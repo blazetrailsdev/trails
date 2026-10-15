@@ -627,6 +627,7 @@ export {
   BacktraceFilter,
   Minitest,
 } from "./testing/assertions.js";
+export { assertErrorReported, assertNoErrorReported } from "./testing/error-reporter-assertions.js";
 export { ConstantLookup } from "./testing/constant-lookup.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { Stream, silenceStream, quietly, capture } from "./testing/stream.js";

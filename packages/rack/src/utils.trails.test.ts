@@ -36,3 +36,11 @@ describe("Utils.setCookieHeader", () => {
     );
   });
 });
+
+describe("Utils.unescapePath", () => {
+  it("decodes every %XX escape and leaves a malformed one as is", () => {
+    expect(Utils.unescapePath("/foo%24bar%2Bbaz%3A")).toBe("/foo$bar+baz:");
+    expect(Utils.unescapePath("/%zz")).toBe("/%zz");
+    expect(Utils.unescapePath("/100%")).toBe("/100%");
+  });
+});

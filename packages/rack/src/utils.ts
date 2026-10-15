@@ -102,7 +102,7 @@ export function escapePath(s: string): string {
 }
 
 export function unescapePath(s: string): string {
-  return decodeURI(s);
+  return URI_PARSER.unescape(s);
 }
 
 export function unescape(s: string): string {

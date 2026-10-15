@@ -4,7 +4,9 @@ import {
   ALLOWED_HOSTS_IN_DEVELOPMENT,
   type HostPermission,
 } from "../middleware/host-authorization.js";
-import { IPAddr } from "@blazetrails/ruby-compat";
+import { IPAddr, StringIO } from "@blazetrails/ruby-compat";
+import { Logger } from "@blazetrails/activesupport";
+import { Base } from "@blazetrails/actionview";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import type { Request } from "../http/request.js";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
@@ -418,7 +420,16 @@ describe("HostAuthorizationTest", () => {
     expect(await bodyToString(body)).toContain("Blocked hosts: .example.com");
   });
 
-  it.skip("checks for requests with #=== to support wider range of host checks", () => {});
+  it("checks for requests with #=== to support wider range of host checks", async () => {
+    const mw = buildApp([(input: string) => input === "www.example.com"]);
+    const [status, , body] = await mw.call({
+      HTTP_HOST: "www.example.com",
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+    });
+    expect(status).toBe(200);
+    expect(await bodyToString(body)).toBe("Success");
+  });
 
   it("mark the host when authorized", async () => {
     const env: RackEnv = { HTTP_HOST: "www.example.com", REQUEST_METHOD: "GET", PATH_INFO: "/" };
@@ -753,5 +764,26 @@ describe("HostAuthorizationTest", () => {
     expect(messages.join("")).toContain("Blocked hosts: www.example.com");
   });
 
-  it.skip("uses ActionView::Base logger when no logger in the env", () => {});
+  it("uses ActionView::Base logger when no logger in the env", async () => {
+    const mw = buildApp(["only.com"]);
+    const output = new StringIO();
+    const logger = new Logger(output);
+
+    const old = Base.logger;
+    Base.logger = logger;
+    let status: number;
+    try {
+      [status] = await mw.call({
+        HTTP_HOST: "www.example.com",
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/",
+      });
+    } finally {
+      Base.logger = old;
+    }
+
+    expect(status).toBe(403);
+    output.rewind();
+    expect(output.read()).toContain("Blocked hosts: www.example.com");
+  });
 });

@@ -1,6 +1,6 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, CONTENT_TYPE, SET_COOKIE } from "@blazetrails/rack";
-import { fetch, merge, rbFSend } from "@blazetrails/ruby-compat";
+import { fetch, merge, rbFSend, toI } from "@blazetrails/ruby-compat";
 import { LOCATION, STRICT_TRANSPORT_SECURITY } from "../constants.js";
 import { Request } from "../http/request.js";
 
@@ -20,7 +20,7 @@ export interface SSLOptions {
 }
 
 export interface HSTSOptions {
-  expires?: number;
+  expires?: number | { toI(): number | bigint };
   subdomains?: boolean;
   preload?: boolean;
 }
@@ -104,7 +104,7 @@ export class SSL {
 
   /** @internal */
   private buildHstsHeader(hsts: Required<HSTSOptions>): string {
-    let value = `max-age=${Math.trunc(hsts.expires)}`;
+    let value = `max-age=${toI(hsts.expires)}`;
     if (hsts.subdomains) value += "; includeSubDomains";
     if (hsts.preload) value += "; preload";
     return value;

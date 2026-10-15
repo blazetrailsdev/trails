@@ -142,6 +142,9 @@ export default defineConfig(
       // index.html.tse is that directory's index.html.erb. TransitionTable#visualizer
       // reads all three off disk (transition_table.rb:128-131).
       "packages/actionpack/src/action-dispatch/journey/visualizer/**",
+      // Byte-for-byte copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
+      "packages/actionpack/src/test-helpers/fixtures/public/**",
+      "packages/actionpack/src/test-helpers/fixtures/公共/**",
       "**/dist-test/**",
       "packages/website/static/**",
       "packages/website/build/**",

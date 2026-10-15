@@ -65,6 +65,11 @@ export class IPAddr {
     return this.beginAddr() <= coerced.beginAddr() && this.endAddr() >= coerced.endAddr();
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:181` */
+  caseEquals(other: unknown): boolean {
+    return this.includes(other);
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:184` */
   toI(): bigint {
     return this._addr!;

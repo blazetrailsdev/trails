@@ -3,6 +3,7 @@ import { SSL, type SSLOptions } from "../middleware/ssl.js";
 import type { Request } from "../http/request.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
+import { years } from "@blazetrails/activesupport";
 
 type App = (env: RackEnv) => Promise<RackResponse>;
 
@@ -194,7 +195,9 @@ describe("StrictTransportSecurityTest", () => {
     await assertHsts("max-age=500; includeSubDomains", { hsts: { expires: 500 } });
   });
 
-  it.skip(":expires supports AS::Duration arguments", () => {});
+  it(":expires supports AS::Duration arguments", async () => {
+    await assertHsts("max-age=31556952; includeSubDomains", { hsts: { expires: years(1) } });
+  });
 
   it("include subdomains", async () => {
     await assertHsts(`${EXPECTED}; includeSubDomains`, { hsts: { subdomains: true } });
@@ -291,7 +294,13 @@ describe("SecureCookiesTest", () => {
     expect(headers.connection).toBe("close");
   });
 
-  it.skip("flag cookies as secure with single cookie in array", () => {});
+  it("flag cookies as secure with single cookie in array", async () => {
+    const [, headers] = await get({ "set-cookie": ["id=1"] });
+    assertCookies(headers["set-cookie"], "id=1; secure");
+  });
 
-  it.skip("flag cookies as secure with multiple cookies in array", () => {});
+  it("flag cookies as secure with multiple cookies in array", async () => {
+    const [, headers] = await get({ "set-cookie": ["id=1", "problem=def"] });
+    assertCookies(headers["set-cookie"], "id=1; secure", "problem=def; secure");
+  });
 });
