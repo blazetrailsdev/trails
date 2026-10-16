@@ -27,6 +27,18 @@ describe("Template::Error#backtrace_locations", () => {
     const e = new TemplateError({} as Template, original);
     expect(e.backtraceLocations()!.map((loc) => loc.toString())).toEqual(["at render (a.js:5:7)"]);
   });
+
+  it("answers the SyntaxErrorProxy's locations for a SyntaxError cause", () => {
+    const original = new SyntaxError("a.tse:3: unexpected end");
+    original.stack = "SyntaxError: a.tse:3: unexpected end\n    at compile (b.js:1:2)";
+    const e = new TemplateError({} as Template, original);
+    expect(e.backtraceLocations()!.map((loc) => loc.toString())).toEqual(
+      ((e.cause as SyntaxErrorProxy).backtraceLocations() as { toString(): string }[]).map((loc) =>
+        loc.toString(),
+      ),
+    );
+    expect(e.backtraceLocations()![0].toString()).toBe("a.tse:3: unexpected end");
+  });
 });
 
 describe("Template::Error#initialize", () => {

@@ -62,11 +62,15 @@ export class Location {
 
 /**
  * `Exception#backtrace_locations` (`vendor/ruby/v3.3.11/error.c:1789`): nil for an
- * exception that was never raised, else one `Location` per frame.
+ * exception that was never raised, else one `Location` per frame. Dispatches
+ * to the receiver's own `backtraceLocations` override, as a Ruby call would.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function excBacktraceLocations(exc: Error): Location[] | null {
+  const override = (exc as Error & { backtraceLocations?: () => Location[] | null })
+    .backtraceLocations;
+  if (typeof override === "function") return override.call(exc);
   const stack = exc.stack;
   if (stack == null) return null;
   return stack
@@ -77,11 +81,14 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
 
 /**
  * `Exception#backtrace` (`vendor/ruby/v3.3.11/error.c:1741` `exc_backtrace`): nil for
- * an exception that was never raised, else one String per frame.
+ * an exception that was never raised, else one String per frame. Dispatches to
+ * the receiver's own `backtrace` override, as a Ruby call would.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function excBacktrace(exc: Error): string[] | null {
+  const override = (exc as Error & { backtrace?: () => string[] | null }).backtrace;
+  if (typeof override === "function") return override.call(exc);
   const locations = excBacktraceLocations(exc);
   if (locations === null) return null;
   return locations.map((location) => location.toString());

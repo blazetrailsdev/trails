@@ -216,19 +216,11 @@ export class TemplateError extends ActionViewError {
     this.template = template;
   }
 
-  /** @inventedArm if — CONVERGEABLE template-error-backtrace-dispatches-to-cause */
-  backtrace(): string[] {
-    const cause: unknown = this.cause;
-    if (cause instanceof SyntaxErrorProxy) return cause.backtrace();
-    return excBacktrace(this.cause) ?? [];
+  backtrace(): string[] | null {
+    return excBacktrace(this.cause);
   }
 
-  /** @inventedArm if — CONVERGEABLE template-error-backtrace-dispatches-to-cause */
   backtraceLocations(): Location[] | null {
-    const cause: unknown = this.cause;
-    if (cause instanceof SyntaxErrorProxy) {
-      return cause.backtraceLocations() as Location[] | null;
-    }
     return excBacktraceLocations(this.cause);
   }
 
@@ -272,7 +264,7 @@ export class TemplateError extends ActionViewError {
       const regexp = new RegExp(`${regexpEscape(File.basename(fileName))}:(\\d+)`);
       const match =
         regexp.exec(this.message) ??
-        this.backtrace()
+        this.backtrace()!
           .map((line) => regexp.exec(line))
           .find((m) => m !== null);
       if (match) this._lineNumber = Number(match[1]);
