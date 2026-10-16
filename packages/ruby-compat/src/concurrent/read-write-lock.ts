@@ -20,9 +20,9 @@ export class ReadWriteLock {
   /** @noRailsEquivalent PERMANENT */
   withReadLock<T>(block: () => T): T | Promise<Awaited<T>> {
     if (this.writer || this.waitingWriters > 0) {
-      return new Promise<void>((resolve) => this.queue.push(resolve)).then(() =>
-        this.withReadLock(block),
-      ) as Promise<Awaited<T>>;
+      return this.acquireReadLock().then(() => this.hold(block, () => this.readers--)) as Promise<
+        Awaited<T>
+      >;
     }
     this.readers++;
     return this.hold(block, () => this.readers--);
@@ -32,11 +32,21 @@ export class ReadWriteLock {
   async withWriteLock<T>(block: () => T): Promise<Awaited<T>> {
     this.waitingWriters++;
     while (this.writer || this.readers > 0) {
-      await new Promise<void>((resolve) => this.queue.push(resolve));
+      await this.wait();
     }
     this.waitingWriters--;
     this.writer = true;
     return await this.hold(block, () => (this.writer = false));
+  }
+
+  private async acquireReadLock(): Promise<void> {
+    while (this.writer || this.waitingWriters > 0) await this.wait();
+    while (this.writer) await this.wait();
+    this.readers++;
+  }
+
+  private wait(): Promise<void> {
+    return new Promise<void>((resolve) => this.queue.push(resolve));
   }
 
   private hold<T>(block: () => T, release: () => void): T | Promise<Awaited<T>> {
