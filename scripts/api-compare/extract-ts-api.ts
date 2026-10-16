@@ -1237,6 +1237,7 @@ export function extractFromProgram(
               line: attr.line,
               file: relPath,
               ...(writer ? { writer: true } : {}),
+              ...(attr.internal === true ? { internal: true } : {}),
             };
             if (at === -1) members.push(method);
             else members[at] = method;
@@ -3343,6 +3344,7 @@ function collectDefineColumnMethodsMembers(
  */
 interface ClassAttributeCall {
   enclosing?: string;
+  internal?: boolean;
   enclosingSeatsModule?: boolean;
   receiver?: string;
   names: string[];
@@ -3404,6 +3406,25 @@ function attrMacro(name: string): { reader: boolean; writer: boolean } | undefin
   }
 }
 
+/**
+ * The `.call` receivers of `attr_internal_*` (`core_ext/module/attr_internal.rb:5-23`),
+ * which define instance methods only: `attrInternal.call(m, "x")` is `x` and `x=`
+ * on `m`, the `moduleEval` carrier of the module it is called inside.
+ */
+function attrInternalMacro(name: string): { reader: boolean; writer: boolean } | undefined {
+  switch (name) {
+    case "attrInternal":
+    case "attrInternalAccessor":
+      return { reader: true, writer: true };
+    case "attrInternalReader":
+      return { reader: true, writer: false };
+    case "attrInternalWriter":
+      return { reader: false, writer: true };
+    default:
+      return undefined;
+  }
+}
+
 function importedName(id: ts.Identifier, sourceFile: ts.SourceFile): string {
   for (const statement of sourceFile.statements) {
     if (!ts.isImportDeclaration(statement)) continue;
@@ -3421,7 +3442,8 @@ function isClassAttributeCallee(expr: ts.Expression): boolean {
     ts.isPropertyAccessExpression(expr) &&
     ts.isIdentifier(expr.expression) &&
     (expr.name.text === "call"
-      ? attributeMacro(expr.expression.text) !== undefined
+      ? attributeMacro(expr.expression.text) !== undefined ||
+        attrInternalMacro(expr.expression.text) !== undefined
       : attrMacro(expr.name.text) !== undefined)
   );
 }
@@ -3431,14 +3453,25 @@ function readClassAttributeCall(
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
   const callee = node.expression as ts.PropertyAccessExpression;
-  const attr = callee.name.text === "call" ? undefined : attrMacro(callee.name.text);
+  const internal =
+    callee.name.text === "call"
+      ? attrInternalMacro(importedName(callee.expression as ts.Identifier, sourceFile))
+      : undefined;
+  const attr = callee.name.text === "call" ? internal : attrMacro(callee.name.text);
   if (attr !== undefined) {
-    const names = node.arguments.filter(ts.isStringLiteralLike).map((arg) => arg.text);
-    if (names.length === 0 || names.length !== node.arguments.length) return null;
+    const args: readonly ts.Expression[] =
+      internal !== undefined ? node.arguments.slice(1) : node.arguments;
+    const names = args.filter(ts.isStringLiteralLike).map((arg) => arg.text);
+    if (names.length === 0 || names.length !== args.length) return null;
     const enclosing = enclosingEntity(node);
+    const recv = internal !== undefined ? node.arguments[0] : callee.expression;
     return {
       ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
-      receiver: importedName(callee.expression as ts.Identifier, sourceFile),
+      ...(internal !== undefined && enclosing?.seatsModule === true
+        ? { enclosingSeatsModule: true }
+        : {}),
+      ...(internal !== undefined && internalStatement(node) ? { internal: true } : {}),
+      ...(ts.isIdentifier(recv) ? { receiver: importedName(recv, sourceFile) } : {}),
       names,
       reader: false,
       writer: false,
@@ -3476,6 +3509,14 @@ function readClassAttributeCall(
   };
 }
 
+/** Whether the statement a macro call sits in carries `@internal`, Ruby's `private` above it. */
+function internalStatement(node: ts.Node): boolean {
+  for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
+    if (ts.isExpressionStatement(cur) && internalJsDocTagApplies(cur)) return true;
+  }
+  return false;
+}
+
 function optionBool(
   options: ts.ObjectLiteralExpression | undefined,
   key: string,
@@ -3493,6 +3534,9 @@ function enclosingEntity(node: ts.Node): { name: string; seatsModule: boolean } 
   for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
     if (ts.isClassDeclaration(cur) && cur.name) return { name: cur.name.text, seatsModule: false };
     if (ts.isVariableDeclaration(cur) && ts.isIdentifier(cur.name)) {
+      if (isExportedModuleConst(cur.getSourceFile(), cur.name.text)) {
+        return { name: cur.name.text, seatsModule: true };
+      }
       const seatsModule =
         cur.initializer !== undefined &&
         ts.isObjectLiteralExpression(cur.initializer) &&
@@ -5594,7 +5638,7 @@ function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined 
   return awaits ? guard.expression : undefined;
 }
 
-function isRescueClassGuard(statement: ts.Statement): boolean {
+function isRescueClassGuard(statement: ts.Statement, bound: string | undefined): boolean {
   if (!ts.isIfStatement(statement) || statement.elseStatement !== undefined) return false;
   const test = statement.expression;
   if (!ts.isPrefixUnaryExpression(test) || test.operator !== ts.SyntaxKind.ExclamationToken) {
@@ -5604,10 +5648,7 @@ function isRescueClassGuard(statement: ts.Statement): boolean {
     ? test.operand.expression
     : test.operand;
   if (!isInstanceOfTest(operand)) return false;
-  const then = ts.isBlock(statement.thenStatement)
-    ? statement.thenStatement.statements
-    : [statement.thenStatement];
-  return then.length === 1 && ts.isThrowStatement(then[0]) && ts.isIdentifier(then[0].expression);
+  return isRethrowOf(statement.thenStatement, bound);
 }
 
 /**
@@ -6402,7 +6443,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
     const chain = statements.find((s) => ts.isIfStatement(s) && isInstanceOfTest(s.expression));
     if (chain === undefined) {
       tokens.push("rescue");
-      const guarded = statements.length > 0 && isRescueClassGuard(statements[0]);
+      const guarded = statements.length > 0 && isRescueClassGuard(statements[0], bound);
       statements.slice(guarded ? 1 : 0).forEach(visit);
       return;
     }

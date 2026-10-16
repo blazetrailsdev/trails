@@ -12,6 +12,9 @@ import {
   rbModName,
   rbModToS,
   rbObjSingletonClass,
+  rbModMethodDefined,
+  rbObjRespondTo,
+  rbFSend,
 } from "./object.js";
 import {
   include,
@@ -1287,6 +1290,81 @@ describe("Module#superMethod", () => {
     record.title = "x";
     expect(record.stored).toBe("x!");
     expect(record.title).toBe("<x!>");
+  });
+
+  it("answers a reader from one included module and a writer from another, in either order", () => {
+    const build = (readerFirst: boolean) => {
+      const Reader = new Module((m) => {
+        m.moduleEval((table) => {
+          Object.defineProperty(table, "x", {
+            configurable: true,
+            get(this: { _x?: unknown }) {
+              return `read:${String(this._x)}`;
+            },
+          });
+        });
+      });
+      const Writer = new Module((m) => m.attrWriter("x"));
+      class Host {}
+      for (const mod of readerFirst ? [Reader, Writer] : [Writer, Reader]) include(Host, mod);
+      return new Host() as { x: unknown };
+    };
+    for (const readerFirst of [true, false]) {
+      const obj = build(readerFirst);
+      obj.x = 123;
+      expect(obj.x).toBe("read:123");
+      expect(Object.hasOwn(obj, "x")).toBe(false);
+    }
+  });
+
+  it("leaves a writer-only module's absent reader out of method_defined? and super", () => {
+    const Writer = new Module((m) => m.attrWriter("x"));
+    expect(Writer.isMethodDefined("x")).toBe(false);
+    class Base {
+      get x(): string {
+        return "base";
+      }
+    }
+    class Host extends Base {}
+    include(Host, Writer);
+    const host = new Host();
+    expect(host.x).toBe("base");
+    expect(Writer.superMethod(host, "x")!()).toBe("base");
+    expect(rbModMethodDefined(Host, "x")).toBe(true);
+    expect(rbObjRespondTo(host, "x")).toBe(true);
+    expect(rbFSend(host, "x")).toBe("base");
+  });
+
+  it("leaves a reader-only module's absent writer out of respond_to? and raises on assignment", () => {
+    const Reader = new Module((m) => {
+      m.moduleEval((table) => {
+        Object.defineProperty(table, "x", { configurable: true, get: () => "r" });
+      });
+    });
+    class Host {}
+    include(Host, Reader);
+    const host = new Host() as { x: unknown };
+    expect(rbObjRespondTo(host, "x=")).toBe(false);
+    expect(rbModMethodDefined(Host, "x=")).toBe(false);
+    expect(() => (host.x = 1)).toThrow(TypeError);
+    expect(host.x).toBe("r");
+  });
+
+  it("defers an absent half past a module included at two levels of one ancestry", () => {
+    const Writer = new Module((m) => m.attrWriter("x"));
+    class Base {
+      get x(): string {
+        return "base";
+      }
+    }
+    class Mid extends Base {}
+    include(Mid, Writer);
+    class Leaf extends Mid {}
+    include(Leaf, Writer);
+    const leaf = new Leaf() as unknown as { x: unknown; _x?: unknown };
+    leaf.x = 5;
+    expect(leaf._x).toBe(5);
+    expect(leaf.x).toBe("base");
   });
 
   it("resumes above a class's singleton link, and the class still constructs", () => {

@@ -50,6 +50,8 @@ import {
   rbCTime,
   rbModAttrReader,
   rbModAttrWriter,
+  isAbsentHalf,
+  defineAccessorHalf,
   rbModName,
   rbModToS,
   UNDEF_METHOD_TABLES,
@@ -234,6 +236,11 @@ export class Module<I extends object = Record<never, never>> {
     const before: Record<PropertyKey, PropertyDescriptor | undefined> =
       Object.getOwnPropertyDescriptors(carrier);
     const result = block(carrier);
+    for (const [key, entry] of Object.entries(Object.getOwnPropertyDescriptors(carrier))) {
+      if (entry.configurable && !("value" in entry) && (!entry.get || !entry.set)) {
+        defineAccessorHalf(carrier, key, {});
+      }
+    }
     const installed = trackedKeys(carrier);
     for (const key of installed) {
       const after = Object.getOwnPropertyDescriptor(carrier, key);
@@ -663,7 +670,7 @@ export class Module<I extends object = Record<never, never>> {
           if (descriptor === undefined) continue;
           if (!("value" in descriptor)) {
             const half = writer ? descriptor.set : descriptor.get;
-            if (half === undefined) continue;
+            if (half === undefined || isAbsentHalf(half)) continue;
             return half.bind(receiver) as (...args: unknown[]) => unknown;
           }
           return !writer && typeof descriptor.value === "function"
@@ -708,7 +715,11 @@ export class Module<I extends object = Record<never, never>> {
    */
   isMethodDefined(name: string): boolean {
     const carrier = carrierOf(this);
-    return Object.prototype.hasOwnProperty.call(carrier, name) && !isUndefEntry(carrier, name);
+    return (
+      Object.prototype.hasOwnProperty.call(carrier, name) &&
+      !isUndefEntry(carrier, name) &&
+      !isAbsentHalf(Object.getOwnPropertyDescriptor(carrier, name)!.get)
+    );
   }
 
   /**

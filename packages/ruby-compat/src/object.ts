@@ -661,11 +661,12 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     o = Object.getPrototypeOf(o) as object | null
   ) {
     const entry = Object.getOwnPropertyDescriptor(o, mid);
-    if (entry) {
+    if (entry && !isAbsentHalf(entry.get)) {
       if (!("value" in entry)) return true;
       return klass ? typeof entry.value === "function" : entry.value !== undefined;
     }
-    if (attr !== undefined && Object.getOwnPropertyDescriptor(o, attr)?.set) return true;
+    const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
+    if (setter !== undefined && !isAbsentHalf(setter)) return true;
     if (
       writer !== undefined &&
       typeof Object.getOwnPropertyDescriptor(o, writer)?.value === "function"
@@ -730,8 +731,9 @@ function checkDefinitionVisibility(
     o = inherit ? (Object.getPrototypeOf(o) as object | null) : null
   ) {
     const me = Object.getOwnPropertyDescriptor(o, mid);
-    if (me) return typeof me.value === "function" || me.get !== undefined;
-    if (attr !== undefined && Object.getOwnPropertyDescriptor(o, attr)?.set) return true;
+    if (me && !isAbsentHalf(me.get)) return typeof me.value === "function" || me.get !== undefined;
+    const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
+    if (setter !== undefined && !isAbsentHalf(setter)) return true;
     if (
       writer !== undefined &&
       typeof Object.getOwnPropertyDescriptor(o, writer)?.value === "function"
@@ -792,34 +794,112 @@ export function rbModDefineMethod(
   return mid;
 }
 
+const ABSENT_HALVES = new WeakSet<object>();
+
 /**
- * `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1863`). A JS accessor is one
- * descriptor, so the half not being defined keeps the nearest entry's; the
- * ivar lives in the `_`-prefixed field ({@link rbDeclareIvar}).
+ * Whether `half` is the getter or setter {@link defineAccessorHalf} seats for
+ * a method the table does not define. Ruby keeps `x` and `x=` as two method
+ * entries (`rb_add_method`, `vendor/ruby/v3.3.11/vm_method.c:1146`), so a table
+ * with only one of them leaves the other to the next table in the ancestry;
+ * every method lookup reads such a half as no entry and keeps walking.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isAbsentHalf(half: unknown): boolean {
+  return typeof half === "function" && ABSENT_HALVES.has(half);
+}
+
+function nextHalf(
+  start: object | null,
+  id: string,
+  write: boolean,
+): PropertyDescriptor | undefined {
+  for (let o = start; o; o = Object.getPrototypeOf(o) as object | null) {
+    const entry = Object.getOwnPropertyDescriptor(o, id);
+    if (entry === undefined) continue;
+    if ("value" in entry) return entry;
+    const half = write ? entry.set : entry.get;
+    if (half !== undefined && !isAbsentHalf(half)) return entry;
+  }
+  return undefined;
+}
+
+function absentHalf(id: string, write: boolean): (this: object, value?: unknown) => unknown {
+  const owner = (recv: object): object | null => {
+    for (let o: object | null = recv; o; o = Object.getPrototypeOf(o) as object | null) {
+      const entry = Object.getOwnPropertyDescriptor(o, id);
+      if ((write ? entry?.set : entry?.get) === half) return o;
+    }
+    return null;
+  };
+  const half = write
+    ? function (this: object, value: unknown): void {
+        const from = owner(this);
+        const entry = nextHalf(from && Object.getPrototypeOf(from), id, true);
+        if (!entry?.set) {
+          throw new globalThis.TypeError(
+            `Cannot set property ${id} of ${String(this)} which has only a getter`,
+          );
+        }
+        entry.set.call(this, value);
+      }
+    : function (this: object): unknown {
+        const from = owner(this);
+        const entry = nextHalf(from && Object.getPrototypeOf(from), id, false);
+        if (entry === undefined) return undefined;
+        return "value" in entry ? entry.value : entry.get!.call(this);
+      };
+  ABSENT_HALVES.add(half);
+  return half;
+}
+
+/**
+ * Seats one half of the accessor `name` on `target`, the JS spelling of adding
+ * the method entry `name` or `name=` to a method table (`rb_add_method`,
+ * `vendor/ruby/v3.3.11/vm_method.c:1146`). A JS accessor is one descriptor, so
+ * the half not given keeps `target`'s own, and where `target` has none it
+ * defers to the next table up the prototype chain, as Ruby's method search
+ * does for an entry the table lacks.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function defineAccessorHalf(
+  target: object,
+  name: string,
+  half: { get?: () => unknown; set?: (value: unknown) => void },
+): void {
+  const existing = Object.getOwnPropertyDescriptor(target, name);
+  Object.defineProperty(target, name, {
+    configurable: true,
+    enumerable: existing?.enumerable ?? false,
+    get: half.get ?? existing?.get ?? absentHalf(name, false),
+    set: half.set ?? existing?.set ?? absentHalf(name, true),
+  });
+}
+
+/**
+ * `rb_attr` (`vendor/ruby/v3.3.11/vm_method.c:1863`). The half not being
+ * defined is left to the next table ({@link defineAccessorHalf}); the ivar
+ * lives in the `_`-prefixed field ({@link rbDeclareIvar}).
  */
 function rbAttr(klass: { prototype: object }, id: string, read: boolean, write: boolean): void {
   const attriv = `_${id}`;
   rbDeclareIvar(klass, `@${id.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}`, attriv);
-  let me: PropertyDescriptor | undefined;
-  for (
-    let o: object | null = klass.prototype;
-    o && !me;
-    o = Object.getPrototypeOf(o) as object | null
-  ) {
-    me = Object.getOwnPropertyDescriptor(o, id);
-  }
-  Object.defineProperty(klass.prototype, id, {
-    configurable: true,
-    get: read
-      ? function (this: Record<string, unknown>) {
-          return this[attriv] ?? null;
+  defineAccessorHalf(klass.prototype, id, {
+    ...(read
+      ? {
+          get(this: Record<string, unknown>) {
+            return this[attriv] ?? null;
+          },
         }
-      : me?.get,
-    set: write
-      ? function (this: Record<string, unknown>, val: unknown) {
-          this[attriv] = val;
+      : {}),
+    ...(write
+      ? {
+          set(this: Record<string, unknown>, val: unknown) {
+            this[attriv] = val;
+          },
         }
-      : me?.set,
+      : {}),
   });
 }
 
@@ -1059,9 +1139,11 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
     if (UNDEF_METHOD_TABLES.has(o) && desc && "value" in desc && desc.value === undefined) break;
-    if (desc && argc === 0) return desc.get ? desc.get.call(recv) : desc.value;
+    if (desc && argc === 0 && !isAbsentHalf(desc.get)) {
+      return desc.get ? desc.get.call(recv) : desc.value;
+    }
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
-    if (setter) return setter.call(recv, args[0]);
+    if (setter && !isAbsentHalf(setter)) return setter.call(recv, args[0]);
     const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
     if (typeof set?.value === "function") return (set.value as AnyFunction).apply(recv, args);
   }

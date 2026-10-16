@@ -610,40 +610,6 @@ class ResourcesTest extends TestCase {
 
 describe("ResourcesTest", () => {
   let tc: ResourcesTest;
-  const withRestfulRouting = (...args: Parameters<ResourcesTest["withRestfulRouting"]>) =>
-    tc.withRestfulRouting(...args);
-  const withSingletonResources = (...args: Parameters<ResourcesTest["withSingletonResources"]>) =>
-    tc.withSingletonResources(...args);
-  const assertNamedRoute = (...args: Parameters<ResourcesTest["assertNamedRoute"]>) =>
-    tc.assertNamedRoute(...args);
-  const assertNotRecognizes = (...args: Parameters<ResourcesTest["assertNotRecognizes"]>) =>
-    tc.assertNotRecognizes(...args);
-  const assertRecognizes = (...args: Parameters<ResourcesTest["assertRecognizes"]>) =>
-    tc.assertRecognizes(...args);
-  const assertResourceAllowedRoutes = (
-    ...args: Parameters<ResourcesTest["assertResourceAllowedRoutes"]>
-  ) => tc.assertResourceAllowedRoutes(...args);
-  const assertRestfulNamedRoutesFor = (
-    ...args: Parameters<ResourcesTest["assertRestfulNamedRoutesFor"]>
-  ) => tc.assertRestfulNamedRoutesFor(...args);
-  const assertRestfulRoutesFor = (...args: Parameters<ResourcesTest["assertRestfulRoutesFor"]>) =>
-    tc.assertRestfulRoutesFor(...args);
-  const assertRouting = (...args: Parameters<ResourcesTest["assertRouting"]>) =>
-    tc.assertRouting(...args);
-  const assertSimplyRestfulFor = (...args: Parameters<ResourcesTest["assertSimplyRestfulFor"]>) =>
-    tc.assertSimplyRestfulFor(...args);
-  const assertSingletonNamedRoutesFor = (
-    ...args: Parameters<ResourcesTest["assertSingletonNamedRoutesFor"]>
-  ) => tc.assertSingletonNamedRoutesFor(...args);
-  const assertSingletonResourceAllowedRoutes = (
-    ...args: Parameters<ResourcesTest["assertSingletonResourceAllowedRoutes"]>
-  ) => tc.assertSingletonResourceAllowedRoutes(...args);
-  const assertSingletonRestfulFor = (
-    ...args: Parameters<ResourcesTest["assertSingletonRestfulFor"]>
-  ) => tc.assertSingletonRestfulFor(...args);
-  const assertSingletonRoutesFor = (
-    ...args: Parameters<ResourcesTest["assertSingletonRoutesFor"]>
-  ) => tc.assertSingletonRoutesFor(...args);
 
   beforeEach(async ({ task }) => {
     tc = new ResourcesTest(task.name);
@@ -651,8 +617,8 @@ describe("ResourcesTest", () => {
     tc.setup();
   });
   it("default restful routes", async () => {
-    await withRestfulRouting("messages", async () => {
-      await assertSimplyRestfulFor("messages");
+    await tc.withRestfulRouting("messages", async () => {
+      await tc.assertSimplyRestfulFor("messages");
     });
   });
 
@@ -661,23 +627,23 @@ describe("ResourcesTest", () => {
     const memberMethods: Options = { rss: "get", atom: "get", upload: "post", fix: "post" };
     const pathNames: Options = { new: "nuevo", rss: "canal", fix: "corrigir" };
 
-    await withRestfulRouting(
+    await tc.withRestfulRouting(
       "messages",
       { collection: collectionMethods, member: memberMethods, pathNames },
       async () => {
-        await assertRestfulRoutesFor(
+        await tc.assertRestfulRoutesFor(
           "messages",
           { collection: collectionMethods, member: memberMethods, pathNames },
           (options) => {
             for (const [action, method] of Object.entries(memberMethods)) {
-              assertRecognizes(
+              tc.assertRecognizes(
                 { ...options, action, id: "1" },
                 { path: `/messages/1/${pathNames[action] ?? action}`, method },
               );
             }
 
             for (const [action, method] of Object.entries(collectionMethods)) {
-              assertRecognizes(
+              tc.assertRecognizes(
                 { ...options, action },
                 { path: `/messages/${pathNames[action] ?? action}`, method },
               );
@@ -685,13 +651,13 @@ describe("ResourcesTest", () => {
           },
         );
 
-        await assertRestfulNamedRoutesFor(
+        await tc.assertRestfulNamedRoutesFor(
           "messages",
           { collection: collectionMethods, member: memberMethods, pathNames },
           undefined,
           () => {
             for (const action of Object.keys(collectionMethods)) {
-              assertNamedRoute(
+              tc.assertNamedRoute(
                 `/messages/${pathNames[action] ?? action}`,
                 `${action}_messages_path`,
                 { action },
@@ -699,7 +665,7 @@ describe("ResourcesTest", () => {
             }
 
             for (const action of Object.keys(memberMethods)) {
-              assertNamedRoute(
+              tc.assertNamedRoute(
                 `/messages/1/${pathNames[action] ?? action}`,
                 `${action}_message_path`,
                 { action, id: "1" },
@@ -712,28 +678,28 @@ describe("ResourcesTest", () => {
   });
 
   it("multiple default restful routes", async () => {
-    await withRestfulRouting("messages", "comments", async () => {
-      await assertSimplyRestfulFor("messages");
-      await assertSimplyRestfulFor("comments");
+    await tc.withRestfulRouting("messages", "comments", async () => {
+      await tc.assertSimplyRestfulFor("messages");
+      await tc.assertSimplyRestfulFor("comments");
     });
   });
 
   it("multiple resources with options", async () => {
     const expectedOptions = { controller: "threads", action: "index" };
 
-    await withRestfulRouting(
+    await tc.withRestfulRouting(
       "messages",
       "comments",
       { controller: expectedOptions.controller },
       () => {
-        assertRecognizes(expectedOptions, { path: "comments" });
-        assertRecognizes(expectedOptions, { path: "messages" });
+        tc.assertRecognizes(expectedOptions, { path: "comments" });
+        tc.assertRecognizes(expectedOptions, { path: "messages" });
       },
     );
   });
 
   it("with custom conditions", async () => {
-    await withRestfulRouting("messages", { conditions: { subdomain: "app" } }, () => {
+    await tc.withRestfulRouting("messages", { conditions: { subdomain: "app" } }, () => {
       expect(
         tc.routes!.recognizePath("/messages", { method: "get", subdomain: "app" } as {
           method: string;
@@ -745,9 +711,9 @@ describe("ResourcesTest", () => {
   it("irregular id with no constraints should raise error", async () => {
     const expectedOptions = { controller: "messages", action: "show", id: "1.1.1" };
 
-    await withRestfulRouting("messages", async () => {
+    await tc.withRestfulRouting("messages", async () => {
       await assertRaises([Assertion], {}, () => {
-        assertRecognizes(expectedOptions, { path: "messages/1.1.1", method: "get" });
+        tc.assertRecognizes(expectedOptions, { path: "messages/1.1.1", method: "get" });
       });
     });
   });
@@ -755,18 +721,18 @@ describe("ResourcesTest", () => {
   it("irregular id with constraints should pass", async () => {
     const expectedOptions = { controller: "messages", action: "show", id: "1.1.1" };
 
-    await withRestfulRouting("messages", { constraints: { id: /[0-9]\.[0-9]\.[0-9]/ } }, () => {
-      assertRecognizes(expectedOptions, { path: "messages/1.1.1", method: "get" });
+    await tc.withRestfulRouting("messages", { constraints: { id: /[0-9]\.[0-9]\.[0-9]/ } }, () => {
+      tc.assertRecognizes(expectedOptions, { path: "messages/1.1.1", method: "get" });
     });
   });
 
   it("with path prefix constraints", async () => {
     const expectedOptions = { controller: "messages", action: "show", thread_id: "1.1.1", id: "1" };
-    await withRestfulRouting(
+    await tc.withRestfulRouting(
       "messages",
       { pathPrefix: "/thread/:thread_id", constraints: { thread_id: /[0-9]\.[0-9]\.[0-9]/ } },
       () => {
-        assertRecognizes(expectedOptions, { path: "thread/1.1.1/messages/1", method: "get" });
+        tc.assertRecognizes(expectedOptions, { path: "thread/1.1.1/messages/1", method: "get" });
       },
     );
   });
@@ -774,18 +740,18 @@ describe("ResourcesTest", () => {
   it("irregular id constraints should get passed to member actions", async () => {
     const expectedOptions = { controller: "messages", action: "custom", id: "1.1.1" };
 
-    await withRestfulRouting(
+    await tc.withRestfulRouting(
       "messages",
       { member: { custom: "get" }, constraints: { id: /[0-9]\.[0-9]\.[0-9]/ } },
       () => {
-        assertRecognizes(expectedOptions, { path: "messages/1.1.1/custom", method: "get" });
+        tc.assertRecognizes(expectedOptions, { path: "messages/1.1.1/custom", method: "get" });
       },
     );
   });
 
   it("with path prefix", async () => {
-    await withRestfulRouting("messages", { pathPrefix: "/thread/:thread_id" }, async () => {
-      await assertSimplyRestfulFor("messages", {
+    await tc.withRestfulRouting("messages", { pathPrefix: "/thread/:thread_id" }, async () => {
+      await tc.assertSimplyRestfulFor("messages", {
         pathPrefix: "thread/5/",
         options: { thread_id: "5" },
       });
@@ -793,16 +759,16 @@ describe("ResourcesTest", () => {
   });
 
   it("multiple with path prefix", async () => {
-    await withRestfulRouting(
+    await tc.withRestfulRouting(
       "messages",
       "comments",
       { pathPrefix: "/thread/:thread_id" },
       async () => {
-        await assertSimplyRestfulFor("messages", {
+        await tc.assertSimplyRestfulFor("messages", {
           pathPrefix: "thread/5/",
           options: { thread_id: "5" },
         });
-        await assertSimplyRestfulFor("comments", {
+        await tc.assertSimplyRestfulFor("comments", {
           pathPrefix: "thread/5/",
           options: { thread_id: "5" },
         });
@@ -811,8 +777,8 @@ describe("ResourcesTest", () => {
   });
 
   it("with name prefix", async () => {
-    await withRestfulRouting("messages", { as: "post_messages" }, async () => {
-      await assertSimplyRestfulFor("messages", { namePrefix: "post_" });
+    await tc.withRestfulRouting("messages", { as: "post_messages" }, async () => {
+      await tc.assertSimplyRestfulFor("messages", { namePrefix: "post_" });
     });
   });
 
@@ -830,15 +796,15 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertRestfulRoutesFor("messages", {}, (options) => {
+      await tc.assertRestfulRoutesFor("messages", {}, (options) => {
         for (const [action, method] of Object.entries(actions)) {
-          assertRecognizes({ ...options, action }, { path: `/messages/${action}`, method });
+          tc.assertRecognizes({ ...options, action }, { path: `/messages/${action}`, method });
         }
       });
 
-      await assertRestfulNamedRoutesFor("messages", null, {}, () => {
+      await tc.assertRestfulNamedRoutesFor("messages", null, {}, () => {
         for (const action of Object.keys(actions)) {
-          assertNamedRoute(`/messages/${action}`, `${action}_messages_path`, { action });
+          tc.assertNamedRoute(`/messages/${action}`, `${action}_messages_path`, { action });
         }
       });
     });
@@ -860,12 +826,12 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertRestfulRoutesFor(
+      await tc.assertRestfulRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         (options) => {
           for (const [action, method] of Object.entries(actions)) {
-            assertRecognizes(
+            tc.assertRecognizes(
               { ...options, action },
               { path: `/threads/1/messages/${action}`, method },
             );
@@ -873,13 +839,13 @@ describe("ResourcesTest", () => {
         },
       );
 
-      await assertRestfulNamedRoutesFor(
+      await tc.assertRestfulNamedRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         undefined,
         () => {
           for (const action of Object.keys(actions)) {
-            assertNamedRoute(`/threads/1/messages/${action}`, `${action}_thread_messages_path`, {
+            tc.assertNamedRoute(`/threads/1/messages/${action}`, `${action}_thread_messages_path`, {
               action,
             });
           }
@@ -901,12 +867,12 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertRestfulRoutesFor(
+      await tc.assertRestfulRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         (options) => {
           for (const [action, method] of Object.entries(actions)) {
-            assertRecognizes(
+            tc.assertRecognizes(
               { ...options, action },
               { path: `/threads/1/messages/${action}`, method },
             );
@@ -914,13 +880,13 @@ describe("ResourcesTest", () => {
         },
       );
 
-      await assertRestfulNamedRoutesFor(
+      await tc.assertRestfulNamedRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         undefined,
         () => {
           for (const action of Object.keys(actions)) {
-            assertNamedRoute(`/threads/1/messages/${action}`, `${action}_thread_messages_path`, {
+            tc.assertNamedRoute(`/threads/1/messages/${action}`, `${action}_thread_messages_path`, {
               action,
             });
           }
@@ -945,12 +911,12 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertRestfulRoutesFor(
+      await tc.assertRestfulRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         (options) => {
           for (const [action, method] of Object.entries(actions)) {
-            assertRecognizes(
+            tc.assertRecognizes(
               { ...options, action, format: "xml" },
               { path: `/threads/1/messages/${action}.xml`, method },
             );
@@ -958,13 +924,13 @@ describe("ResourcesTest", () => {
         },
       );
 
-      await assertRestfulNamedRoutesFor(
+      await tc.assertRestfulNamedRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         undefined,
         () => {
           for (const action of Object.keys(actions)) {
-            assertNamedRoute(
+            tc.assertNamedRoute(
               `/threads/1/messages/${action}.xml`,
               `${action}_thread_messages_path`,
               { action, format: "xml" },
@@ -977,15 +943,15 @@ describe("ResourcesTest", () => {
 
   it("with member action", async () => {
     for (const method of ["patch", "put", "post"]) {
-      await withRestfulRouting("messages", { member: { mark: method } }, async () => {
+      await tc.withRestfulRouting("messages", { member: { mark: method } }, async () => {
         const markOptions = { action: "mark", id: "1" };
         const markPath = "/messages/1/mark";
-        await assertRestfulRoutesFor("messages", {}, (options) => {
-          assertRecognizes({ ...options, ...markOptions }, { path: markPath, method });
+        await tc.assertRestfulRoutesFor("messages", {}, (options) => {
+          tc.assertRecognizes({ ...options, ...markOptions }, { path: markPath, method });
         });
 
-        await assertRestfulNamedRoutesFor("messages", null, {}, () => {
-          assertNamedRoute(markPath, "mark_message_path", markOptions);
+        await tc.assertRestfulNamedRoutesFor("messages", null, {}, () => {
+          tc.assertNamedRoute(markPath, "mark_message_path", markOptions);
         });
       });
     }
@@ -994,34 +960,38 @@ describe("ResourcesTest", () => {
   it("with member action and requirement", async () => {
     const expectedOptions = { controller: "messages", action: "mark", id: "1.1.1" };
 
-    await withRestfulRouting(
+    await tc.withRestfulRouting(
       "messages",
       { constraints: { id: /[0-9]\.[0-9]\.[0-9]/ }, member: { mark: "get" } },
       () => {
-        assertRecognizes(expectedOptions, { path: "messages/1.1.1/mark", method: "get" });
+        tc.assertRecognizes(expectedOptions, { path: "messages/1.1.1/mark", method: "get" });
       },
     );
   });
 
   it("member when override paths for default restful actions with", async () => {
     for (const method of ["patch", "put", "post"]) {
-      await withRestfulRouting(
+      await tc.withRestfulRouting(
         "messages",
         { member: { mark: method }, pathNames: { new: "nuevo" } },
         async () => {
           const markOptions = { action: "mark", id: "1", controller: "messages" };
           const markPath = "/messages/1/mark";
 
-          await assertRestfulRoutesFor("messages", { pathNames: { new: "nuevo" } }, (options) => {
-            assertRecognizes({ ...options, ...markOptions }, { path: markPath, method });
-          });
+          await tc.assertRestfulRoutesFor(
+            "messages",
+            { pathNames: { new: "nuevo" } },
+            (options) => {
+              tc.assertRecognizes({ ...options, ...markOptions }, { path: markPath, method });
+            },
+          );
 
-          await assertRestfulNamedRoutesFor(
+          await tc.assertRestfulNamedRoutesFor(
             "messages",
             { pathNames: { new: "nuevo" } },
             undefined,
             () => {
-              assertNamedRoute(markPath, "mark_message_path", markOptions);
+              tc.assertNamedRoute(markPath, "mark_message_path", markOptions);
             },
           );
         },
@@ -1044,12 +1014,12 @@ describe("ResourcesTest", () => {
         for (const action of ["mark", "unmark"]) {
           const actionOptions = { action, id: "1" };
           const actionPath = `/messages/1/${action}`;
-          await assertRestfulRoutesFor("messages", {}, (options) => {
-            assertRecognizes({ ...options, ...actionOptions }, { path: actionPath, method });
+          await tc.assertRestfulRoutesFor("messages", {}, (options) => {
+            tc.assertRecognizes({ ...options, ...actionOptions }, { path: actionPath, method });
           });
 
-          await assertRestfulNamedRoutesFor("messages", null, {}, () => {
-            assertNamedRoute(actionPath, `${action}_message_path`, actionOptions);
+          await tc.assertRestfulNamedRoutesFor("messages", null, {}, () => {
+            tc.assertNamedRoute(actionPath, `${action}_message_path`, actionOptions);
           });
         }
       });
@@ -1070,12 +1040,15 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertRestfulRoutesFor("messages", {}, (options) => {
+      await tc.assertRestfulRoutesFor("messages", {}, (options) => {
         for (const method of ["get", "post"]) {
-          assertRecognizes({ ...options, action: "search" }, { path: "/messages/search", method });
+          tc.assertRecognizes(
+            { ...options, action: "search" },
+            { path: "/messages/search", method },
+          );
         }
         for (const method of ["get", "post"]) {
-          assertRecognizes(
+          tc.assertRecognizes(
             { ...options, action: "toggle", id: "1" },
             { path: "/messages/1/toggle", method },
           );
@@ -1094,12 +1067,15 @@ describe("ResourcesTest", () => {
 
       const previewOptions = { action: "preview" };
       const previewPath = "/messages/new/preview";
-      await assertRestfulRoutesFor("messages", {}, (options) => {
-        assertRecognizes({ ...options, ...previewOptions }, { path: previewPath, method: "post" });
+      await tc.assertRestfulRoutesFor("messages", {}, (options) => {
+        tc.assertRecognizes(
+          { ...options, ...previewOptions },
+          { path: previewPath, method: "post" },
+        );
       });
 
-      await assertRestfulNamedRoutesFor("messages", null, {}, () => {
-        assertNamedRoute(previewPath, "preview_new_message_path", previewOptions);
+      await tc.assertRestfulNamedRoutesFor("messages", null, {}, () => {
+        tc.assertNamedRoute(previewPath, "preview_new_message_path", previewOptions);
       });
     });
   });
@@ -1116,23 +1092,23 @@ describe("ResourcesTest", () => {
 
       const previewOptions = { action: "preview", thread_id: "1" };
       const previewPath = "/threads/1/messages/new/preview";
-      await assertRestfulRoutesFor(
+      await tc.assertRestfulRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         (options) => {
-          assertRecognizes(
+          tc.assertRecognizes(
             { ...options, ...previewOptions },
             { path: previewPath, method: "post" },
           );
         },
       );
 
-      await assertRestfulNamedRoutesFor(
+      await tc.assertRestfulNamedRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         undefined,
         () => {
-          assertNamedRoute(previewPath, "preview_new_thread_message_path", previewOptions);
+          tc.assertNamedRoute(previewPath, "preview_new_thread_message_path", previewOptions);
         },
       );
     });
@@ -1150,32 +1126,35 @@ describe("ResourcesTest", () => {
 
       const previewOptions = { action: "preview", thread_id: "1", format: "xml" };
       const previewPath = "/threads/1/messages/new/preview.xml";
-      await assertRestfulRoutesFor(
+      await tc.assertRestfulRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         (options) => {
-          assertRecognizes(
+          tc.assertRecognizes(
             { ...options, ...previewOptions },
             { path: previewPath, method: "post" },
           );
         },
       );
 
-      await assertRestfulNamedRoutesFor(
+      await tc.assertRestfulNamedRoutesFor(
         "messages",
         { pathPrefix: "threads/1/", namePrefix: "thread_", options: { thread_id: "1" } },
         undefined,
         () => {
-          assertNamedRoute(previewPath, "preview_new_thread_message_path", previewOptions);
+          tc.assertNamedRoute(previewPath, "preview_new_thread_message_path", previewOptions);
         },
       );
     });
   });
 
   it("override new method", async () => {
-    await withRestfulRouting("messages", async () => {
-      await assertRestfulRoutesFor("messages", {}, async (options) => {
-        assertRecognizes({ ...options, action: "new" }, { path: "/messages/new", method: "get" });
+    await tc.withRestfulRouting("messages", async () => {
+      await tc.assertRestfulRoutesFor("messages", {}, async (options) => {
+        tc.assertRecognizes(
+          { ...options, action: "new" },
+          { path: "/messages/new", method: "get" },
+        );
         await assertRaises([RoutingError], {}, () => {
           tc.routes!.recognizePath("/messages/new", { method: "post" });
         });
@@ -1189,9 +1168,15 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertRestfulRoutesFor("messages", {}, (options) => {
-        assertRecognizes({ ...options, action: "new" }, { path: "/messages/new", method: "post" });
-        assertRecognizes({ ...options, action: "new" }, { path: "/messages/new", method: "get" });
+      await tc.assertRestfulRoutesFor("messages", {}, (options) => {
+        tc.assertRecognizes(
+          { ...options, action: "new" },
+          { path: "/messages/new", method: "post" },
+        );
+        tc.assertRecognizes(
+          { ...options, action: "new" },
+          { path: "/messages/new", method: "get" },
+        );
       });
     });
   });
@@ -1206,13 +1191,13 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("threads");
-      await assertSimplyRestfulFor("messages", {
+      await tc.assertSimplyRestfulFor("threads");
+      await tc.assertSimplyRestfulFor("messages", {
         namePrefix: "thread_",
         pathPrefix: "threads/1/",
         options: { thread_id: "1" },
       });
-      await assertSimplyRestfulFor("comments", {
+      await tc.assertSimplyRestfulFor("comments", {
         namePrefix: "thread_message_",
         pathPrefix: "threads/1/messages/2/",
         options: { thread_id: "1", message_id: "2" },
@@ -1230,14 +1215,14 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("threads", { shallow: true });
-      await assertSimplyRestfulFor("messages", {
+      await tc.assertSimplyRestfulFor("threads", { shallow: true });
+      await tc.assertSimplyRestfulFor("messages", {
         namePrefix: "thread_",
         pathPrefix: "threads/1/",
         shallow: true,
         options: { thread_id: "1" },
       });
-      await assertSimplyRestfulFor("comments", {
+      await tc.assertSimplyRestfulFor("comments", {
         namePrefix: "message_",
         pathPrefix: "messages/2/",
         shallow: true,
@@ -1258,14 +1243,14 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("products", {
+      await tc.assertSimplyRestfulFor("products", {
         controller: "backoffice/admin/products",
         namespace: "backoffice/admin/",
         namePrefix: "backoffice_admin_",
         pathPrefix: "backoffice/admin/",
         shallow: true,
       });
-      await assertSimplyRestfulFor("images", {
+      await tc.assertSimplyRestfulFor("images", {
         controller: "backoffice/admin/images",
         namespace: "backoffice/admin/",
         namePrefix: "backoffice_admin_product_",
@@ -1277,7 +1262,7 @@ describe("ResourcesTest", () => {
   });
 
   it("restful routes dont generate duplicates", async () => {
-    await withRestfulRouting("messages", () => {
+    await tc.withRestfulRouting("messages", () => {
       const routes = tc.routes!.routes.routes;
       for (const route of routes) {
         for (const r of routes) {
@@ -1293,15 +1278,15 @@ describe("ResourcesTest", () => {
   });
 
   it("should create singleton resource routes", async () => {
-    await withSingletonResources("account", async () => {
-      await assertSingletonRestfulFor("account");
+    await tc.withSingletonResources("account", async () => {
+      await tc.assertSingletonRestfulFor("account");
     });
   });
 
   it("should create multiple singleton resource routes", async () => {
-    await withSingletonResources("account", "product", async () => {
-      await assertSingletonRestfulFor("account");
-      await assertSingletonRestfulFor("product");
+    await tc.withSingletonResources("account", "product", async () => {
+      await tc.assertSingletonRestfulFor("account");
+      await tc.assertSingletonRestfulFor("product");
     });
   });
 
@@ -1313,8 +1298,8 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSingletonRestfulFor("admin", { controller: "admin" });
-      await assertSingletonRestfulFor("account", { namePrefix: "admin_", pathPrefix: "admin/" });
+      await tc.assertSingletonRestfulFor("admin", { controller: "admin" });
+      await tc.assertSingletonRestfulFor("account", { namePrefix: "admin_", pathPrefix: "admin/" });
     });
   });
 
@@ -1329,12 +1314,12 @@ describe("ResourcesTest", () => {
 
         const resetOptions = { action: "reset" };
         const resetPath = "/account/reset";
-        await assertSingletonRoutesFor("account", {}, (options) => {
-          assertRecognizes({ ...options, ...resetOptions }, { path: resetPath, method });
+        await tc.assertSingletonRoutesFor("account", {}, (options) => {
+          tc.assertRecognizes({ ...options, ...resetOptions }, { path: resetPath, method });
         });
 
-        await assertSingletonNamedRoutesFor("account", {}, () => {
-          assertNamedRoute(resetPath, "reset_account_path", resetOptions);
+        await tc.assertSingletonNamedRoutesFor("account", {}, () => {
+          tc.assertNamedRoute(resetPath, "reset_account_path", resetOptions);
         });
       });
     }
@@ -1353,12 +1338,12 @@ describe("ResourcesTest", () => {
         for (const action of ["reset", "disable"]) {
           const actionOptions = { action };
           const actionPath = `/account/${action}`;
-          await assertSingletonRoutesFor("account", {}, (options) => {
-            assertRecognizes({ ...options, ...actionOptions }, { path: actionPath, method });
+          await tc.assertSingletonRoutesFor("account", {}, (options) => {
+            tc.assertRecognizes({ ...options, ...actionOptions }, { path: actionPath, method });
           });
 
-          await assertSingletonNamedRoutesFor("account", {}, () => {
-            assertNamedRoute(actionPath, `${action}_account_path`, actionOptions);
+          await tc.assertSingletonNamedRoutesFor("account", {}, () => {
+            tc.assertNamedRoute(actionPath, `${action}_account_path`, actionOptions);
           });
         }
       });
@@ -1373,8 +1358,8 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSingletonRestfulFor("account");
-      await assertSimplyRestfulFor("messages", {
+      await tc.assertSingletonRestfulFor("account");
+      await tc.assertSimplyRestfulFor("messages", {
         namePrefix: "account_",
         pathPrefix: "account/",
       });
@@ -1391,8 +1376,11 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSingletonRestfulFor("account", { pathPrefix: "7/", options: { site_id: "7" } });
-      await assertSimplyRestfulFor("messages", {
+      await tc.assertSingletonRestfulFor("account", {
+        pathPrefix: "7/",
+        options: { site_id: "7" },
+      });
+      await tc.assertSimplyRestfulFor("messages", {
         namePrefix: "account_",
         pathPrefix: "7/account/",
         options: { site_id: "7" },
@@ -1408,8 +1396,8 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("threads");
-      await assertSingletonRestfulFor("admin", {
+      await tc.assertSimplyRestfulFor("threads");
+      await tc.assertSingletonRestfulFor("admin", {
         controller: "admin",
         namePrefix: "thread_",
         pathPrefix: "threads/5/",
@@ -1420,23 +1408,26 @@ describe("ResourcesTest", () => {
 
   it("should not allow delete or patch or put on collection path", async () => {
     const controllerName = "messages";
-    await withRestfulRouting(controllerName, async () => {
+    await tc.withRestfulRouting(controllerName, async () => {
       const options = { controller: controllerName };
       const collectionPath = `/${controllerName}`;
 
       await assertRaises([Assertion], {}, () => {
-        assertRecognizes(
+        tc.assertRecognizes(
           { ...options, action: "update" },
           { path: collectionPath, method: "patch" },
         );
       });
 
       await assertRaises([Assertion], {}, () => {
-        assertRecognizes({ ...options, action: "update" }, { path: collectionPath, method: "put" });
+        tc.assertRecognizes(
+          { ...options, action: "update" },
+          { path: collectionPath, method: "put" },
+        );
       });
 
       await assertRaises([Assertion], {}, () => {
-        assertRecognizes(
+        tc.assertRecognizes(
           { ...options, action: "destroy" },
           { path: collectionPath, method: "delete" },
         );
@@ -1455,14 +1446,14 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("messages", {
+      await tc.assertSimplyRestfulFor("messages", {
         namePrefix: "thread_",
         pathPrefix: "threads/1/",
         options: { thread_id: "1" },
       });
-      assertNamedRoute("/threads/1/messages/search", "search_thread_messages_path", {});
-      assertNamedRoute("/threads/1/messages/new", "new_thread_message_path", {});
-      assertNamedRoute("/threads/1/messages/new/preview", "preview_new_thread_message_path", {});
+      tc.assertNamedRoute("/threads/1/messages/search", "search_thread_messages_path", {});
+      tc.assertNamedRoute("/threads/1/messages/new", "new_thread_message_path", {});
+      tc.assertNamedRoute("/threads/1/messages/new/preview", "preview_new_thread_message_path", {});
     });
   });
 
@@ -1476,10 +1467,10 @@ describe("ResourcesTest", () => {
           });
         });
       });
-      await assertSingletonRestfulFor("account", { namePrefix: "admin_", pathPrefix: "admin/" });
-      assertNamedRoute("/admin/account/login", "login_admin_account_path", {});
-      assertNamedRoute("/admin/account/new", "new_admin_account_path", {});
-      assertNamedRoute("/admin/account/new/preview", "preview_new_admin_account_path", {});
+      await tc.assertSingletonRestfulFor("account", { namePrefix: "admin_", pathPrefix: "admin/" });
+      tc.assertNamedRoute("/admin/account/login", "login_admin_account_path", {});
+      tc.assertNamedRoute("/admin/account/new", "new_admin_account_path", {});
+      tc.assertNamedRoute("/admin/account/new/preview", "preview_new_admin_account_path", {});
     });
   });
 
@@ -1491,7 +1482,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("products", {
+      await tc.assertSimplyRestfulFor("products", {
         controller: "backoffice/products",
         namePrefix: "backoffice_",
         pathPrefix: "backoffice/",
@@ -1509,7 +1500,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("products", {
+      await tc.assertSimplyRestfulFor("products", {
         controller: "backoffice/admin/products",
         namePrefix: "backoffice_admin_",
         pathPrefix: "backoffice/admin/",
@@ -1525,7 +1516,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("products", { controller: "backoffice/products" });
+      await tc.assertSimplyRestfulFor("products", { controller: "backoffice/products" });
     });
   });
 
@@ -1539,7 +1530,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("images", {
+      await tc.assertSimplyRestfulFor("images", {
         controller: "backoffice/images",
         namePrefix: "backoffice_product_",
         pathPrefix: "backoffice/products/1/",
@@ -1560,7 +1551,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("images", {
+      await tc.assertSimplyRestfulFor("images", {
         controller: "backoffice/admin/images",
         namePrefix: "backoffice_admin_product_",
         pathPrefix: "backoffice/admin/products/1/",
@@ -1570,19 +1561,19 @@ describe("ResourcesTest", () => {
   });
 
   it("with path segment", async () => {
-    await withRestfulRouting("messages", async () => {
-      await assertSimplyRestfulFor("messages");
-      assertRecognizes({ controller: "messages", action: "index" }, "/messages");
-      assertRecognizes({ controller: "messages", action: "index" }, "/messages/");
+    await tc.withRestfulRouting("messages", async () => {
+      await tc.assertSimplyRestfulFor("messages");
+      tc.assertRecognizes({ controller: "messages", action: "index" }, "/messages");
+      tc.assertRecognizes({ controller: "messages", action: "index" }, "/messages/");
     });
 
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         this.resources("messages", { path: "reviews" });
       });
-      await assertSimplyRestfulFor("messages", { as: "reviews" });
-      assertRecognizes({ controller: "messages", action: "index" }, "/reviews");
-      assertRecognizes({ controller: "messages", action: "index" }, "/reviews/");
+      await tc.assertSimplyRestfulFor("messages", { as: "reviews" });
+      tc.assertRecognizes({ controller: "messages", action: "index" }, "/reviews");
+      tc.assertRecognizes({ controller: "messages", action: "index" }, "/reviews/");
     });
   });
 
@@ -1597,14 +1588,14 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSimplyRestfulFor("product_reviews", {
+      await tc.assertSimplyRestfulFor("product_reviews", {
         controller: "messages",
         as: "reviews",
         namePrefix: "product_",
         pathPrefix: "products/1/",
         options: { product_id: "1" },
       });
-      await assertSimplyRestfulFor("tutor_reviews", {
+      await tc.assertSimplyRestfulFor("tutor_reviews", {
         controller: "comments",
         as: "reviews",
         namePrefix: "tutor_",
@@ -1626,7 +1617,7 @@ describe("ResourcesTest", () => {
           },
         );
       });
-      assertRecognizes(expectedOptions, { path: "thread/1.1.1/comments/1", method: "get" });
+      tc.assertRecognizes(expectedOptions, { path: "thread/1.1.1/comments/1", method: "get" });
     });
   });
 
@@ -1636,7 +1627,7 @@ describe("ResourcesTest", () => {
         this.resources("products", { only: "show" });
       });
 
-      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
+      await tc.assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
         "index",
         "new",
         "create",
@@ -1644,7 +1635,7 @@ describe("ResourcesTest", () => {
         "update",
         "destroy",
       ]);
-      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "show", [
+      await tc.assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "show", [
         "index",
         "new",
         "create",
@@ -1661,7 +1652,7 @@ describe("ResourcesTest", () => {
         this.resources("products", { only: "show" });
       });
 
-      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
+      await tc.assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
         "index",
         "new",
         "create",
@@ -1669,7 +1660,7 @@ describe("ResourcesTest", () => {
         "update",
         "destroy",
       ]);
-      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "show", [
+      await tc.assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "show", [
         "index",
         "new",
         "create",
@@ -1686,7 +1677,7 @@ describe("ResourcesTest", () => {
         this.resource("account", { only: "show" });
       });
 
-      await assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
         "index",
         "new",
         "create",
@@ -1694,7 +1685,7 @@ describe("ResourcesTest", () => {
         "update",
         "destroy",
       ]);
-      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "show", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "show", [
         "index",
         "new",
         "create",
@@ -1711,7 +1702,7 @@ describe("ResourcesTest", () => {
         this.resource("account", { only: "show" });
       });
 
-      await assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
         "index",
         "new",
         "create",
@@ -1719,7 +1710,7 @@ describe("ResourcesTest", () => {
         "update",
         "destroy",
       ]);
-      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "show", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "show", [
         "index",
         "new",
         "create",
@@ -1736,14 +1727,14 @@ describe("ResourcesTest", () => {
         this.resources("products", { except: "destroy" });
       });
 
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "products",
         {},
         { id: "1" },
         ["index", "new", "create", "show", "edit", "update"],
         "destroy",
       );
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "products",
         { format: "xml" },
         { id: "1" },
@@ -1759,13 +1750,13 @@ describe("ResourcesTest", () => {
         this.resource("account", { except: "destroy" });
       });
 
-      await assertSingletonResourceAllowedRoutes(
+      await tc.assertSingletonResourceAllowedRoutes(
         "accounts",
         {},
         ["new", "create", "show", "edit", "update"],
         "destroy",
       );
-      await assertSingletonResourceAllowedRoutes(
+      await tc.assertSingletonResourceAllowedRoutes(
         "accounts",
         { format: "xml" },
         ["new", "create", "show", "edit", "update"],
@@ -1780,7 +1771,7 @@ describe("ResourcesTest", () => {
         this.resources("products", { only: ["show", "destroy"], except: "destroy" });
       });
 
-      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
+      await tc.assertResourceAllowedRoutes("products", {}, { id: "1" }, "show", [
         "index",
         "new",
         "create",
@@ -1788,7 +1779,7 @@ describe("ResourcesTest", () => {
         "update",
         "destroy",
       ]);
-      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "show", [
+      await tc.assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "show", [
         "index",
         "new",
         "create",
@@ -1805,14 +1796,14 @@ describe("ResourcesTest", () => {
         this.resource("account", { only: ["show", "destroy"], except: "destroy" });
       });
 
-      await assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", {}, "show", [
         "new",
         "create",
         "edit",
         "update",
         "destroy",
       ]);
-      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "show", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "show", [
         "new",
         "create",
         "edit",
@@ -1828,7 +1819,7 @@ describe("ResourcesTest", () => {
         this.resources("products", { only: "create" });
       });
 
-      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "create", [
+      await tc.assertResourceAllowedRoutes("products", {}, { id: "1" }, "create", [
         "index",
         "new",
         "show",
@@ -1836,7 +1827,7 @@ describe("ResourcesTest", () => {
         "update",
         "destroy",
       ]);
-      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "create", [
+      await tc.assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "create", [
         "index",
         "new",
         "show",
@@ -1855,7 +1846,7 @@ describe("ResourcesTest", () => {
         this.resources("products", { only: "update" });
       });
 
-      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "update", [
+      await tc.assertResourceAllowedRoutes("products", {}, { id: "1" }, "update", [
         "index",
         "new",
         "create",
@@ -1863,7 +1854,7 @@ describe("ResourcesTest", () => {
         "edit",
         "destroy",
       ]);
-      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "update", [
+      await tc.assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "update", [
         "index",
         "new",
         "create",
@@ -1882,7 +1873,7 @@ describe("ResourcesTest", () => {
         this.resources("products", { only: "destroy" });
       });
 
-      await assertResourceAllowedRoutes("products", {}, { id: "1" }, "destroy", [
+      await tc.assertResourceAllowedRoutes("products", {}, { id: "1" }, "destroy", [
         "index",
         "new",
         "create",
@@ -1890,7 +1881,7 @@ describe("ResourcesTest", () => {
         "edit",
         "update",
       ]);
-      await assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "destroy", [
+      await tc.assertResourceAllowedRoutes("products", { format: "xml" }, { id: "1" }, "destroy", [
         "index",
         "new",
         "create",
@@ -1909,14 +1900,14 @@ describe("ResourcesTest", () => {
         this.resource("account", { only: "create" });
       });
 
-      await assertSingletonResourceAllowedRoutes("accounts", {}, "create", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", {}, "create", [
         "new",
         "show",
         "edit",
         "update",
         "destroy",
       ]);
-      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "create", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "create", [
         "new",
         "show",
         "edit",
@@ -1934,14 +1925,14 @@ describe("ResourcesTest", () => {
         this.resource("account", { only: "update" });
       });
 
-      await assertSingletonResourceAllowedRoutes("accounts", {}, "update", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", {}, "update", [
         "new",
         "create",
         "show",
         "edit",
         "destroy",
       ]);
-      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "update", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "update", [
         "new",
         "create",
         "show",
@@ -1959,14 +1950,14 @@ describe("ResourcesTest", () => {
         this.resource("account", { only: "destroy" });
       });
 
-      await assertSingletonResourceAllowedRoutes("accounts", {}, "destroy", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", {}, "destroy", [
         "new",
         "create",
         "show",
         "edit",
         "update",
       ]);
-      await assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "destroy", [
+      await tc.assertSingletonResourceAllowedRoutes("accounts", { format: "xml" }, "destroy", [
         "new",
         "create",
         "show",
@@ -1986,14 +1977,14 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "products",
         {},
         { id: "1" },
         [],
         ["index", "new", "create", "show", "edit", "update", "destroy"],
       );
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "products",
         { format: "xml" },
         { id: "1" },
@@ -2001,11 +1992,11 @@ describe("ResourcesTest", () => {
         ["index", "new", "create", "show", "edit", "update", "destroy"],
       );
 
-      assertRecognizes(
+      tc.assertRecognizes(
         { controller: "products", action: "sale" },
         { path: "products/sale", method: "get" },
       );
-      assertRecognizes(
+      tc.assertRecognizes(
         { controller: "products", action: "sale", format: "xml" },
         { path: "products/sale.xml", method: "get" },
       );
@@ -2020,14 +2011,14 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "products",
         {},
         { id: "1" },
         [],
         ["index", "new", "create", "show", "edit", "update", "destroy"],
       );
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "products",
         { format: "xml" },
         { id: "1" },
@@ -2035,11 +2026,11 @@ describe("ResourcesTest", () => {
         ["index", "new", "create", "show", "edit", "update", "destroy"],
       );
 
-      assertRecognizes(
+      tc.assertRecognizes(
         { controller: "products", action: "preview", id: "1" },
         { path: "products/1/preview", method: "get" },
       );
-      assertRecognizes(
+      tc.assertRecognizes(
         { controller: "products", action: "preview", id: "1", format: "xml" },
         { path: "products/1/preview.xml", method: "get" },
       );
@@ -2056,24 +2047,24 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertSingletonResourceAllowedRoutes(
+      await tc.assertSingletonResourceAllowedRoutes(
         "accounts",
         {},
         [],
         ["new", "create", "show", "edit", "update", "destroy"],
       );
-      await assertSingletonResourceAllowedRoutes(
+      await tc.assertSingletonResourceAllowedRoutes(
         "accounts",
         { format: "xml" },
         [],
         ["new", "create", "show", "edit", "update", "destroy"],
       );
 
-      assertRecognizes(
+      tc.assertRecognizes(
         { controller: "accounts", action: "signup" },
         { path: "account/signup", method: "get" },
       );
-      assertRecognizes(
+      tc.assertRecognizes(
         { controller: "accounts", action: "signup", format: "xml" },
         { path: "account/signup.xml", method: "get" },
       );
@@ -2090,7 +2081,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1" },
         { id: "2" },
@@ -2098,7 +2089,7 @@ describe("ResourcesTest", () => {
         ["index", "new", "create", "edit", "update", "destroy"],
         "products/1/images",
       );
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1", format: "xml" },
         { id: "2" },
@@ -2107,11 +2098,11 @@ describe("ResourcesTest", () => {
         "products/1/images",
       );
 
-      assertRecognizes(
+      tc.assertRecognizes(
         { controller: "images", action: "thumbnail", product_id: "1", id: "2" },
         { path: "products/1/images/2/thumbnail", method: "get" },
       );
-      assertRecognizes(
+      tc.assertRecognizes(
         { controller: "images", action: "thumbnail", product_id: "1", id: "2", format: "jpg" },
         { path: "products/1/images/2/thumbnail.jpg", method: "get" },
       );
@@ -2126,7 +2117,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1" },
         { id: "2" },
@@ -2134,7 +2125,7 @@ describe("ResourcesTest", () => {
         "destroy",
         "products/1/images",
       );
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1", format: "xml" },
         { id: "2" },
@@ -2153,7 +2144,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1" },
         { id: "2" },
@@ -2161,7 +2152,7 @@ describe("ResourcesTest", () => {
         [],
         "products/1/images",
       );
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1", format: "xml" },
         { id: "2" },
@@ -2180,7 +2171,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1" },
         { id: "2" },
@@ -2188,7 +2179,7 @@ describe("ResourcesTest", () => {
         ["index", "new", "create", "show", "edit", "update"],
         "products/1/images",
       );
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1", format: "xml" },
         { id: "2" },
@@ -2207,7 +2198,7 @@ describe("ResourcesTest", () => {
         });
       });
 
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1" },
         { id: "2" },
@@ -2215,7 +2206,7 @@ describe("ResourcesTest", () => {
         [],
         "products/1/images",
       );
-      await assertResourceAllowedRoutes(
+      await tc.assertResourceAllowedRoutes(
         "images",
         { product_id: "1", format: "xml" },
         { id: "2" },
@@ -2232,7 +2223,7 @@ describe("ResourcesTest", () => {
         this.resource("product");
       });
 
-      assertRouting("/product", { controller: "products", action: "show" });
+      tc.assertRouting("/product", { controller: "products", action: "show" });
       expect(set.recognizePath("/product", { method: "get" })).toBeTruthy();
     });
   });
@@ -2243,7 +2234,7 @@ describe("ResourcesTest", () => {
         this.match("/products", { to: "products#show", via: ":all" });
       });
 
-      assertRouting(
+      tc.assertRouting(
         { method: "all", path: "/products" },
         { controller: "products", action: "show" },
       );
@@ -2257,7 +2248,7 @@ describe("ResourcesTest", () => {
       });
 
       await assertRaises([Assertion], {}, () => {
-        assertRouting(
+        tc.assertRouting(
           { method: "all", path: "/products" },
           { controller: "products", action: "show" },
         );
@@ -2266,8 +2257,8 @@ describe("ResourcesTest", () => {
   });
 
   it("singleton resource name is not singularized", async () => {
-    await withSingletonResources("products", async () => {
-      await assertSingletonRestfulFor("products");
+    await tc.withSingletonResources("products", async () => {
+      await tc.assertSingletonRestfulFor("products");
     });
   });
 
