@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { DebugExceptions } from "../middleware/debug-exceptions.js";
-import { BacktraceCleaner, Logger } from "@blazetrails/activesupport";
+import { BacktraceCleaner, htmlEscape, Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { rbInspect, StringIO } from "@blazetrails/ruby-compat";
 import { MimeType } from "../http/mime-type.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
@@ -12,6 +12,7 @@ import {
 } from "../../action-controller/metal/exceptions.js";
 import { ParameterMissing } from "../../action-controller/metal/strong-parameters.js";
 import { InvalidType } from "../http/mime-negotiation.js";
+import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [
   200,
@@ -519,17 +520,45 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("show the controller name in the diagnostics template when controller name is present", async () => {
-    const mw = new DebugExceptions(errorApp);
-    const [, , body] = await mw.call(makeEnv({ "action_dispatch.controller": "UsersController" }));
-    const html = await bodyToString(body);
-    expect(html).toContain("UsersController");
+    const mw = new DebugExceptions(boomer);
+    const [status, , body] = await mw.call(
+      makeEnv({
+        PATH_INFO: "/runtime_error",
+        "action_dispatch.request.parameters": {
+          action: "show",
+          id: "unknown",
+          controller: "featured_tile",
+        },
+      }),
+    );
+    expect(status).toBe(500);
+    expect(await bodyToString(body)).toMatch(/Error\n\s+in FeaturedTileController/);
   });
 
   it("show formatted params", async () => {
-    const mw = new DebugExceptions(errorApp);
-    const [, , body] = await mw.call(makeEnv({ PATH_INFO: "/users/1" }));
-    const html = await bodyToString(body);
-    expect(html).toContain("/users/1");
+    const mw = new DebugExceptions(boomer);
+
+    const params = {
+      id: "unknown",
+      someparam: {
+        foo: "bar",
+        abc: "goo",
+      },
+    };
+
+    const [status, , body] = await mw.call(
+      makeEnv({
+        PATH_INFO: "/runtime_error",
+        "action_dispatch.request.parameters": {
+          action: "show",
+          controller: "featured_tile",
+          ...params,
+        },
+      }),
+    );
+    expect(status).toBe(500);
+
+    expect(await bodyToString(body)).toContain(htmlEscape(rbInspect(params)));
   });
 
   it("raise an exception on cascade pass", async () => {
@@ -563,9 +592,11 @@ describe("DebugExceptionsTest", () => {
     expect(closed).toBe(true);
   });
 
-  // BLOCKED: debug-view-rescue-templates-are-never-shipped
-  it.skip("displays routes in a table when a RoutingError occurs", async () => {
-    const [, , body] = await new DebugExceptions(boomer).call(makeEnv({ PATH_INFO: "/pass" }));
+  it("displays routes in a table when a RoutingError occurs", async () => {
+    const RoutesApp = { routes: () => SharedTestRoutes };
+    const [, , body] = await new DebugExceptions(boomer, RoutesApp).call(
+      makeEnv({ PATH_INFO: "/pass" }),
+    );
     const routingTable = (await bodyToString(body)).match(/route_table[\s\S]*<.table>/)![0];
     expect(routingTable).toMatch("/:controller(/:action)(.:format)");
     expect(routingTable).toMatch(":controller#:action");
@@ -573,12 +604,11 @@ describe("DebugExceptionsTest", () => {
   });
 
   it("displays request and response info when a RoutingError occurs", async () => {
-    const mw = new DebugExceptions(routingErrorApp);
-    const [status, , body] = await mw.call(makeEnv({ PATH_INFO: "/missing" }));
-    expect(status).toBe(404);
+    const mw = new DebugExceptions(boomer);
+    const [, , body] = await mw.call(makeEnv({ PATH_INFO: "/pass" }));
     const html = await bodyToString(body);
-    expect(html).toContain("No route matches");
-    expect(html).toContain("/missing");
+    expect(html).toMatch(/<h2[^>]*>Request<\/h2>/);
+    expect(html).toMatch(/<h2[^>]*>Response<\/h2>/);
   });
 
   it("named URLs missing keys raise 500 level error", async () => {
@@ -607,13 +637,6 @@ describe("DebugExceptionsTest", () => {
     expect(json.traces).toBeTruthy();
     expect(json.traces["Application Trace"]).toBeDefined();
     expect(json.traces["Framework Trace"]).toBeDefined();
-  });
-
-  it("html error includes request method", async () => {
-    const mw = new DebugExceptions(errorApp);
-    const [, , body] = await mw.call(makeEnv({ REQUEST_METHOD: "POST" }));
-    const html = await bodyToString(body);
-    expect(html).toContain("POST");
   });
 
   it("xml error includes exception name", async () => {

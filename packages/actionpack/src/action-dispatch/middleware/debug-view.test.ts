@@ -6,7 +6,7 @@ describe("DebugView", () => {
   it("RESCUES_TEMPLATE_PATHS resolves alongside the source file", () => {
     expect(DebugView.RESCUES_TEMPLATE_PATHS).toHaveLength(1);
     expect(DebugView.RESCUES_TEMPLATE_PATHS[0]).toMatch(/templates$/);
-    expect(DebugView.RESCUES_TEMPLATE_PATHS[0]).toMatch(/^(file:|https?:)/);
+    expect(DebugView.RESCUES_TEMPLATE_PATHS[0]).toMatch(/^\//);
   });
 
   describe("debugParams", () => {
@@ -53,7 +53,7 @@ describe("DebugView", () => {
   });
 
   it("protectAgainstForgery returns false", () => {
-    expect(new DebugView({}).protectAgainstForgery()).toBe(false);
+    expect(new DebugView({}).isProtectAgainstForgery()).toBe(false);
   });
 
   describe("paramsValid", () => {
@@ -65,12 +65,12 @@ describe("DebugView", () => {
           },
         },
       });
-      expect(view.paramsValid()).toBe(false);
+      expect(view.isParamsValid()).toBe(false);
     });
 
     it("returns true when parameters are accessible", () => {
       const view = new DebugView({ request: { parameters: { id: 1 } } });
-      expect(view.paramsValid()).toBe(true);
+      expect(view.isParamsValid()).toEqual({ id: 1 });
     });
   });
 });

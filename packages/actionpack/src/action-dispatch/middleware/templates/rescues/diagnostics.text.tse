@@ -1,0 +1,9 @@
+<%= this.exceptionWrapper.exceptionClassName %><%
+  if (isParamsValid() && this.request.parameters["controller"]) {
+%> in <%= ActiveSupport.Inflector.camelize(this.request.parameters["controller"]) %>Controller<% if (this.request.parameters["action"]) { %>#<%= this.request.parameters["action"] %><% } %>
+<% } %>
+
+<%= this.exceptionWrapper.message %>
+<%= render({ template: "rescues/_source" }) %>
+<%= render({ template: "rescues/_trace" }) %>
+<%= render({ template: "rescues/_request_and_response" }) %>

@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && cp -R src/action-dispatch/journey/visualizer dist/action-dispatch/journey/"
+    "build": "tsc && cp -R src/action-dispatch/journey/visualizer dist/action-dispatch/journey/ && cp -R src/action-dispatch/middleware/templates dist/action-dispatch/middleware/"
   },
   "files": [
     "dist"

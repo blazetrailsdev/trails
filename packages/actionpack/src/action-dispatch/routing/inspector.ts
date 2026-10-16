@@ -1,4 +1,4 @@
-import { underscore } from "@blazetrails/activesupport";
+import { underscore, type SafeBuffer } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   except,
@@ -10,6 +10,7 @@ import {
 import type { Endpoint } from "./endpoint.js";
 import type { Route } from "../journey/route.js";
 import { RouteSet } from "./route-set.js";
+import { Routing } from "../../namespaces.js";
 
 export interface CollectedRoute {
   name: string;
@@ -110,12 +111,15 @@ export class RoutesInspector {
     this.engines = {};
   }
 
-  format(formatter: RoutesFormatter = new Sheet(), filter: RoutesFilter = {}): string {
+  format<F extends Omit<RoutesFormatter, "result"> & { result(): unknown } = Sheet>(
+    formatter: F = new Sheet() as RoutesFormatter as F,
+    filter: RoutesFilter = {},
+  ): ReturnType<F["result"]> {
     this.engines = {};
     const routes = this.collectRoutes(this.filterRoutes(this.normalizeFilter(filter)));
     if (routes.length === 0) {
       formatter.noRoutes(this.collectRoutes(this.routes), filter);
-      return formatter.result();
+      return formatter.result() as ReturnType<F["result"]>;
     }
     formatter.header(routes);
     formatter.section(routes);
@@ -123,7 +127,7 @@ export class RoutesInspector {
       formatter.sectionTitle(`Routes for ${name}`);
       formatter.section(engineRoutes);
     }
-    return formatter.result();
+    return formatter.result() as ReturnType<F["result"]>;
   }
 
   /** @internal */
@@ -315,3 +319,51 @@ export class Unused extends Sheet {
 }
 
 export const ConsoleFormatter = { Base, Sheet, Expanded, Unused };
+
+/** @internal */
+interface HtmlTableFormatterView {
+  render(options: object, locals?: object, block?: () => unknown): unknown;
+  raw(stringish: unknown): SafeBuffer;
+}
+
+export class HtmlTableFormatter {
+  private view: HtmlTableFormatterView;
+  private buffer: unknown[];
+
+  constructor(view: HtmlTableFormatterView) {
+    this.view = view;
+    this.buffer = [];
+  }
+
+  sectionTitle(title: string): void {
+    this.buffer.push(`<tr><th colspan="5">${title}</th></tr>`);
+  }
+
+  section(routes: CollectedRoute[]): void {
+    this.buffer.push(this.view.render({ partial: "routes/route", collection: routes }));
+  }
+
+  header(_routes: CollectedRoute[]): void {}
+
+  noRoutes(..._args: unknown[]): void {
+    this.buffer.push(`<p>You don't have any routes defined!</p>
+<ul>
+  <li>Please add some routes in <tt>config/routes.rb</tt>.</li>
+  <li>
+    For more information about routes, please see the Rails guide
+    <a href="https://guides.rubyonrails.org/routing.html">Rails Routing from the Outside In</a>.
+  </li>
+</ul>
+`);
+  }
+
+  result(): SafeBuffer {
+    return this.view.raw(
+      this.view.render({ layout: "routes/table" }, {}, () => {
+        return this.view.raw(this.buffer.join("\n"));
+      }),
+    );
+  }
+}
+
+Routing.HtmlTableFormatter = HtmlTableFormatter;

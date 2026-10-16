@@ -1,0 +1,35 @@
+<header>
+  <h1>
+    <%= this.exceptionWrapper.exceptionClassName %>
+    <% if (isParamsValid() && this.request.parameters["controller"]) { %>
+      in <%= ActiveSupport.Inflector.camelize(this.request.parameters["controller"]) %>Controller<% if (this.request.parameters["action"]) { %>#<%= this.request.parameters["action"] %><% } %>
+    <% } %>
+  </h1>
+</header>
+
+<main role="main" id="container">
+  <%= render("rescues/message_and_suggestions", { exception: this.exception, exceptionWrapper: this.exceptionWrapper }) %>
+  <%= render("rescues/actions", { exception: this.exception, request: this.request, exceptionWrapper: this.exceptionWrapper }) %>
+
+  <%= render("rescues/source", { sourceExtracts: this.sourceExtracts, showSourceIdx: this.showSourceIdx, errorIndex: 0 }) %>
+  <%= render("rescues/trace", { traces: this.traces, traceToShow: this.traceToShow, errorIndex: 0 }) %>
+
+  <% if (this.exceptionWrapper.hasCause()) { %>
+    <h2>Exception Causes</h2>
+  <% } %>
+
+  <% for (const [i, wrapper] of this.exceptionWrapper.wrappedCauses.entries()) { const index = i + 1; %>
+    <div class="details">
+      <a class="summary" href="#" onclick="return toggle(<%= wrapper.exceptionId() %>)">
+        <%= wrapper.exceptionClassName %>: <%= h(wrapper.message) %>
+      </a>
+    </div>
+
+    <div id="<%= wrapper.exceptionId() %>" class="hidden">
+      <%= render("rescues/source", { sourceExtracts: wrapper.sourceExtracts, showSourceIdx: wrapper.sourceToShowId(), errorIndex: index }) %>
+      <%= render("rescues/trace", { traces: wrapper.traces, traceToShow: wrapper.traceToShow(), errorIndex: index }) %>
+    </div>
+  <% } %>
+
+  <%= render({ template: "rescues/_request_and_response" }) %>
+</main>

@@ -1,0 +1,24 @@
+<header role="banner">
+  <h1>
+    <%= this.exception.constructor.name %>
+    <% if (this.request.parameters["controller"]) { %>
+      in <%= ActiveSupport.Inflector.camelize(this.request.parameters["controller"]) %>Controller<% if (this.request.parameters["action"]) { %>#<%= this.request.parameters["action"] %><% } %>
+    <% } %>
+  </h1>
+</header>
+
+<main role="main" id="container">
+  <h2>
+    <%= h(this.exception.message) %>
+    <% if (TopLevel.ActiveStorage != null && new RegExp(`${TopLevel.ActiveStorage.Blob.tableName}|${TopLevel.ActiveStorage.Attachment.tableName}`).test(this.exception.message)) { %>
+      <br />To resolve this issue run: bin/rails active_storage:install
+    <% } %>
+    <% if (TopLevel.ActionMailbox != null && new RegExp(`${TopLevel.ActionMailbox.InboundEmail.tableName}`).test(this.exception.message)) { %>
+      <br />To resolve this issue run: bin/rails action_mailbox:install
+    <% } %>
+  </h2>
+
+  <%= render("rescues/source", { sourceExtracts: this.sourceExtracts, showSourceIdx: this.showSourceIdx }) %>
+  <%= render("rescues/trace", { traces: this.traces, traceToShow: this.traceToShow }) %>
+  <%= render({ template: "rescues/_request_and_response" }) %>
+</main>

@@ -1,0 +1,20 @@
+<header role="banner">
+  <h1>
+    <%= this.exceptionWrapper.exceptionName %> in
+    <%= this.request.parameters["controller"] ? ActiveSupport.Inflector.camelize(this.request.parameters["controller"]) : null %>#<%= this.request.parameters["action"] %>
+  </h1>
+</header>
+
+<main role="main" id="container">
+  <p>
+    Showing <i><%= this.exceptionWrapper.fileName() %></i> where line <b>#<%= this.exceptionWrapper.lineNumber() %></b> raised:
+  </p>
+  <pre><code><%= h(this.exceptionWrapper.message) %></code></pre>
+
+  <%= render("rescues/source", { sourceExtracts: this.sourceExtracts, showSourceIdx: this.showSourceIdx }) %>
+
+  <p><%= this.exceptionWrapper.subTemplateMessage() %></p>
+
+  <%= render("rescues/trace", { traces: this.traces, traceToShow: this.traceToShow }) %>
+  <%= render({ template: "rescues/_request_and_response" }) %>
+</main>

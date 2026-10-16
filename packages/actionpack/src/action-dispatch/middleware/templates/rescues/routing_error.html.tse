@@ -1,0 +1,33 @@
+<%# @missingRailsCall inspect — CONVERGEABLE debug-view-debug-params-uses-pp-and-templates-reach-inspect -%>
+<header role="banner">
+  <h1>Routing Error</h1>
+</header>
+<main role="main" id="container">
+  <h2><%= h(this.exceptionWrapper.message) %></h2>
+  <% if (this.exceptionWrapper.failures().length > 0) { %>
+    <p>
+      <h2>Failure reasons:</h2>
+      <ol>
+      <% for (const [route, reason] of this.exceptionWrapper.failures()) { %>
+        <li><code><%= String(route).replaceAll('\\', '') %></code> failed because <%= reason.toLowerCase() %></li>
+      <% } %>
+      </ol>
+    </p>
+  <% } %>
+
+  <%= render("rescues/trace", { traces: this.traces, traceToShow: this.traceToShow }) %>
+
+  <% if (this.routesInspector) { %>
+    <h2>
+      Routes
+    </h2>
+
+    <p>
+      Routes match in priority from top to bottom
+    </p>
+
+    <%= this.routesInspector.format(new ActionDispatch.Routing.HtmlTableFormatter(this)) %>
+  <% } %>
+
+  <%= render({ template: "rescues/_request_and_response" }) %>
+</main>
