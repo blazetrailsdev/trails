@@ -634,6 +634,45 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(calls["Foo#script"]).toEqual(["nil?", "send"]);
   });
 
+  // permissions_policy.rb:84,122 and content_security_policy.rb:149 each define
+  // their own DIRECTIVES; a bare read resolves lexically, never to the first
+  // file's constant.
+  it("resolves a bare constant through the reading scope and its enclosing namespaces", () => {
+    const calls = rubyCalls({
+      "a.rb": `
+        module Http
+          class Csp
+            DIRECTIVES = { base_uri: "base-uri" }
+          end
+          class Other
+            FORMATS = { script: :capitalize }
+          end
+        end
+      `,
+      "b.rb": `
+        module Http
+          class Policy
+            DIRECTIVES = { camera: "camera" }
+            DIRECTIVES.each { |name, d| define_method(name) { d.to_s } }
+          end
+
+          FORMATS = { language: :downcase }
+          class Csp
+            class Inner
+              FORMATS.each { |name, f| define_method(name) { f.to_s } }
+            end
+          end
+        end
+      `,
+    });
+    expect(Object.keys(calls).filter((k) => k.startsWith("Http::Policy#"))).toEqual([
+      "Http::Policy#camera",
+    ]);
+    expect(Object.keys(calls).filter((k) => k.startsWith("Http::Csp::Inner#"))).toEqual([
+      "Http::Csp::Inner#language",
+    ]);
+  });
+
   it("reads a named capture bound by `=~` as a local, not a call", () => {
     const fixtures = {
       "foo.rb": `
@@ -3334,6 +3373,26 @@ describe("Ruby extractor attr_reader flag", { timeout: RUBY_SUBPROCESS_TIMEOUT_M
       fs.rmSync(dir, { recursive: true, force: true });
     }
   }
+
+  // abstract_controller/base.rb:40, metal.rb:170, layouts.rb:359.
+  it("records the reader and writer each attr_internal macro defines", () => {
+    const m = attrMethods(`
+      class Metal
+        attr_internal :view_runtime
+        attr_internal_reader :response
+        attr_internal_writer(:action_has_layout)
+        attr_internal_accessor :formats
+      end
+    `);
+    expect(m["Metal"].map((x) => x.name)).toEqual([
+      "view_runtime",
+      "view_runtime=",
+      "response",
+      "action_has_layout=",
+      "formats",
+      "formats=",
+    ]);
+  });
 
   // The flag is what tells compare.ts's checkCallArgs that `if foreign_key`
   // (schema_definitions.rb:241) is a FIELD read in the port, so it must not be

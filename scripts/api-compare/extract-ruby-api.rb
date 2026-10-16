@@ -1037,6 +1037,15 @@ class ApiExtractor
       process_attr(args, :writer, force_class: on_singleton)
     when "attr_accessor"
       process_attr(args, :accessor, force_class: on_singleton)
+    # ActiveSupport's attr_internal family
+    # (activesupport/lib/active_support/core_ext/module/attr_internal.rb:5-20)
+    # defines the same public reader/writer, over an `@_name` ivar.
+    when "attr_internal_reader"
+      process_attr(args, :reader, force_class: on_singleton)
+    when "attr_internal_writer"
+      process_attr(args, :writer, force_class: on_singleton)
+    when "attr_internal", "attr_internal_accessor"
+      process_attr(args, :accessor, force_class: on_singleton)
     when "alias_method"
       process_alias_method(args)
     when "define_method"
@@ -1120,7 +1129,8 @@ class ApiExtractor
         else
           apply_visibility_to_named(names, cmd_name.to_sym)
         end
-      when "attr_reader", "attr_writer", "attr_accessor"
+      when "attr_reader", "attr_writer", "attr_accessor", "attr_internal", "attr_internal_reader",
+           "attr_internal_writer", "attr_internal_accessor"
         process_attr_from_arg_paren(node[2], cmd_name)
       when "include"
         process_include_from_arg_paren(node[2])
@@ -1379,9 +1389,9 @@ class ApiExtractor
 
   def process_attr_from_arg_paren(args, cmd_name)
     kind = case cmd_name
-    when "attr_reader" then :reader
-    when "attr_writer" then :writer
-    when "attr_accessor" then :accessor
+    when "attr_reader", "attr_internal_reader" then :reader
+    when "attr_writer", "attr_internal_writer" then :writer
+    when "attr_accessor", "attr_internal", "attr_internal_accessor" then :accessor
     end
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
@@ -2732,7 +2742,8 @@ class ApiExtractor
   # lookup: the container is anchored to the top level (`fqn == container`, or
   # the empty top level for `::CONST`) and the relative `end_with?` suffix match
   # is skipped, honouring Ruby's rule that `::Foo::KEYS` binds to top-level
-  # `Foo`, never a nested `X::Foo`.
+  # `Foo`, never a nested `X::Foo`. A bare `CONST` resolves lexically first and
+  # falls back to the first stored match only when no enclosing scope holds it.
   def resolve_const_members(name, store)
     return nil unless name
     absolute = name.start_with?("::")
@@ -2740,8 +2751,18 @@ class ApiExtractor
     parts = name.split("::")
     const = parts.last
     container = parts[0...-1].join("::")
-    own = store.dig(current_fqn, const)
-    return own if own && !absolute && container.empty?
+    if !absolute && container.empty?
+      # Ruby's lexical lookup: the reading scope, then each enclosing namespace.
+      # `PermissionsPolicy`'s `DIRECTIVES.each` reads its own `DIRECTIVES`, never
+      # `ContentSecurityPolicy::DIRECTIVES`, whichever file was scanned first.
+      scope = current_fqn.to_s.split("::")
+      loop do
+        found = store.dig(scope.join("::"), const)
+        return found if found
+        break if scope.empty?
+        scope.pop
+      end
+    end
     store.each do |fqn, consts|
       next unless consts.key?(const)
       if absolute

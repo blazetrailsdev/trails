@@ -321,6 +321,17 @@ export function rejectsSiblingClassCandidate(
 }
 
 /**
+ * The compared packages whose TS test files `pkg`'s TS population also holds:
+ * a test there may be the port of one of their Rails files.
+ */
+export function sharingPackages(pkg: string, ts: TestManifest): string[] {
+  const own = new Set((ts.packages[pkg]?.files ?? []).map((f) => f.file));
+  return Object.entries(ts.packages)
+    .filter(([p, info]) => p !== pkg && info.files.some((f) => own.has(f.file)))
+    .map(([p]) => p);
+}
+
+/**
  * Where a Ruby case missing from its convention file lives instead, or
  * `undefined` when it is simply missing. A test in another TS file is never
  * credited `matched` — it can only score `misplaced`, and only when it is
@@ -815,11 +826,17 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
 
     const fileResults: ConventionFileResult[] = [];
 
-    // Ruby-side: which test paths/names appear in multiple Ruby files?
+    // Ruby-side: which test paths/names appear in multiple Ruby files? A
+    // package whose TS population reaches another package's test files
+    // (actioncontroller reads actiondispatch's) counts that package's Rails
+    // files too, or a name both share reads as a move into the other package.
     const rubyPathToFileCount = new Map<string, number>();
     const rubyDescToFileCount = new Map<string, number>();
-    for (const file of pkgInfo.files) {
-      if (isTestFileUnported(file.file, pkg)) continue;
+    const countedFiles = [pkg, ...sharingPackages(pkg, ts)].flatMap((p) =>
+      (ruby.packages[p]?.files ?? []).map((file) => ({ p, file })),
+    );
+    for (const { p, file } of countedFiles) {
+      if (isTestFileUnported(file.file, p)) continue;
       const seenPaths = new Set<string>();
       const seenDescs = new Set<string>();
       for (const tc of file.testCases) {

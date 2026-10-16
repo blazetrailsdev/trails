@@ -13,6 +13,7 @@ import {
   matchesInterpolatedPath,
   PKG_SRC_DIRS,
   misplacedLocation,
+  sharingPackages,
   normalize,
   parseMinExtra,
   rejectsSiblingClassCandidate,
@@ -351,6 +352,29 @@ describe("misplacedLocation", () => {
 
   it("reports a case found nowhere as missing", () => {
     expect(misplacedLocation([], [], false, false)).toBeUndefined();
+  });
+});
+
+describe("sharingPackages", () => {
+  it("counts actiondispatch's Rails names when actioncontroller reads its TS files", () => {
+    const file = (f: string) => ({ file: f, testCases: [] });
+    const dispatch = file("packages/actionpack/src/action-dispatch/uploaded-file.test.ts");
+    const ts = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        actiondispatch: { files: [dispatch] },
+        actioncontroller: {
+          files: [file("packages/actionpack/src/action-controller/test-case.test.ts"), dispatch],
+        },
+        abstractcontroller: {
+          files: [file("packages/actionpack/src/abstract-controller/callbacks.test.ts")],
+        },
+      },
+    } as unknown as Parameters<typeof sharingPackages>[1];
+    expect(sharingPackages("actioncontroller", ts)).toEqual(["actiondispatch"]);
+    expect(sharingPackages("actiondispatch", ts)).toEqual(["actioncontroller"]);
+    expect(sharingPackages("abstractcontroller", ts)).toEqual([]);
   });
 });
 
