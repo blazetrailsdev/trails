@@ -103,7 +103,6 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
 
 export const cattrReader = mattrReader;
 
-/** @inventedArm if — CONVERGEABLE accessor-half-shadows-ancestor-on-module-carrier */
 export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void {
   const target = this;
   const options = extractOptionsBang(syms) as MattrOptions;
