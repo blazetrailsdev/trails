@@ -862,7 +862,6 @@ describe("Time#hash", () => {
   });
 });
 
-// `time_mdump` / `time_mload` (`vendor/ruby/v3.3.11/time.c:5272`, `:5448`) under `Marshal`'s `TYPE_USERDEF`
 describe("Time through Marshal", () => {
   it("loads ruby -e 'Marshal.dump(Time.utc(2004,1,2,3,4,5.5r))' and round-trips a local time", async () => {
     const { Marshal } = await import("@blazetrails/ruby-compat");

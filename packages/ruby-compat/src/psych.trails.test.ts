@@ -34,7 +34,6 @@ describe("Psych with Date, DateTime and Time unseated", () => {
     expect(Psych.dump(new Seq())).toBe("---\n- 1\n- a\n");
   });
 
-  // `YAMLTree#emit_coder` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:510-530`)
   it("emits a coder's scalar, object, style and implicit arms, as ruby -ryaml does", () => {
     class S {
       encodeWith(coder: PsychModule.Coder): void {
