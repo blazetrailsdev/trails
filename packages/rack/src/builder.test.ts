@@ -53,7 +53,7 @@ it("supports use when mapping", async () => {
       this.app = app;
     }
     async call(env: any) {
-      const [s, h, b] = await rbFSend(this.app, "call", env);
+      const [s, h, b] = (await rbFSend(this.app, "call", env)) as any;
       return [s, { ...h, "x-middleware": "yes" }, b];
     }
   }
@@ -106,7 +106,7 @@ it("chains apps by default", async () => {
       this.val = val;
     }
     async call(env: any) {
-      const [s, h, b] = await rbFSend(this.app, "call", env);
+      const [s, h, b] = (await rbFSend(this.app, "call", env)) as any;
       h[this.key] = this.val;
       return [s, h, b];
     }
@@ -137,7 +137,7 @@ it("supports blocks on use", async () => {
       this.app = app;
     }
     async call(env: any) {
-      const [s, h, b] = await rbFSend(this.app, "call", env);
+      const [s, h, b] = (await rbFSend(this.app, "call", env)) as any;
       h["x-block"] = "used";
       return [s, h, b];
     }
@@ -218,7 +218,7 @@ it("allows use after run", async () => {
       this.app = app;
     }
     async call(env: any) {
-      const [s, h, b] = await rbFSend(this.app, "call", env);
+      const [s, h, b] = (await rbFSend(this.app, "call", env)) as any;
       h["x-added"] = "yes";
       return [s, h, b];
     }

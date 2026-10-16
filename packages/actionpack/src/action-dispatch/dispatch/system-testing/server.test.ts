@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { ViteDevServer } from "vite";
-import { Server, vite } from "./server.js";
+import { Server, vite } from "../../system-testing/server.js";
 
 describe("ServerTest", () => {
   let oldVitestServer: ViteDevServer | undefined;
