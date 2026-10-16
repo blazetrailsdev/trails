@@ -971,7 +971,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm vitest run packages/actionpack
+      - run: pnpm vitest run packages/actionpack --project "!system"
 
   # RFC 0166 system tests: the `system` Vitest project, against real browsers.
   # webkit and webdriverio are not installed by default.
@@ -989,7 +989,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm exec playwright-core install --with-deps chromium firefox
-      - run: pnpm vitest run --project system --passWithNoTests
+      - run: pnpm vitest run --project system
 
   trailties-tests:
     name: Trailties Tests

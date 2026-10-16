@@ -31,8 +31,8 @@ describe("RackRequestTest", () => {
 
   it("can check if something has been set", () => {
     const req = makeReq();
-    expect(req.has("REQUEST_METHOD")).toBe(true);
-    expect(req.has("NONEXISTENT")).toBe(false);
+    expect(req.hasHeader("REQUEST_METHOD")).toBe(true);
+    expect(req.hasHeader("NONEXISTENT")).toBe(false);
   });
 
   it("can get a key from the env", () => {
@@ -118,7 +118,7 @@ describe("RackRequestTest", () => {
     req.set("HTTP_X_DEL", "val");
     const deleted = req.deleteHeader("HTTP_X_DEL");
     expect(deleted).toBe("val");
-    expect(req.has("HTTP_X_DEL")).toBe(false);
+    expect(req.hasHeader("HTTP_X_DEL")).toBe(false);
   });
 
   it("wrap the rack variables", () => {

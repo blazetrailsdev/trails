@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/session/abstract-store.ts",
+    "rubyName": "initialize_sid",
+    "call": "delete",
+    "reason": "abstract_store.rb:36-37 @default_options.delete(:sidbits) is ported as the native delete statement (CLAUDE.md hash table, removed value unused), which the call gate does not credit on a defaultOptions member receiver. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+  }
+]

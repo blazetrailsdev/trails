@@ -2,9 +2,40 @@
   {
     "package": "rack",
     "tsFile": "request.ts",
+    "rubyName": "GET",
+    "call": "warn",
+    "kind": "args",
+    "rubyArgs": [
+      "str:query string used for GET parsing different from current query string. Starting in Rack 3.2, Rack will used the cached GET value instead of parsing the current query string.",
+      "kwargs{uplevel=num:1}"
+    ],
+    "reason": "request.rb GET calls warn(msg, uplevel: 1); ruby-compat's Kernel#warn takes no uplevel: kwarg and the port calls console.warn(msg). Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+  },
+  {
+    "package": "rack",
+    "tsFile": "request.ts",
+    "rubyName": "POST",
+    "call": "warn",
+    "kind": "args",
+    "rubyArgs": [
+      "str:input stream used for POST parsing different from current input stream. Starting in Rack 3.2, Rack will used the cached POST value instead of parsing the current input stream.",
+      "kwargs{uplevel=num:1}"
+    ],
+    "reason": "request.rb POST calls warn(msg, uplevel: 1); ruby-compat's Kernel#warn takes no uplevel: kwarg and the port calls console.warn(msg). Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+  },
+  {
+    "package": "rack",
+    "tsFile": "request.ts",
     "rubyName": "delete_param",
     "call": "delete",
     "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."
+  },
+  {
+    "package": "rack",
+    "tsFile": "request.ts",
+    "rubyName": "forwarded_for",
+    "call": "order:map,splitAuthority",
+    "reason": "Order-only: request.rb:358 uses in-place map! with the block; the extractor orders Ruby's split_authority before map!, the port's .map(cb) records map first. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
   },
   {
     "package": "rack",

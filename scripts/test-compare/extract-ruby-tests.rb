@@ -2684,6 +2684,28 @@ end
 
 # ---- Main ----
 
+ACTIONDISPATCH_FOREIGN_DIRS = %w[controller abstract].freeze
+
+def select_package_test_files!(pkg_name, pkg_dir, test_files)
+  # For activerecord, exclude arel test files (handled by arel package)
+  if pkg_name == "activerecord"
+    arel_dir = File.join(pkg_dir, "arel")
+    test_files.reject! { |f| f.start_with?(arel_dir) }
+  end
+
+  if pkg_name == "actiondispatch"
+    dirs = ACTIONDISPATCH_FOREIGN_DIRS.map { |d| File.join(pkg_dir, d, "") }
+    test_files.reject! { |f| dirs.any? { |d| f.start_with?(d) } }
+  end
+
+  # For actioncontroller, include only controller/ files
+  if pkg_name == "actioncontroller"
+    controller_dir = File.join(pkg_dir, "controller")
+    test_files.select! { |f| f.start_with?(controller_dir) }
+  end
+  test_files
+end
+
 def run
   package_dirs = package_test_dirs
 
@@ -2717,23 +2739,7 @@ def run
                  Dir.glob(File.join(pkg_dir, "**", "*_spec.rb"))
     test_files.uniq!
 
-    # For activerecord, exclude arel test files (handled by arel package)
-    if pkg_name == "activerecord"
-      arel_dir = File.join(pkg_dir, "arel")
-      test_files.reject! { |f| f.start_with?(arel_dir) }
-    end
-
-    # For actiondispatch, exclude controller/ files (handled by actioncontroller)
-    if pkg_name == "actiondispatch"
-      controller_dir = File.join(pkg_dir, "controller")
-      test_files.reject! { |f| f.start_with?(controller_dir) }
-    end
-
-    # For actioncontroller, include only controller/ files
-    if pkg_name == "actioncontroller"
-      controller_dir = File.join(pkg_dir, "controller")
-      test_files.select! { |f| f.start_with?(controller_dir) }
-    end
+    select_package_test_files!(pkg_name, pkg_dir, test_files)
 
     # For ruby-compat, include only the specs for surface the package ports.
     # `pkg_dir` is ruby/spec's `spec/ruby`; vendor/sources.ts carries why the

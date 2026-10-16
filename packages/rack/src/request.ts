@@ -49,7 +49,7 @@ import {
   QueryParser,
   unescape,
 } from "./utils.js";
-import { block as rbBlock, fetch, include } from "@blazetrails/ruby-compat";
+import { block as rbBlock, fetch, hashDelete, include } from "@blazetrails/ruby-compat";
 import * as MediaTypeModule from "./media-type.js";
 import * as Multipart from "./multipart.js";
 
@@ -163,7 +163,9 @@ export abstract class Helpers {
   }
 
   get session(): Record<string, any> {
-    return this.fetchHeader(RACK_SESSION, (k) => this.setHeader(k, this.defaultSession()));
+    return this.fetchHeader(RACK_SESSION, (_k) =>
+      this.setHeader(RACK_SESSION, this.defaultSession()),
+    );
   }
 
   get sessionOptions(): Record<string, any> {
@@ -687,8 +689,8 @@ export class Request {
     return new (this.constructor as typeof Request)({ ...this.env });
   }
 
-  has(key: string): boolean {
-    return key in this.env;
+  hasHeader(name: string): boolean {
+    return name in this.env;
   }
 
   getHeader(name: string): any {
@@ -705,19 +707,18 @@ export class Request {
     this.env[key] = value;
   }
 
-  addHeader(key: string, v: string): void {
-    const existing = this.env[key];
-    if (existing) {
-      this.env[key] = existing + "," + v;
+  addHeader(key: string, v: string | null): any {
+    if (v == null) {
+      return this.getHeader(key);
+    } else if (this.hasHeader(key)) {
+      return this.setHeader(key, `${this.getHeader(key)},${v}`);
     } else {
-      this.env[key] = v;
+      return this.setHeader(key, v);
     }
   }
 
   deleteHeader(name: string): any {
-    const val = this.env[name];
-    delete this.env[name];
-    return val;
+    return hashDelete(this.env, name);
   }
 
   each(callback: (key: string, value: any) => void): void {

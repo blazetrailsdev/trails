@@ -366,10 +366,7 @@ export class IntegrationTest extends TestCase {
     return (this._integrationSession ??= this.createSession(this.app));
   }
 
-  /**
-   * @internal
-   * @missingRailsCall new — CONVERGEABLE integration-runner-merged-into-session
-   */
+  /** @internal */
   createSession(app: unknown): this {
     const session = this.constructor as typeof IntegrationTest;
     let klass = APP_SESSIONS.get(app);

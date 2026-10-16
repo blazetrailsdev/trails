@@ -1037,6 +1037,12 @@ class ApiExtractor
       process_attr(args, :writer, force_class: on_singleton)
     when "attr_accessor"
       process_attr(args, :accessor, force_class: on_singleton)
+    when "attr_internal_reader"
+      process_attr(args, :reader, force_class: on_singleton)
+    when "attr_internal_writer"
+      process_attr(args, :writer, force_class: on_singleton)
+    when "attr_internal", "attr_internal_accessor"
+      process_attr(args, :accessor, force_class: on_singleton)
     when "alias_method"
       process_alias_method(args)
     when "define_method"
@@ -1120,7 +1126,8 @@ class ApiExtractor
         else
           apply_visibility_to_named(names, cmd_name.to_sym)
         end
-      when "attr_reader", "attr_writer", "attr_accessor"
+      when "attr_reader", "attr_writer", "attr_accessor", "attr_internal", "attr_internal_reader",
+           "attr_internal_writer", "attr_internal_accessor"
         process_attr_from_arg_paren(node[2], cmd_name)
       when "include"
         process_include_from_arg_paren(node[2])
@@ -1379,9 +1386,9 @@ class ApiExtractor
 
   def process_attr_from_arg_paren(args, cmd_name)
     kind = case cmd_name
-    when "attr_reader" then :reader
-    when "attr_writer" then :writer
-    when "attr_accessor" then :accessor
+    when "attr_reader", "attr_internal_reader" then :reader
+    when "attr_writer", "attr_internal_writer" then :writer
+    when "attr_accessor", "attr_internal", "attr_internal_accessor" then :accessor
     end
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
@@ -2740,8 +2747,15 @@ class ApiExtractor
     parts = name.split("::")
     const = parts.last
     container = parts[0...-1].join("::")
-    own = store.dig(current_fqn, const)
-    return own if own && !absolute && container.empty?
+    if !absolute && container.empty?
+      scope = current_fqn.to_s.split("::")
+      loop do
+        found = store.dig(scope.join("::"), const)
+        return found if found
+        break if scope.empty?
+        scope.pop
+      end
+    end
     store.each do |fqn, consts|
       next unless consts.key?(const)
       if absolute

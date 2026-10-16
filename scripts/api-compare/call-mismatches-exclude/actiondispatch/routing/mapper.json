@@ -1,0 +1,37 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "draw",
+    "call": "find",
+    "reason": "mapper.rb:1669 finds a draw path with File.exist?; the port awaits fs.exists in a loop because the check is async. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "draw",
+    "call": "read",
+    "reason": "mapper.rb:1683 instance_evals File.read of a .rb routes file; the port imports a .ts module and calls its drawRoutes. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resource",
+    "call": "order:get,constructor",
+    "reason": "Order-only: the Ruby skeleton records the block's get :new ahead of new do (mapper.rb:1362-1364); the port's this.new(() => this.get(...)) records them the other way. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resources",
+    "call": "order:get,constructor",
+    "reason": "Order-only: the Ruby skeleton records the block's get :new ahead of new do (mapper.rb:1537-1539); the port's this.new(() => this.get(...)) records them the other way. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resources_path_names",
+    "call": "merge!",
+    "reason": "mapper.rb:1316 @scope[:path_names].merge!(options) is ported as the native Object.assign on the scope read, which the call gate does not credit through the cast receiver. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+  }
+]
