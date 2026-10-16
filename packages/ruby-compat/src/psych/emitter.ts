@@ -85,10 +85,18 @@ function analyzeScalar(value: string): {
   return { blockPlainAllowed, singleQuotedAllowed, blockAllowed };
 }
 
+const EXPLICIT_KEYS = new WeakMap<Yaml.Scalar, Yaml.Scalar.Type | undefined>();
+
+const encoder = new TextEncoder();
+
 function writeSingleQuoted(
   stringify: NonNullable<Yaml.ScalarTag["stringify"]>,
 ): NonNullable<Yaml.ScalarTag["stringify"]> {
   return (item, ctx, onComment, onChompKeep) => {
+    const style = EXPLICIT_KEYS.get(item);
+    if (style !== undefined) {
+      item = Object.assign(Object.create(Object.getPrototypeOf(item)), item, { type: style });
+    }
     const { value, type } = item as Yaml.Scalar<string>;
     if (type === yaml.Scalar.PLAIN) {
       return stringify(item, { ...ctx, actualString: false }, onComment, onChompKeep);
@@ -320,6 +328,24 @@ export class Emitter {
     return this;
   }
 
+  private checkSimpleKey(node: Yaml.Node): boolean {
+    if (yaml.isAlias(node)) return encoder.encode(node.source).length <= 128;
+    if (!yaml.isScalar(node) && !yaml.isCollection(node)) return false;
+    const tag = node.tag?.startsWith("tag:yaml.org,2002:")
+      ? `!!${node.tag.slice("tag:yaml.org,2002:".length)}`
+      : node.tag;
+    let length = encoder.encode(node.anchor ?? "").length + encoder.encode(tag ?? "").length;
+    if (yaml.isScalar(node)) {
+      const value = String(node.value);
+      if (BREAK.test(value)) return false;
+      length += encoder.encode(value).length;
+    } else if (node.items.length !== 0) {
+      return false;
+    }
+    if (length > 128) return false;
+    return true;
+  }
+
   private add(node: Yaml.Node): void {
     const top = this.stack.at(-1);
     if (!top) {
@@ -327,6 +353,12 @@ export class Emitter {
     } else if (yaml.isSeq(top.node)) {
       top.node.items.push(node);
     } else if (top.key === undefined) {
+      if (yaml.isScalar(node) && !this.checkSimpleKey(node)) {
+        const style = node.type;
+        node = node.clone() as Yaml.Scalar;
+        node.type = "BLOCK_LITERAL";
+        EXPLICIT_KEYS.set(node, style);
+      }
       top.key = node;
     } else {
       top.node.add(new yaml.Pair(top.key, node));

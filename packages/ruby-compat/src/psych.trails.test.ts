@@ -420,3 +420,36 @@ describe("Psych.dump string scalar style", () => {
     );
   });
 });
+
+describe("Psych.dump empty root collection and explicit keys", () => {
+  it("writes an empty root collection on the document line", async () => {
+    const { Psych } = await import("./psych.js");
+    const { Hash } = await import("./hash.js");
+    expect(Psych.dump(new Hash())).toBe("--- {}\n");
+    expect(Psych.dump({})).toBe("--- {}\n");
+    expect(Psych.dump([])).toBe("--- []\n");
+  });
+
+  it("writes a key longer than 128 bytes or spanning lines as an explicit key", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.dump({ ["a".repeat(129)]: 1 })).toBe(`---\n? ${"a".repeat(129)}\n: 1\n`);
+    expect(Psych.dump({ ["a".repeat(128)]: 1 })).toBe(`---\n${"a".repeat(128)}: 1\n`);
+    expect(Psych.dump({ ["é".repeat(65)]: 1 })).toBe(`---\n? ${"é".repeat(65)}\n: 1\n`);
+    expect(Psych.dump({ ["é".repeat(64)]: 1 })).toBe(`---\n${"é".repeat(64)}: 1\n`);
+    expect(Psych.dump({ "a\nb": 1 })).toBe("---\n? |-\n  a\n  b\n: 1\n");
+  });
+});
+
+describe("Psych.parse stops at the end of the first document", () => {
+  it("ignores text after a closed flow or quoted root", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.unsafeLoad("--- [1] foo bar")).toEqual([1]);
+    expect(Psych.unsafeLoad('--- "a" x')).toBe("a");
+    expect((Psych.parse("--- !ruby/object:X {}\\n") as { tag: string }).tag).toBe("!ruby/object:X");
+    expect(Psych.unsafeLoad("--- {a: 1} }")).toEqual(Psych.unsafeLoad("--- {a: 1}"));
+    expect(() => Psych.parse("--- {")).toThrow(Psych.SyntaxError);
+    expect(() => Psych.parse("--- [1, 2")).toThrow(Psych.SyntaxError);
+    expect(() => Psych.parse('--- {"a": "}"')).toThrow(Psych.SyntaxError);
+    expect(() => Psych.parse("--- foo: bar: baz")).toThrow(Psych.SyntaxError);
+  });
+});

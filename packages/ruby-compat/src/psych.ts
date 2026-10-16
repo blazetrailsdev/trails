@@ -252,6 +252,9 @@ export namespace Psych {
    * (`yaml_parser_set_input_string`, `vendor/ruby/v3.3.11/ext/psych/psych_parser.c:271`),
    * so a source held as its bytes is decoded here. A malformed document raises
    * `Psych::SyntaxError` as `make_exception` does (`psych_parser.c:80-100`).
+   * libyaml ends the first document after a closed flow or quoted root, and
+   * `parse` returns that node before the parser reads on (`psych.rb:398-403`),
+   * so a backend error past the root's end belongs to a later document.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -262,8 +265,15 @@ export namespace Psych {
     if (yamlString instanceof IO) yamlString = yamlString.read();
     if (yamlString instanceof Uint8Array) yamlString = new TextDecoder().decode(yamlString);
     const doc = yaml.parseDocument(yamlString);
-    if (doc.errors.length > 0) {
-      const [error] = doc.errors;
+    const root = doc.contents;
+    const end = root?.range?.[1] ?? 0;
+    const closed =
+      root != null && yaml.isCollection(root) && root.flow
+        ? "}]".includes(yamlString[end - 1] ?? "")
+        : yaml.isScalar(root) && (root.type === "QUOTE_SINGLE" || root.type === "QUOTE_DOUBLE");
+    const errors = closed ? doc.errors.filter((e) => e.pos[0] < end) : doc.errors;
+    if (errors.length > 0) {
+      const [error] = errors;
       const mark = error.linePos?.[0] ?? { line: 0, col: 0 };
       throw new PsychSyntaxError(
         filename,
