@@ -44,11 +44,14 @@ describe("ExceptionWrapper template spots", () => {
       .filter((l) => l.includes(template.methodName()));
     expect(frames).toHaveLength(1);
     const wrapper = new ExceptionWrapper(null, (raised as Error).cause as Error);
-    const extract = wrapper.sourceExtracts.find((e) => e.file.includes(template.methodName()));
+    const extract =
+      wrapper.sourceExtracts[
+        wrapper.backtrace.findIndex((loc) => String(loc).includes(template.methodName()))
+      ];
 
     expect(extract).toBeDefined();
-    expect(extract!.line).toBe(2);
-    expect(extract!.code).toEqual({
+    expect(extract.lineNumber).toBe(2);
+    expect(extract.code).toEqual({
       1: "first line\n",
       2: ["<%= [].boom.", "length %>\n", ""],
       3: "last line\n",
@@ -104,10 +107,7 @@ describe("ExceptionWrapper#backtrace", () => {
     ]);
     expect(wrapper.applicationTrace[0]).toBe(wrapper.fullTrace[0]);
     expect(wrapper.traces["Application Trace"].map((t) => t.id)).toEqual([0]);
-    expect(wrapper.sourceExtracts.map((e) => [e.file, e.line])).toEqual([
-      ["/app/lib/file.js", 42],
-      ["/app/node_modules/rack.js", 43],
-    ]);
+    expect(wrapper.sourceExtracts.map((e) => e.lineNumber)).toEqual([42, 43]);
   });
 });
 

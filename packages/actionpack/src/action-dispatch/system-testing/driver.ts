@@ -43,11 +43,11 @@ interface BrowserType {
 
 export class Driver {
   readonly name: string;
-  private _driverType: string;
-  private _screenSize: [number, number] | undefined;
-  private _options: Record<string, unknown>;
-  private _capabilities: ((options: LaunchOptions | undefined) => void) | undefined;
-  private _browser: Browser | null;
+  private driverType: string;
+  private screenSize: [number, number] | undefined;
+  private options: Record<string, unknown>;
+  private capabilities: ((options: LaunchOptions | undefined) => void) | undefined;
+  private browser: Browser | null;
   private _preload: Promise<void> | undefined;
 
   constructor(
@@ -55,21 +55,21 @@ export class Driver {
     options: DriverOptions = {},
     capabilities?: (options: LaunchOptions | undefined) => void,
   ) {
-    this._driverType = driverType;
-    this._screenSize = options.screenSize;
-    this._options = { ...(options.options ?? {}) };
-    const name = this._options.name as string | undefined;
-    delete this._options.name;
+    this.driverType = driverType;
+    this.screenSize = options.screenSize;
+    this.options = { ...(options.options ?? {}) };
+    const name = this.options.name as string | undefined;
+    delete this.options.name;
     this.name = name ?? driverType;
-    this._capabilities = capabilities;
+    this.capabilities = capabilities;
 
     if (driverType === "selenium") {
-      this._browser = new Browser(options.using);
-      if (this._options.browser !== "remote") {
-        this._preload = this._browser.preload();
+      this.browser = new Browser(options.using);
+      if (this.options.browser !== "remote") {
+        this._preload = this.browser.preload();
       }
     } else {
-      this._browser = null;
+      this.browser = null;
     }
   }
 
@@ -81,15 +81,15 @@ export class Driver {
 
   /** @internal */
   private registerable(): boolean {
-    return ["selenium", "cuprite", "rack_test", "playwright"].includes(this._driverType);
+    return ["selenium", "cuprite", "rack_test", "playwright"].includes(this.driverType);
   }
 
   /** @internal */
   private register(): void {
-    this._browser?.configure(this._capabilities);
+    this.browser?.configure(this.capabilities);
 
     vite.drivers[this.name] = async (app) => {
-      switch (this._driverType) {
+      switch (this.driverType) {
         case "selenium":
           return this.registerSelenium(app);
         case "cuprite":
@@ -104,7 +104,7 @@ export class Driver {
 
   /** @internal */
   private browserOptions(): Record<string, unknown> {
-    return compact({ ...this._options, options: this._browser!.options });
+    return compact({ ...this.options, options: this.browser!.options });
   }
 
   /** @internal */
@@ -122,9 +122,9 @@ export class Driver {
    * @inventedArm launch — CONVERGEABLE converge-system-test-case-onto-test-case-with-page-and-expect-element
    */
   private async registerCuprite(app: RackMiddleware | undefined): Promise<unknown> {
-    const options = { ...this._options, windowSize: this._screenSize };
+    const options = { ...this.options, windowSize: this.screenSize };
     const { chromium } = (await requirePlaywright()) as { chromium: BrowserType };
-    return { app, options, browser: await chromium.launch(this._options) };
+    return { app, options, browser: await chromium.launch(this.options) };
   }
 
   /**
@@ -141,15 +141,15 @@ export class Driver {
    */
   private async registerPlaywright(app: RackMiddleware | undefined): Promise<unknown> {
     let screen: { width: number; height: number } | undefined;
-    if (this._screenSize) screen = { width: this._screenSize[0], height: this._screenSize[1] };
+    if (this.screenSize) screen = { width: this.screenSize[0], height: this.screenSize[1] };
     const options = compact({
       screen: screen,
       viewport: screen,
-      ...this._options,
+      ...this.options,
     });
 
     const { chromium } = (await requirePlaywright()) as { chromium: BrowserType };
-    return { app, options, browser: await chromium.launch(this._options) };
+    return { app, options, browser: await chromium.launch(this.options) };
   }
 
   /** @internal */

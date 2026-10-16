@@ -5,7 +5,7 @@
   <% if (sourceExtract.code) { %>
     <div class="source <%= showSourceIdx != index ? "hidden" : null %>" id="frame-source-<%= errorIndex %>-<%= index %>">
       <div class="info">
-        Extracted source (around line <strong>#<%= sourceExtract.line %></strong>):
+        Extracted source (around line <strong>#<%= sourceExtract.lineNumber %></strong>):
       </div>
       <div class="data">
         <table cellpadding="0" cellspacing="0" class="lines">
@@ -20,7 +20,7 @@
 <td width="100%">
 <pre>
 <% for (const [line, source] of Object.entries(sourceExtract.code)) { -%>
-<div class="line<%= Number(line) == sourceExtract.line ? " active" : null -%>"><% if (Array.isArray(source)) { -%><%= source[0] -%><span class="error_highlight"><%= source[1] -%></span><%= source[2] -%>
+<div class="line<%= Number(line) == sourceExtract.lineNumber ? " active" : null -%>"><% if (Array.isArray(source)) { -%><%= source[0] -%><span class="error_highlight"><%= source[1] -%></span><%= source[2] -%>
 <% } else { -%>
 <%= source -%>
 <% } -%></div><% } -%>

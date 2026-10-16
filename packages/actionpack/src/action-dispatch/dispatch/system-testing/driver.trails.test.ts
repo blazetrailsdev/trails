@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Session } from "@blazetrails/rack-test";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
-import { Driver } from "./driver.js";
-import { vite } from "./server.js";
+import { Driver } from "../../system-testing/driver.js";
+import { vite } from "../../system-testing/server.js";
 
 describe("ActionDispatch::SystemTesting::Driver", () => {
   it("initializes with default options", () => {
