@@ -35,7 +35,12 @@ describe("ActionDispatch::SystemTesting::Driver", () => {
     const driver = new Driver("rack_test");
     driver.use();
     const app = async () => [200, {}, ["ok"]] as [number, Record<string, string>, string[]];
-    expect(await vite.drivers.rack_test(app as never)).toBeInstanceOf(Session);
+    const registered = (await vite.drivers.rack_test(app as never)) as {
+      options: Record<string, unknown>;
+      session: unknown;
+    };
+    expect(registered.session).toBeInstanceOf(Session);
+    expect(registered.options).toEqual({ respectDataMethod: true });
   });
 
   it("selenium arm raises NotImplementedError", async () => {

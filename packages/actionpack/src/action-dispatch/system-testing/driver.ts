@@ -128,12 +128,13 @@ export class Driver {
     return { app, options, browser: await chromium.launch(this.options) };
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs new — CONVERGEABLE driver-rack-test-arm-passes-respect-data-method
-   */
+  /** @internal */
   private async registerRackTest(app: RackMiddleware | undefined): Promise<unknown> {
-    return new Session(app!);
+    return {
+      app,
+      options: { respectDataMethod: true, ...this.options },
+      session: new Session(app!),
+    };
   }
 
   /**
