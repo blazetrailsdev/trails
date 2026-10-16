@@ -67,7 +67,6 @@ export class Driver {
       this._browser = new Browser(options.using as string);
       if (this._options.browser !== "remote") {
         this._preload = this._browser.preload();
-        this._preload.catch(() => undefined);
       }
     } else {
       this._browser = null;
@@ -122,12 +121,12 @@ export class Driver {
   private async registerCuprite(app: RackMiddleware | undefined): Promise<unknown> {
     const options = { ...this._options, windowSize: this._screenSize };
     const { chromium } = (await requirePlaywright()) as { chromium: BrowserType };
-    return { app, options, browser: await chromium.launch(options) };
+    return { app, options, browser: await chromium.launch(this._options) };
   }
 
   /**
    * @internal
-   * @missingRailsArgs new — PERMANENT
+   * @missingRailsArgs new — CONVERGEABLE driver-rack-test-arm-passes-respect-data-method
    */
   private async registerRackTest(app: RackMiddleware | undefined): Promise<unknown> {
     return new Session(app!);
@@ -144,7 +143,7 @@ export class Driver {
     });
 
     const { chromium } = (await requirePlaywright()) as { chromium: BrowserType };
-    return { app, options, browser: await chromium.launch(options) };
+    return { app, options, browser: await chromium.launch(this._options) };
   }
 
   /** @internal */
