@@ -12,6 +12,14 @@ export class Node {
   readonly children: Node[] = [];
   /** @noRailsEquivalent PERMANENT */
   tag: string | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  startLine: number | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  startColumn: number | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  endLine: number | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  endColumn: number | null = null;
 
   /**
    * `Psych::Nodes::Node#yaml` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/node.rb:58-64`).
