@@ -1406,6 +1406,21 @@ body reaches a class's singleton class keeps working on the class itself, and
 `ClassAttribute.redefine` does not port its `attached_object.is_a?(Module)`
 arm.
 
+## A revived object copies a constructed instance (`init_with` / `marshal_load`'s `initialize`)
+
+Ruby's `TimeZone#init_with` is `initialize(coder["name"])`
+(`activesupport/lib/active_support/values/time_zone.rb:575-577`), and
+`TimeWithZone#init_with` / `#marshal_load` call `initialize` on the receiver
+Psych or Marshal allocated (`time_with_zone.rb:174-176`, `:533-535`). trails
+has no `initialize` methods (§ "A module's `initialize` is inlined into the
+constructor"), and a JS constructor cannot run on an object that already
+exists. **Such a body is written `Object.assign(this, new Klass(...))`**, or
+through the class's Rails constructor (`TimeZone.create`): the instance Ruby's
+`initialize` would have built, copied onto the receiver. A coder-aware
+allocator in Psych's `revive` was rejected, since Ruby's allocator never sees
+the coder. Each compared site carries `@inventedArm assign — PERMANENT`. Ruled by the
+repo owner on 2026-10-16.
+
 ## A record is built with `new Klass` only (`Inheritance::ClassMethods#new`)
 
 Ruby has one way to build a record, `Klass.new(attributes, &block)`, and
