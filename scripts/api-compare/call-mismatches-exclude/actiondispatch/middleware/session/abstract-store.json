@@ -4,6 +4,6 @@
     "tsFile": "middleware/session/abstract-store.ts",
     "rubyName": "initialize_sid",
     "call": "delete",
-    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+    "reason": "abstract_store.rb:36-37 @default_options.delete(:sidbits) is ported as the native delete statement (CLAUDE.md hash table, removed value unused), which the call gate does not credit on a defaultOptions member receiver. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
   }
 ]

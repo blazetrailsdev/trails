@@ -4,13 +4,13 @@
     "tsFile": "lookup-context.ts",
     "rubyName": "detail_args_for_any",
     "call": "call",
-    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+    "reason": "lookup_context.rb:188-206 stores variants: :any in details and keys it with DetailsKey.details_cache_key; DetailValue and DetailsKey cannot carry :any yet (porting it reds view-paths/resolver tests), so the port builds Requested directly. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
   },
   {
     "package": "actionview",
     "tsFile": "lookup-context.ts",
     "rubyName": "detail_args_for_any",
     "call": "details_cache_key",
-    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+    "reason": "lookup_context.rb:201: same :any variants gap as the call row; DetailsKey.detailsCacheKey cannot key a details hash whose variants is :any yet. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
   }
 ]

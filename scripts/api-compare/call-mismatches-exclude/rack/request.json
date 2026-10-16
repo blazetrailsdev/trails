@@ -35,7 +35,7 @@
     "tsFile": "request.ts",
     "rubyName": "forwarded_for",
     "call": "order:map,splitAuthority",
-    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+    "reason": "Order-only: request.rb:358 uses in-place map! with the block; the extractor orders Ruby's split_authority before map!, the port's .map(cb) records map first. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
   },
   {
     "package": "rack",

@@ -22,6 +22,7 @@ import {
   pluralize,
   reverseMergeBang,
   singularize,
+  squish,
   TopLevel,
   transformKeys,
   underscore,
@@ -314,7 +315,7 @@ export class SingletonResource extends Resource {
 
 /** @internal */
 interface RouteSetLike {
-  namedRoutes: { get(name: string): unknown };
+  namedRoutes: { get(name: string): unknown; isKey(name: string): boolean };
   urlHelpers(): object;
   addRoute(mapping: Mapping, name?: string | null | false): unknown;
   resourcesPathNames: Record<string, string>;
@@ -1565,7 +1566,7 @@ export class Mapper {
         MountableApp,
         string,
       ];
-      if (app) options.delete(app);
+      if (app) hashDelete(options, app);
     }
 
     if (!rbObjRespondTo(app, "call")) {
@@ -1675,7 +1676,8 @@ export class Mapper {
   ): void {
     if (paths.length > 1) {
       deprecator().warn(
-        "Mapping a route with multiple paths is deprecated and will be removed in Rails 8.1. Please use multiple method calls instead.",
+        squish(`Mapping a route with multiple paths is deprecated and
+          will be removed in Rails 8.1. Please use multiple method calls instead.`),
       );
     }
 
@@ -2012,7 +2014,7 @@ export class Mapper {
 
   /** @internal */
   mergeOptionsScope<T extends Record<string, unknown>>(parent: T | undefined, child: T): T {
-    return { ...(parent ?? ({} as T)), ...child };
+    return { ...(parent || {}), ...child } as T;
   }
 
   /** @internal */
@@ -2125,7 +2127,7 @@ export class Mapper {
 
   /** @internal */
   hasNamedRoute(name: string): boolean {
-    return this._set.namedRoutes.get(name) !== undefined;
+    return this._set.namedRoutes.isKey(name);
   }
 
   /** @internal */
@@ -2206,9 +2208,7 @@ export class Mapper {
 
   /** @internal */
   resourcesPathNames(options: Record<string, string>): Record<string, string> {
-    const current = (this._scope.get("pathNames") as Record<string, string> | undefined) ?? {};
-    Object.assign(current, options);
-    return current;
+    return Object.assign(this._scope.get("pathNames") as Record<string, string>, options);
   }
 
   /** @internal */
@@ -2248,7 +2248,7 @@ export class Mapper {
 
   /** @internal */
   applyActionOptions(method: "resource" | "resources", options: RouteOptions): RouteOptions {
-    if (options.only || options.except) return options;
+    if (this.isActionOptions(options)) return options;
     return { ...options, ...this.scopeActionOptions(method) };
   }
 
