@@ -1,8 +1,6 @@
-import { classAttribute } from "@blazetrails/activesupport";
-import { Driver, type BrowserName, type DriverOptions } from "./system-testing/driver.js";
-import { afterAll } from "vitest";
+import { classAttribute, TopLevel } from "@blazetrails/activesupport";
 import { Builder, type RackApp } from "@blazetrails/rack";
-import { TopLevel } from "@blazetrails/activesupport";
+import { Driver, type BrowserName, type DriverOptions } from "./system-testing/driver.js";
 import { Server, vite } from "./system-testing/server.js";
 
 export const DEFAULT_HOST = "http://127.0.0.1";
@@ -60,6 +58,7 @@ export class SystemTestCase {
     }) as unknown as RackApp;
 
     await new Server().run();
+    const { afterAll } = await import("vitest");
     afterAll(async () => {
       await vite.server?.close();
       vite.server = undefined;

@@ -17,18 +17,20 @@ describe("ServerTest", () => {
   });
 
   it("port is always included", async () => {
-    Server.silencePuma = true;
     await new Server().run();
-    Server.silencePuma = false;
     expect(vite.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
   });
 
   it("server is changed from `default` to `puma`", async () => {
     vite.server = undefined;
     Server.silencePuma = true;
-    await new Server().run();
-    Server.silencePuma = false;
+    try {
+      await new Server().run();
+    } finally {
+      Server.silencePuma = false;
+    }
     expect(vite.server).not.toBeUndefined();
+    expect(vite.server!.config.logLevel).toBe("silent");
     const response = await fetch(vite.url!);
     expect(await response.text()).toBe("ok");
   });

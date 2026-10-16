@@ -14,13 +14,17 @@
   "license": "MIT",
   "peerDependencies": {
     "playwright": ">=1.40.0",
-    "vite": ">=7.0.0"
+    "vite": ">=7.0.0",
+    "vitest": ">=3.0.0"
   },
   "peerDependenciesMeta": {
     "playwright": {
       "optional": true
     },
     "vite": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     }
   },

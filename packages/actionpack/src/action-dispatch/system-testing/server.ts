@@ -2,6 +2,7 @@ import type { InlineConfig, ViteDevServer } from "vite";
 import { Handler, type RackApp } from "@blazetrails/rack";
 import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
 
+/** @noRailsEquivalent PERMANENT */
 export const vite: {
   app: RackApp | undefined;
   config: InlineConfig & { server: NonNullable<InlineConfig["server"]> };
