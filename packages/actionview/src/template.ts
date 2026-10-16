@@ -14,6 +14,7 @@ import {
   rbObjRespondTo,
   rbStrEnumerateLines,
 } from "@blazetrails/ruby-compat";
+import * as RubyCompat from "@blazetrails/ruby-compat";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer, StreamingBuffer } from "./buffers.js";
@@ -427,21 +428,23 @@ export class Template {
       safe: typeof htmlSafe,
       outputBuffer: typeof OutputBuffer,
       topLevel: typeof TopLevel,
+      rubyCompat: typeof RubyCompat,
     ) => CompiledMethod;
     try {
       factory = (0, eval)(
-        `(function (ArgumentError, htmlSafe, OutputBuffer, TopLevel) { return ${compiledSource}; })\n//# sourceURL=${this.identifier.replace(/[\r\n\u2028\u2029]/g, "")}`,
+        `(function (ArgumentError, htmlSafe, OutputBuffer, TopLevel, RubyCompat) { return ${compiledSource}; })\n//# sourceURL=${this.identifier.replace(/[\r\n\u2028\u2029]/g, "")}`,
       ) as (
         argumentError: typeof ArgumentError,
         safe: typeof htmlSafe,
         outputBuffer: typeof OutputBuffer,
         topLevel: typeof TopLevel,
+        rubyCompat: typeof RubyCompat,
       ) => CompiledMethod;
     } catch (error) {
       throw new SyntaxErrorInTemplate(this, this.source, error as Error);
     }
 
-    const method = factory(ArgumentError, htmlSafe, OutputBuffer, TopLevel);
+    const method = factory(ArgumentError, htmlSafe, OutputBuffer, TopLevel, RubyCompat);
     mod._compiledMethods.set(methodName, method);
 
     if (!this.isStrictLocals()) return;

@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { SystemTestCase, DEFAULT_HOST } from "./system-test-case.js";
+import { Browser } from "./system-testing/browser.js";
 import { Driver } from "./system-testing/driver.js";
 import { vite } from "./system-testing/server.js";
 
@@ -31,11 +32,12 @@ describe("ActionDispatch::SystemTestCase", () => {
     }
   });
 
-  it("constructor defaults driver to playwright and calls use", () => {
+  it("constructor defaults driver to selenium and calls use", () => {
     const useSpy = vi.spyOn(Driver.prototype, "use").mockReturnValue(undefined);
-    new SystemTestCase();
+    vi.spyOn(Browser.prototype, "preload").mockResolvedValue(undefined);
+    new SystemTestCase("test");
     expect(SystemTestCase.driver).toBeDefined();
-    expect(SystemTestCase.driver!.name).toBe("playwright");
+    expect(SystemTestCase.driver!.name).toBe("selenium");
     expect(useSpy).toHaveBeenCalled();
   });
 });

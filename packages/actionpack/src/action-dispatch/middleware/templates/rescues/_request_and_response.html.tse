@@ -1,4 +1,3 @@
-<%# @missingRailsCall inspect — CONVERGEABLE debug-view-debug-params-uses-pp-and-templates-reach-inspect -%>
 <h2 class="request-heading">Request</h2>
 <% if (isParamsValid()) { %>
   <p><b>Parameters</b>:</p> <pre><%= debugParams(this.request.filteredParameters()) %></pre>
@@ -11,8 +10,8 @@
 
 <div class="details">
   <div class="summary"><a href="#" onclick="return toggleEnvDump()">Toggle env dump</a></div>
-  <div id="env_dump" class="hidden"><pre><%= debugHash(Object.fromEntries(this.request.constructor.ENV_METHODS.filter((key) => Object.hasOwn(this.request.env, key)).map((key) => [key, this.request.env[key]]))) %></pre></div>
+  <div id="env_dump" class="hidden"><pre><%= debugHash(RubyCompat.slice(this.request.env, ...this.request.constructor.ENV_METHODS)) %></pre></div>
 </div>
 
 <h2 class="response-heading">Response</h2>
-<p><b>Headers</b>:</p> <pre><%= debugHeaders(Object.hasOwn(this, "response") ? this.response.headers : {}) %></pre>
+<p><b>Headers</b>:</p> <pre><%= debugHeaders(RubyCompat.rbObjIvarDefined(this, "@response") ? this.response.headers : {}) %></pre>

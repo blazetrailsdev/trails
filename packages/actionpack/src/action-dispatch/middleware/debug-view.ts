@@ -1,4 +1,4 @@
-import { rbInspect, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
+import { PP, rbInspect, rbObjRespondTo, rtest, StringIO } from "@blazetrails/ruby-compat";
 import { isPresent, type Logger } from "@blazetrails/activesupport";
 import { Base, LookupContext } from "@blazetrails/actionview";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
@@ -18,7 +18,6 @@ export class DebugView extends Base {
     return this.constructor as typeof DebugView;
   }
 
-  /** @inventedArm prettyPrint — CONVERGEABLE debug-view-debug-params-uses-pp-and-templates-reach-inspect */
   debugParams(params: Record<string, unknown>): string {
     const cleanParams = { ...params };
     delete cleanParams["action"];
@@ -27,7 +26,9 @@ export class DebugView extends Base {
     if (Object.keys(cleanParams).length === 0) {
       return "None";
     }
-    return prettyPrint(cleanParams, 200);
+    const out = new StringIO();
+    PP.pp(cleanParams, out, 200);
+    return out.string();
   }
 
   debugHeaders(headers: Record<string, unknown> | null | undefined): string {
@@ -82,11 +83,4 @@ export class DebugView extends Base {
       throw e;
     }
   }
-}
-
-/** @internal */
-function prettyPrint(value: unknown, width: number): string {
-  const single = rbInspect(value);
-  if (single.length <= width) return single;
-  return JSON.stringify(value, null, 2);
 }

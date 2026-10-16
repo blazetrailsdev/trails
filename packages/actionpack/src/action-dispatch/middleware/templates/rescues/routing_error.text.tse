@@ -1,11 +1,10 @@
-<%# @missingRailsCall inspect — CONVERGEABLE debug-view-debug-params-uses-pp-and-templates-reach-inspect -%>
 Routing Error
 
 <%= this.exception.message %>
 <% if (this.exception.failures.length > 0) { %>
 Failure reasons:
 <% for (const [route, reason] of this.exception.failures) { %>
-  - <%= String(route).replaceAll('\\', '') %></code> failed because <%= reason.toLowerCase() %>
+  - <%= RubyCompat.rbInspect(route).replaceAll('\\', '') %></code> failed because <%= reason.toLowerCase() %>
 <% } %>
 <% } %>
 
