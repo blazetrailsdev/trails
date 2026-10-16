@@ -21,8 +21,8 @@ export class SyntaxErrorProxy extends DelegateClass(SyntaxError) {
     return [
       ...this.parseMessageForTrace().map((trace) => {
         const match = /^(.+?):(\d+).*$/.exec(trace);
-        const [file, line] = match ? [match[1], match[2]] : [trace, trace];
-        return new BacktraceLocation(file, parseInt(line, 10) || 0, trace);
+        const [file, line] = match ? [match[1], match[2]] : [trace, null];
+        return new BacktraceLocation(file, line == null ? 0 : parseInt(line, 10), trace);
       }),
       ...locations.map((loc) => new BacktraceLocationProxy(loc, this)),
     ];

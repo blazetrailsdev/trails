@@ -201,7 +201,7 @@ export class MissingTemplate extends ActionViewError {
 export class TemplateError extends Error {
   static readonly SOURCE_CODE_RADIUS = 3;
 
-  declare readonly cause: Error;
+  declare cause: Error;
   readonly template: Template | string;
   private subTemplates?: Template[];
   private _lineNumber?: number | null;
@@ -209,20 +209,21 @@ export class TemplateError extends Error {
   constructor(template: Template | string, errinfo: Error) {
     super(errinfo.message);
     this.name = "ActionView::Template::Error";
-    let cause: Error = errinfo;
-    if (cause instanceof SyntaxError) {
-      cause = new SyntaxErrorProxy(cause);
+    this.cause = errinfo;
+    if (this.cause instanceof SyntaxError) {
+      this.cause = new SyntaxErrorProxy(this.cause);
     }
-    Object.defineProperty(this, "cause", { value: cause, configurable: true, writable: true });
     this.template = template;
   }
 
+  /** @inventedArm if — CONVERGEABLE template-error-backtrace-dispatches-to-cause */
   backtrace(): string[] {
     const cause: unknown = this.cause;
     if (cause instanceof SyntaxErrorProxy) return cause.backtrace();
     return excBacktrace(this.cause) ?? [];
   }
 
+  /** @inventedArm if — CONVERGEABLE template-error-backtrace-dispatches-to-cause */
   backtraceLocations(): Location[] | null {
     const cause: unknown = this.cause;
     if (cause instanceof SyntaxErrorProxy) {
