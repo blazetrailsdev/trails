@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { pluck } from "./enumerable-utils.js";
+import { Hash } from "@blazetrails/ruby-compat";
+import { indexWith, pluck } from "./enumerable-utils.js";
 
 describe("Enumerable#pluck sends each element []", () => {
   class Row {
@@ -16,5 +17,21 @@ describe("Enumerable#pluck sends each element []", () => {
 
   it("reads a hash's key", () => {
     expect(pluck([{ name: "a" }, { name: "b" }], "name")).toEqual(["a", "b"]);
+  });
+});
+
+describe("Enumerable#index_with answers a plain object for String elements", () => {
+  it("answers a plain object when every element is a String", () => {
+    expect(indexWith(["title", "body"], null)).toEqual({ title: null, body: null });
+  });
+
+  it("answers a Hash for an empty or mixed collection", () => {
+    expect(indexWith([], 1)).toBeInstanceOf(Hash);
+    const mixed = indexWith(["a", 1] as unknown[], (e) => e);
+    expect(mixed).toBeInstanceOf(Hash);
+    expect([...mixed]).toEqual([
+      ["a", "a"],
+      [1, 1],
+    ]);
   });
 });

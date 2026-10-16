@@ -1,5 +1,6 @@
 import type * as Yaml from "yaml";
 import { IO } from "../io.js";
+import { rbObjRespondTo } from "../object.js";
 import { yaml as backend } from "../psych-adapter.js";
 import { Handler } from "./handler.js";
 import { SyntaxError } from "./syntax-error.js";
@@ -48,7 +49,12 @@ export class Parser {
    *
    * @noRailsEquivalent PERMANENT
    */
-  parse(yaml: string | Uint8Array | IO, path: string | null = "<unknown>"): this {
+  parse(
+    yaml: string | Uint8Array | IO,
+    path: string | null = rbObjRespondTo(yaml, "path")
+      ? (yaml as unknown as { path: string }).path
+      : "<unknown>",
+  ): this {
     return this._nativeParse(this.handler, yaml, path);
   }
 
@@ -65,8 +71,15 @@ export class Parser {
   ): this {
     if (yamlSource instanceof IO) yamlSource = yamlSource.read();
     if (yamlSource instanceof Uint8Array) yamlSource = new TextDecoder().decode(yamlSource);
-    const parsed = yaml.parseAllDocuments(yamlSource);
+    const lineCounter = new yaml.LineCounter();
+    const parsed = yaml.parseAllDocuments(yamlSource, { lineCounter });
     const docs = Array.isArray(parsed) ? parsed : [];
+    const location = (start: number, end: number): void => {
+      const s = lineCounter.linePos(start);
+      const e = lineCounter.linePos(end);
+      handler.eventLocation(s.line - 1, s.col - 1, e.line - 1, e.col - 1);
+    };
+    location(0, 0);
     handler.startStream(Parser.UTF8);
     for (const doc of docs) {
       const root = doc.contents;
@@ -95,15 +108,24 @@ export class Parser {
       const tagDirectives = Object.entries(directives.tags).filter(
         ([handle, prefix]) => DEFAULT_TAG_DIRECTIVES[handle] !== prefix,
       );
+      location(doc.range[0], doc.range[0]);
       handler.startDocument(version, tagDirectives, !directives.docStart);
-      this.emitNode(handler, doc.contents);
+      this.emitNode(handler, doc.contents, location);
+      location(doc.range[2], doc.range[2]);
       handler.endDocument(!directives.docEnd);
     }
+    location(yamlSource.length, yamlSource.length);
     handler.endStream();
     return this;
   }
 
-  private emitNode(handler: Handler, node: unknown): void {
+  private emitNode(
+    handler: Handler,
+    node: unknown,
+    location: (start: number, end: number) => void,
+  ): void {
+    const range = (node as { range?: [number, number, number] } | null)?.range;
+    if (range) location(range[0], range[1]);
     if (yaml.isAlias(node)) {
       handler.alias(node.source);
     } else if (yaml.isScalar(node)) {
@@ -120,23 +142,29 @@ export class Parser {
       );
     } else if (yaml.isSeq(node)) {
       handler.startSequence(node.anchor ?? null, node.tag ?? null, !node.tag, node.flow ? 2 : 1);
-      for (const item of node.items) this.emitNode(handler, item);
+      for (const item of node.items) this.emitNode(handler, item, location);
+      location(range![1], range![1]);
       handler.endSequence();
     } else if (yaml.isMap(node)) {
       handler.startMapping(node.anchor ?? null, node.tag ?? null, !node.tag, node.flow ? 2 : 1);
-      for (const pair of node.items) this.emitPair(handler, pair);
+      for (const pair of node.items) this.emitPair(handler, pair, location);
+      location(range![1], range![1]);
       handler.endMapping();
     } else if (yaml.isPair(node)) {
       handler.startMapping(null, null, true, 2);
-      this.emitPair(handler, node);
+      this.emitPair(handler, node, location);
       handler.endMapping();
     } else {
       handler.scalar("", null, null, true, false, 1);
     }
   }
 
-  private emitPair(handler: Handler, pair: Yaml.Pair): void {
-    this.emitNode(handler, pair.key);
-    this.emitNode(handler, pair.value);
+  private emitPair(
+    handler: Handler,
+    pair: Yaml.Pair,
+    location: (start: number, end: number) => void,
+  ): void {
+    this.emitNode(handler, pair.key, location);
+    this.emitNode(handler, pair.value, location);
   }
 }

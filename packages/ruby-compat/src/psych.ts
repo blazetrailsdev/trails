@@ -258,6 +258,8 @@ export namespace Psych {
    * next document, so it is thrown out of the block here.
    *
    * @noRailsEquivalent PERMANENT
+   * @inventedArm try — PERMANENT
+   * @inventedArm throw — PERMANENT
    */
   export function parse(
     yaml: string | Uint8Array | IO,

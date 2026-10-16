@@ -53,6 +53,9 @@ describe("Psych::TreeBuilder", () => {
     expect(scalar.plain).toBe(true);
     expect(scalar.quoted).toBe(false);
     expect(scalar.style).toBe(Scalar.PLAIN);
+    expect([scalar.startLine, scalar.startColumn, scalar.endLine, scalar.endColumn]).toEqual([
+      2, 2, 2, 5,
+    ]);
   });
 
   it("mapping", () => {
@@ -71,6 +74,7 @@ describe("Psych::TreeBuilder", () => {
     const al = tree.children[0].children[0].children[2] as Alias;
     expect(al).toBeInstanceOf(Alias);
     expect(al.anchor).toBe("A");
+    expect([al.startLine, al.startColumn, al.endLine, al.endColumn]).toEqual([7, 2, 7, 4]);
   });
 });
 
@@ -88,6 +92,19 @@ describe("Psych::Nodes::Node", () => {
     expect(stream.isStream()).toBe(true);
     expect(stream.encoding).toBe(Stream.UTF8);
     expect(stream.toRuby()).toEqual(["foo", "bar"]);
+  });
+
+  it("parse_stream yields each document in order", () => {
+    const values: unknown[] = [];
+    Psych.parseStream("--- a\n--- b\n--- c\n", {}, (doc) => {
+      values.push((doc.root as Scalar).value);
+    });
+    expect(values).toEqual(["a", "b", "c"]);
+  });
+
+  it("parse returns the first document before a later one fails", () => {
+    expect(((Psych.parse("--- a\n--- {\n") as Document).root as Scalar).value).toBe("a");
+    expect(() => Psych.parseStream("--- a\n--- {\n")).toThrow(Psych.SyntaxError);
   });
 
   it("predicates", () => {
