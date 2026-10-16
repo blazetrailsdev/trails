@@ -583,11 +583,6 @@ for (const [mri, { tsExport }] of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS) {
  *  not aligned. */
 const MODULE_MIXIN_EXPORTS = new Set(["prepend", "include", "extend"]);
 
-/** ActiveSupport core extensions ported as `@blazetrails/activesupport`
- *  functions taking the Ruby receiver as argument 1: `Hash#stringify_keys`
- *  (activesupport/lib/active_support/core_ext/hash/keys.rb:10) is
- *  `stringifyKeys(h)`. Aligned by callee, since `HashWithIndifferentAccess`
- *  also defines `stringify_keys` as a method. */
 const ACTIVESUPPORT_RECEIVER_EXPORTS = new Map([["stringify_keys", "stringifyKeys"]]);
 
 /**

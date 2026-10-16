@@ -161,8 +161,6 @@ let currentChecker: ts.TypeChecker | undefined;
  */
 const rubyCompatBindings = new WeakMap<ts.SourceFile, ReadonlyMap<string, string>>();
 
-/** Per file, each local name bound from `@blazetrails/activesupport` → the
- *  export it binds, for `CallSite.activeSupport`. */
 const activeSupportBindings = new WeakMap<ts.SourceFile, ReadonlyMap<string, string>>();
 
 interface CacheEntry {
