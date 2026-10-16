@@ -3,6 +3,7 @@ import {
   groupBy as enumGroupBy,
   Hash,
   hashAref,
+  hashAset,
   numericPlus,
   rbBigNorm,
   rbEqual,
@@ -56,16 +57,33 @@ export function indexBy<T, K extends string | number>(
   return result;
 }
 
+export function indexWith<V>(
+  collection: readonly string[],
+  defaultOrBlock: V | ((elem: string) => V),
+): Record<string, V>;
 export function indexWith<T, V>(
   collection: readonly T[],
   defaultOrBlock: V | ((elem: T) => V),
-): Hash<T, V> {
-  const result = new Hash<T, V>();
+): Hash<T, V>;
+export function indexWith<T, V>(
+  collection: readonly T[],
+  defaultOrBlock: V | ((elem: T) => V),
+): Hash<T, V> | Record<string, V> {
+  let result: Hash<T, V> | Record<string, V> = {};
+  const aset = (elem: T, value: V): void => {
+    if (!(result instanceof Hash) && typeof elem !== "string") {
+      const objectKeyed = new Hash<T, V>();
+      for (const [k, v] of Object.entries(result)) objectKeyed.set(k as T, v);
+      result = objectKeyed;
+    }
+    if (result instanceof Hash) result.set(elem, value);
+    else hashAset(result, elem as string, value);
+  };
   if (typeof defaultOrBlock === "function") {
     const block = defaultOrBlock as (elem: T) => V;
-    for (const elem of collection) result.set(elem, block(elem));
+    for (const elem of collection) aset(elem, block(elem));
   } else {
-    for (const elem of collection) result.set(elem, defaultOrBlock);
+    for (const elem of collection) aset(elem, defaultOrBlock);
   }
   return result;
 }

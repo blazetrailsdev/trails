@@ -168,7 +168,7 @@ export function serializableAttributes(
     const { owner } = rbModInstanceMethod(this.constructor as never, n);
     return typeof owner === "function" && this instanceof owner;
   });
-  return Object.fromEntries(indexWith(readable, (n) => this.readAttributeForSerialization(n)));
+  return indexWith(readable, (n) => this.readAttributeForSerialization(n));
 }
 
 /** @internal */

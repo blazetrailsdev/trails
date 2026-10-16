@@ -9,7 +9,6 @@ import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
 import {
-  type Hash,
   isEmpty,
   isSymbol,
   rbEqual,
@@ -407,7 +406,7 @@ export class InsertAll {
   }
 
   /** @internal */
-  private timestampsForCreate(): Hash<string, unknown> {
+  private timestampsForCreate(): Record<string, unknown> {
     return indexWith(
       this.model.allTimestampAttributesInModel(),
       this.connection.highPrecisionCurrentTimestamp(),
@@ -449,7 +448,7 @@ export class Builder implements InsertBuilder {
   private async extractTypesFromColumnsOn(
     tableName: string,
     keys: string[],
-  ): Promise<Hash<string, ValueType | null>> {
+  ): Promise<Record<string, ValueType | null>> {
     const columns = await this.model.schemaCache().columnsHash(tableName);
 
     const columnsKeys = Object.keys(columns);
@@ -525,7 +524,7 @@ export class Builder implements InsertBuilder {
 
     const valuesList = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
-      const type = types.get(key);
+      const type = types[key];
       value = SerializeCastValue.serialize(type!, type!.cast(value));
       return value;
     });

@@ -850,10 +850,8 @@ export function _inMemoryQueryConstraintsHash(
   if (queryConstraintsList.call(this.constructor as any) == null) {
     return { [this._primaryKey as string]: this.id };
   } else {
-    return Object.fromEntries(
-      indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
-        this.attribute(columnName),
-      ),
+    return indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
+      this.attribute(columnName),
     );
   }
 }
@@ -875,10 +873,8 @@ export function _queryConstraintsHash(this: PersistencePrivateHost): Record<stri
   if (queryConstraintsList.call(this.constructor as any) == null) {
     return { [this._primaryKey as string]: this.idInDatabase };
   } else {
-    return Object.fromEntries(
-      indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
-        this.attributeInDatabase(columnName),
-      ),
+    return indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
+      this.attributeInDatabase(columnName),
     );
   }
 }

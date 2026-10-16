@@ -62,9 +62,7 @@ export async function touchAttributesWithTime(
   names = names.map((name) => this.attributeAliases?.[name] ?? name);
   let attributeNames = this.timestampAttributesForUpdateInModel();
   attributeNames = [...new Set([...attributeNames, ...names])];
-  return Object.fromEntries(
-    indexWith(attributeNames, time ?? (await this.currentTimeFromProperTimezone())),
-  );
+  return indexWith(attributeNames, time ?? (await this.currentTimeFromProperTimezone()));
 }
 
 export type CounterCacheTouchOption =

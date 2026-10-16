@@ -17,6 +17,7 @@ import {
   BigDecimal,
   eachPair,
   Hash,
+  hashAref,
   Module,
   rbInspect,
 } from "@blazetrails/ruby-compat";
@@ -82,11 +83,11 @@ const BOOLEAN_ATTRIBUTES = new Set([
 const ARIA_PREFIXES = new Set(["aria"]);
 const DATA_PREFIXES = new Set(["data"]);
 
-const TAG_TYPES = new Map<string, string>([
-  ...indexWith([...BOOLEAN_ATTRIBUTES], "boolean"),
-  ...indexWith([...DATA_PREFIXES], "data"),
-  ...indexWith([...ARIA_PREFIXES], "aria"),
-]);
+const TAG_TYPES: Record<string, string> = {};
+Object.assign(TAG_TYPES, indexWith([...BOOLEAN_ATTRIBUTES], "boolean"));
+Object.assign(TAG_TYPES, indexWith([...DATA_PREFIXES], "data"));
+Object.assign(TAG_TYPES, indexWith([...ARIA_PREFIXES], "aria"));
+Object.freeze(TAG_TYPES);
 
 const PRE_CONTENT_STRINGS: Record<string, string> = {
   textarea: "\n",
@@ -477,7 +478,7 @@ export class TagBuilder {
     let output = "";
     const sep = " ";
     eachPair(options!, (key: string, value: unknown) => {
-      const type = TAG_TYPES.get(key);
+      const type = hashAref(TAG_TYPES, key);
       if (type === "data" && (isPlainObject(value) || value instanceof Hash)) {
         eachPair(value, (k: string, v: unknown) => {
           if (v == null) return;
