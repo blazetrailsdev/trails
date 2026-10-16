@@ -25,7 +25,7 @@ describe("I18nBackendKeyValueTest", () => {
   }
 
   function storeTranslations(locale: string, data: Record<string, unknown>): unknown {
-    return config().backend.storeTranslations(locale, data);
+    return config().backend.storeTranslations(locale, deepSymbolizeKeys(data));
   }
 
   function translations(): TranslationData | undefined {

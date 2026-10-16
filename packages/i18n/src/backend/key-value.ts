@@ -24,12 +24,6 @@ function isHash(value: unknown): value is TranslationData {
   return value instanceof Map || value instanceof SubtreeProxy;
 }
 
-function isPlainHash(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null) return false;
-  const proto: unknown = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
-
 const JSON = {
   encode(value: unknown): string {
     return globalThis.JSON.stringify(value);
@@ -98,7 +92,6 @@ export class KeyValue {
     for (let [key, value] of Object.entries(flattened)) {
       key = `${locale}.${key}`;
 
-      if (isPlainHash(value)) value = deepSymbolizeKeys(value);
       if (isHash(value)) {
         let oldValue: unknown;
         if (this._subtrees && (oldValue = this.store!.get(key)) != null) {
