@@ -383,7 +383,10 @@ export class ExceptionWrapper {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE exception-wrapper-extract-source-drops-null-path-guard
+   */
   extractSource(trace: BacktraceLine): SourceExtract {
     const spot = trace instanceof SourceMapLocation ? trace.spot(this.exception) : null;
 

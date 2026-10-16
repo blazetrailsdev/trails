@@ -1,4 +1,3 @@
-<%# @missingRailsArgs line_number — CONVERGEABLE exception-wrapper-extract-source-returns-code-and-line-number -%>
 <% for (const sourceExtract of this.sourceExtracts.slice(0, 3)) { %>
 <% if (sourceExtract.code) { %>
 Extracted source (around line #<%= sourceExtract.lineNumber %>):
