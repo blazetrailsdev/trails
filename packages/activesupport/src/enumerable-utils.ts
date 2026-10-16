@@ -64,7 +64,7 @@ export function indexWith<V>(
 export function indexWith<T, V>(
   collection: readonly T[],
   defaultOrBlock: V | ((elem: T) => V),
-): Hash<T, V>;
+): Hash<T, V> | Record<string, V>;
 export function indexWith<T, V>(
   collection: readonly T[],
   defaultOrBlock: V | ((elem: T) => V),

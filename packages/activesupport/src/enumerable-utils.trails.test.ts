@@ -29,7 +29,7 @@ describe("Enumerable#index_with answers a plain object for String elements", () 
     expect(indexWith([], 1)).toEqual({});
     const mixed = indexWith(["a", 1] as unknown[], (e) => e);
     expect(mixed).toBeInstanceOf(Hash);
-    expect([...mixed]).toEqual([
+    expect([...(mixed as Hash<unknown, unknown>)]).toEqual([
       ["a", "a"],
       [1, 1],
     ]);
