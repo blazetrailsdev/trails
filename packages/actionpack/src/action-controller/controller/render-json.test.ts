@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { ToJsonWithActiveSupportEncoder } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 
 function makeRequest(opts: Record<string, unknown> = {}): Request {
   return new Request({

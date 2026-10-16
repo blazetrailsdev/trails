@@ -4694,6 +4694,7 @@ function extractInterface(
         line,
         file,
         bodyless: true,
+        ...(internalJsDocTagApplies(member) ? { internal: true } : {}),
         ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       });
     } else if (ts.isPropertySignature(member)) {
@@ -4705,6 +4706,7 @@ function extractInterface(
         line,
         file,
         bodyless: true,
+        ...(internalJsDocTagApplies(member) ? { internal: true } : {}),
         ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       });
     }

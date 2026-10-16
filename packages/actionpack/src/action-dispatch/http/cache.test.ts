@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Response } from "../response.js";
+import { Response } from "./response.js";
 import {
   etagMatches,
   fresh,

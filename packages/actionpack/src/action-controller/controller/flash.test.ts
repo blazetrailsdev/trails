@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FlashHash } from "../../action-dispatch/flash.js";
+import { FlashHash } from "../../action-dispatch/middleware/flash.js";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Base } from "../base.js";

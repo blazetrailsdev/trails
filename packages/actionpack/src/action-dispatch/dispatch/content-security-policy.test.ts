@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll, beforeAll, beforeEach } from "vitest";
-import { ContentSecurityPolicy, MAPPINGS } from "../content-security-policy.js";
+import { ContentSecurityPolicy, MAPPINGS } from "../http/content-security-policy.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
 import { Base } from "../../action-controller/base.js";

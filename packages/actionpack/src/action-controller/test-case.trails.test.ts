@@ -127,7 +127,7 @@ describe("ActionController::Live under test_case.rb", () => {
     class LiveControllerTest extends TestCase {}
     LiveControllerTest.tests(LiveController);
     const tc = new LiveControllerTest(task.name);
-    expect(tc.response).toBeUndefined();
+    expect(tc.response).toBeNull();
     await tc.beforeSetup();
     expect(tc.response).toBeInstanceOf(LiveTestResponse);
   });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Parser } from "./parser.js";
-import { Ast } from "./ast.js";
+import { Ast } from "./nodes/node.js";
 import { Pattern } from "./path/pattern.js";
 import { Request } from "@blazetrails/rack";
 import { Range } from "@blazetrails/ruby-compat";

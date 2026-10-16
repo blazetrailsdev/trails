@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect } from "vitest";
 import { Base } from "../base.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { BrowserVersions } from "../metal/allow-browser.js";
 

@@ -14,7 +14,7 @@ import { beforeEach, describe, it } from "vitest";
 import { Metal } from "../../metal.js";
 import { Head } from "../../metal/head.js";
 import { TestCase } from "../../test-case.js";
-import { Request } from "../../../action-dispatch/request.js";
+import { Request } from "../../../action-dispatch/http/request.js";
 import "../../../test-helpers/abstract-unit.js";
 
 class BareController extends Metal {

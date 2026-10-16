@@ -4,7 +4,7 @@ import { Encoding, StringIO } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { ParamBuilder } from "../http/param-builder.js";
 import { InvalidParameterError } from "@blazetrails/rack";
-import { Request, PASS_NOT_FOUND, controllerConstants } from "../request.js";
+import { Request, PASS_NOT_FOUND, controllerConstants } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 

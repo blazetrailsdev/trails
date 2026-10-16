@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FlashHash } from "../../action-dispatch/flash.js";
+import { FlashHash } from "../../action-dispatch/middleware/flash.js";
 import { assertNil } from "@blazetrails/activesupport";
 import { rbObjDup, rbObjIvarSet } from "@blazetrails/ruby-compat";
 

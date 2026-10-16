@@ -5594,6 +5594,31 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toBeUndefined();
   });
 
+  it("marks an interface's own @internal members internal unless a receipt yields", () => {
+    const info = extractFromFiles("/p", {
+      "behavior.ts": `
+        export interface Behavior {
+          /** @internal */
+          buildResponse(klass: unknown): unknown;
+          /** @internal */
+          _htmlDocument?: unknown;
+          /**
+           * @internal
+           * @noRailsEquivalent PERMANENT
+           */
+          wrapExecution(block: () => unknown): unknown;
+          process(action: string): unknown;
+        }
+      `,
+    });
+    const iface = info.classes["behavior.ts:Behavior"] ?? info.modules["behavior.ts:Behavior"];
+    const internal = (name: string) => iface.instanceMethods.find((m) => m.name === name)!.internal;
+    expect(internal("buildResponse")).toBe(true);
+    expect(internal("_htmlDocument")).toBe(true);
+    expect(internal("wrapExecution")).toBeUndefined();
+    expect(internal("process")).toBeUndefined();
+  });
+
   it("records interface property signatures alongside method signatures", () => {
     const info = extractFromFiles("/p", {
       "locator.ts": `

@@ -26,6 +26,7 @@ import {
   merge,
   Module,
   rbModConstSet,
+  rbObjIvarSet,
   RuntimeError,
   SecureRandom,
   StringIO,
@@ -153,8 +154,8 @@ export const ClassMethods: BehaviorClassMethods & ThisType<BehaviorClass> = {
 export interface Behavior extends Included<typeof TestProcess> {
   routes?: RouteSet;
   controller: Metal;
-  request: TestRequest;
-  response: TestResponse | LiveTestResponse;
+  readonly request: TestRequest;
+  readonly response: TestResponse | LiveTestResponse;
   /** @internal */
   _cookieJar?: CookieJar;
   /** @internal */
@@ -261,12 +262,16 @@ async function process(
   this.request.setHeader("HTTP_COOKIE", this.cookies().toHeader());
   this.request.deleteHeader("action_dispatch.cookies");
 
-  this.request = new TestRequest(
-    this.scrubEnvBang(this.request.env),
-    this.request.session as unknown as TestSession,
-    this.controller.constructor as typeof Metal,
+  rbObjIvarSet(
+    this,
+    "@request",
+    new TestRequest(
+      this.scrubEnvBang(this.request.env),
+      this.request.session as unknown as TestSession,
+      this.controller.constructor as typeof Metal,
+    ),
   );
-  this.response = this.buildResponse(this._responseKlass);
+  rbObjIvarSet(this, "@response", this.buildResponse(this._responseKlass));
   this.response.request = this.request;
   this.controller.recycleBang();
 
@@ -326,8 +331,12 @@ function setupControllerRequestAndResponse(this: Behavior): void {
     }
   }
 
-  this.request = TestRequest.create(this.controller == null ? null : this.controller.constructor);
-  this.response = this.buildResponse(this._responseKlass);
+  rbObjIvarSet(
+    this,
+    "@request",
+    TestRequest.create(this.controller == null ? null : this.controller.constructor),
+  );
+  rbObjIvarSet(this, "@response", this.buildResponse(this._responseKlass));
   this.response.request = this.request;
 
   if (this.controller) {
@@ -413,8 +422,8 @@ async function processControllerResponse(
 
     await this.wrapExecution(() => this.controller.dispatch(action, this.request, this.response));
   } finally {
-    this.request = this.controller.request as TestRequest;
-    this.response = this.controller.response as Behavior["response"];
+    rbObjIvarSet(this, "@request", this.controller.request);
+    rbObjIvarSet(this, "@response", this.controller.response);
 
     if (this.request.isHaveCookieJar()) {
       if (!this.request.cookieJar().isCommitted()) {
@@ -481,6 +490,8 @@ export const Behavior = new Module((mod) => {
   mod.include(TestProcess);
   mod.include(ConstantLookup);
 
+  mod.attrReader("response", "request");
+
   (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
 
   mod.moduleEval((m) => {
@@ -531,9 +542,6 @@ export interface TestCase extends Behavior, TemplateAssertions, Assertions {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class TestCase extends ActiveSupportTestCase {
   static executorAroundEachRequest: boolean | null | undefined = null;
-
-  declare response: TestResponse | LiveTestResponse;
-  declare request: TestRequest;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-namespace -- `Behavior::ClassMethods`, `class_attribute :_controller_class` and `RoutingAssertions::ClassMethods` reach `TestCase` through `include Behavior` (`actionpack/lib/action_controller/test_case.rb:379-414,599,696`); a namespace merged onto the class is how the added statics surface on the type side.

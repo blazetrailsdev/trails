@@ -3,7 +3,7 @@ import { ArgumentError, LoadError, NameError, SecureRandom } from "@blazetrails/
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
-import { Request } from "../../request.js";
+import { Request } from "../../http/request.js";
 import { Session as RequestSession } from "../../request/session.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Session } from "../../../namespaces.js";

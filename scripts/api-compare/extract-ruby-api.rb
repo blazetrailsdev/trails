@@ -2490,15 +2490,21 @@ class ApiExtractor
         forms.each do |suffix_in_def, form|
           name = "#{base}#{suffix_in_def}"
           method_name = form == :writer ? "#{name}=" : name
+          generated = defs[method_name]
+          params =
+            if generated
+              extract_params(generated[:params])
+            else
+              form == :writer ? [{ name: "value", kind: "required" }] : []
+            end
           entry = {
             name: method_name,
             visibility: "public",
-            params: form == :writer ? [{ name: "value", kind: "required" }] : [],
+            params: params,
             file: @current_file,
             line: @current_line,
             notes: "class_eval",
           }
-          generated = defs[method_name]
           record_body_facts(entry, generated[:body], generated[:params], fqn) if generated
           target[:instanceMethods] << entry
         end

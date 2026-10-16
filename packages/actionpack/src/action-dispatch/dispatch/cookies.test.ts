@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { Response } from "@blazetrails/rack";
-import { CookieJar } from "../cookies.js";
+import { CookieJar } from "../middleware/cookies.js";
 import { CookieOverflow, type RequestCookieMethodsHost } from "../middleware/cookies.js";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";

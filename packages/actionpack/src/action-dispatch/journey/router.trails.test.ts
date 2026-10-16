@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { X_CASCADE } from "../constants.js";
 import { Request } from "../http/request.js";
 import { Parser } from "./parser.js";
-import { Ast } from "./ast.js";
+import { Ast } from "./nodes/node.js";
 import { Pattern } from "./path/pattern.js";
 import { Route } from "./route.js";
 import { Routes } from "./routes.js";

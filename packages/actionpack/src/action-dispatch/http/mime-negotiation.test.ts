@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { Request } from "../request.js";
+import { Request } from "./request.js";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { InvalidType, isParamsReadable, type MimeNegotiationHost } from "./mime-negotiation.js";
 import { ParseError } from "./parameters.js";

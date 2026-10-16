@@ -2524,6 +2524,45 @@ describe(
       expect(m["ActiveSupport::TimeWithZone"].map((x) => x.name)).toEqual(["year", "mon", "wday"]);
     });
 
+    it("records the parameters of a class_eval heredoc def with an interpolated name", () => {
+      const m = metaMethods(`
+      module ActionController
+        class LogSubscriber
+          %w(write_fragment exist_fragment?).each do |method|
+            class_eval <<-METHOD, __FILE__, __LINE__ + 1
+              def #{method}(event)
+                return unless ActionController::Base.enable_fragment_cache_logging
+              end
+            METHOD
+          end
+        end
+      end
+    `);
+      expect(m["ActionController::LogSubscriber"].map((x) => [x.name, x.params])).toEqual([
+        ["write_fragment", [{ name: "event", kind: "required" }]],
+        ["exist_fragment?", [{ name: "event", kind: "required" }]],
+      ]);
+    });
+
+    it("records the parameter name of a class_eval heredoc writer def", () => {
+      const m = metaMethods(`
+      module ActiveSupport
+        class Options
+          %w(level).each do |name|
+            class_eval <<-EOV, __FILE__, __LINE__ + 1
+              def #{name}=(new_level)
+                @#{name} = new_level
+              end
+            EOV
+          end
+        end
+      end
+    `);
+      expect(m["ActiveSupport::Options"].map((x) => [x.name, x.params])).toEqual([
+        ["level=", [{ name: "new_level", kind: "required" }]],
+      ]);
+    });
+
     it("keeps the literal suffix a class_eval def name carries after the loop variable", () => {
       const m = metaMethods(`
       module ActionDispatch

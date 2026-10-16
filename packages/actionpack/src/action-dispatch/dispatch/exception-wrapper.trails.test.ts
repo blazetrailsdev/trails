@@ -11,7 +11,7 @@ import {
   TseHandler,
 } from "@blazetrails/actionview";
 import { RoutingError, UnknownFormat } from "../../action-controller/metal/exceptions.js";
-import { ExceptionWrapper } from "../exception-wrapper.js";
+import { ExceptionWrapper } from "../middleware/exception-wrapper.js";
 
 class Holder {}
 

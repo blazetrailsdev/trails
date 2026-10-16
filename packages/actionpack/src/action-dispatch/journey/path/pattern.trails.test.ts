@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Parser } from "../parser.js";
-import { Ast } from "../ast.js";
+import { Ast } from "../nodes/node.js";
 import { Symbol as SymbolNode } from "../nodes/node.js";
 import { Pattern } from "./pattern.js";
 
