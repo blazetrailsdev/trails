@@ -47,6 +47,7 @@ const TYPE_UCLASS = 0x43;
 const TYPE_STRUCT = 0x53;
 const TYPE_OBJECT = 0x6f;
 const TYPE_EXTENDED = 0x65;
+const TYPE_USERDEF = 0x75;
 const TYPE_USRMARSHAL = 0x55;
 const TYPE_FLOAT = 0x66;
 const TYPE_BIGNUM = 0x6c;
@@ -113,6 +114,7 @@ interface DumpArg {
   data: Map<unknown, number>;
   numEntries: number;
   compatTbl: Map<object, object> | null;
+  userdefs: Set<object> | null;
 }
 
 /** `struct load_arg` (`vendor/ruby/v3.3.11/marshal.c:1267`). */
@@ -328,8 +330,8 @@ function hashEach(key: unknown, value: unknown, arg: DumpArg, limit: number): vo
  * `dump_funcall` (`marshal.c:210`). `check_dump_arg` (`marshal.c:188`) guards
  * a `dump_arg` a re-entered `Marshal.dump` freed, which a JS object never is.
  */
-function dumpFuncall(obj: object, sym: string, name: string): unknown {
-  const ret = rbFSend(obj, sym);
+function dumpFuncall(obj: object, sym: string, name: string, ...args: unknown[]): unknown {
+  const ret = rbFSend(obj, sym, ...args);
   const klass = Object.getPrototypeOf(obj) as object | null;
   if (ret !== null && typeof ret === "object" && Object.getPrototypeOf(ret) === klass) {
     throw new RuntimeError(`${rbModToS(rbObjClass(obj))}#${name} returned same class instance`);
@@ -435,14 +437,32 @@ function wEncoding(encname: Encname, arg: DumpArg, limit: number): number {
   return 1;
 }
 
-/** `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). */
-function hasIvars(encname: Encname): number {
-  return encname !== null ? 1 : 0;
+/**
+ * `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). Only a boxed `String` (the
+ * ASCII-8BIT String a `_dump` answers) holds ivars, as its own non-index properties.
+ *
+ * @inventedArm if — PERMANENT
+ */
+function hasIvars(obj: unknown, encname: Encname): number {
+  let num = encname !== null ? 1 : 0;
+  if (obj instanceof String) num += Object.keys(obj).length - obj.length;
+  return num;
 }
 
-/** `w_ivar_each` (`vendor/ruby/v3.3.11/marshal.c:736`) over `w_obj_each` (`marshal.c:629`). */
+/**
+ * `w_ivar_each` (`vendor/ruby/v3.3.11/marshal.c:736`) over `w_obj_each` (`marshal.c:629`).
+ *
+ * @inventedArm if — PERMANENT
+ */
 function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void {
   if (!num) return;
+  if (obj instanceof String) {
+    for (const id of Object.keys(obj).slice(obj.length)) {
+      wSymbol(`:${id}`, arg);
+      wObject((obj as unknown as Record<string, unknown>)[id], arg, limit);
+    }
+    return;
+  }
   for (const id of rbObjInstanceVariables(obj)) {
     wSymbol(`:${id}`, arg);
     wObject(rbObjIvarGet(obj, id), arg, limit);
@@ -450,9 +470,18 @@ function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void 
 }
 
 /** `w_ivar` (`vendor/ruby/v3.3.11/marshal.c:763`). */
-function wIvar(num: number, encname: Encname, arg: DumpArg, limit: number): void {
+function wIvar(
+  num: number,
+  ivobj: object | undefined,
+  encname: Encname,
+  arg: DumpArg,
+  limit: number,
+): void {
   wLong(num, arg);
-  wEncoding(encname, arg, limit);
+  num -= wEncoding(encname, arg, limit);
+  if (ivobj !== undefined && num) {
+    wIvarEach(ivobj, num, arg, limit);
+  }
 }
 
 /** `w_objivar` (`vendor/ruby/v3.3.11/marshal.c:780`). */
@@ -551,10 +580,44 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       wObject(v, arg, limit);
       return;
     }
+    if (rbObjRespondTo(obj, "_dump", true)) {
+      let ivobj: object | undefined;
+
+      if (arg.userdefs && arg.userdefs.has(obj as object)) {
+        throw new RuntimeError("can't dump recursive object using _dump()");
+      }
+      const v = dumpFuncall(obj as object, "_dump", "_dump", limit);
+      if (!(typeof v === "string" || v instanceof String)) {
+        throw new TypeError("_dump() must return string");
+      }
+      hasiv = hasIvars(obj, (encname = encodingName(obj)));
+      const encname2 = encodingName(v);
+      const hasiv2 = hasIvars(v, encname2);
+      if (hasiv2) {
+        hasiv = hasiv2;
+        ivobj = v as object;
+        encname = encname2;
+      }
+      if (hasiv) wByte(TYPE_IVAR, arg);
+      wClass(TYPE_USERDEF, obj as object, arg, false);
+      if (typeof v === "string") {
+        wCstr(v, arg);
+      } else {
+        const bytes = Array.from({ length: v.length }, (_, i) => v.charCodeAt(i));
+        wBytes(bytes, bytes.length, arg);
+      }
+      if (hasiv) {
+        (arg.userdefs ??= new Set()).add(obj as object);
+        wIvar(hasiv, ivobj, encname, arg, limit);
+        arg.userdefs.delete(obj as object);
+      }
+      wRemember(obj, arg);
+      return;
+    }
 
     wRemember(key, arg);
 
-    hasiv = hasIvars((encname = encodingName(obj)));
+    hasiv = hasIvars(obj, (encname = encodingName(obj)));
     {
       const allocator = rbGetAllocFunc(rbObjClass(obj));
       const compat = allocator === undefined ? undefined : compatAllocatorTbl.get(allocator);
@@ -660,7 +723,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     }
   }
   if (hasiv) {
-    wIvar(hasiv, encname, arg, limit);
+    wIvar(hasiv, undefined, encname, arg, limit);
   }
 }
 
@@ -672,6 +735,7 @@ function rbMarshalDumpLimited(obj: unknown, limit: number): string {
     data: new Map(),
     numEntries: 0,
     compatTbl: null,
+    userdefs: null,
   };
 
   wByte(MARSHAL_MAJOR, arg);
@@ -942,6 +1006,8 @@ function rEncname(obj: { value: string }, arg: LoadArg): number {
  * `r_ivar` (`vendor/ruby/v3.3.11/marshal.c:1762`), answering `obj` as
  * {@link rIvarEncoding} left it. `rb_hash_ruby2_keywords` flags a Hash as
  * keyword arguments, which a JS call has no slot for.
+ *
+ * @inventedArm if — PERMANENT
  */
 function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadArg): unknown {
   let len = rLong(arg);
@@ -959,6 +1025,8 @@ function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadAr
             `ruby2_keywords flag is given but ${rbObjAsString(obj)} is not a Hash`,
           );
         }
+      } else if (obj instanceof String) {
+        (obj as unknown as Record<string, unknown>)[sym] = val;
       } else {
         rbObjIvarSet(obj as object, sym, val);
       }
@@ -1302,6 +1370,28 @@ function rObjectFor(
         break;
       }
 
+      case TYPE_USERDEF: {
+        const name = rUnique(arg);
+        const klass = path2class(name);
+
+        if (!rbObjRespondTo(klass, "_load", true)) {
+          throw new TypeError(`class ${name} needs to have method \`_load'`);
+        }
+        let data: string | string = rString(arg);
+        if (ivp) {
+          data = rIvar(new String(data), null, arg) as string;
+          ivp.value = false;
+        }
+        v = rbFSend(klass, "_load", data);
+        v = rEntry(v, arg);
+        const allocator = rbGetAllocFunc(klass);
+        const compat = allocator === undefined ? undefined : compatAllocatorTbl.get(allocator);
+        if (compat !== undefined) {
+          v = compat.loader(klass as never, v as never);
+        }
+        break;
+      }
+
       case TYPE_USRMARSHAL: {
         const name = rUnique(arg);
         const klass = path2class(name);
@@ -1457,8 +1547,10 @@ export const Marshal = {
    *  internal slots, a Temporal value, or an instance of a class carrying
    *  `Symbol.toStringTag` is `T_DATA` and takes its `TypeError`.
    *
-   * Not ported: the `anIO` argument; and the `_dump` and Regexp arms, which
-   * nothing calls.
+   * `_dump` (`TYPE_USERDEF`, `marshal.c:918`) answers a String, or a boxed `String`
+   * for an ASCII-8BIT one carrying ivars, as `Time#_dump` does.
+   *
+   * Not ported: the `anIO` argument; and the Regexp arm, which nothing calls.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */
@@ -1485,7 +1577,8 @@ export const Marshal = {
    *  own raises `FrozenError`. A class path resolves through `rbPathToClass`.
    *
    * Not ported: the `proc` and `freeze:` arguments and an IO source; and
-   * `TYPE_USERDEF`, `TYPE_DATA` and Regexp, which nothing calls. A Struct has
+   * `TYPE_DATA` and Regexp, which nothing calls. `TYPE_USERDEF` hands `_load` a boxed
+   * `String` holding the String's ivars, which carries no encoding ivar. A Struct has
    * no `keyword_init`, so `TYPE_STRUCT` reads positional values only.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.load` (`vendor/ruby/v3.3.11/marshal.c:2434`).

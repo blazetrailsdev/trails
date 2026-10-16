@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 
 import type { MessageSerializer } from "./codec.js";
 import type { OnRotation } from "./rotator.js";
+import "./message-metadata-tests.js";
 
 export const DATA: readonly unknown[] = [{ a_boolean: true, a_number: 123, a_string: "abc" }];
 

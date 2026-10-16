@@ -1,8 +1,13 @@
-import { ArgumentError, KeyError, LoadError, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  KeyError,
+  LoadError,
+  Marshal,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";
-import { coder } from "../cache/coder.js";
 import { ActiveSupport } from "../namespaces.js";
 
 /** @internal */
@@ -97,13 +102,11 @@ const marshalWithFallback: Serializer = {
   },
 
   dump(object: unknown): string {
-    return MARSHAL_SIGNATURE + Buffer.from(coder.dump(object), "utf8").toString("latin1");
+    return Marshal.dump(object);
   },
 
   _load(dumped: string): unknown {
-    return coder.load(
-      Buffer.from(dumped.slice(MARSHAL_SIGNATURE.length), "latin1").toString("utf8"),
-    );
+    return Marshal.load(dumped);
   },
 
   dumped(dumped: string): boolean {

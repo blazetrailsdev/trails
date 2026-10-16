@@ -453,7 +453,7 @@ export class YAMLTree {
     switch (c[coderType]) {
       case ":scalar":
         return this.emitter.scalar(
-          c[coderScalar],
+          c[coderScalar] as string,
           null,
           c[coderTag],
           c[coderTag] === null,

@@ -861,3 +861,17 @@ describe("Time#hash", () => {
     expect(Time.at(0).hash()).not.toBe(Time.at(new Rational(1, 3_000_000_000)).hash());
   });
 });
+
+// `time_mdump` / `time_mload` (`vendor/ruby/v3.3.11/time.c:5272`, `:5448`) under `Marshal`'s `TYPE_USERDEF`
+describe("Time through Marshal", () => {
+  it("loads ruby -e 'Marshal.dump(Time.utc(2004,1,2,3,4,5.5r))' and round-trips a local time", async () => {
+    const { Marshal } = await import("@blazetrails/ruby-compat");
+    const mri = '\x04\bIu:\tTime\rC\x00\x1A\xC0 \xA1W\x10\x06:\tzoneI"\bUTC\x06:\x06EF';
+    const t = Marshal.load(mri) as Time;
+    expect([t.toS(), t.usec]).toEqual(["2004-01-02 03:04:05 UTC", 500000]);
+    expect(Marshal.dump(Time.utc(2004, 1, 2, 3, 4, 5.5))).toBe(mri.replace(/F$/, "T"));
+    const local = Time.local(2004);
+    const back = Marshal.load(Marshal.dump(local)) as Time;
+    expect([back.eql(local), back.utcOffset]).toEqual([true, local.utcOffset]);
+  });
+});
