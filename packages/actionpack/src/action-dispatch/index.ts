@@ -1,5 +1,3 @@
-export const VERSION = "8.0.2";
-
 export { Deprecator, deprecator } from "./deprecator.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export * as Constants from "./constants.js";
@@ -23,10 +21,6 @@ export {
   Dispatcher,
   StaticDispatcher,
   type DispatchableControllerClass,
-  escapePath,
-  escapeSegment,
-  escapeFragment,
-  unescapeUri,
   HelperMethodBuilder,
   UrlFor,
 } from "./routing/index.js";
@@ -78,7 +72,6 @@ export {
   type CspRequestHost,
 } from "./http/content-security-policy.js";
 export { Middleware as PermissionsPolicyMiddleware } from "./http/permissions-policy.js";
-export { redirectTo, redirectBack, type RedirectResult } from "./redirect.js";
 export { Flash, FlashHash } from "./middleware/flash.js";
 export { Static, type StaticOptions } from "./middleware/static.js";
 export * as Session from "./middleware/session/index.js";

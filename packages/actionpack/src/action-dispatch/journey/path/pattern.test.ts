@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { Parser } from "../parser.js";
-import { Ast } from "../ast.js";
+import { Ast } from "../nodes/node.js";
 import { Pattern } from "./pattern.js";
 
 const SEPARATORS = "/.?";

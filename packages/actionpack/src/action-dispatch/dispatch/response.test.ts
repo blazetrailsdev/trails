@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { Request } from "../request.js";
-import { Response } from "../response.js";
+import { Request } from "../http/request.js";
+import { Response } from "../http/response.js";
 import { IOError } from "@blazetrails/ruby-compat";
 import {
   assert,

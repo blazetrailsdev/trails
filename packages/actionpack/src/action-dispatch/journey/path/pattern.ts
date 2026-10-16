@@ -1,5 +1,5 @@
 import { regexpEscape, transformValues, uniq } from "@blazetrails/ruby-compat";
-import { Ast } from "../ast.js";
+import { Ast } from "../nodes/node.js";
 import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
 import { FormatBuilder, Format, Visitor } from "../visitors.js";

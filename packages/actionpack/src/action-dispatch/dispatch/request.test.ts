@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect } from "vitest";
-import { Request } from "../request.js";
+import { Request } from "../http/request.js";
 import { emptyRackBody } from "../http/request.js";
 import { Session } from "../request/session.js";
 import { Mime, MimeType } from "../http/mime-type.js";

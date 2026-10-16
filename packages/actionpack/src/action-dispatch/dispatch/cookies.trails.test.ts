@@ -3,7 +3,7 @@ import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotat
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { Response } from "@blazetrails/rack";
-import { CookieJar } from "../cookies.js";
+import { CookieJar } from "../middleware/cookies.js";
 import type { RequestCookieMethodsHost } from "../middleware/cookies.js";
 import { TestRequest } from "../testing/test-request.js";
 

@@ -4,7 +4,7 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Request as RackRequest, ResponseRaw } from "@blazetrails/rack";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
 
-import { Request } from "../../request.js";
+import { Request } from "../../http/request.js";
 import { Session as RequestSession } from "../../request/session.js";
 import {
   AbstractSecureStore,

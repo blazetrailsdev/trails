@@ -7,8 +7,8 @@ import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { type AbstractController } from "../../abstract-controller/base.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 
 registerConstant("FilterTest", { name: "FilterTest" });
 import "../../test-helpers/abstract-unit.js";

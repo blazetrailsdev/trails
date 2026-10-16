@@ -3,7 +3,7 @@ import { registerConstant, stderr, StringIO } from "@blazetrails/ruby-compat";
 import { assert, assertEqual, assertRaise, Logger } from "@blazetrails/activesupport";
 import { Base } from "../../../action-controller/base.js";
 import { ParseError } from "../../http/parameters.js";
-import { MimeType } from "../../mime-type.js";
+import { MimeType } from "../../http/mime-type.js";
 import { deprecator } from "../../deprecator.js";
 import { IntegrationTest } from "../../testing/integration.js";
 import type { RouteSet } from "../../routing/route-set.js";

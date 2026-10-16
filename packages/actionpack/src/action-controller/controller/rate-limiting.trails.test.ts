@@ -3,8 +3,8 @@ import { MemoryStore, Notifications } from "@blazetrails/activesupport";
 import { rateLimiting } from "../metal/rate-limiting.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 
 const makeRequest = () =>
   new Request({

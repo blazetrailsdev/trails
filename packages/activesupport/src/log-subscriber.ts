@@ -175,40 +175,40 @@ export class LogSubscriber extends Subscriber {
     }
   }
 
-  protected _info(message?: string | (() => string)): boolean {
+  protected _info(progname?: string | (() => string)): boolean {
     const l = this.logger;
     if (!l) return false;
-    return l.info(message);
+    return l.info(progname);
   }
 
-  protected _debug(message?: string | (() => string)): boolean {
+  protected _debug(progname?: string | (() => string)): boolean {
     const l = this.logger;
     if (!l) return false;
-    return l.debug(message);
+    return l.debug(progname);
   }
 
-  protected _warn(message?: string | (() => string)): boolean {
+  protected _warn(progname?: string | (() => string)): boolean {
     const l = this.logger;
     if (!l) return false;
-    return l.warn(message);
+    return l.warn(progname);
   }
 
-  protected _error(message?: string | (() => string)): boolean {
+  protected _error(progname?: string | (() => string)): boolean {
     const l = this.logger;
     if (!l) return false;
-    return l.error(message);
+    return l.error(progname);
   }
 
-  protected _fatal(message?: string | (() => string)): boolean {
+  protected _fatal(progname?: string | (() => string)): boolean {
     const l = this.logger;
     if (!l) return false;
-    return l.fatal(message);
+    return l.fatal(progname);
   }
 
-  protected _unknown(message?: string | (() => string)): boolean {
+  protected _unknown(progname?: string | (() => string)): boolean {
     const l = this.logger;
     if (!l) return false;
-    return l.unknown(message);
+    return l.unknown(progname);
   }
 
   protected color(

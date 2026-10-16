@@ -1,8 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
-import { Request, controllerConstants } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request, controllerConstants } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
 import { bodyToString } from "@blazetrails/rack";

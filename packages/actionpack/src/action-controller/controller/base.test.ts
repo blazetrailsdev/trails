@@ -16,8 +16,8 @@ import { deprecator } from "../deprecator.js";
 import { TestCase } from "../test-case.js";
 import { deprecator as actionDispatchDeprecator } from "../../action-dispatch/deprecator.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import "../../test-helpers/abstract-unit.js";
 

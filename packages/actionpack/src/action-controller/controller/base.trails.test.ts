@@ -3,8 +3,8 @@ import { htmlSafe } from "@blazetrails/activesupport";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { Base, DoubleRenderError, MODULES, PROTECTED_IVARS } from "../base.js";
 import { API } from "../api.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({

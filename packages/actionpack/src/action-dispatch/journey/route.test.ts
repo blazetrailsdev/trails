@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Parser } from "./parser.js";
-import { Ast } from "./ast.js";
+import { Ast } from "./nodes/node.js";
 import { Pattern } from "./path/pattern.js";
 import { Terminal } from "./nodes/node.js";
 import { Route } from "./route.js";

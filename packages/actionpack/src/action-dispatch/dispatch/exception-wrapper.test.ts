@@ -3,7 +3,7 @@ import { ParameterTypeError } from "@blazetrails/rack";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 import { BacktraceCleaner } from "@blazetrails/activesupport";
-import { ExceptionWrapper } from "../exception-wrapper.js";
+import { ExceptionWrapper } from "../middleware/exception-wrapper.js";
 
 const BACKTRACE =
   "TestError\n    at index (lib/file.ts:42:1)\n    at run (node_modules/vitest/index.js:7:3)";
