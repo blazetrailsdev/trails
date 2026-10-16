@@ -48,6 +48,11 @@ export class Scalar extends Node {
     this.quoted = quoted;
     this.style = style;
   }
+
+  /** @noRailsEquivalent PERMANENT */
+  override isScalar(): boolean {
+    return true;
+  }
 }
 
 registerConstant("Psych::Nodes::Scalar", Scalar);

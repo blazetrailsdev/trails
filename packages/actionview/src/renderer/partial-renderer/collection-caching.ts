@@ -1,6 +1,6 @@
 import { MemoryStore, SafeBuffer, indexWith } from "@blazetrails/activesupport";
 import type { CacheStore } from "@blazetrails/activesupport";
-import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { OutputBuffer } from "../../buffers.js";
 import type { SameCollectionIterator } from "../collection-renderer.js";
@@ -88,7 +88,7 @@ export function cacheCollectionRender(
       () => renderedPartials[index++],
     );
 
-    return orderedKeys.map((key) => keyedPartials.get(key) as RenderedTemplate);
+    return orderedKeys.map((key) => hashAref(keyedPartials, key) as RenderedTemplate);
   })();
 }
 
@@ -140,7 +140,7 @@ export function fetchOrCachePartial(
   template: RenderableTemplate,
   { orderBy }: { orderBy: unknown[][] },
   block: () => RenderedTemplate,
-): Map<unknown[], RenderedTemplate> {
+): Hash<unknown[], RenderedTemplate> | Record<string, RenderedTemplate> {
   const entriesToWrite = new Hash<unknown[], unknown>();
 
   const keyedPartials = indexWith(orderBy, (cacheKey): RenderedTemplate => {

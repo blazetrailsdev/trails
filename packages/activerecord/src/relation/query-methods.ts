@@ -100,8 +100,9 @@ export class WhereChain<R = any> {
         joinsBang.call(scope, association);
       }
 
-      const associationConditions = Object.fromEntries(
-        indexWith(kernelArray(reflection.associationPrimaryKey()), null),
+      const associationConditions = indexWith(
+        kernelArray(reflection.associationPrimaryKey()),
+        null,
       );
       if (reflection.options.className) {
         this.not({ [association]: associationConditions });
@@ -118,8 +119,9 @@ export class WhereChain<R = any> {
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
       leftOuterJoinsBang.call(scope, association);
-      const associationConditions = Object.fromEntries(
-        indexWith(kernelArray(reflection.associationPrimaryKey()), null),
+      const associationConditions = indexWith(
+        kernelArray(reflection.associationPrimaryKey()),
+        null,
       );
       if (reflection.options.className) {
         whereBang.call(scope, { [association]: associationConditions });

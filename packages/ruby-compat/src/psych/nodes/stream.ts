@@ -1,4 +1,5 @@
 import { registerConstant } from "../../variable.js";
+import { Parser } from "../parser.js";
 import { Node } from "./node.js";
 
 /**
@@ -8,7 +9,13 @@ import { Node } from "./node.js";
  */
 export class Stream extends Node {
   /** @noRailsEquivalent PERMANENT */
-  static readonly UTF8 = 1;
+  static readonly ANY = Parser.ANY;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly UTF8 = Parser.UTF8;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly UTF16LE = Parser.UTF16LE;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly UTF16BE = Parser.UTF16BE;
 
   /** @noRailsEquivalent PERMANENT */
   encoding: number;
@@ -17,6 +24,11 @@ export class Stream extends Node {
   constructor(encoding = Stream.UTF8) {
     super();
     this.encoding = encoding;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  override isStream(): boolean {
+    return true;
   }
 }
 

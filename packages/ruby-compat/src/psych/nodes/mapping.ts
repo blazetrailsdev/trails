@@ -34,6 +34,11 @@ export class Mapping extends Node {
     this.implicit = implicit;
     this.style = style;
   }
+
+  /** @noRailsEquivalent PERMANENT */
+  override isMapping(): boolean {
+    return true;
+  }
 }
 
 registerConstant("Psych::Nodes::Mapping", Mapping);

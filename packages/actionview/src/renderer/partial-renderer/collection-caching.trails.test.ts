@@ -78,6 +78,21 @@ describe("CollectionCaching", () => {
     expect(String(rendered.body)).toBe("<david><mary>");
   });
 
+  it("fetch_or_cache_partial keys an empty collection without a Map", async () => {
+    const { fetchOrCachePartial } = await import("./collection-caching.js");
+    const keyed = fetchOrCachePartial.call(
+      {} as never,
+      new Map(),
+      buildTemplate([]),
+      { orderBy: [] },
+      () => {
+        throw new Error("no render");
+      },
+    );
+    expect(keyed).toEqual({});
+    expect(store.writeMultiCalls).toBe(0);
+  });
+
   it("collapses items with equal cache keys into one render and one written entry", async () => {
     const template = buildTemplate(["<david>"]);
     vi.spyOn(lc, "find").mockReturnValue(template as never);

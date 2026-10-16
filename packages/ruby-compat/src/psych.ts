@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `Psych` module is a
    namespace of module functions and classes; ESM syntax cannot spell `Psych.dump`. */
-import type * as Yaml from "yaml";
-import { yaml as backend, type PsychIO, type PsychNode } from "./psych-adapter.js";
+import type { PsychIO } from "./psych-adapter.js";
 import { Coder as PsychCoder } from "./psych/coder.js";
 import { ClassLoader as PsychClassLoader } from "./psych/class-loader.js";
 import {
@@ -20,9 +19,13 @@ import { File } from "./file.js";
 import { IO } from "./io.js";
 import { registerConstant } from "./variable.js";
 import { Emitter as VisitorsEmitter } from "./psych/visitors/emitter.js";
+import { Parser as PsychParser } from "./psych/parser.js";
+import { TreeBuilder as PsychTreeBuilder } from "./psych/tree-builder.js";
+import { DepthFirst } from "./psych/visitors/depth-first.js";
+import { DocumentStream } from "./psych/handlers/document-stream.js";
+import type { Document as PsychDocument } from "./psych/nodes/document.js";
+import type { Stream as PsychStream } from "./psych/nodes/stream.js";
 import { RestrictedYAMLTree, YAMLTree, type YAMLTreeOptions } from "./psych/visitors/yaml-tree.js";
-
-const yaml = backend as unknown as typeof Yaml;
 
 export { coderTag } from "./psych/coder.js";
 
@@ -132,6 +135,9 @@ export namespace Psych {
     },
     get Emitter() {
       return VisitorsEmitter;
+    },
+    get DepthFirst() {
+      return DepthFirst;
     },
   };
 
@@ -243,48 +249,61 @@ export namespace Psych {
   ): unknown {
     const result = parse(yamlString, { filename });
     if (!result) return fallback;
-    return ToRuby.create({ symbolizeNames, freeze, strictInteger }).accept(result);
+    return result.toRuby({ symbolizeNames, freeze, strictInteger });
   }
 
   /**
-   * `Psych.parse` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:398`): the first
-   * document's root node. libyaml reads the source's bytes
-   * (`yaml_parser_set_input_string`, `vendor/ruby/v3.3.11/ext/psych/psych_parser.c:271`),
-   * so a source held as its bytes is decoded here. A malformed document raises
-   * `Psych::SyntaxError` as `make_exception` does (`psych_parser.c:80-100`).
-   * libyaml ends the first document after a closed flow or quoted root, and
-   * `parse` returns that node before the parser reads on (`psych.rb:398-403`),
-   * so a backend error past the root's end belongs to a later document.
+   * `Psych.parse` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:398-404`).
+   * The block's `return node` leaves `parse_stream` before the parser reads the
+   * next document, so it is thrown out of the block here.
    *
+   * @inventedArm try — PERMANENT
+   * @inventedArm throw — PERMANENT
    * @noRailsEquivalent PERMANENT
    */
   export function parse(
-    yamlString: string | Uint8Array | IO,
+    yaml: string | Uint8Array | IO,
     { filename = null as string | null } = {},
-  ): PsychNode | false {
-    if (yamlString instanceof IO) yamlString = yamlString.read();
-    if (yamlString instanceof Uint8Array) yamlString = new TextDecoder().decode(yamlString);
-    const doc = yaml.parseDocument(yamlString);
-    const root = doc.contents;
-    const end = root?.range?.[1] ?? 0;
-    const closed =
-      root != null && yaml.isCollection(root) && root.flow
-        ? "}]".includes(yamlString[end - 1] ?? "")
-        : yaml.isScalar(root) && (root.type === "QUOTE_SINGLE" || root.type === "QUOTE_DOUBLE");
-    const errors = closed ? doc.errors.filter((e) => e.pos[0] < end) : doc.errors;
-    if (errors.length > 0) {
-      const [error] = errors;
-      const mark = error.linePos?.[0] ?? { line: 0, col: 0 };
-      throw new PsychSyntaxError(
-        filename,
-        mark.line,
-        mark.col,
-        error.pos[0],
-        error.message.split(" at line ")[0],
-        null,
-      );
+  ): PsychDocument | false {
+    const done = {};
+    try {
+      parseStream(yaml, { filename }, (node) => {
+        throw Object.assign(done, { node });
+      });
+    } catch (e) {
+      if (e !== done) throw e;
+      return (done as { node: PsychDocument }).node;
     }
-    return doc.contents ?? false;
+    return false;
+  }
+
+  /**
+   * `Psych.parser` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:419-421`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function parser(): PsychParser {
+    return new PsychParser(new PsychTreeBuilder());
+  }
+
+  /**
+   * `Psych.parse_stream` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:452-461`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function parseStream(
+    yaml: string | Uint8Array | IO,
+    { filename = null as string | null } = {},
+    block?: (node: PsychDocument) => unknown,
+  ): PsychStream | PsychParser {
+    if (block) {
+      const parser = new PsychParser(new DocumentStream(block));
+      return parser.parse(yaml, filename);
+    } else {
+      const parser = Psych.parser();
+      parser.parse(yaml, filename);
+      return (parser.handler as PsychTreeBuilder).root!;
+    }
   }
 
   /**

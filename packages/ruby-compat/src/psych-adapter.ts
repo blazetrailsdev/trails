@@ -15,16 +15,6 @@ export interface PsychAdapter {
 }
 
 /**
- * A node of the backend's tree, as Psych reads it: `Psych::Nodes::Node#tag`
- * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/node.rb:20`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export interface PsychNode {
-  tag?: string | null;
-}
-
-/**
  * The `io` `Psych::Nodes::Node#yaml` writes to
  * (`vendor/ruby/v3.3.11/ext/psych/lib/psych/nodes/node.rb:58-64`).
  *

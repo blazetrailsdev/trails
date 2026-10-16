@@ -34,6 +34,11 @@ export class Sequence extends Node {
     this.implicit = implicit;
     this.style = style;
   }
+
+  /** @noRailsEquivalent PERMANENT */
+  override isSequence(): boolean {
+    return true;
+  }
 }
 
 registerConstant("Psych::Nodes::Sequence", Sequence);

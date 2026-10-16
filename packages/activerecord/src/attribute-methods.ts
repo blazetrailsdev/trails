@@ -543,9 +543,7 @@ export function attributesWithValues(
   this: InstanceMethodHost,
   attributeNames: string[],
 ): Record<string, unknown> {
-  return Object.fromEntries(
-    indexWith(attributeNames, (name) => this._attributes!.getAttribute!(name)),
-  );
+  return indexWith(attributeNames, (name) => this._attributes!.getAttribute!(name));
 }
 
 /** @internal */

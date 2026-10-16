@@ -11,7 +11,7 @@ export class Visitor {
     return this.visit(target);
   }
 
-  private visit(target: unknown): unknown {
+  protected visit(target: unknown): unknown {
     const method = `visit${rbModName(rbObjClass(target))!.replace(/::/g, "")}`;
     return (this as unknown as Record<string, (target: unknown) => unknown>)[method](target);
   }
