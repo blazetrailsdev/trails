@@ -99,7 +99,6 @@ export function extractHostname(host: string): string {
 }
 
 export interface HostAuthorizationOptions {
-  hosts: HostPermission[] | HostPermission | null | undefined;
   exclude?: (request: Request) => boolean;
   responseApp?: (env: RackEnv) => Promise<RackResponse>;
 }
@@ -112,14 +111,18 @@ export class HostAuthorization {
   private app: RackApp;
   private permissions: Permissions;
   private exclude?: (request: Request) => boolean;
-  private responseApp: (env: RackEnv) => Promise<RackResponse>;
+  private responseApp: RackApp;
 
-  constructor(app: RackApp, options: HostAuthorizationOptions) {
+  constructor(
+    app: RackApp,
+    hosts: HostPermission[] | HostPermission | null | undefined,
+    { exclude, responseApp }: HostAuthorizationOptions = {},
+  ) {
     this.app = app;
-    this.permissions = new Permissions(options.hosts);
-    this.exclude = options.exclude;
-    const defaultApp = new DefaultResponseApp();
-    this.responseApp = options.responseApp ?? ((env) => defaultApp.call(env));
+    this.permissions = new Permissions(hosts);
+    this.exclude = exclude;
+
+    this.responseApp = responseApp ?? new DefaultResponseApp();
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
@@ -134,7 +137,7 @@ export class HostAuthorization {
     }
 
     env["action_dispatch.blocked_hosts"] = blocked;
-    return this.responseApp(env);
+    return rbFSend(this.responseApp, "call", env) as Promise<RackResponse>;
   }
 
   /** @internal */
