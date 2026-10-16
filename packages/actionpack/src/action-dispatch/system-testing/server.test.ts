@@ -7,7 +7,7 @@ describe("ServerTest", () => {
 
   beforeEach(() => {
     oldVitestServer = vite.server;
-    vite.app = async () => [200, {}, ["ok"]];
+    vite.app = { call: async () => [200, {}, ["ok"]] };
   });
 
   afterEach(async () => {

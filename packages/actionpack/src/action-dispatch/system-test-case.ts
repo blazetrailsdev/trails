@@ -55,7 +55,7 @@ export class SystemTestCase {
       builder.map("/", (builder) => {
         builder.run(TopLevel.Trails!.application as unknown as RackApp);
       });
-    }) as unknown as RackApp;
+    });
 
     await new Server().run();
     const { afterAll } = await import("vitest");

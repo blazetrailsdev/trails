@@ -19,7 +19,7 @@ import {
 } from "../constants.js";
 import { HTTP_STATUS_CODES } from "../utils.js";
 import { RELEASE } from "../version.js";
-import type { RackApp, RackEnv, RackResponse } from "../index.js";
+import type { RackApp, RackEnv, RackMiddleware, RackResponse } from "../index.js";
 
 export interface Options {
   Port?: number;
@@ -32,9 +32,9 @@ const unhijacked = new Set<HttpSocket>();
 export class Node {
   static server: HttpServer | null = null;
 
-  readonly app: RackApp;
+  readonly app: RackApp | RackMiddleware;
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | RackMiddleware) {
     this.app = app;
   }
 
@@ -70,9 +70,11 @@ export class Node {
       const env = await this.requestEnv(req, new StringIO(await readBody(req)));
       env[RACK_IS_HIJACK] = false;
 
-      const [status, headers, body] = await (rbFSend(this.app, "call", env) as ReturnType<
-        typeof this.app
-      >);
+      const [status, headers, body] = await (rbFSend(
+        this.app,
+        "call",
+        env,
+      ) as Promise<RackResponse>);
       try {
         res.writeHead(status, sentHeaders(headers));
         for await (const chunk of body) {
@@ -113,9 +115,11 @@ export class Node {
           return socket;
         };
 
-        const [status, headers, body] = await (rbFSend(this.app, "call", env) as ReturnType<
-          typeof this.app
-        >);
+        const [status, headers, body] = await (rbFSend(
+          this.app,
+          "call",
+          env,
+        ) as Promise<RackResponse>);
         try {
           if (hijacked) return;
           const partial = headers[RACK_HIJACK] as unknown;
