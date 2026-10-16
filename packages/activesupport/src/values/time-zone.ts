@@ -601,9 +601,9 @@ export class Timezone {
 }
 
 export class TimeZone {
-  declare name: string;
-  declare tzinfo: Timezone;
-  declare private _utcOffset: number | null;
+  declare readonly name: string;
+  declare readonly tzinfo: Timezone;
+  declare private readonly _utcOffset: number | null;
 
   /**
    * @inventedArm if — PERMANENT
@@ -612,11 +612,6 @@ export class TimeZone {
   constructor(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null) {
     if (!creating) return TimeZone.find(name) ?? TimeZone.create(name);
     creating = false;
-    this.initialize(name, utcOffset, tzinfo);
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  initialize(name: string, utcOffset: number | null = null, tzinfo: Timezone | null = null): void {
     this.name = name;
     this._utcOffset = utcOffset;
     this.tzinfo = tzinfo ?? TimeZone.findTzinfo(name);
@@ -837,7 +832,7 @@ export class TimeZone {
   }
 
   initWith(coder: YAML.Coder): void {
-    this.initialize(coder["name"] as string);
+    Object.assign(this, TimeZone.create(coder["name"] as string));
   }
 
   encodeWith(coder: YAML.Coder): void {

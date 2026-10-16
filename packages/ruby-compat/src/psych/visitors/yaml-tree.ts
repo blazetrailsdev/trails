@@ -15,164 +15,27 @@ import {
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjRespondTo,
+  rbObjAsString,
 } from "../../object.js";
 import { Range } from "../../range.js";
 import { type StructInstance, isStruct } from "../../struct.js";
 import { temporalTag } from "../../temporal-tag.js";
 import { TypeError } from "../../type-error.js";
 import { registeredConstant } from "../../variable.js";
-import type { Node, Scalar, YAMLMap } from "yaml";
 import { Psych } from "../../psych.js";
-import type * as Yaml from "yaml";
-import { yaml as backend, type PsychDocument, type PsychNode } from "../../psych-adapter.js";
 import { Coder, coderSeq, coderTag, coderType } from "../coder.js";
 import { ClassLoader } from "../class-loader.js";
 import { BadAlias, DisallowedClass } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
-import { NotImplementedError } from "../../not-implemented-error.js";
 import { ArgumentError } from "../../argument-error.js";
 import { Omap } from "../omap.js";
-
-const yaml = backend as unknown as typeof Yaml;
-
-const BREAK = /[\r\n\u0085\u2028\u2029]/;
-const blankz = (c: string | undefined) =>
-  c === undefined || c === " " || c === "\t" || BREAK.test(c);
-const PRINTABLE = /^[\n\x20-\x7e\x85\xa0-\ud7ff\ue000-\ufefe\uff00-\ufffd\u{10000}-\u{10ffff}]$/u;
-
-function analyzeScalar(value: string): {
-  blockPlainAllowed: boolean;
-  singleQuotedAllowed: boolean;
-  blockAllowed: boolean;
-} {
-  if (value.length === 0) {
-    return { blockPlainAllowed: true, singleQuotedAllowed: true, blockAllowed: false };
-  }
-  const chars = Array.from(value);
-  let blockIndicators = false;
-  let leadingSpace = false;
-  let leadingBreak = false;
-  let trailingSpace = false;
-  let trailingBreak = false;
-  let breakSpace = false;
-  let spaceBreak = false;
-  let previousSpace = false;
-  let previousBreak = false;
-  let lineBreaks = false;
-  let specialCharacters = false;
-
-  if ((value.startsWith("---") || value.startsWith("...")) && blankz(chars[3])) {
-    blockIndicators = true;
-  }
-  let precededByWhitespace = true;
-  for (let i = 0; i < chars.length; i++) {
-    const c = chars[i];
-    const followedByWhitespace = blankz(chars[i + 1]);
-    if (i === 0) {
-      if ("#,[]{}&*!|>'\"%@`".includes(c)) blockIndicators = true;
-      if ((c === "?" || c === ":" || c === "-") && followedByWhitespace) blockIndicators = true;
-    } else {
-      if (c === ":" && followedByWhitespace) blockIndicators = true;
-      if (c === "#" && precededByWhitespace) blockIndicators = true;
-    }
-    if (!PRINTABLE.test(c) || c === "\ufeff") specialCharacters = true;
-    if (BREAK.test(c)) lineBreaks = true;
-    if (c === " ") {
-      if (i === 0) leadingSpace = true;
-      if (i === chars.length - 1) trailingSpace = true;
-      if (previousBreak) breakSpace = true;
-      previousSpace = true;
-      previousBreak = false;
-    } else if (BREAK.test(c)) {
-      if (i === 0) leadingBreak = true;
-      if (i === chars.length - 1) trailingBreak = true;
-      if (previousSpace) spaceBreak = true;
-      previousBreak = true;
-      previousSpace = false;
-    } else {
-      previousSpace = false;
-      previousBreak = false;
-    }
-    precededByWhitespace = blankz(c);
-  }
-
-  let blockPlainAllowed = true;
-  let singleQuotedAllowed = true;
-  let blockAllowed = true;
-  if (leadingSpace || leadingBreak || trailingSpace || trailingBreak) blockPlainAllowed = false;
-  if (trailingSpace) blockAllowed = false;
-  if (breakSpace) {
-    blockPlainAllowed = false;
-    singleQuotedAllowed = false;
-  }
-  if (spaceBreak || specialCharacters) {
-    blockPlainAllowed = singleQuotedAllowed = blockAllowed = false;
-  }
-  if (lineBreaks) blockPlainAllowed = false;
-  if (blockIndicators) blockPlainAllowed = false;
-  return { blockPlainAllowed, singleQuotedAllowed, blockAllowed };
-}
-
-function writeSingleQuoted(
-  stringify: NonNullable<Yaml.ScalarTag["stringify"]>,
-): NonNullable<Yaml.ScalarTag["stringify"]> {
-  return (item, ctx, onComment, onChompKeep) => {
-    const { value, type } = item as Scalar<string>;
-    if (type !== yaml.Scalar.QUOTE_SINGLE || typeof value !== "string") {
-      return stringify(item, ctx, onComment, onChompKeep);
-    }
-    const lineWidth = ctx.options.lineWidth;
-    const bestWidth = lineWidth > 0 ? lineWidth : Infinity;
-    const allowBreaks = !ctx.implicitKey;
-    const chars = Array.from(value);
-    let out = "'";
-    let column =
-      (ctx.indentAtStart === undefined
-        ? ctx.indent === ""
-          ? "--- ".length
-          : ctx.indent.length
-        : ctx.indent.length - ctx.indentStep.length + ctx.indentAtStart) + 1;
-    let spaces = false;
-    let breaks = false;
-    const writeIndent = () => {
-      if (!out.endsWith("\n")) out += "\n";
-      out += ctx.indent;
-      column = ctx.indent.length;
-    };
-    for (let i = 0; i < chars.length; i++) {
-      const c = chars[i];
-      if (c === " ") {
-        if (
-          allowBreaks &&
-          !spaces &&
-          column > bestWidth &&
-          i !== 0 &&
-          i !== chars.length - 1 &&
-          chars[i + 1] !== " "
-        ) {
-          writeIndent();
-        } else {
-          out += c;
-          column++;
-        }
-        spaces = true;
-      } else if (BREAK.test(c)) {
-        if (!breaks && c === "\n") out += "\n";
-        out += "\n";
-        column = 0;
-        breaks = true;
-      } else {
-        if (breaks) writeIndent();
-        out += c === "'" ? "''" : c;
-        column += c === "'" ? 2 : 1;
-        spaces = false;
-        breaks = false;
-      }
-    }
-    if (breaks) writeIndent();
-    return `${out}'`;
-  };
-}
+import { Alias } from "../nodes/alias.js";
+import { Document } from "../nodes/document.js";
+import { Mapping } from "../nodes/mapping.js";
+import type { Node } from "../nodes/node.js";
+import { Scalar } from "../nodes/scalar.js";
+import { Sequence } from "../nodes/sequence.js";
+import { Stream } from "../nodes/stream.js";
 
 type RubyTime = { isUtc(): boolean; strftime(format: string): string };
 type RubyDate = { gregorian(): { toS(): string } };
@@ -202,18 +65,8 @@ export interface YAMLTreeOptions {
  */
 export class YAMLTree {
   /** @internal */
-  protected readonly st = new Map<object, PsychNode>();
-  private readonly doc = new yaml.Document(undefined, {
-    customTags: (tags: Yaml.Tags) =>
-      tags.map((t) =>
-        typeof t === "object" && t.tag === "tag:yaml.org,2002:str"
-          ? {
-              ...(t as Yaml.ScalarTag),
-              stringify: writeSingleQuoted((t as Yaml.ScalarTag).stringify!),
-            }
-          : t,
-      ),
-  });
+  protected readonly st = new Map<object, Node>();
+  private readonly root = new Stream();
   private anchors = 0;
   private readonly ss: ScalarScanner;
   private readonly lineWidth: number | null;
@@ -245,11 +98,11 @@ export class YAMLTree {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  accept(target: unknown): PsychNode {
+  accept(target: unknown): Node {
     if (target !== null && typeof target === "object" && this.st.has(target)) {
-      const node = this.st.get(target)! as Node;
+      const node = this.st.get(target)! as Mapping;
       node.anchor ??= String(++this.anchors);
-      return new yaml.Alias(node.anchor) as unknown as Node;
+      return new Alias(node.anchor);
     }
 
     if (rbObjRespondTo(target, "encodeWith")) {
@@ -286,7 +139,23 @@ export class YAMLTree {
         ? this.visitHash(target)
         : this.visitObject(target);
     }
-    return this.doc.createNode(target ?? null);
+    if (target == null) return this.visitNilClass();
+    if (typeof target === "number" && !Number.isSafeInteger(target)) return this.visitFloat(target);
+    return this.visitInteger(target as number | boolean | bigint);
+  }
+
+  private visitFloat(o: number): Node {
+    if (Number.isNaN(o)) {
+      return new Scalar(".nan", null, null, true, false);
+    } else if (!Number.isFinite(o)) {
+      return new Scalar(o > 0 ? ".inf" : "-.inf", null, null, true, false);
+    } else {
+      return new Scalar(rbObjAsString(new Number(o)), null, null, true, false);
+    }
+  }
+
+  private visitNilClass(): Node {
+    return new Scalar("", null, "tag:yaml.org,2002:null", true, false);
   }
 
   private visitObject(o: object): Node {
@@ -296,8 +165,7 @@ export class YAMLTree {
         o.constructor === Object ? undefined : rbModName(o.constructor as new () => unknown);
       tag = ["!ruby/object", klass].filter((part) => part != null).join(":");
     }
-    const map = new yaml.YAMLMap();
-    map.tag = tag;
+    const map = new Mapping(null, tag, false);
     this.register(o, map);
     this.dumpIvars(o, map);
     return map;
@@ -308,15 +176,12 @@ export class YAMLTree {
       .filter((part) => part != null)
       .join(":");
 
-    const map = new yaml.YAMLMap();
-    map.tag = tag;
+    const map = new Mapping(null, tag, false);
     this.register(o, map);
     for (const member of o.members()) {
-      map.add(
-        new yaml.Pair(
-          this.doc.createNode(member),
-          this.accept((o as unknown as Record<string, unknown>)[member]),
-        ),
+      map.children.push(
+        new Scalar(member, null, null, true, false),
+        this.accept((o as unknown as Record<string, unknown>)[member]),
       );
     }
 
@@ -326,72 +191,54 @@ export class YAMLTree {
   }
 
   private visitPsychOmap(o: Omap): Node {
-    const seq = new yaml.YAMLSeq();
-    seq.tag = "tag:yaml.org,2002:omap";
+    const seq = new Sequence(null, "tag:yaml.org,2002:omap", false);
     this.register(o, seq);
 
-    for (const [k, v] of o) seq.items.push(this.visitHash(new Map([[k, v]])));
+    for (const [k, v] of o) seq.children.push(this.visitHash(new Map([[k, v]])));
     return seq;
   }
 
   private visitClass(o: { name?: string }): Node {
     const name = rbModName(o as new () => unknown);
     if (!name) throw new TypeError(`can't dump anonymous class: ${String(o)}`);
-    const scalar = new yaml.Scalar(name);
-    scalar.tag = "!ruby/class";
-    scalar.type = yaml.Scalar.QUOTE_SINGLE;
-    return this.register(o, scalar);
+    return this.register(
+      o,
+      new Scalar(name, null, "!ruby/class", false, false, Scalar.SINGLE_QUOTED),
+    );
   }
 
   private visitString(o: string): Node {
-    let style: Scalar.Type = yaml.Scalar.PLAIN;
+    let plain = true;
+    let quote = true;
+    let style = Scalar.PLAIN;
     let tag: string | null = null;
 
     if (/\n(?!\n?$)/.test(o)) {
-      style = yaml.Scalar.BLOCK_LITERAL;
+      style = Scalar.LITERAL;
     } else if (o === "<<") {
-      style = yaml.Scalar.QUOTE_SINGLE;
+      style = Scalar.SINGLE_QUOTED;
       tag = "tag:yaml.org,2002:str";
+      plain = false;
+      quote = false;
     } else if (o === "y" || o === "n") {
-      style = yaml.Scalar.QUOTE_DOUBLE;
+      style = Scalar.DOUBLE_QUOTED;
     } else if (this.lineWidth != null && Array.from(o).length > this.lineWidth) {
-      style = yaml.Scalar.BLOCK_FOLDED;
+      style = Scalar.FOLDED;
     } else if (/^[^\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}][^"]*$/mu.test(o)) {
-      style = yaml.Scalar.QUOTE_DOUBLE;
+      style = Scalar.DOUBLE_QUOTED;
     } else if (typeof this.ss.tokenize(o) !== "string" || /^0[0-7]*[89]/.test(o)) {
-      style = yaml.Scalar.QUOTE_SINGLE;
+      style = Scalar.SINGLE_QUOTED;
     }
 
-    const analysis = analyzeScalar(o);
-    if (style === yaml.Scalar.PLAIN && !analysis.blockPlainAllowed) {
-      style = yaml.Scalar.QUOTE_SINGLE;
-    }
-    if (style === yaml.Scalar.QUOTE_SINGLE && !analysis.singleQuotedAllowed) {
-      style = yaml.Scalar.QUOTE_DOUBLE;
-    }
-    if (
-      (style === yaml.Scalar.BLOCK_LITERAL || style === yaml.Scalar.BLOCK_FOLDED) &&
-      !analysis.blockAllowed
-    ) {
-      style = yaml.Scalar.QUOTE_DOUBLE;
-    }
-
-    const scalar = this.doc.createNode(o) as Scalar;
-    scalar.type = style;
-    if (tag) scalar.tag = tag;
-    return scalar;
+    return new Scalar(o, null, tag, plain, quote, style);
   }
 
   private visitSymbol(o: string): Node {
-    const scalar = this.doc.createNode(o) as Scalar;
-    scalar.type = analyzeScalar(o).blockPlainAllowed ? yaml.Scalar.PLAIN : yaml.Scalar.QUOTE_SINGLE;
-    return scalar;
+    return new Scalar(o, null, null, true, false);
   }
 
   private visitRegexp(o: RegExp): Node {
-    const scalar = new yaml.Scalar(String(o));
-    scalar.tag = "!ruby/regexp";
-    return this.register(o, scalar);
+    return this.register(o, new Scalar(String(o), null, "!ruby/regexp", false, false));
   }
 
   private visitDate(o: RubyDate): Node {
@@ -401,43 +248,46 @@ export class YAMLTree {
   private visitDateTime(o: DateTime): Node {
     const t = o.italy();
     const formatted = this.formatTime(t, t.offset.isZero());
-    const scalar = new yaml.Scalar(formatted);
-    scalar.tag = "!ruby/object:DateTime";
-    return this.register(o, scalar);
+    return this.register(o, new Scalar(formatted, null, "!ruby/object:DateTime", false, false));
   }
 
   private visitTime(o: RubyTime | ZonedDateTime | Instant): Node {
-    return this.register(o, new yaml.Scalar(this.formatTime(o)));
+    return this.register(o, new Scalar(this.formatTime(o), null, null, true, false));
   }
 
-  private visitInteger(o: { toS(): string } | PlainDate): Node {
-    return new yaml.Scalar(
-      temporalTag(o) === "Temporal.PlainDate"
-        ? (o as PlainDate).toString()
-        : (o as { toS(): string }).toS(),
+  private visitInteger(o: { toS(): string } | PlainDate | number | boolean | bigint): Node {
+    return new Scalar(
+      typeof o !== "object"
+        ? String(o)
+        : temporalTag(o) === "Temporal.PlainDate"
+          ? (o as PlainDate).toString()
+          : (o as { toS(): string }).toS(),
+      null,
+      null,
+      true,
+      false,
     );
   }
 
   private visitRange(o: Range): Node {
-    const map = new yaml.YAMLMap();
-    map.tag = "!ruby/range";
+    const map = new Mapping(null, "!ruby/range", false);
     this.register(o, map);
     for (const [k, v] of [
       ["begin", o.begin],
       ["end", o.end],
       ["excl", o.excludeEnd],
     ] as const) {
-      map.add(new yaml.Pair(this.accept(k), this.accept(v)));
+      map.children.push(this.accept(k), this.accept(v));
     }
     return map;
   }
 
   private visitHash(o: Map<unknown, unknown> | object): Node {
     if (!(o instanceof Map) || o.constructor === Map || o.constructor === Hash) {
-      const map = new yaml.YAMLMap();
+      const map = new Mapping();
       this.register(o, map);
       for (const [k, v] of o instanceof Map ? o : Object.entries(o)) {
-        map.add(new yaml.Pair(this.accept(k), this.accept(v)));
+        map.children.push(this.accept(k), this.accept(v));
       }
       return map;
     } else {
@@ -446,37 +296,43 @@ export class YAMLTree {
   }
 
   private visitArray(o: unknown[]): Node {
-    const seq = new yaml.YAMLSeq();
+    const seq = new Sequence();
     this.register(o, seq);
-    for (const thing of o) seq.items.push(this.accept(thing));
+    for (const thing of o) seq.children.push(this.accept(thing));
     return seq;
   }
 
   private visitHashSubclass(o: Map<unknown, unknown>): Node {
     const ivars = rbObjInstanceVariables(o);
     if (ivars.length > 0) {
-      const node = new yaml.YAMLMap();
-      node.tag = `!ruby/hash-with-ivars:${rbModToS(o.constructor as new () => unknown)}`;
+      const node = new Mapping(
+        null,
+        `!ruby/hash-with-ivars:${rbModToS(o.constructor as new () => unknown)}`,
+        false,
+      );
       this.register(o, node);
 
-      const ivarsKey = this.accept("ivars");
-      const ivarsMap = new yaml.YAMLMap();
+      node.children.push(this.accept("ivars"));
+      const ivarsMap = new Mapping();
       for (const ivar of rbObjInstanceVariables(o)) {
-        ivarsMap.add(new yaml.Pair(this.accept(`:${ivar}`), this.accept(rbObjIvarGet(o, ivar))));
+        ivarsMap.children.push(this.accept(`:${ivar}`), this.accept(rbObjIvarGet(o, ivar)));
       }
-      node.add(new yaml.Pair(ivarsKey, ivarsMap));
+      node.children.push(ivarsMap);
 
-      const elementsKey = this.accept("elements");
-      const elements = new yaml.YAMLMap();
-      for (const [k, v] of o) elements.add(new yaml.Pair(this.accept(k), this.accept(v)));
-      node.add(new yaml.Pair(elementsKey, elements));
+      node.children.push(this.accept("elements"));
+      const elements = new Mapping();
+      for (const [k, v] of o) elements.children.push(this.accept(k), this.accept(v));
+      node.children.push(elements);
 
       return node;
     } else {
-      const node = new yaml.YAMLMap();
-      node.tag = `!ruby/hash:${rbModToS(o.constructor as new () => unknown)}`;
+      const node = new Mapping(
+        null,
+        `!ruby/hash:${rbModToS(o.constructor as new () => unknown)}`,
+        false,
+      );
       this.register(o, node);
-      for (const [k, v] of o) node.add(new yaml.Pair(this.accept(k), this.accept(v)));
+      for (const [k, v] of o) node.children.push(this.accept(k), this.accept(v));
       return node;
     }
   }
@@ -521,77 +377,39 @@ export class YAMLTree {
 
   private emitCoder(c: Coder, o: object): Node {
     if (c[coderType] === ":seq") {
-      const seq = new yaml.YAMLSeq();
-      if (c[coderTag] !== null) seq.tag = c[coderTag];
-      for (const thing of c[coderSeq]) seq.items.push(this.accept(thing));
+      const seq = new Sequence(null, c[coderTag], c[coderTag] === null);
+      for (const thing of c[coderSeq]) seq.children.push(this.accept(thing));
       return seq;
     }
-    const map = new yaml.YAMLMap();
-    if (c[coderTag] !== null) map.tag = c[coderTag];
+    const map = new Mapping(null, c[coderTag], c[coderTag] === null);
     this.register(o, map);
-    for (const [k, v] of Object.entries(c)) map.add(new yaml.Pair(this.accept(k), this.accept(v)));
+    for (const [k, v] of Object.entries(c)) map.children.push(this.accept(k), this.accept(v));
     return map;
   }
 
-  private dumpIvars(target: object, map: YAMLMap): void {
+  private dumpIvars(target: object, map: Mapping): void {
     for (const iv of rbObjInstanceVariables(target)) {
-      map.add(
-        new yaml.Pair(
-          this.doc.createNode(iv.replace(/^@/, "")),
-          this.accept(rbObjIvarGet(target, iv)),
-        ),
+      map.children.push(
+        new Scalar(iv.replace(/^@/, ""), null, null, true, false),
+        this.accept(rbObjIvarGet(target, iv)),
       );
     }
   }
 
   /**
    * `YAMLTree#tree` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:97-100`).
-   * Its `yaml` is `Psych::Nodes::Node#yaml` (`nodes/node.rb:58-64`) over
-   * `Visitors::Emitter#initialize`'s options (`visitors/emitter.rb:5-17`); the
-   * backend has no canonical style, so `canonical: true` raises.
-   * libyaml writes a tagged or scalar root node on the `---` line, its
-   * continuation lines indented (`YAML.dump(Object.new)` is
-   * `"--- !ruby/object {}\n"`, `YAML.dump("a\nb")` is `"--- |-\n  a\n  b\n"`,
-   * `YAML.dump(nil)` is `"---\n"`) where the backend breaks the line, so that
-   * document start is written here. libyaml does not indent a block sequence
-   * under a mapping key and writes `nil` as an empty plain scalar
-   * (`{"a" => [nil]}.to_yaml` is `"---\na:\n-\n"`), so the backend is told so.
    *
    * @noRailsEquivalent PERMANENT
    */
-  get tree(): PsychDocument {
-    const doc = this.doc;
-    return {
-      yaml(io = null, options = {}) {
-        const du: { indent?: number; lineWidth?: number; indentSeq: boolean; nullStr: string } = {
-          indentSeq: false,
-          nullStr: "",
-        };
-        if ("indentation" in options) du.indent = options.indentation;
-        if (options.canonical) throw new NotImplementedError("canonical");
-        if ("lineWidth" in options) du.lineWidth = options.lineWidth;
-        let string: string;
-        if (doc.contents?.tag) {
-          string = `--- ${doc.toString(du)}`;
-        } else if (yaml.isScalar(doc.contents)) {
-          const indent = " ".repeat(du.indent ?? 2);
-          string =
-            doc.contents.value === null
-              ? "---\n"
-              : `--- ${doc.toString(du).replace(/\n(?=.)/g, `\n${indent}`)}`;
-        } else {
-          string = doc.toString({ directives: true, ...du }).replace(/^( *)- $/gm, "$1-");
-        }
-        if (!io) return string;
-        io.write(string);
-        return io;
-      },
-    };
+  get tree(): Stream {
+    return this.root;
   }
 
   /** @noRailsEquivalent PERMANENT */
   push(object: unknown): void {
-    this.doc.contents = this.accept(object) as typeof this.doc.contents;
+    const document = new Document([], [], false);
+    document.children.push(this.accept(object));
+    this.root.children.push(document);
   }
 }
 
@@ -633,7 +451,7 @@ export class RestrictedYAMLTree extends YAMLTree {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  override accept(target: unknown): PsychNode {
+  override accept(target: unknown): Node {
     if (!this.aliases && target !== null && typeof target === "object" && this.st.has(target)) {
       throw new BadAlias("Tried to dump an aliased object");
     }
