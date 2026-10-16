@@ -7687,6 +7687,8 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
             attrInternal.call(m, "defaultFormBuilder");
             attrInternalReader.call(m, "builder");
           });
+          /** @internal */
+          mod.moduleEval((m) => attrInternal.call(m, "secret"));
         });
       `,
     });
@@ -7697,6 +7699,10 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
         .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
     expect(seats("defaultFormBuilder")).toEqual(["instance", "instance writer"]);
     expect(seats("builder")).toEqual(["instance"]);
+    expect(mod.instanceMethods.filter((m) => m.name === "secret").map((m) => m.internal)).toEqual([
+      true,
+      true,
+    ]);
   });
 
   it("credits a Module's attrReader / attrWriter with the instance half each installs", () => {

@@ -93,6 +93,7 @@ export const ControllerRuntime = new Module((mod) => {
     this.dbRuntime = null;
   };
 
+  /** @internal */
   mod.moduleEval((carrier) => attrInternal.call(carrier, "dbRuntime"));
 
   mod.defineMethod("processAction", processAction);

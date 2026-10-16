@@ -1237,6 +1237,7 @@ export function extractFromProgram(
               line: attr.line,
               file: relPath,
               ...(writer ? { writer: true } : {}),
+              ...(attr.internal === true ? { internal: true } : {}),
             };
             if (at === -1) members.push(method);
             else members[at] = method;
@@ -3343,6 +3344,7 @@ function collectDefineColumnMethodsMembers(
  */
 interface ClassAttributeCall {
   enclosing?: string;
+  internal?: boolean;
   enclosingSeatsModule?: boolean;
   receiver?: string;
   names: string[];
@@ -3468,6 +3470,7 @@ function readClassAttributeCall(
       ...(internal !== undefined && enclosing?.seatsModule === true
         ? { enclosingSeatsModule: true }
         : {}),
+      ...(internal !== undefined && internalStatement(node) ? { internal: true } : {}),
       ...(ts.isIdentifier(recv) ? { receiver: importedName(recv, sourceFile) } : {}),
       names,
       reader: false,
@@ -3504,6 +3507,14 @@ function readClassAttributeCall(
     instancePredicate: macro.predicate && (optionBool(options, "instancePredicate") ?? true),
     line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
   };
+}
+
+/** Whether the statement a macro call sits in carries `@internal`, Ruby's `private` above it. */
+function internalStatement(node: ts.Node): boolean {
+  for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
+    if (ts.isExpressionStatement(cur) && internalJsDocTagApplies(cur)) return true;
+  }
+  return false;
 }
 
 function optionBool(
