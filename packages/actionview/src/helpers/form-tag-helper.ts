@@ -206,7 +206,7 @@ export function buttonTag(
   options: Record<string, unknown> | null = null,
   block?: () => unknown,
 ): SafeBuffer {
-  if (isPlainObject(contentOrOptions)) {
+  if (isPlainObject(contentOrOptions) || contentOrOptions instanceof Hash) {
     options = contentOrOptions as Record<string, unknown>;
   } else {
     options ??= {};

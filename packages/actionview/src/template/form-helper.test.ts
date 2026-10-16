@@ -9,6 +9,8 @@ import {
   assertRaises,
   extend,
   isBlank,
+  htmlSafe,
+  humanize,
   isHtmlSafe,
   isPlainObject,
   isPresent,
@@ -21,7 +23,7 @@ import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
-import type { FormBuilder } from "../helpers/form-helper.js";
+import { FormBuilder } from "../helpers/form-helper.js";
 import type { LabelBuilder } from "../helpers/tags/label.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
@@ -1318,6 +1320,37 @@ describe("FormHelperTest", () => {
       { method: "patch" },
       () => "<button type='submit' formmethod='get' name='button'>GET</button>",
     );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  class LabelledFormBuilder extends FormBuilder {
+    static {
+      for (const selector of this.fieldHelpers.filter((helper) => helper !== "hiddenField")) {
+        const zuper = (
+          FormBuilder.prototype as unknown as Record<string, (...args: unknown[]) => unknown>
+        )[selector];
+        (this.prototype as unknown as Record<string, (...args: unknown[]) => unknown>)[selector] =
+          function (this: FormBuilder, field: string, ...args: unknown[]) {
+            return htmlSafe(
+              `<label for='${field}'>${humanize(field)}:</label> ` +
+                String(zuper.call(this, field, ...args)) +
+                "<br/>",
+            );
+          };
+      }
+    }
+  }
+
+  it("form builder override", () => {
+    view.defaultFormBuilder = LabelledFormBuilder;
+
+    rendered = view.fieldsFor("post", post, {}, (f) => {
+      concat(f.textField("title"));
+    });
+
+    const expected =
+      "<label for='title'>Title:</label> <input name='post[title]' type='text' id='post_title' value='Hello World' /><br/>";
 
     assertDomEqual(expected, rendered);
   });
