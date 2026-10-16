@@ -75,7 +75,7 @@ describe("Template#compiled_source", () => {
     } catch (e) {
       raised = e;
     }
-    const original = (raised as { original?: unknown }).original ?? raised;
+    const original = (raised as { cause?: unknown }).cause ?? raised;
     expect(original).toBeInstanceOf(WrongEncodingError);
     expect(original).toBeInstanceOf(EncodingError);
     expect((original as Error).message).toMatch(

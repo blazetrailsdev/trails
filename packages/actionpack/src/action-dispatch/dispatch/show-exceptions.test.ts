@@ -9,7 +9,7 @@ import {
   assertRaise,
 } from "@blazetrails/activesupport";
 import { RuntimeError, StandardError } from "@blazetrails/ruby-compat";
-import { TemplateError, type Template } from "@blazetrails/actionview";
+import { TemplateError } from "@blazetrails/actionview";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { MethodNotAllowed, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { X_CASCADE } from "../constants.js";
@@ -45,7 +45,7 @@ class Boomer {
         try {
           throw new ActionNotFound();
         } catch (e) {
-          throw new TemplateError("template" as unknown as Template, e as Error);
+          throw new TemplateError("template", e as Error);
         }
       default:
         throw new RuntimeError("puke!");

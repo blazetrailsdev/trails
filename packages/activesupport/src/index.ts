@@ -452,6 +452,7 @@ export {
 } from "./core-ext/tse/util.js";
 export { HtmlSafeTranslation } from "./html-safe-translation.js";
 export { BacktraceCleaner } from "./backtrace-cleaner.js";
+export { SyntaxErrorProxy } from "./syntax-error-proxy.js";
 export { OrderedHash } from "./ordered-hash.js";
 export { ErrorReporter } from "./error-reporter.js";
 export { TopLevel } from "./namespaces.js";

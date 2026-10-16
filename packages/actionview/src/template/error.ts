@@ -1,8 +1,9 @@
-import { isPresent, symbolizeKeys } from "@blazetrails/activesupport";
+import { isPresent, SyntaxErrorProxy, symbolizeKeys } from "@blazetrails/activesupport";
 import { Jaro } from "@blazetrails/did-you-mean";
 import {
   ArgumentError,
   type Encoding,
+  excBacktrace,
   excBacktraceLocations,
   File,
   type Location,
@@ -200,30 +201,38 @@ export class MissingTemplate extends ActionViewError {
 export class TemplateError extends Error {
   static readonly SOURCE_CODE_RADIUS = 3;
 
-  readonly original: Error;
-  readonly template: Template;
+  declare readonly cause: Error;
+  readonly template: Template | string;
   private subTemplates?: Template[];
   private _lineNumber?: number | null;
 
-  constructor(template: Template, errinfo: Error) {
-    super(errinfo.message, { cause: errinfo });
+  constructor(template: Template | string, errinfo: Error) {
+    super(errinfo.message);
     this.name = "ActionView::Template::Error";
-    this.original = errinfo;
+    let cause: Error = errinfo;
+    if (cause instanceof SyntaxError) {
+      cause = new SyntaxErrorProxy(cause);
+    }
+    Object.defineProperty(this, "cause", { value: cause, configurable: true, writable: true });
     this.template = template;
   }
 
   backtrace(): string[] {
-    const stack = this.original.stack;
-    if (stack == null) return [];
-    return stack.split("\n").slice(1);
+    const cause: unknown = this.cause;
+    if (cause instanceof SyntaxErrorProxy) return cause.backtrace();
+    return excBacktrace(this.cause) ?? [];
   }
 
   backtraceLocations(): Location[] | null {
-    return excBacktraceLocations(this.original);
+    const cause: unknown = this.cause;
+    if (cause instanceof SyntaxErrorProxy) {
+      return cause.backtraceLocations() as Location[] | null;
+    }
+    return excBacktraceLocations(this.cause);
   }
 
   fileName(): string {
-    return this.template.identifier;
+    return (this.template as Template).identifier;
   }
 
   subTemplateMessage(): string {
@@ -237,7 +246,7 @@ export class TemplateError extends Error {
     const num = this.lineNumber();
     if (num == null) return [];
 
-    const sourceCode = this.template.encodeBang().split("\n");
+    const sourceCode = (this.template as Template).encodeBang().split("\n");
 
     const startOnLine = Math.max(num - TemplateError.SOURCE_CODE_RADIUS - 1, 0);
     const endOnLine = Math.min(num + TemplateError.SOURCE_CODE_RADIUS - 1, sourceCode.length);

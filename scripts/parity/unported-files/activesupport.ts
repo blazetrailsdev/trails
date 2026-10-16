@@ -169,12 +169,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
   },
-  {
-    pattern: "syntax_error_proxy.rb",
-    package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
-  },
 
   // ---------------------------------------------------------------------------
   // Case-level exclusions from the AR-closure skip-stub triage (RFC 0105,
