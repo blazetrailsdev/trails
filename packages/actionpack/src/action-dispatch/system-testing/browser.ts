@@ -1,20 +1,6 @@
+import type { BrowserType, LaunchOptions } from "playwright";
 import { File, Gem } from "@blazetrails/ruby-compat";
-
-/** @noRailsEquivalent PERMANENT */
-export interface LaunchOptions {
-  args: string[];
-  headless: boolean;
-  channel?: string;
-  executablePath?: string;
-  [key: string]: unknown;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export interface BrowserType {
-  executablePath(): string;
-}
-
-const PLAYWRIGHT_MODULE = "playwright";
+import { requirePlaywright } from "./driver.js";
 
 export class Browser {
   readonly name: string;
@@ -57,14 +43,10 @@ export class Browser {
   async preload(): Promise<void> {
     switch (this.type) {
       case "chrome":
-        await this.resolveDriverPath(
-          ((await import(PLAYWRIGHT_MODULE)) as Record<string, BrowserType>).chromium,
-        );
+        await this.resolveDriverPath((await requirePlaywright()).chromium as BrowserType);
         break;
       case "firefox":
-        await this.resolveDriverPath(
-          ((await import(PLAYWRIGHT_MODULE)) as Record<string, BrowserType>).firefox,
-        );
+        await this.resolveDriverPath((await requirePlaywright()).firefox as BrowserType);
         break;
     }
   }
@@ -75,12 +57,12 @@ export class Browser {
    */
   private defaultChromeOptions(): LaunchOptions {
     const options: LaunchOptions = { args: [], headless: false };
-    options.args.push("--disable-search-engine-choice-screen");
+    options.args!.push("--disable-search-engine-choice-screen");
     if (this.name === "headless_chrome") {
-      options.args.push("--headless");
+      options.args!.push("--headless");
       options.headless = true;
     }
-    if (Gem.isWinPlatform()) options.args.push("--disable-gpu");
+    if (Gem.isWinPlatform()) options.args!.push("--disable-gpu");
     return options;
   }
 
@@ -91,7 +73,7 @@ export class Browser {
   private defaultFirefoxOptions(): LaunchOptions {
     const options: LaunchOptions = { args: [], headless: false };
     if (this.name === "headless_firefox") {
-      options.args.push("-headless");
+      options.args!.push("-headless");
       options.headless = true;
     }
     return options;
@@ -100,6 +82,8 @@ export class Browser {
   /**
    * @internal
    * @missingRailsCall path — PERMANENT
+   * @inventedArm throw — PERMANENT
+   * @inventedArm isExistAsync — PERMANENT
    */
   private async resolveDriverPath(namespace: BrowserType): Promise<void> {
     const driverPath = namespace.executablePath();

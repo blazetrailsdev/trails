@@ -24,7 +24,8 @@ export interface PlaywrightBrowser {
 let playwrightModule: Record<string, unknown> | undefined;
 const PLAYWRIGHT_MODULE = "playwright";
 
-async function requirePlaywright(): Promise<Record<string, unknown>> {
+/** @noRailsEquivalent PERMANENT */
+export async function requirePlaywright(): Promise<Record<string, unknown>> {
   if (playwrightModule) return playwrightModule;
   try {
     playwrightModule = (await import(PLAYWRIGHT_MODULE)) as Record<string, unknown>;
