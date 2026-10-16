@@ -8,8 +8,11 @@ import {
 
 export type TranslationData = Hash<unknown, unknown>;
 
-function isHash(value: unknown): value is TranslationData | Record<string, unknown> {
-  if (value instanceof Map) return true;
+function isHash(value: unknown): value is TranslationData {
+  return value instanceof Map;
+}
+
+function isPlainHash(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null) return false;
   const proto: unknown = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
@@ -37,7 +40,7 @@ export function deepMergeBang(
     otherHash as unknown as Map<string, unknown>,
     rbBlock((key: string, thisVal: unknown, otherVal: unknown) => {
       if (isHash(thisVal) && isHash(otherVal)) {
-        return deepMerge(thisVal as TranslationData, otherVal as TranslationData, block);
+        return deepMerge(thisVal, otherVal, block);
       } else if (block) {
         return block(key, thisVal, otherVal);
       } else {
@@ -60,7 +63,7 @@ export function deepSymbolizeKeys(hash: object): TranslationData {
 
 /** @internal */
 function deepSymbolizeKeysInObject(value: unknown): unknown {
-  if (isHash(value)) return deepSymbolizeKeys(value);
+  if (isHash(value) || isPlainHash(value)) return deepSymbolizeKeys(value);
   if (Array.isArray(value)) return value.map(deepSymbolizeKeysInObject);
   return value;
 }

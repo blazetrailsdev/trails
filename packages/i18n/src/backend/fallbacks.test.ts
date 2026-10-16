@@ -134,7 +134,7 @@ describe("I18nBackendFallbacksTranslateTest", () => {
     expect(
       t("missing_foo", {
         locale: "de-DE",
-        default: [":missing_bar", { other: "Default %{count} Bars" }, "Default Bar"],
+        default: [":missing_bar", new Hash().set(":other", "Default %{count} Bars"), "Default Bar"],
         count: 6,
       }),
     ).toBe("Default 6 Bars");

@@ -22,6 +22,7 @@ import {
 } from "../i18n.js";
 import {
   Hash,
+  JSON,
   NotImplementedError,
   hasKey,
   hashAref,
@@ -91,14 +92,6 @@ function readLocaleModule(filename: string): unknown {
     );
   }
   return localeModules.get(filename);
-}
-
-function deepFreeze(value: unknown): unknown {
-  if (typeof value !== "object" || value === null) return value;
-  if (Object.isFrozen(value)) return value;
-  Object.freeze(value);
-  for (const child of Object.values(value)) deepFreeze(child);
-  return value;
 }
 
 function readFile(filename: string): string {
@@ -396,15 +389,12 @@ export abstract class Base {
   }
 
   protected pluralize(_locale: Locale, entry: unknown, count: unknown): unknown {
-    if (isHash(entry) || isPlainHash(entry)) {
-      entry = except(entry, entry instanceof Map ? ":attributes" : "attributes");
-    }
-    if (!((isHash(entry) || isPlainHash(entry)) && truthy(count))) return entry;
+    if (isHash(entry)) entry = except(entry, ":attributes");
+    if (!(isHash(entry) && truthy(count))) return entry;
 
-    const key = this.pluralizationKey(entry as TranslationData, count);
-    const stored = entry instanceof Map ? key : symbolToS(key);
-    if (!hasKey(entry, stored)) throw new InvalidPluralizationData(entry, count, key);
-    return hashAref(entry, stored);
+    const key = this.pluralizationKey(entry, count);
+    if (!hasKey(entry, key)) throw new InvalidPluralizationData(entry, count, key);
+    return hashAref(entry, key);
   }
 
   protected interpolate(
@@ -543,11 +533,11 @@ export abstract class Base {
 
   /**
    * @missingRailsCall load_file — PERMANENT
-   * @missingRailsName read — PERMANENT
+   * @missingRailsArgs parse — PERMANENT
    */
   protected loadJson(filename: string): [unknown, boolean] {
     try {
-      return [deepFreeze(JSON.parse(readFile(filename))), false];
+      return [JSON.parse(readFile(filename), { symbolizeNames: true, freeze: true }), true];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }
@@ -555,7 +545,7 @@ export abstract class Base {
 
   protected pluralizationKey(entry: TranslationData, count: unknown): string {
     let key: string | undefined;
-    if (count === 0 && hasKey(entry, entry instanceof Map ? ":zero" : "zero")) key = ":zero";
+    if (count === 0 && hasKey(entry, ":zero")) key = ":zero";
     key ??= count === 1 ? ":one" : ":other";
     return key;
   }

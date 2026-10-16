@@ -76,8 +76,10 @@ describe("I18nBackendChainTest", () => {
 
   it("default", () => {
     expect(t(null, { default: "Fuh" })).toBe("Fuh");
-    expect(t(null, { default: { zero: "Zero" }, count: 0 })).toBe("Zero");
-    expect(t(null, { default: { zero: "Zero" } })).toEqual({ zero: "Zero" });
+    expect(t(null, { default: deepSymbolizeKeys({ zero: "Zero" }), count: 0 })).toBe("Zero");
+    expect(t(null, { default: deepSymbolizeKeys({ zero: "Zero" }) })).toEqual(
+      deepSymbolizeKeys({ zero: "Zero" }),
+    );
     expect(t(null, { default: ":foo" })).toBe("Foo");
   });
 

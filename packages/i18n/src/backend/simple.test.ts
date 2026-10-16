@@ -168,10 +168,10 @@ describe("I18nBackendSimpleTest", () => {
 
   it("simple load_json: loads data from a JSON file", () => {
     const [data] = send(backend, "loadJson", `${localesDir()}/en.json`);
-    expect(data).toEqual({ en: { foo: { bar: "baz" } } });
-    expect(data).toEqual({ en: { foo: { bar: "baz" } } });
-    assertPredicate((data as Record<string, Record<string, Record<string, unknown>>>)["en"], (en) =>
-      Object.isFrozen(en["foo"]["bar"]),
+    expect(data).toEqual(h([":en", h([":foo", h([":bar", "baz"])])]));
+    expect(data).toEqual(h([":en", h([":foo", h([":bar", "baz"])])]));
+    assertPredicate((data as Hash<string, Hash<string, Hash<string, unknown>>>).get(":en"), (en) =>
+      Object.isFrozen(en!.get(":foo")!.get(":bar")),
     );
   });
 

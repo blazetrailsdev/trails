@@ -24,6 +24,20 @@ function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const JSON = {
+  encode(value: unknown): string {
+    return globalThis.JSON.stringify(value);
+  },
+  decode(value: string): unknown {
+    return globalThis.JSON.parse(value, (_key, decoded: unknown) => {
+      if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return decoded;
+      const hash = new Hash<unknown, unknown>();
+      for (const [k, v] of Object.entries(decoded)) hash.set(k, v);
+      return hash;
+    });
+  },
+};
+
 const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "isNil"]);
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
@@ -81,7 +95,7 @@ export class KeyValue {
       if (isHash(value)) {
         let oldValue: unknown;
         if (this._subtrees && (oldValue = this.store!.get(key)) != null) {
-          oldValue = JSON.parse(oldValue as string);
+          oldValue = JSON.decode(oldValue as string);
           if (isHash(oldValue)) {
             value = deepMergeBang(deepSymbolizeKeys(oldValue), value);
           }
@@ -90,7 +104,7 @@ export class KeyValue {
         throw new Error("Key-value stores cannot handle procs");
       }
 
-      if (!isSymbol(value)) this.store!.set(key, JSON.stringify(value));
+      if (!isSymbol(value)) this.store!.set(key, JSON.encode(value));
     }
     return flattened;
   }
@@ -110,11 +124,14 @@ export class KeyValue {
     return (this.translationsStore = deepSymbolizeKeys(
       [...this.store!.keys()]
         .map((mainKey) => {
-          const mainValue: unknown = JSON.parse(this.store!.get(mainKey)!);
+          const mainValue: unknown = JSON.decode(this.store!.get(mainKey)!);
           return String(mainKey)
             .split(".")
             .reverse()
-            .reduce<unknown>((value, key) => ({ [key]: value }), mainValue) as TranslationData;
+            .reduce<unknown>(
+              (value, key) => new Hash<unknown, unknown>().set(`:${key}`, value),
+              mainValue,
+            ) as TranslationData;
         })
         .reduce<TranslationData | undefined>(
           (hash, elem) => (hash === undefined ? elem : deepMergeBang(hash, elem)),
@@ -142,7 +159,7 @@ export class KeyValue {
       options.separator as string | false | undefined,
     );
     const stored = this.store!.get(`${locale}.${key}`);
-    const value: unknown = stored != null ? JSON.parse(stored) : stored;
+    const value: unknown = stored != null ? JSON.decode(stored) : stored;
 
     if (isHash(value)) {
       return deepSymbolizeKeys(value);
@@ -208,7 +225,7 @@ export class SubtreeProxy {
     if (this.#subtree == null || (value = this.#subtree.get(key)) == null) {
       value = this.#store.get(`${this.#masterKey}.${isSymbol(key) ? symbolToS(key) : key}`);
       if (value != null) {
-        value = JSON.parse(value as string);
+        value = JSON.decode(value as string);
         (this.#subtree ??= new Hash()).set(key, value);
       }
     }

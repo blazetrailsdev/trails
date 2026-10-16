@@ -1,4 +1,4 @@
-import { Rational, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { Hash, Rational, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
@@ -44,7 +44,7 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
     storage_units: {
       format: "%n %u",
       units: {
-        byte: { one: "Byte", other: "Bytes" },
+        byte: new Hash<unknown, unknown>().set(":one", "Byte").set(":other", "Bytes"),
         kb: "KB",
         mb: "MB",
         gb: "GB",
