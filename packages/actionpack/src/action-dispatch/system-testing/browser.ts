@@ -2,7 +2,7 @@ import type { BrowserType, LaunchOptions } from "playwright";
 import { File, Gem } from "@blazetrails/ruby-compat";
 import { requirePlaywright } from "./driver.js";
 
-/** @noRailsEquivalent CONVERGEABLE converge-driver-selenium-arm-onto-webdriverio */
+/** @noRailsEquivalent PERMANENT */
 export const serviceDriverPath = new Map<BrowserType, string>();
 
 export class Browser {
