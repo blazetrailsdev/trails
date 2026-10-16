@@ -21,7 +21,13 @@ export interface Store {
 }
 
 function isHash(value: unknown): value is TranslationData {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return value instanceof Map || value instanceof SubtreeProxy;
+}
+
+function isPlainHash(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 const JSON = {
@@ -82,6 +88,10 @@ export class KeyValue {
     return this.store != null;
   }
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm deepSymbolizeKeys — PERMANENT
+   */
   storeTranslations(
     locale: Locale,
     data: TranslationData | Record<string, unknown>,
@@ -92,6 +102,7 @@ export class KeyValue {
     for (let [key, value] of Object.entries(flattened)) {
       key = `${locale}.${key}`;
 
+      if (isPlainHash(value)) value = deepSymbolizeKeys(value);
       if (isHash(value)) {
         let oldValue: unknown;
         if (this._subtrees && (oldValue = this.store!.get(key)) != null) {
