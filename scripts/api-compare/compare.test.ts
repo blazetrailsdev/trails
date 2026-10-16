@@ -68,6 +68,7 @@ import {
   ambiguousTsOwner,
   ownersWithBodies,
   ambiguousRubyOwner,
+  countsAsRubyOwner,
   rubyOwnerSeat,
   tsMemberStatesSeat,
   recordTsSeatOwners,
@@ -3302,6 +3303,14 @@ describe("ambiguousRubyOwner", () => {
         rubyOwnersOnTsSeat: 2,
       }),
     ).toBe(true);
+  });
+});
+
+describe("countsAsRubyOwner", () => {
+  it("does not count a same-file module's flattened body as its includer's", () => {
+    expect(countsAsRubyOwner({ mixinFile: "test_case.rb" }, "test_case.rb")).toBe(false);
+    expect(countsAsRubyOwner({}, "test_case.rb")).toBe(true);
+    expect(countsAsRubyOwner({ mixinFile: "metal/testing.rb" }, "test_case.rb")).toBe(true);
   });
 });
 

@@ -1,0 +1,80 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "apply_action_options",
+    "call": "action_options?",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "draw",
+    "call": "find",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "draw",
+    "call": "read",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "has_named_route?",
+    "call": "key?",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "map_match",
+    "call": "warn",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:squish"
+    ],
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "merge_options_scope",
+    "call": "merge",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "mount",
+    "call": "delete",
+    "kind": "args",
+    "rubyArgs": [
+      "str:at"
+    ],
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resource",
+    "call": "order:get,constructor",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resources",
+    "call": "order:get,constructor",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "resources_path_names",
+    "call": "merge!",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  }
+]

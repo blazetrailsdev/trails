@@ -105,19 +105,21 @@ export class KeyValue {
     return locales as Locale[];
   }
 
+  /** @missingRailsName inject — PERMANENT */
   protected translations(): TranslationData {
-    const nested = [...this.store!.keys()].map((mainKey) => {
-      const mainValue: unknown = JSON.parse(this.store!.get(mainKey)!);
-      return String(mainKey)
-        .split(".")
-        .reverse()
-        .reduce<unknown>((value, key) => ({ [key]: value }), mainValue) as TranslationData;
-    });
     return (this.translationsStore = deepSymbolizeKeys(
-      nested.reduce<TranslationData | undefined>(
-        (hash, elem) => (hash === undefined ? elem : deepMergeBang(hash, elem)),
-        undefined,
-      )!,
+      [...this.store!.keys()]
+        .map((mainKey) => {
+          const mainValue: unknown = JSON.parse(this.store!.get(mainKey)!);
+          return String(mainKey)
+            .split(".")
+            .reverse()
+            .reduce<unknown>((value, key) => ({ [key]: value }), mainValue) as TranslationData;
+        })
+        .reduce<TranslationData | undefined>(
+          (hash, elem) => (hash === undefined ? elem : deepMergeBang(hash, elem)),
+          undefined,
+        )!,
     ));
   }
 

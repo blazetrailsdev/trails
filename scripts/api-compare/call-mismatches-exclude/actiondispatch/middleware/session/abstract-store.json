@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/session/abstract-store.ts",
+    "rubyName": "initialize_sid",
+    "call": "delete",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  }
+]

@@ -989,7 +989,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm exec playwright-core install --with-deps chromium firefox
-      - run: pnpm vitest run --project system --passWithNoTests
+      - run: pnpm vitest run --project system
 
   trailties-tests:
     name: Trailties Tests

@@ -1679,7 +1679,10 @@ export class Mapper {
       );
     }
 
-    if (options.on !== undefined) assertValidOnOption(options.on);
+    const on = options.on;
+    if (on != null && !VALID_ON_OPTIONS.has(on)) {
+      throw new ArgumentError(`Unknown scope :${on} given to :on`);
+    }
 
     const scopeTo = this._scope.get("to") as string | undefined;
     if (scopeTo) options.to ??= scopeTo;
@@ -2312,10 +2315,6 @@ const SYMBOL = /^:\w+[?!=]?$/;
 const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
 
 /** @internal */
-function assertValidOnOption(on: string): void {
-  if (!VALID_ON_OPTIONS.has(on)) throw new Error(`Unknown scope :${on} given to :on`);
-}
-
 include(Mapper, Redirection);
 
 /** @noRailsEquivalent PERMANENT */

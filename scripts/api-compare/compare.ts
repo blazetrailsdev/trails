@@ -3538,6 +3538,17 @@ export function flattenIncludedMethodInfos(
 }
 
 /**
+ * Whether a (flattened) Ruby method makes its host a separate owner of the
+ * name. A same-file module's body flattened onto its includer is one body,
+ * not a second owner: `TestCase::Behavior#controller_class_name` copied onto
+ * `TestCase` (actionpack/lib/action_controller/test_case.rb:552) made the one
+ * TS member read as ambiguous, and both call gates skipped it.
+ */
+export function countsAsRubyOwner(rm: { mixinFile?: string }, hostRubyFile: string): boolean {
+  return rm.mixinFile !== hostRubyFile;
+}
+
+/**
  * Is this flattened mixin method already credited in the file mirroring the
  * mixin's OWN Ruby file, and therefore not a gap in the host's file?
  *
@@ -5389,10 +5400,12 @@ export function main() {
               params: [...(owned?.params ?? []), ...rm.params],
             });
           }
-          rubyOwnersByName.set(
-            rm.name,
-            (rubyOwnersByName.get(rm.name) ?? new Set<string>()).add(item.fqn),
-          );
+          if (countsAsRubyOwner(rm, rubyFile)) {
+            rubyOwnersByName.set(
+              rm.name,
+              (rubyOwnersByName.get(rm.name) ?? new Set<string>()).add(item.fqn),
+            );
+          }
           if (klassNames.has(rm.name)) rubyKlassOwnerNames.add(ownerKey(item.fqn, rm.name));
           if (rm.calls && !rubyCallsByName.has(rm.name)) {
             rubyCallsByName.set(rm.name, rm.calls);

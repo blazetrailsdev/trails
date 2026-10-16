@@ -1,0 +1,16 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "lookup-context.ts",
+    "rubyName": "detail_args_for_any",
+    "call": "call",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "lookup-context.ts",
+    "rubyName": "detail_args_for_any",
+    "call": "details_cache_key",
+    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
+  }
+]
