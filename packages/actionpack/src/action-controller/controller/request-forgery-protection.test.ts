@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Cookies } from "../../action-dispatch/middleware/cookies.js";
 import {
+  assertNil,
   ActiveSupportJSON,
   Duration,
   assertNothingRaised,
@@ -1474,7 +1475,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   it("reset csrf token deletes cookie", async () => {
     await tc().get("cookie");
     await tc().get("reset");
-    expect(tc().cookies().get("csrf_token")).toBeUndefined();
+    assertNil(tc().cookies().get("csrf_token"));
   });
 
   it("should allow when session id in cookie matches session id", async () => {
