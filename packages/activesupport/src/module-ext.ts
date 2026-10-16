@@ -103,6 +103,7 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
 
 export const cattrReader = mattrReader;
 
+/** @inventedArm if — CONVERGEABLE accessor-half-shadows-ancestor-on-module-carrier */
 export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void {
   const target = this;
   const options = extractOptionsBang(syms) as MattrOptions;
@@ -128,7 +129,9 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
           },
         });
       if (this instanceof Module) {
-        target.moduleEval(definition);
+        target.moduleEval((mod: object) => {
+          if (Object.getOwnPropertyDescriptor(mod, sym)?.get) definition(mod);
+        });
       } else if (target.prototype) {
         definition(target.prototype);
       }
