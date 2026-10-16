@@ -46,6 +46,7 @@ describe("ScreenshotHelperTest", () => {
   let host: ReturnType<typeof makeHost>;
 
   beforeEach(() => {
+    new DrivenBySeleniumWithChrome("x");
     host = makeHost("x");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT", "");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");

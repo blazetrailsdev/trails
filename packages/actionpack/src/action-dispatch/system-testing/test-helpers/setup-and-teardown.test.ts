@@ -1,10 +1,15 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { vite } from "../server.js";
 import { beforeTeardown, afterTeardown, type SetupAndTeardownHost } from "./setup-and-teardown.js";
 
 describe("ActionDispatch::SystemTesting::TestHelpers::SetupAndTeardown", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vite.currentDriver = "rack_test";
+  });
 
   it("before_teardown calls take_failed_screenshot", async () => {
+    vite.currentDriver = "selenium";
     vi.spyOn(console, "log").mockImplementation(() => {});
     const host: SetupAndTeardownHost = {
       methodName: "test",
