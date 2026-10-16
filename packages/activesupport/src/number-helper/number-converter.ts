@@ -1,4 +1,4 @@
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
@@ -153,8 +153,8 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     const raw = I18n.translate("number.format", { locale, default: {} });
     const options: Record<string, unknown> = {};
     if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
-      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-        options[camelize(k, "lower")] = v;
+      for (const [k, v] of raw instanceof Map ? raw : Object.entries(raw)) {
+        options[camelize(isSymbol(k) ? symbolToS(k) : String(k), "lower")] = v;
       }
     }
 
@@ -162,8 +162,8 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     if (ns) {
       const nsRaw = I18n.translate(`number.${ns}.format`, { locale, default: {} });
       if (typeof nsRaw === "object" && nsRaw !== null && !Array.isArray(nsRaw)) {
-        for (const [k, v] of Object.entries(nsRaw as Record<string, unknown>)) {
-          options[camelize(k, "lower")] = v;
+        for (const [k, v] of nsRaw instanceof Map ? nsRaw : Object.entries(nsRaw)) {
+          options[camelize(isSymbol(k) ? symbolToS(k) : String(k), "lower")] = v;
         }
       }
     }

@@ -8,7 +8,7 @@ export const FLATTEN_SEPARATOR = ".";
 export interface FlattenHost {
   links(): Map<string, Map<string, string>>;
   flattenKeys(
-    hash: TranslationData,
+    hash: TranslationData | Record<string, unknown>,
     escape: boolean,
     prevKey?: string | null,
     block?: (currKey: string, value: unknown) => void,
@@ -22,7 +22,7 @@ export interface FlattenHost {
   escapeDefaultSeparator(key: unknown): string;
 }
 
-function isHash(value: unknown): value is TranslationData {
+function isHash(value: unknown): value is TranslationData | Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -91,13 +91,13 @@ export function links(this: FlattenHost): Map<string, Map<string, string>> {
 
 export function flattenKeys(
   this: FlattenHost,
-  hash: TranslationData,
+  hash: TranslationData | Record<string, unknown>,
   escape: boolean,
   prevKey: string | null = null,
   block?: (currKey: string, value: unknown) => void,
 ): void {
-  for (const [initialKey, value] of Object.entries(hash)) {
-    let key = initialKey;
+  for (const [initialKey, value] of hash instanceof Map ? hash : Object.entries(hash)) {
+    let key = toS(initialKey);
     if (escape) key = this.escapeDefaultSeparator(key);
     const currKey = toSym([prevKey, key].filter((k) => k != null).join(FLATTEN_SEPARATOR)).slice(1);
     block!(currKey, value);
@@ -108,11 +108,11 @@ export function flattenKeys(
 export function flattenTranslations(
   this: FlattenHost,
   locale: string,
-  data: TranslationData,
+  data: TranslationData | Record<string, unknown>,
   escape: boolean,
   subtree: boolean,
-): TranslationData {
-  const hash: TranslationData = {};
+): Record<string, unknown> {
+  const hash: Record<string, unknown> = {};
   this.flattenKeys(data, escape, null, (key, value) => {
     if (isHash(value)) {
       if (subtree) hash[key] = value;

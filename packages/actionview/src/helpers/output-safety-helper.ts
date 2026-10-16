@@ -8,7 +8,7 @@ import {
   isPlainObject,
   unwrappedHtmlEscape,
 } from "@blazetrails/activesupport";
-import { Hash, Module } from "@blazetrails/ruby-compat";
+import { Hash, Module, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { OutputBuffer } from "../buffers.js";
 
 export function raw(stringish: unknown): SafeBuffer {
@@ -66,9 +66,11 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
   const i18nConnectors = I18n.translate("support.array", {
     locale: options.locale ?? null,
     default: {},
-  }) as Record<string, string>;
-  for (const [k, v] of Object.entries(i18nConnectors)) {
-    defaultConnectors[camelize(k, "lower")] = v;
+  }) as Record<string, string> | Map<unknown, string>;
+  for (const [k, v] of i18nConnectors instanceof Map
+    ? i18nConnectors
+    : Object.entries(i18nConnectors)) {
+    defaultConnectors[camelize(isSymbol(k) ? symbolToS(k) : String(k), "lower")] = v;
   }
   options = Object.assign(defaultConnectors, options);
 

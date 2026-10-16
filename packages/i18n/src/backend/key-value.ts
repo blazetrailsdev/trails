@@ -1,4 +1,4 @@
-import { isSymbol } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { deepMergeBang, deepSymbolizeKeys, type TranslationData } from "../utils.js";
@@ -70,7 +70,7 @@ export class KeyValue {
 
   storeTranslations(
     locale: Locale,
-    data: TranslationData,
+    data: TranslationData | Record<string, unknown>,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     const escape = "escape" in options ? options.escape : true;
@@ -160,7 +160,7 @@ export class KeyValue {
     } else {
       if (!isHash(entry)) return entry;
       const key = this.pluralizationKey(entry, count);
-      return entry[key];
+      return hashAref(entry, key);
     }
   }
 }
@@ -200,16 +200,16 @@ export class SubtreeProxy {
   }
 
   hasKey(key: string): boolean {
-    return (this.#subtree != null && key in this.#subtree) || this.get(key) != null;
+    return (this.#subtree != null && this.#subtree.has(key)) || this.get(key) != null;
   }
 
   get(key: string): unknown {
     let value: unknown;
-    if (this.#subtree == null || (value = this.#subtree[key]) == null) {
-      value = this.#store.get(`${this.#masterKey}.${key}`);
+    if (this.#subtree == null || (value = this.#subtree.get(key)) == null) {
+      value = this.#store.get(`${this.#masterKey}.${isSymbol(key) ? symbolToS(key) : key}`);
       if (value != null) {
         value = JSON.parse(value as string);
-        (this.#subtree ??= {})[key] = value;
+        (this.#subtree ??= new Hash()).set(key, value);
       }
     }
     return value;

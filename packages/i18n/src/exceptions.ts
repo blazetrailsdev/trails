@@ -5,8 +5,10 @@ import {
   Module,
   NoMethodError,
   include,
+  isSymbol,
   rbInspect,
   rbModConstSet,
+  symbolToS,
 } from "@blazetrails/ruby-compat";
 
 export { NoMethodError };
@@ -14,7 +16,8 @@ export { NoMethodError };
 function deepSymbolizeKeys(object: unknown): unknown {
   if (Array.isArray(object)) return object.map(deepSymbolizeKeys);
   if (typeof object !== "object" || object === null) return object;
-  if (Object.getPrototypeOf(object) !== Object.prototype) return object;
+  const proto: unknown = Object.getPrototypeOf(object);
+  if (proto !== Object.prototype && proto !== null) return object;
   return Object.fromEntries(
     Object.entries(object).map(([key, value]) => [toSym(key), deepSymbolizeKeys(value)]),
   );
@@ -180,7 +183,7 @@ export class InvalidPluralizationData extends ArgumentError {
 
   constructor(entry: unknown, count: unknown, key: TranslationKey) {
     super(
-      `translation data ${rbInspect(deepSymbolizeKeys(entry))} can not be used with :count => ${count}. key '${key}' is missing.`,
+      `translation data ${rbInspect(deepSymbolizeKeys(entry))} can not be used with :count => ${count}. key '${isSymbol(key) ? symbolToS(key) : key}' is missing.`,
     );
     this.name = "InvalidPluralizationData";
     this.entry = entry;

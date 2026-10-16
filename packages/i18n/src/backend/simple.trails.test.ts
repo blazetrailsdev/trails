@@ -1,8 +1,9 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, hashAref } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { Base } from "./base.js";
 import { Simple } from "./simple.js";
+import { deepSymbolizeKeys } from "../utils.js";
 
 describe("Backend::Simple", () => {
   it("includes Base rather than inheriting from it", () => {
@@ -35,18 +36,16 @@ describe("Backend::Simple", () => {
   it("keeps an Integer key of a symbolized Hash apart from its Symbol twin", () => {
     const backend = new Simple();
     const counts = new Hash<unknown, unknown>().set(1, "one").set(":1", "uno");
-    backend.storeTranslations(
-      "en",
-      new Hash<unknown, unknown>().set(":counts", counts) as unknown as Record<string, unknown>,
-      { skipSymbolizeKeys: true },
-    );
+    backend.storeTranslations("en", new Hash<unknown, unknown>().set(":counts", counts), {
+      skipSymbolizeKeys: true,
+    });
 
-    const stored = (backend.translations()["en"] as Record<string, unknown>)["counts"];
+    const stored = (backend.translations().get(":en") as Hash<unknown, unknown>).get(":counts");
     expect([...(stored as Hash<unknown, unknown>)]).toEqual([
       [1, "one"],
       [":1", "uno"],
     ]);
-    expect(backend.translate("en", "counts.1")).toBe("uno");
+    expect(backend.translate("en", "counts.1")).toBe("one");
   });
 
   it("stores a Symbol-spelled locale in the same bucket as its String form", () => {
@@ -54,7 +53,7 @@ describe("Backend::Simple", () => {
     backend.storeTranslations(":en", { foo: "bar" });
     backend.storeTranslations("en", { baz: "baz" });
 
-    expect(backend.translations()).toEqual({ en: { foo: "bar", baz: "baz" } });
+    expect(backend.translations()).toEqual(deepSymbolizeKeys({ en: { foo: "bar", baz: "baz" } }));
   });
 
   it("looks a Symbol-spelled key up in the same entry as its String form", () => {
@@ -67,10 +66,12 @@ describe("Backend::Simple", () => {
 
   it("stores the caller's own subtree when skipSymbolizeKeys is set", () => {
     const backend = new Simple();
-    const data = { foo: { bar: "barfr", baz: "bazfr" } };
+    const data = deepSymbolizeKeys({ foo: { bar: "barfr", baz: "bazfr" } });
     backend.storeTranslations("fr", data, { skipSymbolizeKeys: true });
 
-    expect((backend.translations()["fr"] as Record<string, unknown>)["foo"]).toBe(data.foo);
+    expect((backend.translations().get(":fr") as Hash<unknown, unknown>).get(":foo")).toBe(
+      data.get(":foo"),
+    );
   });
 
   it("does not vivify a locale for the property reads JSON.stringify makes", () => {
@@ -78,7 +79,7 @@ describe("Backend::Simple", () => {
     backend.storeTranslations("en", { foo: { bar: "baz" } });
 
     expect(JSON.stringify(backend.translations())).toBe('{"en":{"foo":{"bar":"baz"}}}');
-    expect(backend.translations()["fr"]).toEqual({});
-    expect(Object.keys(backend.translations())).toEqual(["en", "fr"]);
+    expect(hashAref(backend.translations(), ":fr")).toEqual(new Hash());
+    expect([...backend.translations().keys()]).toEqual([":en", ":fr"]);
   });
 });
