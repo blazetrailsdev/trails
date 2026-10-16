@@ -112,9 +112,9 @@ export class SystemTestCase extends TestCase {
   /** @noRailsEquivalent PERMANENT */
   async page(): Promise<Page> {
     if (this._page) return this._page;
-    let session = sessions.get(vite.currentDriver!);
+    let session = sessions.get(vite.currentDriver);
     if (!session) {
-      const name = vite.currentDriver!;
+      const name = vite.currentDriver;
       session = vite.drivers[name](vite.app) as Promise<{
         browser: Browser;
         options: Record<string, unknown>;

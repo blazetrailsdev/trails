@@ -18,15 +18,35 @@ import {
   supportsScreenshot,
   type ScreenshotHelperHost,
 } from "../../system-testing/test-helpers/screenshot-helper.js";
+import type { BrowserType } from "playwright";
+import { requirePlaywright } from "../../system-testing/driver.js";
+
+const foundExecutable = new URL(import.meta.url).pathname;
+const { chromium, firefox } = (await requirePlaywright()) as {
+  chromium: BrowserType;
+  firefox: BrowserType;
+};
+vi.spyOn(chromium, "executablePath").mockImplementation(() => foundExecutable);
+vi.spyOn(firefox, "executablePath").mockImplementation(() => foundExecutable);
+
+const { DrivenByRackTest, DrivenBySeleniumWithChrome } =
+  await import("../../../test-helpers/driven-by.js");
 
 function makeHost(testName: string): ScreenshotHelperHost & { metadata: Record<string, unknown> } {
-  return { _testName: testName, _screenshotCounter: undefined, _testFailed: false, metadata: {} };
+  return {
+    methodName: testName,
+    _screenshotCounter: undefined,
+    isPassed: () => true,
+    isSkipped: () => false,
+    metadata: {},
+  };
 }
 
-describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
+describe("ScreenshotHelperTest", () => {
   let host: ReturnType<typeof makeHost>;
 
   beforeEach(() => {
+    new DrivenBySeleniumWithChrome("x");
     host = makeHost("x");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT", "");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
@@ -64,12 +84,14 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
   });
 
   it("image path includes failures text if test did not pass", () => {
-    host._testFailed = true;
+    host.isPassed = () => false;
     expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/failures_x\.png$/);
     expect(htmlPath.call(host)).toMatch(/tmp\/screenshots\/failures_x\.html$/);
   });
 
   it("image path does not include failures text if test skipped", () => {
+    host.isPassed = () => false;
+    host.isSkipped = () => true;
     expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/0_x\.png$/);
     expect(htmlPath.call(host)).toMatch(/tmp\/screenshots\/0_x\.html$/);
   });
@@ -154,7 +176,7 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
   });
 
   it("take_failed_screenshot persists the image path in the test metadata", () => {
-    host._testFailed = true;
+    host.isPassed = () => false;
     const page = {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
       content: vi.fn().mockResolvedValue("<html></html>"),
@@ -173,18 +195,6 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
     const path = imagePath.call(host);
     expect(path).toContain("tmp/screenshots");
     expect(path).toMatch(/tmp\/screenshots\/0_x\.png$/);
-  });
-
-  it("rack_test driver does not support screenshot", () => {
-    expect(supportsScreenshot.call(host)).toBe(false);
-  });
-
-  it("selenium driver supports screenshot", () => {
-    host._page = {
-      screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
-      content: vi.fn().mockResolvedValue(""),
-    };
-    expect(supportsScreenshot.call(host)).toBe(true);
   });
 
   it("screenshotsDir defaults to tmp/screenshots", () => {
@@ -216,5 +226,19 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
     const msg = displayImage.call(host, { html: false, screenshotOutput: "simple" });
     expect(msg).toMatch(/\[Screenshot Image\]/);
     expect(msg).not.toMatch(/\[Screenshot HTML\]/);
+  });
+});
+
+describe("RackTestScreenshotsTest", () => {
+  it("rack_test driver does not support screenshot", () => {
+    const test = new DrivenByRackTest("rack_test driver does not support screenshot");
+    expect(supportsScreenshot.call(test)).toBe(false);
+  });
+});
+
+describe("SeleniumScreenshotsTest", () => {
+  it("selenium driver supports screenshot", () => {
+    const test = new DrivenBySeleniumWithChrome("selenium driver supports screenshot");
+    expect(supportsScreenshot.call(test)).toBe(true);
   });
 });

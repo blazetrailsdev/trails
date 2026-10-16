@@ -10,7 +10,7 @@ export const vite: {
   server: ViteDevServer | undefined;
   url: string | undefined;
   drivers: Record<string, (app: RackMiddleware | undefined) => Promise<unknown>>;
-  currentDriver: string | undefined;
+  currentDriver: string;
 } = {
   app: undefined,
   appHost: undefined,
@@ -18,7 +18,7 @@ export const vite: {
   server: undefined,
   url: undefined,
   drivers: {},
-  currentDriver: undefined,
+  currentDriver: "rack_test",
 };
 
 export class Server {
