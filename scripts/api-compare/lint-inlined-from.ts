@@ -188,11 +188,8 @@ export function inlinedFromFindings(
         (pair) =>
           pair.package === name && pair.tsFile === tsFile && pair.owner === (klass.name ?? owner),
       );
-      const paired =
-        pairedWith.length > 1
-          ? pairedWith.find((pair) => pair.rubyModule.split("::").pop() === short)
-          : pairedWith[0];
-      if (pairedWith.length > 1 && paired === undefined) {
+      const paired = pairedWith[0];
+      if (pairedWith.length > 1) {
         const fqns = pairedWith.map((pair) => pair.rubyModule).join(", ");
         throw new Error(`${TAG} on ${name}/${tsFile} ${owner} was compared against ${fqns}`);
       }

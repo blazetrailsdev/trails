@@ -5605,10 +5605,25 @@ export function main() {
         );
         const sameFile = sameFileInitializeModules(klass, ancestors, rubyPkg.modules);
         const byOwner = tsInlinedFromByFileOwner.get(tsFile);
-        const tsClass =
+        const resolved =
           byOwner === undefined
             ? undefined
             : resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
+        // A TS class named after a sibling Ruby class of the same file ports
+        // that sibling, not this one (`Integration::Session` beside `IntegrationTest`).
+        const short = (fqn: string) => fqn.split(/::|\./).pop();
+        const tsClass =
+          resolved !== undefined &&
+          short(resolved) !== short(rubyModule) &&
+          Object.entries(rubyPkg.classes).some(
+            ([fqn, other]) =>
+              fqn !== rubyModule &&
+              (other as unknown as ClassInfo).file === klass.file &&
+              short(fqn) === short(resolved),
+          )
+            ? undefined
+            : resolved;
+        if (resolved !== undefined && tsClass === undefined) return [];
         if (tsClass !== undefined && byOwner?.has(tsClass)) {
           inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
           const pair = { package: pkg, tsFile, owner: tsClass, rubyModule };
