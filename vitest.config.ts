@@ -552,7 +552,6 @@ export default defineConfig({
           exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
           setupFiles: otherSetupFiles,
           pool: "forks",
-          poolOptions: { forks: { singleFork: true } },
           browser: { enabled: false, screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
           provide: { screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
         },

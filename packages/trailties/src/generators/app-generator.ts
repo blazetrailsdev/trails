@@ -440,7 +440,6 @@ ${
           name: "system",
           include: ["test/system/**/*.test.ts"],
           pool: "forks",
-          poolOptions: { forks: { singleFork: true } },
           provide: { screenshotDirectory: "tmp/screenshots" },
         },
       },
