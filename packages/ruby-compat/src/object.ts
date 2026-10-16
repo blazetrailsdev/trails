@@ -404,6 +404,20 @@ export function rbModSingletonP(klass: unknown): boolean {
 }
 
 /**
+ * `rb_class_attached_object` (`vendor/ruby/v3.3.11/class.c:1707-1714`),
+ * `Class#attached_object`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassAttachedObject(klass: abstract new (...args: never) => unknown): unknown {
+  if (!rbModSingletonP(klass)) {
+    throw new TypeError(`\`${rbModToS(klass)}' is not a singleton class`);
+  }
+
+  return (klass as unknown as { [FL_SINGLETON]: unknown })[FL_SINGLETON];
+}
+
+/**
  * `rb_mod_to_s` (`vendor/ruby/v3.3.11/object.c:1710-1742`), `Module#to_s` /
  * `Module#inspect`: a singleton class renders `#<Class:` plus its attached
  * object — `rb_inspect` for a class or module, `rb_any_to_s` otherwise — and

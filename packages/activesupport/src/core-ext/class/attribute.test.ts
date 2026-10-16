@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { Module, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { classAttribute } from "../../class-attribute.js";
 import { assertNotRespondTo, assertPredicate } from "../../testing/assertions.js";
 
@@ -125,6 +125,13 @@ describe("ClassAttributeTest", () => {
     Klass.setting = "plop";
     expect(object.setting).toBe("bar");
     expect(Klass.setting).toBe("plop");
+  });
+
+  it("works well with module singleton classes", () => {
+    const module: any = new Module();
+    classAttribute.call(rbObjSingletonClass(module), "settings", { default: 42 });
+
+    expect(module.settings).toBe(42);
   });
 
   it("setter returns set value", () => {
