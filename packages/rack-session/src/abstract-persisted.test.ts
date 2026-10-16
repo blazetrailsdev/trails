@@ -13,12 +13,12 @@ describe("Rack::Session::Abstract::Persisted", () => {
   let klass: typeof Persisted;
   let pers: Persisted;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     klass = Persisted;
     pers = new klass(undefined);
   });
 
-  it("#generated_sid generates a session identifier", () => {
+  it("#generated_sid generates a session identifier", async () => {
     expect(pers.generateSid()).toMatch(/^[0-9a-fA-F]+$/);
     expect(pers.generateSid(null)).toMatch(/^[0-9a-fA-F]+$/);
 
@@ -30,15 +30,15 @@ describe("Rack::Session::Abstract::Persisted", () => {
     expect(pers.generateSid(obj)).toMatch(/^[0-9a-fA-F]+$/);
   });
 
-  it("#commit_session? returns false if :skip option is given", () => {
+  it("#commit_session? returns false if :skip option is given", async () => {
     expect(pers.isCommitSession(request(), {} as unknown as PersistedSession, { skip: true })).toBe(
       false,
     );
   });
 
-  it("#commit_session writes to rack.errors if session cannot be written", () => {
+  it("#commit_session writes to rack.errors if session cannot be written", async () => {
     pers = new klass(undefined);
-    pers.writeSession = () => undefined;
+    pers.writeSession = async () => undefined;
     const errors = new StringIO();
     const env: Record<string, unknown> = { "rack.errors": errors };
     const req = request(env);
@@ -48,42 +48,42 @@ describe("Rack::Session::Abstract::Persisted", () => {
     } as unknown as Persisted;
     const session = (env["rack.session"] = new SessionHash(store, req));
     session.set("foo", "bar");
-    pers.commitSession(req, new ResponseRaw(200, {}));
+    await pers.commitSession(req, new ResponseRaw(200, {}));
     errors.rewind();
     expect(errors.read()).toBe(
       "Warning! Rack::Session::Abstract::Persisted failed to save session. Content dropped.\n",
     );
   });
 
-  it("#cookie_value returns its argument", () => {
+  it("#cookie_value returns its argument", async () => {
     const obj = {};
     expect(pers.cookieValue(obj)).toBe(obj);
   });
 
-  it("#session_class returns the default session class", () => {
+  it("#session_class returns the default session class", async () => {
     expect(pers.sessionClass()).toBe(SessionHash);
   });
 
-  it("#find_session raises", () => {
+  it("#find_session raises", async () => {
     expect(() => pers.findSession(null as never, null)).toThrow(Error);
   });
 
-  it("#write_session raises", () => {
-    expect(() => pers.writeSession(null as never, null, null as never, null as never)).toThrow(
-      Error,
-    );
+  it("#write_session raises", async () => {
+    await expect(
+      pers.writeSession(null as never, null, null as never, null as never),
+    ).rejects.toThrow(Error);
   });
 
-  it("#delete_session raises", () => {
-    expect(() => pers.deleteSession(null as never, null, null as never)).toThrow(Error);
+  it("#delete_session raises", async () => {
+    await expect(pers.deleteSession(null as never, null, null as never)).rejects.toThrow(Error);
   });
 
   describe("#security_matches?", () => {
-    it("#security_matches? returns true if secure cookie is off", () => {
+    it("#security_matches? returns true if secure cookie is off", async () => {
       expect(pers.isSecurityMatches(new Request({}) as unknown as PersistedRequest, {})).toBe(true);
     });
 
-    it("#security_matches? returns true if ssl is on", () => {
+    it("#security_matches? returns true if ssl is on", async () => {
       const req = new Request({});
       req.setHeader("HTTPS", "on");
       expect(pers.isSecurityMatches(req as unknown as PersistedRequest, { secure: true })).toBe(
@@ -91,13 +91,13 @@ describe("Rack::Session::Abstract::Persisted", () => {
       );
     });
 
-    it("#security_matches? returns true if assume_ssl option is set", () => {
+    it("#security_matches? returns true if assume_ssl option is set", async () => {
       const req = request();
       const persWithPersist = new klass(undefined, { assumeSsl: true });
       expect(persWithPersist.isSecurityMatches(req, { secure: true })).toBe(true);
     });
 
-    it("#security_matches? returns false if secure cookie is on, but not ssl or assume_ssl", () => {
+    it("#security_matches? returns false if secure cookie is on, but not ssl or assume_ssl", async () => {
       expect(pers.isSecurityMatches(request(), { secure: true })).toBe(false);
     });
   });

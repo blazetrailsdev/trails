@@ -11,14 +11,14 @@ class RecordingStore extends MemoryStore {
   readMultiCalls = 0;
   writeMultiCalls = 0;
 
-  override readMulti(...names: unknown[]): Map<unknown, unknown> {
+  override readMulti(...names: unknown[]): Promise<Map<unknown, unknown>> {
     this.readMultiCalls += 1;
     return super.readMulti(...names);
   }
 
   override writeMulti(
     hash: Map<unknown, unknown> | Record<string, unknown>,
-  ): Map<unknown, unknown> | Record<string, unknown> {
+  ): Promise<Map<unknown, unknown> | Record<string, unknown>> {
     this.writeMultiCalls += 1;
     return super.writeMulti(hash);
   }
@@ -80,7 +80,7 @@ describe("CollectionCaching", () => {
 
   it("fetch_or_cache_partial keys an empty collection without a Map", async () => {
     const { fetchOrCachePartial } = await import("./collection-caching.js");
-    const keyed = fetchOrCachePartial.call(
+    const keyed = await fetchOrCachePartial.call(
       {} as never,
       new Map(),
       buildTemplate([]),

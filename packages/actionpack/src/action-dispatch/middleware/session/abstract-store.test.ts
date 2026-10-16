@@ -17,23 +17,23 @@ import {
 
 describe("ActionDispatch::Session::AbstractStore", () => {
   describe("Compatibility", () => {
-    it("defaults the cookie key to _session_id", () => {
+    it("defaults the cookie key to _session_id", async () => {
       const opts: Record<string, unknown> = {};
       new AbstractStore(undefined, opts);
       expect(opts.key).toBe("_session_id");
     });
 
-    it("does not override an explicit key", () => {
+    it("does not override an explicit key", async () => {
       const opts: Record<string, unknown> = { key: "_app_sid" };
       new AbstractStore(undefined, opts);
       expect(opts.key).toBe("_app_sid");
     });
 
-    it("generates a 32-char hex SID", () => {
+    it("generates a 32-char hex SID", async () => {
       expect(Compatibility.generateSid.call({})).toMatch(/^[0-9a-f]{32}$/);
     });
 
-    it("initializeSid strips deprecated keys from default options", () => {
+    it("initializeSid strips deprecated keys from default options", async () => {
       const host = new Persisted();
       host.defaultOptions.sidbits = 128;
       host.defaultOptions.secureRandom = 1;
@@ -42,7 +42,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       expect(host.defaultOptions).not.toHaveProperty("secureRandom");
     });
 
-    it("makeRequest builds an ActionDispatch::Request from env", () => {
+    it("makeRequest builds an ActionDispatch::Request from env", async () => {
       const env = { foo: "bar" };
       const req = Compatibility.makeRequest.call(null, env);
       expect(req).toBeInstanceOf(Request);
@@ -51,7 +51,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
   });
 
   describe("SessionRestoreError", () => {
-    it("wraps an inner exception's class + message", () => {
+    it("wraps an inner exception's class + message", async () => {
       const inner = new TypeError("undefined class/module Foo::Bar");
       const err = new SessionRestoreError(inner);
       expect(err).toBeInstanceOf(SessionRestoreError);
@@ -61,11 +61,11 @@ describe("ActionDispatch::Session::AbstractStore", () => {
   });
 
   describe("StaleSessionCheck.staleSessionCheckBang", () => {
-    it("passes through the block return value", () => {
+    it("passes through the block return value", async () => {
       expect(StaleSessionCheck.staleSessionCheckBang(() => 42)).toBe(42);
     });
 
-    it("re-raises non-class errors unchanged", () => {
+    it("re-raises non-class errors unchanged", async () => {
       const err = new Error("some other failure");
       expect(() =>
         StaleSessionCheck.staleSessionCheckBang(() => {
@@ -74,7 +74,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       ).toThrow(err);
     });
 
-    it("wraps undefined-class errors in SessionRestoreError", () => {
+    it("wraps undefined-class errors in SessionRestoreError", async () => {
       expect(() =>
         StaleSessionCheck.staleSessionCheckBang(() => {
           throw new ArgumentError("undefined class/module Acme::Missing");
@@ -84,7 +84,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
   });
 
   describe("AbstractStore", () => {
-    it("includes the three Rails mixins on its prototype", () => {
+    it("includes the three Rails mixins on its prototype", async () => {
       const proto = AbstractStore.prototype as unknown as Record<string, unknown>;
       for (const name of [
         "generateSid",
@@ -101,32 +101,37 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       }
     });
 
-    it("setCookie writes to the request cookie jar at @key", () => {
+    it("setCookie writes to the request cookie jar at @key", async () => {
       const store = new AbstractStore();
       const req = new Request({});
       store.setCookie(req, null, "abc");
       expect(req.cookieJar().get("_session_id")).toBe("abc");
     });
 
-    it("commitSession invokes commitCsrfToken on the request", () => {
-      const store = new AbstractStore();
+    it("commitSession invokes commitCsrfToken on the request", async () => {
+      class FindingStore extends AbstractStore {
+        override findSession(): [unknown, Record<string, unknown>] {
+          return [new SessionId("abc"), {}];
+        }
+      }
+      const store = new FindingStore();
       let called = false;
       const req: any = new Request({});
       req.commitCsrfToken = () => {
         called = true;
       };
-      (store as any).prepareSession(req);
-      (store as any).commitSession(req, { setCookie: () => {} });
+      await (store as any).prepareSession(req);
+      await (store as any).commitSession(req, { setCookie: () => {} });
       expect(called).toBe(true);
     });
 
-    it("commitSession expires the cookie at Time.now + expire_after", () => {
+    it("commitSession expires the cookie at Time.now + expire_after", async () => {
       let cookie: any;
       class WritingStore extends AbstractStore {
         override findSession(): [unknown, Record<string, unknown>] {
           return [new SessionId("abc"), {}];
         }
-        override writeSession(): unknown {
+        override async writeSession(): Promise<unknown> {
           return { ok: true };
         }
         override setCookie(_req: any, _res: any, c: any): void {
@@ -135,10 +140,10 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       }
       const store = new WritingStore(undefined, { expireAfter: 60 });
       const req: any = new Request({});
-      (store as any).prepareSession(req);
+      await (store as any).prepareSession(req);
       req.session.set("user", 1);
 
-      (store as any).commitSession(req, { setCookie: () => {} });
+      await (store as any).commitSession(req, { setCookie: () => {} });
 
       expect(cookie.expires).toBeInstanceOf(Date);
       const deltaMs = (cookie.expires as Date).getTime() - Date.now();
@@ -146,7 +151,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       expect(deltaMs).toBeLessThanOrEqual(60_000);
     });
 
-    it("prepareSession wraps in ActionDispatch::Request::Session", () => {
+    it("prepareSession wraps in ActionDispatch::Request::Session", async () => {
       const store = new AbstractStore() as unknown as {
         prepareSession: (req: { env: Record<string, unknown> }) => RequestSession;
         sessionExists: (env: Record<string, unknown>) => boolean;
@@ -160,26 +165,26 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       store.sessionExists = () => false;
       store.loadSession = () => [null, {}];
       store.deleteSession = () => null;
-      const session = store.prepareSession({ env: {} });
+      const session = await store.prepareSession({ env: {} });
       expect(session).toBeInstanceOf(RequestSession);
     });
   });
 
   describe("AbstractSecureStore", () => {
-    it("includes the three Rails mixins on its prototype", () => {
+    it("includes the three Rails mixins on its prototype", async () => {
       const proto = AbstractSecureStore.prototype as unknown as Record<string, unknown>;
       expect(typeof proto.loadSession).toBe("function");
       expect(typeof proto.commitSession).toBe("function");
       expect(typeof proto.makeRequest).toBe("function");
     });
 
-    it("generateSid wraps the hex SID in a SessionId", () => {
+    it("generateSid wraps the hex SID in a SessionId", async () => {
       const sid = new AbstractSecureStore().generateSid();
       expect(sid).toBeInstanceOf(SessionId);
       expect(sid.publicId).toMatch(/^[0-9a-f]{32}$/);
     });
 
-    it("extends PersistedSecure", () => {
+    it("extends PersistedSecure", async () => {
       expect(new AbstractSecureStore()).toBeInstanceOf(PersistedSecure);
     });
   });
@@ -187,25 +192,25 @@ describe("ActionDispatch::Session::AbstractStore", () => {
   describe("#security_matches?", () => {
     const options = (hash: Record<string, unknown>): Record<string, unknown> => hash;
 
-    it("#security_matches? returns true if secure cookie is off", () => {
+    it("#security_matches? returns true if secure cookie is off", async () => {
       const pers = new Persisted();
       expect((pers as any).isSecurityMatches(new RackRequest({}), options({}))).toBe(true);
     });
 
-    it("#security_matches? returns true if ssl is on", () => {
+    it("#security_matches? returns true if ssl is on", async () => {
       const pers = new Persisted();
       const req = new RackRequest({});
       req.setHeader("HTTPS", "on");
       expect((pers as any).isSecurityMatches(req, options({ secure: true }))).toBe(true);
     });
 
-    it("#security_matches? returns true if assume_ssl option is set", () => {
+    it("#security_matches? returns true if assume_ssl option is set", async () => {
       const req = new RackRequest({});
       const persWithPersist = new Persisted(undefined, { assumeSsl: true });
       expect((persWithPersist as any).isSecurityMatches(req, options({ secure: true }))).toBe(true);
     });
 
-    it("#security_matches? returns false if secure cookie is on, but not ssl or assume_ssl", () => {
+    it("#security_matches? returns false if secure cookie is on, but not ssl or assume_ssl", async () => {
       const pers = new Persisted();
       expect((pers as any).isSecurityMatches(new RackRequest({}), options({ secure: true }))).toBe(
         false,
@@ -219,7 +224,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       override findSession(): [unknown, Record<string, unknown>] {
         return [new SessionId("abc"), {}];
       }
-      override writeSession(): unknown {
+      override async writeSession(): Promise<unknown> {
         return "written";
       }
       override setCookie(_request: any, response: unknown, _cookie: unknown): void {
@@ -246,7 +251,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       expect((await runOver("http")).committed.length).toBe(0);
     });
 
-    it("writes the session cookie onto the response headers", () => {
+    it("writes the session cookie onto the response headers", async () => {
       const headers: Record<string, string> = {};
       const res = new ResponseRaw(200, headers);
       Persisted.prototype.setCookie.call(new Persisted(), new Request({}), res, {
@@ -259,7 +264,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
   });
 
   describe("SessionObject.isLoadedSession", () => {
-    it("returns true for non-Session inputs", () => {
+    it("returns true for non-Session inputs", async () => {
       expect(SessionObject.isLoadedSession.call({}, {})).toBe(true);
     });
   });

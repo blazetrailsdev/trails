@@ -24,7 +24,7 @@ function makeStore(opts: { exists?: boolean; data?: Record<string, unknown> } = 
     sessionExists() {
       return exists;
     },
-    deleteSession() {
+    async deleteSession() {
       return 123;
     },
     extractSessionId() {
@@ -39,111 +39,111 @@ function makeReq(): { env: Record<string, unknown> } {
 
 describe("Request", () => {
   describe("SessionTest", () => {
-    it("create adds itself to env", () => {
+    it("create adds itself to env", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       expect(s).toBe(req.env["rack.session"]);
     });
 
-    it("to hash", () => {
+    it("to hash", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("foo", "bar");
       expect(s.get("foo")).toBe("bar");
       expect(s.toHash()).toEqual({ foo: "bar" });
       expect(s.toH()).toEqual({ foo: "bar" });
     });
 
-    it("create merges old", () => {
+    it("create merges old", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("foo", "bar");
 
-      const s1 = Session.create(makeStore(), req, {});
+      const s1 = await Session.create(makeStore(), req, {});
       expect(s1).not.toBe(s);
       expect(s1.get("foo")).toBe("bar");
     });
 
-    it("find", () => {
+    it("find", async () => {
       const req = makeReq();
       assertNil(Session.find(req));
 
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       expect(Session.find(req)).toBe(s);
     });
 
-    it("destroy", () => {
+    it("destroy", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("rails", "ftw");
-      s.destroy();
+      await s.destroy();
       expect(s.isEmpty()).toBe(true);
     });
 
-    it("store", () => {
+    it("store", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.store("foo", "bar");
       expect(s.get("foo")).toBe("bar");
     });
 
-    it("keys", () => {
+    it("keys", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("rails", "ftw");
       s.set("adequate", "awesome");
       expect(s.keys).toEqual(["rails", "adequate"]);
     });
 
-    it("keys with deferred loading", () => {
+    it("keys with deferred loading", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore({ data: { sample_key: "sample_value" } }), req, {});
+      const s = await Session.create(makeStore({ data: { sample_key: "sample_value" } }), req, {});
       expect(s.keys).toEqual(["sample_key"]);
     });
 
-    it("values", () => {
+    it("values", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("rails", "ftw");
       s.set("adequate", "awesome");
       expect(s.values).toEqual(["ftw", "awesome"]);
     });
 
-    it("values with deferred loading", () => {
+    it("values with deferred loading", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore({ data: { sample_key: "sample_value" } }), req, {});
+      const s = await Session.create(makeStore({ data: { sample_key: "sample_value" } }), req, {});
       expect(s.values).toEqual(["sample_value"]);
     });
 
-    it("clear", () => {
+    it("clear", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("rails", "ftw");
       s.set("adequate", "awesome");
       s.clear();
       expect(s.values).toEqual([]);
     });
 
-    it("update", () => {
+    it("update", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("rails", "ftw");
       s.update({ rails: "awesome" });
       expect(s.keys).toEqual(["rails"]);
       expect(s.get("rails")).toBe("awesome");
     });
 
-    it("delete", () => {
+    it("delete", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("rails", "ftw");
       s.delete("rails");
       expect(s.keys).toEqual([]);
     });
 
-    it("fetch", () => {
+    it("fetch", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("one", "1");
       expect(s.fetch("one")).toBe("1");
       expect(s.fetch("two", "2")).toBe("2");
@@ -152,52 +152,52 @@ describe("Request", () => {
       expect(() => s.fetch("three")).toThrow();
     });
 
-    it("dig", () => {
+    it("dig", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("one", { two: "3" });
       expect(s.dig("one", "two")).toBe("3");
       expect(s.dig("three", "two")).toBeUndefined();
       expect(s.dig("one", "three")).toBeUndefined();
     });
 
-    it("id was for new session that does not exist", () => {
+    it("id was for new session that does not exist", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore({ exists: false }), req, {});
+      const s = await Session.create(makeStore({ exists: false }), req, {});
       assertNil(s.idWas());
     });
 
-    it("id was for session that does not exist after writing", () => {
+    it("id was for session that does not exist after writing", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore({ exists: false }), req, {});
+      const s = await Session.create(makeStore({ exists: false }), req, {});
       s.set("one", "1");
       assertNil(s.idWas());
     });
 
-    it("id was for session that does not exist after destroying", () => {
+    it("id was for session that does not exist after destroying", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore({ exists: false }), req, {});
-      s.destroy();
+      const s = await Session.create(makeStore({ exists: false }), req, {});
+      await s.destroy();
       assertNil(s.idWas());
     });
 
-    it("id was for existing session", () => {
+    it("id was for existing session", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       expect(s.idWas()).toBe(1);
     });
 
-    it("id was for existing session after write", () => {
+    it("id was for existing session after write", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
+      const s = await Session.create(makeStore(), req, {});
       s.set("one", "1");
       expect(s.idWas()).toBe(1);
     });
 
-    it("id was for existing session after destroy", () => {
+    it("id was for existing session after destroy", async () => {
       const req = makeReq();
-      const s = Session.create(makeStore(), req, {});
-      s.destroy();
+      const s = await Session.create(makeStore(), req, {});
+      await s.destroy();
       expect(s.idWas()).toBe(1);
     });
   });
@@ -246,28 +246,28 @@ describe("Request", () => {
 });
 
 describe("Options", () => {
-  it("create stores an Options instance", () => {
+  it("create stores an Options instance", async () => {
     const req = makeReq();
-    Session.create(makeStore(), req, { key: "_session_id" });
+    await Session.create(makeStore(), req, { key: "_session_id" });
     const options = Options.find(req);
     expect(options).toBeInstanceOf(Options);
     expect((options as Options).get("key")).toBe("_session_id");
     expect((options as Options).toHash()).toEqual({ key: "_session_id" });
   });
 
-  it("disabled stores an Options instance whose id is nil", () => {
+  it("disabled stores an Options instance whose id is nil", async () => {
     const req = makeReq();
     Session.disabled(req);
     expect((Options.find(req) as Options).id(req)).toBeNull();
   });
 
-  it("id falls back to the store when no id is stored", () => {
+  it("id falls back to the store when no id is stored", async () => {
     const req = makeReq();
     const options = new Options(makeStore(), {});
     expect(options.id(req)).toBe(1);
   });
 
-  it("[]= writes through and values_at reads back", () => {
+  it("[]= writes through and values_at reads back", async () => {
     const options = new Options(null, { key: "_session_id" });
     options.set("secure", true);
     expect(options.valuesAt("key", "secure")).toEqual(["_session_id", true]);

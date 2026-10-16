@@ -45,7 +45,7 @@ export const StaleSessionCheck = {
   loadSession(
     this: StaleSessionCheckHost,
     env: PersistedRequest,
-  ): [unknown, Record<string, unknown>] {
+  ): [unknown, Record<string, unknown>] | Promise<[unknown, Record<string, unknown>]> {
     return this.staleSessionCheckBang(() => Persisted.prototype.loadSession.call(this, env));
   },
 
@@ -76,9 +76,9 @@ export const StaleSessionCheck = {
 };
 
 export const SessionObject = {
-  commitSession(this: Persisted, req: any, res: any): unknown {
-    req.commitCsrfToken?.();
-    return Persisted.prototype.commitSession.call(this, req, res);
+  async commitSession(this: Persisted, req: any, res: any): Promise<unknown> {
+    await req.commitCsrfToken?.();
+    return await Persisted.prototype.commitSession.call(this, req, res);
   },
 
   prepareSession(this: Persisted, req: { env: Record<string, unknown> }): RequestSession {

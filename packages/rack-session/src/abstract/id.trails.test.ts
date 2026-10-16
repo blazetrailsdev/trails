@@ -38,24 +38,24 @@ function stubStore(
 }
 
 describe("Rack::Session::SessionId", () => {
-  it("private_id is versioned and hashed", () => {
+  it("private_id is versioned and hashed", async () => {
     const sid = new SessionId("a".repeat(32));
     expect(sid.privateId).toMatch(/^2::[0-9a-f]{64}$/);
   });
 
-  it("cookie_value and to_s answer the public id", () => {
+  it("cookie_value and to_s answer the public id", async () => {
     const sid = new SessionId("abc");
     expect(sid.cookieValue).toBe("abc");
     expect(String(sid)).toBe("abc");
   });
 
-  it("empty? is always false", () => {
+  it("empty? is always false", async () => {
     expect(new SessionId("").isEmpty()).toBe(false);
   });
 });
 
 describe("Rack::Session::Abstract::Persisted", () => {
-  it("deletes key, cookie_only and same_site out of the default options", () => {
+  it("deletes key, cookie_only and same_site out of the default options", async () => {
     const store = new Persisted(undefined, { key: "_sid", sameSite: ":lax" });
     expect(store.key).toBe("_sid");
     expect(store.sameSite).toBe(":lax");
@@ -65,7 +65,7 @@ describe("Rack::Session::Abstract::Persisted", () => {
     expect(store.defaultOptions.path).toBe(DEFAULT_OPTIONS.path);
   });
 
-  it("find_session is not implemented", () => {
+  it("find_session is not implemented", async () => {
     expect(() => new Persisted().findSession(stubRequest(), null)).toThrow(
       "#find_session not implemented.",
     );
@@ -73,23 +73,23 @@ describe("Rack::Session::Abstract::Persisted", () => {
 });
 
 describe("Rack::Session::Abstract::PersistedSecure", () => {
-  it("generate_sid wraps the hex sid in a SessionId", () => {
+  it("generate_sid wraps the hex sid in a SessionId", async () => {
     const sid = new PersistedSecure().generateSid();
     expect(sid).toBeInstanceOf(SessionId);
     expect(sid.publicId).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("generate_sid takes the rand arm when :secure_random is false", () => {
+  it("generate_sid takes the rand arm when :secure_random is false", async () => {
     const store = new PersistedSecure(undefined, { secureRandom: false });
     expect(store.generateSid().publicId).toMatch(/^[0-9a-f]{32}$/);
   });
 
-  it("extract_session_id answers the falsy public id itself", () => {
+  it("extract_session_id answers the falsy public id itself", async () => {
     const store = new PersistedSecure(undefined, { cookieOnly: true });
     expect(store.extractSessionId(stubRequest())).toBeNull();
   });
 
-  it("cookie_value reads cookie_value off the written data", () => {
+  it("cookie_value reads cookie_value off the written data", async () => {
     const sid = new SessionId("xyz");
     expect(new PersistedSecure().cookieValue(sid)).toBe("xyz");
   });
@@ -100,15 +100,15 @@ describe("Rack::Session::Abstract::SessionHash", () => {
     return new SessionHash(stubStore("id", session), null as unknown as PersistedRequest);
   }
 
-  it("fetch answers a stored null rather than the default", () => {
+  it("fetch answers a stored null rather than the default", async () => {
     expect(sessionHash({ foo: null }).fetch("foo", ":default")).toBeNull();
   });
 
-  it("fetch reads an explicitly passed undefined default as a default, not an omission", () => {
+  it("fetch reads an explicitly passed undefined default as a default, not an omission", async () => {
     expect(sessionHash().fetch("unknown", undefined)).toBeUndefined();
   });
 
-  it("inspect renders the not-yet-loaded form until the store is read", () => {
+  it("inspect renders the not-yet-loaded form until the store is read", async () => {
     const hash = sessionHash();
     expect(hash.inspect()).toMatch(
       /^#<Rack::Session::Abstract::SessionHash:0x[0-9a-f]+ not yet loaded>$/,
@@ -117,7 +117,7 @@ describe("Rack::Session::Abstract::SessionHash", () => {
     expect(hash.inspect()).toBe('{"foo"=>:bar}');
   });
 
-  it("id memoizes the seat, so a null extracted id is asked for once", () => {
+  it("id memoizes the seat, so a null extracted id is asked for once", async () => {
     let calls = 0;
     const store = {
       extractSessionId: () => {
@@ -133,7 +133,7 @@ describe("Rack::Session::Abstract::SessionHash", () => {
 });
 
 describe("Rack::Session::Abstract::Persisted", () => {
-  it("session_class answers SessionHash, and SecureSessionHash on PersistedSecure", () => {
+  it("session_class answers SessionHash, and SecureSessionHash on PersistedSecure", async () => {
     expect(new Persisted().sessionClass()).toBe(SessionHash);
     expect(new PersistedSecure().sessionClass()).toBe(SecureSessionHash);
     expect(PersistedSecure.SecureSessionHash).toBe(SecureSessionHash);
@@ -141,7 +141,7 @@ describe("Rack::Session::Abstract::Persisted", () => {
 });
 
 describe("Rack::Session::Abstract::PersistedSecure::SecureSessionHash", () => {
-  it("inspect names the subclass's own full constant path", () => {
+  it("inspect names the subclass's own full constant path", async () => {
     const hash = new SecureSessionHash(stubStore(), null as unknown as PersistedRequest);
     expect(hash.inspect()).toMatch(
       /^#<Rack::Session::Abstract::PersistedSecure::SecureSessionHash:0x[0-9a-f]+ not yet loaded>$/,
@@ -157,16 +157,16 @@ describe("Rack::Session::Abstract::Persisted#call", () => {
       return ["sid", { counter: 1 }];
     }
 
-    override writeSession(
+    override async writeSession(
       _req: PersistedRequest,
       sid: unknown,
       session: Record<string, unknown>,
-    ): unknown {
+    ): Promise<unknown> {
       this.written.push([sid, session]);
       return sid;
     }
 
-    override deleteSession(): unknown {
+    override async deleteSession(): Promise<unknown> {
       return this.generateSid();
     }
   }
@@ -198,10 +198,10 @@ describe("Rack::Session::Abstract::Persisted#call", () => {
       cookies.push(cookie);
     };
     const req = store.makeRequest({ HTTP_COOKIE: "rack.session=sid" });
-    store.prepareSession(req);
+    await store.prepareSession(req);
     req.setHeader(RACK_SESSION_OPTIONS, seat);
     (req.getHeader(RACK_SESSION) as unknown as SessionHash).set("counter", 2);
-    store.commitSession(req, new ResponseRaw(200, {}));
+    await store.commitSession(req, new ResponseRaw(200, {}));
 
     expect(cookies[0]?.["path"]).toBe("/deep");
     expect(cookies[0]?.["id"]).toBe("stored");
@@ -218,12 +218,12 @@ describe("Rack::Session::Abstract::Persisted#call", () => {
       setVerbose(false);
     });
 
-    function deferredCommit(): StringIO {
+    async function deferredCommit(): Promise<StringIO> {
       const errors = new StringIO();
       const env: Record<string, unknown> = { "rack.errors": errors };
       const req = new Request(env) as unknown as PersistedRequest;
       const store = new Persisted(undefined, { defer: true });
-      store.writeSession = () => "data";
+      store.writeSession = async () => "data";
       const backing = {
         loadSession: () => ["sid", {}],
         sessionExists: () => true,
@@ -231,18 +231,18 @@ describe("Rack::Session::Abstract::Persisted#call", () => {
       const session = (env["rack.session"] = new SessionHash(backing, req));
       session.set("foo", "bar");
       req.setHeader(RACK_SESSION_OPTIONS, { defer: true });
-      store.commitSession(req, new ResponseRaw(200, {}));
+      await store.commitSession(req, new ResponseRaw(200, {}));
       errors.rewind();
       return errors;
     }
 
-    it("stays silent while $VERBOSE is false", () => {
-      expect(deferredCommit().read()).toBe("");
+    it("stays silent while $VERBOSE is false", async () => {
+      expect((await deferredCommit()).read()).toBe("");
     });
 
-    it("writes to rack.errors while $VERBOSE is true", () => {
+    it("writes to rack.errors while $VERBOSE is true", async () => {
       setVerbose(true);
-      expect(deferredCommit().read()).toBe("Deferring cookie for sid\n");
+      expect((await deferredCommit()).read()).toBe("Deferring cookie for sid\n");
     });
   });
 });

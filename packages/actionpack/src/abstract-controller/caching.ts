@@ -109,20 +109,25 @@ export function viewCacheDependencies(this: CachingHost): unknown[] {
   return out;
 }
 
-export function cache<T>(this: CachingHost, key: unknown, options: CacheOptions, block: () => T): T;
-export function cache<T>(this: CachingHost, key: unknown, block: () => T): T;
 export function cache<T>(
+  this: CachingHost,
+  key: unknown,
+  options: CacheOptions,
+  block: () => T,
+): Promise<T>;
+export function cache<T>(this: CachingHost, key: unknown, block: () => T): Promise<T>;
+export async function cache<T>(
   this: CachingHost,
   key: unknown,
   optionsOrBlock: CacheOptions | (() => T),
   maybeBlock?: () => T,
-): T {
+): Promise<T> {
   const block = typeof optionsOrBlock === "function" ? (optionsOrBlock as () => T) : maybeBlock!;
   const options = typeof optionsOrBlock === "function" ? ({} as CacheOptions) : optionsOrBlock;
 
   if (this.isCacheConfigured()) {
-    return this.cacheStore!.fetch(expandCacheKey(key, "controller"), options, block) as T;
+    return (await this.cacheStore!.fetch(expandCacheKey(key, "controller"), options, block)) as T;
   } else {
-    return block();
+    return await block();
   }
 }

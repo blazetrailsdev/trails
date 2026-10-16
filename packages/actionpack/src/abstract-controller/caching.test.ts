@@ -51,22 +51,22 @@ function makeHost(store?: MemoryStore | null): HostClass & CachingHost & typeof 
 
 describe("AbstractController::Caching", () => {
   describe("cacheStore reader/writer", () => {
-    it("reads the class-level slot", () => {
+    it("reads the class-level slot", async () => {
       const store = new MemoryStore();
       const host = makeHost(store);
       expect(host.cacheStore).toBe(store);
     });
-    it("returns null when no store is wired up", () => {
+    it("returns null when no store is wired up", async () => {
       expect(makeHost().cacheStore).toBeUndefined();
     });
-    it("cacheStore= writes the instance's own inheritable config copy", () => {
+    it("cacheStore= writes the instance's own inheritable config copy", async () => {
       const host = makeHost();
       const store = new MemoryStore();
       host.cacheStore = store;
       expect(host.cacheStore).toBe(store);
       expect(HostConfig.cacheStore).toBeUndefined();
     });
-    it("cacheStore= on the class resolves through Cache.lookup_store", () => {
+    it("cacheStore= on the class resolves through Cache.lookup_store", async () => {
       makeHost();
       HostConfig.cacheStore = ":memory_store";
       expect(HostConfig.cacheStore).toBeInstanceOf(MemoryStore);
@@ -74,19 +74,19 @@ describe("AbstractController::Caching", () => {
   });
 
   describe("cacheConfigured", () => {
-    it("is false when no store is wired up", () => {
+    it("is false when no store is wired up", async () => {
       expect(makeHost().isCacheConfigured()).toBeUndefined();
     });
-    it("is false when performCaching is off, even with a store", () => {
+    it("is false when performCaching is off, even with a store", async () => {
       const host = makeHost(new MemoryStore());
       HostConfig.performCaching = false;
       expect(host.isCacheConfigured()).toBe(false);
     });
-    it("is true when both are set", () => {
+    it("is true when both are set", async () => {
       const store = new MemoryStore();
       expect(makeHost(store).isCacheConfigured()).toBe(store);
     });
-    it("reads the instance's own store when only the instance carries one", () => {
+    it("reads the instance's own store when only the instance carries one", async () => {
       const host = makeHost();
       const store = new MemoryStore();
       host.cacheStore = store;
@@ -95,7 +95,7 @@ describe("AbstractController::Caching", () => {
   });
 
   describe("viewCacheDependency / viewCacheDependencies", () => {
-    it("evaluates dependency blocks in host context and drops nullish", () => {
+    it("evaluates dependency blocks in host context and drops nullish", async () => {
       const host = makeHost();
       viewCacheDependency.call(HostConfig, function (this: CachingHost) {
         return (this as unknown as HostClass).greeting;
@@ -104,60 +104,60 @@ describe("AbstractController::Caching", () => {
       viewCacheDependency.call(HostConfig, () => "v2");
       expect(viewCacheDependencies.call(host)).toEqual(["hello", "v2"]);
     });
-    it("returns [] when none registered", () => {
+    it("returns [] when none registered", async () => {
       expect(viewCacheDependencies.call(makeHost())).toEqual([]);
     });
   });
 
   describe("cache()", () => {
-    it("yields the block when not configured", () => {
+    it("yields the block when not configured", async () => {
       const host = makeHost();
       let calls = 0;
-      const result = cache.call(host, "k", () => {
+      const result = await cache.call(host, "k", () => {
         calls++;
         return "computed";
       });
       expect(result).toBe("computed");
       expect(calls).toBe(1);
     });
-    it("fetches through the store under the controller namespace", () => {
+    it("fetches through the store under the controller namespace", async () => {
       const store = new MemoryStore();
       const host = makeHost(store);
       let calls = 0;
-      const first = cache.call(host, "page-1", () => {
+      const first = await cache.call(host, "page-1", () => {
         calls++;
         return "rendered";
       });
-      const second = cache.call(host, "page-1", () => {
+      const second = await cache.call(host, "page-1", () => {
         calls++;
         return "different";
       });
       expect(first).toBe("rendered");
       expect(second).toBe("rendered");
       expect(calls).toBe(1);
-      expect(store.read("controller/page-1")).toBe("rendered");
+      expect(await store.read("controller/page-1")).toBe("rendered");
     });
-    it("fetches through a store set only on the instance", () => {
+    it("fetches through a store set only on the instance", async () => {
       const host = makeHost();
       const store = new MemoryStore();
       host.cacheStore = store;
-      cache.call(host, "instance-page", () => "rendered");
-      expect(store.read("controller/instance-page")).toBe("rendered");
+      await cache.call(host, "instance-page", () => "rendered");
+      expect(await store.read("controller/instance-page")).toBe("rendered");
     });
-    it("flattens array keys", () => {
+    it("flattens array keys", async () => {
       const store = new MemoryStore();
       const host = makeHost(store);
-      cache.call(host, ["posts", 5, "edit"], () => "x");
-      expect(store.read("controller/posts/5/edit")).toBe("x");
+      await cache.call(host, ["posts", 5, "edit"], () => "x");
+      expect(await store.read("controller/posts/5/edit")).toBe("x");
     });
   });
 
   describe("fragment wrappers (Caching::Fragments republish)", () => {
-    it("writeFragment/readFragment round-trip via ./caching", () => {
+    it("writeFragment/readFragment round-trip via ./caching", async () => {
       const store = new MemoryStore();
       const host = makeHost(store);
-      writeFragment.call(host, "post/1", "rendered body");
-      expect(readFragment.call(host, "post/1")).toBe("rendered body");
+      await writeFragment.call(host, "post/1", "rendered body");
+      expect(await readFragment.call(host, "post/1")).toBe("rendered body");
     });
   });
 });
