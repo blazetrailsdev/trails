@@ -88,10 +88,6 @@ export class KeyValue {
     return this.store != null;
   }
 
-  /**
-   * @inventedArm if — PERMANENT
-   * @inventedArm deepSymbolizeKeys — PERMANENT
-   */
   storeTranslations(
     locale: Locale,
     data: TranslationData | Record<string, unknown>,
