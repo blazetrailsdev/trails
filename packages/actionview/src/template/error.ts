@@ -216,8 +216,8 @@ export class TemplateError extends ActionViewError {
     this.template = template;
   }
 
-  backtrace(): string[] {
-    return excBacktrace(this.cause) ?? [];
+  backtrace(): string[] | null {
+    return excBacktrace(this.cause);
   }
 
   backtraceLocations(): Location[] | null {
@@ -264,7 +264,7 @@ export class TemplateError extends ActionViewError {
       const regexp = new RegExp(`${regexpEscape(File.basename(fileName))}:(\\d+)`);
       const match =
         regexp.exec(this.message) ??
-        this.backtrace()
+        this.backtrace()!
           .map((line) => regexp.exec(line))
           .find((m) => m !== null);
       if (match) this._lineNumber = Number(match[1]);
