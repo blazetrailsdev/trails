@@ -23,7 +23,7 @@ const DEFAULT_TAG_DIRECTIVES: Record<string, string> = { "!": "!", "!!": "tag:ya
  * @noRailsEquivalent PERMANENT
  */
 export class Parser {
-  /** `YAML_ANY_ENCODING` (`vendor/ruby/v3.3.11/ext/psych/psych_parser.c:534`). @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent PERMANENT */
   static readonly ANY = 0;
   /** @noRailsEquivalent PERMANENT */
   static readonly UTF8 = 1;

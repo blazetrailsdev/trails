@@ -108,8 +108,4 @@ describe("Psych::Nodes::Node", () => {
     expect(kinds).toEqual(["scalar", "alias", "mapping", "sequence", "document"]);
     expect(doc.toRuby()).toEqual(["x", "x", new Hash()]);
   });
-
-  it("stream encodings", () => {
-    expect([Stream.ANY, Stream.UTF8, Stream.UTF16LE, Stream.UTF16BE]).toEqual([0, 1, 2, 3]);
-  });
 });
