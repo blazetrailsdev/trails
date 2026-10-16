@@ -177,7 +177,7 @@ this section. A new instance is not a new decision to argue.
 
 Rails loads a session lazily: `Request::Session#load_for_read!` calls
 `load!`, which calls the store's `load_session`
-(`actionpack/lib/action_dispatch/request/session.rb:256-276`), on the first
+(`actionpack/lib/action_dispatch/request/session.rb:255-282`), on the first
 `session[...]` read. A cache-backed store's `find_session` reads
 `ActiveSupport::Cache::Store`, which is async in trails because every Node
 cache client is. Making the session accessors async as well was rejected:
