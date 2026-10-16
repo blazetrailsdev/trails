@@ -20,6 +20,10 @@
       "ref": "v1.14.8",
       "sha": "f2fb6a5766dee835082eb74ee83f52e0a6479573"
     },
+    "libyaml": {
+      "ref": "0.2.5",
+      "sha": "2c891fc7a770e8ba2fec34fc6b545c672beb37e6"
+    },
     "minitest": {
       "ref": "v5.27.0",
       "sha": "819e9b5f873d7ab6d4edfeaed48542279367ff93"

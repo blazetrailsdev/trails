@@ -41,11 +41,15 @@ export class SyntaxErrorProxy extends DelegateClass(SyntaxError) {
 }
 
 class BacktraceLocation {
+  declare toString: () => string;
+
   constructor(
     public path: string,
     public lineno: number,
-    public toS: string,
-  ) {}
+    toS: string,
+  ) {
+    this.toString = () => toS;
+  }
 
   spot(_: unknown): void {}
 

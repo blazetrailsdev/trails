@@ -531,6 +531,19 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "libyaml",
+    origin: {
+      type: "git",
+      url: "https://github.com/yaml/libyaml.git",
+      // The C library Psych links (`Psych::LIBYAML_VERSION` is "0.2.5" on the
+      // host ruby), vendored as the read-anchor for the `Psych::Emitter` port
+      // in packages/ruby-compat/src/psych/emitter.ts, which cites
+      // `src/emitter.c`. No Ruby, so nothing for either comparer to measure.
+      ref: "0.2.5",
+    },
+    packages: [],
+  },
+  {
     name: "i18n",
     origin: {
       type: "git",

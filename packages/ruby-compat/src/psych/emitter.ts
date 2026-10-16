@@ -99,8 +99,10 @@ interface ScalarData {
 
 /**
  * `Psych::Emitter` (`vendor/ruby/v3.3.11/ext/psych/psych_emitter.c:527`), the
- * libyaml 0.2.5 emitter (`src/emitter.c`): each handler call builds a libyaml
- * event (`psych_emitter.c`) and `yaml_emitter_emit` drives the state machine.
+ * libyaml 0.2.5 emitter (`vendor/libyaml/0.2.5/src/emitter.c`): each handler
+ * call builds a libyaml event (`psych_emitter.c`) and `yaml_emitter_emit`
+ * (`vendor/libyaml/0.2.5/src/emitter.c:281`) drives the state machine. Each
+ * private method is the `yaml_emitter_<name>` of the same name.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -306,6 +308,7 @@ export class Emitter {
   }
 
   private emitStreamStart(event: Event): void {
+    this.openEnded = 0;
     if (event.type !== "STREAM_START") throw new RuntimeError("expected STREAM-START");
     if (this.bestIndent < 2 || this.bestIndent > 9) this.bestIndent = 2;
     if (this.bestWidth >= 0 && this.bestWidth <= this.bestIndent * 2) this.bestWidth = 80;
@@ -351,6 +354,7 @@ export class Emitter {
           this.writeIndent();
         }
       }
+      if (this.checkEmptyDocument()) implicit = false;
       if (!implicit) {
         this.writeIndent();
         this.writeIndicator("---", true, false, false);
@@ -575,6 +579,10 @@ export class Emitter {
     } else if (!indentless) {
       this.indent += this.bestIndent;
     }
+  }
+
+  private checkEmptyDocument(): boolean {
+    return false;
   }
 
   private checkEmptySequence(): boolean {

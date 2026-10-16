@@ -77,6 +77,10 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * Static members resolve separately, through the constructor chain
  * `klass -> delegator -> superclass` that `Object.setPrototypeOf` links.
  *
+ * The generated constructor is `Delegator#initialize(obj)`
+ * (`vendor/ruby/v3.3.11/lib/delegate.rb:75-77`), so a subclass with no
+ * `initialize` of its own is built with the object to delegate to.
+ *
  * `@delegate_dc_obj` (`delegate.rb:405`) is a plain `delegateDcObj` property rather
  * than a `#private` field: a `#` field is unreachable through the
  * `method_missing` Proxy, whose `get` rebinds the receiver
@@ -88,15 +92,15 @@ export function DelegateClass<T extends MixinBase>(
   superclass: T,
   block?: (this: Delegating<T>) => void,
 ): Delegating<T> {
-  const delegator = function () {} as unknown as T;
+  const delegator = function () {} as unknown as new () => object;
   Object.setPrototypeOf(delegator, superclass);
   delegator.prototype = superclass.prototype;
   const klass = class extends delegator {
     declare delegateDcObj: unknown;
 
-    constructor(...args: ConstructorParameters<MixinBase>) {
+    constructor(obj: unknown) {
       super();
-      this.__setobj__(args[0] as unknown);
+      this.__setobj__(obj);
       return methodMissingProxy(this, { delegate: (self) => self.__getobj__() });
     }
 

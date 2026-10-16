@@ -26,6 +26,7 @@ describe("SyntaxErrorProxy (trails)", () => {
       lineno?: number;
     }[];
     expect([first.path, first.lineno]).toEqual(["a.tse", 3]);
+    expect(String(first)).toBe("a.tse:3: unexpected end");
     expect(String(second)).toBe("at render (/app/a.js:5:7)");
   });
 });

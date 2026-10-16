@@ -1,5 +1,5 @@
 import { classAttribute, TopLevel } from "@blazetrails/activesupport";
-import { Builder, type RackApp } from "@blazetrails/rack";
+import { Builder } from "@blazetrails/rack";
 import { Driver, type BrowserName, type DriverOptions } from "./system-testing/driver.js";
 import { Server, vite } from "./system-testing/server.js";
 
@@ -53,7 +53,7 @@ export class SystemTestCase {
   static async startApplication(): Promise<void> {
     vite.app = new Builder(null, {}, (builder) => {
       builder.map("/", (builder) => {
-        builder.run(TopLevel.Trails!.application as unknown as RackApp);
+        builder.run(TopLevel.Trails!.application!);
       });
     });
 
