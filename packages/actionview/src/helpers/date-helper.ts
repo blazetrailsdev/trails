@@ -72,32 +72,18 @@ function normalizeDistanceOfTimeArgumentToTime(value: DistanceOfTimeInput): Date
 }
 
 /** @internal */
-function lookupTranslation(
-  scope: string,
-  key: string,
-  locale: string | undefined,
-): { one?: string; other?: string } | string | undefined {
-  const result = I18n.translate(`${scope}.${key}`, { locale, default: null });
-  if (typeof result === "string") return result;
-  if (result && typeof result === "object" && !Array.isArray(result)) {
-    return result as { one?: string; other?: string };
-  }
-  return undefined;
-}
-
-/** @internal */
 function translateDistance(
   key: string,
   count: number,
   scope: string,
   locale: string | undefined,
 ): string {
-  const looked = lookupTranslation(scope, key, locale) ?? DEFAULT_DISTANCE_IN_WORDS[key];
+  const result = I18n.translate(key, { locale, scope, count, default: null });
+  if (typeof result === "string") return result;
+  const looked = DEFAULT_DISTANCE_IN_WORDS[key];
   if (looked === undefined) return `[missing: ${scope}.${key}]`;
   if (typeof looked === "string") return looked.replace(/%\{count\}/g, String(count));
-  const variant = count === 1 ? looked.one : looked.other;
-  const template = variant ?? looked.other ?? looked.one ?? "";
-  return template.replace(/%\{count\}/g, String(count));
+  return (count === 1 ? looked.one : looked.other).replace(/%\{count\}/g, String(count));
 }
 
 export function distanceOfTimeInWords(
