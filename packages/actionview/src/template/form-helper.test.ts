@@ -5,9 +5,11 @@ import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activem
 import {
   I18n,
   assertEqual,
+  assertPredicate,
   assertRaises,
   extend,
   isBlank,
+  isHtmlSafe,
   isPlainObject,
   isPresent,
 } from "@blazetrails/activesupport";
@@ -618,6 +620,17 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, view.textField(objectName, "title"));
   });
 
+  it("file field has no size", () => {
+    const expected = '<input id="user_avatar" name="user[avatar]" type="file" />';
+    assertDomEqual(expected, view.fileField("user", "avatar"));
+  });
+
+  it("file field with multiple behavior", () => {
+    const expected =
+      '<input id="import_file" multiple="multiple" name="import[file][]" type="file" />';
+    assertDomEqual(expected, view.fileField("import", "file", { multiple: true }));
+  });
+
   it("hidden field", () => {
     assertDomEqual(
       '<input id="post_title" name="post[title]" type="hidden" value="Hello World" autocomplete="off" />',
@@ -654,6 +667,60 @@ describe("FormHelperTest", () => {
     assertDomEqual(
       '<input id="user_email" name="user[email]" type="email" />',
       view.textField("user", "email", { type: "email" }),
+    );
+  });
+
+  it("checkbox is html safe", () => {
+    assertPredicate(view.checkbox("post", "secret"), isHtmlSafe);
+  });
+
+  it("checkbox checked if object value is same that check value", () => {
+    assertDomEqual(
+      '<input name="post[secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="post_secret" name="post[secret]" type="checkbox" value="1" />',
+      view.checkbox("post", "secret"),
+    );
+  });
+
+  it("checkbox not checked if object value is same that unchecked value", () => {
+    post.secret = 0;
+    assertDomEqual(
+      '<input name="post[secret]" type="hidden" value="0" autocomplete="off" /><input id="post_secret" name="post[secret]" type="checkbox" value="1" />',
+      view.checkbox("post", "secret"),
+    );
+  });
+
+  it("checkbox checked if option checked is present", () => {
+    assertDomEqual(
+      '<input name="post[secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="post_secret" name="post[secret]" type="checkbox" value="1" />',
+      view.checkbox("post", "secret", { checked: "checked" }),
+    );
+  });
+
+  it("checkbox checked if object value is true", () => {
+    post.secret = true;
+    assertDomEqual(
+      '<input name="post[secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="post_secret" name="post[secret]" type="checkbox" value="1" />',
+      view.checkbox("post", "secret"),
+    );
+
+    assertDomEqual(
+      '<input name="post[secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="post_secret" name="post[secret]" type="checkbox" value="1" />',
+      view.checkbox("post", "secret?"),
+    );
+  });
+
+  it("radio button", () => {
+    assertDomEqual(
+      '<input checked="checked" id="post_title_hello_world" name="post[title]" type="radio" value="Hello World" />',
+      view.radioButton("post", "title", "Hello World"),
+    );
+    assertDomEqual(
+      '<input id="post_title_goodbye_world" name="post[title]" type="radio" value="Goodbye World" />',
+      view.radioButton("post", "title", "Goodbye World"),
+    );
+    assertDomEqual(
+      '<input id="item_subobject_title_inside_world" name="item[subobject][title]" type="radio" value="inside world"/>',
+      view.radioButton("item[subobject]", "title", "inside world"),
     );
   });
 
@@ -963,6 +1030,22 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
+  it("form for with file field generate multipart", () => {
+    formFor(post, { html: { id: "create-post" } }, (f) => {
+      concat(f.fileField("file"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "create-post",
+      "edit_post",
+      { method: "patch", multipart: true },
+      () => "<input name='post[file]' type='file' id='post_file' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
   it("form for false url", () => {
     formFor(new Post(), { url: false }, () => {});
 
@@ -1204,6 +1287,39 @@ describe("FormHelperTest", () => {
       (f) => f.fieldName("relevances_attributes", { multiple: true }),
       "post[comments_attributes][0][relevances_attributes][]",
     );
+  });
+
+  it("button with method name", () => {
+    formFor(post, {}, (f) => {
+      concat(f.button(":secret", { value: true }));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        `<button type="submit" id="post_secret" name="post[secret]" value="true">Update Post</button>`,
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("button with get formmethod attribute", () => {
+    formFor(post, { as: "another_post" }, (f) => {
+      concat(f.button("GET", { formmethod: "get" }));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_another_post",
+      "edit_another_post",
+      { method: "patch" },
+      () => "<button type='submit' formmethod='get' name='button'>GET</button>",
+    );
+
+    assertDomEqual(expected, rendered);
   });
 
   it("nested fields for", () => {
