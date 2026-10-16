@@ -1,5 +1,6 @@
 import { presence } from "@blazetrails/activesupport";
 import { Encoding, File, getFs, Module } from "@blazetrails/ruby-compat";
+import { vite } from "../server.js";
 
 declare module "vitest" {
   export interface ProvidedContext {
@@ -14,8 +15,9 @@ export interface ScreenshotPage {
 
 export interface ScreenshotHelperHost {
   _page?: ScreenshotPage;
-  _testName?: string;
-  _testFailed?: boolean;
+  methodName: string;
+  isPassed(): boolean;
+  isSkipped(): boolean;
   _screenshotCounter?: number;
   metadata?: Record<string, unknown>;
 }
@@ -45,7 +47,7 @@ export function takeScreenshot(
 }
 
 export async function takeFailedScreenshot(this: ScreenshotHelperHost): Promise<void> {
-  if (!failed.call(this) || !supportsScreenshot.call(this)) return;
+  if (!(failed.call(this) && supportsScreenshot.call(this) && this._page !== undefined)) return;
   await takeScreenshot.call(this);
   if (this.metadata) {
     this.metadata["failure_screenshot_path"] = relativeImagePath.call(this);
@@ -74,7 +76,7 @@ export function unique(this: ScreenshotHelperHost): string {
 
 /** @internal */
 export function imageName(this: ScreenshotHelperHost): string {
-  const sanitized = (this._testName ?? "test").replace(/[^\w]+/g, "-");
+  const sanitized = this.methodName.replace(/[^\w]+/g, "-");
   const name = `${unique.call(this)}_${sanitized}`;
   return name.slice(0, 225);
 }
@@ -177,12 +179,12 @@ function show(img: string): void {
 
 /** @internal */
 function failed(this: ScreenshotHelperHost): boolean {
-  return this._testFailed === true;
+  return !this.isPassed() && !this.isSkipped();
 }
 
 /** @internal */
 export function supportsScreenshot(this: ScreenshotHelperHost): boolean {
-  return this._page !== undefined;
+  return vite.currentDriver !== "rack_test";
 }
 
 ScreenshotHelper.defineMethod("takeScreenshot", takeScreenshot);

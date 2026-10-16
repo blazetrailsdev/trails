@@ -7,9 +7,10 @@ describe("ActionDispatch::SystemTesting::TestHelpers::SetupAndTeardown", () => {
   it("before_teardown calls take_failed_screenshot", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const host: SetupAndTeardownHost = {
-      _testFailed: true,
+      methodName: "test",
+      isPassed: () => false,
+      isSkipped: () => false,
       _screenshotCounter: undefined,
-      _testName: "test",
       metadata: {},
       _page: {
         screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
@@ -23,6 +24,9 @@ describe("ActionDispatch::SystemTesting::TestHelpers::SetupAndTeardown", () => {
   it("after_teardown closes the context and clears page", async () => {
     const close = vi.fn().mockResolvedValue(undefined);
     const host: SetupAndTeardownHost = {
+      methodName: "test",
+      isPassed: () => true,
+      isSkipped: () => false,
       _context: { close },
       _page: { screenshot: vi.fn(), content: vi.fn() },
     };
