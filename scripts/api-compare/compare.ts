@@ -5609,8 +5609,6 @@ export function main() {
           byOwner === undefined
             ? undefined
             : resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
-        // A TS class named after a sibling Ruby class of the same file ports
-        // that sibling, not this one (`Integration::Session` beside `IntegrationTest`).
         const short = (fqn: string) => fqn.split(/::|\./).pop();
         const tsClass =
           resolved !== undefined &&
