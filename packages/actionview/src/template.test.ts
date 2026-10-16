@@ -329,7 +329,7 @@ describe("ActionView::Template (smoke)", () => {
       } catch (e) {
         raised = e;
       }
-      expect((raised as TemplateError).original).toBeInstanceOf(StrictLocalsError);
+      expect((raised as TemplateError).cause).toBeInstanceOf(StrictLocalsError);
       expect((raised as TemplateError).message).toBe("unknown local: :extra for t");
     });
 
@@ -344,8 +344,8 @@ describe("ActionView::Template (smoke)", () => {
       } catch (e) {
         raised = e;
       }
-      expect((raised as TemplateError).original).toBeInstanceOf(ArgumentError);
-      expect((raised as TemplateError).original).not.toBeInstanceOf(StrictLocalsError);
+      expect((raised as TemplateError).cause).toBeInstanceOf(ArgumentError);
+      expect((raised as TemplateError).cause).not.toBeInstanceOf(StrictLocalsError);
     });
 
     it("memoizes the compile, so a second render of the same source reuses it", () => {

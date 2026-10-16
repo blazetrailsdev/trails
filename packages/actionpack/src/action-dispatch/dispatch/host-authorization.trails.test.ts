@@ -12,7 +12,7 @@ const okApp = async (_env: RackEnv): Promise<RackResponse> => [
 
 describe("HostAuthorization (trails)", () => {
   it("allows request when host matches exactly", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const mw = new HostAuthorization(okApp, ["example.com"]);
     const [status] = await mw.call({
       HTTP_HOST: "example.com",
       REQUEST_METHOD: "GET",
@@ -22,7 +22,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("blocks request when host does not match", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const mw = new HostAuthorization(okApp, ["example.com"]);
     const [status, headers, body] = await mw.call({
       HTTP_HOST: "evil.com",
       REQUEST_METHOD: "GET",
@@ -34,7 +34,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("default response renders DebugView body when show_detailed_exceptions is set", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const mw = new HostAuthorization(okApp, ["example.com"]);
     const [status, headers, body] = await mw.call({
       HTTP_HOST: "evil.com",
       REQUEST_METHOD: "GET",
@@ -49,7 +49,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("default response uses text/plain for XHR requests", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const mw = new HostAuthorization(okApp, ["example.com"]);
     const [status, headers] = await mw.call({
       HTTP_HOST: "evil.com",
       HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
@@ -63,7 +63,7 @@ describe("HostAuthorization (trails)", () => {
   it("default response logs blocked hosts via request logger", async () => {
     const messages: string[] = [];
     const logger = { error: (msg: string) => messages.push(msg) };
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const mw = new HostAuthorization(okApp, ["example.com"]);
     await mw.call({
       HTTP_HOST: "evil.com",
       REQUEST_METHOD: "GET",
@@ -76,7 +76,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("allows wildcard subdomain matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
+    const mw = new HostAuthorization(okApp, [".example.com"]);
     const [status] = await mw.call({
       HTTP_HOST: "app.example.com",
       REQUEST_METHOD: "GET",
@@ -86,7 +86,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("wildcard subdomain also matches apex domain", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
+    const mw = new HostAuthorization(okApp, [".example.com"]);
     const [status] = await mw.call({
       HTTP_HOST: "example.com",
       REQUEST_METHOD: "GET",
@@ -96,7 +96,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("wildcard subdomain does not match different domain", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
+    const mw = new HostAuthorization(okApp, [".example.com"]);
     const [status] = await mw.call({
       HTTP_HOST: "evil-example.com",
       REQUEST_METHOD: "GET",
@@ -106,7 +106,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("allows regexp matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [/example\.(com|org)/] });
+    const mw = new HostAuthorization(okApp, [/example\.(com|org)/]);
     const [s1] = await mw.call({ HTTP_HOST: "example.com", REQUEST_METHOD: "GET", PATH_INFO: "/" });
     expect(s1).toBe(200);
     const [s2] = await mw.call({ HTTP_HOST: "example.org", REQUEST_METHOD: "GET", PATH_INFO: "/" });
@@ -116,7 +116,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("multiple allowed hosts", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["a.com", "b.com"] });
+    const mw = new HostAuthorization(okApp, ["a.com", "b.com"]);
     const [s1] = await mw.call({ HTTP_HOST: "a.com", REQUEST_METHOD: "GET", PATH_INFO: "/" });
     expect(s1).toBe(200);
     const [s2] = await mw.call({ HTTP_HOST: "b.com", REQUEST_METHOD: "GET", PATH_INFO: "/" });
@@ -126,7 +126,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("empty hosts list allows all", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [] });
+    const mw = new HostAuthorization(okApp, []);
     const [status] = await mw.call({
       HTTP_HOST: "anything.com",
       REQUEST_METHOD: "GET",
@@ -136,7 +136,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("strips port from host before checking", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const mw = new HostAuthorization(okApp, ["example.com"]);
     const [status] = await mw.call({
       HTTP_HOST: "example.com:3000",
       REQUEST_METHOD: "GET",
@@ -146,7 +146,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("case insensitive host matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const mw = new HostAuthorization(okApp, ["example.com"]);
     const [status] = await mw.call({
       HTTP_HOST: "Example.COM",
       REQUEST_METHOD: "GET",
@@ -156,8 +156,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("exclude callback bypasses authorization", async () => {
-    const mw = new HostAuthorization(okApp, {
-      hosts: ["example.com"],
+    const mw = new HostAuthorization(okApp, ["example.com"], {
       exclude: (req) => req.path === "/health",
     });
     const [status] = await mw.call({
@@ -169,8 +168,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("exclude does not bypass non-matching paths", async () => {
-    const mw = new HostAuthorization(okApp, {
-      hosts: ["example.com"],
+    const mw = new HostAuthorization(okApp, ["example.com"], {
       exclude: (req) => req.path === "/health",
     });
     const [status] = await mw.call({
@@ -187,8 +185,7 @@ describe("HostAuthorization (trails)", () => {
       { "content-type": "text/plain" },
       bodyFromString("Service Unavailable"),
     ];
-    const mw = new HostAuthorization(okApp, {
-      hosts: ["example.com"],
+    const mw = new HostAuthorization(okApp, ["example.com"], {
       responseApp: customApp,
     });
     const [status, _, body] = await mw.call({
@@ -201,7 +198,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("falls back to SERVER_NAME when HTTP_HOST is absent", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["example.com"] });
+    const mw = new HostAuthorization(okApp, ["example.com"]);
     const [status] = await mw.call({
       SERVER_NAME: "example.com",
       REQUEST_METHOD: "GET",
@@ -211,7 +208,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("IPv4 address matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["127.0.0.1"] });
+    const mw = new HostAuthorization(okApp, ["127.0.0.1"]);
     const [s1] = await mw.call({ HTTP_HOST: "127.0.0.1", REQUEST_METHOD: "GET", PATH_INFO: "/" });
     expect(s1).toBe(200);
     const [s2] = await mw.call({ HTTP_HOST: "192.168.1.1", REQUEST_METHOD: "GET", PATH_INFO: "/" });
@@ -219,7 +216,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("IPv6 loopback matching", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: ["[::1]"] });
+    const mw = new HostAuthorization(okApp, ["[::1]"]);
     const [status] = await mw.call({
       HTTP_HOST: "[::1]",
       REQUEST_METHOD: "GET",
@@ -234,14 +231,14 @@ describe("HostAuthorization (trails)", () => {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/",
     };
-    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
+    const mw = new HostAuthorization(okApp, [new IPAddr("::/0")]);
     const [status] = await mw.call(env);
     expect(status).toBe(200);
     expect(env["action_dispatch.authorized_host"]).toBe("[::1]");
   });
 
   it("SUBDOMAIN_REGEX allows only a single subdomain segment", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [".example.com"] });
+    const mw = new HostAuthorization(okApp, [".example.com"]);
     const [status] = await mw.call({
       HTTP_HOST: "deep.sub.example.com",
       REQUEST_METHOD: "GET",
@@ -251,7 +248,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("IPv4-mapped IPv6 host matches CIDR allowlist", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
+    const mw = new HostAuthorization(okApp, [new IPAddr("::/0")]);
     const [status] = await mw.call({
       HTTP_HOST: "[::ffff:127.0.0.1]",
       REQUEST_METHOD: "GET",
@@ -261,7 +258,7 @@ describe("HostAuthorization (trails)", () => {
   });
 
   it("non-IP hostname does not match IPv6 CIDR allowlist", async () => {
-    const mw = new HostAuthorization(okApp, { hosts: [new IPAddr("::/0")] });
+    const mw = new HostAuthorization(okApp, [new IPAddr("::/0")]);
     const [status] = await mw.call({
       HTTP_HOST: "example.com:3000",
       REQUEST_METHOD: "GET",

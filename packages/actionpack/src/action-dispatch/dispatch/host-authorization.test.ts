@@ -34,7 +34,7 @@ function buildApp(
     app = new Lint(app);
   }
 
-  app = new HostAuthorization(app, { hosts, exclude, responseApp });
+  app = new HostAuthorization(app, hosts, { exclude, responseApp });
 
   if (lint) {
     app = new Lint(app);
