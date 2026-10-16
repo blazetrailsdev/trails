@@ -107,8 +107,7 @@ describe("YAMLColumnTest", () => {
     const badYaml = "--- {";
     expect(() => coder.load(badYaml)).toThrow(Psych.SyntaxError);
   });
-  it.skip("load doesnt handle undefined class or module", () => {
-    // BLOCKED: psych-parse-accepts-trailing-text-after-flow-collection
+  it("load doesnt handle undefined class or module", () => {
     const coder = new YAMLColumn("attr_name");
     const missingClassYaml = "--- !ruby/object:DoesNotExistAndShouldntEver {}\\n";
     expect(() => coder.load(missingClassYaml)).toThrow(ArgumentError);
@@ -178,8 +177,7 @@ describe("YAMLColumnTestWithSafeLoad", () => {
 
     expect(() => coder.load(timeYaml)).toThrow(Psych.DisallowedClass);
   });
-  it.skip("load doesnt handle undefined class or module", () => {
-    // BLOCKED: psych-parse-accepts-trailing-text-after-flow-collection
+  it("load doesnt handle undefined class or module", () => {
     const coder = new YAMLColumn("attr_name");
     const missingClassYaml = "--- !ruby/object:DoesNotExistAndShouldntEver {}\\n";
     expect(() => coder.load(missingClassYaml)).toThrow(Psych.DisallowedClass);

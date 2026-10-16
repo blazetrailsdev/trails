@@ -89,6 +89,10 @@ function writeSingleQuoted(
   stringify: NonNullable<Yaml.ScalarTag["stringify"]>,
 ): NonNullable<Yaml.ScalarTag["stringify"]> {
   return (item, ctx, onComment, onChompKeep) => {
+    const style = EXPLICIT_KEYS.get(item);
+    if (style !== undefined) {
+      item = Object.assign(Object.create(Object.getPrototypeOf(item)), item, { type: style });
+    }
     const { value, type } = item as Yaml.Scalar<string>;
     if (type === yaml.Scalar.PLAIN) {
       return stringify(item, { ...ctx, actualString: false }, onComment, onChompKeep);
@@ -148,6 +152,8 @@ function writeSingleQuoted(
     return `${out}'`;
   };
 }
+
+const EXPLICIT_KEYS = new WeakMap<Yaml.Scalar, Yaml.Scalar.Type | undefined>();
 
 /** `yaml_emitter_t`'s dumper options (`Psych::Handler::DumperOptions`, `vendor/ruby/v3.3.11/ext/psych/lib/psych/handler.rb:16`). */
 export interface DumperOptions {
@@ -320,6 +326,13 @@ export class Emitter {
     return this;
   }
 
+  private checkSimpleKey(node: Yaml.Scalar): boolean {
+    const bytes = (s: string | undefined) => (s ? new TextEncoder().encode(s).length : 0);
+    const length = bytes(node.anchor) + bytes(node.tag) + bytes(String(node.value));
+    if (length > 128) return false;
+    return true;
+  }
+
   private add(node: Yaml.Node): void {
     const top = this.stack.at(-1);
     if (!top) {
@@ -327,6 +340,10 @@ export class Emitter {
     } else if (yaml.isSeq(top.node)) {
       top.node.items.push(node);
     } else if (top.key === undefined) {
+      if (yaml.isScalar(node) && !this.checkSimpleKey(node)) {
+        EXPLICIT_KEYS.set(node, node.type);
+        node.type = "BLOCK_LITERAL";
+      }
       top.key = node;
     } else {
       top.node.add(new yaml.Pair(top.key, node));

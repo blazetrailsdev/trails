@@ -262,8 +262,15 @@ export namespace Psych {
     if (yamlString instanceof IO) yamlString = yamlString.read();
     if (yamlString instanceof Uint8Array) yamlString = new TextDecoder().decode(yamlString);
     const doc = yaml.parseDocument(yamlString);
-    if (doc.errors.length > 0) {
-      const [error] = doc.errors;
+    const root = doc.contents;
+    const end = root?.range?.[1] ?? 0;
+    const closed =
+      root != null && yaml.isCollection(root) && root.flow
+        ? "}]".includes(yamlString[end - 1] ?? "")
+        : yaml.isScalar(root) && (root.type === "QUOTE_SINGLE" || root.type === "QUOTE_DOUBLE");
+    const errors = closed ? doc.errors.filter((e) => e.pos[0] < end) : doc.errors;
+    if (errors.length > 0) {
+      const [error] = errors;
       const mark = error.linePos?.[0] ?? { line: 0, col: 0 };
       throw new PsychSyntaxError(
         filename,
