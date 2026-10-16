@@ -251,7 +251,7 @@ export const DateHelper = new Module((mod) => {
 
 type DateType = "year" | "month" | "day" | "hour" | "minute" | "second";
 
-function present(value: unknown): boolean {
+function isRubyTruthy(value: unknown): boolean {
   return value != null && value !== false;
 }
 
@@ -308,10 +308,10 @@ export class DateTimeSelector {
     this._options = { ...options };
     this._htmlOptions = { ...htmlOptions };
     this._datetime = datetime;
-    this._options.datetimeSeparator = present(this._options.datetimeSeparator)
+    this._options.datetimeSeparator = isRubyTruthy(this._options.datetimeSeparator)
       ? this._options.datetimeSeparator
       : " &mdash; ";
-    this._options.timeSeparator = present(this._options.timeSeparator)
+    this._options.timeSeparator = isRubyTruthy(this._options.timeSeparator)
       ? this._options.timeSeparator
       : " : ";
   }
@@ -320,23 +320,23 @@ export class DateTimeSelector {
     let order = [...this.dateOrder()];
     order = order.filter((o) => !["hour", "minute", "second"].includes(o));
     if (!order.includes("year"))
-      if (!present(this._options.discardYear)) this._options.discardYear = true;
+      if (!isRubyTruthy(this._options.discardYear)) this._options.discardYear = true;
     if (!order.includes("month"))
-      if (!present(this._options.discardMonth)) this._options.discardMonth = true;
-    if (present(this._options.discardMonth) || !order.includes("day"))
-      if (!present(this._options.discardDay)) this._options.discardDay = true;
-    if (present(this._options.discardHour))
-      if (!present(this._options.discardMinute)) this._options.discardMinute = true;
-    if (!(present(this._options.includeSeconds) && !present(this._options.discardMinute)))
-      if (!present(this._options.discardSecond)) this._options.discardSecond = true;
+      if (!isRubyTruthy(this._options.discardMonth)) this._options.discardMonth = true;
+    if (isRubyTruthy(this._options.discardMonth) || !order.includes("day"))
+      if (!isRubyTruthy(this._options.discardDay)) this._options.discardDay = true;
+    if (isRubyTruthy(this._options.discardHour))
+      if (!isRubyTruthy(this._options.discardMinute)) this._options.discardMinute = true;
+    if (!(isRubyTruthy(this._options.includeSeconds) && !isRubyTruthy(this._options.discardMinute)))
+      if (!isRubyTruthy(this._options.discardSecond)) this._options.discardSecond = true;
 
     this.setDayIfDiscarded();
 
-    if (present(this._options.tag) && present(this._options.ignoreDate)) {
+    if (isRubyTruthy(this._options.tag) && isRubyTruthy(this._options.ignoreDate)) {
       return this.selectTime();
     } else {
       for (const o of ["day", "month", "year"]) if (!order.includes(o)) order.unshift(o);
-      if (!present(this._options.discardHour)) order = [...order, "hour", "minute", "second"];
+      if (!isRubyTruthy(this._options.discardHour)) order = [...order, "hour", "minute", "second"];
 
       return this.buildSelectsFromTypes(order);
     }
@@ -350,11 +350,11 @@ export class DateTimeSelector {
     this._options.discardSecond = true;
 
     if (!order.includes("year"))
-      if (!present(this._options.discardYear)) this._options.discardYear = true;
+      if (!isRubyTruthy(this._options.discardYear)) this._options.discardYear = true;
     if (!order.includes("month"))
-      if (!present(this._options.discardMonth)) this._options.discardMonth = true;
-    if (present(this._options.discardMonth) || !order.includes("day"))
-      if (!present(this._options.discardDay)) this._options.discardDay = true;
+      if (!isRubyTruthy(this._options.discardMonth)) this._options.discardMonth = true;
+    if (isRubyTruthy(this._options.discardMonth) || !order.includes("day"))
+      if (!isRubyTruthy(this._options.discardDay)) this._options.discardDay = true;
 
     this.setDayIfDiscarded();
 
@@ -369,20 +369,20 @@ export class DateTimeSelector {
     this._options.discardMonth = true;
     this._options.discardYear = true;
     this._options.discardDay = true;
-    if (!present(this._options.includeSeconds))
-      if (!present(this._options.discardSecond)) this._options.discardSecond = true;
+    if (!isRubyTruthy(this._options.includeSeconds))
+      if (!isRubyTruthy(this._options.discardSecond)) this._options.discardSecond = true;
 
-    if (!present(this._options.ignoreDate)) order = [...order, "year", "month", "day"];
+    if (!isRubyTruthy(this._options.ignoreDate)) order = [...order, "year", "month", "day"];
 
     order = [...order, "hour", "minute"];
-    if (present(this._options.includeSeconds)) order.push("second");
+    if (isRubyTruthy(this._options.includeSeconds)) order.push("second");
 
     return this.buildSelectsFromTypes(order);
   }
 
   selectSecond(): SafeBuffer | undefined {
-    if (present(this._options.useHidden) || present(this._options.discardSecond)) {
-      if (present(this._options.includeSeconds)) return this.buildHidden("second", this.sec());
+    if (isRubyTruthy(this._options.useHidden) || isRubyTruthy(this._options.discardSecond)) {
+      if (isRubyTruthy(this._options.includeSeconds)) return this.buildHidden("second", this.sec());
       return undefined;
     } else {
       return this.buildOptionsAndSelect("second", this.sec());
@@ -390,7 +390,7 @@ export class DateTimeSelector {
   }
 
   selectMinute(): SafeBuffer {
-    if (present(this._options.useHidden) || present(this._options.discardMinute)) {
+    if (isRubyTruthy(this._options.useHidden) || isRubyTruthy(this._options.discardMinute)) {
       return this.buildHidden("minute", this.min());
     } else {
       return this.buildOptionsAndSelect("minute", this.min(), { step: this._options.minuteStep });
@@ -398,28 +398,28 @@ export class DateTimeSelector {
   }
 
   selectHour(): SafeBuffer {
-    if (present(this._options.useHidden) || present(this._options.discardHour)) {
+    if (isRubyTruthy(this._options.useHidden) || isRubyTruthy(this._options.discardHour)) {
       return this.buildHidden("hour", this.hour());
     } else {
       const options: Record<string, unknown> = {};
-      options.ampm = present(this._options.ampm) ? this._options.ampm : false;
-      options.start = present(this._options.startHour) ? this._options.startHour : 0;
-      options.end = present(this._options.endHour) ? this._options.endHour : 23;
+      options.ampm = isRubyTruthy(this._options.ampm) ? this._options.ampm : false;
+      options.start = isRubyTruthy(this._options.startHour) ? this._options.startHour : 0;
+      options.end = isRubyTruthy(this._options.endHour) ? this._options.endHour : 23;
       return this.buildOptionsAndSelect("hour", this.hour(), options);
     }
   }
 
   selectDay(): SafeBuffer {
-    if (present(this._options.useHidden) || present(this._options.discardDay)) {
-      return this.buildHidden("day", present(this.day()) ? this.day() : 1);
+    if (isRubyTruthy(this._options.useHidden) || isRubyTruthy(this._options.discardDay)) {
+      return this.buildHidden("day", isRubyTruthy(this.day()) ? this.day() : 1);
     } else {
       return this.buildSelect("day", this.buildDayOptions(this.day()));
     }
   }
 
   selectMonth(): SafeBuffer {
-    if (present(this._options.useHidden) || present(this._options.discardMonth)) {
-      return this.buildHidden("month", present(this.month()) ? this.month() : 1);
+    if (isRubyTruthy(this._options.useHidden) || isRubyTruthy(this._options.discardMonth)) {
+      return this.buildHidden("month", isRubyTruthy(this.month()) ? this.month() : 1);
     } else {
       const monthOptions: string[] = [];
       for (let monthNumber = 1; monthNumber <= 12; monthNumber++) {
@@ -436,26 +436,26 @@ export class DateTimeSelector {
   selectYear(): SafeBuffer {
     let val: unknown;
     let middleYear: number;
-    if (!present(this.year()) || this._datetime === 0) {
+    if (!isRubyTruthy(this.year()) || this._datetime === 0) {
       val = "1";
       middleYear = Number(RubyDate.today().year);
     } else {
       val = middleYear = this.year() as number;
     }
 
-    if (present(this._options.useHidden) || present(this._options.discardYear)) {
+    if (isRubyTruthy(this._options.useHidden) || isRubyTruthy(this._options.discardYear)) {
       return this.buildHidden("year", val);
     } else {
       const options: Record<string, number> = {};
-      options.start = present(this._options.startYear)
+      options.start = isRubyTruthy(this._options.startYear)
         ? (this._options.startYear as number)
         : middleYear - 5;
-      options.end = present(this._options.endYear)
+      options.end = isRubyTruthy(this._options.endYear)
         ? (this._options.endYear as number)
         : middleYear + 5;
       options.step = options.start < options.end ? 1 : -1;
 
-      const maxYearsAllowed = present(this._options.maxYearsAllowed)
+      const maxYearsAllowed = isRubyTruthy(this._options.maxYearsAllowed)
         ? (this._options.maxYearsAllowed as number)
         : 1000;
 
@@ -499,7 +499,7 @@ export class DateTimeSelector {
 
   /** @internal */
   private setDayIfDiscarded(): void {
-    if (present(this._datetime) && present(this._options.discardDay)) {
+    if (isRubyTruthy(this._datetime) && isRubyTruthy(this._options.discardDay)) {
       this._datetime = rbFSend(this._datetime, "change", { day: 1 });
     }
   }
@@ -508,7 +508,7 @@ export class DateTimeSelector {
   private monthNames(): unknown[] {
     return (this._monthNames ??= (() => {
       let monthNames = (
-        present(this._options.useMonthNames)
+        isRubyTruthy(this._options.useMonthNames)
           ? this._options.useMonthNames
           : this.translatedMonthNames()
       ) as unknown[];
@@ -519,16 +519,18 @@ export class DateTimeSelector {
 
   /** @internal */
   private translatedMonthNames(): unknown {
-    const key = present(this._options.useShortMonth) ? "date.abbr_month_names" : "date.month_names";
+    const key = isRubyTruthy(this._options.useShortMonth)
+      ? "date.abbr_month_names"
+      : "date.month_names";
     return I18n.translate(key, { locale: this._options.locale as string });
   }
 
   /** @internal */
   private dayName(number: number): unknown {
     const dayFormatLambda = this._options.dayFormat as ((n: number) => unknown) | undefined;
-    if (present(dayFormatLambda)) {
+    if (isRubyTruthy(dayFormatLambda)) {
       return dayFormatLambda!(number);
-    } else if (present(this._options.useTwoDigitNumbers)) {
+    } else if (isRubyTruthy(this._options.useTwoDigitNumbers)) {
       return format("%02d", number);
     } else {
       return number;
@@ -538,13 +540,13 @@ export class DateTimeSelector {
   /** @internal */
   private monthName(number: number): unknown {
     let formatString: unknown;
-    if (present(this._options.useMonthNumbers)) {
+    if (isRubyTruthy(this._options.useMonthNumbers)) {
       return number;
-    } else if (present(this._options.useTwoDigitNumbers)) {
+    } else if (isRubyTruthy(this._options.useTwoDigitNumbers)) {
       return format("%02d", number);
-    } else if (present(this._options.addMonthNumbers)) {
+    } else if (isRubyTruthy(this._options.addMonthNumbers)) {
       return `${number} - ${this.monthNames()[number]}`;
-    } else if (present((formatString = this._options.monthFormatString))) {
+    } else if (isRubyTruthy((formatString = this._options.monthFormatString))) {
       return format(formatString as string, { number, name: this.monthNames()[number] });
     } else {
       return this.monthNames()[number];
@@ -554,7 +556,7 @@ export class DateTimeSelector {
   /** @internal */
   private yearName(number: number): unknown {
     const yearFormatLambda = this._options.yearFormat as ((n: number) => unknown) | undefined;
-    if (present(yearFormatLambda)) {
+    if (isRubyTruthy(yearFormatLambda)) {
       return yearFormatLambda!(number);
     } else {
       return number;
@@ -563,7 +565,7 @@ export class DateTimeSelector {
 
   /** @internal */
   private dateOrder(): string[] {
-    return (this._dateOrder ??= present(this._options.order)
+    return (this._dateOrder ??= isRubyTruthy(this._options.order)
       ? (this._options.order as string[])
       : this.translatedDateOrder());
   }
@@ -604,22 +606,22 @@ export class DateTimeSelector {
       options,
     );
 
-    const start = present(options.start) ? (options.start as number) : 0;
+    const start = isRubyTruthy(options.start) ? (options.start as number) : 0;
     delete options.start;
-    const stop = present(options.end) ? (options.end as number) : 59;
+    const stop = isRubyTruthy(options.end) ? (options.end as number) : 59;
     delete options.end;
-    const step = present(options.step) ? (options.step as number) : 1;
+    const step = isRubyTruthy(options.step) ? (options.step as number) : 1;
     delete options.step;
     const leadingZeros = options.leadingZeros;
     delete options.leadingZeros;
 
     const selectOptions: SafeBuffer[] = [];
     for (let i = start; i <= stop; i += step) {
-      const value = present(leadingZeros) ? sprintf("%02d", i) : i;
+      const value = isRubyTruthy(leadingZeros) ? sprintf("%02d", i) : i;
       const tagOptions: Record<string, unknown> = { value };
       if (selected === i) tagOptions.selected = "selected";
-      let text: unknown = present(options.useTwoDigitNumbers) ? sprintf("%02d", i) : value;
-      text = present(options.ampm) ? DateTimeSelector.AMPM_TRANSLATION[i] : text;
+      let text: unknown = isRubyTruthy(options.useTwoDigitNumbers) ? sprintf("%02d", i) : value;
+      text = isRubyTruthy(options.ampm) ? DateTimeSelector.AMPM_TRANSLATION[i] : text;
       selectOptions.push(this.contentTag("option", text, tagOptions));
     }
 
@@ -665,8 +667,8 @@ export class DateTimeSelector {
       { id: this.inputIdFromType(type), name: this.inputNameFromType(type) },
       this._htmlOptions,
     );
-    if (present(this._options.disabled)) selectOptions.disabled = "disabled";
-    if (present(this._options.withCssClasses))
+    if (isRubyTruthy(this._options.disabled)) selectOptions.disabled = "disabled";
+    if (isRubyTruthy(this._options.withCssClasses))
       selectOptions.class = this.cssClassAttribute(
         type,
         selectOptions.class,
@@ -674,9 +676,9 @@ export class DateTimeSelector {
       );
 
     let selectHtml = "\n";
-    if (present(this._options.includeBlank))
+    if (isRubyTruthy(this._options.includeBlank))
       selectHtml += this.contentTag("option", "", { value: "", label: " " }) + "\n";
-    if (present(this._options.prompt))
+    if (isRubyTruthy(this._options.prompt))
       selectHtml += this.promptOptionTag(type, this._options.prompt) + "\n";
     selectHtml += selectOptionsAsHtml;
 
@@ -716,7 +718,7 @@ export class DateTimeSelector {
       });
     }
 
-    return present(prompt)
+    return isRubyTruthy(prompt)
       ? this.contentTag("option", this.promptText(prompt, type), { value: "" })
       : "";
   }
@@ -733,24 +735,26 @@ export class DateTimeSelector {
       },
       Object.hasOwn(this._htmlOptions, "disabled") ? { disabled: this._htmlOptions.disabled } : {},
     );
-    if (present(this._options.disabled)) selectOptions.disabled = "disabled";
+    if (isRubyTruthy(this._options.disabled)) selectOptions.disabled = "disabled";
 
-    return htmlSafe(String(this.tag("input", selectOptions)) + htmlSafe("\n"));
+    return this.tag("input", selectOptions).plus("\n");
   }
 
   /** @internal */
   private inputNameFromType(type: DateType): string {
-    let prefix = present(this._options.prefix)
+    let prefix = isRubyTruthy(this._options.prefix)
       ? (this._options.prefix as string)
       : DateTimeSelector.DEFAULT_PREFIX;
     if (Object.hasOwn(this._options, "index")) prefix += `[${String(this._options.index)}]`;
 
-    let fieldName = present(this._options.fieldName) ? (this._options.fieldName as string) : type;
-    if (present(this._options.includePosition)) {
+    let fieldName = isRubyTruthy(this._options.fieldName)
+      ? (this._options.fieldName as string)
+      : type;
+    if (isRubyTruthy(this._options.includePosition)) {
       fieldName += `(${DateTimeSelector.POSITION[type]}i)`;
     }
 
-    return present(this._options.discardType) ? prefix : `${prefix}[${fieldName}]`;
+    return isRubyTruthy(this._options.discardType) ? prefix : `${prefix}[${fieldName}]`;
   }
 
   /** @internal */
@@ -758,7 +762,7 @@ export class DateTimeSelector {
     let id = this.inputNameFromType(type)
       .replace(/([[(])|(\]\[)/g, "_")
       .replace(/[\])]/g, "");
-    if (present(this._options.namespace)) id = `${String(this._options.namespace)}_${id}`;
+    if (isRubyTruthy(this._options.namespace)) id = `${String(this._options.namespace)}_${id}`;
 
     return id;
   }
@@ -767,7 +771,8 @@ export class DateTimeSelector {
   private buildSelectsFromTypes(order: string[]): SafeBuffer {
     let select = "";
     const firstVisible = order.find(
-      (type) => !present(this._options[`discard${type.charAt(0).toUpperCase()}${type.slice(1)}`]),
+      (type) =>
+        !isRubyTruthy(this._options[`discard${type.charAt(0).toUpperCase()}${type.slice(1)}`]),
     );
     for (const type of [...order].reverse()) {
       let separator: unknown;
@@ -782,22 +787,22 @@ export class DateTimeSelector {
 
   /** @internal */
   private separator(type: DateType): unknown {
-    if (present(this._options.useHidden)) return "";
+    if (isRubyTruthy(this._options.useHidden)) return "";
 
     switch (type) {
       case "year":
       case "month":
       case "day":
-        return present(this._options[`discard${type.charAt(0).toUpperCase()}${type.slice(1)}`])
+        return isRubyTruthy(this._options[`discard${type.charAt(0).toUpperCase()}${type.slice(1)}`])
           ? ""
           : this._options.dateSeparator;
       case "hour":
-        return present(this._options.discardYear) && present(this._options.discardDay)
+        return isRubyTruthy(this._options.discardYear) && isRubyTruthy(this._options.discardDay)
           ? ""
           : this._options.datetimeSeparator;
       case "minute":
       case "second":
-        return present(this._options[`discard${type.charAt(0).toUpperCase()}${type.slice(1)}`])
+        return isRubyTruthy(this._options[`discard${type.charAt(0).toUpperCase()}${type.slice(1)}`])
           ? ""
           : this._options.timeSeparator;
     }
@@ -805,7 +810,13 @@ export class DateTimeSelector {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
-export interface DateTimeSelector extends Included<typeof import("./tag-helper.js")> {
+export interface DateTimeSelector extends Omit<Included<typeof import("./tag-helper.js")>, "tag"> {
+  tag(
+    name: string,
+    options?: Record<string, unknown> | null,
+    open?: boolean,
+    escape?: boolean,
+  ): SafeBuffer;
   /** @internal */
   sec(): unknown;
   /** @internal */
