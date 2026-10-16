@@ -141,6 +141,20 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["on the test object"]).toBe(2);
   });
 
+  it("counts an assert helper called on the suite's tc instance, folding a same-file helper", () => {
+    const src = `
+      function withRouting(block: () => void) {
+        assertNothingRaised(block);
+      }
+      it("on tc", () => {
+        tc.assertRecognizes({ controller: "messages" }, "/messages");
+        tc.withRouting(() => {});
+        tc.setup();
+      });
+    `;
+    expect(tsAssertionCounts(src)["on tc"]).toBe(2);
+  });
+
   it("counts trails expect* assertion helpers (twins of Rails assert_* helpers)", () => {
     const src = `
       it("mixed", () => {

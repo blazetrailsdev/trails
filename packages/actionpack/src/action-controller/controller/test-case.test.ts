@@ -241,10 +241,6 @@ describe("TestCaseTest", () => {
   const FILES_DIR = `${FIXTURE_LOAD_PATH}/multipart`;
   const controllerInfo = { controller: "test_case_test/test", action: "testParams" };
   let tc: TestCaseTest;
-  const assertGenerates = (...args: Parameters<TestCaseTest["assertGenerates"]>) =>
-    tc.assertGenerates(...args);
-  const assertRouting = (...args: Parameters<TestCaseTest["assertRouting"]>) =>
-    tc.assertRouting(...args);
 
   beforeEach(async ({ task }) => {
     tc = new TestCaseTest(task.name);
@@ -451,29 +447,29 @@ describe("TestCaseTest", () => {
   it.skip("should not impose childless html tags in xml", () => {});
 
   it("assert generates", () => {
-    assertGenerates("controller/action/5", {
+    tc.assertGenerates("controller/action/5", {
       controller: "controller",
       action: "action",
       id: "5",
     });
-    assertGenerates(
+    tc.assertGenerates(
       "controller/action/7",
       { id: "7" },
       { controller: "controller", action: "action" },
     );
-    assertGenerates(
+    tc.assertGenerates(
       "controller/action/5",
       { controller: "controller", action: "action", id: "5", name: "bob" },
       {},
       { name: "bob" },
     );
-    assertGenerates(
+    tc.assertGenerates(
       "controller/action/7",
       { id: "7", name: "bob" },
       { controller: "controller", action: "action" },
       { name: "bob" },
     );
-    assertGenerates(
+    tc.assertGenerates(
       "controller/action/7",
       { id: "7" },
       { controller: "controller", action: "action", name: "bob" },
@@ -482,7 +478,7 @@ describe("TestCaseTest", () => {
   });
 
   it("assert routing", () => {
-    assertRouting("content", { controller: "content", action: "index" });
+    tc.assertRouting("content", { controller: "content", action: "index" });
   });
 
   it("assert routing with method", () => {
@@ -490,7 +486,7 @@ describe("TestCaseTest", () => {
       set.draw(function () {
         this.resources("content");
       });
-      assertRouting(
+      tc.assertRouting(
         { method: "post", path: "content" },
         { controller: "content", action: "create" },
       );
@@ -505,7 +501,7 @@ describe("TestCaseTest", () => {
         });
       });
 
-      assertRouting("admin/user", { controller: "admin/user", action: "index" });
+      tc.assertRouting("admin/user", { controller: "admin/user", action: "index" });
     });
   });
 
@@ -514,7 +510,7 @@ describe("TestCaseTest", () => {
       set.draw(function () {
         this.get("*path", { to: "pages#show" });
       });
-      assertRouting("/company/about", {
+      tc.assertRouting("/company/about", {
         controller: "pages",
         action: "show",
         path: "company/about",
