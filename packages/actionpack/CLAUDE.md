@@ -194,5 +194,6 @@ PERMANENT`). Only `Session::CacheStore` prewarms. Its `prepareSession` awaits
 result. `destroy` prewarms again before its `load_for_write!`. The cookie store
 and `Rack::Session::Pool` answer synchronously and still load lazily, so a
 request that never touches the session never decrypts its cookie. A
-`staleSessionCheckBang` retry covers a synchronous `ArgumentError` only.
+rejected `findSession` re-enters `staleSessionCheckBang`'s rescue, so an async
+`ArgumentError` is retried as a synchronous one is.
 Ruled by the repo owner on 2026-10-16 (trails#8997).
