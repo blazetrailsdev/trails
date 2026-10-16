@@ -1,4 +1,4 @@
-import { block, deleteIf, fetch, KeyError } from "@blazetrails/ruby-compat";
+import { block, deleteIf, fetch, hashReplace, KeyError } from "@blazetrails/ruby-compat";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 /** @noRailsEquivalent PERMANENT */
@@ -339,16 +339,13 @@ export class Session {
     if (this.isEnabled() && !this.isLoaded()) this.loadBang();
   }
 
-  /**
-   * @missingRailsCall replace — PERMANENT
-   * @internal
-   */
+  /** @internal */
   loadBang(): void {
     if (this.isEnabled()) {
       if (!this.isExists()) this.idWasInitialized = true;
       const [id, session] = this.by!.loadSession(this.req);
       this.options()!.set("id", id);
-      this.delegate = stringifyKeys(session);
+      hashReplace(this.delegate, stringifyKeys(session));
       if (!this.idWasInitialized) this._idWas = id;
     }
     this.idWasInitialized = true;

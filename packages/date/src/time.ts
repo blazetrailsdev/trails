@@ -24,6 +24,7 @@ import {
   rbCTime,
   rbDefineAllocFunc,
   rbHash,
+  rbBigNorm,
   rbObjDup,
   rbObjInstanceVariables,
   rbObjIvarGet,
@@ -1700,7 +1701,6 @@ export class Time extends rbCTime {
     return this.getutc().strftime("%a, %d %b %Y %T GMT");
   }
 
-  /** @noRailsEquivalent PERMANENT */
   /**
    * `Time#_dump` (`time_dump`, `vendor/ruby/v3.3.11/time.c:5414`) over `time_mdump`
    * (`time.c:5272`). The ASCII-8BIT String is one character per byte, boxed so it can hold
@@ -1708,7 +1708,7 @@ export class Time extends rbCTime {
    *
    * @noRailsEquivalent PERMANENT
    */
-  _dump(_limit?: unknown): string {
+  _dump(_limit?: unknown): typeof String.prototype {
     const vtm = this.getutc();
     const maxYear = 1900 + 0xffff;
     let year = vtm.year;
@@ -1751,11 +1751,11 @@ export class Time extends rbCTime {
         packed += String.fromCharCode(y % 256);
       buf += String.fromCharCode(packed.length + 5) + packed;
     }
-    const str = new String(buf) as string & Record<string, unknown>;
+    const str = new String(buf) as typeof String.prototype & Record<string, unknown>;
     for (const iv of rbObjInstanceVariables(this)) str[iv] = rbObjIvarGet(this, iv);
     if (nano.numerator !== 0n) {
-      str.nano_num = Number(nano.numerator);
-      str.nano_den = Number(nano.denominator);
+      str.nano_num = rbBigNorm(nano.numerator);
+      str.nano_den = rbBigNorm(nano.denominator);
     }
     if (nsec) {
       const sub1 = (nsec % 10) << 4;
@@ -1785,7 +1785,7 @@ export class Time extends rbCTime {
    *
    * @noRailsEquivalent PERMANENT
    */
-  static _load(str: string | string): Time {
+  static _load(str: string | typeof String.prototype): Time {
     const ivars = (typeof str === "string" ? {} : str) as Record<string, unknown>;
     const getAttr = (attr: string): unknown => {
       if (!Object.hasOwn(ivars, attr)) return null;
@@ -1878,15 +1878,21 @@ export class Time extends rbCTime {
       time = time.getlocal(offset as number);
     }
     if (zone != null) {
-      const z = rbObjRespondTo(Time, "findTimezone")
-        ? (Time as unknown as { findTimezone(zone: unknown): unknown }).findTimezone(zone)
-        : null;
+      let z: unknown;
+      try {
+        z = rbObjRespondTo(Time, "findTimezone")
+          ? (Time as unknown as { findTimezone(zone: unknown): unknown }).findTimezone(zone)
+          : null;
+      } catch {
+        z = null;
+      }
       if (maybeTzobjP(z)) time = Time.#zoneLocaltime(z, time) ?? time;
     }
     for (const iv of Object.keys(ivars)) if (iv.startsWith("@")) rbObjIvarSet(time, iv, ivars[iv]);
     return time;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   actsLikeTime(): boolean {
     return true;
   }

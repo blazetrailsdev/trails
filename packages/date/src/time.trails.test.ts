@@ -869,6 +869,17 @@ describe("Time through Marshal", () => {
     const t = Marshal.load(mri) as Time;
     expect([t.toS(), t.usec]).toEqual(["2004-01-02 03:04:05 UTC", 500000]);
     expect(Marshal.dump(Time.utc(2004, 1, 2, 3, 4, 5.5))).toBe(mri.replace(/F$/, "T"));
+    expect(Marshal.dump(Time.utc(1800, 3, 4, 5, 6, 7))).toBe(
+      '\x04\bIu:\tTime\x0F\x85\b\x00\xC0\x00\x00p\x18\x06d\x06:\tzoneI"\bUTC\x06:\x06ET',
+    );
+    expect(Marshal.dump(Time.utc(70000, 1, 1))).toBe(
+      '\x04\bIu:\tTime\x10 \xC0\xFF\xFF\x00\x00\x00\x00\x07\x05\n\x06:\tzoneI"\bUTC\x06:\x06ET',
+    );
+    const third =
+      '\x04\bIu:\tTime\r \x00\x1A\xC0\x00\x00\x00\x00\t:\rnano_numi\x02\xE8\x03:\rnano_deni\b:\rsubmicro"\x0730:\tzoneI"\bUTC\x06:\x06EF';
+    const loaded = Marshal.load(third) as Time;
+    expect([loaded.nsec, String(loaded.subsec)]).toEqual([333, "1/3000000"]);
+    expect((Marshal.load(Marshal.dump(loaded)) as Time).eql(loaded)).toBe(true);
     const local = Time.local(2004);
     const back = Marshal.load(Marshal.dump(local)) as Time;
     expect([back.eql(local), back.utcOffset]).toEqual([true, local.utcOffset]);
