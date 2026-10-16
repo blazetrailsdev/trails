@@ -1,0 +1,33 @@
+<% var errorIndex = localAssigns.errorIndex ?? 0 %>
+
+<% sourceExtracts.forEach((sourceExtract, index) => { %>
+  <% if (sourceExtract.code) { %>
+    <div class="source <%= showSourceIdx != index ? "hidden" : null %>" id="frame-source-<%= errorIndex %>-<%= index %>">
+      <div class="info">
+        Extracted source (around line <strong>#<%= sourceExtract.line %></strong>):
+      </div>
+      <div class="data">
+        <table cellpadding="0" cellspacing="0" class="lines">
+          <tr>
+            <td>
+              <pre class="line_numbers">
+                <% for (const lineNumber of Object.keys(sourceExtract.code)) { %>
+<span><%= lineNumber -%></span>
+                <% } %>
+              </pre>
+            </td>
+<td width="100%">
+<pre>
+<% for (const [line, source] of Object.entries(sourceExtract.code)) { -%>
+<div class="line<%= Number(line) == sourceExtract.line ? " active" : null -%>"><% if (Array.isArray(source)) { -%><%= source[0] -%><span class="error_highlight"><%= source[1] -%></span><%= source[2] -%>
+<% } else { -%>
+<%= source -%>
+<% } -%></div><% } -%>
+</pre>
+</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  <% } %>
+<% }) %>

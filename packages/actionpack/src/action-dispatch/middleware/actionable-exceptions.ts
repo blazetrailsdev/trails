@@ -1,10 +1,11 @@
-import { rbFSend, URI } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModConstSet, URI } from "@blazetrails/ruby-compat";
 import { ActionableError, cattrAccessor } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
 import { LOCATION } from "../constants.js";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
+import { ActionDispatch } from "../../namespaces.js";
 
 export class ActionableExceptions {
   static endpoint: string;
@@ -67,3 +68,5 @@ export class ActionableExceptions {
     ];
   }
 }
+
+rbModConstSet(ActionDispatch, "ActionableExceptions", ActionableExceptions);

@@ -1,0 +1,9 @@
+Rails.root: <%= TopLevel.Trails != null && typeof TopLevel.Trails.root === "function" ? TopLevel.Trails.root() : "unset" %>
+
+<% for (const [name, trace] of Object.entries(this.traces)) { %>
+<% if (trace.length > 0) { %>
+<%= name %>
+<%= trace.map((t) => t.trace).join("\n") %>
+
+<% } %>
+<% } %>

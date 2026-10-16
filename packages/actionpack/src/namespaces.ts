@@ -25,6 +25,8 @@ import type { Assertions } from "./action-dispatch/testing/assertions.js";
 import type { TestProcess } from "./action-dispatch/testing/test-process.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
 import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
+import type { ActionableExceptions } from "./action-dispatch/middleware/actionable-exceptions.js";
+import type { HtmlTableFormatter } from "./action-dispatch/routing/inspector.js";
 import type {
   AbstractSecureStore,
   AbstractStore,
@@ -61,6 +63,7 @@ export const ActionDispatch = {
   testApp: null,
 } as AutoloadModule & {
   Request: typeof Request;
+  ActionableExceptions: typeof ActionableExceptions;
   MissingController: typeof MissingController;
   Routing: typeof Routing;
   Assertions: typeof Assertions;
@@ -83,6 +86,7 @@ ActionDispatch.autoloadUnder("testing", () => {
 export const Routing = { name: "ActionDispatch::Routing", loadPath } as AutoloadModule & {
   PolymorphicRoutes: typeof PolymorphicRoutes;
   RoutesProxy: typeof RoutesProxy;
+  HtmlTableFormatter: typeof HtmlTableFormatter;
 };
 extend(Routing, Autoload);
 Routing.eagerAutoload(() => {

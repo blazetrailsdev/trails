@@ -1,0 +1,11 @@
+Routing Error
+
+<%= this.exception.message %>
+<% if (this.exception.failures.length > 0) { %>
+Failure reasons:
+<% for (const [route, reason] of this.exception.failures) { %>
+  - <%= String(route).replaceAll('\\', '') %></code> failed because <%= reason.toLowerCase() %>
+<% } %>
+<% } %>
+
+<%= render({ template: "rescues/_trace", format: ":text" }) %>

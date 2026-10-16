@@ -1,0 +1,19 @@
+<%
+  const cleanParams = isParamsValid() ? { ...this.request.filteredParameters() } : {};
+  delete cleanParams["action"];
+  delete cleanParams["controller"];
+
+  const requestDump = debugHeaders(cleanParams);
+%>
+
+Request parameters
+<%= requestDump %>
+
+Session dump
+<%= debugHash(this.request.session) %>
+
+Env dump
+<%= debugHash(Object.fromEntries(this.request.constructor.ENV_METHODS.filter((key) => Object.hasOwn(this.request.env, key)).map((key) => [key, this.request.env[key]]))) %>
+
+Response headers
+<%= Object.hasOwn(this, "response") ? debugHeaders(this.response.headers) : 'None' %>

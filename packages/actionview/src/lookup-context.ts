@@ -173,7 +173,7 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
   private _detailArgsForAny: [DetailsMap, Requested | null] | null = null;
 
   constructor(
-    viewPaths: PathSet | ReadonlyArray<PathSetResolver> | null = null,
+    viewPaths: PathSet | ReadonlyArray<PathSetResolver | string> | null = null,
     details: DetailsMap = {},
     prefixes: string[] = [],
   ) {
@@ -284,7 +284,7 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
   }
 
   /** @internal */
-  buildViewPaths(paths: PathSet | ReadonlyArray<PathSetResolver> | null): PathSet {
+  buildViewPaths(paths: PathSet | ReadonlyArray<PathSetResolver | string> | null): PathSet {
     if (paths instanceof PathSet) return paths;
     return new PathSet(paths ?? []);
   }

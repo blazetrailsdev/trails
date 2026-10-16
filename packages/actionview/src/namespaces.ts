@@ -1,5 +1,6 @@
 import { Autoload, extend, TopLevel, type Extended } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import type { FileSystemResolver } from "./template/resolver.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -9,6 +10,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 
 export const ActionView = { name: "ActionView", loadPath } as AutoloadModule & {
   Base: typeof Base;
+  FileSystemResolver: typeof FileSystemResolver;
 };
 extend(ActionView, Autoload);
 ActionView.eagerAutoload(() => {

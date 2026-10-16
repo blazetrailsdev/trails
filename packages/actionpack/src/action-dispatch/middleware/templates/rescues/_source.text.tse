@@ -1,0 +1,8 @@
+<% for (const sourceExtract of this.sourceExtracts.slice(0, 3)) { %>
+<% if (sourceExtract.code) { %>
+Extracted source (around line #<%= sourceExtract.line %>):
+
+<% for (const [line, source] of Object.entries(sourceExtract.code)) { -%>
+<%= Number(line) == sourceExtract.line ? `*${line}` : `#${line}` -%> <%= source -%><% } -%>
+<% } %>
+<% } %>

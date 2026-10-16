@@ -9,6 +9,7 @@ import { Base } from "@blazetrails/actionview";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
+import { DebugView } from "./debug-view.js";
 import { X_CASCADE } from "../constants.js";
 import { Mime, type MimeType } from "../http/mime-type.js";
 import { Request } from "../http/request.js";
@@ -207,7 +208,7 @@ export class DebugExceptions {
     request: Request,
     exception: Error,
     wrapper: ExceptionWrapper,
-  ): RackResponse {
+  ): RackResponse | Promise<RackResponse> {
     this.logError(request, wrapper);
 
     if (rtest(request.getHeader("action_dispatch.show_detailed_exceptions"))) {
@@ -230,58 +231,36 @@ export class DebugExceptions {
   }
 
   /** @internal */
-  renderForBrowserRequest(request: Request, wrapper: ExceptionWrapper): RackResponse {
+  async renderForBrowserRequest(
+    request: Request,
+    wrapper: ExceptionWrapper,
+  ): Promise<RackResponse> {
+    const template = this.createTemplate(request, wrapper);
+    const file = `rescues/${wrapper.rescueTemplate()}`;
+
     let body: string;
     let format: string;
     if (request.xhr) {
-      body = [
-        `${wrapper.exceptionName} (${wrapper.message})`,
-        "",
-        ...wrapper.applicationTrace.slice(0, 10),
-      ].join("\n");
+      body = String(await template.render({ template: file, layout: false, formats: [":text"] }));
       format = "text/plain";
     } else {
-      const method = (request.getHeader("REQUEST_METHOD") as string) ?? "GET";
-      const path = (request.getHeader("PATH_INFO") as string) ?? "/";
-      const controller = request.getHeader("action_dispatch.controller") as string | undefined;
-
-      const traceHtml = wrapper.applicationTrace
-        .slice(0, 20)
-        .map((line) => `  <li>${this.escapeHtml(String(line))}</li>`)
-        .join("\n");
-
-      body = [
-        "<!DOCTYPE html>",
-        "<html>",
-        "<head>",
-        `  <title>${wrapper.exceptionName} at ${this.escapeHtml(path)}</title>`,
-        '  <meta charset="utf-8">',
-        "</head>",
-        "<body>",
-        `  <h1>${this.escapeHtml(wrapper.exceptionName)}</h1>`,
-        `  <h2>${this.escapeHtml(wrapper.message)}</h2>`,
-        controller ? `  <p>Controller: ${this.escapeHtml(controller)}</p>` : "",
-        `  <p>Request: ${this.escapeHtml(method)} ${this.escapeHtml(path)}</p>`,
-        "  <h3>Application Trace</h3>",
-        "  <ul>",
-        traceHtml,
-        "  </ul>",
-        "</body>",
-        "</html>",
-      ]
-        .filter((l) => l.length > 0)
-        .join("\n");
+      body = String(await template.render({ template: file, layout: "rescues/layout" }));
       format = "text/html";
     }
-
     return this.render(wrapper.statusCode, body, format);
   }
 
-  private escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
+  /** @internal */
+  createTemplate(request: Request, wrapper: ExceptionWrapper): DebugView {
+    return new DebugView({
+      request: request,
+      exceptionWrapper: wrapper,
+      exception: wrapper.exception,
+      traces: wrapper.traces,
+      showSourceIdx: wrapper.sourceToShowId(),
+      traceToShow: wrapper.traceToShow(),
+      routesInspector: this.routesInspector(wrapper),
+      sourceExtracts: wrapper.sourceExtracts,
+    });
   }
 }

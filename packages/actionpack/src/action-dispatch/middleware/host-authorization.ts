@@ -3,7 +3,8 @@ import { bodyFromString } from "@blazetrails/rack";
 import { isBlank, type Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import { Request } from "../http/request.js";
-import { IPAddr, regexpEscape, rbEqq, rbFSend } from "@blazetrails/ruby-compat";
+import { IPAddr, regexpEscape, rbEqq, rbFSend, rtest } from "@blazetrails/ruby-compat";
+import { DebugView } from "./debug-view.js";
 
 /** @internal */
 export const PORT_REGEX = "(?::\\d+)";
@@ -174,17 +175,15 @@ export class DefaultResponseApp {
     const request = new Request(env);
     const format = request.xhr ? "text/plain" : "text/html";
     this.logError(request);
-    return this.response(format, this.responseBody(request));
+    return this.response(format, String(await this.responseBody(request)));
   }
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE debug-view-extends-action-view-base-and-renders-rescue-templates
-   */
-  private responseBody(request: Request): string {
-    if (!request.getHeader("action_dispatch.show_detailed_exceptions")) return "";
-    const blocked = (request.env["action_dispatch.blocked_hosts"] as string[]) ?? [];
-    return request.xhr ? renderBlockedHostText(blocked) : renderBlockedHostHtml(blocked);
+  /** @internal */
+  private responseBody(request: Request): ReturnType<DebugView["render"]> {
+    if (!rtest(request.getHeader("action_dispatch.show_detailed_exceptions"))) return "";
+
+    const template = new DebugView({ hosts: request.env["action_dispatch.blocked_hosts"] });
+    return template.render({ template: "rescues/blocked_host", layout: "rescues/layout" });
   }
 
   /** @internal */
@@ -214,46 +213,4 @@ export class DefaultResponseApp {
   private availableLogger(request: Request): Logger | null {
     return (request.logger as Logger | null | undefined) ?? (Base.logger as Logger | null);
   }
-}
-
-/** @internal */
-function renderBlockedHostHtml(hosts: string[]): string {
-  const joined = escapeHtml(hosts.join(", "));
-  const lines = hosts.map((host) => `    config.hosts << "${escapeHtml(host)}"`).join("\n");
-  return [
-    "<header>",
-    `  <h1>Blocked hosts: ${joined}</h1>`,
-    "</header>",
-    '<main role="main" id="container">',
-    "  <h2>To allow requests to these hosts, make sure they are valid hostnames (containing only numbers, letters, dashes and dots), then add the following to your environment configuration:</h2>",
-    "  <pre>",
-    lines,
-    "  </pre>",
-    '  <p>For more details view: <a href="https://guides.rubyonrails.org/configuring.html#actiondispatch-hostauthorization">the Host Authorization guide</a></p>',
-    "</main>",
-  ].join("\n");
-}
-
-/** @internal */
-function renderBlockedHostText(hosts: string[]): string {
-  const lines = hosts.map((host) => `  config.hosts << "${host}"`).join("\n");
-  return [
-    `Blocked hosts: ${hosts.join(", ")}`,
-    "",
-    "To allow requests to these hosts, make sure they are valid hostnames (containing only numbers, letters, dashes and dots), then add the following to your environment configuration:",
-    "",
-    lines,
-    "",
-    "For more details on host authorization view: https://guides.rubyonrails.org/configuring.html#actiondispatch-hostauthorization",
-  ].join("\n");
-}
-
-/** @internal */
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }

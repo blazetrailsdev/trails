@@ -1,0 +1,7 @@
+<%= this.exception.cause.constructor.name %> in <%= this.request.parameters["controller"] ? ActiveSupport.Inflector.camelize(this.request.parameters["controller"]) : null %>#<%= this.request.parameters["action"] %>
+
+Showing <%= this.exception.fileName() %> where line #<%= this.exception.lineNumber() %> raised:
+<%= this.exception.message %>
+<%= this.exception.subTemplateMessage() %>
+<%= render({ template: "rescues/_trace", format: ":text" }) %>
+<%= render({ template: "rescues/_request_and_response", format: ":text" }) %>

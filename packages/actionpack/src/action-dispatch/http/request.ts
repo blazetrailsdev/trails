@@ -205,6 +205,7 @@ export const ENV_METHODS: readonly string[] = Object.freeze([
 export class Request {
   declare static Utils: typeof Utils;
   static HTTP_METHOD_LOOKUP = HTTP_METHOD_LOOKUP;
+  static ENV_METHODS = ENV_METHODS;
 
   static {
     for (const env of ENV_METHODS) {

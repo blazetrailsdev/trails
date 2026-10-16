@@ -1,0 +1,11 @@
+<header role="banner">
+  <h1>Template is missing</h1>
+</header>
+
+<main role="main" id="container">
+  <h2><%= h(this.exceptionWrapper.message) %></h2>
+
+  <%= render("rescues/source", { sourceExtracts: this.sourceExtracts, showSourceIdx: this.showSourceIdx }) %>
+  <%= render("rescues/trace", { traces: this.traces, traceToShow: this.traceToShow }) %>
+  <%= render({ template: "rescues/_request_and_response" }) %>
+</main>

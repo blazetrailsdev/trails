@@ -1,0 +1,23 @@
+<% if (exceptionWrapper.hasCorrections()) { %>
+  <div class="exception-message">
+    <%= simpleFormat(h(exceptionWrapper.originalMessage()), { class: "message" }, { wrapperTag: "div" }) %>
+  </div>
+  <%
+    // The 'did_you_mean' gem can raise exceptions when calling #corrections on
+    // the exception. If it does there are no corrections to show.
+    let corrections;
+    try { corrections = exceptionWrapper.corrections(); } catch { corrections = []; }
+  %>
+  <% if (corrections.length > 0) { %>
+    <b>Did you mean?</b>
+    <ul>
+    <% for (const correction of corrections) { %>
+      <li class="correction"><%= h(correction) %></li>
+    <% } %>
+    </ul>
+  <% } %>
+<% } else { %>
+  <div class="exception-message">
+    <%= simpleFormat(h(exceptionWrapper.message), { class: "message" }, { wrapperTag: "div" }) %>
+  </div>
+<% } %>

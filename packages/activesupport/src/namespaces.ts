@@ -5,6 +5,7 @@ import type { BroadcastLogger } from "./broadcast-logger.js";
 import type { CacheStore } from "./cache/index.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
 import type { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
+import type * as Inflector from "./inflector.js";
 import type { Logger } from "./logger.js";
 import type { MessagePack } from "./message-pack.js";
 
@@ -34,6 +35,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 export const ActiveSupport = { name: "ActiveSupport", loadPath } as AutoloadModule & {
   BroadcastLogger: typeof BroadcastLogger;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
+  Inflector: typeof Inflector;
   MessagePack?: typeof MessagePack;
 };
 extend(ActiveSupport, Autoload);
