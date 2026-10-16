@@ -10,7 +10,19 @@ import { Range } from "../range.js";
 import { rbEqual } from "../rb-equal.js";
 import { rbHash } from "../rb-hash.js";
 import { TypeError } from "../type-error.js";
-import { EACH_METHODS, rbStrUpto } from "./each.js";
+import {
+  rbStrBytes,
+  rbStrChars,
+  rbStrCodepoints,
+  rbStrEachByte,
+  rbStrEachChar,
+  rbStrEachCodepoint,
+  rbStrEachGraphemeCluster,
+  rbStrEachLine,
+  rbStrGraphemeClusters,
+  rbStrLines,
+  rbStrUpto,
+} from "./each.js";
 import {
   rbStrByteindexM,
   rbStrByterindexM,
@@ -149,7 +161,16 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     hex: rbDefineMethod(0, (self) => rbStrHex(self.string)),
     oct: rbDefineMethod(0, (self) => rbStrOct(self.string)),
     split: rbStrSplitM,
-    ...EACH_METHODS,
+    lines: rbStrLines,
+    eachLine: rbStrEachLine,
+    chars: rbStrChars,
+    eachChar: rbStrEachChar,
+    bytes: rbStrBytes,
+    eachByte: rbStrEachByte,
+    codepoints: rbStrCodepoints,
+    eachCodepoint: rbStrEachCodepoint,
+    graphemeClusters: rbStrGraphemeClusters,
+    eachGraphemeCluster: rbStrEachGraphemeCluster,
     reverse: rbDefineMethod(0, (self) => [...self.string].reverse().join("")),
     reverseBang: rbDefineMethod(0, (self) => (self.string = [...self.string].reverse().join(""))),
     concat: rbStrConcatMulti,

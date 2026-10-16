@@ -145,35 +145,89 @@ export function codepoints(str: string): number[] {
 }
 
 /**
- * The iteration table entries: `lines`/`each_line`, `chars`/`each_char`,
- * `bytes`/`each_byte`, `codepoints`/`each_codepoint`,
- * `grapheme_clusters`/`each_grapheme_cluster` (`vendor/ruby/v3.3.11/string.c:9202`,
- * `:9307`, `:9322`, `:9238`, `:9367`, `:9537`).
+ * `String#lines` (`vendor/ruby/v3.3.11/string.c:9202` `rb_str_lines`).
  *
  * @noRailsEquivalent PERMANENT
  */
-export const EACH_METHODS = {
-  lines: (self: StringReceiver, ...argv: unknown[]) => {
-    const [args, block] = blockArg(argv);
-    const lines = rbStrEnumerateLines(self.string, args);
-    if (!block) return lines;
-    lines.forEach((line) => block(line));
-    return self.string;
-  },
-  eachLine: rbStrEachLine,
-  chars: (self: StringReceiver, ...argv: unknown[]) => listing(self, argv, [...self.string]),
-  eachChar: (self: StringReceiver, ...argv: unknown[]) => each(self, argv, [...self.string]),
-  bytes: (self: StringReceiver, ...argv: unknown[]) => listing(self, argv, bytes(self.string)),
-  eachByte: (self: StringReceiver, ...argv: unknown[]) => each(self, argv, bytes(self.string)),
-  codepoints: (self: StringReceiver, ...argv: unknown[]) =>
-    listing(self, argv, codepoints(self.string)),
-  eachCodepoint: (self: StringReceiver, ...argv: unknown[]) =>
-    each(self, argv, codepoints(self.string)),
-  graphemeClusters: (self: StringReceiver, ...argv: unknown[]) =>
-    listing(self, argv, graphemeClusters(self.string)),
-  eachGraphemeCluster: (self: StringReceiver, ...argv: unknown[]) =>
-    each(self, argv, graphemeClusters(self.string)),
-};
+export function rbStrLines(self: StringReceiver, ...argv: unknown[]): unknown {
+  const [args, block] = blockArg(argv);
+  const lines = rbStrEnumerateLines(self.string, args);
+  if (!block) return lines;
+  lines.forEach((line) => block(line));
+  return self.string;
+}
+
+/**
+ * `String#chars` (`vendor/ruby/v3.3.11/string.c:9322` `rb_str_chars`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrChars(self: StringReceiver, ...argv: unknown[]): unknown {
+  return listing(self, argv, [...self.string]);
+}
+
+/**
+ * `String#each_char` (`vendor/ruby/v3.3.11/string.c:9307` `rb_str_each_char`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrEachChar(self: StringReceiver, ...argv: unknown[]): unknown {
+  return each(self, argv, [...self.string]);
+}
+
+/**
+ * `String#bytes` (`vendor/ruby/v3.3.11/string.c:9253` `rb_str_bytes`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrBytes(self: StringReceiver, ...argv: unknown[]): unknown {
+  return listing(self, argv, bytes(self.string));
+}
+
+/**
+ * `String#each_byte` (`vendor/ruby/v3.3.11/string.c:9238` `rb_str_each_byte`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrEachByte(self: StringReceiver, ...argv: unknown[]): unknown {
+  return each(self, argv, bytes(self.string));
+}
+
+/**
+ * `String#codepoints` (`vendor/ruby/v3.3.11/string.c:9382` `rb_str_codepoints`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrCodepoints(self: StringReceiver, ...argv: unknown[]): unknown {
+  return listing(self, argv, codepoints(self.string));
+}
+
+/**
+ * `String#each_codepoint` (`vendor/ruby/v3.3.11/string.c:9367` `rb_str_each_codepoint`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrEachCodepoint(self: StringReceiver, ...argv: unknown[]): unknown {
+  return each(self, argv, codepoints(self.string));
+}
+
+/**
+ * `String#grapheme_clusters` (`vendor/ruby/v3.3.11/string.c:9552` `rb_str_grapheme_clusters`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrGraphemeClusters(self: StringReceiver, ...argv: unknown[]): unknown {
+  return listing(self, argv, graphemeClusters(self.string));
+}
+
+/**
+ * `String#each_grapheme_cluster` (`vendor/ruby/v3.3.11/string.c:9537` `rb_str_each_grapheme_cluster`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrEachGraphemeCluster(self: StringReceiver, ...argv: unknown[]): unknown {
+  return each(self, argv, graphemeClusters(self.string));
+}
 
 function listing<T>(self: StringReceiver, argv: unknown[], items: T[]): T[] | string {
   const [args, block] = blockArg(argv);

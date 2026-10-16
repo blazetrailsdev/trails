@@ -1,4 +1,5 @@
 import { b } from "../string/b.js";
+import { registerConstant } from "../variable.js";
 import { ArgumentError } from "../argument-error.js";
 import { rbEqual } from "../rb-equal.js";
 import { BadURIError, DEFAULT_PARSER, InvalidComponentError, InvalidURIError } from "./common.js";
@@ -793,3 +794,5 @@ export class Generic {
     return str;
   }
 }
+
+registerConstant("URI::Generic", Generic);

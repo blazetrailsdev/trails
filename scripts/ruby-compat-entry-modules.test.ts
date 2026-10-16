@@ -18,7 +18,7 @@ const DIST = path.join(REPO_ROOT, "packages/ruby-compat/dist");
 
 describe("ruby-compat entry modules", () => {
   it("imports every built module as the entry module", async () => {
-    const files = (await readdir(DIST)).filter((f) => f.endsWith(".js"));
+    const files = (await readdir(DIST, { recursive: true })).filter((f) => f.endsWith(".js"));
     expect(files.length).toBeGreaterThan(0);
     const failures: string[] = [];
     for (const f of files) {

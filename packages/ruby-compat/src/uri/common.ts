@@ -1,4 +1,5 @@
 import { ArgumentError } from "../argument-error.js";
+import { registerConstant } from "../variable.js";
 import { Encoding } from "../encoding.js";
 import { rbObjClone } from "../include.js";
 import { bytes } from "../string/bytes.js";
@@ -334,3 +335,6 @@ export class URI {
     return RFC3986_PARSER.parse(uri);
   }
 }
+
+registerConstant("URI", URI);
+registerConstant("URI::InvalidURIError", InvalidURIError);
