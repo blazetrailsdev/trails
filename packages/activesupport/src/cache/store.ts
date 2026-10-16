@@ -400,27 +400,27 @@ export abstract class Store {
     });
   }
 
-  deleteMatched(_matcher: unknown, _options?: StoreOptions): Promise<void> {
+  async deleteMatched(_matcher: unknown, _options?: StoreOptions): Promise<void> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support delete_matched`);
   }
 
-  increment(_name: string, _amount = 1, _options?: StoreOptions): Promise<number | null> {
+  async increment(_name: string, _amount = 1, _options?: StoreOptions): Promise<number | null> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support increment`);
   }
 
-  decrement(_name: string, _amount = 1, _options?: StoreOptions): Promise<number | null> {
+  async decrement(_name: string, _amount = 1, _options?: StoreOptions): Promise<number | null> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support decrement`);
   }
 
-  cleanup(_options?: StoreOptions): Promise<void> {
+  async cleanup(_options?: StoreOptions): Promise<void> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support cleanup`);
   }
 
-  clear(_options?: StoreOptions): Promise<void> {
+  async clear(_options?: StoreOptions): Promise<void> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support clear`);
   }

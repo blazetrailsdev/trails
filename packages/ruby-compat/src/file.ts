@@ -185,6 +185,14 @@ export class File extends IO {
   static readonly LOCK_UN = 8;
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:7845` — `File::LOCK_NB`, which makes `File#flock`
+   * answer `false` rather than wait (`file.c:5201`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::LOCK_NB`.
+   */
+  static readonly LOCK_NB = 4;
+
+  /**
    * `vendor/ruby/v3.3.11/dir.c:3678` — a backslash is an ordinary character, not an escape.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_NOESCAPE`.
@@ -848,8 +856,12 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File#flock`
    * (`vendor/ruby/v3.3.11/file.c:5301`).
    */
-  flock(operation: number): number {
-    getFs().flockSync?.(this.fd, operation === File.LOCK_UN ? "un" : "ex");
+  flock(operation: number): number | false {
+    const locked = getFs().flockSync?.(
+      this.fd,
+      operation === File.LOCK_UN ? "un" : operation & File.LOCK_NB ? "exnb" : "ex",
+    );
+    if (locked === false) return false;
     return 0;
   }
 

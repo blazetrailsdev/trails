@@ -359,6 +359,7 @@ export class Session {
       const [id, session] =
         this.prewarmedSession ??
         (this.by!.loadSession(this.req) as [unknown, Record<string, unknown>]);
+      this.prewarmedSession = undefined;
       this.options()!.set("id", id);
       hashReplace(this.delegate, stringifyKeys(session));
       if (!this.idWasInitialized) this._idWas = id;

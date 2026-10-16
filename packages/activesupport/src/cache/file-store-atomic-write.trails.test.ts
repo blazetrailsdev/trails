@@ -40,6 +40,18 @@ describe("FileStore atomic write and inspect", () => {
     });
   });
 
+  it("serialises concurrent in-process increments through lock_file", async () => {
+    await withStore(async (store) => {
+      await store.write("counter", 0);
+      await Promise.all([
+        store.increment("counter"),
+        store.increment("counter"),
+        store.increment("counter"),
+      ]);
+      expect(await store.read("counter")).toBe(3);
+    });
+  });
+
   it("does not lose concurrent increments", { timeout: 60_000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), "trails-file-store-"));
     const iterations = 100;

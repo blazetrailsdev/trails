@@ -53,10 +53,24 @@ export const StaleSessionCheck = {
     return this.staleSessionCheckBang(() => Persisted.prototype.extractSessionId.call(this, env));
   },
 
-  staleSessionCheckBang<T>(block: () => T): T {
+  staleSessionCheckBang<T>(
+    this: { staleSessionCheckBang<U>(block: () => U): U },
+    block: () => T,
+  ): T {
     for (;;) {
       try {
-        return block();
+        const result = block();
+        if (result instanceof Promise) {
+          return result.catch((argumentError: unknown) => {
+            let rescued = false;
+            return this.staleSessionCheckBang(() => {
+              if (rescued) return block();
+              rescued = true;
+              throw argumentError;
+            });
+          }) as T;
+        }
+        return result;
       } catch (argumentError) {
         if (!(argumentError instanceof ArgumentError)) throw argumentError;
         const match = /undefined class\/module ([\w:]*\w)/.exec(argumentError.message);

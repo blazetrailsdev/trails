@@ -180,7 +180,9 @@ export class FileStore extends Store implements CacheStore {
     if (File.isExist(fileName)) {
       return await File.open(fileName, "r+", async (f) => {
         try {
-          f.flock(File.LOCK_EX);
+          while (f.flock(File.LOCK_EX | File.LOCK_NB) === false) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
           return await block();
         } finally {
           f.flock(File.LOCK_UN);
@@ -239,18 +241,17 @@ export class FileStore extends Store implements CacheStore {
     if (!File.isExist(path)) FileUtils.makedirs(path);
   }
 
+  /** @missingRailsCall exist? — CONVERGEABLE file-store-async-fs-bodies */
   protected async searchDir(dir: string, callback: (path: string) => Promise<void>): Promise<void> {
-    if (!File.isExist(dir)) return;
-    let pending = Promise.resolve();
-    Dir.eachChild(dir, (d) => {
+    if (!(await File.isExistAsync(dir))) return;
+    for (const d of await Dir.childrenAsync(dir)) {
       const name = File.join(dir, d);
       if (File.isDirectory(name)) {
-        pending = pending.then(() => this.searchDir(name, callback));
+        await this.searchDir(name, callback);
       } else {
-        pending = pending.then(() => callback(name));
+        await callback(name);
       }
-    });
-    await pending;
+    }
   }
 
   private async modifyValue(name: string, amount: number, options: StoreOptions): Promise<number> {
