@@ -453,3 +453,28 @@ describe("Psych.parse stops at the end of the first document", () => {
     expect(() => Psych.parse("--- foo: bar: baz")).toThrow(Psych.SyntaxError);
   });
 });
+
+describe("YAMLTree through a TreeBuilder", () => {
+  // `YAMLTree#push` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:102-119`)
+  it("starts each document with the :header and :version arms", async () => {
+    const { YAMLTree } = await import("./psych/visitors/yaml-tree.js");
+    const versionOf = (options: object) => {
+      const visitor = YAMLTree.create(options);
+      visitor.push("a");
+      return (visitor.tree.children[0] as unknown as { version: number[] }).version;
+    };
+    expect(versionOf({})).toEqual([]);
+    expect(versionOf({ header: true })).toEqual([1, 1]);
+    expect(versionOf({ version: "1.2" })).toEqual([1, 2]);
+    expect(versionOf({ version: [1, 0] })).toEqual([1, 0]);
+  });
+
+  it("finishes the stream once, when tree is read", async () => {
+    const { YAMLTree } = await import("./psych/visitors/yaml-tree.js");
+    const visitor = YAMLTree.create();
+    visitor.push({ a: [1] });
+    expect(visitor.isFinished()).toBe(false);
+    expect(visitor.tree).toBe(visitor.tree);
+    expect(visitor.isFinished()).toBe(true);
+  });
+});

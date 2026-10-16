@@ -29,13 +29,12 @@ import { BadAlias, DisallowedClass } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
 import { ArgumentError } from "../../argument-error.js";
 import { Omap } from "../omap.js";
-import { Alias } from "../nodes/alias.js";
-import { Document } from "../nodes/document.js";
 import { Mapping } from "../nodes/mapping.js";
 import type { Node } from "../nodes/node.js";
 import { Scalar } from "../nodes/scalar.js";
 import { Sequence } from "../nodes/sequence.js";
 import { Stream } from "../nodes/stream.js";
+import { TreeBuilder } from "../tree-builder.js";
 
 type RubyTime = { isUtc(): boolean; strftime(format: string): string };
 type RubyDate = { gregorian(): { toS(): string } };
@@ -56,6 +55,8 @@ export interface YAMLTreeOptions {
   indentation?: number;
   canonical?: boolean;
   lineWidth?: number;
+  header?: boolean;
+  version?: number[] | string;
 }
 
 /**
@@ -66,8 +67,13 @@ export interface YAMLTreeOptions {
 export class YAMLTree {
   /** @internal */
   protected readonly st = new Map<object, Node>();
-  private readonly root = new Stream();
+  /** @noRailsEquivalent PERMANENT */
+  started = false;
+  /** @noRailsEquivalent PERMANENT */
+  finished = false;
+  private readonly emitter: TreeBuilder;
   private anchors = 0;
+  private readonly options: YAMLTreeOptions;
   private readonly ss: ScalarScanner;
   private readonly lineWidth: number | null;
 
@@ -76,15 +82,18 @@ export class YAMLTree {
    *
    * @noRailsEquivalent PERMANENT
    */
-  static create(options: YAMLTreeOptions = {}): YAMLTree {
+  static create(options: YAMLTreeOptions = {}, emitter: TreeBuilder | null = null): YAMLTree {
+    emitter ??= new TreeBuilder();
     const classLoader = new ClassLoader();
     const ss = new ScalarScanner(classLoader);
-    return new this(ss, options);
+    return new this(emitter, ss, options);
   }
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(ss: ScalarScanner, options: YAMLTreeOptions = {}) {
+  constructor(emitter: TreeBuilder, ss: ScalarScanner, options: YAMLTreeOptions = {}) {
+    this.emitter = emitter;
     this.ss = ss;
+    this.options = options;
     this.lineWidth = options.lineWidth ?? null;
     if (this.lineWidth != null && this.lineWidth < 0) {
       if (this.lineWidth === -1) {
@@ -102,7 +111,7 @@ export class YAMLTree {
     if (target !== null && typeof target === "object" && this.st.has(target)) {
       const node = this.st.get(target)! as Mapping;
       node.anchor ??= String(++this.anchors);
-      return new Alias(node.anchor);
+      return this.emitter.alias(node.anchor);
     }
 
     if (rbObjRespondTo(target, "encodeWith")) {
@@ -146,16 +155,16 @@ export class YAMLTree {
 
   private visitFloat(o: number): Node {
     if (Number.isNaN(o)) {
-      return new Scalar(".nan", null, null, true, false);
+      return this.emitter.scalar(".nan", null, null, true, false, Scalar.ANY);
     } else if (!Number.isFinite(o)) {
-      return new Scalar(o > 0 ? ".inf" : "-.inf", null, null, true, false);
+      return this.emitter.scalar(o > 0 ? ".inf" : "-.inf", null, null, true, false, Scalar.ANY);
     } else {
-      return new Scalar(rbObjAsString(new Number(o)), null, null, true, false);
+      return this.emitter.scalar(rbObjAsString(new Number(o)), null, null, true, false, Scalar.ANY);
     }
   }
 
   private visitNilClass(): Node {
-    return new Scalar("", null, "tag:yaml.org,2002:null", true, false);
+    return this.emitter.scalar("", null, "tag:yaml.org,2002:null", true, false, Scalar.ANY);
   }
 
   private visitObject(o: object): Node {
@@ -165,10 +174,11 @@ export class YAMLTree {
         o.constructor === Object ? undefined : rbModName(o.constructor as new () => unknown);
       tag = ["!ruby/object", klass].filter((part) => part != null).join(":");
     }
-    const map = new Mapping(null, tag, false);
+    const map = this.emitter.startMapping(null, tag, false, Mapping.BLOCK);
     this.register(o, map);
-    this.dumpIvars(o, map);
-    return map;
+
+    this.dumpIvars(o);
+    return this.emitter.endMapping();
   }
 
   private visitStruct(o: StructInstance & object): Node {
@@ -176,26 +186,23 @@ export class YAMLTree {
       .filter((part) => part != null)
       .join(":");
 
-    const map = new Mapping(null, tag, false);
-    this.register(o, map);
+    this.register(o, this.emitter.startMapping(null, tag, false, Mapping.BLOCK));
     for (const member of o.members()) {
-      map.children.push(
-        new Scalar(member, null, null, true, false),
-        this.accept((o as unknown as Record<string, unknown>)[member]),
-      );
+      this.emitter.scalar(member, null, null, true, false, Scalar.ANY);
+      this.accept((o as unknown as Record<string, unknown>)[member]);
     }
 
-    this.dumpIvars(o, map);
+    this.dumpIvars(o);
 
-    return map;
+    return this.emitter.endMapping();
   }
 
   private visitPsychOmap(o: Omap): Node {
-    const seq = new Sequence(null, "tag:yaml.org,2002:omap", false);
+    const seq = this.emitter.startSequence(null, "tag:yaml.org,2002:omap", false, Sequence.BLOCK);
     this.register(o, seq);
 
-    for (const [k, v] of o) seq.children.push(this.visitHash(new Map([[k, v]])));
-    return seq;
+    for (const [k, v] of o) this.visitHash(new Map([[k, v]]));
+    return this.emitter.endSequence();
   }
 
   private visitClass(o: { name?: string }): Node {
@@ -203,7 +210,7 @@ export class YAMLTree {
     if (!name) throw new TypeError(`can't dump anonymous class: ${String(o)}`);
     return this.register(
       o,
-      new Scalar(name, null, "!ruby/class", false, false, Scalar.SINGLE_QUOTED),
+      this.emitter.scalar(name, null, "!ruby/class", false, false, Scalar.SINGLE_QUOTED),
     );
   }
 
@@ -230,15 +237,18 @@ export class YAMLTree {
       style = Scalar.SINGLE_QUOTED;
     }
 
-    return new Scalar(o, null, tag, plain, quote, style);
+    return this.emitter.scalar(o, null, tag, plain, quote, style);
   }
 
   private visitSymbol(o: string): Node {
-    return new Scalar(o, null, null, true, false);
+    return this.emitter.scalar(o, null, null, true, false, Scalar.ANY);
   }
 
   private visitRegexp(o: RegExp): Node {
-    return this.register(o, new Scalar(String(o), null, "!ruby/regexp", false, false));
+    return this.register(
+      o,
+      this.emitter.scalar(String(o), null, "!ruby/regexp", false, false, Scalar.ANY),
+    );
   }
 
   private visitDate(o: RubyDate): Node {
@@ -248,15 +258,21 @@ export class YAMLTree {
   private visitDateTime(o: DateTime): Node {
     const t = o.italy();
     const formatted = this.formatTime(t, t.offset.isZero());
-    return this.register(o, new Scalar(formatted, null, "!ruby/object:DateTime", false, false));
+    return this.register(
+      o,
+      this.emitter.scalar(formatted, null, "!ruby/object:DateTime", false, false, Scalar.ANY),
+    );
   }
 
   private visitTime(o: RubyTime | ZonedDateTime | Instant): Node {
-    return this.register(o, new Scalar(this.formatTime(o), null, null, true, false));
+    return this.register(
+      o,
+      this.emitter.scalar(this.formatTime(o), null, null, true, false, Scalar.ANY),
+    );
   }
 
   private visitInteger(o: { toS(): string } | PlainDate | number | boolean | bigint): Node {
-    return new Scalar(
+    return this.emitter.scalar(
       typeof o !== "object"
         ? String(o)
         : temporalTag(o) === "Temporal.PlainDate"
@@ -266,74 +282,83 @@ export class YAMLTree {
       null,
       true,
       false,
+      Scalar.ANY,
     );
   }
 
   private visitRange(o: Range): Node {
-    const map = new Mapping(null, "!ruby/range", false);
-    this.register(o, map);
+    this.register(o, this.emitter.startMapping(null, "!ruby/range", false, Mapping.BLOCK));
     for (const [k, v] of [
       ["begin", o.begin],
       ["end", o.end],
       ["excl", o.excludeEnd],
     ] as const) {
-      map.children.push(this.accept(k), this.accept(v));
+      this.accept(k);
+      this.accept(v);
     }
-    return map;
+    return this.emitter.endMapping();
   }
 
   private visitHash(o: Map<unknown, unknown> | object): Node {
     if (!(o instanceof Map) || o.constructor === Map || o.constructor === Hash) {
-      const map = new Mapping();
-      this.register(o, map);
+      this.register(o, this.emitter.startMapping(null, null, true, Mapping.BLOCK));
       for (const [k, v] of o instanceof Map ? o : Object.entries(o)) {
-        map.children.push(this.accept(k), this.accept(v));
+        this.accept(k);
+        this.accept(v);
       }
-      return map;
+      return this.emitter.endMapping();
     } else {
       return this.visitHashSubclass(o);
     }
   }
 
   private visitArray(o: unknown[]): Node {
-    const seq = new Sequence();
-    this.register(o, seq);
-    for (const thing of o) seq.children.push(this.accept(thing));
-    return seq;
+    this.register(o, this.emitter.startSequence(null, null, true, Sequence.BLOCK));
+    for (const c of o) this.accept(c);
+    return this.emitter.endSequence();
   }
 
   private visitHashSubclass(o: Map<unknown, unknown>): Node {
     const ivars = rbObjInstanceVariables(o);
     if (ivars.length > 0) {
-      const node = new Mapping(
+      const node = this.emitter.startMapping(
         null,
         `!ruby/hash-with-ivars:${rbModToS(o.constructor as new () => unknown)}`,
         false,
+        Mapping.BLOCK,
       );
       this.register(o, node);
 
-      node.children.push(this.accept("ivars"));
-      const ivarsMap = new Mapping();
+      this.accept("ivars");
+      this.emitter.startMapping(null, null, true, Mapping.BLOCK);
       for (const ivar of rbObjInstanceVariables(o)) {
-        ivarsMap.children.push(this.accept(`:${ivar}`), this.accept(rbObjIvarGet(o, ivar)));
+        this.accept(`:${ivar}`);
+        this.accept(rbObjIvarGet(o, ivar));
       }
-      node.children.push(ivarsMap);
+      this.emitter.endMapping();
 
-      node.children.push(this.accept("elements"));
-      const elements = new Mapping();
-      for (const [k, v] of o) elements.children.push(this.accept(k), this.accept(v));
-      node.children.push(elements);
+      this.accept("elements");
+      this.emitter.startMapping(null, null, true, Mapping.BLOCK);
+      for (const [k, v] of o) {
+        this.accept(k);
+        this.accept(v);
+      }
+      this.emitter.endMapping();
 
-      return node;
+      return this.emitter.endMapping();
     } else {
-      const node = new Mapping(
+      const node = this.emitter.startMapping(
         null,
         `!ruby/hash:${rbModToS(o.constructor as new () => unknown)}`,
         false,
+        Mapping.BLOCK,
       );
       this.register(o, node);
-      for (const [k, v] of o) node.children.push(this.accept(k), this.accept(v));
-      return node;
+      for (const [k, v] of o) {
+        this.accept(k);
+        this.accept(v);
+      }
+      return this.emitter.endMapping();
     }
   }
 
@@ -377,23 +402,48 @@ export class YAMLTree {
 
   private emitCoder(c: Coder, o: object): Node {
     if (c[coderType] === ":seq") {
-      const seq = new Sequence(null, c[coderTag], c[coderTag] === null);
-      for (const thing of c[coderSeq]) seq.children.push(this.accept(thing));
-      return seq;
+      this.emitter.startSequence(null, c[coderTag], c[coderTag] === null, Sequence.BLOCK);
+      for (const thing of c[coderSeq]) this.accept(thing);
+      return this.emitter.endSequence();
     }
-    const map = new Mapping(null, c[coderTag], c[coderTag] === null);
-    this.register(o, map);
-    for (const [k, v] of Object.entries(c)) map.children.push(this.accept(k), this.accept(v));
-    return map;
+    this.register(
+      o,
+      this.emitter.startMapping(null, c[coderTag], c[coderTag] === null, Mapping.BLOCK),
+    );
+    for (const [k, v] of Object.entries(c)) {
+      this.accept(k);
+      this.accept(v);
+    }
+    return this.emitter.endMapping();
   }
 
-  private dumpIvars(target: object, map: Mapping): void {
+  private dumpIvars(target: object): void {
     for (const iv of rbObjInstanceVariables(target)) {
-      map.children.push(
-        new Scalar(iv.replace(/^@/, ""), null, null, true, false),
-        this.accept(rbObjIvarGet(target, iv)),
-      );
+      this.emitter.scalar(iv.replace(/^@/, ""), null, null, true, false, Scalar.ANY);
+      this.accept(rbObjIvarGet(target, iv));
     }
+  }
+
+  /**
+   * `YAMLTree#start` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:79-83`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  start(encoding: number = Stream.UTF8): Stream {
+    const stream = this.emitter.startStream(encoding);
+    this.started = true;
+    return stream;
+  }
+
+  /**
+   * `YAMLTree#finish` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:85-89`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  finish(): Stream {
+    const stream = this.emitter.endStream();
+    this.finished = true;
+    return stream;
   }
 
   /**
@@ -402,14 +452,43 @@ export class YAMLTree {
    * @noRailsEquivalent PERMANENT
    */
   get tree(): Stream {
-    return this.root;
+    if (!this.isFinished()) this.finish();
+    return this.emitter.root!;
   }
 
   /** @noRailsEquivalent PERMANENT */
+  isFinished(): boolean {
+    return this.finished;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isStarted(): boolean {
+    return this.started;
+  }
+
+  /**
+   * `YAMLTree#push` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:102-119`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   push(object: unknown): void {
-    const document = new Document([], [], false);
-    document.children.push(this.accept(object));
-    this.root.children.push(document);
+    if (!this.isStarted()) this.start();
+    let version: number[] = [];
+    if (this.options.header) version = [1, 1];
+
+    if ("version" in this.options) {
+      if (Array.isArray(this.options.version)) {
+        version = this.options.version;
+      } else if (typeof this.options.version === "string") {
+        version = this.options.version.split(".").map((x) => parseInt(x, 10) || 0);
+      } else {
+        version = [1, 1];
+      }
+    }
+
+    this.emitter.startDocument(version, [], false);
+    this.accept(object);
+    this.emitter.endDocument(!this.emitter.isStreaming());
   }
 }
 
@@ -441,8 +520,8 @@ export class RestrictedYAMLTree extends YAMLTree {
   private readonly aliases: boolean;
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(ss: ScalarScanner, options: YAMLTreeOptions = {}) {
-    super(ss, options);
+  constructor(emitter: TreeBuilder, ss: ScalarScanner, options: YAMLTreeOptions = {}) {
+    super(emitter, ss, options);
     this.permittedClasses = new Set(RestrictedYAMLTree.DEFAULT_PERMITTED_CLASSES);
     for (const klass of options.permittedClasses ?? []) {
       this.permittedClasses.add(klass);
