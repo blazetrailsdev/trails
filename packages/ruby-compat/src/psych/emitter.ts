@@ -85,6 +85,10 @@ function analyzeScalar(value: string): {
   return { blockPlainAllowed, singleQuotedAllowed, blockAllowed };
 }
 
+const EXPLICIT_KEYS = new WeakMap<Yaml.Scalar, Yaml.Scalar.Type | undefined>();
+
+const encoder = new TextEncoder();
+
 function writeSingleQuoted(
   stringify: NonNullable<Yaml.ScalarTag["stringify"]>,
 ): NonNullable<Yaml.ScalarTag["stringify"]> {
@@ -152,8 +156,6 @@ function writeSingleQuoted(
     return `${out}'`;
   };
 }
-
-const EXPLICIT_KEYS = new WeakMap<Yaml.Scalar, Yaml.Scalar.Type | undefined>();
 
 /** `yaml_emitter_t`'s dumper options (`Psych::Handler::DumperOptions`, `vendor/ruby/v3.3.11/ext/psych/lib/psych/handler.rb:16`). */
 export interface DumperOptions {
@@ -326,9 +328,19 @@ export class Emitter {
     return this;
   }
 
-  private checkSimpleKey(node: Yaml.Scalar): boolean {
-    const bytes = (s: string | undefined) => (s ? new TextEncoder().encode(s).length : 0);
-    const length = bytes(node.anchor) + bytes(node.tag) + bytes(String(node.value));
+  private checkSimpleKey(node: Yaml.Node): boolean {
+    if (!yaml.isScalar(node) && !yaml.isCollection(node)) return false;
+    const tag = node.tag?.startsWith("tag:yaml.org,2002:")
+      ? `!!${node.tag.slice("tag:yaml.org,2002:".length)}`
+      : node.tag;
+    let length = encoder.encode(node.anchor ?? "").length + encoder.encode(tag ?? "").length;
+    if (yaml.isScalar(node)) {
+      const value = String(node.value);
+      if (BREAK.test(value)) return false;
+      length += encoder.encode(value).length;
+    } else if (node.items.length !== 0) {
+      return false;
+    }
     if (length > 128) return false;
     return true;
   }

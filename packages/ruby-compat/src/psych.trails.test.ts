@@ -443,7 +443,11 @@ describe("Psych.parse stops at the end of the first document", () => {
     const { Psych } = await import("./psych.js");
     expect(Psych.unsafeLoad("--- [1] foo bar")).toEqual([1]);
     expect(Psych.unsafeLoad('--- "a" x')).toBe("a");
-    expect(Psych.parse("--- !ruby/object:X {}\\n")).toBeTruthy();
+    expect((Psych.parse("--- !ruby/object:X {}\\n") as { tag: string }).tag).toBe("!ruby/object:X");
+    expect(Psych.unsafeLoad("--- {a: 1} }")).toEqual(Psych.unsafeLoad("--- {a: 1}"));
     expect(() => Psych.parse("--- {")).toThrow(Psych.SyntaxError);
+    expect(() => Psych.parse("--- [1, 2")).toThrow(Psych.SyntaxError);
+    expect(() => Psych.parse('--- {"a": "}"')).toThrow(Psych.SyntaxError);
+    expect(() => Psych.parse("--- foo: bar: baz")).toThrow(Psych.SyntaxError);
   });
 });
