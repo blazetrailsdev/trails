@@ -1,6 +1,6 @@
 import { inject } from "vitest";
 import { presence } from "@blazetrails/activesupport";
-import { Encoding, File, getFs } from "@blazetrails/ruby-compat";
+import { Encoding, File, getFs, Module } from "@blazetrails/ruby-compat";
 
 declare module "vitest" {
   export interface ProvidedContext {
@@ -21,10 +21,10 @@ export interface ScreenshotHelperHost {
   metadata?: Record<string, unknown>;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const ScreenshotHelper: { screenshotDirectory: string | undefined } = {
+export const ScreenshotHelper = Object.assign(new Module(), {
+  /** @noRailsEquivalent PERMANENT */
   screenshotDirectory: inject("screenshotDirectory"),
-};
+});
 
 function env(key: string): string | undefined {
   return (globalThis as any).process?.env?.[key] as string | undefined;
@@ -185,3 +185,6 @@ function failed(this: ScreenshotHelperHost): boolean {
 export function supportsScreenshot(this: ScreenshotHelperHost): boolean {
   return this._page !== undefined;
 }
+
+ScreenshotHelper.defineMethod("takeScreenshot", takeScreenshot);
+ScreenshotHelper.defineMethod("takeFailedScreenshot", takeFailedScreenshot);

@@ -119,7 +119,7 @@ export class Driver {
 
   /**
    * @internal
-   * @inventedArm launch — CONVERGEABLE converge-system-test-case-onto-test-case-with-page-and-expect-element
+   * @inventedArm launch — PERMANENT
    */
   private async registerCuprite(app: RackMiddleware | undefined): Promise<unknown> {
     const options = { ...this._options, windowSize: this._screenSize };
@@ -137,7 +137,7 @@ export class Driver {
 
   /**
    * @internal
-   * @inventedArm launch — CONVERGEABLE converge-system-test-case-onto-test-case-with-page-and-expect-element
+   * @inventedArm launch — PERMANENT
    */
   private async registerPlaywright(app: RackMiddleware | undefined): Promise<unknown> {
     let screen: { width: number; height: number } | undefined;

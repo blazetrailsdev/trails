@@ -5,6 +5,7 @@ import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
 /** @noRailsEquivalent PERMANENT */
 export const vite: {
   app: RackMiddleware | undefined;
+  appHost: string | undefined;
   config: InlineConfig & { server: NonNullable<InlineConfig["server"]> };
   server: ViteDevServer | undefined;
   url: string | undefined;
@@ -12,6 +13,7 @@ export const vite: {
   currentDriver: string | undefined;
 } = {
   app: undefined,
+  appHost: undefined,
   config: { server: { host: "127.0.0.1", port: 0 } },
   server: undefined,
   url: undefined,
@@ -38,6 +40,7 @@ export class Server {
       const { createServer } = await import("vite");
       const server = await createServer({
         configFile: false,
+        appType: "custom",
         ...vite.config,
         logLevel: (this.constructor as typeof Server).silencePuma ? "silent" : "info",
         plugins: [
