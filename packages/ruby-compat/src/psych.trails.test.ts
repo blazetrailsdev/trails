@@ -434,6 +434,8 @@ describe("Psych.dump empty root collection and explicit keys", () => {
     const { Psych } = await import("./psych.js");
     expect(Psych.dump({ ["a".repeat(129)]: 1 })).toBe(`---\n? ${"a".repeat(129)}\n: 1\n`);
     expect(Psych.dump({ ["a".repeat(128)]: 1 })).toBe(`---\n${"a".repeat(128)}: 1\n`);
+    expect(Psych.dump({ ["é".repeat(65)]: 1 })).toBe(`---\n? ${"é".repeat(65)}\n: 1\n`);
+    expect(Psych.dump({ ["é".repeat(64)]: 1 })).toBe(`---\n${"é".repeat(64)}: 1\n`);
     expect(Psych.dump({ "a\nb": 1 })).toBe("---\n? |-\n  a\n  b\n: 1\n");
   });
 });
