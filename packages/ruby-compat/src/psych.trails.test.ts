@@ -148,7 +148,7 @@ describe("Psych load_tags, dump_tags and domain_types", () => {
       Psych.domainTypes = Object.create(null);
       Psych.addBuiltinType("x", (_tag, value) => value);
       expect(Object.keys(Psych.domainTypes)).toEqual(["tag:yaml.org,2002:x"]);
-      expect(() => Psych.dump(1)).toThrow("cannot load such file -- yaml");
+      expect(Psych.dump(1)).toBe("--- 1\n");
     } finally {
       vi.restoreAllMocks();
       vi.resetModules();
@@ -437,6 +437,17 @@ describe("Psych.dump empty root collection and explicit keys", () => {
     expect(Psych.dump({ ["é".repeat(65)]: 1 })).toBe(`---\n? ${"é".repeat(65)}\n: 1\n`);
     expect(Psych.dump({ ["é".repeat(64)]: 1 })).toBe(`---\n${"é".repeat(64)}: 1\n`);
     expect(Psych.dump({ "a\nb": 1 })).toBe("---\n? |-\n  a\n  b\n: 1\n");
+  });
+
+  it("writes scalars as libyaml's emitter does", async () => {
+    const { Psych } = await import("./psych.js");
+    expect(Psych.dump(["b c", "\n\n\n"])).toBe("---\n- b c\n- |2+\n\n\n\n...\n");
+    expect(Psych.dump("x\u0085y")).toBe('--- "x\\Ny"\n');
+    expect(Psych.dump('>\u2028"...')).toBe(`--- '>\u2028  "...'\n`);
+    expect(Psych.dump({ k: "a ".repeat(50) }, { lineWidth: 20 })).toBe(
+      '---\nk: "a a a a a a a a a\n  a a a a a a a a a a\n  a a a a a a a a a a\n  a a a a a a a a a a\n  a a a a a a a a a a\n  a "\n',
+    );
+    expect(Psych.dump({ a: { b: "x\ny" } })).toBe("---\na:\n  b: |-\n    x\n    y\n");
   });
 });
 

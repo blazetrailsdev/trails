@@ -265,7 +265,9 @@ export class YAMLTree {
       style = Scalar.DOUBLE_QUOTED;
     } else if (this.lineWidth != null && Array.from(o).length > this.lineWidth) {
       style = Scalar.FOLDED;
-    } else if (/^[^\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}][^"]*$/mu.test(o)) {
+    } else if (
+      /(?:^|(?<=\n))[^\p{Alphabetic}\p{M}\p{Nd}\p{Pc}\p{Join_Control}][^"]*(?=\n|$)/u.test(o)
+    ) {
       style = Scalar.DOUBLE_QUOTED;
     } else if (typeof this.ss.tokenize(o) !== "string" || /^0[0-7]*[89]/.test(o)) {
       style = Scalar.SINGLE_QUOTED;
