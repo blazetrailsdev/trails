@@ -1178,6 +1178,17 @@ ratified here so no port re-derives them.
   `TimeZone.new`'s unknown-name `self[name]` (`values/time_zone.rb:216-218`)
   drop that arm. An unknown zone name reaches `create`, which raises
   `TZInfo::InvalidTimezoneIdentifier`. Ruled by the repo owner on 2026-10-14.
+- **`initialize` on an allocated receiver.** Psych's `revive` and Marshal's
+  `r_object` allocate, then call `init_with` / `marshal_load`, whose Rails
+  body runs `initialize` on that receiver (`TimeZone#init_with`,
+  `values/time_zone.rb:575-577`; `TimeWithZone#init_with` /
+  `#marshal_load`). A JS constructor cannot run on an existing object, and
+  trails has no `initialize` methods (RFC 0188), so the body constructs an
+  instance with `new` and copies it onto the receiver with `Object.assign`,
+  receipted `@inventedArm assign — PERMANENT` on each declaration the arms
+  gate compares (`marshalLoad` has no skeleton row, so carries none). An allocator handed the coder
+  was rejected: a Ruby allocator never sees it. Ruled by the repo owner on
+  2026-10-16.
 - **SQLite's double-quoted-string setting.** better-sqlite3 compiles with
   `SQLITE_DQS=0` and no option reaches `SQLITE_DBCONFIG_DQS_DDL` / `_DML`, so
   `strict: false` cannot re-enable double-quoted string literals on that
