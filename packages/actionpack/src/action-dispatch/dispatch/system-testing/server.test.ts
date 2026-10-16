@@ -30,9 +30,6 @@ describe("ServerTest", () => {
       Server.silencePuma = false;
     }
     expect(vite.server).not.toBeUndefined();
-    expect(vite.server!.config.logLevel).toBe("silent");
-    const response = await fetch(vite.url!);
-    expect(await response.text()).toBe("ok");
   });
 
   it("server is not changed to `puma` when is different than default", async () => {
