@@ -1,4 +1,4 @@
-import { classpaths, NameError, rbModName } from "@blazetrails/ruby-compat";
+import { classpaths, Module, NameError, rbModName } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
@@ -87,8 +87,14 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
 
     defineAccessorHalf(target, sym, { get: () => target[storageKey] });
 
-    if (instanceReader && instanceAccessor && target.prototype) {
-      defineAccessorHalf(target.prototype, sym, { get: () => target[sym] });
+    if (instanceReader && instanceAccessor) {
+      const definition = (methodTable: object) =>
+        defineAccessorHalf(methodTable, sym, { get: () => target[sym] });
+      if (this instanceof Module) {
+        target.moduleEval(definition);
+      } else if (target.prototype) {
+        definition(target.prototype);
+      }
     }
 
     setMattrDefault(target, sym, storageKey, options);
@@ -114,12 +120,20 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
       },
     });
 
-    if (instanceWriter && instanceAccessor && target.prototype) {
-      defineAccessorHalf(target.prototype, sym, {
-        set: (val: unknown) => {
-          target[sym] = val;
-        },
-      });
+    if (instanceWriter && instanceAccessor) {
+      const definition = (methodTable: object) =>
+        defineAccessorHalf(methodTable, sym, {
+          set: (val: unknown) => {
+            target[sym] = val;
+          },
+        });
+      if (this instanceof Module) {
+        target.moduleEval((mod: object) => {
+          if (Object.getOwnPropertyDescriptor(mod, sym)?.get) definition(mod);
+        });
+      } else if (target.prototype) {
+        definition(target.prototype);
+      }
     }
 
     setMattrDefault(target, sym, storageKey, options);
