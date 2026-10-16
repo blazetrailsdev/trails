@@ -26,13 +26,6 @@
   {
     "package": "rack",
     "tsFile": "request.ts",
-    "rubyName": "add_header",
-    "call": "has_header?",
-    "reason": "Surfaced when the call gates stopped counting a same-file module body flattened onto its includer as a second Ruby owner (countsAsRubyOwner); convergence tracked by story `converge-call-rows-surfaced-by-same-file-mixin-owner` (RFC 0167)."
-  },
-  {
-    "package": "rack",
-    "tsFile": "request.ts",
     "rubyName": "delete_param",
     "call": "delete",
     "reason": "Surfaced when the call-set gate began comparing every same-name Ruby owner in a file, not only the first-seen one (compare.ts direct-match arm); pre-existing, triage and convergence tracked by story `converge-same-name-second-owner-call-rows` (RFC 0130)."

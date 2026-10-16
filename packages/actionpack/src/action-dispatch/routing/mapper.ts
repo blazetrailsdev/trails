@@ -1679,8 +1679,8 @@ export class Mapper {
       );
     }
 
-    const on = options.on;
-    if (on != null && !VALID_ON_OPTIONS.has(on)) {
+    let on;
+    if ((on = options.on) != null && (on as unknown) !== false && !VALID_ON_OPTIONS.has(on)) {
       throw new ArgumentError(`Unknown scope :${on} given to :on`);
     }
 
@@ -2314,7 +2314,6 @@ const SYMBOL = /^:\w+[?!=]?$/;
 
 const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
 
-/** @internal */
 include(Mapper, Redirection);
 
 /** @noRailsEquivalent PERMANENT */

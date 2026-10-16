@@ -689,8 +689,8 @@ export class Request {
     return new (this.constructor as typeof Request)({ ...this.env });
   }
 
-  has(key: string): boolean {
-    return key in this.env;
+  hasHeader(name: string): boolean {
+    return name in this.env;
   }
 
   getHeader(name: string): any {
@@ -710,7 +710,7 @@ export class Request {
   addHeader(key: string, v: string | null): any {
     if (v == null) {
       return this.getHeader(key);
-    } else if (this.has(key)) {
+    } else if (this.hasHeader(key)) {
       return this.setHeader(key, `${this.getHeader(key)},${v}`);
     } else {
       return this.setHeader(key, v);
