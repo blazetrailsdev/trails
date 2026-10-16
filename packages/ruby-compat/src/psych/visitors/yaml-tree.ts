@@ -23,7 +23,16 @@ import { temporalTag } from "../../temporal-tag.js";
 import { TypeError } from "../../type-error.js";
 import { registeredConstant } from "../../variable.js";
 import { Psych } from "../../psych.js";
-import { Coder, coderSeq, coderTag, coderType } from "../coder.js";
+import {
+  Coder,
+  coderImplicit,
+  coderObject,
+  coderScalar,
+  coderSeq,
+  coderStyle,
+  coderTag,
+  coderType,
+} from "../coder.js";
 import { ClassLoader } from "../class-loader.js";
 import { BadAlias, DisallowedClass } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
@@ -441,20 +450,33 @@ export class YAMLTree {
   }
 
   private emitCoder(c: Coder, o: object): Node {
-    if (c[coderType] === ":seq") {
-      this.emitter.startSequence(null, c[coderTag], c[coderTag] === null, Sequence.BLOCK);
-      for (const thing of c[coderSeq]) this.accept(thing);
-      return this.emitter.endSequence();
+    switch (c[coderType]) {
+      case ":scalar":
+        return this.emitter.scalar(
+          c[coderScalar],
+          null,
+          c[coderTag],
+          c[coderTag] === null,
+          false,
+          c[coderStyle],
+        );
+      case ":seq":
+        this.emitter.startSequence(null, c[coderTag], c[coderTag] === null, c[coderStyle]);
+        for (const thing of c[coderSeq]) this.accept(thing);
+        return this.emitter.endSequence();
+      case ":map":
+        this.register(
+          o,
+          this.emitter.startMapping(null, c[coderTag], c[coderImplicit], c[coderStyle]),
+        );
+        for (const [k, v] of Object.entries(c)) {
+          this.accept(k);
+          this.accept(v);
+        }
+        return this.emitter.endMapping();
+      case ":object":
+        return this.accept(c[coderObject]);
     }
-    this.register(
-      o,
-      this.emitter.startMapping(null, c[coderTag], c[coderTag] === null, Mapping.BLOCK),
-    );
-    for (const [k, v] of Object.entries(c)) {
-      this.accept(k);
-      this.accept(v);
-    }
-    return this.emitter.endMapping();
   }
 
   private dumpIvars(target: object): void {
