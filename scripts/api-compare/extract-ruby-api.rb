@@ -4148,6 +4148,13 @@ class ApiExtractor
   # side already satisfies (extract-ts-api.ts records `constructor` for every
   # `new X()`, and rubyMethodToTs("new") is ["constructor"]), so this verdict is
   # per-SITE — a body with both `Proc.new` and `Foo.new` still records the second.
+  def proc_new_receiver?(recv)
+    return false unless recv.is_a?(Array) && recv[0] == :var_ref
+
+    inner = recv[1]
+    inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
+  end
+
   INDEXED_ITERATORS = %w[map each select reject flat_map each_with_object].freeze
 
   def indexed_iterator_receiver?(recv, args)
@@ -4155,13 +4162,6 @@ class ApiExtractor
     return false unless recv.is_a?(Array) && recv[0] == :call && recv[3]
 
     INDEXED_ITERATORS.include?(ident_name(recv[3]))
-  end
-
-  def proc_new_receiver?(recv)
-    return false unless recv.is_a?(Array) && recv[0] == :var_ref
-
-    inner = recv[1]
-    inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
   end
 
   # `Promise.new(...)`, `Promise::Complete.new(...)` and `Promise.wrap(...)` port
