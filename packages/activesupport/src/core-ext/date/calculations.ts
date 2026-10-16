@@ -227,3 +227,11 @@ export function compareWithoutCoercion(
 ): number {
   return Temporal.PlainDate.compare(date, other);
 }
+
+declare module "@blazetrails/date" {
+  namespace Date {
+    export function current(): Temporal.PlainDate;
+  }
+}
+
+Object.assign(RubyDate, { current });

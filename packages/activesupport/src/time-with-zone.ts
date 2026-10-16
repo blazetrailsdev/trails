@@ -901,11 +901,7 @@ export class TimeWithZone {
   marshalLoad(variables: [Time, string, Time]): void {
     Object.assign(
       this,
-      new TimeWithZone(
-        variables[0].getutc(),
-        findZone(variables[1]) as TimeZone,
-        variables[2].getutc(),
-      ),
+      new TimeWithZone(variables[0].utc(), findZone(variables[1]) as TimeZone, variables[2].utc()),
     );
   }
 
