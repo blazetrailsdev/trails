@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertNil, assertEqual } from "@blazetrails/activesupport";
 import { rbHash, registerConstant, resetConstants, uniq } from "@blazetrails/ruby-compat";
@@ -81,9 +82,9 @@ describe("GlobalIDTest", () => {
   });
 
   it("invalid app name", () => {
-    expect(() => GlobalID.validateApp("")).toThrow();
-    expect(() => GlobalID.validateApp("blog_app")).toThrow();
-    expect(() => GlobalID.validateApp(null)).toThrow();
+    expect(() => GlobalID.setApp("")).toThrow(ArgumentError);
+    expect(() => GlobalID.setApp("blog_app")).toThrow(ArgumentError);
+    expect(() => GlobalID.setApp(null)).toThrow(ArgumentError);
   });
 });
 
