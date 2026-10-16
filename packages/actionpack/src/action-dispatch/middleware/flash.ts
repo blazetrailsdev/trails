@@ -1,6 +1,7 @@
 import type { RackApp, RackEnv } from "@blazetrails/rack";
 import { exceptBang, isPlainObject, stringifyKeys } from "@blazetrails/activesupport";
 import {
+  hashAref,
   Enumerable,
   Set,
   except,
@@ -118,12 +119,12 @@ export class FlashHash {
         exceptBang(flashes, ...(discard as Iterable<string>));
       }
       return new this(flashes, Object.keys(flashes));
-    } else if (isPlainObject(value)) {
-      flashes = (value as Record<string, unknown>)["flashes"] as Record<string, unknown>;
-      if ((discard = (value as Record<string, unknown>)["discard"]) != null) {
+    } else if (isPlainObject(value) || value instanceof Map) {
+      flashes = hashAref(value as object, "flashes") as Record<string, unknown>;
+      if ((discard = hashAref(value as object, "discard")) != null) {
         exceptBang(flashes, ...(discard as string[]));
       }
-      return new this(flashes, Object.keys(flashes));
+      return new this(flashes, flashes instanceof Map ? [...flashes.keys()] : Object.keys(flashes));
     } else {
       return new this();
     }
@@ -139,7 +140,7 @@ export class FlashHash {
   /** @internal */
   constructor(flashes: Record<string, unknown> = {}, discard: readonly string[] = []) {
     this._discard = new Set(this.stringifyArray(discard));
-    this._flashes = stringifyKeys(flashes);
+    this._flashes = hashReplace({}, stringifyKeys(flashes));
     this._now = null;
   }
 

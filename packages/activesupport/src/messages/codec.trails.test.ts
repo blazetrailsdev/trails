@@ -5,6 +5,7 @@ import { InvalidMessage, MessageEncryptor } from "../message-encryptor.js";
 import { InvalidSignature, MessageVerifier } from "../message-verifier.js";
 import { Codec, type CodecOptions } from "./codec.js";
 import type { Format } from "./serializer-with-fallback.js";
+import "./message-metadata-tests.js";
 
 class ExposedCodec extends Codec {
   constructor(options: CodecOptions = {}) {

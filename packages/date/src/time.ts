@@ -24,7 +24,11 @@ import {
   rbCTime,
   rbDefineAllocFunc,
   rbHash,
+  rbBigNorm,
   rbObjDup,
+  rbObjInstanceVariables,
+  rbObjIvarGet,
+  rbObjIvarSet,
   rbObjRespondTo,
   registerConstant,
   setRubyTzUptodate,
@@ -1695,6 +1699,195 @@ export class Time extends rbCTime {
 
   httpdate(): string {
     return this.getutc().strftime("%a, %d %b %Y %T GMT");
+  }
+
+  /**
+   * `Time#_dump` (`time_dump`, `vendor/ruby/v3.3.11/time.c:5414`) over `time_mdump`
+   * (`time.c:5272`). The ASCII-8BIT String is one character per byte, boxed so it can hold
+   * the ivars `rb_ivar_set` gives it, each an own property under its Ruby ID.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  _dump(_limit?: unknown): typeof String.prototype {
+    const vtm = this.getutc();
+    const maxYear = 1900 + 0xffff;
+    let year = vtm.year;
+    let yearExtend: number | null = null;
+    if (year > maxYear) {
+      yearExtend = year - maxYear;
+      year = maxYear;
+    } else if (year < 1900) {
+      yearExtend = 1900 - year;
+      year = 1900;
+    }
+
+    let nsec = vtm.nsec;
+    const usec = Math.floor(nsec / 1000);
+    nsec = nsec % 1000;
+    const nano = new Rational(nsec, 1).add(this.#subnano);
+
+    let p =
+      2 ** 31 +
+      (this.#tzmodeUtc ? 2 ** 30 : 0) +
+      (year - 1900) * 2 ** 14 +
+      (vtm.mon - 1) * 2 ** 10 +
+      vtm.mday * 2 ** 5 +
+      vtm.hour;
+    let s = vtm.min * 2 ** 26 + vtm.sec * 2 ** 20 + usec;
+
+    let buf = "";
+    for (let i = 0; i < 4; i++) {
+      buf += String.fromCharCode(p % 256);
+      p = Math.floor(p / 256);
+    }
+    for (let i = 4; i < 8; i++) {
+      buf += String.fromCharCode(s % 256);
+      s = Math.floor(s / 256);
+    }
+
+    if (yearExtend !== null) {
+      let packed = "";
+      for (let y = yearExtend; y > 0; y = Math.floor(y / 256))
+        packed += String.fromCharCode(y % 256);
+      buf += String.fromCharCode(packed.length + 5) + packed;
+    }
+    const str = new String(buf) as typeof String.prototype & Record<string, unknown>;
+    for (const iv of rbObjInstanceVariables(this)) str[iv] = rbObjIvarGet(this, iv);
+    if (nano.numerator !== 0n) {
+      str.nano_num = rbBigNorm(nano.numerator);
+      str.nano_den = rbBigNorm(nano.denominator);
+    }
+    if (nsec) {
+      const sub1 = (nsec % 10) << 4;
+      nsec = Math.floor(nsec / 10);
+      let sub0 = nsec % 10;
+      nsec = Math.floor(nsec / 10);
+      sub0 |= (nsec % 10) << 4;
+      str.submicro = String.fromCharCode(sub0) + (sub1 === 0 ? "" : String.fromCharCode(sub1));
+    }
+    if (!this.#tzmodeUtc) {
+      str.offset = this.utcOffset;
+    }
+    let zone: unknown = this.zone;
+    if (maybeTzobjP(zone)) {
+      zone = (zone as { name: unknown }).name;
+    }
+    str.zone = zone;
+    return str;
+  }
+
+  /**
+   * `Time._load` (`time_load`, `vendor/ruby/v3.3.11/time.c:5600`) over `time_mload`
+   * (`time.c:5448`), reading the ivars {@link Time#_dump} boxes onto the String.
+   *
+   * @missingRailsCall time_set_zone — CONVERGEABLE time-mload-seats-string-zone
+   * @noRailsEquivalent PERMANENT
+   */
+  static _load(str: string | typeof String.prototype): Time {
+    const ivars = (typeof str === "string" ? {} : str) as Record<string, unknown>;
+    const getAttr = (attr: string): unknown => {
+      if (!Object.hasOwn(ivars, attr)) return null;
+      const value = ivars[attr];
+      delete ivars[attr];
+      return value;
+    };
+    const nanoNum = getAttr("nano_num");
+    const nanoDen = getAttr("nano_den");
+    const submicro = getAttr("submicro");
+    let offset = getAttr("offset");
+    if (offset != null && (Number(offset) <= -86400 || Number(offset) >= 86400)) offset = null;
+    let zone = getAttr("zone");
+    if (zone != null && (typeof zone !== "string" || zone.includes("\0"))) zone = null;
+    let year = getAttr("year") as number | null;
+
+    const buf = String(str);
+    if (buf.length < 8) throw new TypeError("marshaled time format differ");
+
+    let p = 0;
+    let s = 0;
+    for (let i = 0; i < 4; i++) p += buf.charCodeAt(i) * 256 ** i;
+    for (let i = 4; i < 8; i++) s += buf.charCodeAt(i) * 256 ** (i - 4);
+
+    let gmt: boolean;
+    let time: Time;
+    if (p < 2 ** 31) {
+      gmt = false;
+      offset = null;
+      time = Time.at(p, s);
+    } else {
+      p -= 2 ** 31;
+      gmt = Math.floor(p / 2 ** 30) % 2 === 1;
+
+      if (year == null) {
+        year = (Math.floor(p / 2 ** 14) & 0xffff) + 1900;
+      }
+      if (buf.length > 8) {
+        const ysize = buf.charCodeAt(8) - 5;
+        if (ysize < 0 || ysize > buf.length - 9)
+          throw new TypeError("marshaled time format differ");
+        let yearExtend = 0;
+        for (let i = 0; i < ysize; i++) yearExtend += buf.charCodeAt(9 + i) * 256 ** i;
+        year = year === 1900 ? year - yearExtend : year + yearExtend;
+      }
+      let mon = (p >> 10) & 0xf;
+      if (mon >= 12) {
+        mon -= 12;
+        year += 1;
+      }
+
+      const usec = s & 0xfffff;
+      let subsecx = new Rational(usec * 1000, 1);
+      if (nanoNum != null) {
+        subsecx = subsecx.add(numExact(nanoNum).quo(Number(nanoDen)));
+      } else if (submicro != null) {
+        const ptr = String(submicro);
+        let nsec = 0;
+        let digit: number;
+        end: {
+          if (0 < ptr.length) {
+            if (10 <= (digit = ptr.charCodeAt(0) >> 4)) break end;
+            nsec += digit * 100;
+            if (10 <= (digit = ptr.charCodeAt(0) & 0xf)) break end;
+            nsec += digit * 10;
+          }
+          if (1 < ptr.length) {
+            if (10 <= (digit = ptr.charCodeAt(1) >> 4)) break end;
+            nsec += digit;
+          }
+          subsecx = subsecx.add(nsec);
+        }
+      }
+      time = Time.utc(
+        year,
+        mon + 1,
+        (p >> 5) & 0x1f,
+        p & 0x1f,
+        Math.floor(s / 2 ** 26) & 0x3f,
+        Math.floor(s / 2 ** 20) & 0x3f,
+        subsecx.quo(1000),
+      );
+    }
+
+    if (gmt) {
+      time = time.getutc();
+    } else if (offset == null) {
+      time = time.getlocal();
+    } else {
+      time = time.getlocal(offset as number);
+    }
+    if (zone != null) {
+      let z: unknown;
+      try {
+        z = rbObjRespondTo(Time, "findTimezone")
+          ? (Time as unknown as { findTimezone(zone: unknown): unknown }).findTimezone(zone)
+          : null;
+      } catch {
+        z = null;
+      }
+      if (maybeTzobjP(z)) time = Time.#zoneLocaltime(z, time) ?? time;
+    }
+    for (const iv of Object.keys(ivars)) if (iv.startsWith("@")) rbObjIvarSet(time, iv, ivars[iv]);
+    return time;
   }
 
   /** @noRailsEquivalent PERMANENT */

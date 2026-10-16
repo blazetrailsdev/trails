@@ -366,7 +366,11 @@ export function hashReplace<H extends object>(hash: H, hash2: object): H {
   }
   if (hash === hash2) return hash;
   for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
-  Object.assign(hash, hash2);
+  if (hash2 instanceof Map) {
+    for (const [key, value] of hash2) hashAset(hash, key, value);
+  } else {
+    Object.assign(hash, hash2);
+  }
   return hash;
 }
 

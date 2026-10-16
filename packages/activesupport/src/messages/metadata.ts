@@ -5,7 +5,7 @@ import { Encoding } from "../json/encoding.js";
 import { onLoad } from "../lazy-load-hooks.js";
 import { ActiveSupport } from "../namespaces.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, hasKey, hashAref } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
@@ -64,11 +64,11 @@ export abstract class Metadata {
     if (this.dualSerializedMetadataEnvelopeJson(message)) {
       const envelope = this.deserializeFromJson(message);
       const extracted = this.extractFromMetadataEnvelope(envelope, expectedMetadata);
-      return this.deserializeFromJsonSafeString(extracted.message as string);
+      return this.deserializeFromJsonSafeString(hashAref(extracted, "message") as string);
     } else {
       const deserialized = this.deserialize(message);
       if (this.metadataEnvelope(deserialized)) {
-        return this.extractFromMetadataEnvelope(deserialized, expectedMetadata).data;
+        return hashAref(this.extractFromMetadataEnvelope(deserialized, expectedMetadata), "data");
       } else if (!Object.values(expectedMetadata).some(isPresent)) {
         return deserialized;
       } else {
@@ -107,20 +107,20 @@ export abstract class Metadata {
   protected extractFromMetadataEnvelope(
     envelope: unknown,
     { purpose = null }: ExpectedMetadataOptions = {},
-  ): Record<string, unknown> {
-    const hash = (envelope as Record<string, unknown>)._rails as Record<string, unknown>;
+  ): object {
+    const hash = hashAref(envelope as object, "_rails") as object;
 
-    if (isPresent(hash.exp)) {
+    if (isPresent(hashAref(hash, "exp"))) {
       if (
         Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n))
           .utc()
-          .compare(this.parseExpiry(hash.exp as string | Time))! >= 0
+          .compare(this.parseExpiry(hashAref(hash, "exp") as string | Time))! >= 0
       ) {
         throw new Thrown("invalid_message_content", "expired");
       }
     }
 
-    if (toS(hash.pur) !== toS(purpose)) {
+    if (toS(hashAref(hash, "pur")) !== toS(purpose)) {
       throw new Thrown("invalid_message_content", "mismatched purpose");
     }
 
@@ -128,7 +128,7 @@ export abstract class Metadata {
   }
 
   protected metadataEnvelope(object: unknown): boolean {
-    return typeof object === "object" && object !== null && "_rails" in object;
+    return typeof object === "object" && object !== null && hasKey(object, "_rails");
   }
 
   protected dualSerializedMetadataEnvelopeJson(string: string): boolean {

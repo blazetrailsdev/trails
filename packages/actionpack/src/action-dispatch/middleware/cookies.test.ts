@@ -236,9 +236,11 @@ describe("SerializedCookieJars", () => {
     const host = serializedHost();
     const options = { value: { hello: "world" } } as { value: unknown };
     commit.call(host, "session", options);
-    expect(SerializerWithFallback.get("marshal").load(options.value as string)).toEqual({
-      hello: "world",
-    });
+    expect(
+      Object.fromEntries(
+        SerializerWithFallback.get("marshal").load(options.value as string) as Map<string, unknown>,
+      ),
+    ).toEqual({ hello: "world" });
   });
 
   it("isReserialize is true when the payload was not produced by JSON", () => {
@@ -292,7 +294,10 @@ describe("SignedKeyRotatingCookieJar serialized API", () => {
   it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
     const jar = CookieJar.build(cookieRequest(), {});
     jar.signed.set("user", { value: { id: 45, name: "Aaron" } });
-    expect(jar.signed.get("user")).toEqual({ id: 45, name: "Aaron" });
+    expect(Object.fromEntries(jar.signed.get("user") as Map<string, unknown>)).toEqual({
+      id: 45,
+      name: "Aaron",
+    });
   });
 
   it("accepts a hash carrying value alongside cookie options", () => {
@@ -325,7 +330,10 @@ describe("EncryptedKeyRotatingCookieJar serialized API", () => {
   it("accepts arbitrary hash values via set and JSON-round-trips them", () => {
     const jar = CookieJar.build(cookieRequest(), {});
     jar.encrypted.set("session", { value: { uid: 7, role: "admin" } });
-    expect(jar.encrypted.get("session")).toEqual({ uid: 7, role: "admin" });
+    expect(Object.fromEntries(jar.encrypted.get("session") as Map<string, unknown>)).toEqual({
+      uid: 7,
+      role: "admin",
+    });
   });
 
   it("returns undefined when decryption fails", () => {

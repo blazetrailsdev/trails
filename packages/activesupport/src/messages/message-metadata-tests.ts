@@ -4,6 +4,7 @@ import "../message-pack.js";
 import { Encoding } from "../json/encoding.js";
 import { NullSerializer } from "../message-encryptor.js";
 import { Temporal, Time } from "@blazetrails/date";
+import { Hash } from "@blazetrails/ruby-compat";
 import { currentTimeInstant, setFrozenInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { Metadata, type ExpectedMetadataOptions, type MetadataOptions } from "./metadata.js";
@@ -35,6 +36,12 @@ export function freezeTime(
 }
 
 expect.addEqualityTesters([
+  function (a, b, testers) {
+    const [hash, other] = a instanceof Hash ? [a, b] : b instanceof Hash ? [b, a] : [null, null];
+    if (hash === null || other === null || typeof other !== "object") return undefined;
+    if (other instanceof Map || Array.isArray(other)) return undefined;
+    return this.equals(Object.fromEntries(hash), other, testers);
+  },
   function (a: unknown, b: unknown): boolean | undefined {
     const toInstant = (x: unknown) => (x instanceof Time ? x.toZonedDateTime().toInstant() : x);
     const [x, y] = [toInstant(a), toInstant(b)];

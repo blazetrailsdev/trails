@@ -406,8 +406,7 @@ describe("CookiesTest", () => {
     assertEqual("Jamie", controllerCookies().permanent.get("user_name"));
   });
 
-  it.skip("signed cookie using default digest", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("signed cookie using default digest", async () => {
     await tc.get("setSignedCookie");
     const cookies = controllerCookies();
     assertNotEqual(45, cookies.get("user_id"));
@@ -487,8 +486,7 @@ describe("CookiesTest", () => {
     assertEqual("bar was dumped and loaded", tc.cookies().encrypted.get("foo"));
   });
 
-  it.skip("signed cookie using hybrid serializer can migrate marshal dumped value to json", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("signed cookie using hybrid serializer can migrate marshal dumped value to json", async () => {
     tc.request.env["action_dispatch.cookies_serializer"] = ":hybrid";
 
     const keyGenerator = tc.request.env["action_dispatch.key_generator"] as KeyGenerator;
@@ -528,8 +526,7 @@ describe("CookiesTest", () => {
     assertEqual({ user_name: "david" }, tc.response.cookies);
   });
 
-  it.skip("raise data overflow", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("raise data overflow", async () => {
     const error = await assertRaise([CookieOverflow], {}, async () => {
       await tc.get("raiseDataOverflow");
     });
@@ -559,8 +556,7 @@ describe("CookiesTest", () => {
     assertNil(tc.response.cookies["foo"]);
   });
 
-  it.skip("signed cookie using custom digest", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("signed cookie using custom digest", async () => {
     tc.request.env["action_dispatch.signed_cookie_digest"] = "SHA256";
 
     await tc.get("setSignedCookie");
@@ -577,8 +573,7 @@ describe("CookiesTest", () => {
     assertEqual(verifier.generate(45), cookies.get("user_id"));
   });
 
-  it.skip("signed cookie rotating secret and digest", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("signed cookie rotating secret and digest", async () => {
     let secret: string | ReturnType<KeyGenerator["generateKey"]> =
       "b3c631c314c0bbca50c1b2843150fe33";
 
@@ -712,8 +707,7 @@ describe("CookiesTest", () => {
     assertEqual("bar", cookies.encrypted.get("foo"));
   });
 
-  it.skip("encrypted cookie using hybrid serializer can migrate marshal dumped value to json", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("encrypted cookie using hybrid serializer can migrate marshal dumped value to json", async () => {
     tc.request.env["action_dispatch.cookies_serializer"] = ":hybrid";
 
     const keyGenerator = tc.request.env["action_dispatch.key_generator"] as KeyGenerator;
@@ -848,8 +842,7 @@ describe("CookiesTest", () => {
     // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
   });
 
-  it.skip("encrypted cookie rotating secret", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("encrypted cookie rotating secret", async () => {
     let secret: string | Buffer = "b3c631c314c0bbca50c1b2843150fe33";
 
     tc.request.env["action_dispatch.encrypted_cookie_cipher"] = "aes-256-gcm";
@@ -1652,8 +1645,7 @@ describe("CookiesTest", () => {
     assertNil(tc.cookies().signed.get("user_id"));
   });
 
-  it.skip("read rails 5 2 stable encrypted cookies if config is false", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("read rails 5 2 stable encrypted cookies if config is false", async () => {
     tc.request.env["action_dispatch.use_cookies_with_metadata"] = false;
 
     await tc.get("rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOn");
@@ -1669,8 +1661,7 @@ describe("CookiesTest", () => {
     assertEqual("5-2-Stable Chocolate Cookies", tc.cookies().encrypted.get("favorite"));
   });
 
-  it.skip("read rails 5 2 stable signed cookies if config is false", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("read rails 5 2 stable signed cookies if config is false", async () => {
     tc.request.env["action_dispatch.use_cookies_with_metadata"] = false;
 
     await tc.get("rails52StableSignedCookieWithAuthenticatedEncryptionFlagOn");
@@ -1686,8 +1677,7 @@ describe("CookiesTest", () => {
     assertEqual("5-2-Stable Choco Chip Cookie", tc.cookies().signed.get("favorite"));
   });
 
-  it.skip("read rails 5 2 stable encrypted cookies if use metadata config is true", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("read rails 5 2 stable encrypted cookies if use metadata config is true", async () => {
     tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
 
     await tc.get("rails52StableEncryptedCookieWithAuthenticatedEncryptionFlagOn");
@@ -1703,8 +1693,7 @@ describe("CookiesTest", () => {
     assertEqual("5-2-Stable Chocolate Cookies", tc.cookies().encrypted.get("favorite"));
   });
 
-  it.skip("read rails 5 2 stable signed cookies if use metadata config is true", async () => {
-    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
+  it("read rails 5 2 stable signed cookies if use metadata config is true", async () => {
     tc.request.env["action_dispatch.use_cookies_with_metadata"] = true;
 
     await tc.get("rails52StableSignedCookieWithAuthenticatedEncryptionFlagOn");

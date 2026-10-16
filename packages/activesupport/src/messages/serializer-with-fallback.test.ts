@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";
-import { coder } from "../cache/coder.js";
 import { MessagePack } from "../message-pack.js";
 import { assert } from "../testing/assertions.js";
 import {
@@ -10,7 +9,8 @@ import {
   type Format,
   type Serializer,
 } from "./serializer-with-fallback.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, Marshal } from "@blazetrails/ruby-compat";
+import "./message-metadata-tests.js";
 
 const FORMATS = Object.keys(SERIALIZERS) as Format[];
 
@@ -18,10 +18,6 @@ function serializer(format: Format): Serializer {
   return SerializerWithFallback.get(format);
 }
 
-const MARSHAL_SIGNATURE = "\x04\x08";
-const marshalModule = {
-  load: (dumped: string) => coder.load(dumped.slice(MARSHAL_SIGNATURE.length)),
-};
 const jsonModule = { load: (dumped: string) => ActiveSupportJSON.decode(dumped) };
 const messagePackModule = {
   load: (dumped: string) => MessagePack.load(Buffer.from(dumped, "latin1")),
@@ -37,7 +33,7 @@ function assertRoundtrip(
 
 describe("MessagesSerializerWithFallbackTest", () => {
   it(":marshal serializer dumps objects using Marshal format", () => {
-    assertRoundtrip(serializer("marshal"), marshalModule);
+    assertRoundtrip(serializer("marshal"), Marshal);
   });
 
   it(":json serializer dumps objects using JSON format", () => {

@@ -34,6 +34,36 @@ describe("Psych with Date, DateTime and Time unseated", () => {
     expect(Psych.dump(new Seq())).toBe("---\n- 1\n- a\n");
   });
 
+  it("emits a coder's scalar, object, style and implicit arms, as ruby -ryaml does", () => {
+    class S {
+      encodeWith(coder: PsychModule.Coder): void {
+        coder.representScalar("!s", "v");
+      }
+    }
+    class O {
+      encodeWith(coder: PsychModule.Coder): void {
+        coder.representObject(null, [1]);
+      }
+    }
+    class F {
+      encodeWith(coder: PsychModule.Coder): void {
+        coder.setStyle(2);
+        coder.setImplicit(true);
+        coder.representMap("!f", { a: 1 });
+      }
+    }
+    class Q {
+      encodeWith(coder: PsychModule.Coder): void {
+        coder.setStyle(2);
+        coder.representSeq(null, [1, 2]);
+      }
+    }
+    expect(Psych.dump(new S())).toBe("--- !s v\n");
+    expect(Psych.dump(new O())).toBe("---\n- 1\n");
+    expect(Psych.dump(new F())).toBe("--- {a: 1}\n");
+    expect(Psych.dump(new Q())).toBe("--- [1, 2]\n");
+  });
+
   it("round-trips plain data", () => {
     const yaml = Psych.dump({ a: [1, "x", null] });
     expect(Object.fromEntries(Psych.unsafeLoad(yaml) as Map<string, unknown>)).toEqual({
@@ -451,6 +481,17 @@ describe("Psych.dump empty root collection and explicit keys", () => {
       '---\n{\n  ? "a"\n  : [\n    ! "1",\n    "b c",\n  ],\n  ? "k"\n  : {},\n}\n',
     );
     expect(Psych.dump("x", { canonical: true })).toBe('---\n"x"\n');
+    expect(Psych.dump("a", { header: true })).toBe("%YAML 1.1\n--- a\n");
+    expect(Psych.dump("a", { version: "1.1" })).toBe("%YAML 1.1\n--- a\n");
+    const { Hash } = await import("./hash.js");
+    const emptyKey = new Hash();
+    emptyKey.set({}, 1);
+    expect(Psych.dump(emptyKey)).toBe("---\n{}: 1\n");
+    const list = [1];
+    const aliasKey = new Hash();
+    aliasKey.set("x", list);
+    aliasKey.set(list, 2);
+    expect(Psych.dump(aliasKey)).toBe("---\nx: &1\n- 1\n*1 : 2\n");
     const { Emitter } = await import("./psych/emitter.js");
     const { RuntimeError } = await import("./runtime-error.js");
     const out: string[] = [];
