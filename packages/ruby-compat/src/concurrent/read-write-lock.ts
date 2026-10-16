@@ -40,7 +40,7 @@ export class ReadWriteLock {
   }
 
   private async acquireReadLock(): Promise<void> {
-    while (this.writer || this.waitingWriters > 0) await this.wait();
+    while (this.waitingWriters > 0) await this.wait();
     while (this.writer) await this.wait();
     this.readers++;
   }
