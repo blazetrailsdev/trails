@@ -1,15 +1,15 @@
+import { GlobalID } from "./global-id.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { assertEqual } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { SignedGlobalID } from "./signed-global-id.js";
-import { setApp, _resetApp } from "./config.js";
 
 describe("SignedGlobalID pick_purpose explicit-null semantics", () => {
   const verifier = new MessageVerifier("test-secret", { digest: "sha256", url_safe: true });
   const person = { id: 5, constructor: { name: "Person" } };
 
-  beforeEach(() => setApp("bcx"));
-  afterEach(() => _resetApp());
+  beforeEach(() => GlobalID.setApp("bcx"));
+  afterEach(() => (GlobalID["_app"] = undefined));
 
   it("pickPurpose returns null for an explicit for: null", () => {
     expect(SignedGlobalID.pickPurpose({ for: null })).toBeNull();
@@ -33,8 +33,8 @@ describe("SignedGlobalID.parse verifier resolution", () => {
   const verifier = new MessageVerifier("test-secret", { digest: "sha256", url_safe: true });
   const person = { id: 5, constructor: { name: "Person" } };
 
-  beforeEach(() => setApp("bcx"));
-  afterEach(() => _resetApp());
+  beforeEach(() => GlobalID.setApp("bcx"));
+  afterEach(() => (GlobalID["_app"] = undefined));
 
   it("parse raises when no verifier is configured", () => {
     const sgid = SignedGlobalID.create(person, { verifier });
@@ -56,8 +56,8 @@ describe("SignedGlobalID implicit string coercion", () => {
   const verifier = new MessageVerifier("test-secret", { digest: "sha256", url_safe: true });
   const person = { id: 5, constructor: { name: "Person" } };
 
-  beforeEach(() => setApp("bcx"));
-  afterEach(() => _resetApp());
+  beforeEach(() => GlobalID.setApp("bcx"));
+  afterEach(() => (GlobalID["_app"] = undefined));
 
   it("interpolation and String() reach toString without a toPrimitive hook", () => {
     const sgid = SignedGlobalID.create(person, { verifier });

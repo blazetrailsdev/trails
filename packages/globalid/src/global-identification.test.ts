@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { setApp, _resetApp } from "./config.js";
 import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
@@ -35,12 +34,12 @@ describe("GlobalIdentificationTest", () => {
   let model: Person;
 
   beforeEach(() => {
-    setApp("bcx");
+    GlobalID.setApp("bcx");
     registerConstant("Person", Person);
     model = new Person("1");
   });
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetConstants();
   });
 
@@ -119,11 +118,11 @@ describe("GlobalIdentificationTest", () => {
 
 describe("Locator.locateSigned + locateManySigned", () => {
   beforeEach(() => {
-    setApp("bcx");
+    GlobalID.setApp("bcx");
     registerConstant("Person", Person);
   });
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetConstants();
   });
 

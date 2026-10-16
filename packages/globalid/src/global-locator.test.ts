@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { setApp, _resetApp } from "./config.js";
 import { assertDeprecated, assertNil } from "@blazetrails/activesupport";
 import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
@@ -81,7 +80,7 @@ describe("GlobalLocatorTest", () => {
   let cpkSgid: SignedGlobalID;
 
   beforeEach(() => {
-    setApp(TEST_APP);
+    GlobalID.setApp(TEST_APP);
     registerConstants(REGISTRY);
     verifier = makeVerifier();
     personGid = GlobalID.create(new Person("id"));
@@ -96,7 +95,7 @@ describe("GlobalLocatorTest", () => {
     );
   });
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetConstants();
   });
 
@@ -554,13 +553,13 @@ describe("ScopedRecordLocatingTest", () => {
   let gid: GlobalID;
 
   beforeEach(() => {
-    setApp(TEST_APP);
+    GlobalID.setApp(TEST_APP);
     registerConstant("PersonScoped", PersonScoped);
     registerConstant("Person", Person);
     gid = GlobalID.create(new PersonScoped("1"));
   });
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetConstants();
     PersonScoped._findAllowed = false;
   });
@@ -586,11 +585,11 @@ describe("ScopedRecordLocatingTest", () => {
 
 describe("Locator (non-Rails coverage)", () => {
   beforeEach(() => {
-    setApp(TEST_APP);
+    GlobalID.setApp(TEST_APP);
     registerConstants(REGISTRY);
   });
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetConstants();
   });
 
@@ -628,10 +627,10 @@ describe("Locator (non-Rails coverage)", () => {
 
 describe("Locator without model finder", () => {
   beforeEach(() => {
-    setApp(TEST_APP);
+    GlobalID.setApp(TEST_APP);
     resetConstants();
   });
-  afterEach(() => _resetApp());
+  afterEach(() => (GlobalID["_app"] = undefined));
 
   it("returns null when no finder is registered", async () => {
     expect(await Locator.locate("gid://bcx/Person/1")).toBeNull();
@@ -640,11 +639,11 @@ describe("Locator without model finder", () => {
 
 describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
   beforeEach(() => {
-    setApp(TEST_APP);
+    GlobalID.setApp(TEST_APP);
     registerConstants(REGISTRY);
   });
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetConstants();
     _resetLocators();
   });

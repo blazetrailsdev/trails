@@ -1,6 +1,3 @@
-export { getApp, setApp } from "./config.js";
-/** @internal */
-export { _resetApp } from "./config.js";
 export { GlobalID } from "./global-id.js";
 export type { GlobalIDModel, GlobalIDOptions } from "./global-id.js";
 export { SignedGlobalID, ExpiredMessage } from "./signed-global-id.js";

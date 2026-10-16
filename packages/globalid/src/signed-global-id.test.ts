@@ -1,3 +1,4 @@
+import { GlobalID } from "./global-id.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
   travelBack,
@@ -13,7 +14,6 @@ import {
   ExpiredMessage,
   _resetSignedGlobalIDClassConfig,
 } from "./signed-global-id.js";
-import { setApp, _resetApp } from "./config.js";
 import { registerConstant, resetConstants } from "@blazetrails/ruby-compat";
 
 function makeVerifier(secret = "test-secret"): MessageVerifier {
@@ -33,11 +33,11 @@ class Person {
 
 describe("SignedGlobalIDTest", () => {
   beforeEach(() => {
-    setApp(TEST_APP);
+    GlobalID.setApp(TEST_APP);
     registerConstant("Person", Person);
   });
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetConstants();
   });
 
@@ -80,8 +80,8 @@ describe("SignedGlobalIDTest", () => {
 });
 
 describe("SignedGlobalIDPurposeTest", () => {
-  beforeEach(() => setApp(TEST_APP));
-  afterEach(() => _resetApp());
+  beforeEach(() => GlobalID.setApp(TEST_APP));
+  afterEach(() => (GlobalID["_app"] = undefined));
 
   it("sign with purpose when :for is provided", () => {
     const verifier = makeVerifier();
@@ -139,8 +139,8 @@ describe("SignedGlobalIDPurposeTest", () => {
 });
 
 describe("SignedGlobalIDExpirationTest", () => {
-  beforeEach(() => setApp(TEST_APP));
-  afterEach(() => _resetApp());
+  beforeEach(() => GlobalID.setApp(TEST_APP));
+  afterEach(() => (GlobalID["_app"] = undefined));
 
   it("passing expires_in less than a second is not expired", () => {
     try {
@@ -306,8 +306,8 @@ describe("SignedGlobalIDExpirationTest", () => {
 });
 
 describe("SignedGlobalIDCustomParamsTest", () => {
-  beforeEach(() => setApp(TEST_APP));
-  afterEach(() => _resetApp());
+  beforeEach(() => GlobalID.setApp(TEST_APP));
+  afterEach(() => (GlobalID["_app"] = undefined));
 
   it("create custom params", () => {
     const verifier = makeVerifier();
@@ -331,8 +331,8 @@ describe("SignedGlobalIDCustomParamsTest", () => {
 });
 
 describe("SignedGlobalID (non-Rails coverage)", () => {
-  beforeEach(() => setApp(TEST_APP));
-  afterEach(() => _resetApp());
+  beforeEach(() => GlobalID.setApp(TEST_APP));
+  afterEach(() => (GlobalID["_app"] = undefined));
 
   it("modelName getter delegates to parseGid", () => {
     const verifier = makeVerifier();
@@ -377,12 +377,12 @@ describe("SignedGlobalID (non-Rails coverage)", () => {
     expect(sgid.uri.toString()).toBe("gid://MyApp/Person/5");
   });
 
-  describe("getApp() integration", () => {
-    beforeEach(() => _resetApp());
-    afterEach(() => _resetApp());
+  describe("GlobalID.app integration", () => {
+    beforeEach(() => (GlobalID["_app"] = undefined));
+    afterEach(() => (GlobalID["_app"] = undefined));
 
-    it("uses getApp() when no app option", () => {
-      setApp("ConfiguredApp");
+    it("uses GlobalID.app when no app option", () => {
+      GlobalID.setApp("ConfiguredApp");
       const verifier = makeVerifier();
       const sgid = SignedGlobalID.create(person(5), { verifier });
       expect(sgid.uri.toString()).toBe("gid://ConfiguredApp/Person/5");
