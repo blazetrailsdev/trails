@@ -170,6 +170,24 @@ export function uncomparedInlinedTags(
  * `ancestors` in tag order. Empty when the class has no `self.new`, no
  * same-file module and no tag, which leaves the pair to the ordinary gate.
  */
+/**
+ * Whether `tsClass` is named after a Ruby class other than `rubyModule` in
+ * `rubyModule`'s own `.rb`, so that it ports that sibling rather than
+ * `rubyModule` (`Integration::Session` beside `IntegrationTest`).
+ */
+export function portsSiblingClass(
+  tsClass: string,
+  rubyModule: string,
+  classes: Readonly<Record<string, ClassInfo>>,
+): boolean {
+  const short = (fqn: string) => fqn.split(/::|\./).pop();
+  const file = classes[rubyModule]?.file;
+  if (file === undefined || short(tsClass) === short(rubyModule)) return false;
+  return Object.entries(classes).some(
+    ([fqn, other]) => fqn !== rubyModule && other.file === file && short(fqn) === short(tsClass),
+  );
+}
+
 export function inlinedSegments(
   own: MethodInfo | undefined,
   ancestors: ModuleAncestors,

@@ -194,6 +194,7 @@ import {
   inlinedRubyCallArgs,
   inlinedRubySkeleton,
   inlinedSegments,
+  portsSiblingClass,
   isInitializeLessTaggedClass,
   moduleAncestors,
   sameFileInitializeModules,
@@ -5609,19 +5610,10 @@ export function main() {
           byOwner === undefined
             ? undefined
             : resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
-        const short = (fqn: string) => fqn.split(/::|\./).pop();
         const tsClass =
-          resolved !== undefined &&
-          short(resolved) !== short(rubyModule) &&
-          Object.entries(rubyPkg.classes).some(
-            ([fqn, other]) =>
-              fqn !== rubyModule &&
-              (other as unknown as ClassInfo).file === klass.file &&
-              short(fqn) === short(resolved),
-          )
+          resolved !== undefined && portsSiblingClass(resolved, rubyModule, rubyPkg.classes)
             ? undefined
             : resolved;
-        if (resolved !== undefined && tsClass === undefined) return [];
         if (tsClass !== undefined && byOwner?.has(tsClass)) {
           inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
           const pair = { package: pkg, tsFile, owner: tsClass, rubyModule };

@@ -18,6 +18,7 @@ import {
   inlinedSegments,
   isInitializeLessTaggedClass,
   moduleAncestors,
+  portsSiblingClass,
   type ModuleBody,
   sameFileInitializeModules,
   taggedBodies,
@@ -552,5 +553,35 @@ describe("a module hook is credited through the tag on an includer's constructor
     expect(credited("ActiveRecord::Inheritance::ClassMethods", "new")).toBe("base.ts");
     expect(credited("ActiveRecord::Inheritance::ClassMethods", "initialize")).toBeUndefined();
     expect(credited("ActiveRecord::Core", "initialize")).toBeUndefined();
+  });
+});
+
+describe("portsSiblingClass", () => {
+  const klass = (file: string) => ({ file }) as unknown as ClassInfo;
+  const classes = {
+    "ActionDispatch::Integration::Session": klass("action_dispatch/testing/integration.rb"),
+    "ActionDispatch::IntegrationTest": klass("action_dispatch/testing/integration.rb"),
+    "ActionDispatch::Request": klass("action_dispatch/http/request.rb"),
+  };
+
+  it("refuses a TS class named after a sibling Ruby class of the same file", () => {
+    expect(
+      portsSiblingClass("IntegrationTest", "ActionDispatch::Integration::Session", classes),
+    ).toBe(true);
+  });
+
+  it("keeps the same-named TS class", () => {
+    expect(portsSiblingClass("IntegrationTest", "ActionDispatch::IntegrationTest", classes)).toBe(
+      false,
+    );
+  });
+
+  it("keeps a renamed TS class no Ruby class of the file is named after", () => {
+    expect(portsSiblingClass("Helper", "ActionDispatch::Integration::Session", classes)).toBe(
+      false,
+    );
+    expect(portsSiblingClass("Request", "ActionDispatch::Integration::Session", classes)).toBe(
+      false,
+    );
   });
 });
