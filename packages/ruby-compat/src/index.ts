@@ -446,6 +446,8 @@ export { Concurrent } from "./concurrent/map.js";
 import "./concurrent/count-down-latch.js";
 import "./concurrent/cyclic-barrier.js";
 import "./concurrent/event.js";
+import "./concurrent/atomic-boolean.js";
+import "./concurrent/read-write-lock.js";
 export type { MonitorMixin } from "./monitor.js";
 
 export { Tempfile } from "./tempfile.js";
