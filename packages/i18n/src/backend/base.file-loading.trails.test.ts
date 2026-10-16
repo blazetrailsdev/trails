@@ -12,7 +12,7 @@ function hashOf(literal: Record<string, unknown>): Hash<unknown, unknown> {
   const hash = new Hash<unknown, unknown>();
   for (const [k, v] of Object.entries(literal)) {
     hash.set(
-      k,
+      `:${k}`,
       v !== null && typeof v === "object" && !Array.isArray(v)
         ? hashOf(v as Record<string, unknown>)
         : v,
@@ -52,17 +52,20 @@ describe("I18n::Backend::Base file loading", () => {
     const overriding = new Overriding() as unknown as {
       loadYaml(f: string): [unknown, boolean];
     };
-    expect(overriding.loadYaml(filename)).toEqual([hashOf({ en: { foo: { bar: "baz" } } }), false]);
+    expect(overriding.loadYaml(filename)).toEqual([hashOf({ en: { foo: { bar: "baz" } } }), true]);
   });
 
   it("load_yml freezes the parsed data deeply", () => {
     const filename = `${localesDir()}/en.yml`;
     const loading = backend as unknown as { loadYml(f: string): [unknown, boolean] };
     const [data, keysSymbolized] = loading.loadYml(filename);
-    expect(keysSymbolized).toBe(false);
+    expect(keysSymbolized).toBe(true);
     expect((data as Hash<string, Hash<string, Hash<string, unknown>>>).isFrozen()).toBe(true);
     expect(
-      (data as Hash<string, Hash<string, Hash<string, unknown>>>).get("en")!.get("foo")!.isFrozen(),
+      (data as Hash<string, Hash<string, Hash<string, unknown>>>)
+        .get(":en")!
+        .get(":foo")!
+        .isFrozen(),
     ).toBe(true);
   });
 
@@ -206,7 +209,9 @@ describe("I18n::Backend::Base file loading", () => {
     expect(backend.translate("en", "greeting")).toBe("Hello");
     expect(backend.translate("en", "aliased")).toBe("Hello");
     expect(backend.translate("en", "farewell")).toBe("Bye\nnow");
-    expect(backend.translate("en", "entries")).toEqual([{ key: "value" }]);
+    expect(backend.translate("en", "entries")).toEqual([
+      new Hash<unknown, unknown>().set(":key", "value"),
+    ]);
     expect(backend.translate("en", "tagged")).toBe("42");
   });
 });

@@ -149,13 +149,13 @@ describe("I18nBackendSimpleTest", () => {
   it("simple load_yml: loads data from a YAML file", () => {
     const [data] = send(backend, "loadYml", `${localesDir()}/en.yml`);
     const expected = new Hash<unknown, unknown>().set(
-      "en",
-      new Hash<unknown, unknown>().set("foo", new Hash<unknown, unknown>().set("bar", "baz")),
+      ":en",
+      new Hash<unknown, unknown>().set(":foo", new Hash<unknown, unknown>().set(":bar", "baz")),
     );
     expect(data).toEqual(expected);
     expect(data).toEqual(expected);
-    assertPredicate((data as Hash<string, Hash<string, Hash<string, unknown>>>).get("en"), (en) =>
-      Object.isFrozen(en!.get("foo")!.get("bar")),
+    assertPredicate((data as Hash<string, Hash<string, Hash<string, unknown>>>).get(":en"), (en) =>
+      Object.isFrozen(en!.get(":foo")!.get(":bar")),
     );
   });
 

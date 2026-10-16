@@ -1,3 +1,5 @@
+import { Hash, hashAref, hashAset, hasKey, rbObjDup } from "@blazetrails/ruby-compat";
+
 export type TranslationData = { [key: string]: unknown };
 
 function isHash(value: unknown): value is TranslationData {
@@ -15,7 +17,7 @@ export function deepMerge(
   otherHash: TranslationData,
   block?: (key: string, thisVal: unknown, otherVal: unknown) => unknown,
 ): TranslationData {
-  return deepMergeBang({ ...hash }, otherHash, block);
+  return deepMergeBang(rbObjDup(hash), otherHash, block);
 }
 
 export function deepMergeBang(
@@ -23,27 +25,51 @@ export function deepMergeBang(
   otherHash: TranslationData,
   block?: (key: string, thisVal: unknown, otherVal: unknown) => unknown,
 ): TranslationData {
-  for (const [key, otherVal] of Object.entries(otherHash)) {
-    if (!(key in hash)) {
-      hash[key] = otherVal;
+  for (let [key, otherVal] of otherHash instanceof Map
+    ? (otherHash as Map<unknown, unknown>)
+    : Object.entries(otherHash)) {
+    if (hash instanceof Map && !(otherHash instanceof Map)) key = `:${key as string}`;
+    else if (!(hash instanceof Map) && otherHash instanceof Map && typeof key === "string") {
+      key = key.startsWith(":") ? key.slice(1) : key;
+      if (
+        otherVal instanceof Map &&
+        [...otherVal.keys()].every((k) => typeof k === "string" && k.startsWith(":"))
+      ) {
+        const frozen = Object.isFrozen(otherVal);
+        otherVal = deepMergeBang({}, otherVal as unknown as TranslationData);
+        if (frozen) Object.freeze(otherVal);
+      }
+    }
+    if (!hasKey(hash, key as string)) {
+      hashAset(hash, key, otherVal);
       continue;
     }
-    const thisVal = hash[key];
+    const thisVal = hashAref(hash, key);
     if (isHash(thisVal) && isHash(otherVal)) {
-      hash[key] = deepMerge(thisVal, otherVal, block);
+      hashAset(hash, key, deepMerge(thisVal, otherVal, block));
     } else if (block) {
-      hash[key] = block(key, thisVal, otherVal);
+      hashAset(hash, key, block(key as string, thisVal, otherVal));
     } else {
-      hash[key] = otherVal;
+      hashAset(hash, key, otherVal);
     }
   }
   return hash;
 }
 
 export function deepSymbolizeKeys(hash: TranslationData | Map<unknown, unknown>): TranslationData {
+  if (hash instanceof Map) {
+    const result = new Hash<unknown, unknown>();
+    for (const [key, value] of hash) {
+      result.set(
+        typeof key === "string" && !key.startsWith(":") ? `:${key}` : key,
+        deepSymbolizeKeysInObject(value),
+      );
+    }
+    return result as unknown as TranslationData;
+  }
   const result: TranslationData = {};
-  for (const [key, value] of hash instanceof Map ? hash : Object.entries(hash)) {
-    result[key as string] = deepSymbolizeKeysInObject(value);
+  for (const [key, value] of Object.entries(hash)) {
+    result[key] = deepSymbolizeKeysInObject(value);
   }
   return result;
 }

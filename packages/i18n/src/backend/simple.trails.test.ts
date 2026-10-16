@@ -1,3 +1,4 @@
+import { Hash } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { Base } from "./base.js";
@@ -29,6 +30,23 @@ describe("Backend::Simple", () => {
 
     expect(seen).toEqual(["en"]);
     expect(backend.translate("en", "foo")).toBe("bar");
+  });
+
+  it("keeps an Integer key of a symbolized Hash apart from its Symbol twin", () => {
+    const backend = new Simple();
+    const counts = new Hash<unknown, unknown>().set(1, "one").set(":1", "uno");
+    backend.storeTranslations(
+      "en",
+      new Hash<unknown, unknown>().set(":counts", counts) as unknown as Record<string, unknown>,
+      { skipSymbolizeKeys: true },
+    );
+
+    const stored = (backend.translations()["en"] as Record<string, unknown>)["counts"];
+    expect([...(stored as Hash<unknown, unknown>)]).toEqual([
+      [1, "one"],
+      [":1", "uno"],
+    ]);
+    expect(backend.translate("en", "counts.1")).toBe("uno");
   });
 
   it("stores a Symbol-spelled locale in the same bucket as its String form", () => {

@@ -8,7 +8,7 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import { isSymbol } from "@blazetrails/ruby-compat";
+import { hashAref, hasKey, isSymbol } from "@blazetrails/ruby-compat";
 import { deepMergeBang, deepSymbolizeKeys, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 
@@ -100,12 +100,12 @@ export class Simple {
     let result: unknown = this.translations();
     for (const rawKey of keys) {
       if (!isHash(result)) return null;
-      let _key = String(rawKey);
-      if (!(_key in result)) {
-        _key = toSym(_key).slice(1);
-        if (!(_key in result)) return null;
+      let _key = result instanceof Map ? toSym(rawKey) : String(rawKey);
+      if (!hasKey(result, _key)) {
+        _key = result instanceof Map ? toSym(String(rawKey)) : toSym(_key).slice(1);
+        if (!hasKey(result, _key)) return null;
       }
-      result = result[_key];
+      result = hashAref(result, _key);
       if (isSymbol(result)) {
         result = this.resolveEntry(
           locale,
