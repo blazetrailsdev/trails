@@ -32,6 +32,7 @@ describe("ActionDispatch::SystemTesting::TestHelpers::SetupAndTeardown", () => {
       methodName: "test",
       isPassed: () => true,
       isSkipped: () => false,
+      metadata: {},
       _context: { close },
       _page: { screenshot: vi.fn(), content: vi.fn() },
     };
