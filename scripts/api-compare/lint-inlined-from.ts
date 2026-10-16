@@ -37,6 +37,7 @@ import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
 import {
   INLINED_FROM_PAIRS_FILE,
   moduleAncestors,
+  shortName,
   type InlinedFromPair,
 } from "./inlined-bodies.js";
 import { TAG } from "./inlined-from-tags.js";
@@ -97,7 +98,7 @@ export const CONCERN = "ActiveSupport::Concern";
 function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   const byShort = new Map<string, string[]>();
   for (const fqn of modules.keys()) {
-    const short = fqn.split("::").pop()!;
+    const short = shortName(fqn);
     byShort.set(short, [...(byShort.get(short) ?? []), fqn]);
   }
   const resolve = (name: string, context: string) => resolveModuleName(name, context, byShort);
@@ -170,7 +171,7 @@ export function inlinedFromFindings(
         continue;
       const tsFile = ctor?.file ?? klass.file;
       if (tsFile === undefined) continue;
-      const short = (klass.name ?? owner).split(".").pop()!;
+      const short = shortName(klass.name ?? owner);
       const seat = `${name} ${tsFile} ${klass.name ?? owner}`;
       if (visited.has(seat)) continue;
       visited.add(seat);
@@ -188,11 +189,8 @@ export function inlinedFromFindings(
         (pair) =>
           pair.package === name && pair.tsFile === tsFile && pair.owner === (klass.name ?? owner),
       );
-      const paired =
-        pairedWith.length > 1
-          ? pairedWith.find((pair) => pair.rubyModule.split("::").pop() === short)
-          : pairedWith[0];
-      if (pairedWith.length > 1 && paired === undefined) {
+      const paired = pairedWith[0];
+      if (pairedWith.length > 1) {
         const fqns = pairedWith.map((pair) => pair.rubyModule).join(", ");
         throw new Error(`${TAG} on ${name}/${tsFile} ${owner} was compared against ${fqns}`);
       }

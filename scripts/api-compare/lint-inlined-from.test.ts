@@ -225,16 +225,13 @@ describe("inlinedFromFindings", () => {
     expect(messages(tags, { owner: "Helper", sibling: true, enrolled, pairs })).toEqual([]);
   });
 
-  it("takes the same-named Rails class of two compare.ts pairs, and refuses two others", () => {
+  it("refuses a constructor compare.ts paired with two Rails classes", () => {
     const pair = { package: "activerecord", tsFile: "base.ts", owner: "Base" };
     const pairs = [
       { ...pair, rubyModule: "ActiveRecord::Base" },
       { ...pair, rubyModule: "ActiveRecord::Relation" },
     ];
-    expect(messages([LAST, NEW, FIRST, CORE, API], { pairs })).toEqual([]);
-    expect(() =>
-      messages([CORE], { owner: "Helper", pairs: pairs.map((p) => ({ ...p, owner: "Helper" })) }),
-    ).toThrow(/compared against/);
+    expect(() => messages([LAST, NEW, FIRST, CORE, API], { pairs })).toThrow(/compared against/);
   });
 
   it("orders one include statement's first argument ahead of its second", () => {

@@ -161,6 +161,29 @@ export function uncomparedInlinedTags(
     .sort();
 }
 
+/** The last segment of a Ruby `A::B` or TS `A.B` name. */
+export function shortName(name: string): string {
+  return name.split(/::|\./).pop()!;
+}
+
+/**
+ * Whether `tsClass` is named after a Ruby class other than `rubyModule` in
+ * `rubyModule`'s own `.rb`, so that it ports that sibling rather than
+ * `rubyModule` (`Integration::Session` beside `IntegrationTest`).
+ */
+export function portsSiblingClass(
+  tsClass: string,
+  rubyModule: string,
+  classes: Readonly<Record<string, ClassInfo>>,
+): boolean {
+  const file = classes[rubyModule]?.file;
+  if (file === undefined || shortName(tsClass) === shortName(rubyModule)) return false;
+  return Object.entries(classes).some(
+    ([fqn, other]) =>
+      fqn !== rubyModule && other.file === file && shortName(fqn) === shortName(tsClass),
+  );
+}
+
 /**
  * The Rails chain a constructor that inlines module bodies answers to
  * (RFC 0188), in the order Ruby runs it: the class's own `self.new`, then a
