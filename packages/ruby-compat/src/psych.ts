@@ -252,6 +252,9 @@ export namespace Psych {
    * (`yaml_parser_set_input_string`, `vendor/ruby/v3.3.11/ext/psych/psych_parser.c:271`),
    * so a source held as its bytes is decoded here. A malformed document raises
    * `Psych::SyntaxError` as `make_exception` does (`psych_parser.c:80-100`).
+   * libyaml ends the first document after a closed flow or quoted root, and
+   * `parse` returns that node before the parser reads on (`psych.rb:398-403`),
+   * so a backend error past the root's end belongs to a later document.
    *
    * @noRailsEquivalent PERMANENT
    */
