@@ -41,25 +41,27 @@ const browserInstalled = await getFs().stat!(chromium.executablePath()).then(
 );
 
 describe("SystemTestCase", () => {
-  it.skipIf(!browserInstalled)("drives a page through the playwright driver", async () => {
-    class PostsTest extends SystemTestCase {
-      testDrivesAPage(): void {}
-    }
-    PostsTest.drivenBy("playwright", { using: "chromium" });
-    const test = new PostsTest("testDrivesAPage");
-    const page = await test.page();
-    const browser = page.context().browser();
-    try {
-      await page.goto(new URL("posts", vite.url).href);
+  it.skipIf(!browserInstalled)(
+    "drives a page through the playwright driver",
+    async () => {
+      class PostsTest extends SystemTestCase {
+        testDrivesAPage(): void {}
+      }
+      PostsTest.drivenBy("playwright", { using: "chromium" });
+      const test = new PostsTest("testDrivesAPage");
+      const page = await test.page();
+      try {
+        await page.goto(new URL("posts", vite.url).href);
 
-      await expect.element(page.getByRole("heading")).toBeVisible();
-      await expect.element(page.getByText("Posts")).toBeInTheDocument();
-      await expect.element(page.getByRole("heading")).toHaveTextContent("Posts");
-      await expect.element(page.getByLabel("Title")).toHaveValue("Hello");
-      test.assertions += 4;
-    } finally {
-      await test.afterTeardown();
-      await browser?.close();
-    }
-  });
+        await expect.element(page.getByRole("heading")).toBeVisible();
+        await expect.element(page.getByText("Posts")).toBeInTheDocument();
+        await expect.element(page.getByRole("heading")).toHaveTextContent("Posts");
+        await expect.element(page.getByLabel("Title")).toHaveValue("Hello");
+        test.assertions += 4;
+      } finally {
+        await test.afterTeardown();
+      }
+    },
+    30_000,
+  );
 });

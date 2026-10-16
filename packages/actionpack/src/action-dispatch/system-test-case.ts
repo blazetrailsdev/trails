@@ -38,6 +38,9 @@ declare module "vitest" {
   }
 }
 
+/** @internal */
+const sessions = new Map<string, Promise<{ browser: Browser; options: Record<string, unknown> }>>();
+
 export class SystemTestCase extends TestCase {
   static readonly DEFAULT_HOST = DEFAULT_HOST;
 
@@ -73,6 +76,8 @@ export class SystemTestCase extends TestCase {
     await new Server().run();
     const { afterAll } = await import("vitest");
     afterAll(async () => {
+      for (const session of sessions.values()) await (await session).browser.close();
+      sessions.clear();
       await vite.server?.close();
       vite.server = undefined;
     });
@@ -96,17 +101,22 @@ export class SystemTestCase extends TestCase {
   /** @noRailsEquivalent PERMANENT */
   async page(): Promise<Page> {
     if (this._page) return this._page;
-    const { browser, options } = (await vite.drivers[vite.currentDriver!](vite.app)) as {
-      browser: Browser;
-      options: Record<string, unknown>;
-    };
+    let session = sessions.get(vite.currentDriver!);
+    if (!session) {
+      session = vite.drivers[vite.currentDriver!](vite.app) as Promise<{
+        browser: Browser;
+        options: Record<string, unknown>;
+      }>;
+      sessions.set(vite.currentDriver!, session);
+    }
+    const { browser, options } = await session;
     this._context = await browser.newContext(options);
     return (this._page = await this._context.newPage());
   }
 
   /** @internal */
   private urlHelpers(): object | null {
-    if (this._urlHelpers !== undefined) return this._urlHelpers;
+    if (this._urlHelpers) return this._urlHelpers;
     const testApp = ActionDispatch.testApp as { routes: RouteSet } | null;
     if (testApp) {
       const klass = class {
