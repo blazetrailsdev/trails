@@ -15,7 +15,6 @@ import { temporalTag } from "./temporal-tag.js";
 import { rbRegToS } from "./regexp.js";
 import { NoMethodError } from "./no-method-error.js";
 import { Hash } from "./hash.js";
-import { registeredConstant } from "./variable.js";
 import { toEnum } from "./enumerator.js";
 
 type Klass = abstract new (...args: never) => unknown;
@@ -122,6 +121,16 @@ export function rbSetClassPathString(
 }
 
 /**
+ * `RCLASS_CONST_TBL(rb_cObject)` (`vendor/ruby/v3.3.11/internal/class.h:95`):
+ * the top-level constant table `registerConstant` fills. It lives with
+ * `rb_cObject` so `object.ts` reads it without importing `variable.ts`, whose
+ * load-time `registerConstant` calls need this module evaluated first.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const RCLASS_CONST_TBL = new Map<string, unknown>();
+
+/**
  * The one class object a core class has once a gem reopens it
  * (`class Date extends rbCDate`, seated by `registerConstant`): MRI has one
  * `cDate` (`vendor/ruby/v3.3.11/ext/date/date_core.c:9604`), so the seat and
@@ -132,7 +141,7 @@ export function rbSetClassPathString(
  */
 export function reopened(klass: object): object {
   const path = classpaths.get(klass)?.path;
-  return path === undefined ? klass : (registeredConstant(path) ?? klass);
+  return path === undefined ? klass : (RCLASS_CONST_TBL.get(path) ?? klass);
 }
 
 function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {
