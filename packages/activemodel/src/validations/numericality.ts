@@ -1,3 +1,4 @@
+import { FLOAT_DIG } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   isInclude,
@@ -115,8 +116,6 @@ export class NumericalityValidator extends EachValidator {
     }
   }
 }
-
-const FLOAT_DIG = 15;
 
 const INTEGER_REGEX = /^[+-]?\d+(?![\s\S])/;
 const HEXADECIMAL_REGEX = /^[+-]?0[xX]/;

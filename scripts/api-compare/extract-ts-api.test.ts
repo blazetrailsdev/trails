@@ -17,6 +17,7 @@ import {
   declaringFile,
   extractClass,
   extractFileConstants,
+  extractFileConstantReceipts,
   extractInternalFileConstants,
   extractFileLocalHelpers,
   extractFromProgram,
@@ -3065,6 +3066,15 @@ describe("extractInternalFileConstants", () => {
       export const SHOWN = 2;
       /** @internal */ export const NOT_A_LITERAL = compute();`;
     expect(extractInternalFileConstants(compile(src).sourceFile)).toEqual(["HIDDEN"]);
+  });
+});
+
+describe("extractFileConstantReceipts", () => {
+  it("maps each receipted exported literal const to its reason", () => {
+    const src = `/** @noRailsEquivalent PERMANENT */ export const TAGGED = 1;
+      export const BARE = 2;
+      /** @noRailsEquivalent PERMANENT */ export const NOT_A_LITERAL = compute();`;
+    expect(extractFileConstantReceipts(compile(src).sourceFile)).toEqual({ TAGGED: "PERMANENT" });
   });
 });
 

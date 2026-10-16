@@ -52,3 +52,10 @@ function hexFloat(hex: RegExpExecArray): number {
   const scaled = mantissa * 2 ** Number(exponent ?? "0");
   return sign === "-" ? -scaled : scaled;
 }
+
+/**
+ * `Float::DIG` (`vendor/ruby/v3.3.11/numeric.c:6283`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const FLOAT_DIG = 15;

@@ -832,6 +832,9 @@ export function collectTaggedEntries(ts: ApiManifest): TaggedEntry[] {
     for (const [file, fns] of Object.entries(tsPkg.fileFunctions ?? {})) {
       for (const fn of fns) pushMethod(pkg, file, fn);
     }
+    for (const [file, receipts] of Object.entries(tsPkg.fileConstantNoRailsEquivalent ?? {})) {
+      for (const [name, reason] of Object.entries(receipts)) push(pkg, file, name, reason);
+    }
     for (const [file, reason] of Object.entries(tsPkg.fileNoRailsEquivalent ?? {})) {
       const entry: TaggedEntry = { package: pkg, tsFile: file, name: FILE_TAG_NAME, reason };
       if (seen.has(allowKeyOf(entry))) continue;
