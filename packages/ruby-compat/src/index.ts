@@ -68,6 +68,7 @@ export {
   rbObjIsProc,
   rbModName,
   rbModSingletonP,
+  rbClassAttachedObject,
   rbModToS,
   rbObjClassname,
   rbObjFrozenP,

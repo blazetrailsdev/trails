@@ -15,6 +15,7 @@ import {
   rbObjClass,
   rbClassOf,
   rbObjSingletonClass,
+  rbClassAttachedObject,
   rbCDate,
   rbCDateTime,
   rbCNumeric,
@@ -1220,5 +1221,19 @@ describe("rbClassNewInstance", () => {
     expect(rbClassNewInstance(rbCString)).toBe("");
     expect(rbClassNewInstance(Array)).toEqual([]);
     expect(rbObjClass(rbClassNewInstance(rbCClass))).toBe(rbCClass);
+  });
+});
+
+describe("rbClassAttachedObject", () => {
+  it("answers the attached object of a singleton class", () => {
+    class Foo {}
+    const obj = new Foo();
+    expect(rbClassAttachedObject(rbObjSingletonClass(obj))).toBe(obj);
+  });
+
+  it("raises TypeError for a non-singleton class", () => {
+    class Foo {}
+    expect(() => rbClassAttachedObject(Foo)).toThrow(TypeError);
+    expect(() => rbClassAttachedObject(Foo)).toThrow("`Foo' is not a singleton class");
   });
 });

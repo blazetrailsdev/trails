@@ -1418,8 +1418,10 @@ every Rails call that reaches them goes through `record.class`.
 A JS class has no metaclass apart from its own statics, so
 `rbObjSingletonClass` raises `TypeError` for a class receiver. Code whose Rails
 body reaches a class's singleton class keeps working on the class itself, and
-`ClassAttribute.redefine` does not port its `attached_object.is_a?(Module)`
-arm.
+`ClassAttribute.redefine`'s `attached_object.is_a?(Module)` arm is unported
+for a JS-class receiver only. A ruby-compat `Module` instance is a plain
+object with a real singleton class, so for it the arm is taken
+(`rbClassAttachedObject`).
 
 ## A revived object copies a constructed instance (`init_with` / `marshal_load`'s `initialize`)
 
