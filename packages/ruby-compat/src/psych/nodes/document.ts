@@ -29,6 +29,11 @@ export class Document extends Node {
   get root(): Node | undefined {
     return this.children[0];
   }
+
+  /** @noRailsEquivalent PERMANENT */
+  override isDocument(): boolean {
+    return true;
+  }
 }
 
 registerConstant("Psych::Nodes::Document", Document);

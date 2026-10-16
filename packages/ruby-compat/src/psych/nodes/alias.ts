@@ -15,6 +15,11 @@ export class Alias extends Node {
     super();
     this.anchor = anchor;
   }
+
+  /** @noRailsEquivalent PERMANENT */
+  override isAlias(): boolean {
+    return true;
+  }
 }
 
 registerConstant("Psych::Nodes::Alias", Alias);

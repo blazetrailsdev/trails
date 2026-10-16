@@ -15,8 +15,8 @@ import { Stream } from "./nodes/stream.js";
 export class TreeBuilder extends Handler {
   /** @noRailsEquivalent PERMANENT */
   root: Stream | null = null;
-  private stack: Node[] = [];
-  private last: Node | null = null;
+  protected stack: Node[] = [];
+  protected last: Node | null = null;
   private startLine: number | null = null;
   private startColumn: number | null = null;
   private endLine: number | null = null;
@@ -88,7 +88,7 @@ export class TreeBuilder extends Handler {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  override endDocument(implicitEnd: boolean = !this.isStreaming()): Document {
+  override endDocument(implicitEnd: boolean = !this.isStreaming()): unknown {
     (this.last as Document).implicitEnd = implicitEnd;
     const n = this.pop() as Document;
     this.setEndLocation(n);
@@ -132,13 +132,13 @@ export class TreeBuilder extends Handler {
     return a;
   }
 
-  private push<T extends Node>(value: T): T {
+  protected push<T extends Node>(value: T): T {
     this.stack.push(value);
     this.last = value;
     return value;
   }
 
-  private pop(): Node | undefined {
+  protected pop(): Node | undefined {
     const x = this.stack.pop();
     this.last = this.stack.at(-1) ?? null;
     return x;

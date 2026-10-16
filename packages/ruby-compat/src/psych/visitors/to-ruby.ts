@@ -3,17 +3,21 @@ import { Range } from "../../range.js";
 import { rbGetAllocFunc } from "../../include.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
 import type { Struct, StructInstance } from "../../struct.js";
-import type { Alias, Node, Pair, ParsedNode, Scalar, YAMLMap, YAMLSeq } from "yaml";
 import { Psych } from "../../psych.js";
-import type * as Yaml from "yaml";
-import { yaml as backend, type PsychNode } from "../../psych-adapter.js";
+import { registerConstant } from "../../variable.js";
+import { Alias } from "../nodes/alias.js";
+import type { Document } from "../nodes/document.js";
+import { Mapping } from "../nodes/mapping.js";
+import type { Node } from "../nodes/node.js";
+import { Scalar } from "../nodes/scalar.js";
+import { Sequence } from "../nodes/sequence.js";
+import type { Stream } from "../nodes/stream.js";
+import { Visitor } from "./visitor.js";
 import { Coder } from "../coder.js";
 import { Omap } from "../omap.js";
 import { ClassLoader } from "../class-loader.js";
 import { AliasesNotEnabled, AnchorNotDefined } from "../exception.js";
 import { ScalarScanner } from "../scalar-scanner.js";
-
-const yaml = backend as unknown as typeof Yaml;
 
 type RubyClass = { prototype: object; allocate?: () => object };
 
@@ -30,7 +34,7 @@ function allocate(klass: RubyClass): object {
  *
  * @noRailsEquivalent PERMANENT
  */
-export class ToRuby {
+export class ToRuby extends Visitor {
   /**
    * `ToRuby.create` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/to_ruby.rb:15`).
    *
@@ -57,6 +61,7 @@ export class ToRuby {
     classLoader: ClassLoader,
     { symbolizeNames = false, freeze = false } = {},
   ) {
+    super();
     this.ss = ss;
     this.loadTags = Psych.loadTags;
     this.domainTypes = Psych.domainTypes;
@@ -70,9 +75,9 @@ export class ToRuby {
    *
    * @noRailsEquivalent PERMANENT
    */
-  accept(target: PsychNode | null): unknown {
+  override accept(target: Node | null): unknown {
     if (target === null) return null;
-    let result = this.visit(target as ParsedNode);
+    let result = super.accept(target);
 
     if (!(Object.keys(this.domainTypes).length === 0 || !target.tag)) {
       let key = target.tag.replace(/^[!/]*/, "").replace(/(,\d+)\//, "$1:");
@@ -88,21 +93,28 @@ export class ToRuby {
     return result;
   }
 
-  private visit(o: ParsedNode): unknown {
-    if (yaml.isAlias(o)) return this.visitPsychNodesAlias(o);
-    if (yaml.isMap(o)) return this.visitMapping(o);
-    if (yaml.isSeq(o)) return this.visitPsychNodesSequence(o);
+  /**
+   * `ToRuby#visit_Psych_Nodes_Scalar` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/to_ruby.rb:139-141`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitPsychNodesScalar(o: Scalar): unknown {
     return this.register(o, this.deserialize(o));
   }
 
-  private visitPsychNodesSequence(o: YAMLSeq.Parsed): unknown {
+  /**
+   * `ToRuby#visit_Psych_Nodes_Sequence` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/to_ruby.rb:143-176`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitPsychNodesSequence(o: Sequence): unknown {
     const klass = this.resolveClass(this.loadTags[o.tag ?? ""]);
     if (klass) {
       const instance = allocate(klass);
 
       if (rbObjRespondTo(instance, "initWith")) {
-        const coder = new Coder(o.tag!);
-        coder.setSeq(o.items.map((c) => this.accept(c)));
+        const coder = new Coder(o.tag);
+        coder.setSeq(o.children.map((c) => this.accept(c)));
         (instance as { initWith(coder: Coder): void }).initWith(coder);
       }
 
@@ -114,18 +126,14 @@ export class ToRuby {
       return this.register(o, this.registerEmpty(o));
     } else if (o.tag === "!omap" || o.tag === "tag:yaml.org,2002:omap") {
       const map = this.register(o, new Omap());
-      for (const a of o.items as (YAMLMap.Parsed | Pair<ParsedNode, ParsedNode>)[]) {
-        const { key, value } = (yaml.isPair(a) ? a : a.items[0]) as {
-          key: ParsedNode;
-          value: ParsedNode;
-        };
-        map.set(this.accept(key), this.accept(value));
+      for (const a of o.children) {
+        map.set(this.accept(a.children[0]), this.accept(a.children.at(-1)!));
       }
       return map;
     } else if ((match = /^!(?:seq|ruby\/array):(.*)$/.exec(o.tag))) {
       const klass = this.resolveClass(match[1]);
       const list = this.register(o, allocate(klass) as unknown[]);
-      for (const c of o.items) list.push(this.accept(c));
+      for (const c of o.children) list.push(this.accept(c));
       return list;
     } else {
       return this.register(o, this.registerEmpty(o));
@@ -137,56 +145,77 @@ export class ToRuby {
    *
    * @noRailsEquivalent PERMANENT
    */
-  visitPsychNodesAlias(o: PsychNode): unknown {
-    const { source } = o as Alias;
-    if (!this.st.has(source)) throw new AnchorNotDefined(source);
-    return this.st.get(source);
+  visitPsychNodesAlias(o: Alias): unknown {
+    if (!this.st.has(o.anchor)) throw new AnchorNotDefined(o.anchor);
+    return this.st.get(o.anchor);
   }
 
-  private deserialize(o: Scalar.Parsed): unknown {
+  /**
+   * `ToRuby#visit_Psych_Nodes_Document` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/to_ruby.rb:319-321`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitPsychNodesDocument(o: Document): unknown {
+    return this.accept(o.root ?? null);
+  }
+
+  /**
+   * `ToRuby#visit_Psych_Nodes_Stream` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/to_ruby.rb:323-325`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitPsychNodesStream(o: Stream): unknown {
+    return o.children.map((c) => this.accept(c));
+  }
+
+  private deserialize(o: Scalar): unknown {
     const klass = this.resolveClass(this.loadTags[o.tag ?? ""]);
     if (klass) {
       const instance = allocate(klass);
 
       if (rbObjRespondTo(instance, "initWith")) {
-        const coder = new Coder(o.tag!);
-        coder.setScalar(o.source);
+        const coder = new Coder(o.tag);
+        coder.setScalar(o.value);
         (instance as { initWith(coder: Coder): void }).initWith(coder);
       }
 
       return instance;
     }
 
-    if (!o.tag && o.type !== yaml.Scalar.PLAIN) return o.value;
-    if (!o.tag) return this.ss.tokenize(o.source);
+    if (o.quoted) return o.value;
+    if (!o.tag) return this.ss.tokenize(o.value);
 
-    const value = String(o.value);
     switch (o.tag) {
       case "!ruby/object:DateTime":
-        return (this.classLoader.dateTime() as { parse(s: string): unknown }).parse(value);
+        return (this.classLoader.dateTime() as { parse(s: string): unknown }).parse(o.value);
       case "!ruby/class":
       case "!ruby/module":
-        return this.resolveClass(value);
+        return this.resolveClass(o.value);
       case "!ruby/regexp": {
         const klass = this.classLoader.regexp() as typeof RegExp;
-        const [, source, options] = /^\/(.*)\/([mixn]*)$/s.exec(value)!;
+        const [, source, options] = /^\/(.*)\/([mixn]*)$/s.exec(o.value)!;
         return new klass(source, options.replace("x", "").replace("n", "").replace("m", "s"));
       }
       case "!ruby/range": {
         const klass = this.classLoader.range() as typeof Range;
-        const [begin, dots, end] = value.split(/([.]{2,3})/, 3);
-        const endpoint = (text: string): unknown => this.accept(yaml.parseDocument(text).contents);
-        return new klass(endpoint(begin), endpoint(end), dots === "...");
+        const args = o.value.split(/([.]{2,3})/, 3).map((s) => this.accept(new Scalar(s)));
+        args.push(args.splice(1, 1)[0] === "...");
+        return new klass(...(args as [unknown, unknown, boolean]));
       }
       default:
         if (/^!(?:str|ruby\/string)(?::(.*))?$/.test(o.tag) || o.tag === "tag:yaml.org,2002:str")
-          return value;
-        if (/^!ruby\/sym(bol)?:?(.*)?$/.test(o.tag)) return this.classLoader.symbolize(value);
-        return this.ss.tokenize(o.source);
+          return o.value;
+        if (/^!ruby\/sym(bol)?:?(.*)?$/.test(o.tag)) return this.classLoader.symbolize(o.value);
+        return this.ss.tokenize(o.value);
     }
   }
 
-  private visitMapping(o: YAMLMap): unknown {
+  /**
+   * `ToRuby#visit_Psych_Nodes_Mapping` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/to_ruby.rb:178-317`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  visitPsychNodesMapping(o: Mapping): unknown {
     if (o.tag && this.loadTags[o.tag])
       return this.revive(this.resolveClass(this.loadTags[o.tag]), o);
     if (!o.tag) return this.reviveHash(this.register(o, new Hash<unknown, unknown>()), o);
@@ -200,7 +229,8 @@ export class ToRuby {
 
         const members: Record<string, unknown> = {};
         const structMembers = s.members().map((x) => this.classLoader.symbolize(x));
-        for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
+        for (let i = 0; i < o.children.length; i += 2) {
+          const [k, v] = [o.children[i], o.children[i + 1]];
           const member = this.accept(k) as string;
           const value = this.accept(v);
           if (structMembers.includes(this.classLoader.symbolize(member))) {
@@ -239,7 +269,8 @@ export class ToRuby {
     }
     if (o.tag === "!omap" || o.tag === "tag:yaml.org,2002:omap") {
       const map = this.register(o, new (this.classLoader.psychOmap() as typeof Omap)());
-      for (const { key: l, value: r } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
+      for (let i = 0; i < o.children.length; i += 2) {
+        const [l, r] = [o.children[i], o.children[i + 1]];
         map.set(this.accept(l), this.accept(r));
       }
       return map;
@@ -247,34 +278,35 @@ export class ToRuby {
     return this.reviveHash(this.register(o, new Hash<unknown, unknown>()), o);
   }
 
-  private register<T>(node: Node, object: T): T {
+  private register<T>(node: Node & { anchor?: string | null }, object: T): T {
     if (node.anchor) this.st.set(node.anchor, object);
     return object;
   }
 
-  private registerEmpty(o: YAMLSeq): unknown[] {
+  private registerEmpty(o: Sequence): unknown[] {
     const list = this.register(o, [] as unknown[]);
-    for (const c of o.items) list.push(this.accept(c as ParsedNode));
+    for (const c of o.children) list.push(this.accept(c));
     return list;
   }
 
   private reviveHash<H extends Map<unknown, unknown> | Record<string, unknown>>(
     hash: H,
-    o: YAMLMap,
+    o: Mapping,
     tagged = false,
   ): H {
     const aset = (key: unknown, val: unknown) => {
       if (hash instanceof Map) hash.set(key, val);
       else hash[String(key)] = val;
     };
-    for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
+    for (let i = 0; i < o.children.length; i += 2) {
+      const [k, v] = [o.children[i], o.children[i + 1]];
       const key = this.accept(k);
       const val = this.accept(v);
       if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
-        if (yaml.isAlias(v) || yaml.isMap(v)) {
+        if (v instanceof Alias || v instanceof Mapping) {
           if (val instanceof Map) for (const [mk, mv] of val) aset(mk, mv);
           else aset(key, val);
-        } else if (yaml.isSeq(v)) {
+        } else if (v instanceof Sequence) {
           const values = val as unknown[];
           if (values.every((value) => value instanceof Map)) {
             const h = new Hash<unknown, unknown>();
@@ -295,7 +327,7 @@ export class ToRuby {
     return hash;
   }
 
-  private revive(klass: RubyClass, node: YAMLMap): object {
+  private revive(klass: RubyClass, node: Mapping): object {
     const s = this.register(node, allocate(klass));
     return this.initWith(
       s,
@@ -326,7 +358,9 @@ export class ToRuby {
  */
 export class NoAliasRuby extends ToRuby {
   /** @noRailsEquivalent PERMANENT */
-  override visitPsychNodesAlias(_o: PsychNode): unknown {
+  override visitPsychNodesAlias(_o: Alias): unknown {
     throw new AliasesNotEnabled();
   }
 }
+
+registerConstant("Psych::Visitors::ToRuby", ToRuby);
