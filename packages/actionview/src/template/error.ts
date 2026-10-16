@@ -198,7 +198,7 @@ export class MissingTemplate extends ActionViewError {
   }
 }
 
-export class TemplateError extends Error {
+export class TemplateError extends ActionViewError {
   static readonly SOURCE_CODE_RADIUS = 3;
 
   declare cause: Error;

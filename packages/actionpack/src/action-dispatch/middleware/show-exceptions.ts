@@ -1,6 +1,6 @@
 import { excBacktrace, rbFSend, stderr } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
+import { CONTENT_LENGTH, CONTENT_TYPE, bodyFromString } from "@blazetrails/rack";
 import type { BacktraceCleaner } from "@blazetrails/activesupport";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 import { Request } from "../http/request.js";
@@ -57,14 +57,13 @@ export class ShowExceptions {
       ) as Promise<RackResponse>);
       return response[1][X_CASCADE] === "pass" ? this.passResponse(status) : response;
     } catch (failsafeError) {
-      const error = failsafeError as Error;
       stderr.write(
-        `Error during failsafe response: ${error.message}\n  ${(excBacktrace(error) ?? []).join("\n  ")}\n`,
+        `Error during failsafe response: ${(failsafeError as Error).message}\n  ${excBacktrace(failsafeError as Error)!.join("\n  ")}\n`,
       );
 
       return [
         500,
-        { "content-type": "text/plain; charset=utf-8" },
+        { [CONTENT_TYPE]: "text/plain; charset=utf-8" },
         bodyFromString(
           "500 Internal Server Error\n" +
             "If you are the administrator of this website, then please read this web " +
@@ -96,7 +95,7 @@ export class ShowExceptions {
   private passResponse(status: number): RackResponse {
     return [
       status,
-      { "content-type": "text/html; charset=utf-8", "content-length": "0" },
+      { [CONTENT_TYPE]: "text/html; charset=utf-8", [CONTENT_LENGTH]: "0" },
       bodyFromString(""),
     ];
   }
