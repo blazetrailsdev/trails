@@ -278,10 +278,9 @@ describe("Psych.dump options", () => {
 });
 
 describe("Psych.dump canonical", () => {
-  it("raises NotImplementedError for the canonical emitter option", async () => {
+  it("writes the canonical form as libyaml does", async () => {
     const { Psych } = await import("./psych.js");
-    const { NotImplementedError } = await import("./not-implemented-error.js");
-    expect(() => Psych.dump({ a: 1 }, { canonical: true })).toThrow(NotImplementedError);
+    expect(Psych.dump({ a: 1 }, { canonical: true })).toBe('---\n{\n  ? "a"\n  : ! "1",\n}\n');
     expect(Psych.dump({ a: 1 }, { canonical: false })).toBe("---\na: 1\n");
   });
 });
@@ -448,6 +447,10 @@ describe("Psych.dump empty root collection and explicit keys", () => {
       '---\nk: "a a a a a a a a a\n  a a a a a a a a a a\n  a a a a a a a a a a\n  a a a a a a a a a a\n  a a a a a a a a a a\n  a "\n',
     );
     expect(Psych.dump({ a: { b: "x\ny" } })).toBe("---\na:\n  b: |-\n    x\n    y\n");
+    expect(Psych.dump({ a: [1, "b c"], k: {} }, { canonical: true })).toBe(
+      '---\n{\n  ? "a"\n  : [\n    ! "1",\n    "b c",\n  ],\n  ? "k"\n  : {},\n}\n',
+    );
+    expect(Psych.dump("x", { canonical: true })).toBe('---\n"x"\n');
   });
 });
 

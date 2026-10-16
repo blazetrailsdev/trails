@@ -1,4 +1,3 @@
-import { NotImplementedError } from "../not-implemented-error.js";
 import { RuntimeError } from "../runtime-error.js";
 import { registerConstant } from "../variable.js";
 import type { PsychIO } from "../psych-adapter.js";
@@ -145,7 +144,6 @@ export class Emitter {
 
   /** @noRailsEquivalent PERMANENT */
   startStream(_encoding: number): this {
-    if (this.canonical) throw new NotImplementedError("canonical");
     this.emit({ type: "STREAM_START" });
     return this;
   }
@@ -956,8 +954,7 @@ export class Emitter {
       } else {
         for (const byte of encoder.encode(c)) {
           this.put("%");
-          this.put(byte.toString(16).toUpperCase().padStart(2, "0")[0]);
-          this.put(byte.toString(16).toUpperCase().padStart(2, "0")[1]);
+          for (const digit of byte.toString(16).toUpperCase().padStart(2, "0")) this.put(digit);
         }
       }
     }
