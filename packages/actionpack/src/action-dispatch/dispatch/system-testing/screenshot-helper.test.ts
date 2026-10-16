@@ -16,7 +16,6 @@ import {
   incrementUnique,
   inlineBase64,
   supportsScreenshot,
-  type ScreenshotHelperHost,
 } from "../../system-testing/test-helpers/screenshot-helper.js";
 import type { BrowserType } from "playwright";
 import { requirePlaywright } from "../../system-testing/driver.js";
@@ -33,10 +32,10 @@ const { DrivenByRackTest, DrivenBySeleniumWithChrome } =
   await import("../../../test-helpers/driven-by.js");
 
 describe("ScreenshotHelperTest", () => {
-  let host: InstanceType<typeof DrivenBySeleniumWithChrome> & ScreenshotHelperHost;
+  let host: InstanceType<typeof DrivenBySeleniumWithChrome>;
 
   beforeEach(() => {
-    host = new DrivenBySeleniumWithChrome("x") as typeof host;
+    host = new DrivenBySeleniumWithChrome("x");
     host._screenshotCounter = undefined;
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT", "");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
@@ -87,7 +86,7 @@ describe("ScreenshotHelperTest", () => {
   });
 
   it("image name truncates names over 225 characters including counter", () => {
-    const longHost = new DrivenBySeleniumWithChrome("x".repeat(400)) as typeof host;
+    const longHost = new DrivenBySeleniumWithChrome("x".repeat(400));
     const name = imageName.call(longHost);
     expect(name.length).toBeLessThanOrEqual(225);
     expect(name).toMatch(/^0_x+$/);
@@ -98,7 +97,7 @@ describe("ScreenshotHelperTest", () => {
   });
 
   it("Non word characters are replaced with dashes in paths", () => {
-    const h = new DrivenBySeleniumWithChrome("x/y\\z?<br>-span") as typeof host;
+    const h = new DrivenBySeleniumWithChrome("x/y\\z?<br>-span");
     expect(imagePath.call(h)).toMatch(/tmp\/screenshots\/0_x-y-z-br-span\.png$/);
     expect(htmlPath.call(h)).toMatch(/tmp\/screenshots\/0_x-y-z-br-span\.html$/);
   });

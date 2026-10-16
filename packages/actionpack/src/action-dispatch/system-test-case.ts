@@ -48,6 +48,8 @@ export class SystemTestCase extends TestCase {
   declare _context?: BrowserContext;
   declare _page?: Page;
   /** @internal */
+  declare _screenshotCounter?: number;
+  /** @internal */
   declare private _urlHelpers?: object | null;
 
   static {
