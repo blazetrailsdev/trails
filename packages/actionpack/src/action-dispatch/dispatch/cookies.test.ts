@@ -614,7 +614,9 @@ describe("CookiesTest", () => {
     assertEqual(45, cookies.signed.get("user_id"));
   });
 
-  it.skip("wrapped signed cookie using json serializer", () => {});
+  it.skip("wrapped signed cookie using json serializer", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  });
 
   it("signed cookie using message pack serializer", async () => {
     tc.request.env["action_dispatch.cookies_serializer"] = ":message_pack";
@@ -684,7 +686,9 @@ describe("CookiesTest", () => {
     assertNil(tc.response.cookies["foo"]);
   });
 
-  it.skip("signed cookie using message pack serializer can migrate json dumped value to message pack", () => {});
+  it.skip("signed cookie using message pack serializer can migrate json dumped value to message pack", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  });
 
   it("encrypted cookie using marshal serializer", async () => {
     tc.request.env["action_dispatch.cookies_serializer"] = ":marshal";
@@ -695,7 +699,9 @@ describe("CookiesTest", () => {
     assertEqual("bar", cookies.encrypted.get("foo"));
   });
 
-  it.skip("wrapped encrypted cookie using json serializer", () => {});
+  it.skip("wrapped encrypted cookie using json serializer", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  });
 
   it("encrypted cookie using message pack serializer", async () => {
     tc.request.env["action_dispatch.cookies_serializer"] = ":message_pack";
@@ -780,7 +786,9 @@ describe("CookiesTest", () => {
     assertNil(tc.response.cookies["foo"]);
   });
 
-  it.skip("encrypted cookie using message pack serializer can migrate json dumped value to message pack", () => {});
+  it.skip("encrypted cookie using message pack serializer can migrate json dumped value to message pack", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  });
 
   it("cookie jar mutated by request persists on future requests", async () => {
     await tc.get("authenticate");
@@ -828,11 +836,17 @@ describe("CookiesTest", () => {
     assertEqual("bar", encryptor.decryptAndVerify(tc.response.cookies["foo"]!));
   });
 
-  it.skip("rotating signed cookies digest", () => {});
+  it.skip("rotating signed cookies digest", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  });
 
-  it.skip("legacy hmac aes cbc marshal mode falls back to authenticated encrypted cookie", () => {});
+  it.skip("legacy hmac aes cbc marshal mode falls back to authenticated encrypted cookie", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  });
 
-  it.skip("legacy hmac aes cbc json mode falls back to authenticated encrypted cookie", () => {});
+  it.skip("legacy hmac aes cbc json mode falls back to authenticated encrypted cookie", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  });
 
   it.skip("encrypted cookie rotating secret", async () => {
     // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
@@ -869,9 +883,13 @@ describe("CookiesTest", () => {
     assertEqual(45, encryptor.decryptAndVerify(tc.response.cookies["foo"]!));
   });
 
-  it.skip("legacy hmac aes cbc encrypted marshal cookie is upgraded to authenticated encrypted cookie", () => {});
+  it.skip("legacy hmac aes cbc encrypted marshal cookie is upgraded to authenticated encrypted cookie", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  });
 
-  it.skip("legacy hmac aes cbc encrypted json cookie is upgraded to authenticated encrypted cookie", () => {});
+  it.skip("legacy hmac aes cbc encrypted json cookie is upgraded to authenticated encrypted cookie", () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  });
 
   it.skip("legacy hmac aes cbc encrypted cookie using 64 byte key is upgraded to authenticated encrypted cookie", async () => {
     // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
