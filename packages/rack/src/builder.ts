@@ -91,7 +91,7 @@ export class Builder {
     if (app && block) {
       throw new ArgumentError("Both app and block given!");
     }
-    this._run = block || (app !== null && typeof app === "object" ? (env) => app.call(env) : app);
+    this._run = (app !== null && typeof app === "object" ? (env) => app.call(env) : app) || block!;
     return this;
   }
 

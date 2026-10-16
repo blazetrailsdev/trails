@@ -113,6 +113,13 @@ describe("NumericalityValidator (trails-only)", () => {
     expect(errs.where("age", ":not_a_number")).toHaveLength(1);
   });
 
+  it("rounds to the scale passed as a keyword argument", () => {
+    const v = new NumericalityValidator({ attributes: ["age"], lessThan: 2 });
+    const errs = new Errors(new Person());
+    v.validateEach({ errors: errs }, "age", 1.996, { precision: 15, scale: 2 });
+    expect(errs.where("age", ":less_than")).toHaveLength(1);
+  });
+
   it("validates against the raw before-type-cast value (prepareValueForValidation)", () => {
     class MockRecord {
       errors = { add: vi.fn() };

@@ -11,7 +11,7 @@ export class NumericalityValidator extends BaseNumericalityValidator {
   ): void {
     precision = Math.min(columnPrecisionFor(record, attribute) ?? FLOAT_DIG, FLOAT_DIG);
     scale = columnScaleFor(record, attribute) ?? null;
-    super.validateEach(record, attribute, value, { precision: precision, scale: scale });
+    super.validateEach(record, attribute, value, { precision, scale });
   }
 }
 
