@@ -313,6 +313,10 @@ export class YAMLTree {
   }
 
   private visitArray(o: unknown[]): Node {
+    return this.visitEnumerator(o);
+  }
+
+  private visitEnumerator(o: unknown[]): Node {
     this.register(o, this.emitter.startSequence(null, null, true, Sequence.BLOCK));
     for (const c of o) this.accept(c);
     return this.emitter.endSequence();
