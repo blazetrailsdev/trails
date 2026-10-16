@@ -73,11 +73,11 @@ export class CookieStore extends AbstractSecureStore {
     super(app, options);
   }
 
-  deleteSession(
+  async deleteSession(
     req: any,
     _sessionId: unknown,
     options: Record<string, unknown>,
-  ): RackSessionId | null {
+  ): Promise<RackSessionId | null> {
     const newSid = options["drop"] ? null : this.generateSid();
     req.setHeader(
       "action_dispatch.request.unsigned_session_cookie",
@@ -130,12 +130,12 @@ export class CookieStore extends AbstractSecureStore {
   }
 
   /** @internal */
-  writeSession(
+  async writeSession(
     _req: CookieStoreRequest | PersistedRequest,
     sid: RackSessionId,
     sessionData: Record<string, unknown>,
     _options?: Record<string, unknown>,
-  ): SessionId {
+  ): Promise<SessionId> {
     sessionData["session_id"] = sid.publicId;
     return new SessionId(sid, sessionData);
   }

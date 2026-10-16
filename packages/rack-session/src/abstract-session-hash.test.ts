@@ -9,7 +9,7 @@ describe("Rack::Session::Abstract::SessionHash", () => {
   let hash: SessionHash;
   let klass: typeof SessionHash;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     const store = {
       loadSession: () => ["id", { foo: ":bar", baz: ":qux", x: { y: 1 } }],
       sessionExists: () => true,
@@ -18,18 +18,18 @@ describe("Rack::Session::Abstract::SessionHash", () => {
     hash = new klass(store, null as unknown as PersistedRequest);
   });
 
-  it(".find finds entry in request", () => {
+  it(".find finds entry in request", async () => {
     const req = new Request({ "rack.session": {} }) as unknown as PersistedRequest;
     expect(klass.find(req)).toEqual({});
   });
 
-  it(".set sets session in request", () => {
+  it(".set sets session in request", async () => {
     const req = new Request({});
     klass.set(req as unknown as PersistedRequest, {});
     expect(req.env["rack.session"]).toEqual({});
   });
 
-  it(".set_options sets session options in request", () => {
+  it(".set_options sets session options in request", async () => {
     const req = new Request({});
     const h = {};
     klass.setOptions(req as unknown as PersistedRequest, h);
@@ -38,15 +38,15 @@ describe("Rack::Session::Abstract::SessionHash", () => {
     expect(opts).not.toBe(h);
   });
 
-  it("#keys returns keys", () => {
+  it("#keys returns keys", async () => {
     expect(hash.keys()).toEqual(["foo", "baz", "x"]);
   });
 
-  it("#values returns values", () => {
+  it("#values returns values", async () => {
     expect(hash.values()).toEqual([":bar", ":qux", { y: 1 }]);
   });
 
-  it("#dig operates like Hash#dig", () => {
+  it("#dig operates like Hash#dig", async () => {
     expect(hash.dig("x")).toEqual({ y: 1 });
     expect(hash.dig("x", "y")).toBe(1);
     expect(hash.dig("z")).toBeUndefined();
@@ -55,7 +55,7 @@ describe("Rack::Session::Abstract::SessionHash", () => {
     expect(() => (hash.dig as () => unknown)()).toThrow(ArgumentError);
   });
 
-  it("#each iterates over entries", () => {
+  it("#each iterates over entries", async () => {
     const a: [string, unknown][] = [];
     hash.each((k, v) => {
       a.push([k, v]);
@@ -67,37 +67,37 @@ describe("Rack::Session::Abstract::SessionHash", () => {
     ]);
   });
 
-  it("#has_key returns whether the key is in the hash", () => {
+  it("#has_key returns whether the key is in the hash", async () => {
     expect(hash.hasKey("foo")).toBe(true);
     expect(hash.hasKey("food")).toBe(false);
     expect(hash.isKey("foo")).toBe(true);
     expect(hash.isInclude("food")).toBe(false);
   });
 
-  it("#replace replaces hash", () => {
+  it("#replace replaces hash", async () => {
     hash.replace({ bar: "foo" });
     expect(hash.get("bar")).toBe("foo");
   });
 
   describe("#fetch", () => {
-    it("returns value for a matching key", () => {
+    it("returns value for a matching key", async () => {
       expect(hash.fetch("foo")).toBe(":bar");
     });
 
-    it("works with a default value", () => {
+    it("works with a default value", async () => {
       expect(hash.fetch("unknown", ":default")).toBe(":default");
     });
 
-    it("works with a block", () => {
+    it("works with a block", async () => {
       expect(hash.fetch("unknown", undefined, () => ":default")).toBe(":default");
     });
 
-    it("it raises when fetching unknown keys without defaults", () => {
+    it("it raises when fetching unknown keys without defaults", async () => {
       expect(() => hash.fetch("unknown")).toThrow('key not found: "unknown"');
     });
   });
 
-  it("#stringify_keys returns hash or session hash with keys stringified", () => {
+  it("#stringify_keys returns hash or session hash with keys stringified", async () => {
     expect(hash.stringifyKeys(hash)).toEqual({ foo: ":bar", baz: ":qux", x: { y: 1 } });
   });
 });

@@ -13,17 +13,17 @@ export interface CacheInstrumentationBehaviorHost {
 export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorHost): void {
   let cache: Store;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     cache = host.lookupStore();
   });
 
-  function withInstrumentation(method: string, block: () => void): Event[] {
+  async function withInstrumentation(method: string, block: () => unknown): Promise<Event[]> {
     const eventName = `cache_${method}.active_support`;
 
     const events: Event[] = [];
     try {
       Notifications.subscribe(eventName, (event) => events.push(event));
-      block();
+      await block();
       return events;
     } finally {
       Notifications.unsubscribe(eventName);
@@ -36,15 +36,15 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     ).normalizeKey(key, options);
   }
 
-  it("write multi instrumentation", () => {
+  it("write multi instrumentation", async () => {
     const key1 = crypto.randomUUID();
     const key2 = crypto.randomUUID();
     const value1 = crypto.randomUUID();
     const value2 = crypto.randomUUID();
     const writes = { [key1]: value1, [key2]: value2 };
 
-    const events = withInstrumentation("write_multi", () => {
-      cache.writeMulti(writes);
+    const events = await withInstrumentation("write_multi", async () => {
+      await cache.writeMulti(writes);
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_write_multi.active_support"]);
@@ -55,14 +55,14 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
   });
 
-  it("instrumentation with fetch multi as super operation", () => {
+  it("instrumentation with fetch multi as super operation", async () => {
     const key1 = crypto.randomUUID();
-    cache.write(key1, crypto.randomUUID());
+    await cache.write(key1, crypto.randomUUID());
 
     const key2 = crypto.randomUUID();
 
-    const events = withInstrumentation("read_multi", () => {
-      cache.fetchMulti(key2, key1, (key) => `${key}${key}`);
+    const events = await withInstrumentation("read_multi", async () => {
+      await cache.fetchMulti(key2, key1, (key) => `${key}${key}`);
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_read_multi.active_support"]);
@@ -72,7 +72,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
-  it("fetch multi instrumentation order of operations", () => {
+  it("fetch multi instrumentation order of operations", async () => {
     const operations: string[] = [];
     const callback = (event: Event): void => {
       operations.push(event.name);
@@ -86,7 +86,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
       callback,
     );
     try {
-      cache.fetchMulti(key1, key2, (key) => `${key}${key}`);
+      await cache.fetchMulti(key1, key2, (key) => `${key}${key}`);
     } finally {
       Notifications.unsubscribe(subscription);
     }
@@ -97,14 +97,14 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     ]);
   });
 
-  it("read multi instrumentation", () => {
+  it("read multi instrumentation", async () => {
     const key1 = crypto.randomUUID();
-    cache.write(key1, crypto.randomUUID());
+    await cache.write(key1, crypto.randomUUID());
 
     const key2 = crypto.randomUUID();
 
-    const events = withInstrumentation("read_multi", () => {
-      cache.readMulti(key2, key1);
+    const events = await withInstrumentation("read_multi", async () => {
+      await cache.readMulti(key2, key1);
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_read_multi.active_support"]);
@@ -113,12 +113,12 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
-  it("read instrumentation", () => {
+  it("read instrumentation", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, crypto.randomUUID());
+    await cache.write(key, crypto.randomUUID());
 
-    const events = withInstrumentation("read", () => {
-      cache.read(key);
+    const events = await withInstrumentation("read", async () => {
+      await cache.read(key);
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_read.active_support"]);
@@ -127,11 +127,11 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
-  it("write instrumentation", () => {
+  it("write instrumentation", async () => {
     const key = crypto.randomUUID();
 
-    const events = withInstrumentation("write", () => {
-      cache.write(key, crypto.randomUUID());
+    const events = await withInstrumentation("write", async () => {
+      await cache.write(key, crypto.randomUUID());
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_write.active_support"]);
@@ -139,12 +139,12 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
-  it("delete instrumentation", () => {
+  it("delete instrumentation", async () => {
     const key = crypto.randomUUID();
 
     const options = { namespace: "foo" };
-    const events = withInstrumentation("delete", () => {
-      cache.delete(key, options);
+    const events = await withInstrumentation("delete", async () => {
+      await cache.delete(key, options);
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_delete.active_support"]);
@@ -153,13 +153,13 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     expect(events[0].payload.namespace).toBe("foo");
   });
 
-  it("delete multi instrumentation", () => {
+  it("delete multi instrumentation", async () => {
     const key1 = crypto.randomUUID();
     const key2 = crypto.randomUUID();
 
     const options = { namespace: "foo" };
-    const events = withInstrumentation("delete_multi", () => {
-      cache.deleteMulti([key2, key1], options);
+    const events = await withInstrumentation("delete_multi", async () => {
+      await cache.deleteMulti([key2, key1], options);
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_delete_multi.active_support"]);
@@ -170,12 +170,12 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
-  it("increment instrumentation", () => {
+  it("increment instrumentation", async () => {
     const key1 = crypto.randomUUID();
-    cache.write(key1, 0);
+    await cache.write(key1, 0);
 
-    const events = withInstrumentation("increment", () => {
-      cache.increment(key1);
+    const events = await withInstrumentation("increment", async () => {
+      await cache.increment(key1);
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_increment.active_support"]);
@@ -183,12 +183,12 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
-  it("decrement instrumentation", () => {
+  it("decrement instrumentation", async () => {
     const key1 = crypto.randomUUID();
-    cache.write(key1, 0);
+    await cache.write(key1, 0);
 
-    const events = withInstrumentation("decrement", () => {
-      cache.decrement(key1);
+    const events = await withInstrumentation("decrement", async () => {
+      await cache.decrement(key1);
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_decrement.active_support"]);

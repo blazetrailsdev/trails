@@ -13,12 +13,12 @@ import type { Event } from "../../notifications/instrumenter.js";
 import { Notifications } from "../../notifications.js";
 import { assert, assertNot, assertSame, assertNil } from "../../testing/assertions.js";
 
-function withInstrumentation(operation: string, block: () => void): Event[] {
+async function withInstrumentation(operation: string, block: () => unknown): Promise<Event[]> {
   const eventName = `cache_${operation}.active_support`;
   const events: Event[] = [];
   try {
     Notifications.subscribe(eventName, (event: Event) => events.push(event));
-    block();
+    await block();
     return events;
   } finally {
     Notifications.unsubscribe(eventName);
@@ -38,37 +38,37 @@ function cachedSizeOf(key: string, value: string): number {
 describe("MemoryStoreTest", () => {
   let store: MemoryStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     store = new MemoryStore({ expiresIn: 60 });
   });
 
   it("increment preserves expiry", async () => {
     const cache = new MemoryStore();
-    cache.write("counter", 1, { raw: true, expiresIn: 0.05 });
-    expect(cache.read("counter", { raw: true })).toEqual(1);
+    await cache.write("counter", 1, { raw: true, expiresIn: 0.05 });
+    expect(await cache.read("counter", { raw: true })).toEqual(1);
 
     await sleep(60);
-    assertNil(cache.read("counter", { raw: true }));
+    assertNil(await cache.read("counter", { raw: true }));
 
-    cache.write("counter", 1, { raw: true, expiresIn: 0.05 });
-    cache.increment("counter");
-    expect(cache.read("counter", { raw: true })).toEqual(2);
+    await cache.write("counter", 1, { raw: true, expiresIn: 0.05 });
+    await cache.increment("counter");
+    expect(await cache.read("counter", { raw: true })).toEqual(2);
     await sleep(60);
-    assertNil(cache.read("counter", { raw: true }));
+    assertNil(await cache.read("counter", { raw: true }));
 
-    cache.write("counter", 1, { raw: true });
-    cache.increment("counter", 1, { expiresIn: 0.05 });
-    expect(cache.read("counter", { raw: true })).toEqual(2);
+    await cache.write("counter", 1, { raw: true });
+    await cache.increment("counter", 1, { expiresIn: 0.05 });
+    expect(await cache.read("counter", { raw: true })).toEqual(2);
     await sleep(60);
-    assertNil(cache.read("counter2", { raw: true }));
+    assertNil(await cache.read("counter2", { raw: true }));
   });
 
-  it("cleanup instrumentation", () => {
+  it("cleanup instrumentation", async () => {
     const size = 3;
-    for (let i = 0; i < size; i++) store.write(String(i), i);
+    for (let i = 0; i < size; i++) await store.write(String(i), i);
 
-    const events = withInstrumentation("cleanup", () => {
-      store.cleanup();
+    const events = await withInstrumentation("cleanup", async () => {
+      await store.cleanup();
     });
 
     expect(events.map((event) => event.name)).toEqual(["cache_cleanup.active_support"]);
@@ -76,34 +76,34 @@ describe("MemoryStoreTest", () => {
     expect(events[0].payload.store).toEqual(store.constructor.name);
   });
 
-  it("nil coder bypasses mutation safeguard", () => {
+  it("nil coder bypasses mutation safeguard", async () => {
     const cache = new MemoryStore({ coder: null });
     const value = {};
-    cache.write("key", value);
+    await cache.write("key", value);
 
-    assertSame(value, cache.read("key"));
+    assertSame(value, await cache.read("key"));
   });
 
-  it("namespaced write with unless exist", () => {
+  it("namespaced write with unless exist", async () => {
     const namespacedCache = new MemoryStore({ expiresIn: 60, namespace: "foo" });
 
-    expect(namespacedCache.write("1", "aaaaaaaaaa")).toEqual(true);
-    expect(namespacedCache.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
-    namespacedCache.write("1", null);
-    expect(namespacedCache.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
+    expect(await namespacedCache.write("1", "aaaaaaaaaa")).toEqual(true);
+    expect(await namespacedCache.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
+    await namespacedCache.write("1", null);
+    expect(await namespacedCache.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
   });
 
   it("write expired value with unless exist", async () => {
-    expect(store.write("1", "aaaa", { expiresIn: 0.05 })).toEqual(true);
+    expect(await store.write("1", "aaaa", { expiresIn: 0.05 })).toEqual(true);
     await sleep(60);
-    expect(store.write("1", "bbbb", { expiresIn: 0.05, unlessExist: true })).toEqual(true);
+    expect(await store.write("1", "bbbb", { expiresIn: 0.05, unlessExist: true })).toEqual(true);
   });
 
-  it("write with unless exist", () => {
-    expect(store.write("1", "aaaaaaaaaa")).toEqual(true);
-    expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
-    store.write("1", null);
-    expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
+  it("write with unless exist", async () => {
+    expect(await store.write("1", "aaaaaaaaaa")).toEqual(true);
+    expect(await store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
+    await store.write("1", null);
+    expect(await store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
   });
 
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
@@ -134,58 +134,58 @@ describe("MemoryStoreTest", () => {
 describe("MemoryStore increment/decrement amount coercion", () => {
   let cache: MemoryStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     cache = new MemoryStore();
   });
 
-  it("increment raises on a non-integer amount when seeding a missing key", () => {
-    expect(() => cache.increment("foo", NaN)).toThrow();
-    expect(() => cache.increment("foo", Infinity)).toThrow();
-    expect(cache.read("foo")).toBeNull();
+  it("increment raises on a non-integer amount when seeding a missing key", async () => {
+    await expect(cache.increment("foo", NaN)).rejects.toThrow();
+    await expect(cache.increment("foo", Infinity)).rejects.toThrow();
+    expect(await cache.read("foo")).toBeNull();
   });
 
-  it("decrement raises on a non-integer amount when seeding a missing key", () => {
-    expect(() => cache.decrement("foo", NaN)).toThrow();
-    expect(() => cache.decrement("foo", Infinity)).toThrow();
-    expect(cache.read("foo")).toBeNull();
+  it("decrement raises on a non-integer amount when seeding a missing key", async () => {
+    await expect(cache.decrement("foo", NaN)).rejects.toThrow();
+    await expect(cache.decrement("foo", Infinity)).rejects.toThrow();
+    expect(await cache.read("foo")).toBeNull();
   });
 
-  it("increment seeds with the integer amount but returns the raw amount", () => {
-    expect(cache.increment("frac", 1.5)).toBe(1.5);
-    expect(Number(cache.read("frac"))).toBe(1);
+  it("increment seeds with the integer amount but returns the raw amount", async () => {
+    expect(await cache.increment("frac", 1.5)).toBe(1.5);
+    expect(Number(await cache.read("frac"))).toBe(1);
   });
 
-  it("increment adds the raw amount on the hit path", () => {
-    cache.write("frac", 1, { raw: true });
-    expect(cache.increment("frac", 2.5)).toBe(3.5);
+  it("increment adds the raw amount on the hit path", async () => {
+    await cache.write("frac", 1, { raw: true });
+    expect(await cache.increment("frac", 2.5)).toBe(3.5);
   });
 });
 
 describe("MemoryStore delete_matched namespacing", () => {
-  it("scopes delete_matched to the configured namespace", () => {
+  it("scopes delete_matched to the configured namespace", async () => {
     const cache = new MemoryStore({ namespace: "ns" });
-    cache.write("foo", "bar");
-    cache.write("fu", "baz");
-    cache.deleteMatched(/oo/);
-    expect(cache.exist("foo")).toBe(false);
-    expect(cache.exist("fu")).toBe(true);
+    await cache.write("foo", "bar");
+    await cache.write("fu", "baz");
+    await cache.deleteMatched(/oo/);
+    expect(await cache.exist("foo")).toBe(false);
+    expect(await cache.exist("fu")).toBe(true);
   });
 });
 
 describe("MemoryStore increment instrumentation", () => {
   it("instruments with the raw, unnormalized name under a namespace", async () => {
     const store = new MemoryStore({ namespace: "ns" });
-    store.write("counter", 0);
+    await store.write("counter", 0);
     const events: Event[] = [];
     await Notifications.subscribed(
       (event: Event) => events.push(event),
       "cache_increment.active_support",
-      () => {
-        store.increment("counter");
+      async () => {
+        await store.increment("counter");
       },
     );
     expect(events[0].payload.key).toBe("counter");
-    expect(store.read("counter")).toBe(1);
+    expect(await store.read("counter")).toBe(1);
   });
 });
 
@@ -193,64 +193,64 @@ describe("MemoryStorePruningTest", () => {
   let recordSize: number;
   let store: MemoryStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     recordSize = cachedSizeOf("1", "aaaaaaaaaa");
     store = new MemoryStore({ expiresIn: 60, size: recordSize * 10 + 1 });
   });
 
-  it("prune size", () => {
-    store.write("1", "aaaaaaaaaa");
-    store.write("2", "bbbbbbbbbb");
-    store.write("3", "cccccccccc");
-    store.write("4", "dddddddddd");
-    store.write("5", "eeeeeeeeee");
-    store.read("2");
-    store.read("4");
-    store.prune(recordSize * 3);
-    assert(store.exist("5"));
-    assert(store.exist("4"));
-    assertNot(store.exist("3"), "no entry");
-    assert(store.exist("2"));
-    assertNot(store.exist("1"), "no entry");
+  it("prune size", async () => {
+    await store.write("1", "aaaaaaaaaa");
+    await store.write("2", "bbbbbbbbbb");
+    await store.write("3", "cccccccccc");
+    await store.write("4", "dddddddddd");
+    await store.write("5", "eeeeeeeeee");
+    await store.read("2");
+    await store.read("4");
+    await store.prune(recordSize * 3);
+    assert(await store.exist("5"));
+    assert(await store.exist("4"));
+    assertNot(await store.exist("3"), "no entry");
+    assert(await store.exist("2"));
+    assertNot(await store.exist("1"), "no entry");
   });
 
-  it("prune size on write", () => {
+  it("prune size on write", async () => {
     const values = "abcdefghij";
-    for (let i = 1; i <= 10; i++) store.write(String(i), values[i - 1].repeat(10));
-    store.read("2");
-    store.read("4");
-    store.write("11", "llllllllll");
-    assert(store.exist("11"));
-    assert(store.exist("10"));
-    assert(store.exist("9"));
-    assert(store.exist("8"));
-    assert(store.exist("7"));
-    assertNot(store.exist("6"), "no entry");
-    assertNot(store.exist("5"), "no entry");
-    assert(store.exist("4"));
-    assertNot(store.exist("3"), "no entry");
-    assert(store.exist("2"));
-    assertNot(store.exist("1"), "no entry");
+    for (let i = 1; i <= 10; i++) await store.write(String(i), values[i - 1].repeat(10));
+    await store.read("2");
+    await store.read("4");
+    await store.write("11", "llllllllll");
+    assert(await store.exist("11"));
+    assert(await store.exist("10"));
+    assert(await store.exist("9"));
+    assert(await store.exist("8"));
+    assert(await store.exist("7"));
+    assertNot(await store.exist("6"), "no entry");
+    assertNot(await store.exist("5"), "no entry");
+    assert(await store.exist("4"));
+    assertNot(await store.exist("3"), "no entry");
+    assert(await store.exist("2"));
+    assertNot(await store.exist("1"), "no entry");
   });
 
-  it("prune size on write based on key length", () => {
+  it("prune size on write based on key length", async () => {
     const values = "abcdefghi";
-    for (let i = 1; i <= 9; i++) store.write(String(i), values[i - 1].repeat(10));
+    for (let i = 1; i <= 9; i++) await store.write(String(i), values[i - 1].repeat(10));
     const longKey = "*".repeat(2 * recordSize);
-    store.write(longKey, "llllllllll");
-    assert(store.exist(longKey));
-    assert(store.exist("9"));
-    assert(store.exist("8"));
-    assert(store.exist("7"));
-    assert(store.exist("6"));
-    assertNot(store.exist("5"), "no entry");
-    assertNot(store.exist("4"), "no entry");
-    assertNot(store.exist("3"), "no entry");
-    assertNot(store.exist("2"), "no entry");
-    assertNot(store.exist("1"), "no entry");
+    await store.write(longKey, "llllllllll");
+    assert(await store.exist(longKey));
+    assert(await store.exist("9"));
+    assert(await store.exist("8"));
+    assert(await store.exist("7"));
+    assert(await store.exist("6"));
+    assertNot(await store.exist("5"), "no entry");
+    assertNot(await store.exist("4"), "no entry");
+    assertNot(await store.exist("3"), "no entry");
+    assertNot(await store.exist("2"), "no entry");
+    assertNot(await store.exist("1"), "no entry");
   });
 
-  it("pruning is capped at a max time", () => {
+  it("pruning is capped at a max time", async () => {
     const slow = store as unknown as { deleteEntry(key: string, options: object): boolean };
     const deleteEntry = slow.deleteEntry.bind(store);
     slow.deleteEntry = (key: string, options: object) => {
@@ -258,96 +258,96 @@ describe("MemoryStorePruningTest", () => {
       while (Date.now() < until) {}
       return deleteEntry(key, options);
     };
-    store.write("1", "aaaaaaaaaa");
-    store.write("2", "bbbbbbbbbb");
-    store.write("3", "cccccccccc");
-    store.write("4", "dddddddddd");
-    store.write("5", "eeeeeeeeee");
-    store.prune(30, 0.001);
-    assert(store.exist("5"));
-    assert(store.exist("4"));
-    assert(store.exist("3"));
-    assert(store.exist("2"));
-    assertNot(store.exist("1"), "no entry");
+    await store.write("1", "aaaaaaaaaa");
+    await store.write("2", "bbbbbbbbbb");
+    await store.write("3", "cccccccccc");
+    await store.write("4", "dddddddddd");
+    await store.write("5", "eeeeeeeeee");
+    await store.prune(30, 0.001);
+    assert(await store.exist("5"));
+    assert(await store.exist("4"));
+    assert(await store.exist("3"));
+    assert(await store.exist("2"));
+    assertNot(await store.exist("1"), "no entry");
   });
 
-  it("cache not mutated", () => {
+  it("cache not mutated", async () => {
     const item = { foo: "bar" };
-    store.write("test_key", item);
-    const read = store.read("test_key") as { foo: string };
+    await store.write("test_key", item);
+    const read = (await store.read("test_key")) as { foo: string };
     read.foo = "xyz";
-    expect((store.read("test_key") as { foo: string }).foo).toBe("bar");
+    expect(((await store.read("test_key")) as { foo: string }).foo).toBe("bar");
   });
 
-  it("cache different object ids hash", () => {
+  it("cache different object ids hash", async () => {
     const item = { foo: "bar" };
-    store.write("test_key", item);
-    const r1 = store.read("test_key");
-    const r2 = store.read("test_key");
+    await store.write("test_key", item);
+    const r1 = await store.read("test_key");
+    const r2 = await store.read("test_key");
     expect(r1).not.toBe(item);
     expect(r1).not.toBe(r2);
   });
 
-  it("cache different object ids string", () => {
+  it("cache different object ids string", async () => {
     const item = { toS: "my_string" };
-    store.write("test_key", item);
-    expect(store.read("test_key")).not.toBe(item);
-    expect(store.read("test_key")).not.toBe(store.read("test_key"));
+    await store.write("test_key", item);
+    expect(await store.read("test_key")).not.toBe(item);
+    expect(await store.read("test_key")).not.toBe(await store.read("test_key"));
   });
 });
 
 describe("CacheStoreRaceConditionTtlTest", () => {
   let store: MemoryStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     store = new MemoryStore();
   });
 
   it("fetch with race condition ttl", async () => {
-    store.write("foo", "bar", { expiresIn: 0.02 });
+    await store.write("foo", "bar", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 30));
-    const result = store.fetch("foo", { raceConditionTtl: 0.2 }, () => "new");
+    const result = await store.fetch("foo", { raceConditionTtl: 0.2 }, () => "new");
     expect(result).toBe("new");
-    expect(store.read("foo")).toBe("new");
+    expect(await store.read("foo")).toBe("new");
   });
 
   it("fetch with race condition ttl serves stale to concurrent readers", async () => {
-    store.write("foo", "stale", { expiresIn: 0.02 });
+    await store.write("foo", "stale", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 30));
     let seenDuringRegen: unknown;
-    store.fetch("foo", { raceConditionTtl: 0.5 }, () => {
-      seenDuringRegen = store.read("foo");
+    await store.fetch("foo", { raceConditionTtl: 0.5 }, async () => {
+      seenDuringRegen = await store.read("foo");
       return "fresh";
     });
     expect(seenDuringRegen).toBe("stale");
-    expect(store.read("foo")).toBe("fresh");
+    expect(await store.read("foo")).toBe("fresh");
   });
 
   it("fetch without race condition ttl deletes expired entry", async () => {
-    store.write("foo", "bar", { expiresIn: 0.02 });
+    await store.write("foo", "bar", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 30));
-    const result = store.fetch("foo", () => "new");
+    const result = await store.fetch("foo", () => "new");
     expect(result).toBe("new");
   });
 
   it("race condition ttl beyond window deletes expired entry", async () => {
-    store.write("foo", "bar", { expiresIn: 0.02 });
+    await store.write("foo", "bar", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 200));
-    const result = store.fetch("foo", { raceConditionTtl: 0.05 }, () => "regen");
+    const result = await store.fetch("foo", { raceConditionTtl: 0.05 }, () => "regen");
     expect(result).toBe("regen");
   });
 
   it("fetch_multi honors entry expiration", async () => {
-    store.write("foo", "old", { expiresIn: 0.02 });
+    await store.write("foo", "old", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 40));
-    const result = store.fetchMulti("foo", "bar", (key) => `${key}-generated`);
+    const result = await store.fetchMulti("foo", "bar", (key) => `${key}-generated`);
     expect(Object.fromEntries(result)).toEqual({ foo: "foo-generated", bar: "bar-generated" });
-    expect(store.read("foo")).toBe("foo-generated");
+    expect(await store.read("foo")).toBe("foo-generated");
   });
 
-  it("fetch_multi honors version mismatch", () => {
-    store.write("foo", "old", { version: "v1" });
-    const result = store.fetchMulti("foo", { version: "v2" }, (key) => `${key}-generated`);
+  it("fetch_multi honors version mismatch", async () => {
+    await store.write("foo", "old", { version: "v1" });
+    const result = await store.fetchMulti("foo", { version: "v2" }, (key) => `${key}-generated`);
     expect(Object.fromEntries(result)).toEqual({ foo: "foo-generated" });
   });
 });
@@ -355,49 +355,49 @@ describe("CacheStoreRaceConditionTtlTest", () => {
 describe("MemoryStore coder fidelity", () => {
   let store: MemoryStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     store = new MemoryStore();
   });
 
-  it("round-trips Date values", () => {
+  it("round-trips Date values", async () => {
     const date = new Date("2026-06-19T14:36:26.123Z");
-    store.write("d", date);
-    const result = store.read("d");
+    await store.write("d", date);
+    const result = await store.read("d");
     expect(result).toBeInstanceOf(Date);
     expect((result as Date).getTime()).toBe(date.getTime());
   });
 
-  it("round-trips undefined distinct from null", () => {
-    store.write("u", undefined);
-    expect(store.read("u")).toBeUndefined();
-    store.write("n", null);
-    expect(store.read("n")).toBeNull();
+  it("round-trips undefined distinct from null", async () => {
+    await store.write("u", undefined);
+    expect(await store.read("u")).toBeUndefined();
+    await store.write("n", null);
+    expect(await store.read("n")).toBeNull();
   });
 
-  it("round-trips bigint values", () => {
-    store.write("b", 9007199254740993n);
-    expect(store.read("b")).toBe(9007199254740993n);
+  it("round-trips bigint values", async () => {
+    await store.write("b", 9007199254740993n);
+    expect(await store.read("b")).toBe(9007199254740993n);
   });
 
-  it("round-trips non-finite numbers", () => {
-    store.write("nan", NaN);
-    expect(store.read("nan")).toBeNaN();
-    store.write("inf", Infinity);
-    expect(store.read("inf")).toBe(Infinity);
+  it("round-trips non-finite numbers", async () => {
+    await store.write("nan", NaN);
+    expect(await store.read("nan")).toBeNaN();
+    await store.write("inf", Infinity);
+    expect(await store.read("inf")).toBe(Infinity);
   });
 
-  it("deep-clone isolates stored value from later mutation", () => {
+  it("deep-clone isolates stored value from later mutation", async () => {
     const obj = { nested: { count: 1 } };
-    store.write("obj", obj);
+    await store.write("obj", obj);
     obj.nested.count = 99;
-    const result = store.read("obj") as typeof obj;
+    const result = (await store.read("obj")) as typeof obj;
     expect(result.nested.count).toBe(1);
   });
 
-  it("deep-clone isolates reads from each other", () => {
-    store.write("obj", { nested: { count: 1 } });
-    const r1 = store.read("obj") as { nested: { count: number } };
-    const r2 = store.read("obj") as { nested: { count: number } };
+  it("deep-clone isolates reads from each other", async () => {
+    await store.write("obj", { nested: { count: 1 } });
+    const r1 = (await store.read("obj")) as { nested: { count: number } };
+    const r2 = (await store.read("obj")) as { nested: { count: number } };
     expect(r1).not.toBe(r2);
     r1.nested.count = 42;
     expect(r2.nested.count).toBe(1);

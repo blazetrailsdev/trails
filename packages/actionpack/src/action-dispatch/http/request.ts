@@ -588,8 +588,8 @@ export class Request {
     return this._fallbackRequestParameters();
   }
 
-  resetSession(): void {
-    this.session.destroy();
+  async resetSession(): Promise<void> {
+    await this.session.destroy();
     this.resetCsrfToken();
     resetFlashSession.call(this as never);
   }

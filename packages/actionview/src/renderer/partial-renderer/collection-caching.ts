@@ -69,7 +69,7 @@ export function cacheCollectionRender(
       collection,
     );
 
-    const cachedPartials = collectionCache().readMulti(...keyedCollection.keys());
+    const cachedPartials = await collectionCache().readMulti(...keyedCollection.keys());
     instrumentationPayload["cache_hits"] = cachedPartials.size;
 
     const filtered = [...keyedCollection]
@@ -80,7 +80,7 @@ export function cacheCollectionRender(
       filtered.length === 0 ? [] : await block(collectionIterator.fromCollection(filtered));
 
     let index = 0;
-    const keyedPartials = fetchOrCachePartial.call(
+    const keyedPartials = await fetchOrCachePartial.call(
       this,
       cachedPartials,
       template,
@@ -134,13 +134,13 @@ export function expandedCacheKey(
 }
 
 /** @internal */
-export function fetchOrCachePartial(
+export async function fetchOrCachePartial(
   this: CollectionCachingHost,
   cachedPartials: Map<unknown, unknown>,
   template: RenderableTemplate,
   { orderBy }: { orderBy: unknown[][] },
   block: () => RenderedTemplate,
-): Hash<unknown[], RenderedTemplate> | Record<string, RenderedTemplate> {
+): Promise<Hash<unknown[], RenderedTemplate> | Record<string, RenderedTemplate>> {
   const entriesToWrite = new Hash<unknown[], unknown>();
 
   const keyedPartials = indexWith(orderBy, (cacheKey): RenderedTemplate => {
@@ -161,7 +161,7 @@ export function fetchOrCachePartial(
   });
 
   if (entriesToWrite.size !== 0) {
-    collectionCache().writeMulti(entriesToWrite);
+    await collectionCache().writeMulti(entriesToWrite);
   }
 
   return keyedPartials;

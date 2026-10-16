@@ -24,6 +24,25 @@ describe("AbstractStore", () => {
       }
     });
 
+    it("retries an async block once the class its rejection names resolves", async () => {
+      class LoadableAsync {}
+      registerConstant("StaleSessionCheckLoadableAsync", LoadableAsync);
+      let calls = 0;
+      try {
+        expect(
+          await StaleSessionCheck.staleSessionCheckBang(async () => {
+            calls += 1;
+            if (calls === 1) {
+              throw new ArgumentError("undefined class/module StaleSessionCheckLoadableAsync");
+            }
+            return calls;
+          }),
+        ).toBe(2);
+      } finally {
+        unregisterConstant("StaleSessionCheckLoadableAsync", LoadableAsync);
+      }
+    });
+
     it("re-raises an error that is not an ArgumentError, whatever its message", () => {
       const err = new Error("undefined class/module Acme::Missing");
       expect(() =>

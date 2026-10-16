@@ -8,16 +8,16 @@ export interface CacheDeleteMatchedBehaviorHost {
 }
 
 export function cacheDeleteMatchedBehavior(host: CacheDeleteMatchedBehaviorHost): void {
-  it("delete matched", () => {
+  it("delete matched", async () => {
     const cache = host.lookupStore();
-    cache.write("foo", "bar");
-    cache.write("fu", "baz");
-    cache.write("foo/bar", "baz");
-    cache.write("fu/baz", "bar");
-    cache.deleteMatched(/oo/);
-    assertNot(cache.exist("foo"));
-    assert(cache.exist("fu"));
-    assertNot(cache.exist("foo/bar"));
-    assert(cache.exist("fu/baz"));
+    await cache.write("foo", "bar");
+    await cache.write("fu", "baz");
+    await cache.write("foo/bar", "baz");
+    await cache.write("fu/baz", "bar");
+    await cache.deleteMatched(/oo/);
+    assertNot(await cache.exist("foo"));
+    assert(await cache.exist("fu"));
+    assertNot(await cache.exist("foo/bar"));
+    assert(await cache.exist("fu/baz"));
   });
 }

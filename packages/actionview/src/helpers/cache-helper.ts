@@ -22,8 +22,8 @@ export class UncacheableFragmentError extends Error {
 export interface CacheHelperController {
   performCaching?: boolean;
   urlFor(options: unknown): string;
-  readFragment(key: unknown, options?: unknown): unknown;
-  writeFragment(key: unknown, content: unknown, options?: unknown): unknown;
+  readFragment(key: unknown, options?: unknown): Promise<unknown>;
+  writeFragment(key: unknown, content: unknown, options?: unknown): Promise<unknown>;
 }
 
 export interface CacheHelperHost {
@@ -43,17 +43,17 @@ export interface CacheFragmentNameOptions {
   digestPath?: string | null;
 }
 
-export function cache(
+export async function cache(
   this: CacheHelperHost,
   name: unknown = {},
   options: Record<string, unknown> = {},
   block?: () => unknown,
-): null {
+): Promise<null> {
   if ("performCaching" in this.controller && this.controller.performCaching) {
-    CachingRegistry.trackCaching(() => {
+    await CachingRegistry.trackCaching(async () => {
       const nameOptions = slice(options, "skipDigest");
       this.safeConcat(
-        fragmentFor.call(this, this.cacheFragmentName(name, nameOptions), options, block),
+        await fragmentFor.call(this, this.cacheFragmentName(name, nameOptions), options, block),
       );
     });
   } else {
@@ -71,15 +71,15 @@ export function uncacheableBang(this: CacheHelperHost): void {
   if (isCaching.call(this)) throw new UncacheableFragmentError("can't be fragment cached");
 }
 
-export function cacheIf(
+export async function cacheIf(
   this: CacheHelperHost,
   condition: unknown,
   name: unknown = {},
   options: Record<string, unknown> = {},
   block?: () => unknown,
-): null {
+): Promise<null> {
   if (condition != null && condition !== false) {
-    cache.call(this, name, options, block);
+    await cache.call(this, name, options, block);
   } else {
     block?.();
   }
@@ -87,14 +87,20 @@ export function cacheIf(
   return null;
 }
 
-export function cacheUnless(
+export async function cacheUnless(
   this: CacheHelperHost,
   condition: unknown,
   name: unknown = {},
   options: Record<string, unknown> = {},
   block?: () => unknown,
-): null {
-  return cacheIf.call(this, !(condition != null && condition !== false), name, options, block);
+): Promise<null> {
+  return await cacheIf.call(
+    this,
+    !(condition != null && condition !== false),
+    name,
+    options,
+    block,
+  );
 }
 
 export function cacheFragmentName(
@@ -141,13 +147,13 @@ function fragmentNameWithDigest(
 }
 
 /** @internal */
-function fragmentFor(
+async function fragmentFor(
   this: CacheHelperHost,
   name: unknown = {},
   options?: Record<string, unknown> | null,
   block?: () => unknown,
-): unknown {
-  const content = readFragmentFor.call(this, name, options);
+): Promise<unknown> {
+  const content = await readFragmentFor.call(this, name, options);
   if (content != null && content !== false) {
     if (this.viewRenderer !== undefined)
       this.viewRenderer.cacheHits[this.currentTemplate?.virtualPath as string] = "hit";
@@ -155,30 +161,30 @@ function fragmentFor(
   } else {
     if (this.viewRenderer !== undefined)
       this.viewRenderer.cacheHits[this.currentTemplate?.virtualPath as string] = "miss";
-    return writeFragmentFor.call(this, name, options, block);
+    return await writeFragmentFor.call(this, name, options, block);
   }
 }
 
 /** @internal */
-function readFragmentFor(
+async function readFragmentFor(
   this: CacheHelperHost,
   name: unknown,
   options?: Record<string, unknown> | null,
-): unknown {
-  return this.controller.readFragment(name, options ?? undefined);
+): Promise<unknown> {
+  return await this.controller.readFragment(name, options ?? undefined);
 }
 
 /** @internal */
-function writeFragmentFor(
+async function writeFragmentFor(
   this: CacheHelperHost,
   name: unknown,
   options: Record<string, unknown> | null | undefined,
   block?: () => unknown,
-): unknown {
+): Promise<unknown> {
   const fragment: SafeBuffer = this.outputBuffer.capture(() => {
     block?.();
   });
-  return this.controller.writeFragment(name, fragment, options ?? undefined);
+  return await this.controller.writeFragment(name, fragment, options ?? undefined);
 }
 
 const ACTION_VIEW_CACHING = "action_view_caching";
@@ -191,12 +197,12 @@ export const CachingRegistry = {
       : IsolatedExecutionState.set(ACTION_VIEW_CACHING, false);
   },
 
-  trackCaching<T>(block: () => T): T {
+  async trackCaching<T>(block: () => T | Promise<T>): Promise<T> {
     const cachingWas = IsolatedExecutionState.get<boolean>(ACTION_VIEW_CACHING);
     IsolatedExecutionState.set(ACTION_VIEW_CACHING, true);
 
     try {
-      return block();
+      return await block();
     } finally {
       IsolatedExecutionState.set(ACTION_VIEW_CACHING, cachingWas);
     }

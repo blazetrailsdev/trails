@@ -779,7 +779,7 @@ export class TestSession extends SecureSessionHash {
     return Object.values(this.data);
   }
 
-  override destroy(): void {
+  override async destroy(): Promise<void> {
     this.clear();
   }
 

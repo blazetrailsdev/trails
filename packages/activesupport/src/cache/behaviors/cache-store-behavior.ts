@@ -18,53 +18,53 @@ export interface CacheStoreBehaviorHost {
 export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   let cache: Store;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     cache = host.lookupStore();
   });
 
-  it("should read and write strings", () => {
+  it("should read and write strings", async () => {
     const key = crypto.randomUUID();
-    expect(cache.write(key, "bar")).toBe(true);
-    expect(cache.read(key)).toBe("bar");
+    expect(await cache.write(key, "bar")).toBe(true);
+    expect(await cache.read(key)).toBe("bar");
   });
 
-  it("should overwrite", () => {
+  it("should overwrite", async () => {
     const key = crypto.randomUUID();
-    expect(cache.write(key, "bar")).toBe(true);
-    expect(cache.write(key, "baz")).toBe(true);
-    expect(cache.read(key)).toBe("baz");
+    expect(await cache.write(key, "bar")).toBe(true);
+    expect(await cache.write(key, "baz")).toBe(true);
+    expect(await cache.read(key)).toBe("baz");
   });
 
-  it("fetch without cache miss", () => {
+  it("fetch without cache miss", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, "bar");
+    await cache.write(key, "bar");
     const write = vi.spyOn(cache, "write");
     try {
-      expect(cache.fetch(key, () => "baz")).toBe("bar");
+      expect(await cache.fetch(key, () => "baz")).toBe("bar");
       expect(write).not.toHaveBeenCalled();
     } finally {
       write.mockRestore();
     }
   });
 
-  it("fetch with cache miss", () => {
+  it("fetch with cache miss", async () => {
     const key = crypto.randomUUID();
     const write = vi.spyOn(cache, "write");
     try {
-      expect(cache.fetch(key, () => "baz")).toBe("baz");
+      expect(await cache.fetch(key, () => "baz")).toBe("baz");
       expect(write).toHaveBeenCalledWith(key, "baz", cache.options);
     } finally {
       write.mockRestore();
     }
   });
 
-  it("fetch with forced cache miss", () => {
+  it("fetch with forced cache miss", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, "bar");
+    await cache.write(key, "bar");
     const read = vi.spyOn(cache, "read");
     const write = vi.spyOn(cache, "write");
     try {
-      cache.fetch(key, { force: true }, () => "bar");
+      await cache.fetch(key, { force: true }, () => "bar");
       expect(read).not.toHaveBeenCalled();
       expect(write).toHaveBeenCalledWith(key, "bar", { ...cache.options, force: true });
     } finally {
@@ -73,125 +73,127 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     }
   });
 
-  it("fetch with cached nil", () => {
+  it("fetch with cached nil", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, null);
+    await cache.write(key, null);
     const write = vi.spyOn(cache, "write");
     try {
-      assertNil(cache.fetch(key, () => "baz"));
+      assertNil(await cache.fetch(key, () => "baz"));
       expect(write).not.toHaveBeenCalled();
     } finally {
       write.mockRestore();
     }
   });
 
-  it("fetch cache miss with skip nil", () => {
+  it("fetch cache miss with skip nil", async () => {
     const key = crypto.randomUUID();
     const write = vi.spyOn(cache, "write");
     try {
-      assertNil(cache.fetch(key, { skipNil: true }, () => null));
-      expect(cache.exist("foo")).toBe(false);
+      assertNil(await cache.fetch(key, { skipNil: true }, () => null));
+      expect(await cache.exist("foo")).toBe(false);
       expect(write).not.toHaveBeenCalled();
     } finally {
       write.mockRestore();
     }
   });
 
-  it("fetch with forced cache miss with block", () => {
+  it("fetch with forced cache miss with block", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, "bar");
-    expect(cache.fetch(key, { force: true }, () => "foo_bar")).toBe("foo_bar");
+    await cache.write(key, "bar");
+    expect(await cache.fetch(key, { force: true }, () => "foo_bar")).toBe("foo_bar");
   });
 
-  it("fetch with forced cache miss without block", () => {
+  it("fetch with forced cache miss without block", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, "bar");
-    expect(() => cache.fetch(key, { force: true })).toThrow(ArgumentError);
-    expect(cache.read(key)).toBe("bar");
+    await cache.write(key, "bar");
+    await expect(cache.fetch(key, { force: true })).rejects.toThrow(ArgumentError);
+    expect(await cache.read(key)).toBe("bar");
   });
 
-  it("should read and write hash", () => {
+  it("should read and write hash", async () => {
     const key = crypto.randomUUID();
-    expect(cache.write(key, { a: "b" })).toBe(true);
-    expect(cache.read(key)).toEqual({ a: "b" });
+    expect(await cache.write(key, { a: "b" })).toBe(true);
+    expect(await cache.read(key)).toEqual({ a: "b" });
   });
 
-  it("should read and write integer", () => {
+  it("should read and write integer", async () => {
     const key = crypto.randomUUID();
-    expect(cache.write(key, 1)).toBe(true);
-    expect(cache.read(key)).toBe(1);
+    expect(await cache.write(key, 1)).toBe(true);
+    expect(await cache.read(key)).toBe(1);
   });
 
-  it("should read and write nil", () => {
+  it("should read and write nil", async () => {
     const key = crypto.randomUUID();
-    expect(cache.write(key, null)).toBe(true);
-    assertNil(cache.read(key));
+    expect(await cache.write(key, null)).toBe(true);
+    assertNil(await cache.read(key));
   });
 
-  it("should read and write false", () => {
+  it("should read and write false", async () => {
     const key = crypto.randomUUID();
-    expect(cache.write(key, false)).toBe(true);
-    expect(cache.read(key)).toBe(false);
+    expect(await cache.write(key, false)).toBe(true);
+    expect(await cache.read(key)).toBe(false);
   });
 
-  it("read multi", () => {
+  it("read multi", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, "bar");
+    await cache.write(key, "bar");
     const otherKey = crypto.randomUUID();
-    cache.write(otherKey, "baz");
-    cache.write(crypto.randomUUID(), "biz");
-    expect(Object.fromEntries(cache.readMulti(key, otherKey))).toEqual({
+    await cache.write(otherKey, "baz");
+    await cache.write(crypto.randomUUID(), "biz");
+    expect(Object.fromEntries(await cache.readMulti(key, otherKey))).toEqual({
       [key]: "bar",
       [otherKey]: "baz",
     });
   });
 
-  it("read multi empty list", () => {
-    expect(Object.fromEntries(cache.readMulti())).toEqual({});
+  it("read multi empty list", async () => {
+    expect(Object.fromEntries(await cache.readMulti())).toEqual({});
   });
 
-  it("write multi", () => {
+  it("write multi", async () => {
     const key = crypto.randomUUID();
-    cache.writeMulti({ [`${key}1`]: 1, [`${key}2`]: 2 });
-    expect(cache.read(`${key}1`)).toBe(1);
-    expect(cache.read(`${key}2`)).toBe(2);
+    await cache.writeMulti({ [`${key}1`]: 1, [`${key}2`]: 2 });
+    expect(await cache.read(`${key}1`)).toBe(1);
+    expect(await cache.read(`${key}2`)).toBe(2);
   });
 
-  it("fetch multi", () => {
+  it("fetch multi", async () => {
     const key = crypto.randomUUID();
     const otherKey = crypto.randomUUID();
     const thirdKey = crypto.randomUUID();
-    cache.write(key, "bar");
-    cache.write(otherKey, "biz");
+    await cache.write(key, "bar");
+    await cache.write(otherKey, "biz");
 
-    const values = cache.fetchMulti(key, otherKey, thirdKey, (value) => `${value}${value}`);
+    const values = await cache.fetchMulti(key, otherKey, thirdKey, (value) => `${value}${value}`);
 
     expect(Object.fromEntries(values)).toEqual({
       [key]: "bar",
       [otherKey]: "biz",
       [thirdKey]: thirdKey + thirdKey,
     });
-    expect(cache.read(thirdKey)).toBe(thirdKey + thirdKey);
+    expect(await cache.read(thirdKey)).toBe(thirdKey + thirdKey);
   });
 
-  it("fetch multi returns ordered names", () => {
+  it("fetch multi returns ordered names", async () => {
     const key = crypto.randomUUID().toLowerCase();
     const otherKey = crypto.randomUUID().toLowerCase();
     const thirdKey = crypto.randomUUID().toLowerCase();
-    cache.write(key, "BAM");
+    await cache.write(key, "BAM");
 
-    const values = cache.fetchMulti(otherKey, thirdKey, key, (k) => (k as string).toUpperCase());
+    const values = await cache.fetchMulti(otherKey, thirdKey, key, (k) =>
+      (k as string).toUpperCase(),
+    );
 
     expect([...values.keys()]).toEqual([otherKey, thirdKey, key]);
     expect([...values.values()]).toEqual([otherKey.toUpperCase(), thirdKey.toUpperCase(), "BAM"]);
   });
 
-  it("fetch multi with forced cache miss", () => {
+  it("fetch multi with forced cache miss", async () => {
     const key = crypto.randomUUID();
     const otherKey = crypto.randomUUID();
-    cache.write(key, "bar");
+    await cache.write(key, "bar");
 
-    const values = cache.fetchMulti(key, otherKey, { force: true }, (value) =>
+    const values = await cache.fetchMulti(key, otherKey, { force: true }, (value) =>
       (value as string).concat(value as string),
     );
 
@@ -199,71 +201,71 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
       [key]: key + key,
       [otherKey]: otherKey + otherKey,
     });
-    expect(cache.read(key)).toEqual(key + key);
-    expect(cache.read(otherKey)).toEqual(otherKey + otherKey);
+    expect(await cache.read(key)).toEqual(key + key);
+    expect(await cache.read(otherKey)).toEqual(otherKey + otherKey);
   });
 
-  it("exist", () => {
+  it("exist", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, "bar");
-    expect(cache.exist(key)).toBe(true);
-    expect(cache.exist(crypto.randomUUID())).toBe(false);
+    await cache.write(key, "bar");
+    expect(await cache.exist(key)).toBe(true);
+    expect(await cache.exist(crypto.randomUUID())).toBe(false);
   });
 
-  it("nil exist", () => {
+  it("nil exist", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, null);
-    assert(cache.exist(key));
+    await cache.write(key, null);
+    assert(await cache.exist(key));
   });
 
-  it("delete", () => {
+  it("delete", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, "bar");
-    assert(cache.exist(key));
-    assertSame(true, cache.delete(key));
-    assertNot(cache.exist(key));
+    await cache.write(key, "bar");
+    assert(await cache.exist(key));
+    assertSame(true, await cache.delete(key));
+    assertNot(await cache.exist(key));
   });
 
-  it("delete returns false if not exist", () => {
+  it("delete returns false if not exist", async () => {
     const key = crypto.randomUUID();
-    assertSame(false, cache.delete(key));
+    assertSame(false, await cache.delete(key));
   });
 
-  it("delete multi", () => {
+  it("delete multi", async () => {
     const key = crypto.randomUUID();
-    cache.write(key, "bar");
-    assert(cache.exist(key));
+    await cache.write(key, "bar");
+    assert(await cache.exist(key));
     const otherKey = crypto.randomUUID();
-    cache.write(otherKey, "world");
-    assert(cache.exist(otherKey));
-    expect(cache.deleteMulti([key, crypto.randomUUID(), otherKey])).toEqual(2);
-    assertNot(cache.exist(key));
-    assertNot(cache.exist(otherKey));
+    await cache.write(otherKey, "world");
+    assert(await cache.exist(otherKey));
+    expect(await cache.deleteMulti([key, crypto.randomUUID(), otherKey])).toEqual(2);
+    assertNot(await cache.exist(key));
+    assertNot(await cache.exist(otherKey));
   });
 
-  it("delete multi empty list", () => {
-    expect(cache.deleteMulti([])).toBe(0);
+  it("delete multi empty list", async () => {
+    expect(await cache.deleteMulti([])).toBe(0);
   });
 
   it("invalid expiration time raises an error when raise on invalid cache expiration time is true", async () => {
     await withRaiseOnInvalidCacheExpirationTime(true, async () => {
       const key = crypto.randomUUID();
-      const error = await assertRaises([ArgumentError], {}, () => {
-        cache.write(key, "bar", { expiresIn: -60 });
+      const error = await assertRaises([ArgumentError], {}, async () => {
+        await cache.write(key, "bar", { expiresIn: -60 });
       });
       assertSame("Cache expiration time is invalid, cannot be negative: -60", error.message);
-      assertNil(cache.read(key));
+      assertNil(await cache.read(key));
     });
   });
 
   it("invalid expiration time reports and logs when raise on invalid cache expiration time is false", async () => {
     await withRaiseOnInvalidCacheExpirationTime(false, async () => {
       const errorMessage = "Cache expiration time is invalid, cannot be negative: -60";
-      const report = await assertErrorReported(ArgumentError, () => {
-        const logs = captureLogs(() => {
+      const report = await assertErrorReported(ArgumentError, async () => {
+        const logs = await captureLogs(async () => {
           const key = crypto.randomUUID();
-          cache.write(key, "bar", { expiresIn: -60 });
-          assertSame("bar", cache.read(key));
+          await cache.write(key, "bar", { expiresIn: -60 });
+          assertSame("bar", await cache.read(key));
         });
         assertIncludes(logs, `ArgumentError: ${errorMessage}`);
       });
@@ -282,7 +284,7 @@ function withRaiseOnInvalidCacheExpirationTime<T>(newValue: boolean, block: () =
   }
 }
 
-function captureLogs(block: () => void): string {
+async function captureLogs(block: () => unknown): Promise<string> {
   const oldLogger = CacheStore.logger;
   const log: string[] = [];
   CacheStore.logger = {
@@ -290,7 +292,7 @@ function captureLogs(block: () => void): string {
     error: (message) => log.push(message),
   };
   try {
-    block();
+    await block();
     return log.join("\n");
   } finally {
     CacheStore.logger = oldLogger;

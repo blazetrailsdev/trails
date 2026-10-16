@@ -14,7 +14,7 @@ const makeRequest = () =>
     REMOTE_ADDR: "1.2.3.4",
   });
 
-afterEach(() => {
+afterEach(async () => {
   Notifications.unsubscribeAll();
 });
 
@@ -40,7 +40,7 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
     await r2.dispatch("show", makeRequest(), new Response());
     expect(r2.status).toBe(429);
     expect(actionRan).toBe(1);
-    expect(store.read("rate-limit:limited:1.2.3.4")).toBe(2);
+    expect(await store.read("rate-limit:limited:1.2.3.4")).toBe(2);
   });
 
   it("instruments a rate_limit.action_controller event when the limit is exceeded", async () => {
@@ -106,7 +106,7 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
     DefaultStoreController.rateLimit({ to: 5, within: 60, store: undefined, name: undefined });
 
     await new DefaultStoreController().dispatch("show", makeRequest(), new Response());
-    expect(cacheStore.read("rate-limit:default_store:1.2.3.4")).toBe(1);
+    expect(await cacheStore.read("rate-limit:default_store:1.2.3.4")).toBe(1);
 
     class NullStoreController extends DefaultStoreController {}
     NullStoreController.rateLimit({ to: 5, within: 60, store: null as never });

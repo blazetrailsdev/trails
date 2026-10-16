@@ -10,14 +10,14 @@ const request = (env: Record<string, unknown> = {}): PersistedRequest =>
   new Request(env) as unknown as PersistedRequest;
 
 describe("Rack::Session::Abstract::ID", () => {
-  it("use securerandom", () => {
+  it("use securerandom", async () => {
     expect(ID.DEFAULT_OPTIONS["secureRandom"]).toBe(SecureRandom);
 
     const id = new ID(undefined);
     expect(id.sidSecure).toBe(SecureRandom);
   });
 
-  it("allow to use another securerandom provider", () => {
+  it("allow to use another securerandom provider", async () => {
     const secureRandom = class {
       hex(..._args: unknown[]): string {
         return "fake_hex";
@@ -31,19 +31,19 @@ describe("Rack::Session::Abstract::ID", () => {
     // PERMANENT-SKIP: Ruby's `self.inherited` hook fires when a subclass is defined; JS has no such hook
   });
 
-  it("#find_session should find session in request", () => {
+  it("#find_session should find session in request", async () => {
     const id = new ID(undefined);
     (id as unknown as { getSession: unknown }).getSession = (env: RackEnv) => [
       env["rack.session"],
       id.generateSid(),
     ];
     const req = request({ "rack.session": {} });
-    const [session, sid] = id.findSession(req, null);
+    const [session, sid] = await id.findSession(req, null);
     expect(session).toEqual({});
     expect(sid).toMatch(/^[0-9a-fA-F]+$/);
   });
 
-  it("#write_session should write session to request", () => {
+  it("#write_session should write session to request", async () => {
     const id = new ID(undefined);
     (id as unknown as { setSession: unknown }).setSession = (
       env: RackEnv,
@@ -52,15 +52,12 @@ describe("Rack::Session::Abstract::ID", () => {
       options: unknown,
     ) => [env, sid, session, options];
     const req = new Request({});
-    expect(id.writeSession(req as unknown as PersistedRequest, 1, 2 as never, 3 as never)).toEqual([
-      {},
-      1,
-      2,
-      3,
-    ]);
+    expect(
+      await id.writeSession(req as unknown as PersistedRequest, 1, 2 as never, 3 as never),
+    ).toEqual([{}, 1, 2, 3]);
   });
 
-  it("#delete_session should remove session from request", () => {
+  it("#delete_session should remove session from request", async () => {
     const id = new ID(undefined);
     (id as unknown as { destroySession: unknown }).destroySession = (
       env: RackEnv,
@@ -68,6 +65,10 @@ describe("Rack::Session::Abstract::ID", () => {
       options: unknown,
     ) => [env, sid, options];
     const req = new Request({});
-    expect(id.deleteSession(req as unknown as PersistedRequest, 1, 2 as never)).toEqual([{}, 1, 2]);
+    expect(await id.deleteSession(req as unknown as PersistedRequest, 1, 2 as never)).toEqual([
+      {},
+      1,
+      2,
+    ]);
   });
 });

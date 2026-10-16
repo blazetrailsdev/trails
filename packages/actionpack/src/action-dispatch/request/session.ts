@@ -6,9 +6,11 @@ export type Req = { env: Record<string, unknown> };
 
 /** @noRailsEquivalent PERMANENT */
 export interface SessionStore {
-  loadSession(req: Req): [unknown, Record<string, unknown>];
+  loadSession(
+    req: Req,
+  ): [unknown, Record<string, unknown>] | Promise<[unknown, Record<string, unknown>]>;
   sessionExists(req: Req): boolean;
-  deleteSession(req: Req, id: unknown, options: unknown): unknown;
+  deleteSession(req: Req, id: unknown, options: unknown): Promise<unknown>;
   extractSessionId(req: Req): unknown;
 }
 
@@ -108,6 +110,7 @@ export class Session {
   private enabled: boolean;
   private _idWas: unknown;
   private idWasInitialized: boolean;
+  private prewarmedSession?: [unknown, Record<string, unknown>];
 
   static create(store: SessionStore, req: Req, defaultOptions: Record<string, unknown>): Session {
     const sessionWas = Session.find(req);
@@ -164,14 +167,16 @@ export class Session {
     return Options.find(this.req) as Options | undefined;
   }
 
-  destroy(): void {
+  /** @inventedArm prewarmBang — PERMANENT */
+  async destroy(): Promise<void> {
     this.clear();
 
     if (this.isEnabled()) {
       const options = (this.options() ?? {}) as Options;
-      this.by!.deleteSession(this.req, options.id(this.req), options);
+      await this.by!.deleteSession(this.req, options.id(this.req), options);
 
       this.loaded = false;
+      await this.prewarmBang();
       this.loadForWriteBang();
     }
   }
@@ -339,11 +344,22 @@ export class Session {
     if (this.isEnabled() && !this.isLoaded()) this.loadBang();
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  async prewarmBang(): Promise<void> {
+    if (this.isEnabled()) {
+      this.isExists();
+      this.prewarmedSession = await this.by!.loadSession(this.req);
+    }
+  }
+
   /** @internal */
   loadBang(): void {
     if (this.isEnabled()) {
       if (!this.isExists()) this.idWasInitialized = true;
-      const [id, session] = this.by!.loadSession(this.req);
+      const [id, session] =
+        this.prewarmedSession ??
+        (this.by!.loadSession(this.req) as [unknown, Record<string, unknown>]);
+      this.prewarmedSession = undefined;
       this.options()!.set("id", id);
       hashReplace(this.delegate, stringifyKeys(session));
       if (!this.idWasInitialized) this._idWas = id;

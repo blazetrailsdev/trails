@@ -11,6 +11,7 @@ import { isEmpty } from "@blazetrails/ruby-compat";
 export const FILENAME_MAX_SIZE = 226;
 const FILEPATH_MAX_SIZE = 900;
 const GITKEEP_FILES = [".gitkeep", ".keep"];
+const LOCK_RETRY_MS = 10;
 
 function dirFormatter(dir: number): string {
   return dir.toString(16).toUpperCase().padStart(3, "0");
@@ -61,46 +62,54 @@ export class FileStore extends Store implements CacheStore {
   }
 
   /** @missingRailsName collect — PERMANENT */
-  override clear(): void {
+  override async clear(): Promise<void> {
     try {
       const rootDirs = Dir.children(this.cachePath).filter((f) => !GITKEEP_FILES.includes(f));
       FileUtils.rmR(rootDirs.map((f) => File.join(this.cachePath, f)));
     } catch {}
   }
 
-  override cleanup(options?: CacheOptions): void {
+  override async cleanup(options?: CacheOptions): Promise<void> {
     options = this.mergedOptions(options);
-    this.searchDir(this.cachePath, (fname) => {
-      const entry = this.readEntry(fname, options);
-      if (entry && entry.isExpired()) this.deleteEntry(fname, options);
+    await this.searchDir(this.cachePath, async (fname) => {
+      const entry = await this.readEntry(fname, options);
+      if (entry && entry.isExpired()) await this.deleteEntry(fname, options);
     });
   }
 
-  override increment(name: string, amount = 1, options?: StoreOptions): number | null {
+  override async increment(
+    name: string,
+    amount = 1,
+    options?: StoreOptions,
+  ): Promise<number | null> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
-    return this.instrument("increment", key, { amount }, () =>
+    return await this.instrument("increment", key, { amount }, () =>
       this.modifyValue(name, amount, options),
     );
   }
 
-  override decrement(name: string, amount = 1, options?: StoreOptions): number | null {
+  override async decrement(
+    name: string,
+    amount = 1,
+    options?: StoreOptions,
+  ): Promise<number | null> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
-    return this.instrument("decrement", key, { amount }, () =>
+    return await this.instrument("decrement", key, { amount }, () =>
       this.modifyValue(name, -amount, options),
     );
   }
 
-  override deleteMatched(matcher: string | RegExp, options?: StoreOptions): void {
+  override async deleteMatched(matcher: string | RegExp, options?: StoreOptions): Promise<void> {
     options = this.mergedOptions(options);
     if (typeof matcher === "string") matcher = new RegExp(matcher);
     matcher = this.keyMatcher(matcher, options);
 
-    this.instrument("delete_matched", String(matcher), undefined, () => {
-      this.searchDir(this.cachePath, (path) => {
+    await this.instrument("delete_matched", String(matcher), undefined, async () => {
+      await this.searchDir(this.cachePath, async (path) => {
         const key = this.filePathKey(path);
-        if (key.match(matcher) !== null) this.deleteEntry(path, options);
+        if (key.match(matcher) !== null) await this.deleteEntry(path, options);
       });
     });
   }
@@ -111,8 +120,8 @@ export class FileStore extends Store implements CacheStore {
     )}>`;
   }
 
-  protected readEntry(key: string, _options: StoreOptions): Entry | null {
-    const payload = this.readSerializedEntry(key);
+  protected async readEntry(key: string, _options: StoreOptions): Promise<Entry | null> {
+    const payload = await this.readSerializedEntry(key);
     if (payload != null) {
       const entry = this.deserializeEntry(payload);
       return entry instanceof Entry ? entry : null;
@@ -120,7 +129,7 @@ export class FileStore extends Store implements CacheStore {
     return null;
   }
 
-  protected readSerializedEntry(key: string): string | null {
+  protected async readSerializedEntry(key: string): Promise<string | null> {
     try {
       return File.isExist(key) ? File.binread(key) : null;
     } catch (error) {
@@ -130,18 +139,30 @@ export class FileStore extends Store implements CacheStore {
     }
   }
 
-  protected writeEntry(key: string, entry: Entry, options: StoreOptions = {}): boolean {
-    return this.writeSerializedEntry(key, this.serializeEntry(entry, options) as string, options);
+  protected async writeEntry(
+    key: string,
+    entry: Entry,
+    options: StoreOptions = {},
+  ): Promise<boolean> {
+    return await this.writeSerializedEntry(
+      key,
+      this.serializeEntry(entry, options) as string,
+      options,
+    );
   }
 
-  protected writeSerializedEntry(key: string, payload: string, options: StoreOptions): boolean {
+  protected async writeSerializedEntry(
+    key: string,
+    payload: string,
+    options: StoreOptions,
+  ): Promise<boolean> {
     if (options.unlessExist && File.isExist(key)) return false;
     this.ensureCachePath(File.dirname(key));
     atomicWrite(key, this.cachePath, (f) => f.write(Buffer.from(payload, "latin1")));
     return true;
   }
 
-  protected deleteEntry(key: string, _options: StoreOptions): boolean {
+  protected async deleteEntry(key: string, _options: StoreOptions): Promise<boolean> {
     if (File.isExist(key)) {
       try {
         File.delete(key);
@@ -156,18 +177,20 @@ export class FileStore extends Store implements CacheStore {
     }
   }
 
-  protected lockFile<T>(fileName: string, block: () => T): T {
+  protected async lockFile<T>(fileName: string, block: () => Promise<T>): Promise<T> {
     if (File.isExist(fileName)) {
-      return File.open(fileName, "r+", (f) => {
+      return await File.open(fileName, "r+", async (f) => {
         try {
-          f.flock(File.LOCK_EX);
-          return block();
+          while (f.flock(File.LOCK_EX | File.LOCK_NB) === false) {
+            await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
+          }
+          return await block();
         } finally {
           f.flock(File.LOCK_UN);
         }
       });
     } else {
-      return block();
+      return await block();
     }
   }
 
@@ -219,34 +242,35 @@ export class FileStore extends Store implements CacheStore {
     if (!File.isExist(path)) FileUtils.makedirs(path);
   }
 
-  protected searchDir(dir: string, callback: (path: string) => void): void {
-    if (!File.isExist(dir)) return;
-    Dir.eachChild(dir, (d) => {
+  /** @missingRailsCall exist? — CONVERGEABLE file-store-async-fs-bodies */
+  protected async searchDir(dir: string, callback: (path: string) => Promise<void>): Promise<void> {
+    if (!(await File.isExistAsync(dir))) return;
+    for (const d of await Dir.childrenAsync(dir)) {
       const name = File.join(dir, d);
       if (File.isDirectory(name)) {
-        this.searchDir(name, callback);
+        await this.searchDir(name, callback);
       } else {
-        callback(name);
+        await callback(name);
       }
-    });
+    }
   }
 
-  private modifyValue(name: string, amount: number, options: StoreOptions): number {
+  private async modifyValue(name: string, amount: number, options: StoreOptions): Promise<number> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
     const version = this.normalizeVersion(name, options) ?? null;
     amount = kernelInteger(amount);
 
-    return this.lockFile(key, () => {
-      let entry = this.readEntry(key, options);
+    return await this.lockFile(key, async () => {
+      let entry = await this.readEntry(key, options);
 
       if (!entry || entry.isExpired() || entry.isMismatched(version)) {
-        this.write(name, amount, options);
+        await this.write(name, amount, options);
         return amount;
       } else {
         const num = toI(entry.value) + amount;
         entry = new Entry(num, { expiresAt: entry.expiresAt, version: entry.version });
-        this.writeEntry(key, entry);
+        await this.writeEntry(key, entry);
         return num;
       }
     });

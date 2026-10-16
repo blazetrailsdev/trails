@@ -53,21 +53,21 @@ export class Pool extends PersistedSecure {
   }
 
   /** @missingRailsCall store — PERMANENT */
-  override writeSession(
+  override async writeSession(
     _req: PersistedRequest,
     sessionId: SessionId,
     newSession: Record<string, unknown>,
     _options: Record<string, unknown>,
-  ): SessionId {
+  ): Promise<SessionId> {
     this.pool[sessionId.privateId] = newSession;
     return sessionId;
   }
 
-  override deleteSession(
+  override async deleteSession(
     _req: PersistedRequest,
     sessionId: SessionId,
     options: Record<string, unknown>,
-  ): SessionId | null {
+  ): Promise<SessionId | null> {
     delete this.pool[sessionId.publicId];
     delete this.pool[sessionId.privateId];
     if (!isTruthy(options["drop"])) return this.generateSid({ useMutex: false });

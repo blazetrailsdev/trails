@@ -36,44 +36,44 @@ function filePathKey(store: FileStore, path: string): string {
 describe("FileStoreTest", () => {
   let cacheDir: string;
   let store: FileStore;
-  beforeEach(() => {
+  beforeEach(async () => {
     cacheDir = mkdtempSync(join(tmpdir(), "file-store-"));
     store = new FileStore(cacheDir, { expiresIn: 60 });
   });
-  afterEach(() => {
+  afterEach(async () => {
     try {
       rmSync(cacheDir, { recursive: true, force: true });
     } catch {}
   });
 
-  it("clear without cache dir", () => {
+  it("clear without cache dir", async () => {
     rmSync(cacheDir, { recursive: true, force: true });
-    expect(() => store.clear()).not.toThrow();
+    await expect(store.clear()).resolves.not.toThrow();
   });
 
-  it("long uri encoded keys", () => {
-    store.write("%".repeat(870), 1);
-    expect(store.read("%".repeat(870))).toEqual(1);
+  it("long uri encoded keys", async () => {
+    await store.write("%".repeat(870), 1);
+    expect(await store.read("%".repeat(870))).toEqual(1);
   });
 
-  it("key transformation", () => {
+  it("key transformation", async () => {
     const key = pathFor(store, "views/index?id=1");
     expect(filePathKey(store, key)).toEqual("views/index?id=1");
   });
 
-  it("key transformation with pathname", () => {
+  it("key transformation with pathname", async () => {
     writeFileSync(join(cacheDir, "foo"), "");
     const cacheWithPathname = new FileStore(cacheDir, { expiresIn: 60 });
     const key = pathFor(cacheWithPathname, "views/index?id=1");
     expect(filePathKey(cacheWithPathname, key)).toEqual("views/index?id=1");
   });
 
-  it("filename max size", () => {
+  it("filename max size", async () => {
     const key = "A".repeat(FILENAME_MAX_SIZE);
     const open = vi.spyOn(File, "open");
     let tmpname: string;
     try {
-      store.write(key, "v");
+      await store.write(key, "v");
       tmpname = basename(String(open.mock.calls[0][0]));
     } finally {
       open.mockRestore();
@@ -84,61 +84,63 @@ describe("FileStoreTest", () => {
     );
   });
 
-  it("key transformation max filename size", () => {
+  it("key transformation max filename size", async () => {
     const key = `${"A".repeat(FILENAME_MAX_SIZE)}B`;
     const path = pathFor(store, key);
     assert(path.split("/").every((dirName) => dirName.length <= FILENAME_MAX_SIZE));
     expect(basename(path)).toEqual("B");
   });
 
-  it("delete matched when key exceeds max filename size", () => {
+  it("delete matched when key exceeds max filename size", async () => {
     const submaximalKey = "_".repeat(FILENAME_MAX_SIZE - 1);
 
-    store.write(submaximalKey + "AB", "value");
-    store.deleteMatched(/AB/);
-    assertNot(store.exist(submaximalKey + "AB"));
+    await store.write(submaximalKey + "AB", "value");
+    await store.deleteMatched(/AB/);
+    assertNot(await store.exist(submaximalKey + "AB"));
 
-    store.write(submaximalKey + "/A", "value");
-    store.deleteMatched(/A/);
-    assertNot(store.exist(submaximalKey + "/A"));
+    await store.write(submaximalKey + "/A", "value");
+    await store.deleteMatched(/A/);
+    assertNot(await store.exist(submaximalKey + "/A"));
   });
 
-  it("delete matched when cache directory does not exist", () => {
+  it("delete matched when cache directory does not exist", async () => {
     const nonExistent = new FileStore("/tmp/does_not_exist_rails_ts_test_" + Date.now());
     expect(() => nonExistent.deleteMatched(/does_not_exist/)).not.toThrow();
   });
 
-  it("delete does not delete empty parent dir", () => {
+  it("delete does not delete empty parent dir", async () => {
     const subCacheDir = join(cacheDir, "subdir/");
     const subCacheStore = new FileStore(subCacheDir);
-    expect(() => {
-      assert(subCacheStore.write("foo", "bar"));
-      assert(subCacheStore.delete("foo"));
-    }).not.toThrow();
+    await expect(
+      (async () => {
+        assert(await subCacheStore.write("foo", "bar"));
+        assert(await subCacheStore.delete("foo"));
+      })(),
+    ).resolves.not.toThrow();
     assert(existsSync(cacheDir), "Parent of top level cache dir was deleted!");
     assert(existsSync(subCacheDir), "Top level cache dir was deleted!");
     assertEmpty(readdirSync(subCacheDir));
   });
 
-  it("delete prunes empty parent directories", () => {
+  it("delete prunes empty parent directories", async () => {
     const entryDir = dirname(pathFor(store, "a/b"));
-    store.write("a/b", "val");
+    await store.write("a/b", "val");
     expect(existsSync(entryDir)).toBe(true);
-    store.delete("a/b");
+    await store.delete("a/b");
     expect(existsSync(entryDir)).toBe(false);
     expect(existsSync(cacheDir)).toBe(true);
   });
 
-  it("delete prunes empty directories up to a symlinked cache dir", () => {
+  it("delete prunes empty directories up to a symlinked cache dir", async () => {
     const realRoot = mkdtempSync(join(tmpdir(), "file-store-real-"));
     const linkRoot = join(mkdtempSync(join(tmpdir(), "file-store-link-")), "cache");
     symlinkSync(realRoot, linkRoot, "dir");
     try {
       const linkStore = new FileStore(linkRoot, { expiresIn: 60 });
       const entryDir = dirname(pathFor(linkStore, "a/b"));
-      linkStore.write("a/b", "val");
+      await linkStore.write("a/b", "val");
       expect(existsSync(entryDir)).toBe(true);
-      linkStore.delete("a/b");
+      await linkStore.delete("a/b");
       expect(existsSync(entryDir)).toBe(false);
       expect(existsSync(realRoot)).toBe(true);
       expect(existsSync(linkRoot)).toBe(true);
@@ -148,7 +150,7 @@ describe("FileStoreTest", () => {
     }
   });
 
-  it("log exception when cache read fails", () => {
+  it("log exception when cache read fails", async () => {
     const buffer = { string: "" };
     const previousLogger = Store.logger;
     Store.logger = {
@@ -167,59 +169,59 @@ describe("FileStoreTest", () => {
     }
   });
 
-  it("cleanup removes all expired entries", () => {
+  it("cleanup removes all expired entries", async () => {
     const time = Time.now();
-    store.write("foo", "bar", { expiresIn: 10 });
-    store.write("baz", "qux");
-    store.write("quux", "corge", { expiresIn: 20 });
+    await store.write("foo", "bar", { expiresIn: 10 });
+    await store.write("baz", "qux");
+    await store.write("quux", "corge", { expiresIn: 20 });
     const now = vi.spyOn(Time, "now").mockReturnValue(time.plus(15));
     try {
-      store.cleanup();
-      assertNot(store.exist("foo"));
-      assert(store.exist("baz"));
-      assert(store.exist("quux"));
+      await store.cleanup();
+      assertNot(await store.exist("foo"));
+      assert(await store.exist("baz"));
+      assert(await store.exist("quux"));
       expect(readdirSync(cacheDir).length).toEqual(2);
     } finally {
       now.mockRestore();
     }
   });
 
-  it("cleanup when non active support cache file exists", () => {
+  it("cleanup when non active support cache file exists", async () => {
     const cacheFilePath = pathFor(store, "foo");
     mkdirSync(dirname(cacheFilePath), { recursive: true });
     writeFileSync(cacheFilePath, cacheDir);
-    expect(() => store.cleanup()).not.toThrow();
+    await expect(store.cleanup()).resolves.not.toThrow();
     expect(readdirSync(cacheDir).length).toEqual(1);
   });
 
-  it("write with unless exist", () => {
-    expect(store.write("1", "aaaaaaaaaa")).toEqual(true);
-    expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
-    store.write("1", null);
-    expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
+  it("write with unless exist", async () => {
+    expect(await store.write("1", "aaaaaaaaaa")).toEqual(true);
+    expect(await store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
+    await store.write("1", null);
+    expect(await store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
   });
 
-  it("clear", () => {
+  it("clear", async () => {
     const gitkeep = join(cacheDir, ".gitkeep");
     const keep = join(cacheDir, ".keep");
     writeFileSync(gitkeep, "");
     writeFileSync(keep, "");
-    store.clear();
+    await store.clear();
     assert(existsSync(gitkeep));
     assert(existsSync(keep));
   });
 
   it("fetch_multi honors entry expiration", async () => {
-    store.write("foo", "old", { expiresIn: 0.01 });
+    await store.write("foo", "old", { expiresIn: 0.01 });
     await new Promise((r) => setTimeout(r, 20));
-    const result = store.fetchMulti("foo", "bar", (key) => `${key}-generated`);
+    const result = await store.fetchMulti("foo", "bar", (key) => `${key}-generated`);
     expect(Object.fromEntries(result)).toEqual({ foo: "foo-generated", bar: "bar-generated" });
-    expect(store.read("foo")).toBe("foo-generated");
+    expect(await store.read("foo")).toBe("foo-generated");
   });
 
-  it("fetch_multi honors version mismatch", () => {
-    store.write("foo", "old", { version: "v1" });
-    const result = store.fetchMulti("foo", { version: "v2" }, (key) => `${key}-generated`);
+  it("fetch_multi honors version mismatch", async () => {
+    await store.write("foo", "old", { version: "v1" });
+    const result = await store.fetchMulti("foo", { version: "v2" }, (key) => `${key}-generated`);
     expect(Object.fromEntries(result)).toEqual({ foo: "foo-generated" });
   });
 
@@ -255,42 +257,42 @@ describe("FileStore coder fidelity", () => {
   let cacheDir: string;
   let store: FileStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     cacheDir = mkdtempSync(join(tmpdir(), "file-store-coder-"));
     store = new FileStore(cacheDir);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       rmSync(cacheDir, { recursive: true, force: true });
     } catch {}
   });
 
-  it("round-trips Date values", () => {
+  it("round-trips Date values", async () => {
     const date = new Date("2026-06-19T14:36:26.123Z");
-    store.write("d", date);
-    const result = store.read("d");
+    await store.write("d", date);
+    const result = await store.read("d");
     expect(result).toBeInstanceOf(Date);
     expect((result as Date).getTime()).toBe(date.getTime());
   });
 
-  it("round-trips undefined distinct from null", () => {
-    store.write("u", undefined);
-    expect(store.read("u")).toBeUndefined();
-    store.write("n", null);
-    expect(store.read("n")).toBeNull();
+  it("round-trips undefined distinct from null", async () => {
+    await store.write("u", undefined);
+    expect(await store.read("u")).toBeUndefined();
+    await store.write("n", null);
+    expect(await store.read("n")).toBeNull();
   });
 
-  it("round-trips bigint values", () => {
-    store.write("b", 9007199254740993n);
-    expect(store.read("b")).toBe(9007199254740993n);
+  it("round-trips bigint values", async () => {
+    await store.write("b", 9007199254740993n);
+    expect(await store.read("b")).toBe(9007199254740993n);
   });
 
-  it("round-trips non-finite numbers", () => {
-    store.write("nan", NaN);
-    expect(store.read("nan")).toBeNaN();
-    store.write("inf", Infinity);
-    expect(store.read("inf")).toBe(Infinity);
+  it("round-trips non-finite numbers", async () => {
+    await store.write("nan", NaN);
+    expect(await store.read("nan")).toBeNaN();
+    await store.write("inf", Infinity);
+    expect(await store.read("inf")).toBe(Infinity);
   });
 });
 
@@ -298,34 +300,34 @@ describe("FileStore increment/decrement amount coercion", () => {
   let cacheDir: string;
   let cache: FileStore;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     cacheDir = mkdtempSync(join(tmpdir(), "file-store-"));
     cache = new FileStore(cacheDir);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     try {
       rmSync(cacheDir, { recursive: true, force: true });
     } catch {}
   });
 
-  it("increment raises on a non-integer amount when seeding a missing key", () => {
-    expect(() => cache.increment("foo", NaN)).toThrow();
-    expect(() => cache.increment("foo", Infinity)).toThrow();
-    expect(() => cache.increment("foo", -Infinity)).toThrow();
-    expect(cache.read("foo")).toBeNull();
+  it("increment raises on a non-integer amount when seeding a missing key", async () => {
+    await expect(cache.increment("foo", NaN)).rejects.toThrow();
+    await expect(cache.increment("foo", Infinity)).rejects.toThrow();
+    await expect(cache.increment("foo", -Infinity)).rejects.toThrow();
+    expect(await cache.read("foo")).toBeNull();
   });
 
-  it("decrement raises on a non-integer amount when seeding a missing key", () => {
-    expect(() => cache.decrement("foo", NaN)).toThrow();
-    expect(() => cache.decrement("foo", Infinity)).toThrow();
-    expect(cache.read("foo")).toBeNull();
+  it("decrement raises on a non-integer amount when seeding a missing key", async () => {
+    await expect(cache.decrement("foo", NaN)).rejects.toThrow();
+    await expect(cache.decrement("foo", Infinity)).rejects.toThrow();
+    expect(await cache.read("foo")).toBeNull();
   });
 
-  it("increment truncates a finite float amount toward zero", () => {
-    expect(cache.increment("frac", 1.9)).toBe(1);
-    expect(Number(cache.read("frac"))).toBe(1);
-    expect(cache.increment("frac", 2.9)).toBe(3);
-    expect(Number(cache.read("frac"))).toBe(3);
+  it("increment truncates a finite float amount toward zero", async () => {
+    expect(await cache.increment("frac", 1.9)).toBe(1);
+    expect(Number(await cache.read("frac"))).toBe(1);
+    expect(await cache.increment("frac", 2.9)).toBe(3);
+    expect(Number(await cache.read("frac"))).toBe(3);
   });
 });

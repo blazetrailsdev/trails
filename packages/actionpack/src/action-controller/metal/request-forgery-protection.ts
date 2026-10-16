@@ -53,7 +53,7 @@ export class InvalidCrossOriginRequest extends ActionControllerError {
 }
 
 export interface ProtectionMethods {
-  handleUnverifiedRequest(): void;
+  handleUnverifiedRequest(): void | Promise<void>;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -72,7 +72,7 @@ export class NullSessionHash extends SessionHash {
     this.loaded = true;
   }
 
-  override destroy(): void {}
+  override async destroy(): Promise<void> {}
 
   override isExists(): boolean {
     return true;
@@ -108,8 +108,8 @@ export class ResetSession implements ProtectionMethods {
   constructor(controller: Controller) {
     this._controller = controller;
   }
-  handleUnverifiedRequest(): void {
-    (this._controller as { resetSession(): void }).resetSession();
+  async handleUnverifiedRequest(): Promise<void> {
+    await (this._controller as { resetSession(): Promise<void> }).resetSession();
   }
 }
 
@@ -461,26 +461,26 @@ export function verifySameOriginRequest(this: CsrfController): void {
 }
 
 /** @internal */
-export function verifyAuthenticityToken(this: CsrfController): void {
+export async function verifyAuthenticityToken(this: CsrfController): Promise<void> {
   this.markForSameOriginVerificationBang();
 
   if (!this.isVerifiedRequest()) {
     if (this.logger && this.logWarningOnCsrfFailure)
       this.logger.warn(this.unverifiedRequestWarningMessage());
 
-    this.handleUnverifiedRequest();
+    await this.handleUnverifiedRequest();
   }
 }
 
 /** @internal */
-export function handleUnverifiedRequest(this: CsrfController): void {
+export async function handleUnverifiedRequest(this: CsrfController): Promise<void> {
   const protectionStrategy = new this.forgeryProtectionStrategy!(this);
 
   if ("warningMessage" in protectionStrategy) {
     (protectionStrategy as Exception).warningMessage = this.unverifiedRequestWarningMessage();
   }
 
-  protectionStrategy.handleUnverifiedRequest();
+  await protectionStrategy.handleUnverifiedRequest();
 }
 
 /** @internal */

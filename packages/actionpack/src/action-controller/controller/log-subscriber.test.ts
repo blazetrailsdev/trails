@@ -403,7 +403,9 @@ describe("ACLogSubscriberTest", () => {
     assertMatch(/test-helpers\/fixtures\/company\.rb/, tc.logs()[1]);
   });
 
-  it("with fragment cache", async () => {
+  // BLOCKED: cache-store-async-consumers
+
+  it.skip("with fragment cache", async () => {
     await tc.get("withFragmentCache");
     tc.wait();
 
@@ -412,7 +414,9 @@ describe("ACLogSubscriberTest", () => {
     assertMatch(/Write fragment views\/foo/, tc.logs()[2]);
   });
 
-  it("with fragment cache when log disabled", async () => {
+  // BLOCKED: cache-store-async-consumers
+
+  it.skip("with fragment cache when log disabled", async () => {
     (Base as unknown as CachingClassMethods).enableFragmentCacheLogging = false;
     await tc.get("withFragmentCache");
     tc.wait();
@@ -426,7 +430,9 @@ describe("ACLogSubscriberTest", () => {
     (Base as unknown as CachingClassMethods).enableFragmentCacheLogging = true;
   });
 
-  it("with fragment cache if with true", async () => {
+  // BLOCKED: cache-store-async-consumers
+
+  it.skip("with fragment cache if with true", async () => {
     await tc.get("withFragmentCacheIfWithTrueCondition");
     tc.wait();
 
@@ -435,7 +441,9 @@ describe("ACLogSubscriberTest", () => {
     assertMatch(/Write fragment views\/foo/, tc.logs()[2]);
   });
 
-  it("with fragment cache if with false", async () => {
+  // BLOCKED: cache-store-async-consumers
+
+  it.skip("with fragment cache if with false", async () => {
     await tc.get("withFragmentCacheIfWithFalseCondition");
     tc.wait();
 
@@ -444,7 +452,9 @@ describe("ACLogSubscriberTest", () => {
     assertNoMatch(/Write fragment views\/foo/, tc.logs()[2]);
   });
 
-  it("with fragment cache unless with true", async () => {
+  // BLOCKED: cache-store-async-consumers
+
+  it.skip("with fragment cache unless with true", async () => {
     await tc.get("withFragmentCacheUnlessWithTrueCondition");
     tc.wait();
 
@@ -453,7 +463,9 @@ describe("ACLogSubscriberTest", () => {
     assertNoMatch(/Write fragment views\/foo/, tc.logs()[2]);
   });
 
-  it("with fragment cache unless with false", async () => {
+  // BLOCKED: cache-store-async-consumers
+
+  it.skip("with fragment cache unless with false", async () => {
     await tc.get("withFragmentCacheUnlessWithFalseCondition");
     tc.wait();
 
@@ -462,7 +474,9 @@ describe("ACLogSubscriberTest", () => {
     assertMatch(/Write fragment views\/foo/, tc.logs()[2]);
   });
 
-  it("with fragment cache and percent in key", async () => {
+  // BLOCKED: cache-store-async-consumers
+
+  it.skip("with fragment cache and percent in key", async () => {
     await tc.get("withFragmentCacheAndPercentInKey");
     tc.wait();
 

@@ -127,46 +127,54 @@ function toStr(content: unknown): string {
   throw new NoMethodError(`undefined method 'to_str' for ${String(content)}`);
 }
 
-export function writeFragment(
+export async function writeFragment(
   this: FragmentsHost,
   key: unknown,
   content: unknown,
   options?: CacheOptions,
-): unknown {
+): Promise<unknown> {
   if (!this.isCacheConfigured()) return content;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  instrumentFragmentCache.call(this, "write_fragment", key, () => {
+  await instrumentFragmentCache.call(this, "write_fragment", key, async () => {
     content = toStr(content);
-    this.cacheStore!.write(key as string, content, options);
+    await this.cacheStore!.write(key as string, content, options);
   });
   return content;
 }
 
-export function readFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
+export async function readFragment(
+  this: FragmentsHost,
+  key: unknown,
+  options?: CacheOptions,
+): Promise<unknown> {
   if (!this.isCacheConfigured()) return undefined;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache.call(this, "read_fragment", key, () =>
+  return await instrumentFragmentCache.call(this, "read_fragment", key, () =>
     this.cacheStore!.read(key as string, options),
   );
 }
 
-export function fragmentExist(
+export async function fragmentExist(
   this: FragmentsHost,
   key: unknown,
   options?: CacheOptions,
-): boolean | undefined {
+): Promise<boolean | undefined> {
   if (!this.isCacheConfigured()) return undefined;
   key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return instrumentFragmentCache.call(this, "exist_fragment?", key, () =>
+  return (await instrumentFragmentCache.call(this, "exist_fragment?", key, () =>
     this.cacheStore!.exist(key as string, options),
-  ) as boolean | undefined;
+  )) as boolean | undefined;
 }
 
-export function expireFragment(this: FragmentsHost, key: unknown, options?: CacheOptions): unknown {
+export async function expireFragment(
+  this: FragmentsHost,
+  key: unknown,
+  options?: CacheOptions,
+): Promise<unknown> {
   if (!this.isCacheConfigured()) return undefined;
   if (!(key instanceof RegExp)) key = stringifyKey(combinedFragmentCacheKey.call(this, key));
 
-  return instrumentFragmentCache.call(this, "expire_fragment", key, () => {
+  return await instrumentFragmentCache.call(this, "expire_fragment", key, () => {
     if (key instanceof RegExp) {
       return this.cacheStore!.deleteMatched(key, options);
     } else {

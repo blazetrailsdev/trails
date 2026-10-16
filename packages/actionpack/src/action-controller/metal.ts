@@ -269,9 +269,9 @@ export class Metal extends AbstractController {
     this._response = response as Response;
   }
 
-  resetSession(): void {
+  async resetSession(): Promise<void> {
     if (this.request && typeof (this.request as any).resetSession === "function") {
-      (this.request as any).resetSession();
+      await (this.request as any).resetSession();
     }
   }
 

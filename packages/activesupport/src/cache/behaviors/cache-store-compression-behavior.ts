@@ -26,11 +26,11 @@ export interface CompressionBehaviorHost {
 export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): void {
   let cache: Store;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     cache = host.lookupStore();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     Cache.setFormatVersion(7.0);
   });
 
@@ -89,37 +89,37 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
     }
   }
 
-  it("compression works with cache format version 7.0 (using Marshal70WithFallback)", () => {
+  it("compression works with cache format version 7.0 (using Marshal70WithFallback)", async () => {
     cache = withFormat(7.0, () => host.lookupStore({ compress: true }));
     assertCompression(true);
   });
 
-  it("compression works with cache format version >= 7.1 (using Cache::Coder)", () => {
+  it("compression works with cache format version >= 7.1 (using Cache::Coder)", async () => {
     cache = withFormat(7.1, () => host.lookupStore({ compress: true }));
     assertCompression(true);
   });
 
-  it("compression is disabled with custom coder", () => {
+  it("compression is disabled with custom coder", async () => {
     cache = withFormat(7.1, () => host.lookupStore({ coder: MARSHAL_CODER }));
     assertCompression(false);
   });
 
-  it("compression works with custom serializer", () => {
+  it("compression works with custom serializer", async () => {
     cache = withFormat(7.1, () => host.lookupStore({ compress: true, serializer: coder }));
     assertCompression(true);
   });
 
-  it("compression by default", () => {
+  it("compression by default", async () => {
     cache = host.lookupStore();
     assertCompression(!host.compressionAlwaysDisabledByDefault);
   });
 
-  it("compression can be disabled", () => {
+  it("compression can be disabled", async () => {
     cache = host.lookupStore({ compress: false });
     assertCompression(false);
   });
 
-  it(":compress method option overrides initializer option", () => {
+  it(":compress method option overrides initializer option", async () => {
     cache = host.lookupStore({ compress: true });
     assertCompression(false, { compress: false });
 
@@ -127,17 +127,17 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
     assertCompression(true, { compress: true });
   });
 
-  it("low :compress_threshold triggers compression", () => {
+  it("low :compress_threshold triggers compression", async () => {
     cache = host.lookupStore({ compress: true, compressThreshold: 1 });
     assertCompression(":all");
   });
 
-  it("high :compress_threshold inhibits compression", () => {
+  it("high :compress_threshold inhibits compression", async () => {
     cache = host.lookupStore({ compress: true, compressThreshold: 1024 * 1024 });
     assertCompression(false);
   });
 
-  it(":compress_threshold method option overrides initializer option", () => {
+  it(":compress_threshold method option overrides initializer option", async () => {
     cache = host.lookupStore({ compress: true, compressThreshold: 1 });
     assertCompression(false, { compressThreshold: 1024 * 1024 });
 
@@ -145,12 +145,12 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
     assertCompression(":all", { compressThreshold: 1 });
   });
 
-  it("compression ignores nil", () => {
+  it("compression ignores nil", async () => {
     assertNotCompress(null);
     assertNotCompress(null, { compress: true, compressThreshold: 1 });
   });
 
-  it("compression ignores incompressible data", () => {
+  it("compression ignores incompressible data", async () => {
     assertNotCompress("", { compress: true, compressThreshold: 1 });
     assertNotCompress(Array.from({ length: 128 }, (_, i) => String.fromCharCode(i)).join(""), {
       compress: true,
@@ -158,7 +158,7 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
     });
   });
 
-  it("compressor can be specified", () => {
+  it("compressor can be specified", async () => {
     const lossyCompressor = {
       deflate(_dumped: string): string {
         return "yolo";
@@ -173,22 +173,22 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
     );
     const key = crypto.randomUUID();
 
-    cache.write(key, LARGE_OBJECT);
-    expect(cache.read(key)).toBe("lossy!");
+    await cache.write(key, LARGE_OBJECT);
+    expect(await cache.read(key)).toBe("lossy!");
   });
 
-  it("compressor can be nil", () => {
+  it("compressor can be nil", async () => {
     cache = withFormat(7.1, () => host.lookupStore({ compressor: null }));
     assertCompression(false);
   });
 
-  it("specifying a compressor raises when cache format version < 7.1", () => {
+  it("specifying a compressor raises when cache format version < 7.1", async () => {
     withFormat(7.0, () => {
       expect(() => host.lookupStore({ compressor: ZLIB })).toThrow(/compressor/i);
     });
   });
 
-  it("specifying a compressor raises when also specifying a coder", () => {
+  it("specifying a compressor raises when also specifying a coder", async () => {
     withFormat(7.1, () => {
       expect(() => host.lookupStore({ compressor: ZLIB, coder: MARSHAL_CODER })).toThrow(
         /compressor/i,

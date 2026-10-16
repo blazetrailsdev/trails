@@ -45,7 +45,7 @@ export const StaleSessionCheck = {
   loadSession(
     this: StaleSessionCheckHost,
     env: PersistedRequest,
-  ): [unknown, Record<string, unknown>] {
+  ): [unknown, Record<string, unknown>] | Promise<[unknown, Record<string, unknown>]> {
     return this.staleSessionCheckBang(() => Persisted.prototype.loadSession.call(this, env));
   },
 
@@ -53,10 +53,28 @@ export const StaleSessionCheck = {
     return this.staleSessionCheckBang(() => Persisted.prototype.extractSessionId.call(this, env));
   },
 
-  staleSessionCheckBang<T>(block: () => T): T {
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm try — PERMANENT
+   */
+  staleSessionCheckBang<T>(
+    this: { staleSessionCheckBang<U>(block: () => U): U },
+    block: () => T,
+  ): T {
     for (;;) {
       try {
-        return block();
+        const result = block();
+        if (result instanceof Promise) {
+          return result.catch((argumentError: unknown) => {
+            let rescued = false;
+            return this.staleSessionCheckBang(() => {
+              if (rescued) return block();
+              rescued = true;
+              throw argumentError;
+            });
+          }) as T;
+        }
+        return result;
       } catch (argumentError) {
         if (!(argumentError instanceof ArgumentError)) throw argumentError;
         const match = /undefined class\/module ([\w:]*\w)/.exec(argumentError.message);
@@ -76,9 +94,9 @@ export const StaleSessionCheck = {
 };
 
 export const SessionObject = {
-  commitSession(this: Persisted, req: any, res: any): unknown {
-    req.commitCsrfToken?.();
-    return Persisted.prototype.commitSession.call(this, req, res);
+  async commitSession(this: Persisted, req: any, res: any): Promise<unknown> {
+    await req.commitCsrfToken?.();
+    return await Persisted.prototype.commitSession.call(this, req, res);
   },
 
   prepareSession(this: Persisted, req: { env: Record<string, unknown> }): RequestSession {
