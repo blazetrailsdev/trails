@@ -12,7 +12,7 @@
     }
   },
   "actiondispatch": {
-    "total": 38,
+    "total": 37,
     "byFile": {
       "http/headers.rb": 1,
       "http/query_parser.rb": 1,
@@ -24,7 +24,6 @@
       "middleware/stack.rb": 5,
       "routing/mapper.rb": 20,
       "system_test_case.rb": 1,
-      "system_testing/driver.rb": 1,
       "testing/integration.rb": 3
     }
   },
