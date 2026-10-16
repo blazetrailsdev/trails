@@ -45,7 +45,11 @@ const SHARED_EXCLUDE = [
   // packages/website: `pnpm exec svelte-kit sync && pnpm exec vitest run`.
   "packages/website/**",
   "packages/*/dx-tests/**",
+  // System tests launch real browsers; only the `system` project runs them.
+  "**/*.system.test.ts",
 ];
+
+const SYSTEM_SCREENSHOT_DIRECTORY = "tmp/screenshots";
 
 // Rails model: ARCONN selects one backend; that backend's adapter dirs
 // run as part of the shared `pnpm vitest run packages/activerecord/` invocation;
@@ -534,6 +538,23 @@ export default defineConfig({
           ],
           exclude: ["packages/activerecord/**", "packages/trailties/**", ...SHARED_EXCLUDE],
           setupFiles: otherSetupFiles,
+        },
+      },
+      {
+        // System tests (RFC 0166): Node workers that each launch one real
+        // browser. `screenshotDirectory` reaches the worker through `inject`,
+        // since Vitest does not serialize `browser.screenshotDirectory`.
+        resolve: otherResolve,
+        test: {
+          name: "system",
+          globals: true,
+          include: ["packages/*/src/**/*.system.test.ts"],
+          exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
+          setupFiles: otherSetupFiles,
+          pool: "forks",
+          poolOptions: { forks: { singleFork: true } },
+          browser: { enabled: false, screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
+          provide: { screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
         },
       },
       {

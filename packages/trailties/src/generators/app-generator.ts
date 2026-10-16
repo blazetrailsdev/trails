@@ -174,6 +174,7 @@ export class AppGenerator extends AppBase {
     this.createAppFiles(name);
     this.createDbFiles();
     this.createTestFiles();
+    if (this.dependsOnSystemTest()) this.systemTest();
     this.createPublicFiles();
     this.createDirectoryPlaceholders();
 
@@ -421,10 +422,35 @@ export default defineConfig({
   root: "app",
   test: {
     root: fileURLToPath(new URL(".", import.meta.url)),
-    include: ["test/**/*.test.ts"],
+${
+  this.dependsOnSystemTest()
+    ? `    globalSetup: ["test/global-setup.ts"],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          include: ["test/**/*.test.ts"],
+          exclude: ["test/{system,dummy,fixtures}/**/*.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "system",
+          include: ["test/system/**/*.test.ts"],
+          pool: "forks",
+          poolOptions: { forks: { singleFork: true } },
+          provide: { screenshotDirectory: "tmp/screenshots" },
+        },
+      },
+    ],
+`
+    : `    include: ["test/**/*.test.ts"],
     exclude: ["test/{system,dummy,fixtures}/**/*.test.ts"],
     globalSetup: ["test/global-setup.ts"],
-  },
+`
+}  },
   publicDir: false,
   build: {
     outDir: "../public/assets",
@@ -1161,6 +1187,24 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
 // Example:
 //   import { User } from "../app/models/user.js";
 //   await User.create({ name: "Admin", email: "admin@example.com" });
+`,
+    );
+  }
+
+  /** @internal */
+  private systemTest(): void {
+    this.createFile("test/system/.keep", "");
+
+    this.createFile(
+      "test/application-system-test-case.ts",
+      `import "./test-helper.js";
+import { SystemTestCase } from "@blazetrails/actionpack";
+
+export class ApplicationSystemTestCase extends SystemTestCase {
+  static {
+    this.drivenBy("playwright", { screenSize: [1400, 1400] });
+  }
+}
 `,
     );
   }

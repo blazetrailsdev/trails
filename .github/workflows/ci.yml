@@ -973,6 +973,23 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm vitest run packages/actionpack
 
+  # RFC 0166 system tests: the `system` Vitest project, against real browsers.
+  # webkit and webdriverio are not installed by default.
+  system-tests:
+    name: System Tests
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      needs.changes.outputs.actionpack_affected == 'true'
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - run: pnpm exec playwright-core install --with-deps chromium firefox
+      - run: pnpm vitest run --project system --passWithNoTests
+
   trailties-tests:
     name: Trailties Tests
     needs: changes
@@ -2345,6 +2362,7 @@ jobs:
       - trails-tsc-tests
       - unit-tests
       - actionpack-tests
+      - system-tests
       - trailties-tests
       - sqlite-tests
       - sqlite-mem-tests
@@ -2457,7 +2475,7 @@ jobs:
                     continue
                   fi
                   ;;
-                actionpack-tests)
+                actionpack-tests|system-tests)
                   # Actionpack test skip is legitimate when no actionpack-affecting paths changed.
                   if [ "$AP_AFFECTED" = "false" ]; then
                     continue

@@ -1,6 +1,9 @@
 import type { BrowserType, LaunchOptions } from "playwright";
-import { File, Gem } from "@blazetrails/ruby-compat";
+import { Gem } from "@blazetrails/ruby-compat";
 import { requirePlaywright } from "./driver.js";
+
+/** @noRailsEquivalent PERMANENT */
+export const serviceDriverPath = new Map<BrowserType, string>();
 
 export class Browser {
   readonly name: string | undefined;
@@ -81,15 +84,12 @@ export class Browser {
 
   /**
    * @internal
+   * @missingRailsCall new — PERMANENT
    * @missingRailsCall path — PERMANENT
-   * @inventedArm throw — PERMANENT
-   * @inventedArm isExistAsync — PERMANENT
    */
   private async resolveDriverPath(namespace: BrowserType): Promise<void> {
-    const driverPath = namespace.executablePath();
-    if (!(await File.isExistAsync(driverPath))) {
-      throw new Error(`Executable doesn't exist at ${driverPath}`);
-    }
+    const driverPath = serviceDriverPath.get(namespace) ?? namespace.executablePath();
+    serviceDriverPath.set(namespace, driverPath);
     this.options!.executablePath = driverPath;
   }
 }

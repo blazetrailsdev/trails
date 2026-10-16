@@ -1,26 +1,11 @@
-import { describe, it, expect, vi, afterAll } from "vitest";
-import type { BrowserType } from "playwright";
-import { requirePlaywright } from "../../system-testing/driver.js";
-import { vite } from "../../system-testing/server.js";
-
-const foundExecutable = new URL(import.meta.url).pathname;
-const { chromium, firefox } = (await requirePlaywright()) as {
-  chromium: BrowserType;
-  firefox: BrowserType;
-};
-vi.spyOn(chromium, "executablePath").mockImplementation(() => foundExecutable);
-vi.spyOn(firefox, "executablePath").mockImplementation(() => foundExecutable);
-
-const {
+import { describe, it, expect } from "vitest";
+import {
   DrivenByRackTest,
   DrivenBySeleniumWithChrome,
   DrivenBySeleniumWithHeadlessChrome,
   DrivenBySeleniumWithHeadlessFirefox,
-} = await import("../../../test-helpers/driven-by.js");
-
-afterAll(() => {
-  vi.restoreAllMocks();
-});
+} from "../../../test-helpers/abstract-unit.js";
+import { vite } from "../../system-testing/server.js";
 
 class SetDriverToRackTestTest extends DrivenByRackTest {}
 
