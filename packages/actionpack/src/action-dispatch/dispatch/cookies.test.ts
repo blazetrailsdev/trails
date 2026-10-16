@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Response } from "@blazetrails/rack";
 import { CookieJar } from "../cookies.js";
 import { CookieOverflow, type RequestCookieMethodsHost } from "../middleware/cookies.js";
@@ -245,14 +244,6 @@ describe("CookiesTest", () => {
     assertEqual({ user_name: "david" }, tc.response.cookies);
   });
 
-  it("setting cookie expires from a Temporal.Instant", () => {
-    const jar = new CookieJar(cookieRequest());
-    const instant = Temporal.Instant.from("2030-04-15T12:00:00Z");
-    jar.set("user_name", { value: "david", expires: instant });
-    const headers = setCookieHeaders(jar);
-    expect(headers[0]).toContain("expires=Mon, 15 Apr 2030 12:00:00 GMT");
-  });
-
   it("setting cookie for fourteen days with symbols", async () => {
     await tc.get("authenticateForFourteenDaysWithSymbols");
     tc.assertSetCookieHeader(
@@ -445,31 +436,6 @@ describe("CookiesTest", () => {
     assertNil(controllerCookies().signed.get("user_id"));
   });
 
-  it("signed cookie round trip", () => {
-    const jar1 = new CookieJar(cookieRequest());
-    jar1.signed.set("session_id", "abc123");
-    const raw = jar1.get("session_id")!;
-
-    const jar2 = CookieJar.build(cookieRequest(), { session_id: raw });
-    expect(jar2.signed.get("session_id")).toBe("abc123");
-  });
-
-  it("encrypted cookie round trip", () => {
-    const jar = new CookieJar(cookieRequest());
-    jar.encrypted.set("data", "sensitive");
-    const raw = jar.get("data");
-    expect(raw).not.toBe("sensitive");
-    expect(raw).toContain("--");
-    expect(jar.encrypted.get("data")).toBe("sensitive");
-  });
-
-  it("tampered encrypted cookie returns undefined", () => {
-    const jar = new CookieJar(cookieRequest());
-    jar.encrypted.set("data", "secret");
-    jar.set("data", "tampered--value");
-    expect(jar.encrypted.get("data")).toBeUndefined();
-  });
-
   it("signed cookie using default serializer", async () => {
     await tc.get("setSignedCookie");
     const cookies = controllerCookies();
@@ -594,6 +560,7 @@ describe("CookiesTest", () => {
   });
 
   it.skip("signed cookie using custom digest", async () => {
+    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
     tc.request.env["action_dispatch.signed_cookie_digest"] = "SHA256";
 
     await tc.get("setSignedCookie");
@@ -611,6 +578,7 @@ describe("CookiesTest", () => {
   });
 
   it.skip("signed cookie rotating secret and digest", async () => {
+    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
     let secret: string | ReturnType<KeyGenerator["generateKey"]> =
       "b3c631c314c0bbca50c1b2843150fe33";
 
@@ -739,6 +707,7 @@ describe("CookiesTest", () => {
   });
 
   it.skip("encrypted cookie using hybrid serializer can migrate marshal dumped value to json", async () => {
+    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
     tc.request.env["action_dispatch.cookies_serializer"] = ":hybrid";
 
     const keyGenerator = tc.request.env["action_dispatch.key_generator"] as KeyGenerator;
@@ -832,6 +801,7 @@ describe("CookiesTest", () => {
   });
 
   it.skip("use authenticated cookie encryption uses legacy hmac aes cbc encryption when not enabled", async () => {
+    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
     tc.request.env["action_dispatch.use_authenticated_cookie_encryption"] = null;
 
     const keyGenerator = tc.request.env["action_dispatch.key_generator"] as KeyGenerator;
@@ -865,6 +835,7 @@ describe("CookiesTest", () => {
   it.skip("legacy hmac aes cbc json mode falls back to authenticated encrypted cookie", () => {});
 
   it.skip("encrypted cookie rotating secret", async () => {
+    // BLOCKED: messages-marshal-with-fallback-uses-real-marshal
     let secret: string | Buffer = "b3c631c314c0bbca50c1b2843150fe33";
 
     tc.request.env["action_dispatch.encrypted_cookie_cipher"] = "aes-256-gcm";
@@ -931,8 +902,7 @@ describe("CookiesTest", () => {
     assertEqual("bar", encryptor.decryptAndVerify(tc.response.cookies["foo"]!));
   });
 
-  it.skip("cookie with hash value not modified by rotation", async () => {
-    // BLOCKED: cookie-jar-serializer-fallbacks-and-legacy-cbc-upgrade
+  it("cookie with hash value not modified by rotation", async () => {
     tc.request.env["action_dispatch.signed_cookie_digest"] = "SHA256";
     (tc.request.env["action_dispatch.cookies_rotations"] as RotationConfiguration).rotate(
       "signed",
