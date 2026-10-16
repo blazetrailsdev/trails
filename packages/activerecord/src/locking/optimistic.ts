@@ -1,4 +1,4 @@
-import { DelegateClass, type Hash, Module, rtest, union } from "@blazetrails/ruby-compat";
+import { DelegateClass, Module, rtest, union } from "@blazetrails/ruby-compat";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
@@ -65,7 +65,7 @@ interface LockingHost {
   lockingColumn: string;
   lockOptimistically?: boolean;
   _updateRecord?(
-    values: Hash<string, unknown>,
+    values: Record<string, unknown>,
     constraints: Record<string, unknown>,
   ): Promise<number>;
 }

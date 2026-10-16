@@ -2,7 +2,6 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
 import {
   basicObjRespondTo,
-  Hash,
   isEmpty,
   keys,
   Module,
@@ -279,21 +278,18 @@ export async function _insertRecord(
     insert(arel: unknown, ...args: unknown[]): Promise<unknown>;
     emptyInsertStatementValue(pk?: string | null): string;
   },
-  values: Hash<string, unknown>,
+  values: Record<string, unknown>,
   returning?: string[] | null,
 ): Promise<unknown> {
   const ctor = this as any;
   const primaryKey = ctor.primaryKey;
   let primaryKeyValue: unknown = null;
   if (ctor.isPrefetchPrimaryKey() && primaryKey) {
-    if (!rtest(values.get(primaryKey))) {
-      values.set(
-        primaryKey,
-        (() => {
-          primaryKeyValue = ctor.nextSequenceValue();
-          return ctor._defaultAttributes().getAttribute(primaryKey).withCastValue(primaryKeyValue);
-        })(),
-      );
+    if (!rtest(values[primaryKey])) {
+      values[primaryKey] = (() => {
+        primaryKeyValue = ctor.nextSequenceValue();
+        return ctor._defaultAttributes().getAttribute(primaryKey).withCastValue(primaryKeyValue);
+      })();
     }
   }
 
@@ -321,7 +317,7 @@ export async function _insertRecord(
 
 export async function _updateRecord(
   this: PersistenceHost,
-  values: Map<string, unknown> | Record<string, unknown>,
+  values: Record<string, unknown>,
   constraints: Record<string, unknown>,
 ): Promise<number> {
   const klass = this as unknown as typeof Base;
@@ -814,7 +810,7 @@ type PersistenceInstanceChainHost = {
   typeForAttribute(name: string): { deserialize(value: unknown): unknown };
   attributesForCreate(attributeNames: string[]): string[];
   attributesForUpdate(attributeNames: string[]): string[];
-  attributesWithValues(attributeNames: string[]): Hash<string, unknown>;
+  attributesWithValues(attributeNames: string[]): Record<string, unknown>;
 };
 
 /** @internal */
