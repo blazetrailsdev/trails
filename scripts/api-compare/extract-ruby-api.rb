@@ -1037,9 +1037,6 @@ class ApiExtractor
       process_attr(args, :writer, force_class: on_singleton)
     when "attr_accessor"
       process_attr(args, :accessor, force_class: on_singleton)
-    # ActiveSupport's attr_internal family
-    # (activesupport/lib/active_support/core_ext/module/attr_internal.rb:5-20)
-    # defines the same public reader/writer, over an `@_name` ivar.
     when "attr_internal_reader"
       process_attr(args, :reader, force_class: on_singleton)
     when "attr_internal_writer"
@@ -2742,8 +2739,7 @@ class ApiExtractor
   # lookup: the container is anchored to the top level (`fqn == container`, or
   # the empty top level for `::CONST`) and the relative `end_with?` suffix match
   # is skipped, honouring Ruby's rule that `::Foo::KEYS` binds to top-level
-  # `Foo`, never a nested `X::Foo`. A bare `CONST` resolves lexically first and
-  # falls back to the first stored match only when no enclosing scope holds it.
+  # `Foo`, never a nested `X::Foo`.
   def resolve_const_members(name, store)
     return nil unless name
     absolute = name.start_with?("::")
@@ -2752,9 +2748,6 @@ class ApiExtractor
     const = parts.last
     container = parts[0...-1].join("::")
     if !absolute && container.empty?
-      # Ruby's lexical lookup: the reading scope, then each enclosing namespace.
-      # `PermissionsPolicy`'s `DIRECTIVES.each` reads its own `DIRECTIVES`, never
-      # `ContentSecurityPolicy::DIRECTIVES`, whichever file was scanned first.
       scope = current_fqn.to_s.split("::")
       loop do
         found = store.dig(scope.join("::"), const)

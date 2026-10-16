@@ -634,9 +634,6 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(calls["Foo#script"]).toEqual(["nil?", "send"]);
   });
 
-  // permissions_policy.rb:84,122 and content_security_policy.rb:149 each define
-  // their own DIRECTIVES; a bare read resolves lexically, never to the first
-  // file's constant.
   it("resolves a bare constant through the reading scope and its enclosing namespaces", () => {
     const calls = rubyCalls({
       "a.rb": `
@@ -3374,7 +3371,6 @@ describe("Ruby extractor attr_reader flag", { timeout: RUBY_SUBPROCESS_TIMEOUT_M
     }
   }
 
-  // abstract_controller/base.rb:40, metal.rb:170, layouts.rb:359.
   it("records the reader and writer each attr_internal macro defines", () => {
     const m = attrMethods(`
       class Metal

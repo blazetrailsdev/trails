@@ -826,10 +826,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
 
     const fileResults: ConventionFileResult[] = [];
 
-    // Ruby-side: which test paths/names appear in multiple Ruby files? A
-    // package whose TS population reaches another package's test files
-    // (actioncontroller reads actiondispatch's) counts that package's Rails
-    // files too, or a name both share reads as a move into the other package.
+    // Ruby-side: which test paths/names appear in multiple Ruby files?
     const rubyPathToFileCount = new Map<string, number>();
     const rubyDescToFileCount = new Map<string, number>();
     const countedFiles = [pkg, ...sharingPackages(pkg, ts)].flatMap((p) =>

@@ -2684,10 +2684,6 @@ end
 
 # ---- Main ----
 
-# Directories of a shared Rails test tree that another package scores. Both
-# actiondispatch and actioncontroller read actionpack/test; abstractcontroller
-# reads actionpack/test/abstract on its own, so actiondispatch leaves it out the
-# way it leaves controller/ to actioncontroller.
 ACTIONDISPATCH_FOREIGN_DIRS = %w[controller abstract].freeze
 
 def select_package_test_files!(pkg_name, pkg_dir, test_files)
