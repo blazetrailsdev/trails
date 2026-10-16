@@ -40,32 +40,32 @@ export interface CacheStoreCoderBehaviorHost {
 }
 
 export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void {
-  it("coder receive the entry on write", () => {
+  it("coder receive the entry on write", async () => {
     const coder = new SpyCoder();
     const store = host.lookupStore({ coder });
-    store.write("foo", "bar");
+    await store.write("foo", "bar");
     expect(coder.dumpedEntries.length).toBe(1);
     const entry = coder.dumpedEntries[0];
     expect(entry).toBeInstanceOf(Entry);
     expect(entry.value).toBe("bar");
   });
 
-  it("coder receive the entry on read", () => {
+  it("coder receive the entry on read", async () => {
     const coder = new SpyCoder();
     const store = host.lookupStore({ coder });
-    store.write("foo", "bar");
-    store.read("foo");
+    await store.write("foo", "bar");
+    await store.read("foo");
     expect(coder.loadedEntries.length).toBe(1);
     const entry = coder.loadedEntries[0];
     expect(entry).toBeInstanceOf(Entry);
     expect(entry.value).toBe("bar");
   });
 
-  it("coder receive the entry on read multi", () => {
+  it("coder receive the entry on read multi", async () => {
     const coder = new SpyCoder();
     const store = host.lookupStore({ coder });
-    store.writeMulti({ foo: "bar", egg: "spam" });
-    store.readMulti("foo", "egg");
+    await store.writeMulti({ foo: "bar", egg: "spam" });
+    await store.readMulti("foo", "egg");
     expect(coder.loadedEntries.length).toBe(2);
     let entry = coder.loadedEntries[0];
     expect(entry).toBeInstanceOf(Entry);
@@ -76,10 +76,10 @@ export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void
     expect(entry.value).toBe("spam");
   });
 
-  it("coder receive the entry on write multi", () => {
+  it("coder receive the entry on write multi", async () => {
     const coder = new SpyCoder();
     const store = host.lookupStore({ coder });
-    store.writeMulti({ foo: "bar", egg: "spam" });
+    await store.writeMulti({ foo: "bar", egg: "spam" });
     expect(coder.dumpedEntries.length).toBe(2);
     let entry = coder.dumpedEntries[0];
     expect(entry).toBeInstanceOf(Entry);
@@ -90,14 +90,14 @@ export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void
     expect(entry.value).toBe("spam");
   });
 
-  it("coder does not receive the entry on read miss", () => {
+  it("coder does not receive the entry on read miss", async () => {
     const coder = new SpyCoder();
     const store = host.lookupStore({ coder });
-    store.read("foo");
+    await store.read("foo");
     expect(coder.loadedEntries.length).toBe(0);
   });
 
-  it("nil coder bypasses serialization", () => {
+  it("nil coder bypasses serialization", async () => {
     const store = host.lookupStore({ coder: null });
     const entry = new Entry("value");
     assertSame(entry, serializeEntry(store, entry));
@@ -106,13 +106,13 @@ export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void
   it("coder is used during handle expired entry when expired", async () => {
     const coder = new SpyCoder();
     const store = host.lookupStore({ coder });
-    store.write("foo", "bar", { expiresIn: 0.05 });
+    await store.write("foo", "bar", { expiresIn: 0.05 });
     expect(coder.loadedEntries.length).toBe(0);
     expect(coder.dumpedEntries.length).toBe(1);
 
     await new Promise((r) => setTimeout(r, 100));
 
-    const val = store.fetch(
+    const val = await store.fetch(
       "foo",
       { raceConditionTtl: 5, compress: true, compressThreshold: 0 },
       () => "baz",

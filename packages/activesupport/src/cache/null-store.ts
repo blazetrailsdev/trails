@@ -8,37 +8,41 @@ export class NullStore extends Store implements CacheStore {
     return true;
   }
 
-  override clear(): void {}
+  override async clear(): Promise<void> {}
 
-  override cleanup(): void {}
+  override async cleanup(): Promise<void> {}
 
-  override increment(_name: string, _amount = 1, _options?: CacheOptions): null {
+  override async increment(_name: string, _amount = 1, _options?: CacheOptions): Promise<null> {
     return null;
   }
 
-  override decrement(_name: string, _amount = 1, _options?: CacheOptions): null {
+  override async decrement(_name: string, _amount = 1, _options?: CacheOptions): Promise<null> {
     return null;
   }
 
-  override deleteMatched(_matcher: string | RegExp, _options?: CacheOptions): void {}
+  override async deleteMatched(_matcher: string | RegExp, _options?: CacheOptions): Promise<void> {}
 
-  protected readEntry(key: string, _options: Record<string, unknown>): Entry | null {
-    return this.deserializeEntry(this.readSerializedEntry(key));
+  protected async readEntry(key: string, _options: Record<string, unknown>): Promise<Entry | null> {
+    return this.deserializeEntry(await this.readSerializedEntry(key));
   }
 
-  protected readSerializedEntry(_key: string): unknown {
+  protected async readSerializedEntry(_key: string): Promise<unknown> {
     return null;
   }
 
-  protected writeEntry(key: string, entry: Entry, _options: Record<string, unknown>): boolean {
-    return this.writeSerializedEntry(key, this.serializeEntry(entry));
+  protected async writeEntry(
+    key: string,
+    entry: Entry,
+    _options: Record<string, unknown>,
+  ): Promise<boolean> {
+    return await this.writeSerializedEntry(key, this.serializeEntry(entry));
   }
 
-  protected writeSerializedEntry(_key: string, _payload: unknown): boolean {
+  protected async writeSerializedEntry(_key: string, _payload: unknown): Promise<boolean> {
     return true;
   }
 
-  protected deleteEntry(_key: string, _options: Record<string, unknown>): boolean {
+  protected async deleteEntry(_key: string, _options: Record<string, unknown>): Promise<boolean> {
     return false;
   }
 }

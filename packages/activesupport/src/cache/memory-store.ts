@@ -59,7 +59,7 @@ export class MemoryStore extends Store implements CacheStore {
     );
   }
 
-  protected readEntry(key: string, _options: Record<string, unknown>): Entry | null {
+  protected async readEntry(key: string, _options: Record<string, unknown>): Promise<Entry | null> {
     const payload = this.data.get(key);
     if (payload === undefined) return null;
     this.data.delete(key);
@@ -67,9 +67,13 @@ export class MemoryStore extends Store implements CacheStore {
     return this.deserializeEntry(payload);
   }
 
-  protected writeEntry(key: string, entry: Entry, options: Record<string, unknown>): boolean {
+  protected async writeEntry(
+    key: string,
+    entry: Entry,
+    options: Record<string, unknown>,
+  ): Promise<boolean> {
     const payload = this.serializeEntry(entry, options) as Entry | string;
-    if (options.unlessExist && this.exist(key, { namespace: null })) return false;
+    if (options.unlessExist && (await this.exist(key, { namespace: null }))) return false;
 
     const oldPayload = this.data.get(key);
     if (oldPayload !== undefined) {
@@ -80,39 +84,39 @@ export class MemoryStore extends Store implements CacheStore {
       this.cacheSize += this.cachedSize(key, payload);
     }
     this.data.set(key, payload);
-    if (this.cacheSize > this.maxSize) this.prune(this.maxSize * 0.75, this.maxPruneTime);
+    if (this.cacheSize > this.maxSize) await this.prune(this.maxSize * 0.75, this.maxPruneTime);
     return true;
   }
 
-  protected deleteEntry(key: string, _options: Record<string, unknown>): boolean {
+  protected async deleteEntry(key: string, _options: Record<string, unknown>): Promise<boolean> {
     const payload = this.data.get(key);
     this.data.delete(key);
     if (payload !== undefined) this.cacheSize -= this.cachedSize(key, payload);
     return payload !== undefined;
   }
 
-  override clear(): void {
+  override async clear(): Promise<void> {
     this.data.clear();
     this.cacheSize = 0;
   }
 
-  override cleanup(options?: CacheOptions): void {
+  override async cleanup(options?: CacheOptions): Promise<void> {
     options = this.mergedOptions(options);
-    this.instrument("cleanup", null, { size: this.data.size }, () => {
+    await this.instrument("cleanup", null, { size: this.data.size }, async () => {
       for (const key of [...this.data.keys()]) {
         const entry = this.deserializeEntry(this.data.get(key));
-        if (entry && entry.isExpired()) this.deleteEntry(key, options);
+        if (entry && entry.isExpired()) await this.deleteEntry(key, options);
       }
     });
   }
 
-  override deleteMatched(matcher: string | RegExp, options?: CacheOptions): void {
+  override async deleteMatched(matcher: string | RegExp, options?: CacheOptions): Promise<void> {
     options = this.mergedOptions(options);
     if (typeof matcher === "string") matcher = new RegExp(matcher);
     matcher = this.keyMatcher(matcher, options);
-    this.instrument("delete_matched", String(matcher), undefined, () => {
-      for (const key of this.data.keys()) {
-        if (key.match(matcher) !== null) this.deleteEntry(key, options);
+    await this.instrument("delete_matched", String(matcher), undefined, async () => {
+      for (const key of [...this.data.keys()]) {
+        if (key.match(matcher) !== null) await this.deleteEntry(key, options);
       }
     });
   }
@@ -123,30 +127,30 @@ export class MemoryStore extends Store implements CacheStore {
     )}>`;
   }
 
-  override increment(name: string, amount = 1, options?: CacheOptions): number {
-    return this.instrument("increment", name, { amount }, () =>
+  override async increment(name: string, amount = 1, options?: CacheOptions): Promise<number> {
+    return await this.instrument("increment", name, { amount }, () =>
       this.modifyValue(name, amount, options),
     );
   }
 
-  override decrement(name: string, amount = 1, options?: CacheOptions): number {
-    return this.instrument("decrement", name, { amount }, () =>
+  override async decrement(name: string, amount = 1, options?: CacheOptions): Promise<number> {
+    return await this.instrument("decrement", name, { amount }, () =>
       this.modifyValue(name, -amount, options),
     );
   }
 
   /** @missingRailsName integer — PERMANENT */
-  private modifyValue(name: string, amount: number, options?: CacheOptions): number {
+  private async modifyValue(name: string, amount: number, options?: CacheOptions): Promise<number> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
     const version = this.normalizeVersion(name, options) ?? null;
-    const entry = this.readEntry(key, options);
+    const entry = await this.readEntry(key, options);
     if (!entry || entry.isExpired() || entry.isMismatched(version)) {
-      this.write(name, kernelInteger(amount), options);
+      await this.write(name, kernelInteger(amount), options);
       return amount;
     }
     const num = toI(entry.value) + amount;
-    this.writeEntry(
+    await this.writeEntry(
       key,
       new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
       {},
@@ -154,15 +158,15 @@ export class MemoryStore extends Store implements CacheStore {
     return num;
   }
 
-  prune(targetSize: number, maxTime?: number): void {
+  async prune(targetSize: number, maxTime?: number): Promise<void> {
     if (this.isPruning()) return;
     this._pruning = true;
     try {
       const startTime = Process.clockGettime(Process.CLOCK_MONOTONIC);
-      this.cleanup();
-      this.instrument("prune", targetSize, { from: this.cacheSize }, () => {
+      await this.cleanup();
+      await this.instrument("prune", targetSize, { from: this.cacheSize }, async () => {
         for (const key of [...this.data.keys()]) {
-          this.deleteEntry(key, {});
+          await this.deleteEntry(key, {});
           if (
             this.cacheSize <= targetSize ||
             (maxTime != null && Process.clockGettime(Process.CLOCK_MONOTONIC) - startTime > maxTime)

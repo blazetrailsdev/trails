@@ -16,20 +16,23 @@ export interface CacheOptions {
 
 /** @noRailsEquivalent PERMANENT */
 export interface CacheStore {
-  read(key: string, options?: CacheOptions): unknown;
-  write(key: string, value: unknown, options?: CacheOptions): boolean;
-  delete(key: string, options?: CacheOptions): boolean;
-  exist(key: string, options?: CacheOptions): boolean;
-  fetch(key: string, options: CacheOptions, fallback: () => unknown): unknown;
-  fetch(key: string, fallback: () => unknown): unknown;
-  clear(): void;
-  cleanup(): void;
-  readMulti(...keys: unknown[]): Map<unknown, unknown>;
-  writeMulti(hash: Map<unknown, unknown> | Record<string, unknown>, options?: CacheOptions): void;
-  deleteMulti(names: string[], options?: CacheOptions): number;
-  deleteMatched(pattern: string | RegExp, options?: CacheOptions): void;
-  increment(key: string, amount?: number, options?: CacheOptions): number | null;
-  decrement(key: string, amount?: number, options?: CacheOptions): number | null;
+  read(key: string, options?: CacheOptions): Promise<unknown>;
+  write(key: string, value: unknown, options?: CacheOptions): Promise<boolean>;
+  delete(key: string, options?: CacheOptions): Promise<boolean>;
+  exist(key: string, options?: CacheOptions): Promise<boolean>;
+  fetch(key: string, options: CacheOptions, fallback: () => unknown): Promise<unknown>;
+  fetch(key: string, fallback: () => unknown): Promise<unknown>;
+  clear(): Promise<void>;
+  cleanup(): Promise<void>;
+  readMulti(...keys: unknown[]): Promise<Map<unknown, unknown>>;
+  writeMulti(
+    hash: Map<unknown, unknown> | Record<string, unknown>,
+    options?: CacheOptions,
+  ): Promise<unknown>;
+  deleteMulti(names: string[], options?: CacheOptions): Promise<number>;
+  deleteMatched(pattern: string | RegExp, options?: CacheOptions): Promise<void>;
+  increment(key: string, amount?: number, options?: CacheOptions): Promise<number | null>;
+  decrement(key: string, amount?: number, options?: CacheOptions): Promise<number | null>;
 }
 
 export { Store } from "./store.js";

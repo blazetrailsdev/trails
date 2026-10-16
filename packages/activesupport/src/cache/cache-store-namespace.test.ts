@@ -9,37 +9,37 @@ function rawValue(cache: MemoryStore, key: string): unknown {
 }
 
 describe("CacheStoreNamespaceTest", () => {
-  it("static namespace", () => {
+  it("static namespace", async () => {
     const cache = new MemoryStore({ namespace: "tester" });
-    cache.write("foo", "bar");
-    expect(cache.read("foo")).toBe("bar");
+    await cache.write("foo", "bar");
+    expect(await cache.read("foo")).toBe("bar");
     expect(rawValue(cache, "tester:foo")).toBe("bar");
   });
 
-  it("proc namespace", () => {
+  it("proc namespace", async () => {
     const testVal = "tester";
     const proc = () => testVal;
     const cache = new MemoryStore({ namespace: proc });
-    cache.write("foo", "bar");
-    expect(cache.read("foo")).toBe("bar");
+    await cache.write("foo", "bar");
+    expect(await cache.read("foo")).toBe("bar");
     expect(rawValue(cache, "tester:foo")).toBe("bar");
   });
 
-  it("delete matched key start", () => {
+  it("delete matched key start", async () => {
     const cache = new MemoryStore({ namespace: "tester" });
-    cache.write("foo", "bar");
-    cache.write("fu", "baz");
-    cache.deleteMatched(/^fo/);
-    assertNot(cache.exist("foo"));
-    assert(cache.exist("fu"));
+    await cache.write("foo", "bar");
+    await cache.write("fu", "baz");
+    await cache.deleteMatched(/^fo/);
+    assertNot(await cache.exist("foo"));
+    assert(await cache.exist("fu"));
   });
 
-  it("delete matched key", () => {
+  it("delete matched key", async () => {
     const cache = new MemoryStore({ namespace: "foo" });
-    cache.write("foo", "bar");
-    cache.write("fu", "baz");
-    cache.deleteMatched(/OO/i);
-    assertNot(cache.exist("foo"));
-    assert(cache.exist("fu"));
+    await cache.write("foo", "bar");
+    await cache.write("fu", "baz");
+    await cache.deleteMatched(/OO/i);
+    assertNot(await cache.exist("foo"));
+    assert(await cache.exist("fu"));
   });
 });

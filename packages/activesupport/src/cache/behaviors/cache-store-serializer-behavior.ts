@@ -12,7 +12,7 @@ export interface CacheStoreSerializerBehaviorHost {
 }
 
 export function cacheStoreSerializerBehavior(host: CacheStoreSerializerBehaviorHost): void {
-  afterEach(() => {
+  afterEach(async () => {
     Cache.setFormatVersion(7.0);
   });
 
@@ -26,7 +26,7 @@ export function cacheStoreSerializerBehavior(host: CacheStoreSerializerBehaviorH
     }
   }
 
-  it("serializer can be specified", () => {
+  it("serializer can be specified", async () => {
     const serializer = {
       dump(value: unknown): string {
         return (value as object).constructor.name;
@@ -39,21 +39,23 @@ export function cacheStoreSerializerBehavior(host: CacheStoreSerializerBehaviorH
     const cache = withFormat(7.1, () => host.lookupStore({ serializer }));
     const key = `key${Math.random()}`;
 
-    cache.write(key, 123);
-    expect(cache.read(key)).toBe("Number");
+    await cache.write(key, 123);
+    expect(await cache.read(key)).toBe("Number");
   });
 
-  it("serializer can be :message_pack", () => {
+  it("serializer can be :message_pack", async () => {
     const cache = withFormat(7.1, () => host.lookupStore({ serializer: ":message_pack" }));
     const key = `key${Math.random()}`;
 
-    cache.write(key, 123);
-    expect(cache.read(key)).toBe(123);
+    await cache.write(key, 123);
+    expect(await cache.read(key)).toBe(123);
 
-    expect(() => cache.write(key, new UnserializableObject())).toThrow(UnserializableObjectError);
+    await expect(cache.write(key, new UnserializableObject())).rejects.toThrow(
+      UnserializableObjectError,
+    );
   });
 
-  it("specifying a serializer raises when also specifying a coder", () => {
+  it("specifying a serializer raises when also specifying a coder", async () => {
     withFormat(7.1, () => {
       expect(() => host.lookupStore({ serializer: ":marshal_7_1", coder: null })).toThrow(
         /serializer/i,

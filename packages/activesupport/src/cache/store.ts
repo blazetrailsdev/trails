@@ -182,11 +182,11 @@ export abstract class Store {
     return this;
   }
 
-  mute<T>(block: () => T): T {
+  async mute<T>(block: () => T | Promise<T>): Promise<T> {
     const prev = this.silence;
     this.silence = true;
     try {
-      return block();
+      return await block();
     } finally {
       this.silence = prev;
     }
@@ -196,13 +196,13 @@ export abstract class Store {
     name: string,
     options?: StoreOptions,
     block?: (key: string, opts: WriteOptions) => unknown,
-  ): unknown;
-  fetch(name: string, block: (key: string, opts: WriteOptions) => unknown): unknown;
-  fetch(
+  ): Promise<unknown>;
+  fetch(name: string, block: (key: string, opts: WriteOptions) => unknown): Promise<unknown>;
+  async fetch(
     name: string,
     optionsOrBlock?: StoreOptions | ((key: string, opts: WriteOptions) => unknown),
     maybeBlock?: (key: string, opts: WriteOptions) => unknown,
-  ): unknown {
+  ): Promise<unknown> {
     let options: StoreOptions | undefined;
     let block: ((key: string, opts: WriteOptions) => unknown) | undefined;
     if (typeof optionsOrBlock === "function") {
@@ -217,9 +217,9 @@ export abstract class Store {
       const key = this.normalizeKey(name, options);
       let entry: Entry | null = null;
       if (!options.force) {
-        this.instrument("read", key, options, (payload) => {
-          const cachedEntry = this.readEntry(key, options!);
-          entry = this.handleExpiredEntry(cachedEntry, key, options!);
+        await this.instrument("read", key, options, async (payload) => {
+          const cachedEntry = await this.readEntry(key, options!);
+          entry = await this.handleExpiredEntry(cachedEntry, key, options!);
           if (entry) {
             if (entry.isMismatched(this.normalizeVersion(name, options) ?? null)) {
               entry = null;
@@ -237,28 +237,28 @@ export abstract class Store {
         });
       }
       if (entry) return this.getEntryValue(entry, name, options);
-      return this.saveBlockResultToCache(name, key, options, block);
+      return await this.saveBlockResultToCache(name, key, options, block);
     } else if (options?.force) {
       throw new ArgumentError(
         "Missing block: Calling `Cache#fetch` with `force: true` requires a block.",
       );
     } else {
-      return this.read(name, options);
+      return await this.read(name, options);
     }
   }
 
-  read(name: string, options?: StoreOptions): unknown {
+  async read(name: string, options?: StoreOptions): Promise<unknown> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
     const version = this.normalizeVersion(name, options);
-    return this.instrument("read", key, options, (payload) => {
-      const entry = this.readEntry(key, options);
+    return await this.instrument("read", key, options, async (payload) => {
+      const entry = await this.readEntry(key, options);
       if (!entry) {
         payload.hit = false;
         return null;
       }
       if (entry.isExpired()) {
-        this.deleteEntry(key, options);
+        await this.deleteEntry(key, options);
         payload.hit = false;
         return null;
       }
@@ -279,22 +279,22 @@ export abstract class Store {
     });
   }
 
-  readMulti(...names: unknown[]): Map<unknown, unknown> {
+  async readMulti(...names: unknown[]): Promise<Map<unknown, unknown>> {
     if (names.length === 0) return new Map();
     let options = extractOptions(names);
     options = this.mergedOptions(options);
     const keys = names.map((name) => this.normalizeKey(name, options));
-    return this.instrumentMulti("read_multi", keys, options, (payload) => {
-      const results = this.readMultiEntries(names, options);
+    return await this.instrumentMulti("read_multi", keys, options, async (payload) => {
+      const results = await this.readMultiEntries(names, options);
       payload.hits = [...results.keys()].map((name) => this.normalizeKey(name, options));
       return results;
     });
   }
 
-  writeMulti(
+  async writeMulti(
     hash: Map<unknown, unknown> | Record<string, unknown>,
     options?: StoreOptions,
-  ): Map<unknown, unknown> | Record<string, unknown> {
+  ): Promise<Map<unknown, unknown> | Record<string, unknown>> {
     const pairs = hash instanceof Map ? [...hash] : Object.entries(hash);
     if (pairs.length === 0) return hash;
     options = this.mergedOptions(options);
@@ -302,7 +302,7 @@ export abstract class Store {
     for (const [key, value] of pairs) {
       normalizedHash[this.normalizeKey(key, options)] = value;
     }
-    return this.instrumentMulti("write_multi", normalizedHash, options, () => {
+    return await this.instrumentMulti("write_multi", normalizedHash, options, () => {
       const entries: Record<string, Entry> = {};
       for (const [name, value] of pairs) {
         entries[this.normalizeKey(name, options)] = new Entry(value, {
@@ -314,11 +314,11 @@ export abstract class Store {
     });
   }
 
-  fetchMulti(
+  async fetchMulti(
     ...names:
       | [...NonNullable<unknown>[], StoreOptions, (key: unknown) => unknown]
       | [...NonNullable<unknown>[], (key: unknown) => unknown]
-  ): Map<unknown, unknown> {
+  ): Promise<Map<unknown, unknown>> {
     const block = (names as unknown[]).pop() as ((key: unknown) => unknown) | undefined;
     if (typeof block !== "function")
       throw new ArgumentError("Missing block: `Cache#fetch_multi` requires a block.");
@@ -327,13 +327,13 @@ export abstract class Store {
     options = this.mergedOptions(options);
     const keys = (names as unknown[]).map((name) => this.normalizeKey(name, options));
     const writes = new Map<unknown, unknown>();
-    const ordered = this.instrumentMulti("read_multi", keys, options, (payload) => {
+    const ordered = await this.instrumentMulti("read_multi", keys, options, async (payload) => {
       const reads = options.force
         ? new Map<unknown, unknown>()
-        : this.readMultiEntries(names, options);
+        : await this.readMultiEntries(names, options);
       const result = new Map<unknown, unknown>();
       for (const name of names) {
-        if (!reads.has(name)) writes.set(name, block(name));
+        if (!reads.has(name)) writes.set(name, await block(name));
         result.set(name, reads.has(name) ? reads.get(name) : writes.get(name));
       }
       if (options.skipNil) {
@@ -345,14 +345,14 @@ export abstract class Store {
       payload.super_operation = "fetch_multi";
       return result;
     });
-    this.writeMulti(writes, options);
+    await this.writeMulti(writes, options);
     return ordered;
   }
 
-  write(name: string, value: unknown, options?: StoreOptions): boolean {
+  async write(name: string, value: unknown, options?: StoreOptions): Promise<boolean> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
-    return this.instrument("write", key, options, () =>
+    return await this.instrument("write", key, options, () =>
       this.writeEntry(
         key,
         new Entry(value, {
@@ -364,26 +364,26 @@ export abstract class Store {
     );
   }
 
-  delete(name: string, options?: StoreOptions): boolean {
+  async delete(name: string, options?: StoreOptions): Promise<boolean> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
-    return this.instrument("delete", key, options, () => this.deleteEntry(key, options));
+    return await this.instrument("delete", key, options, () => this.deleteEntry(key, options));
   }
 
-  deleteMulti(names: string[], options?: StoreOptions): number {
+  async deleteMulti(names: string[], options?: StoreOptions): Promise<number> {
     if (names.length === 0) return 0;
     options = this.mergedOptions(options);
     names = names.map((key) => this.normalizeKey(key, options));
-    return this.instrumentMulti("delete_multi", names, options, () =>
+    return await this.instrumentMulti("delete_multi", names, options, () =>
       this.deleteMultiEntries(names, options),
     );
   }
 
-  exist(name: string, options?: StoreOptions): boolean {
+  async exist(name: string, options?: StoreOptions): Promise<boolean> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
-    return this.instrument("exist?", key, undefined, () => {
-      const entry = this.readEntry(key, options);
+    return await this.instrument("exist?", key, undefined, async () => {
+      const entry = await this.readEntry(key, options);
       return !!(
         entry &&
         !entry.isExpired() &&
@@ -400,27 +400,27 @@ export abstract class Store {
     });
   }
 
-  deleteMatched(_matcher: unknown, _options?: StoreOptions): void {
+  deleteMatched(_matcher: unknown, _options?: StoreOptions): Promise<void> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support delete_matched`);
   }
 
-  increment(_name: string, _amount = 1, _options?: StoreOptions): number | null {
+  increment(_name: string, _amount = 1, _options?: StoreOptions): Promise<number | null> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support increment`);
   }
 
-  decrement(_name: string, _amount = 1, _options?: StoreOptions): number | null {
+  decrement(_name: string, _amount = 1, _options?: StoreOptions): Promise<number | null> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support decrement`);
   }
 
-  cleanup(_options?: StoreOptions): void {
+  cleanup(_options?: StoreOptions): Promise<void> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support cleanup`);
   }
 
-  clear(_options?: StoreOptions): void {
+  clear(_options?: StoreOptions): Promise<void> {
     // @nie disposition=keep-as-strategy-hook
     throw new NotImplementedError(`${this.constructor.name} does not support clear`);
   }
@@ -486,9 +486,9 @@ export abstract class Store {
     }
   }
 
-  protected abstract readEntry(key: string, options: StoreOptions): Entry | null;
-  protected abstract writeEntry(key: string, entry: Entry, options: StoreOptions): boolean;
-  protected abstract deleteEntry(key: string, options: StoreOptions): boolean;
+  protected abstract readEntry(key: string, options: StoreOptions): Promise<Entry | null>;
+  protected abstract writeEntry(key: string, entry: Entry, options: StoreOptions): Promise<boolean>;
+  protected abstract deleteEntry(key: string, options: StoreOptions): Promise<boolean>;
 
   protected serializeEntry(entry: Entry, options?: StoreOptions): unknown {
     options = this.mergedOptions(options);
@@ -509,17 +509,20 @@ export abstract class Store {
     }
   }
 
-  protected readMultiEntries(names: unknown[], options: StoreOptions): Map<unknown, unknown> {
+  protected async readMultiEntries(
+    names: unknown[],
+    options: StoreOptions,
+  ): Promise<Map<unknown, unknown>> {
     const results = new Map<unknown, unknown>();
     for (const name of names) {
       const key = this.normalizeKey(name, options);
-      const entry = this.readEntry(key, options);
+      const entry = await this.readEntry(key, options);
       if (!entry) continue;
 
       const version = this.normalizeVersion(name, options) ?? null;
 
       if (entry.isExpired()) {
-        this.deleteEntry(key, options);
+        await this.deleteEntry(key, options);
       } else if (!entry.isMismatched(version)) {
         results.set(name, entry.value);
       }
@@ -527,16 +530,18 @@ export abstract class Store {
     return results;
   }
 
-  protected writeMultiEntries(
+  protected async writeMultiEntries(
     hash: Record<string, Entry>,
     options: StoreOptions,
-  ): Record<string, Entry> {
-    for (const [key, entry] of Object.entries(hash)) this.writeEntry(key, entry, options);
+  ): Promise<Record<string, Entry>> {
+    for (const [key, entry] of Object.entries(hash)) await this.writeEntry(key, entry, options);
     return hash;
   }
 
-  protected deleteMultiEntries(entries: string[], options: StoreOptions): number {
-    return entries.filter((key) => this.deleteEntry(key, options)).length;
+  protected async deleteMultiEntries(entries: string[], options: StoreOptions): Promise<number> {
+    let count = 0;
+    for (const key of entries) if (await this.deleteEntry(key, options)) count++;
+    return count;
   }
 
   protected mergedOptions(callOptions?: StoreOptions): StoreOptions {
@@ -694,18 +699,18 @@ export abstract class Store {
     return undefined;
   }
 
-  protected handleExpiredEntry(
+  protected async handleExpiredEntry(
     entry: Entry | null,
     key: string,
     options: StoreOptions,
-  ): Entry | null {
+  ): Promise<Entry | null> {
     if (entry && entry.isExpired()) {
       const raceTtl = typeof options.raceConditionTtl === "number" ? options.raceConditionTtl : 0;
       if (raceTtl > 0 && Time.now().toF() * 1000 - (entry.expiresAt ?? 0) <= raceTtl * 1000) {
         entry.expiresAt = Time.now().toF() * 1000 + raceTtl * 1000;
-        this.writeEntry(key, entry, { ...options, expiresIn: raceTtl * 2 });
+        await this.writeEntry(key, entry, { ...options, expiresIn: raceTtl * 2 });
       } else {
-        this.deleteEntry(key, options);
+        await this.deleteEntry(key, options);
       }
       return null;
     }
@@ -717,17 +722,17 @@ export abstract class Store {
     return entry.value;
   }
 
-  protected saveBlockResultToCache(
+  protected async saveBlockResultToCache(
     name: string,
     key: string,
     options: StoreOptions,
     block: (key: string, opts: WriteOptions) => unknown,
-  ): unknown {
+  ): Promise<unknown> {
     options = { ...options };
-    const result = this.instrument("generate", key, options, () =>
+    const result = await this.instrument("generate", key, options, () =>
       block(name, new WriteOptions(options)),
     );
-    if (result != null || !options.skipNil) this.write(name, result, options);
+    if (result != null || !options.skipNil) await this.write(name, result, options);
     return result;
   }
 }
