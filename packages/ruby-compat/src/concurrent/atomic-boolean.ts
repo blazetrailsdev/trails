@@ -3,7 +3,7 @@ import { Concurrent } from "./map.js";
 
 /**
  * concurrent-ruby's `Concurrent::AtomicBoolean` (not vendored,
- * `concurrent/atomic/mutex_atomic_boolean.rb`): a boolean behind a mutex
+ * `concurrent/atomic/mutex_atomic_boolean.rb:39-66`, concurrent-ruby 1.3.6): a boolean behind a mutex
  * (`vendor/ruby/v3.3.11/thread_sync.c:697` `rb_mutex_synchronize_m`). A JS
  * turn is never preempted, so the plain field is the whole of it.
  *
