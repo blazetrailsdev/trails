@@ -542,8 +542,10 @@ function attributeMethod(this: InstanceMethodHost, attrName: string): boolean {
 export function attributesWithValues(
   this: InstanceMethodHost,
   attributeNames: string[],
-): Hash<string, unknown> {
-  return indexWith(attributeNames, (name) => this._attributes!.getAttribute!(name));
+): Record<string, unknown> {
+  return Object.fromEntries(
+    indexWith(attributeNames, (name) => this._attributes!.getAttribute!(name)),
+  );
 }
 
 /** @internal */
