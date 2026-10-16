@@ -1,11 +1,11 @@
 import { rbInspect, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
-import type { Logger } from "@blazetrails/activesupport";
+import { isPresent, type Logger } from "@blazetrails/activesupport";
 import { Base, LookupContext } from "@blazetrails/actionview";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 
 export class DebugView extends Base {
   static readonly RESCUES_TEMPLATE_PATHS: readonly string[] = [
-    new URL("./templates", import.meta.url).pathname.replace(/\/$/, ""),
+    decodeURIComponent(new URL("./templates", import.meta.url).pathname),
   ];
 
   constructor(assigns: Record<string, unknown>) {
@@ -30,7 +30,7 @@ export class DebugView extends Base {
   }
 
   debugHeaders(headers: Record<string, unknown> | null | undefined): string {
-    if (headers && Object.keys(headers).length > 0) {
+    if (isPresent(headers)) {
       return rbInspect(headers).replace(/,/g, ",\n");
     }
     return "None";

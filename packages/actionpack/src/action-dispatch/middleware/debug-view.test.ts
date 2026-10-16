@@ -68,7 +68,7 @@ describe("DebugView", () => {
       expect(view.isParamsValid()).toBe(false);
     });
 
-    it("returns the parameters when they are accessible", () => {
+    it("returns true when parameters are accessible", () => {
       const view = new DebugView({ request: { parameters: { id: 1 } } });
       expect(view.isParamsValid()).toEqual({ id: 1 });
     });

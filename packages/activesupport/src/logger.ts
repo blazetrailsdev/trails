@@ -232,12 +232,8 @@ export class Logger {
     return this.level <= Logger.FATAL;
   }
 
-  silence(severity: number | LogLevel = Logger.ERROR, fn?: (logger: this) => void): void {
-    if (this.silencer) {
-      this.logAt(severity, () => fn?.(this));
-    } else {
-      fn?.(this);
-    }
+  silence<T>(severity: number | LogLevel = Logger.ERROR, fn?: (logger: this) => T): T | undefined {
+    return this.silencer ? this.logAt(severity, () => fn?.(this)) : fn?.(this);
   }
 
   debugBang(): void {
@@ -295,7 +291,7 @@ export interface Logger {
   set level(severity: number | LogLevel | string);
   get localLevel(): number | null;
   set localLevel(level: number | LogLevel | null);
-  logAt(level: number | LogLevel, fn: () => void): void;
+  logAt<T>(level: number | LogLevel, fn: () => T): T;
 }
 include(Logger, LoggerThreadSafeLevel);
 
