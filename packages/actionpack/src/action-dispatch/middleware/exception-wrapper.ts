@@ -80,8 +80,9 @@ function _idFor(err: object): number {
 
 export type TraceEntry = { file: string; line: number };
 export type TraceWithId = { exceptionObjectId: number; id: number; trace: string };
-export type SourceExtract = TraceEntry & {
-  code?: Record<number, string | [string, string, string]>;
+export type SourceExtract = {
+  code: Record<number, string | [string, string, string]> | null;
+  lineNumber: number;
 };
 
 export class ExceptionWrapper {
@@ -382,7 +383,10 @@ export class ExceptionWrapper {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE exception-wrapper-extract-source-drops-null-path-guard
+   */
   extractSource(trace: BacktraceLine): SourceExtract {
     const spot = trace instanceof SourceMapLocation ? trace.spot(this.exception) : null;
 
@@ -399,13 +403,18 @@ export class ExceptionWrapper {
         ];
       }
 
-      return { file: String(trace), line, code };
+      return {
+        code: code,
+        lineNumber: line,
+      };
     }
 
     const [file, lineNumber] = this.extractFileAndLineNumber(trace);
-    if (file == null) return { file: String(trace), line: 0 };
-    const code = this.sourceFragment(file, lineNumber);
-    return code ? { file, line: lineNumber, code } : { file, line: lineNumber };
+
+    return {
+      code: file == null ? null : this.sourceFragment(file, lineNumber),
+      lineNumber: lineNumber,
+    };
   }
 
   /** @internal */

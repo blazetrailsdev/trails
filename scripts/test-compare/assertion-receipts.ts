@@ -31,6 +31,36 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a browser":
+    [
+      {
+        kind: "assert_instance_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'dispatch/system_testing/driver_test.rb:17 `@browser.options` is a Playwright `LaunchOptions` plain object with no browser-specific options class, so its `args` are asserted (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
+      },
+    ],
+  "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a headless chrome":
+    [
+      {
+        kind: "assert_instance_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'dispatch/system_testing/driver_test.rb:26 `@browser.options` is a Playwright `LaunchOptions` plain object with no browser-specific options class, so its `args` are asserted (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
+      },
+    ],
+  "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a headless firefox":
+    [
+      {
+        kind: "assert_instance_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'dispatch/system_testing/driver_test.rb:45 `@browser.options` is a Playwright `LaunchOptions` plain object with no browser-specific options class, so its `args` are asserted (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
+      },
+    ],
   "actiondispatch:dispatch/request/multipart_params_parsing_test.rb › MultipartParamsParsingTest › parses utf8 filename with percent character":
     [
       {
