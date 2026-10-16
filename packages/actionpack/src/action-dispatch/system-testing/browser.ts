@@ -57,10 +57,14 @@ export class Browser {
   async preload(): Promise<void> {
     switch (this.type) {
       case "chrome":
-        await this.resolveDriverPath(await playwrightBrowserType("chromium"));
+        await this.resolveDriverPath(
+          ((await import(PLAYWRIGHT_MODULE)) as Record<string, BrowserType>).chromium,
+        );
         break;
       case "firefox":
-        await this.resolveDriverPath(await playwrightBrowserType("firefox"));
+        await this.resolveDriverPath(
+          ((await import(PLAYWRIGHT_MODULE)) as Record<string, BrowserType>).firefox,
+        );
         break;
     }
   }
@@ -104,10 +108,4 @@ export class Browser {
     }
     this.options!.executablePath = driverPath;
   }
-}
-
-/** @noRailsEquivalent PERMANENT */
-async function playwrightBrowserType(key: "chromium" | "firefox"): Promise<BrowserType> {
-  const pw = (await import(PLAYWRIGHT_MODULE)) as Record<string, BrowserType>;
-  return pw[key];
 }
