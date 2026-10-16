@@ -531,6 +531,15 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "libyaml",
+    origin: {
+      type: "git",
+      url: "https://github.com/yaml/libyaml.git",
+      ref: "0.2.5",
+    },
+    packages: [],
+  },
+  {
     name: "i18n",
     origin: {
       type: "git",

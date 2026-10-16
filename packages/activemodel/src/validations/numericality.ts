@@ -1,3 +1,4 @@
+import { FLOAT_DIG } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   isInclude,
@@ -67,8 +68,7 @@ export class NumericalityValidator extends EachValidator {
     record: ValidatableRecord,
     attrName: string,
     value: unknown,
-    precision = 15,
-    scale?: number,
+    { precision = FLOAT_DIG, scale = null }: { precision?: number; scale?: number | null } = {},
   ): void {
     if (!this.isNumber(value, precision, scale)) {
       record.errors.add(attrName, ":not_a_number", this.filteredOptions(value));
@@ -139,7 +139,7 @@ export function optionAsNumber(
   record: ValidatableRecord,
   optionValue: unknown,
   precision: number,
-  scale?: number,
+  scale?: number | null,
 ): number | bigint | undefined {
   return parseAsNumber(this.resolveValue(record, optionValue), precision, scale);
 }
@@ -151,7 +151,7 @@ export function optionAsNumber(
 export function parseAsNumber(
   rawValue: unknown,
   precision: number,
-  scale?: number,
+  scale?: number | null,
 ): number | bigint | undefined {
   if (typeof rawValue === "number" && rawValue % 1 !== 0) {
     return parseFloat(rawValue, precision, scale);
@@ -172,7 +172,7 @@ function isNumeric(value: unknown): boolean {
 }
 
 /** @internal */
-export function round(rawValue: number, scale?: number): number {
+export function round(rawValue: number, scale?: number | null): number {
   if (scale === undefined || scale === null) return rawValue;
   if (!Number.isFinite(rawValue)) return rawValue;
   return Number(new BigDecimal(String(rawValue)).round(scale).toString("F"));
@@ -183,7 +183,7 @@ export function isNumber(
   this: { options: Record<string, unknown> },
   rawValue: unknown,
   precision: number,
-  scale?: number,
+  scale?: number | null,
 ): boolean {
   if (this.options.onlyNumeric && !isNumeric(rawValue)) return false;
 
@@ -278,7 +278,7 @@ export function isRecordAttributeChangedInPlace(
 }
 
 /** @internal */
-function parseFloat(num: number, precision: number, scale?: number): number {
+function parseFloat(num: number, precision: number, scale?: number | null): number {
   if (!Number.isFinite(num)) return num;
   return Number(new BigDecimal(round(num, scale), precision).toString("F"));
 }

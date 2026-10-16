@@ -1,12 +1,16 @@
 import { NumericalityValidator as BaseNumericalityValidator } from "@blazetrails/activemodel";
-
-const FLOAT_DIG = 15;
+import { FLOAT_DIG } from "@blazetrails/ruby-compat";
 
 export class NumericalityValidator extends BaseNumericalityValidator {
-  validateEach(record: any, attribute: string, value: unknown): void {
-    const precision = Math.min(columnPrecisionFor(record, attribute) ?? FLOAT_DIG, FLOAT_DIG);
-    const scale = columnScaleFor(record, attribute);
-    super.validateEach(record, attribute, value, precision, scale);
+  validateEach(
+    record: any,
+    attribute: string,
+    value: unknown,
+    { precision = null, scale = null }: { precision?: number | null; scale?: number | null } = {},
+  ): void {
+    precision = Math.min(columnPrecisionFor(record, attribute) ?? FLOAT_DIG, FLOAT_DIG);
+    scale = columnScaleFor(record, attribute) ?? null;
+    super.validateEach(record, attribute, value, { precision, scale });
   }
 }
 

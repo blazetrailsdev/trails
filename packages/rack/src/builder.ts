@@ -84,13 +84,14 @@ export class Builder {
     return this;
   }
 
-  run(app: RackApp): this;
+  run(app: RackApp | { call: RackApp }): this;
   run(app: null, block: RackApp): this;
-  run(app: RackApp | null, block?: RackApp): this {
+  /** @inventedArm if — PERMANENT */
+  run(app: RackApp | { call: RackApp } | null, block?: RackApp): this {
     if (app && block) {
       throw new ArgumentError("Both app and block given!");
     }
-    this._run = block || app;
+    this._run = (app !== null && typeof app === "object" ? (env) => app.call(env) : app) || block!;
     return this;
   }
 

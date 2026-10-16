@@ -671,7 +671,11 @@ export function extractFromProgram(
     Required<
       Pick<
         PackageInfo,
-        "fileFunctions" | "fileConstants" | "fileInternalConstants" | "fileNoRailsEquivalent"
+        | "fileFunctions"
+        | "fileConstants"
+        | "fileInternalConstants"
+        | "fileConstantNoRailsEquivalent"
+        | "fileNoRailsEquivalent"
       >
     > = {
     classes: {},
@@ -679,6 +683,7 @@ export function extractFromProgram(
     fileFunctions: {},
     fileConstants: {},
     fileInternalConstants: {},
+    fileConstantNoRailsEquivalent: {},
     fileNoRailsEquivalent: {},
   };
   const pendingReExports: PendingReExport[] = [];
@@ -1389,6 +1394,10 @@ export function extractFromProgram(
     if (Object.keys(fileConstants).length > 0) info.fileConstants[relPath] = fileConstants;
     const internalConstants = extractInternalFileConstants(sourceFile);
     if (internalConstants.length > 0) info.fileInternalConstants[relPath] = internalConstants;
+    const constantReceipts = extractFileConstantReceipts(sourceFile);
+    if (Object.keys(constantReceipts).length > 0) {
+      info.fileConstantNoRailsEquivalent[relPath] = constantReceipts;
+    }
 
     const fileReason = fileLevelNoRailsEquivalentReason(sourceFile);
     if (fileReason !== undefined) info.fileNoRailsEquivalent[relPath] = fileReason;
@@ -4873,6 +4882,26 @@ export function extractInternalFileConstants(sourceFile: ts.SourceFile): string[
     for (const decl of node.declarationList.declarations) {
       if (ts.isIdentifier(decl.name) && decl.initializer && tsLiteralValue(decl.initializer)) {
         out.push(decl.name.text);
+      }
+    }
+  });
+  return out;
+}
+
+/**
+ * The `extractFileConstants` names whose declaration carries a
+ * `@noRailsEquivalent` receipt, mapped to its reason.
+ */
+export function extractFileConstantReceipts(sourceFile: ts.SourceFile): Record<string, string> {
+  const out: Record<string, string> = {};
+  ts.forEachChild(sourceFile, (node) => {
+    if (!ts.isVariableStatement(node) || !isExported(node)) return;
+    if (!(node.declarationList.flags & ts.NodeFlags.Const)) return;
+    const reason = noRailsEquivalentReason(node);
+    if (reason === undefined) return;
+    for (const decl of node.declarationList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.initializer && tsLiteralValue(decl.initializer)) {
+        out[decl.name.text] = reason;
       }
     }
   });

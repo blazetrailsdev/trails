@@ -50,6 +50,7 @@ export function stripReceipts(ts: ApiManifest): ApiManifest {
   };
   for (const pkg of Object.values(out.packages)) {
     delete pkg.fileNoRailsEquivalent;
+    delete pkg.fileConstantNoRailsEquivalent;
     for (const c of [...Object.values(pkg.classes), ...Object.values(pkg.modules)]) {
       delete c.noRailsEquivalent;
       for (const m of [...c.instanceMethods, ...c.classMethods]) strip(m);

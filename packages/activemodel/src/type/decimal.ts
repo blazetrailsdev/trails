@@ -1,3 +1,4 @@
+import { FLOAT_DIG } from "@blazetrails/ruby-compat";
 import { BigDecimal, toD } from "@blazetrails/activesupport";
 import {
   Rational,
@@ -15,8 +16,6 @@ import { applyNumericMixin } from "./helpers/numeric.js";
 const NumericValueType = applyNumericMixin(ValueType<BigDecimal>);
 
 const BIGDECIMAL_PRECISION = 18;
-
-const FLOAT_DIG = 15;
 
 export class DecimalType extends NumericValueType {
   type(): string {

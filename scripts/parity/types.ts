@@ -545,6 +545,12 @@ export interface PackageInfo {
    */
   fileInternalConstants?: Record<string, string[]>;
   /**
+   * TS-side only: file → `fileConstants` name → the `@noRailsEquivalent`
+   * reason on its declaration, so a receipted constant is scored `Allowed`
+   * the way a receipted member is.
+   */
+  fileConstantNoRailsEquivalent?: Record<string, Record<string, string>>;
+  /**
    * Ruby-side only: file → the literal Hash KEY names declared in it — the keys
    * of a Hash-constant assignment and the Symbol keys an options hash is read
    * by in a method body. A key is a Ruby name that is not a declaration, so
