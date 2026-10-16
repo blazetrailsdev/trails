@@ -329,6 +329,7 @@ export class Emitter {
   }
 
   private checkSimpleKey(node: Yaml.Node): boolean {
+    if (yaml.isAlias(node)) return encoder.encode(node.source).length <= 128;
     if (!yaml.isScalar(node) && !yaml.isCollection(node)) return false;
     const tag = node.tag?.startsWith("tag:yaml.org,2002:")
       ? `!!${node.tag.slice("tag:yaml.org,2002:".length)}`
@@ -353,8 +354,10 @@ export class Emitter {
       top.node.items.push(node);
     } else if (top.key === undefined) {
       if (yaml.isScalar(node) && !this.checkSimpleKey(node)) {
-        EXPLICIT_KEYS.set(node, node.type);
+        const style = node.type;
+        node = node.clone() as Yaml.Scalar;
         node.type = "BLOCK_LITERAL";
+        EXPLICIT_KEYS.set(node, style);
       }
       top.key = node;
     } else {
