@@ -4155,6 +4155,15 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
   end
 
+  INDEXED_ITERATORS = %w[map each select reject flat_map each_with_object].freeze
+
+  def indexed_iterator_receiver?(recv, args)
+    return false unless args.all? { |a| a.is_a?(Array) && a[0] == :arg_paren && a[1].nil? }
+    return false unless recv.is_a?(Array) && recv[0] == :call && recv[3]
+
+    INDEXED_ITERATORS.include?(ident_name(recv[3]))
+  end
+
   # `Promise.new(...)`, `Promise::Complete.new(...)` and `Promise.wrap(...)` port
   # to the value itself: the native JS promise is the port of
   # `ActiveRecord::Promise` (CLAUDE.md § "`ActiveRecord::Promise` is the native
@@ -4287,7 +4296,8 @@ class ApiExtractor
 
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
        !(name == "new" && recv && proc_new_receiver?(recv)) &&
-       !(recv && native_promise_call?(name, recv))
+       !(recv && native_promise_call?(name, recv)) &&
+       !(name == "with_index" && has_block && indexed_iterator_receiver?(recv, args))
       calls << name
       kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
       (@call_receivers[name] ||= Set.new) << kind

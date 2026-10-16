@@ -1105,6 +1105,24 @@ describe(
       expect(c["Qux#d"].calls).toContain("run");
     });
 
+    it("drops a with_index chained after a block-less iterator, keeping an offset one", () => {
+      const c = rubyWeakCalls({
+        "indexed.rb": `
+        class Indexed
+          def f
+            columns.map.with_index { |c, i| c[i] }
+          end
+
+          def g
+            columns.map.with_index(1) { |c, i| c[i] }
+          end
+        end
+      `,
+      });
+      expect(c["Indexed#f"].calls).toEqual(["columns", "map"]);
+      expect(c["Indexed#g"].calls).toEqual(["columns", "map", "with_index"]);
+    });
+
     it("drops the new a raise builds its error with, keeping any other new", () => {
       const c = rubyWeakCalls({
         "raiser.rb": `

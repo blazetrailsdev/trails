@@ -1,5 +1,15 @@
 import { isPresent, wrap } from "@blazetrails/activesupport";
-import { first, Hash, rbEqual, rbHash, Set, toS, zip } from "@blazetrails/ruby-compat";
+import {
+  first,
+  Hash,
+  rbEqual,
+  rbHash,
+  rbObjId,
+  Set,
+  toS,
+  uniq,
+  zip,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 
@@ -33,7 +43,7 @@ export class Association {
     associateByDefault: boolean = true,
   ) {
     this.klass = klass;
-    this.owners = this._uniqueOwners(owners);
+    this.owners = uniq(owners, (o) => rbObjId(o));
     this.reflection = reflection;
     this.preloadScope = preloadScope ?? null;
     this._reflectionScope = reflectionScope ?? null;
@@ -263,15 +273,6 @@ export class Association {
   /** @internal */
   protected cascadeStrictLoading(scope: any): any {
     return this.preloadScope?.strictLoadingValue ? (scope.strictLoading?.() ?? scope) : scope;
-  }
-
-  private _uniqueOwners(owners: Base[]): Base[] {
-    const seen = new globalThis.Set<Base>();
-    return owners.filter((o) => {
-      if (seen.has(o)) return false;
-      seen.add(o);
-      return true;
-    });
   }
 }
 
