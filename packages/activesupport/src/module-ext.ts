@@ -80,7 +80,6 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
   const names = syms as string[];
   const instanceReader = options.instanceReader !== false;
   const instanceAccessor = options.instanceAccessor !== false;
-  const isModule = this instanceof Module;
 
   for (const sym of names) {
     if (!/^[_A-Za-z]\w*$/.test(sym)) throw new NameError(`invalid attribute name: ${sym}`);
@@ -89,12 +88,12 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
     defineAccessorHalf(target, sym, { get: () => target[storageKey] });
 
     if (instanceReader && instanceAccessor) {
-      if (isModule) {
-        target.moduleEval((mod: object) =>
-          defineAccessorHalf(mod, sym, { get: () => target[sym] }),
-        );
+      const definition = (methodTable: object) =>
+        defineAccessorHalf(methodTable, sym, { get: () => target[sym] });
+      if (this instanceof Module) {
+        target.moduleEval(definition);
       } else if (target.prototype) {
-        defineAccessorHalf(target.prototype, sym, { get: () => target[sym] });
+        definition(target.prototype);
       }
     }
 
@@ -110,7 +109,6 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
   const names = syms as string[];
   const instanceWriter = options.instanceWriter !== false;
   const instanceAccessor = options.instanceAccessor !== false;
-  const isModule = this instanceof Module;
 
   for (const sym of names) {
     if (!/^[_A-Za-z]\w*$/.test(sym)) throw new NameError(`invalid attribute name: ${sym}`);
@@ -123,15 +121,16 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
     });
 
     if (instanceWriter && instanceAccessor) {
-      const half = {
-        set: (val: unknown) => {
-          target[sym] = val;
-        },
-      };
-      if (isModule) {
-        target.moduleEval((mod: object) => defineAccessorHalf(mod, sym, half));
+      const definition = (methodTable: object) =>
+        defineAccessorHalf(methodTable, sym, {
+          set: (val: unknown) => {
+            target[sym] = val;
+          },
+        });
+      if (this instanceof Module) {
+        target.moduleEval(definition);
       } else if (target.prototype) {
-        defineAccessorHalf(target.prototype, sym, half);
+        definition(target.prototype);
       }
     }
 
