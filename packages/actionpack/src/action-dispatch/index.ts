@@ -149,10 +149,5 @@ export {
   type PlaywrightBrowserContext,
   type PlaywrightPage,
 } from "./system-testing/driver.js";
-export {
-  Server,
-  type ServerApp,
-  type ServerHandle,
-  type ServerAddress,
-} from "./system-testing/server.js";
+export { Server } from "./system-testing/server.js";
 export { Request as CacheRequest } from "./http/cache.js";

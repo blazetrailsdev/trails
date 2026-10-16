@@ -51,6 +51,7 @@ export {
   escape,
   escapePath,
 } from "./utils.js";
+export { Builder } from "./builder.js";
 export { Headers } from "./headers.js";
 export { BodyProxy } from "./body-proxy.js";
 export { DEFAULT_PORTS, Request, Helpers as RequestHelpers } from "./request.js";
