@@ -2,7 +2,7 @@ import type { aroundAction, CallbackOptions } from "../../abstract-controller/ca
 import { Concern, Module, extend, type LogLevel } from "@blazetrails/activesupport";
 
 interface LoggedController {
-  logger: { logAt(level: number | LogLevel, fn: () => void): void };
+  logger: { logAt<T>(level: number | LogLevel, fn: () => T): T };
 }
 
 export function logAt(

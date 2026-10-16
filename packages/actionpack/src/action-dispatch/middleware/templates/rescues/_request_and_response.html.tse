@@ -1,3 +1,4 @@
+<%# @missingRailsCall inspect — CONVERGEABLE debug-view-debug-params-uses-pp-and-templates-reach-inspect -%>
 <h2 class="request-heading">Request</h2>
 <% if (isParamsValid()) { %>
   <p><b>Parameters</b>:</p> <pre><%= debugParams(this.request.filteredParameters()) %></pre>

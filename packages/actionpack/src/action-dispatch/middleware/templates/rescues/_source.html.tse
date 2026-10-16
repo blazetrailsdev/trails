@@ -1,3 +1,4 @@
+<%# @missingRailsArgs line_number — CONVERGEABLE exception-wrapper-extract-source-returns-code-and-line-number -%>
 <% var errorIndex = localAssigns.errorIndex ?? 0 %>
 
 <% sourceExtracts.forEach((sourceExtract, index) => { %>

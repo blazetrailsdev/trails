@@ -18,6 +18,7 @@ export class DebugView extends Base {
     return this.constructor as typeof DebugView;
   }
 
+  /** @inventedArm prettyPrint — CONVERGEABLE debug-view-debug-params-uses-pp-and-templates-reach-inspect */
   debugParams(params: Record<string, unknown>): string {
     const cleanParams = { ...params };
     delete cleanParams["action"];
@@ -63,11 +64,7 @@ export class DebugView extends Base {
     const logger = Base.logger as Logger | null;
 
     if (rtest(logger) && rbObjRespondTo(logger, "silence")) {
-      let result!: ReturnType<Base["render"]>;
-      logger.silence(undefined, () => {
-        result = super.render(...args);
-      });
-      return result;
+      return logger.silence(undefined, () => super.render(...args))!;
     } else {
       return super.render(...args);
     }

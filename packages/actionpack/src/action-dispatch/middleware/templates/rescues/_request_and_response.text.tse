@@ -1,3 +1,4 @@
+<%# @missingRailsCall inspect — CONVERGEABLE debug-view-debug-params-uses-pp-and-templates-reach-inspect -%>
 <%
   const cleanParams = isParamsValid() ? { ...this.request.filteredParameters() } : {};
   delete cleanParams["action"];
