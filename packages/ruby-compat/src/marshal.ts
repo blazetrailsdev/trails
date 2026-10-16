@@ -1377,9 +1377,9 @@ function rObjectFor(
         if (!rbObjRespondTo(klass, "_load", true)) {
           throw new TypeError(`class ${name} needs to have method \`_load'`);
         }
-        let data: string | string = rString(arg);
+        let data: string | typeof String.prototype = rString(arg);
         if (ivp) {
-          data = rIvar(new String(data), null, arg) as string;
+          data = rIvar(new String(data), null, arg) as typeof String.prototype;
           ivp.value = false;
         }
         v = rbFSend(klass, "_load", data);

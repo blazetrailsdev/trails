@@ -1780,9 +1780,7 @@ export class Time extends rbCTime {
    * `Time._load` (`time_load`, `vendor/ruby/v3.3.11/time.c:5600`) over `time_mload`
    * (`time.c:5448`), reading the ivars {@link Time#_dump} boxes onto the String.
    *
-   * @boundary: a Time with a fixed offset has no zone-name slot, so a String zone that
-   *  `find_timezone` does not resolve keeps the offset and drops the abbreviation.
-   *
+   * @missingRailsCall time_set_zone — CONVERGEABLE time-mload-seats-string-zone
    * @noRailsEquivalent PERMANENT
    */
   static _load(str: string | typeof String.prototype): Time {
