@@ -96,16 +96,20 @@ export class Thread<R = unknown> {
   readonly #killed = new Promise<void>((resolve) => (this.#kill = resolve));
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897`):
+   * the arguments before the block are handed to it (`thread_create_core`'s
+   * `proc.args`, `vendor/ruby/v3.3.11/thread.c:822`).
    */
-  constructor(block: () => R) {
+  constructor(...argsAndBlock: [...args: unknown[], block: (...args: never[]) => R]) {
+    const block = argsAndBlock.pop() as (...args: unknown[]) => R;
+    const args = argsAndBlock;
     this.id = ++_threadIdCounter;
     this.status = "run";
     const frame = new Error().stack?.split("\n")[2] ?? "";
     const location = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);
     if (location) _locations.set(this, `${location[1]}:${location[2]}`);
     try {
-      this.#value = currentSlot().run(this as Thread, block);
+      this.#value = currentSlot().run(this as Thread, () => block(...args));
     } catch (error) {
       this.#error = { raised: error };
       this.status = "dead";

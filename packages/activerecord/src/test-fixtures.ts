@@ -232,7 +232,7 @@ async function setupFixtures(this: TestFixtures, config: typeof Base = Base): Pr
 
 /** @internal */
 async function teardownFixtures(this: TestFixtures): Promise<void> {
-  this.teardownAsynchronousQueriesSession();
+  await this.teardownAsynchronousQueriesSession();
 
   if (this.isRunInTransaction()) {
     await this.teardownTransactionalFixtures();
@@ -250,8 +250,8 @@ function setupAsynchronousQueriesSession(this: TestFixtures): void {
 }
 
 /** @internal */
-function teardownAsynchronousQueriesSession(this: TestFixtures): void {
-  if (this._asyncQueriesSession) Base.asynchronousQueriesTracker().finalizeSession(true);
+async function teardownAsynchronousQueriesSession(this: TestFixtures): Promise<void> {
+  if (this._asyncQueriesSession) await Base.asynchronousQueriesTracker().finalizeSession(true);
 }
 
 /** @internal */

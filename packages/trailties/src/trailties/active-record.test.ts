@@ -301,7 +301,7 @@ describe("RailtieTest", () => {
     );
 
     Executor.wrap(() => {
-      expect(Base.asynchronousQueriesTracker().currentSession.active()).toBe(true);
+      expect(Base.asynchronousQueriesTracker().currentSession.isActive()).toBe(true);
     });
 
     expect(() => Base.asynchronousQueriesTracker().currentSession).toThrow(

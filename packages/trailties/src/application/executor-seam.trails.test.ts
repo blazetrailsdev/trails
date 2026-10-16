@@ -49,7 +49,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
     let sessionActiveInRequest: boolean | null = null;
     let rows: unknown[] | null = null;
     const middleware = new ActionDispatchExecutor(async () => {
-      sessionActiveInRequest = Base.asynchronousQueriesSession().active();
+      sessionActiveInRequest = Base.asynchronousQueriesSession().isActive();
       rows = await selectOneAsync();
       return [200, {}, []] as unknown as RackResponse;
     }, app.executor);
@@ -59,7 +59,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
     expect(sessionActiveInRequest).toBe(true);
     expect(rows).toEqual([{ one: 1 }]);
 
-    expect(Base.asynchronousQueriesSession().active()).toBe(true);
+    expect(Base.asynchronousQueriesSession().isActive()).toBe(true);
     (body as unknown as { close(): void }).close();
     expect(() => Base.asynchronousQueriesSession()).toThrow(SESSION_ERROR);
   });
@@ -115,7 +115,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
 
   it("finalizes the session when the request raises", async () => {
     const middleware = new ActionDispatchExecutor(async () => {
-      expect(Base.asynchronousQueriesSession().active()).toBe(true);
+      expect(Base.asynchronousQueriesSession().isActive()).toBe(true);
       throw new Error("lol borked");
     }, app.executor);
 

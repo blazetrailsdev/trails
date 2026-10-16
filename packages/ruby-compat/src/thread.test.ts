@@ -2,6 +2,11 @@ import { describe, it, expect, vi } from "vitest";
 import { Thread } from "./thread.js";
 
 describe("Thread", () => {
+  it("Thread.new hands its arguments to the block", () => {
+    expect(new Thread(1, "a", (n: number, s: string) => `${s}${n}`).value()).toBe("a1");
+    expect(new Thread(() => 2).value()).toBe(2);
+  });
+
   it("is the main thread at top level", () => {
     expect(Thread.current()).toBe(Thread.main);
     expect(Thread.main.id).toBe(0);

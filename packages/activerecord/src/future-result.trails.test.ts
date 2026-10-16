@@ -105,7 +105,7 @@ describe("FutureResult", () => {
     const session = new AsynchronousQueriesTracker.Session();
     const futureResult = new FutureResult(fakePool(new Result([], [])), ["SELECT 1", null, []]);
     futureResult.scheduleBang(session);
-    session.finalize();
+    void session.finalize();
 
     expect(futureResult.canceled()).toBe(true);
     await expect(futureResult.result()).rejects.toThrow(FutureResult.Canceled);
@@ -129,7 +129,7 @@ describe("AsynchronousQueriesTracker", () => {
     );
   });
 
-  it("stacks and finalizes sessions", () => {
+  it("stacks and finalizes sessions", async () => {
     const tracker = new AsynchronousQueriesTracker();
     tracker.startSession();
     const outer = tracker.currentSession;
@@ -137,23 +137,41 @@ describe("AsynchronousQueriesTracker", () => {
     const inner = tracker.currentSession;
     expect(inner).not.toBe(outer);
 
-    tracker.finalizeSession();
-    expect(inner.active()).toBe(false);
+    await tracker.finalizeSession();
+    expect(inner.isActive()).toBe(false);
     expect(tracker.currentSession).toBe(outer);
-    expect(outer.active()).toBe(true);
+    expect(outer.isActive()).toBe(true);
 
-    tracker.finalizeSession();
-    expect(outer.active()).toBe(false);
+    await tracker.finalizeSession();
+    expect(outer.isActive()).toBe(false);
     expect(() => tracker.currentSession).toThrow();
   });
 
-  it("run starts a session on the execution state's tracker", () => {
+  it("finalize_session(true) waits for a scheduled query's synchronize block", async () => {
+    const tracker = new AsynchronousQueriesTracker();
+    tracker.startSession();
+    const session = tracker.currentSession;
+    const log: string[] = [];
+    let finish!: () => void;
+    const running = session.synchronize(async () => {
+      await new Promise<void>((resolve) => (finish = resolve));
+      log.push("query");
+    });
+    const finalizing = tracker.finalizeSession(true).then(() => log.push("finalized"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(log).toEqual([]);
+    finish();
+    await Promise.all([running, finalizing]);
+    expect(log).toEqual(["query", "finalized"]);
+  });
+
+  it("run starts a session on the execution state's tracker", async () => {
     const tracker = AsynchronousQueriesTracker.run();
     const session = tracker.currentSession;
-    expect(session.active()).toBe(true);
+    expect(session.isActive()).toBe(true);
 
-    AsynchronousQueriesTracker.complete(tracker);
-    expect(session.active()).toBe(false);
+    await AsynchronousQueriesTracker.complete(tracker);
+    expect(session.isActive()).toBe(false);
   });
 });
 

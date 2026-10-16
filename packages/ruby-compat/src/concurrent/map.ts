@@ -3,6 +3,8 @@ import { rbModConstSet } from "../include.js";
 import type { CountDownLatch } from "./count-down-latch.js";
 import type { CyclicBarrier } from "./cyclic-barrier.js";
 import type { Event } from "./event.js";
+import type { AtomicBoolean } from "./atomic-boolean.js";
+import type { ReadWriteLock } from "./read-write-lock.js";
 
 /**
  * concurrent-ruby's `Concurrent` module (`vendor/ruby/v3.3.11/class.c:1087` `rb_define_module`).
@@ -15,6 +17,8 @@ export const Concurrent = { name: "Concurrent" } as {
   CountDownLatch: typeof CountDownLatch;
   CyclicBarrier: typeof CyclicBarrier;
   Event: typeof Event;
+  AtomicBoolean: typeof AtomicBoolean;
+  ReadWriteLock: typeof ReadWriteLock;
 };
 
 /**
