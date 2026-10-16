@@ -64,7 +64,7 @@ export class Driver {
     this._capabilities = capabilities;
 
     if (driverType === "selenium") {
-      this._browser = new Browser(options.using as string);
+      this._browser = new Browser(options.using);
       if (this._options.browser !== "remote") {
         this._preload = this._browser.preload();
       }
