@@ -978,18 +978,21 @@ export function flatten(ary: readonly unknown[]): unknown[] {
  * order, deduplicated through `ary_make_hash` (`array.c:5342`) — a Hash, so it
  * keys on `hash`/`eql?`, never `==` or identity: `1` and `1n` collapse the way
  * Ruby's `1` and `1` do, a tuple is `eql?` by its elements, and a value whose
- * class defines only `==` stays distinct.
+ * class defines only `==` stays distinct. With a block, each element is keyed
+ * on the block's result (`ary_make_hash_by`, `array.c:5361`) and the first
+ * element for each key is kept.
  * @noRailsEquivalent PERMANENT — Ruby core `Array#uniq`
  *   (`vendor/ruby/v3.3.11/array.c:6177`).
  */
-export function uniq<T>(ary: readonly T[]): T[] {
-  const hash = new Map<number, T[]>();
+export function uniq<T>(ary: readonly T[], block?: (element: T) => unknown): T[] {
+  const hash = new Map<number, unknown[]>();
   const result: T[] = [];
   for (const element of ary) {
-    const key = rbHash(element);
+    const k = block ? block(element) : element;
+    const key = rbHash(k);
     const bucket = hash.get(key) ?? [];
-    if (bucket.some((seen) => rbEql(seen, element))) continue;
-    bucket.push(element);
+    if (bucket.some((seen) => rbEql(seen, k))) continue;
+    bucket.push(k);
     hash.set(key, bucket);
     result.push(element);
   }

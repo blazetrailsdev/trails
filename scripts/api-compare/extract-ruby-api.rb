@@ -4148,6 +4148,20 @@ class ApiExtractor
   # side already satisfies (extract-ts-api.ts records `constructor` for every
   # `new X()`, and rubyMethodToTs("new") is ["constructor"]), so this verdict is
   # per-SITE — a body with both `Proc.new` and `Foo.new` still records the second.
+  # `columns.map.with_index { |name, i| … }` (activerecord/lib/active_record/
+  # result.rb:182) ports as `columns.map((name, i) => …)`: a JS iterator's
+  # callback already receives the index, so the block-less iterator carries the
+  # call and `with_index` names none of its own. An offset (`with_index(1)`)
+  # has no such form, since a JS index always starts at 0.
+  INDEXED_ITERATORS = %w[map each select reject flat_map each_with_object].freeze
+
+  def indexed_iterator_receiver?(recv, args)
+    return false unless args.all? { |a| a.is_a?(Array) && a[0] == :arg_paren && a[1].nil? }
+    return false unless recv.is_a?(Array) && recv[0] == :call && recv[3]
+
+    INDEXED_ITERATORS.include?(ident_name(recv[3]))
+  end
+
   def proc_new_receiver?(recv)
     return false unless recv.is_a?(Array) && recv[0] == :var_ref
 
@@ -4287,7 +4301,8 @@ class ApiExtractor
 
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
        !(name == "new" && recv && proc_new_receiver?(recv)) &&
-       !(recv && native_promise_call?(name, recv))
+       !(recv && native_promise_call?(name, recv)) &&
+       !(name == "with_index" && has_block && indexed_iterator_receiver?(recv, args))
       calls << name
       kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
       (@call_receivers[name] ||= Set.new) << kind

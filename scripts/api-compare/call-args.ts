@@ -583,6 +583,13 @@ for (const [mri, { tsExport }] of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS) {
  *  not aligned. */
 const MODULE_MIXIN_EXPORTS = new Set(["prepend", "include", "extend"]);
 
+/** ActiveSupport core extensions ported as `@blazetrails/activesupport`
+ *  functions taking the Ruby receiver as argument 1: `Hash#stringify_keys`
+ *  (activesupport/lib/active_support/core_ext/hash/keys.rb:10) is
+ *  `stringifyKeys(h)`. Aligned by callee, since `HashWithIndifferentAccess`
+ *  also defines `stringify_keys` as a method. */
+const ACTIVESUPPORT_RECEIVER_EXPORTS = new Map([["stringify_keys", "stringifyKeys"]]);
+
 /**
  * Whether the TS site carries the Ruby receiver as argument 1: by name, for a
  * {@link RECEIVER_AS_FIRST_ARG} built-in; or by callee, where the name is one
@@ -595,6 +602,8 @@ const MODULE_MIXIN_EXPORTS = new Set(["prepend", "include", "extend"]);
 function receiverIsFirstArg(ruby: CallSite, ts: CallSite): boolean {
   if (RECEIVER_AS_FIRST_ARG.has(ruby.name)) return true;
   if (MODULE_MIXIN_EXPORTS.has(ruby.name)) return ts.rubyCompat === ruby.name;
+  const activeSupport = ACTIVESUPPORT_RECEIVER_EXPORTS.get(ruby.name);
+  if (activeSupport !== undefined && ts.activeSupport === activeSupport) return true;
   return (
     ts.rubyCompat !== undefined &&
     RECEIVER_KEYED_EXPORTS_BY_NAME.get(ruby.name)?.has(ts.rubyCompat) === true

@@ -13,7 +13,7 @@ import {
   type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { Hash, isEmpty, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
+import { Hash, isEmpty, rbObjId, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
 import { beforeCommittedOnAllRecords } from "../../active-record.js";
 
 /** @internal */
@@ -519,15 +519,7 @@ export class Transaction {
 
   /** @internal */
   private uniqueRecords(): TransactionRecord[] {
-    const seen = new Set<unknown>();
-    const result: TransactionRecord[] = [];
-    for (const record of this.records ?? []) {
-      if (!seen.has(record)) {
-        seen.add(record);
-        result.push(record);
-      }
-    }
-    return result;
+    return uniq(this.records!, (r) => rbObjId(r));
   }
 
   /** @internal */

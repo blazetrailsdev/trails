@@ -161,6 +161,10 @@ let currentChecker: ts.TypeChecker | undefined;
  */
 const rubyCompatBindings = new WeakMap<ts.SourceFile, ReadonlyMap<string, string>>();
 
+/** Per file, each local name bound from `@blazetrails/activesupport` → the
+ *  export it binds, for `CallSite.activeSupport`. */
+const activeSupportBindings = new WeakMap<ts.SourceFile, ReadonlyMap<string, string>>();
+
 interface CacheEntry {
   schemaVersion: string;
   fingerprint: string;
@@ -4882,13 +4886,22 @@ export function extractInternalFileConstants(sourceFile: ts.SourceFile): string[
 function rubyCompatBindingsFor(sourceFile: ts.SourceFile): ReadonlyMap<string, string> {
   let bindings = rubyCompatBindings.get(sourceFile);
   if (!bindings) {
-    bindings = collectRubyCompatBindings(sourceFile);
+    bindings = collectPackageBindings(sourceFile, "@blazetrails/ruby-compat");
     rubyCompatBindings.set(sourceFile, bindings);
   }
   return bindings;
 }
 
-function collectRubyCompatBindings(sourceFile: ts.SourceFile): Map<string, string> {
+function activeSupportBindingsFor(sourceFile: ts.SourceFile): ReadonlyMap<string, string> {
+  let bindings = activeSupportBindings.get(sourceFile);
+  if (!bindings) {
+    bindings = collectPackageBindings(sourceFile, "@blazetrails/activesupport");
+    activeSupportBindings.set(sourceFile, bindings);
+  }
+  return bindings;
+}
+
+function collectPackageBindings(sourceFile: ts.SourceFile, pkg: string): Map<string, string> {
   const bindings = new Map<string, string>();
   ts.forEachChild(sourceFile, (node) => {
     if (
@@ -4899,7 +4912,7 @@ function collectRubyCompatBindings(sourceFile: ts.SourceFile): Map<string, strin
     ) {
       return;
     }
-    if (!node.moduleSpecifier.text.startsWith("@blazetrails/ruby-compat")) return;
+    if (!node.moduleSpecifier.text.startsWith(pkg)) return;
     for (const el of node.importClause.namedBindings.elements) {
       bindings.set(el.name.text, (el.propertyName ?? el.name).text);
     }
@@ -6499,6 +6512,9 @@ function recordCallSite(
     const rubyCompat = ts.isIdentifier(callee)
       ? rubyCompatBindingsFor(call.getSourceFile()).get(callee.text)
       : undefined;
+    const activeSupport = ts.isIdentifier(callee)
+      ? activeSupportBindingsFor(call.getSourceFile()).get(callee.text)
+      : undefined;
     sites.push({
       name,
       args,
@@ -6507,6 +6523,7 @@ function recordCallSite(
         ? { recv }
         : {}),
       ...(rubyCompat !== undefined ? { rubyCompat } : {}),
+      ...(activeSupport !== undefined ? { activeSupport } : {}),
     });
   }
 

@@ -65,6 +65,12 @@ export interface CallSite {
    * cannot where Rails defines the same name (`Relation#merge`).
    */
   rubyCompat?: string;
+  /**
+   * TS side only: the `@blazetrails/activesupport` export a bare-identifier
+   * callee binds to (`stringifyKeys` for `stringifyKeys(h)`), the same proof
+   * as `rubyCompat` for a core extension activesupport ports as a function.
+   */
+  activeSupport?: string;
 }
 
 export interface ParamInfo {

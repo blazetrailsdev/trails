@@ -35,7 +35,7 @@ import {
   unpack1,
 } from "./array.js";
 import { Range } from "./range.js";
-import { rbFSend, rbObjRespondTo } from "./object.js";
+import { rbFSend, rbObjId, rbObjRespondTo } from "./object.js";
 import { byteslice } from "./string/byte-methods.js";
 
 describe("Array#pack", () => {
@@ -419,6 +419,14 @@ describe("Array#compact and Array#uniq", () => {
         [1, 3],
       ]),
     ).toEqual([[1n, 3]]);
+  });
+
+  it("keys on a block's result and keeps the first element per key", () => {
+    expect(uniq(["a", "bb", "c", "dd"], (s) => s.length)).toEqual(["a", "bb"]);
+    const x = { a: 1 };
+    const y = { a: 1 };
+    expect(uniq([x, y, x], (o) => rbObjId(o))).toEqual([x, y]);
+    expect(uniq([x, y, x], (o) => rbObjId(o))[1]).toBe(y);
   });
 });
 

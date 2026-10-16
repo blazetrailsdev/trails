@@ -1388,6 +1388,24 @@ describe("pairCallSites core_ext receiver as argument 1", () => {
   });
 });
 
+describe("compareCallArgs function-form Hash#stringify_keys", () => {
+  const ruby = { ...site("stringify_keys", []), recv: "call:extract_options!" };
+
+  it("aligns the receiver of activesupport's stringifyKeys export", () => {
+    const ts = {
+      ...site("stringifyKeys", ["call:extractOptionsBang"]),
+      activeSupport: "stringifyKeys",
+    };
+    expect(compareCallArgs(ruby, ts).verdict).toBe("match");
+  });
+
+  it("does not align a bare stringifyKeys that is not the export", () => {
+    expect(compareCallArgs(ruby, site("stringifyKeys", ["call:extractOptionsBang"])).verdict).toBe(
+      "mismatch",
+    );
+  });
+});
+
 describe("compareCallArgs function-form Hash#merge", () => {
   const ruby = { ...site("merge", ["call:conditional_options"]), recv: "call:as_options" };
 
