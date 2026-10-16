@@ -161,15 +161,11 @@ export function uncomparedInlinedTags(
     .sort();
 }
 
-/**
- * The Rails chain a constructor that inlines module bodies answers to
- * (RFC 0188), in the order Ruby runs it: the class's own `self.new`, then a
- * tagged `ClassMethods#new`, both of which `Class#new` is entered through
- * before any `initialize`, then each prepended module's `initialize`, the
- * class's own, each included module's, and any tagged module outside
- * `ancestors` in tag order. Empty when the class has no `self.new`, no
- * same-file module and no tag, which leaves the pair to the ordinary gate.
- */
+/** The last segment of a Ruby `A::B` or TS `A.B` name. */
+export function shortName(name: string): string {
+  return name.split(/::|\./).pop()!;
+}
+
 /**
  * Whether `tsClass` is named after a Ruby class other than `rubyModule` in
  * `rubyModule`'s own `.rb`, so that it ports that sibling rather than
@@ -180,14 +176,23 @@ export function portsSiblingClass(
   rubyModule: string,
   classes: Readonly<Record<string, ClassInfo>>,
 ): boolean {
-  const short = (fqn: string) => fqn.split(/::|\./).pop();
   const file = classes[rubyModule]?.file;
-  if (file === undefined || short(tsClass) === short(rubyModule)) return false;
+  if (file === undefined || shortName(tsClass) === shortName(rubyModule)) return false;
   return Object.entries(classes).some(
-    ([fqn, other]) => fqn !== rubyModule && other.file === file && short(fqn) === short(tsClass),
+    ([fqn, other]) =>
+      fqn !== rubyModule && other.file === file && shortName(fqn) === shortName(tsClass),
   );
 }
 
+/**
+ * The Rails chain a constructor that inlines module bodies answers to
+ * (RFC 0188), in the order Ruby runs it: the class's own `self.new`, then a
+ * tagged `ClassMethods#new`, both of which `Class#new` is entered through
+ * before any `initialize`, then each prepended module's `initialize`, the
+ * class's own, each included module's, and any tagged module outside
+ * `ancestors` in tag order. Empty when the class has no `self.new`, no
+ * same-file module and no tag, which leaves the pair to the ordinary gate.
+ */
 export function inlinedSegments(
   own: MethodInfo | undefined,
   ancestors: ModuleAncestors,
