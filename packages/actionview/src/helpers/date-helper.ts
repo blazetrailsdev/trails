@@ -1,4 +1,4 @@
-import { I18n, htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
+import { I18n, htmlSafe, isPlainObject, type SafeBuffer } from "@blazetrails/activesupport";
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import {
   ArgumentError,
@@ -319,13 +319,16 @@ export class DateTimeSelector {
   selectDatetime(): SafeBuffer {
     let order = [...this.dateOrder()];
     order = order.filter((o) => !["hour", "minute", "second"].includes(o));
-    if (!order.includes("year")) this._options.discardYear ||= true;
-    if (!order.includes("month")) this._options.discardMonth ||= true;
+    if (!order.includes("year"))
+      if (!present(this._options.discardYear)) this._options.discardYear = true;
+    if (!order.includes("month"))
+      if (!present(this._options.discardMonth)) this._options.discardMonth = true;
     if (present(this._options.discardMonth) || !order.includes("day"))
-      this._options.discardDay ||= true;
-    if (present(this._options.discardHour)) this._options.discardMinute ||= true;
+      if (!present(this._options.discardDay)) this._options.discardDay = true;
+    if (present(this._options.discardHour))
+      if (!present(this._options.discardMinute)) this._options.discardMinute = true;
     if (!(present(this._options.includeSeconds) && !present(this._options.discardMinute)))
-      this._options.discardSecond ||= true;
+      if (!present(this._options.discardSecond)) this._options.discardSecond = true;
 
     this.setDayIfDiscarded();
 
@@ -346,10 +349,12 @@ export class DateTimeSelector {
     this._options.discardMinute = true;
     this._options.discardSecond = true;
 
-    if (!order.includes("year")) this._options.discardYear ||= true;
-    if (!order.includes("month")) this._options.discardMonth ||= true;
+    if (!order.includes("year"))
+      if (!present(this._options.discardYear)) this._options.discardYear = true;
+    if (!order.includes("month"))
+      if (!present(this._options.discardMonth)) this._options.discardMonth = true;
     if (present(this._options.discardMonth) || !order.includes("day"))
-      this._options.discardDay ||= true;
+      if (!present(this._options.discardDay)) this._options.discardDay = true;
 
     this.setDayIfDiscarded();
 
@@ -364,7 +369,8 @@ export class DateTimeSelector {
     this._options.discardMonth = true;
     this._options.discardYear = true;
     this._options.discardDay = true;
-    if (!present(this._options.includeSeconds)) this._options.discardSecond ||= true;
+    if (!present(this._options.includeSeconds))
+      if (!present(this._options.discardSecond)) this._options.discardSecond = true;
 
     if (!present(this._options.ignoreDate)) order = [...order, "year", "month", "day"];
 
@@ -396,16 +402,16 @@ export class DateTimeSelector {
       return this.buildHidden("hour", this.hour());
     } else {
       const options: Record<string, unknown> = {};
-      options.ampm = this._options.ampm || false;
-      options.start = this._options.startHour ?? 0;
-      options.end = this._options.endHour ?? 23;
+      options.ampm = present(this._options.ampm) ? this._options.ampm : false;
+      options.start = present(this._options.startHour) ? this._options.startHour : 0;
+      options.end = present(this._options.endHour) ? this._options.endHour : 23;
       return this.buildOptionsAndSelect("hour", this.hour(), options);
     }
   }
 
   selectDay(): SafeBuffer {
     if (present(this._options.useHidden) || present(this._options.discardDay)) {
-      return this.buildHidden("day", this.day() || 1);
+      return this.buildHidden("day", present(this.day()) ? this.day() : 1);
     } else {
       return this.buildSelect("day", this.buildDayOptions(this.day()));
     }
@@ -413,7 +419,7 @@ export class DateTimeSelector {
 
   selectMonth(): SafeBuffer {
     if (present(this._options.useHidden) || present(this._options.discardMonth)) {
-      return this.buildHidden("month", this.month() || 1);
+      return this.buildHidden("month", present(this.month()) ? this.month() : 1);
     } else {
       const monthOptions: string[] = [];
       for (let monthNumber = 1; monthNumber <= 12; monthNumber++) {
@@ -441,11 +447,17 @@ export class DateTimeSelector {
       return this.buildHidden("year", val);
     } else {
       const options: Record<string, number> = {};
-      options.start = (this._options.startYear as number) ?? middleYear - 5;
-      options.end = (this._options.endYear as number) ?? middleYear + 5;
+      options.start = present(this._options.startYear)
+        ? (this._options.startYear as number)
+        : middleYear - 5;
+      options.end = present(this._options.endYear)
+        ? (this._options.endYear as number)
+        : middleYear + 5;
       options.step = options.start < options.end ? 1 : -1;
 
-      const maxYearsAllowed = (this._options.maxYearsAllowed as number) ?? 1000;
+      const maxYearsAllowed = present(this._options.maxYearsAllowed)
+        ? (this._options.maxYearsAllowed as number)
+        : 1000;
 
       if (Math.abs(options.end - options.start) > maxYearsAllowed) {
         throw new ArgumentError(
@@ -454,6 +466,27 @@ export class DateTimeSelector {
       }
 
       return this.buildSelect("year", this.buildYearOptions(val, options));
+    }
+  }
+
+  static {
+    for (const method of ["sec", "min", "hour", "day", "month", "year"]) {
+      Object.defineProperty(this.prototype, method, {
+        value(this: { _datetime: unknown }): unknown {
+          const datetime = this._datetime;
+          if (isPlainObject(datetime)) {
+            return (datetime as Record<string, unknown>)[method];
+          } else if (typeof datetime === "number") {
+            return datetime;
+          } else if (datetime == null) {
+            return null;
+          } else {
+            return rbFSend(datetime, method);
+          }
+        },
+        writable: true,
+        configurable: true,
+      });
     }
   }
 
@@ -474,7 +507,11 @@ export class DateTimeSelector {
   /** @internal */
   private monthNames(): unknown[] {
     return (this._monthNames ??= (() => {
-      let monthNames = (this._options.useMonthNames ?? this.translatedMonthNames()) as unknown[];
+      let monthNames = (
+        present(this._options.useMonthNames)
+          ? this._options.useMonthNames
+          : this.translatedMonthNames()
+      ) as unknown[];
       if (monthNames.length < 13) monthNames = [null, ...monthNames];
       return monthNames;
     })());
@@ -526,7 +563,9 @@ export class DateTimeSelector {
 
   /** @internal */
   private dateOrder(): string[] {
-    return (this._dateOrder ??= (this._options.order as string[]) || this.translatedDateOrder());
+    return (this._dateOrder ??= present(this._options.order)
+      ? (this._options.order as string[])
+      : this.translatedDateOrder());
   }
 
   /** @internal */
@@ -542,7 +581,7 @@ export class DateTimeSelector {
     );
     if (forbiddenElements.length > 0) {
       throw new StandardError(
-        `${String(this._options.locale)}.date.order only accepts :year, :month and :day`,
+        `${String(this._options.locale ?? "")}.date.order only accepts :year, :month and :day`,
       );
     }
 
@@ -565,11 +604,11 @@ export class DateTimeSelector {
       options,
     );
 
-    const start = (options.start as number) ?? 0;
+    const start = present(options.start) ? (options.start as number) : 0;
     delete options.start;
-    const stop = (options.end as number) ?? 59;
+    const stop = present(options.end) ? (options.end as number) : 59;
     delete options.end;
-    const step = (options.step as number) ?? 1;
+    const step = present(options.step) ? (options.step as number) : 1;
     delete options.step;
     const leadingZeros = options.leadingZeros;
     delete options.leadingZeros;
@@ -647,7 +686,7 @@ export class DateTimeSelector {
   /** @internal */
   private cssClassAttribute(type: DateType, htmlOptionsClass: unknown, options: unknown): string {
     let cssClass: unknown;
-    if (options != null && typeof options === "object") {
+    if (isPlainObject(options)) {
       cssClass = (options as Record<string, unknown>)[type];
     } else {
       cssClass = type;
@@ -659,7 +698,7 @@ export class DateTimeSelector {
   /** @internal */
   private promptOptionTag(type: DateType, options: unknown): SafeBuffer | string {
     let prompt: unknown;
-    if (options != null && typeof options === "object") {
+    if (isPlainObject(options)) {
       const defaultOptions: Record<string, unknown> = {
         year: false,
         month: false,
@@ -692,19 +731,21 @@ export class DateTimeSelector {
         value,
         autocomplete: "off",
       },
-      "disabled" in this._htmlOptions ? { disabled: this._htmlOptions.disabled } : {},
+      Object.hasOwn(this._htmlOptions, "disabled") ? { disabled: this._htmlOptions.disabled } : {},
     );
     if (present(this._options.disabled)) selectOptions.disabled = "disabled";
 
-    return (this.tag("input", selectOptions) as SafeBuffer).plus(htmlSafe("\n"));
+    return htmlSafe(String(this.tag("input", selectOptions)) + htmlSafe("\n"));
   }
 
   /** @internal */
   private inputNameFromType(type: DateType): string {
-    let prefix = (this._options.prefix as string) ?? DateTimeSelector.DEFAULT_PREFIX;
-    if ("index" in this._options) prefix += `[${String(this._options.index)}]`;
+    let prefix = present(this._options.prefix)
+      ? (this._options.prefix as string)
+      : DateTimeSelector.DEFAULT_PREFIX;
+    if (Object.hasOwn(this._options, "index")) prefix += `[${String(this._options.index)}]`;
 
-    let fieldName = (this._options.fieldName as string) ?? type;
+    let fieldName = present(this._options.fieldName) ? (this._options.fieldName as string) : type;
     if (present(this._options.includePosition)) {
       fieldName += `(${DateTimeSelector.POSITION[type]}i)`;
     }
@@ -780,22 +821,3 @@ export interface DateTimeSelector extends Included<typeof import("./tag-helper.j
 }
 
 include(DateTimeSelector, TagHelper);
-
-for (const method of ["sec", "min", "hour", "day", "month", "year"]) {
-  Object.defineProperty(DateTimeSelector.prototype, method, {
-    value(this: { _datetime: unknown }): unknown {
-      const datetime = this._datetime;
-      if (datetime != null && Object.getPrototypeOf(datetime) === Object.prototype) {
-        return (datetime as Record<string, unknown>)[method];
-      } else if (typeof datetime === "number") {
-        return datetime;
-      } else if (datetime == null) {
-        return null;
-      } else {
-        return rbFSend(datetime, method);
-      }
-    },
-    writable: true,
-    configurable: true,
-  });
-}
