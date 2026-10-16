@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { isAbsentHalf } from "@blazetrails/ruby-compat";
 import {
   delegate,
   mattrAccessor,
@@ -190,14 +191,14 @@ describe("ModuleAttributeAccessorTest", () => {
     (MyModule as any).config = "class_value";
     expect(instance.config).toBe("class_value");
     const desc = Object.getOwnPropertyDescriptor(MyModule.prototype, "config");
-    expect(desc?.set).toBeUndefined();
+    expect(isAbsentHalf(desc?.set)).toBe(true);
   });
 
   it("should not create instance reader", () => {
     class MyModule {}
     mattrAccessor.call(MyModule, "secret", { instanceReader: false });
     const desc = Object.getOwnPropertyDescriptor(MyModule.prototype, "secret");
-    expect(desc?.get).toBeUndefined();
+    expect(isAbsentHalf(desc?.get)).toBe(true);
     expect(desc?.set).toBeDefined();
   });
 

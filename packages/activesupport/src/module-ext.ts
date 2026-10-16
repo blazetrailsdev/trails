@@ -1,4 +1,10 @@
-import { classpaths, Module, NameError, rbModName } from "@blazetrails/ruby-compat";
+import {
+  classpaths,
+  defineAccessorHalf,
+  Module,
+  NameError,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
@@ -45,20 +51,6 @@ function assertValidAttrName(name: string): void {
   if (!VALID_ATTR_NAME.test(name)) {
     throw new Error(`Invalid attribute name: ${name}`);
   }
-}
-
-function defineAccessorHalf(
-  target: object,
-  name: string,
-  half: { get?: () => unknown; set?: (value: unknown) => void },
-): void {
-  const existing = Object.getOwnPropertyDescriptor(target, name);
-  Object.defineProperty(target, name, {
-    configurable: true,
-    enumerable: false,
-    get: half.get ?? existing?.get,
-    set: half.set ?? existing?.set,
-  });
 }
 
 function setMattrDefault(
@@ -128,9 +120,7 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
           },
         });
       if (this instanceof Module) {
-        target.moduleEval((mod: object) => {
-          if (Object.getOwnPropertyDescriptor(mod, sym)?.get) definition(mod);
-        });
+        target.moduleEval(definition);
       } else if (target.prototype) {
         definition(target.prototype);
       }

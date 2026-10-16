@@ -12,6 +12,9 @@ import {
   rbModName,
   rbModToS,
   rbObjSingletonClass,
+  rbModMethodDefined,
+  rbObjRespondTo,
+  rbFSend,
 } from "./object.js";
 import {
   include,
@@ -1287,6 +1290,49 @@ describe("Module#superMethod", () => {
     record.title = "x";
     expect(record.stored).toBe("x!");
     expect(record.title).toBe("<x!>");
+  });
+
+  it("answers a reader from one included module and a writer from another, in either order", () => {
+    const build = (readerFirst: boolean) => {
+      const Reader = new Module((m) => {
+        m.moduleEval((table) => {
+          Object.defineProperty(table, "x", {
+            configurable: true,
+            get(this: { _x?: unknown }) {
+              return `read:${String(this._x)}`;
+            },
+          });
+        });
+      });
+      const Writer = new Module((m) => m.attrWriter("x"));
+      class Host {}
+      for (const mod of readerFirst ? [Reader, Writer] : [Writer, Reader]) include(Host, mod);
+      return new Host() as { x: unknown };
+    };
+    for (const readerFirst of [true, false]) {
+      const obj = build(readerFirst);
+      obj.x = 123;
+      expect(obj.x).toBe("read:123");
+      expect(Object.hasOwn(obj, "x")).toBe(false);
+    }
+  });
+
+  it("leaves a writer-only module's absent reader out of method_defined? and super", () => {
+    const Writer = new Module((m) => m.attrWriter("x"));
+    expect(Writer.isMethodDefined("x")).toBe(false);
+    class Base {
+      get x(): string {
+        return "base";
+      }
+    }
+    class Host extends Base {}
+    include(Host, Writer);
+    const host = new Host();
+    expect(host.x).toBe("base");
+    expect(Writer.superMethod(host, "x")!()).toBe("base");
+    expect(rbModMethodDefined(Host, "x")).toBe(true);
+    expect(rbObjRespondTo(host, "x")).toBe(true);
+    expect(rbFSend(host, "x")).toBe("base");
   });
 
   it("resumes above a class's singleton link, and the class still constructs", () => {

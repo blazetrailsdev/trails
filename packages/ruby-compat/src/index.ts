@@ -81,6 +81,8 @@ export {
   toSym,
   rbModAttrReader,
   rbModAttrWriter,
+  defineAccessorHalf,
+  isAbsentHalf,
   rbModDefineMethod,
   rbModMethodDefined,
   rbModPublicMethodDefined,

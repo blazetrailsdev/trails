@@ -12,6 +12,7 @@ import {
   getChildProcess,
   hashAref,
   keys,
+  isAbsentHalf,
   rbAnyToS,
   rbEqual,
   rbModToS,
@@ -608,11 +609,13 @@ function respondsTo(object: object, name: string, includeAll: boolean): boolean 
   if (name in object) {
     const descriptor = findDescriptor(object, name);
     if (descriptor && "value" in descriptor && descriptor.value === undefined) return false;
+    if (descriptor && "get" in descriptor && isAbsentHalf(descriptor.get)) {
+      return basicObjRespondTo(object, name, !includeAll);
+    }
     return !(descriptor && descriptor.set !== undefined && descriptor.get === undefined);
   }
-  if (name.endsWith("=") && findDescriptor(object, name.slice(0, -1))?.set !== undefined) {
-    return true;
-  }
+  const setter = name.endsWith("=") ? findDescriptor(object, name.slice(0, -1))?.set : undefined;
+  if (setter !== undefined && !isAbsentHalf(setter)) return true;
   return basicObjRespondTo(object, name, !includeAll);
 }
 
