@@ -257,6 +257,7 @@ export class Base {
     this.assignController(controller as Parameters<typeof assignController>[0]);
     this._prepareContext();
 
+    this._routes = null;
     initializeIncludedModules(this);
 
     this.assign(assigns);

@@ -285,6 +285,14 @@ export function transformKeys<T extends AnyObject>(
   hash: T,
   block: (key: string) => string,
 ): Record<string, unknown>;
+export function transformKeys<T extends AnyObject, U extends object>(
+  hash: T,
+  block: (key: string) => U,
+): Hash<U, unknown>;
+export function transformKeys<U extends object>(
+  hash: AnyObject | Map<string, unknown>,
+  block: (key: string) => U,
+): Map<U, unknown>;
 export function transformKeys<V>(
   hash: AnyObject | Map<string, V>,
   block: (key: string) => string,
@@ -299,9 +307,16 @@ export function transformKeys(
     for (const [key, value] of hash) result.set((block as (key: unknown) => unknown)(key), value);
     return result;
   }
-  const result: Record<string, unknown> = {};
+  let result: Record<string, unknown> | Hash<unknown, unknown> = {};
   for (const key of Object.keys(hash)) {
-    hashAset(result, (block as (key: string) => string)(key), hash[key]);
+    const newKey = (block as (key: string) => unknown)(key);
+    if (!(result instanceof Hash) && typeof newKey === "object" && newKey !== null) {
+      const objectKeyed = new Hash<unknown, unknown>();
+      for (const [k, v] of Object.entries(result)) objectKeyed.set(k, v);
+      result = objectKeyed;
+    }
+    if (result instanceof Hash) result.set(newKey, hash[key]);
+    else hashAset(result, newKey as string, hash[key]);
   }
   return result;
 }

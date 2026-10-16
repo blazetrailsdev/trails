@@ -129,3 +129,9 @@ describe("ActionView::Base class-hosted accessors", () => {
     expect(Tse.tseTrimMode).toBe(">");
   });
 });
+
+describe("ActionView::Base#initialize Routing::UrlFor segment", () => {
+  it("starts a view with _routes nil", () => {
+    expect(new Base()._routes).toBeNull();
+  });
+});
