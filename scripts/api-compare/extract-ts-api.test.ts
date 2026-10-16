@@ -1812,6 +1812,29 @@ describe("body call capture", () => {
     expect(skeleton("poll")).toEqual(["loop", "if", "ref:done"]);
   });
 
+  it("keeps the `if` and `throw` of a negated instanceof guard that throws something other than the catch binding", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        run(cause: Error) {
+          try {
+            this.work();
+          } catch (error) {
+            if (!(error instanceof Busy)) throw cause;
+            this.retry();
+          }
+        }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "run")!.skeleton).toEqual([
+      "try",
+      "ref:work",
+      "rescue",
+      "if",
+      "throw",
+      "ref:retry",
+    ]);
+  });
+
   it("reads a loop that only pushes an awaited element as the `map` an awaiting `collect` block lowers to", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -7652,6 +7675,28 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(seats("config")).toEqual(["static", "instance"]);
     expect(seats("listeners")).toEqual(["static", "static writer", "instance", "instance writer"]);
     expect(seats("isConfig")).toEqual([]);
+  });
+
+  it("credits attrInternal on a moduleEval carrier as the module's instance reader and writer", () => {
+    const info = extractFromFiles("/p", {
+      "form-helper.ts": `
+        import { attrInternal, attrInternalReader } from "@blazetrails/activesupport";
+        import { Module } from "@blazetrails/ruby-compat";
+        export const FormHelper = new Module((mod) => {
+          mod.moduleEval((m) => {
+            attrInternal.call(m, "defaultFormBuilder");
+            attrInternalReader.call(m, "builder");
+          });
+        });
+      `,
+    });
+    const mod = info.modules["form-helper.ts:FormHelper"];
+    const seats = (name: string) =>
+      [...mod.classMethods, ...mod.instanceMethods]
+        .filter((m) => m.name === name)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats("defaultFormBuilder")).toEqual(["instance", "instance writer"]);
+    expect(seats("builder")).toEqual(["instance"]);
   });
 
   it("credits a Module's attrReader / attrWriter with the instance half each installs", () => {
