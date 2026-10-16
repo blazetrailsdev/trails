@@ -103,11 +103,13 @@ export class SystemTestCase extends TestCase {
     if (this._page) return this._page;
     let session = sessions.get(vite.currentDriver!);
     if (!session) {
-      session = vite.drivers[vite.currentDriver!](vite.app) as Promise<{
+      const name = vite.currentDriver!;
+      session = vite.drivers[name](vite.app) as Promise<{
         browser: Browser;
         options: Record<string, unknown>;
       }>;
-      sessions.set(vite.currentDriver!, session);
+      sessions.set(name, session);
+      session.catch(() => sessions.delete(name));
     }
     const { browser, options } = await session;
     this._context = await browser.newContext(options);

@@ -26,7 +26,9 @@ export class DebugView extends Base {
     if (Object.keys(cleanParams).length === 0) {
       return "None";
     }
-    return (PP.pp(cleanParams, new StringIO(), 200) as StringIO).string();
+    const out = new StringIO();
+    PP.pp(cleanParams, out, 200);
+    return out.string();
   }
 
   debugHeaders(headers: Record<string, unknown> | null | undefined): string {
