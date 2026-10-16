@@ -1,9 +1,49 @@
 /**
+ * `Psych::Handler::DumperOptions` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/handler.rb:16-27`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class DumperOptions {
+  /** @noRailsEquivalent PERMANENT */
+  lineWidth = 0;
+  /** @noRailsEquivalent PERMANENT */
+  indentation = 2;
+  /** @noRailsEquivalent PERMANENT */
+  canonical = false;
+}
+
+/**
  * `Psych::Handler` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/handler.rb:13`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export class Handler {
+  /**
+   * `Psych::Handler::OPTIONS` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/handler.rb:30`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static readonly OPTIONS: DumperOptions = new DumperOptions();
+
+  /**
+   * `Psych::Handler::EVENTS` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/handler.rb:33-43`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static readonly EVENTS: readonly string[] = [
+    "alias",
+    "empty",
+    "endDocument",
+    "endMapping",
+    "endSequence",
+    "endStream",
+    "scalar",
+    "startDocument",
+    "startMapping",
+    "startSequence",
+    "startStream",
+  ];
+
   /** @noRailsEquivalent PERMANENT */
   startStream(_encoding: number): unknown {
     return undefined;
@@ -19,7 +59,7 @@ export class Handler {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  endDocument(_implicit?: boolean): unknown {
+  endDocument(_implicit: boolean): unknown {
     return undefined;
   }
 

@@ -60,19 +60,51 @@ export interface YAMLTreeOptions {
 }
 
 /**
+ * `YAMLTree::Registrar` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:16-41`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class Registrar {
+  private readonly objToId = new Map<unknown, number>();
+  private readonly objToNode = new Map<unknown, Node>();
+  private readonly targets: unknown[] = [];
+  private counter = 0;
+
+  /** @noRailsEquivalent PERMANENT */
+  register(target: unknown, node: Node): void {
+    this.targets.push(target);
+    this.objToNode.set(target, node);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isKey(target: unknown): boolean {
+    return this.objToNode.has(target);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  idFor(target: unknown): number {
+    let id = this.objToId.get(target);
+    if (id === undefined) this.objToId.set(target, (id = ++this.counter));
+    return id;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  nodeFor(target: unknown): Node | undefined {
+    return this.objToNode.get(target);
+  }
+}
+
+/**
  * `Psych::Visitors::YAMLTree` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:15`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export class YAMLTree {
   /** @internal */
-  protected readonly st = new Map<object, Node>();
-  /** @noRailsEquivalent PERMANENT */
-  started = false;
-  /** @noRailsEquivalent PERMANENT */
-  finished = false;
+  protected readonly st = new Registrar();
+  private _started = false;
+  private _finished = false;
   private readonly emitter: TreeBuilder;
-  private anchors = 0;
   private readonly options: YAMLTreeOptions;
   private readonly ss: ScalarScanner;
   private readonly lineWidth: number | null;
@@ -108,10 +140,12 @@ export class YAMLTree {
 
   /** @noRailsEquivalent PERMANENT */
   accept(target: unknown): Node {
-    if (target !== null && typeof target === "object" && this.st.has(target)) {
-      const node = this.st.get(target)! as Mapping;
-      node.anchor ??= String(++this.anchors);
-      return this.emitter.alias(node.anchor);
+    if (this.st.isKey(target)) {
+      const oid = this.st.idFor(target);
+      const node = this.st.nodeFor(target) as Mapping;
+      const anchor = String(oid);
+      node.anchor = anchor;
+      return this.emitter.alias(anchor);
     }
 
     if (rbObjRespondTo(target, "encodeWith")) {
@@ -387,8 +421,8 @@ export class YAMLTree {
       : time.strftime("%Y-%m-%d %H:%M:%S.%9N %:z");
   }
 
-  private register(target: object, yamlObj: Node): Node {
-    this.st.set(target, yamlObj);
+  private register(target: unknown, yamlObj: Node): Node {
+    this.st.register(target, yamlObj);
     return yamlObj;
   }
 
@@ -435,7 +469,7 @@ export class YAMLTree {
    */
   start(encoding: number = Stream.UTF8): Stream {
     const stream = this.emitter.startStream(encoding);
-    this.started = true;
+    this._started = true;
     return stream;
   }
 
@@ -446,7 +480,7 @@ export class YAMLTree {
    */
   finish(): Stream {
     const stream = this.emitter.endStream();
-    this.finished = true;
+    this._finished = true;
     return stream;
   }
 
@@ -461,13 +495,23 @@ export class YAMLTree {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  isFinished(): boolean {
-    return this.finished;
+  get started(): boolean {
+    return this._started;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get finished(): boolean {
+    return this._finished;
   }
 
   /** @noRailsEquivalent PERMANENT */
   isStarted(): boolean {
     return this.started;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isFinished(): boolean {
+    return this.finished;
   }
 
   /**
@@ -535,7 +579,7 @@ export class RestrictedYAMLTree extends YAMLTree {
 
   /** @noRailsEquivalent PERMANENT */
   override accept(target: unknown): Node {
-    if (!this.aliases && target !== null && typeof target === "object" && this.st.has(target)) {
+    if (!this.aliases && this.st.isKey(target)) {
       throw new BadAlias("Tried to dump an aliased object");
     }
 

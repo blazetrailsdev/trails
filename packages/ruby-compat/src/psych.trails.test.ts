@@ -458,10 +458,11 @@ describe("YAMLTree through a TreeBuilder", () => {
   // `YAMLTree#push` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:102-119`)
   it("starts each document with the :header and :version arms", async () => {
     const { YAMLTree } = await import("./psych/visitors/yaml-tree.js");
+    type Document = import("./psych/nodes/document.js").Document;
     const versionOf = (options: object) => {
       const visitor = YAMLTree.create(options);
       visitor.push("a");
-      return (visitor.tree.children[0] as unknown as { version: number[] }).version;
+      return (visitor.tree.children[0] as Document).version;
     };
     expect(versionOf({})).toEqual([]);
     expect(versionOf({ header: true })).toEqual([1, 1]);
@@ -476,5 +477,31 @@ describe("YAMLTree through a TreeBuilder", () => {
     expect(visitor.isFinished()).toBe(false);
     expect(visitor.tree).toBe(visitor.tree);
     expect(visitor.isFinished()).toBe(true);
+  });
+
+  // `TreeBuilder#set_location` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/tree_builder.rb:120-133`)
+  it("stamps the last event_location on each node it builds", async () => {
+    const { TreeBuilder } = await import("./psych/tree-builder.js");
+    const builder = new TreeBuilder();
+    builder.eventLocation(0, 0, 0, 0);
+    builder.startStream(1);
+    builder.eventLocation(1, 2, 1, 2);
+    const doc = builder.startDocument([], [], false);
+    builder.eventLocation(1, 4, 1, 7);
+    const scalar = builder.scalar("foo", null, null, true, false, 1);
+    builder.eventLocation(2, 0, 3, 1);
+    builder.endDocument();
+    expect([scalar.startLine, scalar.startColumn, scalar.endLine, scalar.endColumn]).toEqual([
+      1, 4, 1, 7,
+    ]);
+    expect([doc.startLine, doc.startColumn, doc.endLine, doc.endColumn]).toEqual([1, 2, 3, 1]);
+    expect(doc.implicitEnd).toBe(true);
+  });
+
+  // `YAMLTree#accept`'s `@st.key?` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:123-130`)
+  it("aliases a class dumped twice, as ruby -ryaml does", async () => {
+    const { Psych } = await import("./psych.js");
+    const { rbCString } = await import("./object.js");
+    expect(Psych.dump([rbCString, rbCString])).toBe("---\n- &1 !ruby/class 'String'\n- *1\n");
   });
 });
