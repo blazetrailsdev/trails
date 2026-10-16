@@ -411,9 +411,26 @@ export default defineConfig({
   root: "app",
   test: {
     root: fileURLToPath(new URL(".", import.meta.url)),
-    include: ["test/**/*.test.ts"],
-    exclude: ["test/{system,dummy,fixtures}/**/*.test.ts"],
     globalSetup: ["test/global-setup.ts"],
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          include: ["test/**/*.test.ts"],
+          exclude: ["test/{system,dummy,fixtures}/**/*.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "system",
+          include: ["test/system/**/*.test.ts"],
+          pool: "forks",
+          provide: { screenshotDirectory: "tmp/screenshots" },
+        },
+      },
+    ],
   },
   publicDir: false,
   build: {

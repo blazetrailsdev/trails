@@ -145,7 +145,7 @@ describe("DevcontainerGeneratorTest", () => {
       '  drivenBy(":selenium", { using: ":headless_chrome" });\n',
     );
     run();
-    expect(env().CAPYBARA_SERVER_PORT).toBe("45678");
+    expect(env().TRAILS_SYSTEM_TESTING_SERVER_PORT).toBe("45678");
     expect(env().SELENIUM_HOST).toBe("selenium");
     expect(read("test/application_system_test_case.ts")).toMatch(/servedBy/);
   });
@@ -157,7 +157,7 @@ describe("DevcontainerGeneratorTest", () => {
     run({ systemTest: false });
     expect(services()["rails-app"].depends_on ?? []).not.toContain("selenium");
     expect(services().selenium).toBeUndefined();
-    expect(env().CAPYBARA_SERVER_PORT).toBeUndefined();
+    expect(env().TRAILS_SYSTEM_TESTING_SERVER_PORT).toBeUndefined();
   });
   it("test_dockerfile_content", () => {
     run({ nodeVersion: "20.0.0" });

@@ -140,7 +140,7 @@ export class DevcontainerGenerator extends GeneratorBase {
 
     const env: Record<string, string> = {};
     if (systemTest)
-      Object.assign(env, { CAPYBARA_SERVER_PORT: "45678", SELENIUM_HOST: "selenium" });
+      Object.assign(env, { TRAILS_SYSTEM_TESTING_SERVER_PORT: "45678", SELENIUM_HOST: "selenium" });
     if (redis) env.REDIS_URL = "redis://redis:6379/1";
     if (kamal) env.KAMAL_REGISTRY_PASSWORD = "$KAMAL_REGISTRY_PASSWORD";
     if (this.database.service) env.DB_HOST = this.database.name;
@@ -251,8 +251,8 @@ services:
   }
 
   private systemTestConfiguration(): string {
-    return `  if (process.env.CAPYBARA_SERVER_PORT) {
-    servedBy({ host: "rails-app", port: process.env.CAPYBARA_SERVER_PORT });
+    return `  if (process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT) {
+    servedBy({ host: "rails-app", port: process.env.TRAILS_SYSTEM_TESTING_SERVER_PORT });
     drivenBy(":selenium", { using: ":headless_chrome", screenSize: [1400, 1400], options: { browser: ":remote", url: \`http://\${process.env.SELENIUM_HOST}:4444\` } });
   } else {
     drivenBy(":selenium", { using: ":headless_chrome", screenSize: [1400, 1400] });

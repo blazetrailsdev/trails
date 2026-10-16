@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Gem } from "@blazetrails/ruby-compat";
-import { Browser } from "./browser.js";
+import { Browser, serviceDriverPath } from "./browser.js";
+import { requirePlaywright } from "./driver.js";
 
 const installed = import.meta.url.replace(/^file:\/\//, "");
 const paths = vi.hoisted(() => ({ chromium: "", firefox: "" }));
@@ -11,6 +12,10 @@ vi.mock("playwright", () => ({
 }));
 
 describe("Browser", () => {
+  beforeEach(() => {
+    serviceDriverPath.clear();
+  });
+
   it("maps headless names to their browser type", () => {
     expect(new Browser("headless_chrome").type).toBe("chrome");
     expect(new Browser("headless_firefox").type).toBe("firefox");
@@ -60,10 +65,11 @@ describe("Browser", () => {
     paths.firefox = installed;
     const chrome = new Browser("headless_chrome");
     await chrome.preload();
-    expect(chrome.options?.executablePath).toBe(installed);
+    const playwright = await requirePlaywright();
+    expect(serviceDriverPath.get(playwright.chromium as never)).toBe(installed);
     const firefox = new Browser("firefox");
     await firefox.preload();
-    expect(firefox.options?.executablePath).toBe(installed);
+    expect(serviceDriverPath.get(playwright.firefox as never)).toBe(installed);
   });
 
   it("preload raises when the browser is not installed", async () => {

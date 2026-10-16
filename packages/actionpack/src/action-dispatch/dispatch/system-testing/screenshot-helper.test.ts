@@ -29,7 +29,7 @@ vi.spyOn(chromium, "executablePath").mockImplementation(() => foundExecutable);
 vi.spyOn(firefox, "executablePath").mockImplementation(() => foundExecutable);
 
 const { DrivenByRackTest, DrivenBySeleniumWithChrome } =
-  await import("../../../test-helpers/driven-by.js");
+  await import("../../../test-helpers/abstract-unit.js");
 
 describe("ScreenshotHelperTest", () => {
   let host: InstanceType<typeof DrivenBySeleniumWithChrome>;

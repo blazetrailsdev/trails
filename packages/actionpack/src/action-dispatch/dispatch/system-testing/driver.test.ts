@@ -3,23 +3,29 @@ import type { BrowserType, LaunchOptions } from "playwright";
 import { assertNoChanges } from "@blazetrails/activesupport";
 import { rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { Driver, requirePlaywright } from "../../system-testing/driver.js";
-import type { Browser } from "../../system-testing/browser.js";
+import { serviceDriverPath, type Browser } from "../../system-testing/browser.js";
 
 const foundExecutable = new URL(import.meta.url).pathname;
-const driverPaths = { chromium: foundExecutable, firefox: foundExecutable };
+let chromium: BrowserType;
+let firefox: BrowserType;
 
 beforeAll(async () => {
-  const { chromium, firefox } = (await requirePlaywright()) as {
+  ({ chromium, firefox } = (await requirePlaywright()) as {
     chromium: BrowserType;
     firefox: BrowserType;
-  };
-  vi.spyOn(chromium, "executablePath").mockImplementation(() => driverPaths.chromium);
-  vi.spyOn(firefox, "executablePath").mockImplementation(() => driverPaths.firefox);
+  });
+  vi.spyOn(chromium, "executablePath").mockImplementation(() => foundExecutable);
+  vi.spyOn(firefox, "executablePath").mockImplementation(() => foundExecutable);
 });
 
 afterAll(() => {
   vi.restoreAllMocks();
 });
+
+function setDriverPath(namespace: BrowserType, path: string | undefined): void {
+  if (path === undefined) serviceDriverPath.delete(namespace);
+  else serviceDriverPath.set(namespace, path);
+}
 
 function browserOf(driver: Driver): Browser {
   return rbObjIvarGet(driver, "@browser") as Browser;
@@ -61,14 +67,14 @@ describe("DriverTest", () => {
   });
 
   it("initializing the driver with a headless chrome and custom path", () => {
-    const originalDriverPath = driverPaths.chromium;
+    const originalDriverPath = serviceDriverPath.get(chromium);
     try {
       expect(() => {
-        driverPaths.chromium = foundExecutable;
+        serviceDriverPath.set(chromium, "bin/test");
         new Driver("selenium", { using: "headless_chrome", screenSize: [1400, 1400] });
       }).not.toThrow();
     } finally {
-      driverPaths.chromium = originalDriverPath;
+      setDriverPath(chromium, originalDriverPath);
     }
   });
 
@@ -86,14 +92,14 @@ describe("DriverTest", () => {
   });
 
   it("initializing the driver with a headless firefox and custom path", () => {
-    const originalDriverPath = driverPaths.firefox;
+    const originalDriverPath = serviceDriverPath.get(firefox);
     try {
       expect(() => {
-        driverPaths.firefox = foundExecutable;
+        serviceDriverPath.set(firefox, "bin/test");
         new Driver("selenium", { using: "headless_firefox", screenSize: [1400, 1400] });
       }).not.toThrow();
     } finally {
-      driverPaths.firefox = originalDriverPath;
+      setDriverPath(firefox, originalDriverPath);
     }
   });
 
@@ -197,25 +203,25 @@ describe("DriverTest", () => {
   });
 
   it("preloads browser's driver_path with DriverFinder if a path isn't already specified", async () => {
-    const originalDriverPath = driverPaths.chromium;
+    const originalDriverPath = serviceDriverPath.get(chromium);
     try {
-      driverPaths.chromium = foundExecutable;
+      serviceDriverPath.delete(chromium);
       const driver = new Driver("selenium", { screenSize: [1400, 1400], using: "chrome" });
       await (driver as unknown as { _preload: Promise<void> })._preload;
 
-      expect(browserOf(driver).options!.executablePath).toBe(foundExecutable);
+      expect(serviceDriverPath.get(chromium)).toBe(foundExecutable);
     } finally {
-      driverPaths.chromium = originalDriverPath;
+      setDriverPath(chromium, originalDriverPath);
     }
   });
 
   it("does not overwrite existing driver_path during preload", async () => {
-    const originalDriverPath = driverPaths.chromium;
+    const originalDriverPath = serviceDriverPath.get(chromium);
     try {
-      driverPaths.chromium = foundExecutable;
+      serviceDriverPath.set(chromium, "bin/test");
 
       await assertNoChanges(
-        () => driverPaths.chromium,
+        () => serviceDriverPath.get(chromium),
         null,
         {},
         async () => {
@@ -224,7 +230,7 @@ describe("DriverTest", () => {
         },
       );
     } finally {
-      driverPaths.chromium = originalDriverPath;
+      setDriverPath(chromium, originalDriverPath);
     }
   });
 
