@@ -76,4 +76,19 @@ describe("Exception#set_backtrace", () => {
     expect(exc.stack).toBe("Error: boom\n    at foo (a.js:1:2)\n    at bar (b.js:3:4)");
     expect(excBacktraceLocations(exc)!.map((loc) => loc.label)).toEqual(["foo", "bar"]);
   });
+
+  it("dispatches to an exception's own backtrace and backtraceLocations", () => {
+    const locations = [new Location("    at foo (a.js:1:2)")];
+    class Proxy extends Error {
+      backtrace(): string[] {
+        return ["proxied"];
+      }
+      backtraceLocations(): Location[] {
+        return locations;
+      }
+    }
+    const exc = new Proxy("boom");
+    expect(excBacktrace(exc)).toEqual(["proxied"]);
+    expect(excBacktraceLocations(exc)).toBe(locations);
+  });
 });

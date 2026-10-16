@@ -216,19 +216,11 @@ export class TemplateError extends ActionViewError {
     this.template = template;
   }
 
-  /** @inventedArm if — CONVERGEABLE template-error-backtrace-dispatches-to-cause */
   backtrace(): string[] {
-    const cause: unknown = this.cause;
-    if (cause instanceof SyntaxErrorProxy) return cause.backtrace();
     return excBacktrace(this.cause) ?? [];
   }
 
-  /** @inventedArm if — CONVERGEABLE template-error-backtrace-dispatches-to-cause */
   backtraceLocations(): Location[] | null {
-    const cause: unknown = this.cause;
-    if (cause instanceof SyntaxErrorProxy) {
-      return cause.backtraceLocations() as Location[] | null;
-    }
     return excBacktraceLocations(this.cause);
   }
 
