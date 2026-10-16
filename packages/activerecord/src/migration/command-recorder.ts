@@ -609,7 +609,7 @@ for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
   if (method in CommandRecorder.prototype) continue;
   (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] = function (
     this: CommandRecorder,
-    ...args: unknown[]
+    ...args: [...args: unknown[], block: MigrationBlock] | unknown[]
   ): Promise<MigrationCommand[]> {
     while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
     const block =
