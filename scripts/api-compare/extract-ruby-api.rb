@@ -2491,9 +2491,6 @@ class ApiExtractor
           name = "#{base}#{suffix_in_def}"
           method_name = form == :writer ? "#{name}=" : name
           generated = defs[method_name]
-          # The template's own parameter list wins when it re-parses
-          # (`def #{method}(event)`, action_controller/log_subscriber.rb:77-88);
-          # otherwise fall back to the accessor shape.
           params =
             if generated
               extract_params(generated[:params])
