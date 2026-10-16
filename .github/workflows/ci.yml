@@ -971,7 +971,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm vitest run packages/actionpack
+      - run: pnpm vitest run packages/actionpack --project "!system"
 
   # RFC 0166 system tests: the `system` Vitest project, against real browsers.
   # webkit and webdriverio are not installed by default.
