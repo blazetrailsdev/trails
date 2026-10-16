@@ -615,3 +615,10 @@ export function rbPlus(v: unknown, i: unknown): unknown {
     `undefined method '+' for ${v == null ? "nil" : `an instance of ${rbObjClassname(v)}`}`,
   );
 }
+
+/**
+ * `Float::DIG` (`vendor/ruby/v3.3.11/numeric.c:6283`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const FLOAT_DIG = 15;

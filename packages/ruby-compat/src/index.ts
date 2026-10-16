@@ -246,7 +246,7 @@ export {
 export type { Extended, Included, Initialized, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
 export { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "./kernel-catch.js";
-export { FLOAT_DIG, kernelFloat } from "./kernel-float.js";
+export { kernelFloat } from "./kernel-float.js";
 export { format, sprintf } from "./kernel-format.js";
 export { warn } from "./kernel-warn.js";
 export { kernelInteger } from "./kernel-integer.js";
@@ -264,7 +264,7 @@ export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-mi
 export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
-export { anybits, fixDiv, fixMod, isFinite, isNan, round, toF, toI } from "./numeric.js";
+export { FLOAT_DIG, anybits, fixDiv, fixMod, isFinite, isNan, round, toF, toI } from "./numeric.js";
 export {
   intXor,
   numericMinus,
