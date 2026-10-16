@@ -8,11 +8,15 @@ export const vite: {
   config: InlineConfig & { server: NonNullable<InlineConfig["server"]> };
   server: ViteDevServer | undefined;
   url: string | undefined;
+  drivers: Record<string, (app: RackMiddleware | undefined) => Promise<unknown>>;
+  currentDriver: string | undefined;
 } = {
   app: undefined,
   config: { server: { host: "127.0.0.1", port: 0 } },
   server: undefined,
   url: undefined,
+  drivers: {},
+  currentDriver: undefined,
 };
 
 export class Server {

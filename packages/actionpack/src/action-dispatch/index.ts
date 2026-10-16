@@ -141,13 +141,6 @@ export {
   type DrivenByOptions,
   type ServedByOptions,
 } from "./system-test-case.js";
-export {
-  Driver,
-  type BrowserName,
-  type DriverOptions,
-  type PlaywrightBrowser,
-  type PlaywrightBrowserContext,
-  type PlaywrightPage,
-} from "./system-testing/driver.js";
+export { Driver, type BrowserName, type DriverOptions } from "./system-testing/driver.js";
 export { Server } from "./system-testing/server.js";
 export { Request as CacheRequest } from "./http/cache.js";

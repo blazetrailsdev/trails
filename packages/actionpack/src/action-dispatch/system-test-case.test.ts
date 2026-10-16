@@ -32,7 +32,7 @@ describe("ActionDispatch::SystemTestCase", () => {
   });
 
   it("constructor defaults driver to playwright and calls use", () => {
-    const useSpy = vi.spyOn(Driver.prototype, "use").mockResolvedValue(undefined);
+    const useSpy = vi.spyOn(Driver.prototype, "use").mockReturnValue(undefined);
     new SystemTestCase();
     expect(SystemTestCase.driver).toBeDefined();
     expect(SystemTestCase.driver!.name).toBe("playwright");

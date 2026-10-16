@@ -24,12 +24,10 @@ export class SystemTestCase {
     classAttribute.call(this, "driver", { instanceAccessor: false });
   }
 
-  private _driverReady: Promise<void>;
-
   constructor() {
     const klass = this.constructor as typeof SystemTestCase;
     if (!klass.driver) klass.drivenBy("playwright");
-    this._driverReady = klass.driver!.use();
+    klass.driver!.use();
   }
 
   static drivenBy(driver: string, options: DrivenByOptions = {}): void {
