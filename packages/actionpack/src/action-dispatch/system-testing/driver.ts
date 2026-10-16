@@ -67,7 +67,10 @@ export class Driver {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall configure — CONVERGEABLE converge-driver-onto-vitest-native-drivers
+   */
   private async register(): Promise<void> {
     switch (this._driverType) {
       case "selenium":

@@ -549,6 +549,7 @@ export class TimeWithZone {
     return this.asJson();
   }
 
+  /** @inventedArm assign — PERMANENT */
   initWith(coder: YAML.Coder): void {
     Object.assign(
       this,

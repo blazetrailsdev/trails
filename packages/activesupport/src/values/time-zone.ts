@@ -831,6 +831,7 @@ export class TimeZone {
     return this.tzinfo.isDst(time);
   }
 
+  /** @inventedArm assign — PERMANENT */
   initWith(coder: YAML.Coder): void {
     Object.assign(this, TimeZone.create(coder["name"] as string));
   }
