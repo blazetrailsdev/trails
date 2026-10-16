@@ -110,14 +110,17 @@ export class Driver {
   /** @internal */
   private async registerSelenium(app: RackMiddleware | undefined): Promise<unknown> {
     await this._preload;
-    const options = this.browserOptions();
+    this.browserOptions();
     // @nie disposition=port-real rails=actionpack/lib/action_dispatch/system_testing/driver.rb:55
     throw new NotImplementedError(
       "selenium is not implemented; see converge-driver-selenium-arm-onto-webdriverio",
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm launch — CONVERGEABLE converge-system-test-case-onto-test-case-with-page-and-expect-element
+   */
   private async registerCuprite(app: RackMiddleware | undefined): Promise<unknown> {
     const options = { ...this._options, windowSize: this._screenSize };
     const { chromium } = (await requirePlaywright()) as { chromium: BrowserType };
@@ -132,7 +135,10 @@ export class Driver {
     return new Session(app!);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm launch — CONVERGEABLE converge-system-test-case-onto-test-case-with-page-and-expect-element
+   */
   private async registerPlaywright(app: RackMiddleware | undefined): Promise<unknown> {
     let screen: { width: number; height: number } | undefined;
     if (this._screenSize) screen = { width: this._screenSize[0], height: this._screenSize[1] };
