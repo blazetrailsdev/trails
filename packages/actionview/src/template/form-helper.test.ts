@@ -1333,7 +1333,7 @@ describe("FormHelperTest", () => {
         (this.prototype as unknown as Record<string, (...args: unknown[]) => unknown>)[selector] =
           function (this: FormBuilder, field: string, ...args: unknown[]) {
             return htmlSafe(
-              `<label for='${field}'>${humanize(field)}:</label> ` +
+              `<label for='${field}'>${humanize(String(field))}:</label> ` +
                 String(zuper.call(this, field, ...args)) +
                 "<br/>",
             );
