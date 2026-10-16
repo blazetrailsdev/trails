@@ -1,7 +1,7 @@
 import { b } from "../string/b.js";
-import { registerConstant } from "../variable.js";
 import { ArgumentError } from "../argument-error.js";
 import { rbEqual } from "../rb-equal.js";
+import { registerConstant } from "../variable.js";
 import { BadURIError, DEFAULT_PARSER, InvalidComponentError, InvalidURIError } from "./common.js";
 import type { RFC2396Parser } from "./rfc2396-parser.js";
 import type { RFC3986Parser } from "./rfc3986-parser.js";

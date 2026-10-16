@@ -1,10 +1,10 @@
 import { ArgumentError } from "../argument-error.js";
-import { registerConstant } from "../variable.js";
 import { Encoding } from "../encoding.js";
 import { rbObjClone } from "../include.js";
 import { bytes } from "../string/bytes.js";
 import { encode } from "../string/encode.js";
 import { forceEncoding, rbObjEncoding } from "../string/force-encoding.js";
+import { registerConstant } from "../variable.js";
 import { Generic } from "./generic.js";
 import { RFC2396Parser } from "./rfc2396-parser.js";
 import { RFC3986Parser } from "./rfc3986-parser.js";
