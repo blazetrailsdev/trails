@@ -38,7 +38,7 @@ export async function requirePlaywright(): Promise<Record<string, unknown>> {
 }
 
 interface BrowserType {
-  launch(options: LaunchOptions): Promise<unknown>;
+  launch(options: Record<string, unknown>): Promise<unknown>;
 }
 
 export class Driver {
@@ -64,7 +64,7 @@ export class Driver {
     this._capabilities = capabilities;
 
     if (driverType === "selenium") {
-      this._browser = new Browser(options.using!);
+      this._browser = new Browser(options.using as string);
       if (this._options.browser !== "remote") {
         this._preload = this._browser.preload();
         this._preload.catch(() => undefined);
@@ -111,6 +111,7 @@ export class Driver {
   /** @internal */
   private async registerSelenium(app: RackMiddleware | undefined): Promise<unknown> {
     await this._preload;
+    const options = this.browserOptions();
     // @nie disposition=port-real rails=actionpack/lib/action_dispatch/system_testing/driver.rb:55
     throw new NotImplementedError(
       "selenium is not implemented; see converge-driver-selenium-arm-onto-webdriverio",
@@ -119,20 +120,21 @@ export class Driver {
 
   /** @internal */
   private async registerCuprite(app: RackMiddleware | undefined): Promise<unknown> {
+    const options = { ...this._options, windowSize: this._screenSize };
     const { chromium } = (await requirePlaywright()) as { chromium: BrowserType };
-    return chromium.launch(
-      compact({ ...this._options, windowSize: this._screenSize }) as LaunchOptions,
-    );
+    return { app, options, browser: await chromium.launch(options) };
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs new — PERMANENT
+   */
   private async registerRackTest(app: RackMiddleware | undefined): Promise<unknown> {
     return new Session(app!);
   }
 
   /** @internal */
   private async registerPlaywright(app: RackMiddleware | undefined): Promise<unknown> {
-    void app;
     let screen: { width: number; height: number } | undefined;
     if (this._screenSize) screen = { width: this._screenSize[0], height: this._screenSize[1] };
     const options = compact({
@@ -142,7 +144,7 @@ export class Driver {
     });
 
     const { chromium } = (await requirePlaywright()) as { chromium: BrowserType };
-    return chromium.launch(options as LaunchOptions);
+    return { app, options, browser: await chromium.launch(options) };
   }
 
   /** @internal */
