@@ -11,6 +11,7 @@ import { isEmpty } from "@blazetrails/ruby-compat";
 export const FILENAME_MAX_SIZE = 226;
 const FILEPATH_MAX_SIZE = 900;
 const GITKEEP_FILES = [".gitkeep", ".keep"];
+const LOCK_RETRY_MS = 10;
 
 function dirFormatter(dir: number): string {
   return dir.toString(16).toUpperCase().padStart(3, "0");
@@ -181,7 +182,7 @@ export class FileStore extends Store implements CacheStore {
       return await File.open(fileName, "r+", async (f) => {
         try {
           while (f.flock(File.LOCK_EX | File.LOCK_NB) === false) {
-            await new Promise((resolve) => setTimeout(resolve, 10));
+            await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
           }
           return await block();
         } finally {

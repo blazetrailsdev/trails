@@ -53,6 +53,7 @@ export const StaleSessionCheck = {
     return this.staleSessionCheckBang(() => Persisted.prototype.extractSessionId.call(this, env));
   },
 
+  /** @inventedArm if — PERMANENT */
   staleSessionCheckBang<T>(
     this: { staleSessionCheckBang<U>(block: () => U): U },
     block: () => T,
