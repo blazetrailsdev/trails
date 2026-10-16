@@ -2544,6 +2544,25 @@ describe(
       ]);
     });
 
+    it("records the parameter name of a class_eval heredoc writer def", () => {
+      const m = metaMethods(`
+      module ActiveSupport
+        class Options
+          %w(level).each do |name|
+            class_eval <<-EOV, __FILE__, __LINE__ + 1
+              def #{name}=(new_level)
+                @#{name} = new_level
+              end
+            EOV
+          end
+        end
+      end
+    `);
+      expect(m["ActiveSupport::Options"].map((x) => [x.name, x.params])).toEqual([
+        ["level=", [{ name: "new_level", kind: "required" }]],
+      ]);
+    });
+
     it("keeps the literal suffix a class_eval def name carries after the loop variable", () => {
       const m = metaMethods(`
       module ActionDispatch
