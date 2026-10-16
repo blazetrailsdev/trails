@@ -142,7 +142,7 @@ describe("ResponseTest", () => {
       expires: new Date(Date.UTC(2005, 9, 10, 5)),
     });
     res.deleteCookie("login");
-    expect(res.cookies).toStrictEqual({ user_name: "david", login: undefined });
+    expect(res.cookies).toStrictEqual({ user_name: "david", login: null });
   });
 
   it("read ETag and Cache-Control", () => {

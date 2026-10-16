@@ -445,15 +445,15 @@ export class Response {
     this.setHeader(SET_COOKIE, Array.isArray(header) ? header.join("\n") : header);
   }
 
-  get cookies(): Record<string, string | undefined> {
-    const cookies: Record<string, string | undefined> = {};
+  get cookies(): Record<string, string | null> {
+    const cookies: Record<string, string | null> = {};
     let header: string | string[] | undefined = this.getHeader(SET_COOKIE);
     if (header != null) {
       if (typeof header === "string") header = stringSplit(header, "\n");
       for (const cookie of header) {
         const pair = stringSplit(cookie, ";")[0];
         if (pair != null) {
-          const [key, value] = stringSplit(pair, "=").map((v) => unescape(v));
+          const [key, value = null] = stringSplit(pair, "=").map((v) => unescape(v));
           cookies[key] = value;
         }
       }
