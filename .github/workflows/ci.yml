@@ -980,7 +980,8 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.actionpack_affected == 'true'
+      (needs.changes.outputs.actionpack_affected == 'true' ||
+      needs.changes.outputs.trailties_affected == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -2475,9 +2476,14 @@ jobs:
                     continue
                   fi
                   ;;
-                actionpack-tests|system-tests)
+                actionpack-tests)
                   # Actionpack test skip is legitimate when no actionpack-affecting paths changed.
                   if [ "$AP_AFFECTED" = "false" ]; then
+                    continue
+                  fi
+                  ;;
+                system-tests)
+                  if [ "$AP_AFFECTED" = "false" ] && [ "$TRAILTIES_AFFECTED" = "false" ]; then
                     continue
                   fi
                   ;;

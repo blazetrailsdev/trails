@@ -1,8 +1,8 @@
 import type { BrowserType, LaunchOptions } from "playwright";
-import { Gem } from "@blazetrails/ruby-compat";
+import { File, Gem } from "@blazetrails/ruby-compat";
 import { requirePlaywright } from "./driver.js";
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE converge-driver-selenium-arm-onto-webdriverio */
 export const serviceDriverPath = new Map<BrowserType, string>();
 
 export class Browser {
@@ -84,12 +84,18 @@ export class Browser {
 
   /**
    * @internal
-   * @missingRailsCall new — PERMANENT
    * @missingRailsCall path — PERMANENT
+   * @inventedArm throw — PERMANENT
+   * @inventedArm isExistAsync — PERMANENT
    */
   private async resolveDriverPath(namespace: BrowserType): Promise<void> {
-    const driverPath = serviceDriverPath.get(namespace) ?? namespace.executablePath();
+    let driverPath = serviceDriverPath.get(namespace);
+    if (driverPath == null) {
+      driverPath = namespace.executablePath();
+      if (!(await File.isExistAsync(driverPath))) {
+        throw new Error(`Executable doesn't exist at ${driverPath}`);
+      }
+    }
     serviceDriverPath.set(namespace, driverPath);
-    this.options!.executablePath = driverPath;
   }
 }
