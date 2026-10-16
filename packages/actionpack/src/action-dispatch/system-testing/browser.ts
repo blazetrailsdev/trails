@@ -3,14 +3,14 @@ import { File, Gem } from "@blazetrails/ruby-compat";
 import { requirePlaywright } from "./driver.js";
 
 export class Browser {
-  readonly name: string;
+  readonly name: string | undefined;
   private _options: LaunchOptions | undefined;
 
-  constructor(name: string) {
+  constructor(name: string | undefined) {
     this.name = name;
   }
 
-  get type(): string {
+  get type(): string | undefined {
     switch (this.name) {
       case "headless_chrome":
         return "chrome";
