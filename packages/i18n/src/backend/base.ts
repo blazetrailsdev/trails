@@ -21,7 +21,11 @@ import {
   type TranslationKey,
 } from "../i18n.js";
 import {
+  Hash,
+  JSON,
   NotImplementedError,
+  hasKey,
+  hashAref,
   isSymbol,
   symbolToS,
   kernelCatch,
@@ -90,14 +94,6 @@ function readLocaleModule(filename: string): unknown {
   return localeModules.get(filename);
 }
 
-function deepFreeze(value: unknown): unknown {
-  if (typeof value !== "object" || value === null) return value;
-  if (Object.isFrozen(value)) return value;
-  Object.freeze(value);
-  for (const child of Object.values(value)) deepFreeze(child);
-  return value;
-}
-
 function readFile(filename: string): string {
   const contents = fileContents.get(filename);
   if (contents === undefined) {
@@ -130,7 +126,13 @@ function truthy(value: unknown): boolean {
 }
 
 function isHash(value: unknown): value is TranslationData {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return value instanceof Map;
+}
+
+function isPlainHash(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 function toS(subject: unknown): string {
@@ -200,7 +202,10 @@ export abstract class Base {
   loadTranslations(...filenames: unknown[]): void {
     const block =
       typeof filenames[filenames.length - 1] === "function"
-        ? (filenames.pop() as (filename: string, loadedTranslations: TranslationData) => void)
+        ? (filenames.pop() as (
+            filename: string,
+            loadedTranslations: TranslationData | Record<string, unknown>,
+          ) => void)
         : undefined;
     if (filenames.length === 0) filenames = config().loadPath;
     for (const filename of (filenames as (string | string[])[]).flat()) {
@@ -211,7 +216,7 @@ export abstract class Base {
 
   storeTranslations(
     _locale: Locale,
-    _data: TranslationData,
+    _data: TranslationData | Record<string, unknown>,
     _options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     throw new NotImplementedError();
@@ -384,18 +389,18 @@ export abstract class Base {
   }
 
   protected pluralize(_locale: Locale, entry: unknown, count: unknown): unknown {
-    entry = isHash(entry) ? except(entry, "attributes") : entry;
-    if (!isHash(entry) || !truthy(count)) return entry;
+    if (isHash(entry)) entry = except(entry, ":attributes");
+    if (!(isHash(entry) && truthy(count))) return entry;
 
     const key = this.pluralizationKey(entry, count);
-    if (!(key in entry)) throw new InvalidPluralizationData(entry, count, key);
-    return entry[key];
+    if (!hasKey(entry, key)) throw new InvalidPluralizationData(entry, count, key);
+    return hashAref(entry, key);
   }
 
   protected interpolate(
     locale: Locale,
     subject: unknown,
-    values: TranslationData = EMPTY_HASH,
+    values: TranslateOptions = EMPTY_HASH,
   ): unknown {
     if (Object.keys(values).length === 0) return subject;
     if (typeof subject === "string") return interpolateString(subject, values);
@@ -408,15 +413,15 @@ export abstract class Base {
   protected deepInterpolate(
     locale: Locale,
     data: unknown,
-    values: TranslationData = EMPTY_HASH,
+    values: TranslateOptions = EMPTY_HASH,
   ): unknown {
     if (Object.keys(values).length === 0) return data;
     if (typeof data === "string") return interpolateString(data, values);
     if (Array.isArray(data)) return data.map((v) => this.deepInterpolate(locale, v, values));
     if (isHash(data)) {
-      const result: TranslationData = {};
-      for (const [k, v] of Object.entries(data)) {
-        result[k] = this.deepInterpolate(locale, v, values);
+      const result: TranslationData = new Hash();
+      for (const [k, v] of data) {
+        result.set(k, this.deepInterpolate(locale, v, values));
       }
       return result;
     }
@@ -480,7 +485,7 @@ export abstract class Base {
     }
   }
 
-  protected loadFile(filename: string): TranslationData {
+  protected loadFile(filename: string): TranslationData | Record<string, unknown> {
     let type = extname(filename);
     type = tr(type, ".", "").toLowerCase();
     const loader = (this as unknown as Record<string, unknown>)[
@@ -490,13 +495,17 @@ export abstract class Base {
     const [data, keysSymbolized] = (
       loader as (this: Base, filename: string) => [unknown, boolean]
     ).call(this, filename);
-    if (!isHash(data)) {
+    if (!(isHash(data) || isPlainHash(data))) {
       throw new InvalidLocaleData(filename, "expects it to return a hash, but does not");
     }
-    for (const [locale, d] of data instanceof Map ? data : Object.entries(data)) {
-      this.storeTranslations(locale, (truthy(d) ? d : {}) as TranslationData, {
-        skipSymbolizeKeys: keysSymbolized,
-      });
+    for (const [locale, d] of isHash(data) ? data : Object.entries(data)) {
+      this.storeTranslations(
+        locale as Locale,
+        (truthy(d) ? d : new Hash()) as TranslationData | Record<string, unknown>,
+        {
+          skipSymbolizeKeys: keysSymbolized,
+        },
+      );
     }
     return data;
   }
@@ -506,13 +515,13 @@ export abstract class Base {
     return [translations, false];
   }
 
-  /**
-   * @missingRailsCall load_file — PERMANENT
-   * @missingRailsArgs unsafe_load_file — PERMANENT
-   */
+  /** @missingRailsCall load_file — PERMANENT */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
-      return [YAML.unsafeLoad(readFile(filename), { filename, freeze: true }), false];
+      return [
+        YAML.unsafeLoad(readFile(filename), { filename, symbolizeNames: true, freeze: true }),
+        true,
+      ];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }
@@ -524,18 +533,20 @@ export abstract class Base {
 
   /**
    * @missingRailsCall load_file — PERMANENT
-   * @missingRailsName read — PERMANENT
+   * @missingRailsArgs parse — PERMANENT
    */
   protected loadJson(filename: string): [unknown, boolean] {
     try {
-      return [deepFreeze(JSON.parse(readFile(filename))), true];
+      return [JSON.parse(readFile(filename), { symbolizeNames: true, freeze: true }), true];
     } catch (e) {
       throw new InvalidLocaleData(filename, inspectError(e));
     }
   }
 
   protected pluralizationKey(entry: TranslationData, count: unknown): string {
-    if (count === 0 && "zero" in entry) return "zero";
-    return count === 1 ? "one" : "other";
+    let key: string | undefined;
+    if (count === 0 && hasKey(entry, ":zero")) key = ":zero";
+    key ??= count === 1 ? ":one" : ":other";
+    return key;
   }
 }

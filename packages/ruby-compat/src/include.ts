@@ -2047,6 +2047,7 @@ Object.setPrototypeOf(rbCClass, Module);
 Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
 
 rbDefineAllocFunc(Rational, (klass) => new klass(0, 1));
+rbDefineAllocFunc(Hash, (klass) => new klass());
 classpaths.set(Rational, { path: "Rational", permanent: true });
 rbSetClassPathString(Rational.compatible, Rational, "compatible");
 for (const klass of [Rational, Complex, BigDecimal]) {

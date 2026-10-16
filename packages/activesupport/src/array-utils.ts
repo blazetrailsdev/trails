@@ -4,7 +4,7 @@ import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
 import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { ARRAY_METHOD_TABLE, isEmpty } from "@blazetrails/ruby-compat";
-import { rbEqq, rbObjClassname } from "@blazetrails/ruby-compat";
+import { isSymbol, rbEqq, rbObjClassname, symbolToS } from "@blazetrails/ruby-compat";
 
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
   if (object === null || object === undefined) return [];
@@ -75,9 +75,11 @@ export function toSentence(
     const i18nConnectors = I18n.translate("support.array", {
       locale: options.locale ?? null,
       default: {},
-    }) as Record<string, string>;
-    for (const [k, v] of Object.entries(i18nConnectors)) {
-      defaultConnectors[camelize(k, "lower")] = v;
+    }) as Record<string, string> | Map<unknown, string>;
+    for (const [k, v] of i18nConnectors instanceof Map
+      ? i18nConnectors
+      : Object.entries(i18nConnectors)) {
+      defaultConnectors[camelize(isSymbol(k) ? symbolToS(k) : String(k), "lower")] = v;
     }
   }
   options = Object.assign(defaultConnectors, options);

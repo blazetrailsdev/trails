@@ -1,11 +1,11 @@
-import { kernelCatch, kernelThrow } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, kernelCatch, kernelThrow, rbObjDup } from "@blazetrails/ruby-compat";
 import { MissingTranslation } from "../exceptions.js";
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { deepMergeBang, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 
 function isHash(value: unknown): value is TranslationData {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return value instanceof Map;
 }
 
 function truthy(value: unknown): boolean {
@@ -48,7 +48,7 @@ export class Chain {
 
   storeTranslations(
     locale: Locale,
-    data: TranslationData,
+    data: TranslationData | Record<string, unknown>,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     return this.backends[0].storeTranslations(locale, data, options);
@@ -72,7 +72,7 @@ export class Chain {
         if (backend === this.backends[this.backends.length - 1]) options = defaultOptions;
         const translation = backend.translate(locale, key, options);
         if (this.namespaceLookup(translation, options)) {
-          namespace = this._deepMerge(translation as TranslationData, namespace ?? {});
+          namespace = this._deepMerge(translation as TranslationData, namespace ?? new Hash());
         } else if (translation != null || ("default" in options && options.default == null)) {
           returned = { value: translation };
         }
@@ -115,7 +115,7 @@ export class Chain {
   }
 
   protected translations(): TranslationData {
-    const memo: TranslationData = {};
+    const memo: TranslationData = new Hash();
     for (const backend of [...this.backends].reverse()) {
       const chained = backend as ChainedBackend;
       if (!chained.initialized()) chained.initTranslations();
@@ -130,10 +130,10 @@ export class Chain {
   }
 
   private _deepMerge(hash: TranslationData, otherHash: TranslationData): TranslationData {
-    const copy = { ...hash };
-    for (const [k, v] of Object.entries(otherHash)) {
-      const valueFromOther = hash[k];
-      copy[k] = isHash(valueFromOther) && isHash(v) ? this._deepMerge(valueFromOther, v) : v;
+    const copy = rbObjDup(hash);
+    for (const [k, v] of otherHash) {
+      const valueFromOther = hashAref(hash, k);
+      copy.set(k, isHash(valueFromOther) && isHash(v) ? this._deepMerge(valueFromOther, v) : v);
     }
     return copy;
   }

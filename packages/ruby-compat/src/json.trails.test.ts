@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Hash } from "./hash.js";
 import { JSON } from "./json.js";
 
 describe("JSON.parse", () => {
@@ -20,6 +21,17 @@ describe("JSON.parse", () => {
 
   it("raises SyntaxError for a byte source that is not valid UTF-8", () => {
     expect(() => JSON.parse(Uint8Array.of(0x22, 0xff, 0x22))).toThrow(SyntaxError);
+  });
+});
+
+describe("JSON.parse options", () => {
+  it("parses an object into a Hash with Symbol names, frozen", () => {
+    const parsed = JSON.parse('{"en":{"foo":["bar"]}}', { symbolizeNames: true, freeze: true });
+    expect(parsed).toBeInstanceOf(Hash);
+    const en = (parsed as Hash<unknown, Hash<unknown, unknown>>).get(":en")!;
+    expect(en.get(":foo")).toEqual(["bar"]);
+    expect(en.isFrozen()).toBe(true);
+    expect(Object.isFrozen(en.get(":foo"))).toBe(true);
   });
 });
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { Hash, rbInspect } from "@blazetrails/ruby-compat";
 
 import {
   ArgumentError,
@@ -13,12 +13,11 @@ import {
 import { config, resetConfig, translate } from "./i18n.js";
 import { resetClassConfig } from "./config.js";
 import { Simple } from "./backend/simple.js";
-import type { TranslationData } from "./utils.js";
 
 describe("I18nExceptionsTest", () => {
   let backend: Simple;
 
-  function storeTranslations(locale: string, data: TranslationData): void {
+  function storeTranslations(locale: string, data: Record<string, unknown>): void {
     backend.storeTranslations(locale, data);
   }
 
@@ -63,9 +62,9 @@ describe("I18nExceptionsTest", () => {
 
   it("InvalidPluralizationData stores entry, count and key", () => {
     forceInvalidPluralizationData((exception) => {
-      expect(exception.entry).toEqual({ other: "bar" });
+      expect(exception.entry).toEqual(new Hash().set(":other", "bar"));
       expect(exception.count).toBe(1);
-      expect(exception.key).toBe("one");
+      expect(exception.key).toBe(":one");
     });
   });
 

@@ -1,3 +1,4 @@
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../exceptions.js";
 import { t, type Locale } from "../i18n.js";
 import type { Base } from "./base.js";
@@ -238,10 +239,10 @@ export class HashTransliterator {
     ž: "z",
   });
 
-  private rule: Record<string, unknown> | null;
+  private rule: Record<string, unknown> | Map<unknown, unknown> | null;
   private approximationsMemo?: Record<string, string>;
 
-  constructor(rule: Record<string, unknown> | null = null) {
+  constructor(rule: Record<string, unknown> | Map<unknown, unknown> | null = null) {
     this.rule = rule;
     this.addDefaultApproximations();
     if (this.rule != null) this.add(this.rule);
@@ -266,9 +267,9 @@ export class HashTransliterator {
     }
   }
 
-  private add(hash: Record<string, unknown>): void {
-    for (const [key, value] of Object.entries(hash)) {
-      this.approximations()[String(key)] = String(value);
+  private add(hash: Record<string, unknown> | Map<unknown, unknown>): void {
+    for (const [key, value] of hash instanceof Map ? hash : Object.entries(hash)) {
+      this.approximations()[isSymbol(key) ? symbolToS(key) : String(key)] = String(value);
     }
   }
 }

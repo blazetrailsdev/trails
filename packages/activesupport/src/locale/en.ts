@@ -1,7 +1,6 @@
-import type { TranslationData } from "@blazetrails/i18n";
 import { ordinal } from "../inflector.js";
 
-export const en: TranslationData = {
+export const en: Record<string, unknown> = {
   date: {
     formats: {
       default: "%Y-%m-%d",

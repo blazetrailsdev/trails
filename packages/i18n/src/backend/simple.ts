@@ -8,15 +8,13 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import { isSymbol } from "@blazetrails/ruby-compat";
+import { Hash, fetch, hashAref, isSymbol } from "@blazetrails/ruby-compat";
 import { deepMergeBang, deepSymbolizeKeys, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 
 function isHash(value: unknown): value is TranslationData {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return value instanceof Map;
 }
-
-const NON_LOCALE_READS = new Set(["toJSON", "then", "inspect", "constructor"]);
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
 export interface Simple extends Base {}
@@ -32,7 +30,7 @@ export class Simple {
 
   storeTranslations(
     locale: Locale,
-    data: TranslationData,
+    data: TranslationData | Record<string, unknown>,
     options: TranslateOptions = EMPTY_HASH,
   ): unknown {
     if (
@@ -42,20 +40,22 @@ export class Simple {
     ) {
       return data;
     }
-    locale = toSym(locale).slice(1);
+    locale = toSym(locale);
     const translations = this.translations();
-    translations[locale] ??= {};
-    const payload = options.skipSymbolizeKeys ? data : deepSymbolizeKeys(data);
-    return deepMergeBang(translations[locale] as TranslationData, payload);
+    const existing = hashAref(translations, locale);
+    if (existing == null || existing === false) translations.set(locale, new Hash());
+    if (!fetch(options, "skipSymbolizeKeys", false)) data = deepSymbolizeKeys(data);
+    return deepMergeBang(translations.get(locale) as TranslationData, data as TranslationData);
   }
 
   availableLocales(): Locale[] {
     if (!this.initialized()) this.initTranslations();
     const locales: Locale[] = [];
-    for (const [locale, data] of Object.entries(this.translations())) {
-      const entries = isHash(data) ? Object.keys(data) : [];
-      const onlyMetadata = entries.length <= 1 && (entries.length === 0 || entries[0] === "i18n");
-      if (!onlyMetadata) locales.push(locale);
+    for (const [locale, data] of this.translations()) {
+      const hash = data as TranslationData;
+      if (!(hash.size <= 1 && (hash.size === 0 || hash.has(":i18n")))) {
+        locales.push((locale as string).slice(1));
+      }
     }
     return locales;
   }
@@ -74,11 +74,9 @@ export class Simple {
   translations({ doInit = false }: { doInit?: boolean } = {}): TranslationData {
     if (doInit && !this.initialized()) this.initTranslations();
 
-    this.translationsStore ??= new Proxy({} as TranslationData, {
-      get(h, k) {
-        if (typeof k === "string" && !NON_LOCALE_READS.has(k) && !(k in h)) h[k] = {};
-        return h[k as string];
-      },
+    this.translationsStore ??= new Hash((h, k) => {
+      h.set(k, new Hash());
+      return h.get(k);
     });
     return this.translationsStore;
   }
@@ -100,16 +98,16 @@ export class Simple {
     let result: unknown = this.translations();
     for (const rawKey of keys) {
       if (!isHash(result)) return null;
-      let _key = String(rawKey);
-      if (!(_key in result)) {
-        _key = toSym(_key).slice(1);
-        if (!(_key in result)) return null;
+      let _key: unknown = typeof rawKey === "string" ? toSym(rawKey) : rawKey;
+      if (!result.has(_key)) {
+        _key = toSym(String(rawKey));
+        if (!result.has(_key)) return null;
       }
-      result = result[_key];
+      result = hashAref(result, _key);
       if (isSymbol(result)) {
         result = this.resolveEntry(
           locale,
-          _key,
+          _key as TranslationKey,
           result,
           except({ ...options, scope: null }, "count"),
         );

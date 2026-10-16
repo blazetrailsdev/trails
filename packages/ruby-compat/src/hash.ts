@@ -6,6 +6,7 @@ import { isPlainHash, rbBuiltinClassName, rbInspect, rbObjClass } from "./object
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { RuntimeError } from "./runtime-error.js";
+import { isSymbol, symbolToS } from "./symbol.js";
 
 const BLOCK = Symbol.for("@blazetrails/ruby-compat:block");
 const UNDEF = Symbol("Qundef");
@@ -1216,14 +1217,14 @@ export class Hash<K, V> extends Map<K, V> {
    * The `JSON.stringify` protocol: a `Map`'s entries are not properties, so
    * without it a Hash stringifies as `{}` where `Hash#to_json`
    * (`vendor/ruby/v3.3.11/ext/json/generator/generator.c:430` `mHash_to_json`)
-   * writes each pair under its key's `to_s`.
+   * writes each pair under its key's `to_s`, a Symbol's being its name.
    *
    * @noRailsEquivalent PERMANENT
    */
   toJSON(): Record<string, V> {
     const result = Object.create(null) as Record<string, V>;
     for (const [key, value] of this) {
-      result[String(key)] = value;
+      result[isSymbol(key) ? symbolToS(key) : String(key)] = value;
     }
     return result;
   }
@@ -1441,6 +1442,17 @@ export class Hash<K, V> extends Map<K, V> {
     thisArg?: unknown,
   ): void {
     for (const [key, value] of this) callbackfn.call(thisArg, value, key, this);
+  }
+
+  /**
+   * `Hash#initialize_copy`, which MRI binds to `rb_hash_replace`
+   * (`vendor/ruby/v3.3.11/hash.c:7190`): the hook `rbObjDup` / `rbObjClone`
+   * dispatch, so a dup holds a copy of the receiver's table.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#initialize_copy` (`vendor/ruby/v3.3.11/hash.c:7190`).
+   */
+  initializeCopy(hash: Hash<K, V>): this {
+    return this.replace(hash);
   }
 
   /**

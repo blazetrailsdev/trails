@@ -50,8 +50,14 @@ describe("I18nBackendSimpleTest", () => {
     );
   }
 
-  function storeTranslations(locale: string, data: TranslationData): unknown {
-    return backend.storeTranslations(locale, data);
+  function h(...pairs: [unknown, unknown][]): Hash<unknown, unknown> {
+    const hash = new Hash<unknown, unknown>();
+    for (const [k, v] of pairs) hash.set(k, v);
+    return hash;
+  }
+
+  function storeTranslations(locale: string, data: object): unknown {
+    return backend.storeTranslations(locale, data as TranslationData);
   }
 
   function translations(): TranslationData {
@@ -67,55 +73,56 @@ describe("I18nBackendSimpleTest", () => {
   });
 
   it("simple backend translate: given true as a key", () => {
-    storeTranslations("en", { available: { true: "Yes", false: "No" } });
-    expect((t("available") as TranslationData)["true"]).toBe("Yes");
-    expect((t("available") as TranslationData)["false"]).toBe("No");
+    storeTranslations("en", h([":available", h([true, "Yes"], [false, "No"])]));
+    expect((t("available") as TranslationData).get(true)).toBe("Yes");
+    expect((t("available") as TranslationData).get(false)).toBe("No");
   });
 
   it("simple backend translate: given integer as a key", () => {
-    storeTranslations("en", {
-      available: { "-1": "Possibly", 0: "Maybe", 1: "Yes", 2: "No", 3: "Never" },
-    });
-    expect((t("available") as TranslationData)["-1"]).toBe("Possibly");
+    storeTranslations(
+      "en",
+      h([":available", h([-1, "Possibly"], [0, "Maybe"], [1, "Yes"], [2, "No"], [3, "Never"])]),
+    );
+    expect((t("available") as TranslationData).get(-1)).toBe("Possibly");
     expect(t("available.-1")).toBe("Possibly");
-    expect((t("available") as TranslationData)[0]).toBe("Maybe");
+    expect((t("available") as TranslationData).get(0)).toBe("Maybe");
     expect(t("available.0")).toBe("Maybe");
-    expect((t("available") as TranslationData)[1]).toBe("Yes");
+    expect((t("available") as TranslationData).get(1)).toBe("Yes");
     expect(t("available.1")).toBe("Yes");
-    expect((t("available") as TranslationData)[2]).toBe("No");
+    expect((t("available") as TranslationData).get(2)).toBe("No");
     expect(t("available.2")).toBe("No");
-    expect((t("available") as TranslationData)[3]).toBe("Never");
+    expect((t("available") as TranslationData).get(3)).toBe("Never");
     expect(t("available.+3")).toBe("Never");
   });
 
   it("simple backend translate: given integer with a leading positive/negative sign", () => {
-    storeTranslations("en", { available: { "-1": "No", 0: "Maybe", 1: "Yes" } });
-    expect((t("available") as TranslationData)["-1"]).toBe("No");
+    storeTranslations("en", h([":available", h([-1, "No"], [0, "Maybe"], [1, "Yes"])]));
+    expect((t("available") as TranslationData).get(-1)).toBe("No");
     expect(t("available.-1")).toBe("No");
-    expect((t("available") as TranslationData)[0]).toBe("Maybe");
-    expect((t("available") as TranslationData)[-0]).toBe("Maybe");
+    expect((t("available") as TranslationData).get(+0)).toBe("Maybe");
+    expect((t("available") as TranslationData).get(-0)).toBe("Maybe");
     expect(t("available.-0")).toBe("Maybe");
     expect(t("available.+0")).toBe("Maybe");
-    expect((t("available") as TranslationData)[1]).toBe("Yes");
+    expect((t("available") as TranslationData).get(+1)).toBe("Yes");
     expect(t("available.+1")).toBe("Yes");
   });
 
   it("simple backend translate: given integer with a lead zero as a key", () => {
-    storeTranslations("en", { available: { "01": "foo" } });
-    expect((t("available") as TranslationData)["01"]).toBe("foo");
+    storeTranslations("en", h([":available", h(["01", "foo"])]));
+    expect((t("available") as TranslationData).get(":01")).toBe("foo");
     expect(t("available.01")).toBe("foo");
   });
 
   it("simple backend translate: symbolize keys in hash", () => {
     storeTranslations("en", { nested_hashes_in_array: { hello: "world" } });
     expect(t("nested_hashes_in_array.hello")).toBe("world");
-    expect((t("nested_hashes_in_array") as TranslationData)["hello"]).toBe("world");
+    expect((t("nested_hashes_in_array") as TranslationData).get(":hello")).toBe("world");
   });
 
   it("simple backend translate: symbolize keys in array", () => {
     storeTranslations("en", { nested_hashes_in_array: [{ hello: "world" }] });
     for (const val of t("nested_hashes_in_array") as TranslationData[]) {
-      expect(val["hello"]).toBe("world");
+      expect(val.get(":hello")).toBe("world");
     }
   });
 
@@ -138,7 +145,7 @@ describe("I18nBackendSimpleTest", () => {
   it("simple load_translations: given no argument, it uses I18n.load_path", async () => {
     await config().setLoadPath([`${localesDir()}/en.yml`]);
     backend.loadTranslations();
-    expect(translations()).toEqual({ en: { foo: { bar: "baz" } } });
+    expect(translations()).toEqual(h([":en", h([":foo", h([":bar", "baz"])])]));
   });
 
   it("simple load_rb: loads data from a Ruby file", () => {
@@ -149,22 +156,22 @@ describe("I18nBackendSimpleTest", () => {
   it("simple load_yml: loads data from a YAML file", () => {
     const [data] = send(backend, "loadYml", `${localesDir()}/en.yml`);
     const expected = new Hash<unknown, unknown>().set(
-      "en",
-      new Hash<unknown, unknown>().set("foo", new Hash<unknown, unknown>().set("bar", "baz")),
+      ":en",
+      new Hash<unknown, unknown>().set(":foo", new Hash<unknown, unknown>().set(":bar", "baz")),
     );
     expect(data).toEqual(expected);
     expect(data).toEqual(expected);
-    assertPredicate((data as Hash<string, Hash<string, Hash<string, unknown>>>).get("en"), (en) =>
-      Object.isFrozen(en!.get("foo")!.get("bar")),
+    assertPredicate((data as Hash<string, Hash<string, Hash<string, unknown>>>).get(":en"), (en) =>
+      Object.isFrozen(en!.get(":foo")!.get(":bar")),
     );
   });
 
   it("simple load_json: loads data from a JSON file", () => {
     const [data] = send(backend, "loadJson", `${localesDir()}/en.json`);
-    expect(data).toEqual({ en: { foo: { bar: "baz" } } });
-    expect(data).toEqual({ en: { foo: { bar: "baz" } } });
-    assertPredicate((data as TranslationData)["en"], (en) =>
-      Object.isFrozen(((en as TranslationData)["foo"] as TranslationData)["bar"]),
+    expect(data).toEqual(h([":en", h([":foo", h([":bar", "baz"])])]));
+    expect(data).toEqual(h([":en", h([":foo", h([":bar", "baz"])])]));
+    assertPredicate((data as Hash<string, Hash<string, Hash<string, unknown>>>).get(":en"), (en) =>
+      Object.isFrozen(en!.get(":foo")!.get(":bar")),
     );
   });
 
@@ -172,7 +179,7 @@ describe("I18nBackendSimpleTest", () => {
     backend = new Simple();
     config().backend = backend;
     backend.loadTranslations(`${localesDir()}/en.js`, `${localesDir()}/en.yml`);
-    const expected = { en: { fuh: { bah: "bas" }, foo: { bar: "baz" } } };
+    const expected = h([":en", h([":fuh", h([":bah", "bas"])], [":foo", h([":bar", "baz"])])]);
     expect(translations()).toEqual(expected);
   });
 
@@ -184,23 +191,23 @@ describe("I18nBackendSimpleTest", () => {
 
   it("simple store_translations: stores translations, ... no, really :-)", () => {
     storeTranslations("en", { foo: "bar" });
-    expect(translations()).toEqual({ en: { foo: "bar" } });
+    expect(translations()).toEqual(h([":en", h([":foo", "bar"])]));
   });
 
   it("simple store_translations: deep_merges with existing translations", () => {
     storeTranslations("en", { foo: { bar: "bar" } });
     storeTranslations("en", { foo: { baz: "baz" } });
-    expect(translations()).toEqual({ en: { foo: { bar: "bar", baz: "baz" } } });
+    expect(translations()).toEqual(h([":en", h([":foo", h([":bar", "bar"], [":baz", "baz"])])]));
   });
 
   it("simple store_translations: converts the given locale to a Symbol", () => {
     storeTranslations("en", { foo: "bar" });
-    expect(translations()).toEqual({ en: { foo: "bar" } });
+    expect(translations()).toEqual(h([":en", h([":foo", "bar"])]));
   });
 
   it("simple store_translations: converts keys to Symbols", () => {
-    storeTranslations("en", { foo: { bar: "bar", baz: "baz" } });
-    expect(translations()).toEqual({ en: { foo: { bar: "bar", baz: "baz" } } });
+    storeTranslations("en", h(["foo", h(["bar", "bar"], ["baz", "baz"])]));
+    expect(translations()).toEqual(h([":en", h([":foo", h([":bar", "bar"], [":baz", "baz"])])]));
   });
 
   it("simple store_translations: do not store translations unavailable locales if enforce_available_locales is true", () => {
@@ -209,8 +216,10 @@ describe("I18nBackendSimpleTest", () => {
       config().availableLocales = ["en", "es"];
       storeTranslations("fr", { foo: { bar: "barfr", baz: "bazfr" } });
       storeTranslations("es", { foo: { bar: "bares", baz: "bazes" } });
-      expect(translations()["fr"]).toEqual({});
-      expect(translations()["es"]).toEqual({ foo: { bar: "bares", baz: "bazes" } });
+      expect(translations().get(":fr")).toEqual(h());
+      expect(translations().get(":es")).toEqual(
+        h([":foo", h([":bar", "bares"], [":baz", "bazes"])]),
+      );
     } finally {
       config().enforceAvailableLocales = false;
     }
@@ -219,26 +228,26 @@ describe("I18nBackendSimpleTest", () => {
   it("simple store_translations: store translations for unavailable locales if enforce_available_locales is false", () => {
     config().availableLocales = ["en", "es"];
     storeTranslations("fr", { foo: { bar: "barfr", baz: "bazfr" } });
-    expect(translations()["fr"]).toEqual({ foo: { bar: "barfr", baz: "bazfr" } });
+    expect(translations().get(":fr")).toEqual(h([":foo", h([":bar", "barfr"], [":baz", "bazfr"])]));
   });
 
   it("simple store_translations: supports numeric keys", () => {
-    storeTranslations("en", { 1: "foo" });
+    storeTranslations("en", h([1, "foo"]));
     expect(t("1")).toBe("foo");
     expect(t(1)).toBe("foo");
     expect(t("1")).toBe("foo");
   });
 
   it("simple store_translations: store translations doesn't deep symbolize keys if skip_symbolize_keys is true", async () => {
-    const data = { foo: { bar: "barfr", baz: "bazfr" } };
+    const data = h([":foo", h(["bar", "barfr"], ["baz", "bazfr"])]);
 
     storeTranslations("fr", data);
-    expect(translations()["fr"]).toEqual({ foo: { bar: "barfr", baz: "bazfr" } });
+    expect(translations().get(":fr")).toEqual(h([":foo", h([":bar", "barfr"], [":baz", "bazfr"])]));
 
     await backend.reloadBang();
 
     backend.storeTranslations("fr", data, { skipSymbolizeKeys: true });
-    expect(translations()["fr"]).toEqual({ foo: { bar: "barfr", baz: "bazfr" } });
+    expect(translations().get(":fr")).toEqual(h([":foo", h(["bar", "barfr"], ["baz", "bazfr"])]));
   });
 
   it("simple reload_translations: unloads translations", async () => {

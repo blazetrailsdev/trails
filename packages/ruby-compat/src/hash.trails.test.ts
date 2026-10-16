@@ -38,6 +38,7 @@ import { KeyError } from "./key-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { IndexError } from "./index-error.js";
 import { RuntimeError } from "./runtime-error.js";
+import { rbObjDup } from "./include.js";
 
 describe("Hash#fetch", () => {
   it("looks up an object key in a Map, keeping a stored nil or false", () => {
@@ -517,6 +518,24 @@ describe("Hash and JSON.stringify", () => {
     const hash = new Hash<string, number[]>();
     hash.set("name", [1]);
     expect(JSON.stringify({ errors: hash })).toBe('{"errors":{"name":[1]}}');
+  });
+
+  it("writes a Symbol key under its name, as Symbol#to_s does", () => {
+    const hash = new Hash<unknown, number>().set(":name", 1).set(2, 3);
+    expect(JSON.stringify(hash)).toBe('{"2":3,"name":1}');
+  });
+});
+
+describe("rbObjDup of a Hash", () => {
+  it("copies the table through Hash#initialize_copy, unfrozen", () => {
+    const hash = new Hash<unknown, number>().set(":a", 1).freeze();
+    const dup = rbObjDup(hash);
+    dup.set(":b", 2);
+    expect([...dup]).toEqual([
+      [":a", 1],
+      [":b", 2],
+    ]);
+    expect([...hash]).toEqual([[":a", 1]]);
   });
 });
 
