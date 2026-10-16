@@ -10,6 +10,8 @@ import {
   env,
   isEmpty,
   getChildProcess,
+  hashAref,
+  keys,
   rbAnyToS,
   rbEqual,
   rbModToS,
@@ -336,7 +338,7 @@ export async function assertDifference<T>(
     typeof args[args.length - 1] === "function" ? (args.pop() as () => T | Promise<T>) : undefined;
 
   let message: string | null | undefined;
-  let expressions: Map<Expression<number>, number>;
+  let expressions: Map<Expression<number>, number> | Record<string, number>;
   if (expression instanceof Map) {
     message = args[0] as string | null | undefined;
     expressions = expression;
@@ -346,14 +348,14 @@ export async function assertDifference<T>(
     expressions = indexWith(Array.isArray(expression) ? expression : [expression], difference);
   }
 
-  const exps = [...expressions.keys()];
+  const exps = keys(expressions);
   const before: number[] = [];
   for (const exp of exps) before.push(await exp());
 
   const retval = await _assertNothingRaisedOrWarn("assert_difference", block);
 
   for (const [index, exp] of exps.entries()) {
-    const diff = expressions.get(exp) as number;
+    const diff = hashAref(expressions, exp) as number;
     const beforeValue = before[index];
     const actual = await exp();
     const richMessage = () => {

@@ -69,10 +69,11 @@ export function indexWith<T, V>(
   collection: readonly T[],
   defaultOrBlock: V | ((elem: T) => V),
 ): Hash<T, V> | Record<string, V> {
-  const result: Hash<T, V> | Record<string, V> =
-    collection.length > 0 && collection.every((elem) => typeof elem === "string")
-      ? {}
-      : new Hash<T, V>();
+  const result: Hash<T, V> | Record<string, V> = collection.every(
+    (elem) => typeof elem === "string",
+  )
+    ? {}
+    : new Hash<T, V>();
   const aset = (elem: T, value: V): unknown =>
     result instanceof Hash ? result.set(elem, value) : hashAset(result, elem as string, value);
   if (typeof defaultOrBlock === "function") {

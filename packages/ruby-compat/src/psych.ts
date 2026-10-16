@@ -257,9 +257,9 @@ export namespace Psych {
    * The block's `return node` leaves `parse_stream` before the parser reads the
    * next document, so it is thrown out of the block here.
    *
-   * @noRailsEquivalent PERMANENT
    * @inventedArm try — PERMANENT
    * @inventedArm throw — PERMANENT
+   * @noRailsEquivalent PERMANENT
    */
   export function parse(
     yaml: string | Uint8Array | IO,

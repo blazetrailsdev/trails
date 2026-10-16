@@ -25,8 +25,8 @@ describe("Enumerable#index_with answers a plain object for String elements", () 
     expect(indexWith(["title", "body"], null)).toEqual({ title: null, body: null });
   });
 
-  it("answers a Hash for an empty or mixed collection", () => {
-    expect(indexWith([], 1)).toBeInstanceOf(Hash);
+  it("answers a plain object for an empty collection and a Hash for a mixed one", () => {
+    expect(indexWith([], 1)).toEqual({});
     const mixed = indexWith(["a", 1] as unknown[], (e) => e);
     expect(mixed).toBeInstanceOf(Hash);
     expect([...mixed]).toEqual([
