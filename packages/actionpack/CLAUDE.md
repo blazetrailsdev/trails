@@ -172,3 +172,27 @@ Rules that follow:
 Members and arms that exist only to serve this carry
 `@noRailsEquivalent PERMANENT` / `@inventedArm … PERMANENT` receipts against
 this section. A new instance is not a new decision to argue.
+
+## A cache-backed session is prewarmed and peeked (`Session::CacheStore#prepare_session`)
+
+Rails loads a session lazily: `Request::Session#load_for_read!` calls
+`load!`, which calls the store's `load_session`
+(`actionpack/lib/action_dispatch/request/session.rb:256-276`), on the first
+`session[...]` read. A cache-backed store's `find_session` reads
+`ActiveSupport::Cache::Store`, which is async in trails because every Node
+cache client is. Making the session accessors async as well was rejected:
+`form_authenticity_token` and `request.flash` read the session from inside a
+template, and a non-streaming template compiles to a synchronous function
+(`actionview/src/template.ts`).
+
+**The store hooks are async and the accessors stay synchronous and lazy.**
+`writeSession`, `deleteSession` and `commitSession` are async, and
+`Persisted#context` awaits them. `findSession` may answer a promise, and
+`Persisted#loadSession` wraps one with `then` (`@inventedArm then —
+PERMANENT`). Only `Session::CacheStore` prewarms. Its `prepareSession` awaits
+`Request::Session#prewarmBang` before the app runs, and `loadBang` peeks the
+result. `destroy` prewarms again before its `load_for_write!`. The cookie store
+and `Rack::Session::Pool` answer synchronously and still load lazily, so a
+request that never touches the session never decrypts its cookie. A
+`staleSessionCheckBang` retry covers a synchronous `ArgumentError` only.
+Ruled by the repo owner on 2026-10-16 (trails#8997).

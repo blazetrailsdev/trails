@@ -109,12 +109,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     });
 
     it("commitSession invokes commitCsrfToken on the request", async () => {
-      class FindingStore extends AbstractStore {
-        override findSession(): [unknown, Record<string, unknown>] {
-          return [new SessionId("abc"), {}];
-        }
-      }
-      const store = new FindingStore();
+      const store = new AbstractStore();
       let called = false;
       const req: any = new Request({});
       req.commitCsrfToken = () => {
