@@ -68,8 +68,9 @@ export class Location {
  * @noRailsEquivalent PERMANENT
  */
 export function excBacktraceLocations(exc: Error): Location[] | null {
-  const override = (exc as { backtraceLocations?: unknown }).backtraceLocations;
-  if (typeof override === "function") return override.call(exc) as Location[] | null;
+  const override = (exc as Error & { backtraceLocations?: () => Location[] | null })
+    .backtraceLocations;
+  if (typeof override === "function") return override.call(exc);
   const stack = exc.stack;
   if (stack == null) return null;
   return stack
@@ -86,8 +87,8 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
  * @noRailsEquivalent PERMANENT
  */
 export function excBacktrace(exc: Error): string[] | null {
-  const override = (exc as { backtrace?: unknown }).backtrace;
-  if (typeof override === "function") return override.call(exc) as string[] | null;
+  const override = (exc as Error & { backtrace?: () => string[] | null }).backtrace;
+  if (typeof override === "function") return override.call(exc);
   const locations = excBacktraceLocations(exc);
   if (locations === null) return null;
   return locations.map((location) => location.toString());
