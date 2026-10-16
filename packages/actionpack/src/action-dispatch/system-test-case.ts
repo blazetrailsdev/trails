@@ -1,4 +1,3 @@
-import { expect } from "vitest";
 import type { Browser, BrowserContext, Locator, Page } from "playwright";
 import { classAttribute, reverseMerge, TopLevel } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -65,6 +64,8 @@ export class SystemTestCase extends TestCase {
   /**
    * @internal
    * @inventedArm afterAll — PERMANENT
+   * @inventedArm inject — PERMANENT
+   * @inventedArm poll — PERMANENT
    */
   static async startApplication(): Promise<void> {
     vite.app = new Builder(null, {}, (builder) => {
@@ -74,7 +75,17 @@ export class SystemTestCase extends TestCase {
     });
 
     await new Server().run();
-    const { afterAll } = await import("vitest");
+    const { afterAll, expect, inject } = await import("vitest");
+    ScreenshotHelper.screenshotDirectory ??= inject("screenshotDirectory");
+    expect.element = (locator, options) => ({
+      toBeVisible: () => expect.poll(() => locator.isVisible(), options).toBe(true),
+      toBeInTheDocument: () => expect.poll(() => locator.count(), options).toBeGreaterThan(0),
+      toHaveTextContent: (text) =>
+        typeof text === "string"
+          ? expect.poll(() => locator.textContent(), options).toContain(text)
+          : expect.poll(() => locator.textContent(), options).toMatch(text),
+      toHaveValue: (value) => expect.poll(() => locator.inputValue(), options).toBe(value),
+    });
     afterAll(async () => {
       for (const session of sessions.values()) await (await session).browser.close();
       sessions.clear();
@@ -158,14 +169,3 @@ export class SystemTestCase extends TestCase {
 
 include(SystemTestCase, SetupAndTeardown);
 include(SystemTestCase, ScreenshotHelper);
-
-/** @noRailsEquivalent PERMANENT */
-expect.element = (locator, options) => ({
-  toBeVisible: () => expect.poll(() => locator.isVisible(), options).toBe(true),
-  toBeInTheDocument: () => expect.poll(() => locator.count(), options).toBeGreaterThan(0),
-  toHaveTextContent: (text) =>
-    typeof text === "string"
-      ? expect.poll(() => locator.textContent(), options).toContain(text)
-      : expect.poll(() => locator.textContent(), options).toMatch(text),
-  toHaveValue: (value) => expect.poll(() => locator.inputValue(), options).toBe(value),
-});

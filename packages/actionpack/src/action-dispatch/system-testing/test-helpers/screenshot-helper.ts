@@ -1,4 +1,3 @@
-import { inject } from "vitest";
 import { presence } from "@blazetrails/activesupport";
 import { Encoding, File, getFs, Module } from "@blazetrails/ruby-compat";
 
@@ -23,7 +22,7 @@ export interface ScreenshotHelperHost {
 
 export const ScreenshotHelper = Object.assign(new Module(), {
   /** @noRailsEquivalent PERMANENT */
-  screenshotDirectory: inject("screenshotDirectory"),
+  screenshotDirectory: undefined as string | undefined,
 });
 
 function env(key: string): string | undefined {
