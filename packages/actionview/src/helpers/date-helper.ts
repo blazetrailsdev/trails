@@ -1,4 +1,4 @@
-import { I18n, dateCurrent, htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
+import { I18n, htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import {
   ArgumentError,
@@ -179,7 +179,7 @@ export function selectDatetime(
 }
 
 export function selectDate(
-  date: unknown = dateCurrent(),
+  date: unknown = RubyDate.current(),
   options: Opts = {},
   htmlOptions: Opts = {},
 ): SafeBuffer {
@@ -308,8 +308,12 @@ export class DateTimeSelector {
     this._options = { ...options };
     this._htmlOptions = { ...htmlOptions };
     this._datetime = datetime;
-    this._options.datetimeSeparator ||= " &mdash; ";
-    this._options.timeSeparator ||= " : ";
+    this._options.datetimeSeparator = present(this._options.datetimeSeparator)
+      ? this._options.datetimeSeparator
+      : " &mdash; ";
+    this._options.timeSeparator = present(this._options.timeSeparator)
+      ? this._options.timeSeparator
+      : " : ";
   }
 
   selectDatetime(): SafeBuffer {
@@ -393,8 +397,8 @@ export class DateTimeSelector {
     } else {
       const options: Record<string, unknown> = {};
       options.ampm = this._options.ampm || false;
-      options.start = this._options.startHour || 0;
-      options.end = this._options.endHour || 23;
+      options.start = this._options.startHour ?? 0;
+      options.end = this._options.endHour ?? 23;
       return this.buildOptionsAndSelect("hour", this.hour(), options);
     }
   }
@@ -437,11 +441,11 @@ export class DateTimeSelector {
       return this.buildHidden("year", val);
     } else {
       const options: Record<string, number> = {};
-      options.start = (this._options.startYear as number) || middleYear - 5;
-      options.end = (this._options.endYear as number) || middleYear + 5;
+      options.start = (this._options.startYear as number) ?? middleYear - 5;
+      options.end = (this._options.endYear as number) ?? middleYear + 5;
       options.step = options.start < options.end ? 1 : -1;
 
-      const maxYearsAllowed = (this._options.maxYearsAllowed as number) || 1000;
+      const maxYearsAllowed = (this._options.maxYearsAllowed as number) ?? 1000;
 
       if (Math.abs(options.end - options.start) > maxYearsAllowed) {
         throw new ArgumentError(
@@ -470,7 +474,7 @@ export class DateTimeSelector {
   /** @internal */
   private monthNames(): unknown[] {
     return (this._monthNames ??= (() => {
-      let monthNames = (this._options.useMonthNames || this.translatedMonthNames()) as unknown[];
+      let monthNames = (this._options.useMonthNames ?? this.translatedMonthNames()) as unknown[];
       if (monthNames.length < 13) monthNames = [null, ...monthNames];
       return monthNames;
     })());
@@ -561,11 +565,11 @@ export class DateTimeSelector {
       options,
     );
 
-    const start = (options.start as number) || 0;
+    const start = (options.start as number) ?? 0;
     delete options.start;
-    const stop = (options.end as number) || 59;
+    const stop = (options.end as number) ?? 59;
     delete options.end;
-    const step = (options.step as number) || 1;
+    const step = (options.step as number) ?? 1;
     delete options.step;
     const leadingZeros = options.leadingZeros;
     delete options.leadingZeros;
@@ -697,10 +701,10 @@ export class DateTimeSelector {
 
   /** @internal */
   private inputNameFromType(type: DateType): string {
-    let prefix = (this._options.prefix as string) || DateTimeSelector.DEFAULT_PREFIX;
+    let prefix = (this._options.prefix as string) ?? DateTimeSelector.DEFAULT_PREFIX;
     if ("index" in this._options) prefix += `[${String(this._options.index)}]`;
 
-    let fieldName = (this._options.fieldName as string) || type;
+    let fieldName = (this._options.fieldName as string) ?? type;
     if (present(this._options.includePosition)) {
       fieldName += `(${DateTimeSelector.POSITION[type]}i)`;
     }
@@ -721,13 +725,15 @@ export class DateTimeSelector {
   /** @internal */
   private buildSelectsFromTypes(order: string[]): SafeBuffer {
     let select = "";
-    const firstVisible = order.find((type) => !present(this._options[discardKey(type)]));
+    const firstVisible = order.find(
+      (type) => !present(this._options[`discard${type.charAt(0).toUpperCase()}${type.slice(1)}`]),
+    );
     for (const type of [...order].reverse()) {
       let separator: unknown;
       if (type !== firstVisible) separator = this.separator(type as DateType);
       select =
         String(separator ?? "") +
-        String(rbFPublicSend(this, `select${capitalize(type)}`) ?? "") +
+        String(rbFPublicSend(this, `select${type.charAt(0).toUpperCase()}${type.slice(1)}`) ?? "") +
         select;
     }
     return htmlSafe(select);
@@ -741,24 +747,20 @@ export class DateTimeSelector {
       case "year":
       case "month":
       case "day":
-        return present(this._options[discardKey(type)]) ? "" : this._options.dateSeparator;
+        return present(this._options[`discard${type.charAt(0).toUpperCase()}${type.slice(1)}`])
+          ? ""
+          : this._options.dateSeparator;
       case "hour":
         return present(this._options.discardYear) && present(this._options.discardDay)
           ? ""
           : this._options.datetimeSeparator;
       case "minute":
       case "second":
-        return present(this._options[discardKey(type)]) ? "" : this._options.timeSeparator;
+        return present(this._options[`discard${type.charAt(0).toUpperCase()}${type.slice(1)}`])
+          ? ""
+          : this._options.timeSeparator;
     }
   }
-}
-
-function capitalize(type: string): string {
-  return type.charAt(0).toUpperCase() + type.slice(1);
-}
-
-function discardKey(type: string): string {
-  return `discard${capitalize(type)}`;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.

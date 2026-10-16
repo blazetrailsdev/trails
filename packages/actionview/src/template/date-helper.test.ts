@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateCurrent } from "@blazetrails/activesupport";
-import { Time } from "@blazetrails/date";
+import { Date as RubyDate, Time } from "@blazetrails/date";
 import {
   distanceOfTimeInWords,
   selectDay,
@@ -181,7 +180,7 @@ describe("DateHelperTest", () => {
   it("select year with position", () => {
     assertDomEqual(
       '<select id="date_year_1i" name="date[year(1i)]">\n<option value="2003">2003</option>\n<option value="2004">2004</option>\n<option value="2005">2005</option>\n</select>\n',
-      selectYear(dateCurrent(), { includePosition: true, startYear: 2003, endYear: 2005 }),
+      selectYear(RubyDate.current(), { includePosition: true, startYear: 2003, endYear: 2005 }),
     );
   });
 
