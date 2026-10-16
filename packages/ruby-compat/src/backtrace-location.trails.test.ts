@@ -14,7 +14,7 @@ describe("Thread::Backtrace::Location", () => {
     expect(loc.label).toBe("_app_views_posts_show");
     expect(loc.lineno).toBe(3);
     expect(loc.column).toBe(11);
-    expect(loc.path).toBeNull();
+    expect(loc.path).toBe("(eval at compile (x.js:1:2))");
     expect(loc.toString()).toBe(
       "at Base._app_views_posts_show (eval at compile (x.js:1:2), <anonymous>:3:11)",
     );
@@ -34,10 +34,11 @@ describe("Thread::Backtrace::Location", () => {
       "webpack-internal:///(app-pages)/x.js",
     );
     expect(new Location("    at new Foo (/app/d.js:9:1)").path).toBe("/app/d.js");
-    expect(
-      new Location("    at eval (eval at compile (x.js:1:2), <anonymous>:3:11)").path,
-    ).toBeNull();
-    expect(new Location("    at <anonymous>").path).toBeNull();
+    expect(new Location("    at eval (eval at compile (x.js:1:2), <anonymous>:3:11)").path).toBe(
+      "(eval at compile (x.js:1:2))",
+    );
+    expect(new Location("    at <anonymous>").path).toBe("<anonymous>");
+    expect(new Location("    at new Promise (<anonymous>)").path).toBe("<anonymous>");
   });
 });
 

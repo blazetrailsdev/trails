@@ -29,7 +29,7 @@ export class SourceMapLocation {
     this.template = template;
   }
 
-  get path(): string | null {
+  get path(): string {
     return this.location.path;
   }
 
@@ -383,10 +383,7 @@ export class ExceptionWrapper {
     }
   }
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE exception-wrapper-extract-source-drops-null-path-guard
-   */
+  /** @internal */
   extractSource(trace: BacktraceLine): SourceExtract {
     const spot = trace instanceof SourceMapLocation ? trace.spot(this.exception) : null;
 
@@ -412,7 +409,7 @@ export class ExceptionWrapper {
     const [file, lineNumber] = this.extractFileAndLineNumber(trace);
 
     return {
-      code: file == null ? null : this.sourceFragment(file, lineNumber),
+      code: this.sourceFragment(file, lineNumber),
       lineNumber: lineNumber,
     };
   }
@@ -445,7 +442,7 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  extractFileAndLineNumber(trace: BacktraceLine): [string | null, number] {
+  extractFileAndLineNumber(trace: BacktraceLine): [string, number] {
     return [trace.path, trace.lineno];
   }
 

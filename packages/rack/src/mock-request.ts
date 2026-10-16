@@ -59,9 +59,9 @@ export type RackApp = (
 export class MockRequest {
   private static parser: RFC2396Parser | undefined;
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -90,7 +90,7 @@ export class MockRequest {
   async request(method = GET, uri = "", opts: Record<string, any> = {}): Promise<MockResponse> {
     const env = MockRequest.envFor(uri, { ...opts, ":method": method });
 
-    let app: RackApp | Lint;
+    let app: RackApp | { call: RackApp } | Lint;
     if (opts[":lint"]) {
       app = new Lint(this.app);
     } else {
