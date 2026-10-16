@@ -25,6 +25,30 @@ export class CGI {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `CGI::Util::TABLE_FOR_ESCAPE_HTML__`
+   * (`vendor/ruby/v3.3.11/lib/cgi/util.rb:66`).
+   */
+  static readonly TABLE_FOR_ESCAPE_HTML__: Readonly<Record<string, string>> = {
+    "'": "&#39;",
+    "&": "&amp;",
+    '"': "&quot;",
+    "<": "&lt;",
+    ">": "&gt;",
+  };
+
+  /**
+   * `CGI.escapeHTML` (`vendor/ruby/v3.3.11/lib/cgi/util.rb:77-94`), its
+   * ASCII-compatible arm: a String has no encoding tag (CLAUDE.md, "A String has
+   * no encoding tag either").
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `CGI.escapeHTML`
+   * (`vendor/ruby/v3.3.11/lib/cgi/util.rb:77`).
+   */
+  static escapeHTML(string: string): string {
+    return string.replace(/['&"<>]/g, (c) => CGI.TABLE_FOR_ESCAPE_HTML__[c]);
+  }
+
+  /**
    * `CGI.unescape` (`vendor/ruby/v3.3.11/lib/cgi/util.rb:27-36`): `+` as a space and
    * each run of `%XX` as its bytes, read as UTF-8. A `%` not followed by two
    * hex digits is left as it is.

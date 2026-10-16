@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { DebugExceptions } from "../middleware/debug-exceptions.js";
-import { BacktraceCleaner, htmlEscape, Logger } from "@blazetrails/activesupport";
+import { BacktraceCleaner, Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
-import { rbInspect, StringIO } from "@blazetrails/ruby-compat";
+import { CGI, PP, StringIO } from "@blazetrails/ruby-compat";
 import { MimeType } from "../http/mime-type.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
@@ -558,7 +558,9 @@ describe("DebugExceptionsTest", () => {
     );
     expect(status).toBe(500);
 
-    expect(await bodyToString(body)).toContain(htmlEscape(rbInspect(params)));
+    expect(await bodyToString(body)).toContain(
+      CGI.escapeHTML((PP.pp(params, new StringIO(), 200) as StringIO).string()),
+    );
   });
 
   it("raise an exception on cascade pass", async () => {
