@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isAbsentHalf } from "@blazetrails/ruby-compat";
+import { isAbsentHalf, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
   delegate,
   mattrAccessor,
@@ -192,6 +192,7 @@ describe("ModuleAttributeAccessorTest", () => {
     expect(instance.config).toBe("class_value");
     const desc = Object.getOwnPropertyDescriptor(MyModule.prototype, "config");
     expect(isAbsentHalf(desc?.set)).toBe(true);
+    expect(rbObjRespondTo(instance, "config=")).toBe(false);
   });
 
   it("should not create instance reader", () => {
@@ -199,6 +200,7 @@ describe("ModuleAttributeAccessorTest", () => {
     mattrAccessor.call(MyModule, "secret", { instanceReader: false });
     const desc = Object.getOwnPropertyDescriptor(MyModule.prototype, "secret");
     expect(isAbsentHalf(desc?.get)).toBe(true);
+    expect(rbObjRespondTo(new MyModule(), "secret")).toBe(false);
     expect(desc?.set).toBeDefined();
   });
 

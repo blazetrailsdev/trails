@@ -836,20 +836,12 @@ function absentHalf(id: string, write: boolean): (this: object, value?: unknown)
     ? function (this: object, value: unknown): void {
         const from = owner(this);
         const entry = nextHalf(from && Object.getPrototypeOf(from), id, true);
-        if (entry?.set) {
-          entry.set.call(this, value);
-        } else if (entry !== undefined) {
-          Object.defineProperty(this, id, {
-            value,
-            writable: true,
-            enumerable: true,
-            configurable: true,
-          });
-        } else {
+        if (!entry?.set) {
           throw new globalThis.TypeError(
             `Cannot set property ${id} of ${String(this)} which has only a getter`,
           );
         }
+        entry.set.call(this, value);
       }
     : function (this: object): unknown {
         const from = owner(this);

@@ -1335,6 +1335,38 @@ describe("Module#superMethod", () => {
     expect(rbFSend(host, "x")).toBe("base");
   });
 
+  it("leaves a reader-only module's absent writer out of respond_to? and raises on assignment", () => {
+    const Reader = new Module((m) => {
+      m.moduleEval((table) => {
+        Object.defineProperty(table, "x", { configurable: true, get: () => "r" });
+      });
+    });
+    class Host {}
+    include(Host, Reader);
+    const host = new Host() as { x: unknown };
+    expect(rbObjRespondTo(host, "x=")).toBe(false);
+    expect(rbModMethodDefined(Host, "x=")).toBe(false);
+    expect(() => (host.x = 1)).toThrow(TypeError);
+    expect(host.x).toBe("r");
+  });
+
+  it("defers an absent half past a module included at two levels of one ancestry", () => {
+    const Writer = new Module((m) => m.attrWriter("x"));
+    class Base {
+      get x(): string {
+        return "base";
+      }
+    }
+    class Mid extends Base {}
+    include(Mid, Writer);
+    class Leaf extends Mid {}
+    include(Leaf, Writer);
+    const leaf = new Leaf() as unknown as { x: unknown; _x?: unknown };
+    leaf.x = 5;
+    expect(leaf._x).toBe(5);
+    expect(leaf.x).toBe("base");
+  });
+
   it("resumes above a class's singleton link, and the class still constructs", () => {
     class Parent {
       value: string;
