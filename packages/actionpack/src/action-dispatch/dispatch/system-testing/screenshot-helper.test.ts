@@ -18,10 +18,19 @@ import {
   supportsScreenshot,
   type ScreenshotHelperHost,
 } from "../../system-testing/test-helpers/screenshot-helper.js";
-import {
-  DrivenByRackTest,
-  DrivenBySeleniumWithChrome,
-} from "../../../test-helpers/abstract-unit.js";
+import type { BrowserType } from "playwright";
+import { requirePlaywright } from "../../system-testing/driver.js";
+
+const foundExecutable = new URL(import.meta.url).pathname;
+const { chromium, firefox } = (await requirePlaywright()) as {
+  chromium: BrowserType;
+  firefox: BrowserType;
+};
+vi.spyOn(chromium, "executablePath").mockImplementation(() => foundExecutable);
+vi.spyOn(firefox, "executablePath").mockImplementation(() => foundExecutable);
+
+const { DrivenByRackTest, DrivenBySeleniumWithChrome } =
+  await import("../../../test-helpers/driven-by.js");
 
 function makeHost(testName: string): ScreenshotHelperHost & { metadata: Record<string, unknown> } {
   return {

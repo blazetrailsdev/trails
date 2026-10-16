@@ -1,5 +1,5 @@
 import { presence } from "@blazetrails/activesupport";
-import { Encoding, File, getFs, Module } from "@blazetrails/ruby-compat";
+import { Encoding, File, getFs, Module, Pathname } from "@blazetrails/ruby-compat";
 import { vite } from "../server.js";
 
 declare module "vitest" {
@@ -98,7 +98,7 @@ export function screenshotsDir(): string {
 
 /** @internal */
 function absolutePath(this: ScreenshotHelperHost): string {
-  return File.join(projectRoot(), screenshotsDir(), imageName.call(this));
+  return new Pathname(projectRoot()).join(screenshotsDir(), imageName.call(this)).toString();
 }
 
 /** @internal */
@@ -116,7 +116,10 @@ function absoluteHtmlPath(this: ScreenshotHelperHost): string {
   return `${absolutePath.call(this)}.html`;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsCall save_page — PERMANENT
+ */
 export async function saveHtml(this: ScreenshotHelperHost): Promise<void> {
   if (!this._page) return;
   const path = absoluteHtmlPath.call(this);
