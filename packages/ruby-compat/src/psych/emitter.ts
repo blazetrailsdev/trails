@@ -242,7 +242,7 @@ export class Emitter {
       default:
         return false;
     }
-    if (this.events.length - 1 > accumulate) return false;
+    if (this.events.length > accumulate) return false;
     let level = 0;
     for (const event of this.events) {
       switch (event.type) {
@@ -320,6 +320,7 @@ export class Emitter {
 
   private emitDocumentStart(event: Event, first: boolean): void {
     if (event.type === "DOCUMENT_START") {
+      if (event.version.length > 0) this.analyzeVersionDirective(event.version);
       for (const [handle, prefix] of event.tagDirectives) {
         this.analyzeTagDirective(handle, prefix);
         this.appendTagDirective(handle, prefix, false);
@@ -681,6 +682,12 @@ export class Emitter {
         return this.writeLiteralScalar(value);
       case Scalar.FOLDED:
         return this.writeFoldedScalar(value);
+    }
+  }
+
+  private analyzeVersionDirective(versionDirective: number[]): void {
+    if (versionDirective[0] !== 1 || (versionDirective[1] !== 1 && versionDirective[1] !== 2)) {
+      throw new RuntimeError("incompatible %YAML directive");
     }
   }
 

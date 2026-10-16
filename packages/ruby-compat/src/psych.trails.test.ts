@@ -451,6 +451,19 @@ describe("Psych.dump empty root collection and explicit keys", () => {
       '---\n{\n  ? "a"\n  : [\n    ! "1",\n    "b c",\n  ],\n  ? "k"\n  : {},\n}\n',
     );
     expect(Psych.dump("x", { canonical: true })).toBe('---\n"x"\n');
+    const { Emitter } = await import("./psych/emitter.js");
+    const { RuntimeError } = await import("./runtime-error.js");
+    const out: string[] = [];
+    const emitter = new Emitter({ write: (s: string) => out.push(s) } as never);
+    emitter.startStream(1).startDocument([1, 1], [], false);
+    emitter.scalar("a", null, null, true, false, 1).endDocument(true).endStream();
+    expect(out.join("")).toBe("%YAML 1.1\n--- a\n");
+    const bad = new Emitter({ write: () => 0 } as never)
+      .startStream(1)
+      .startDocument([1, 3], [], false);
+    expect(() => bad.scalar("a", null, null, true, false, 1)).toThrow(
+      new RuntimeError("incompatible %YAML directive"),
+    );
   });
 });
 
