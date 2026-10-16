@@ -1,4 +1,4 @@
-import { classpaths, Module, NameError, rbModName, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import { classpaths, Module, NameError, rbModName } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
@@ -80,6 +80,7 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
   const names = syms as string[];
   const instanceReader = options.instanceReader !== false;
   const instanceAccessor = options.instanceAccessor !== false;
+  const isModule = this instanceof Module;
 
   for (const sym of names) {
     if (!/^[_A-Za-z]\w*$/.test(sym)) throw new NameError(`invalid attribute name: ${sym}`);
@@ -88,7 +89,7 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
     defineAccessorHalf(target, sym, { get: () => target[storageKey] });
 
     if (instanceReader && instanceAccessor) {
-      if (rbObjIsKindOf(target, Module)) {
+      if (isModule) {
         target.moduleEval((mod: object) =>
           defineAccessorHalf(mod, sym, { get: () => target[sym] }),
         );
@@ -109,6 +110,7 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
   const names = syms as string[];
   const instanceWriter = options.instanceWriter !== false;
   const instanceAccessor = options.instanceAccessor !== false;
+  const isModule = this instanceof Module;
 
   for (const sym of names) {
     if (!/^[_A-Za-z]\w*$/.test(sym)) throw new NameError(`invalid attribute name: ${sym}`);
@@ -126,7 +128,7 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
           target[sym] = val;
         },
       };
-      if (rbObjIsKindOf(target, Module)) {
+      if (isModule) {
         target.moduleEval((mod: object) => defineAccessorHalf(mod, sym, half));
       } else if (target.prototype) {
         defineAccessorHalf(target.prototype, sym, half);
