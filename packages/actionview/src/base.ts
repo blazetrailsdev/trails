@@ -1,5 +1,4 @@
 import {
-  attrInternal,
   cattrAccessor,
   classAttribute,
   delegate,
@@ -393,7 +392,6 @@ export class Base {
 }
 
 installControllerInternals(Base.prototype);
-attrInternal.call(Base.prototype, "defaultFormBuilder");
 installControllerDelegates(Base.prototype);
 
 Object.defineProperty(Base.prototype, "yield", {

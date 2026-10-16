@@ -1,9 +1,25 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertMatch } from "@blazetrails/activesupport";
+import { assertMatch, assertPredicate, isHtmlSafe } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
+import { Template } from "../template.js";
+import { TemplateHandlers } from "./handlers.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
+import { defaultEnforceUtf8, setDefaultEnforceUtf8 } from "../helpers/form-tag-helper.js";
+import { raw } from "../helpers/output-safety-helper.js";
+
+const renderErb = (string: string): string => {
+  const template = new Template(
+    string.trim(),
+    "test template",
+    TemplateHandlers.handlerForExtension("tse")!,
+    { format: ":html", locals: [] },
+  );
+  const view = Base.withEmptyTemplateCache();
+  return String(template.render(view.empty(), {})).trim();
+};
 
 describe("FormTagHelperTest", () => {
   const VALID_HTML_ID = /^[A-Za-z][-_:.A-Za-z0-9]*$/;
@@ -53,8 +69,25 @@ describe("FormTagHelperTest", () => {
   function wholeForm(
     action: string | false = "http://www.example.com",
     options: { remote?: boolean; enctype?: boolean; method?: string; enforceUtf8?: boolean } = {},
+    block?: () => string,
   ): string {
-    return formText(action, options) + hiddenFields(options);
+    let out = formText(action, options) + hiddenFields(options);
+
+    if (block !== undefined) {
+      out += block() + "</form>";
+    }
+
+    return out;
+  }
+
+  function withDefaultEnforceUtf8(value: boolean, block: () => void): void {
+    const oldValue = defaultEnforceUtf8;
+    setDefaultEnforceUtf8(value);
+    try {
+      block();
+    } finally {
+      setDefaultEnforceUtf8(oldValue);
+    }
   }
 
   function stubUrlFor(): void {
@@ -67,6 +100,12 @@ describe("FormTagHelperTest", () => {
       }
     } as typeof view.urlFor;
   }
+
+  it("checkbox tag", () => {
+    const actual = view.checkboxTag("admin");
+    const expected = `<input id="admin" name="admin" type="checkbox" value="1" />`;
+    assertDomEqual(expected, actual);
+  });
 
   it("form tag", () => {
     stubUrlFor();
@@ -135,6 +174,131 @@ describe("FormTagHelperTest", () => {
     assertDomEqual(expected, actual);
   });
 
+  it("form tag enforce utf8 true", () => {
+    stubUrlFor();
+    const actual = view.formTag({}, { enforceUtf8: true });
+    const expected = wholeForm("http://www.example.com", { enforceUtf8: true });
+    assertDomEqual(expected, actual);
+    assertPredicate(actual, isHtmlSafe);
+  });
+
+  it("form tag enforce utf8 false", () => {
+    stubUrlFor();
+    const actual = view.formTag({}, { enforceUtf8: false });
+    const expected = wholeForm("http://www.example.com", { enforceUtf8: false });
+    assertDomEqual(expected, actual);
+    assertPredicate(actual, isHtmlSafe);
+  });
+
+  it("form tag default enforce utf8 false", () => {
+    stubUrlFor();
+    withDefaultEnforceUtf8(false, () => {
+      const actual = view.formTag({});
+      const expected = wholeForm("http://www.example.com", { enforceUtf8: false });
+      assertDomEqual(expected, actual);
+      assertPredicate(actual, isHtmlSafe);
+    });
+  });
+
+  it("form tag default enforce utf8 true", () => {
+    stubUrlFor();
+    withDefaultEnforceUtf8(true, () => {
+      const actual = view.formTag({});
+      const expected = wholeForm("http://www.example.com", { enforceUtf8: true });
+      assertDomEqual(expected, actual);
+      assertPredicate(actual, isHtmlSafe);
+    });
+  });
+
+  it("form tag with block in tse", () => {
+    const outputBuffer = renderErb(
+      `<%= formTag("http://www.example.com", {}, () => { %>Hello world!<% }) %>`,
+    );
+
+    const expected = wholeForm(undefined, {}, () => "Hello world!");
+    assertDomEqual(expected, outputBuffer);
+  });
+
+  it("form tag with block and method in tse", () => {
+    const outputBuffer = renderErb(
+      `<%= formTag("http://www.example.com", { method: "put" }, () => { %>Hello world!<% }) %>`,
+    );
+
+    const expected = wholeForm("http://www.example.com", { method: "put" }, () => {
+      return "Hello world!";
+    });
+
+    assertDomEqual(expected, outputBuffer);
+  });
+
+  it("hidden field tag", () => {
+    const actual = view.hiddenFieldTag("id", 3);
+    const expected = `<input id="id" name="id" type="hidden" value="3" autocomplete="off" />`;
+    assertDomEqual(expected, actual);
+  });
+
+  it("radio button tag", () => {
+    let actual = view.radioButtonTag("people", "david");
+    let expected = `<input id="people_david" name="people" type="radio" value="david" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("num_people", 5);
+    expected = `<input id="num_people_5" name="num_people" type="radio" value="5" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("gender", "m").plus(view.radioButtonTag("gender", "f"));
+    expected = `<input id="gender_m" name="gender" type="radio" value="m" /><input id="gender_f" name="gender" type="radio" value="f" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("opinion", "-1").plus(view.radioButtonTag("opinion", "1"));
+    expected = `<input id="opinion_-1" name="opinion" type="radio" value="-1" /><input id="opinion_1" name="opinion" type="radio" value="1" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("person[gender]", "m");
+    expected = `<input id="person_gender_m" name="person[gender]" type="radio" value="m" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("ctrlname", "apache2.2");
+    expected = `<input id="ctrlname_apache2.2" name="ctrlname" type="radio" value="apache2.2" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("people", "david", true);
+    expected = `<input id="people_david" name="people" type="radio" value="david" checked="checked" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("people", "david", false);
+    expected = `<input id="people_david" name="people" type="radio" value="david" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("people", "david", false, { disabled: true });
+    expected = `<input id="people_david" name="people" type="radio" value="david" disabled="disabled" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("people", "david", { checked: true });
+    expected = `<input id="people_david" name="people" type="radio" value="david" checked="checked" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("people", "david", { checked: false });
+    expected = `<input id="people_david" name="people" type="radio" value="david" />`;
+    assertDomEqual(expected, actual);
+
+    actual = view.radioButtonTag("people", "david", { checked: false, disabled: true });
+    expected = `<input id="people_david" name="people" type="radio" value="david" disabled="disabled" />`;
+    assertDomEqual(expected, actual);
+  });
+
+  it("select tag", () => {
+    const actual = view.selectTag("people", raw("<option>david</option>"));
+    const expected = `<select id="people" name="people"><option>david</option></select>`;
+    assertDomEqual(expected, actual);
+  });
+
+  it("text field tag", () => {
+    const actual = view.textFieldTag("title", "Hello!");
+    const expected = `<input id="title" name="title" type="text" value="Hello!" />`;
+    assertDomEqual(expected, actual);
+  });
+
   it("label tag without text", () => {
     const actual = view.labelTag("title");
     const expected = `<label for="title">Title</label>`;
@@ -179,5 +343,14 @@ describe("FormTagHelperTest", () => {
   it("label tag with block and argument and options", () => {
     const output = view.labelTag("clock", { id: "label_clock" }, null, () => "Grandfather");
     assertDomEqual('<label for="clock" id="label_clock">Grandfather</label>', output);
+  });
+
+  it("button tag", () => {
+    assertDomEqual(`<button name="button" type="submit">Button</button>`, view.buttonTag());
+  });
+
+  it("number field tag", () => {
+    const expected = `<input name="quantity" max="9" id="quantity" type="number" min="1" />`;
+    assertDomEqual(expected, view.numberFieldTag("quantity", null, { in: new Range(1, 10, true) }));
   });
 });

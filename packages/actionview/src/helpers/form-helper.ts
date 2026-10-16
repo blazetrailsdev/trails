@@ -2,6 +2,7 @@ import {
   CodeGenerator,
   I18n,
   SafeBuffer,
+  attrInternal,
   classAttribute,
   constantize,
   cattrAccessor,
@@ -11,6 +12,7 @@ import {
   isBlank,
   isExtractableOptions,
   isPlainObject,
+  isPresent,
   onLoad,
   presence,
   reverseMergeBang,
@@ -38,6 +40,8 @@ export { domClass, domId } from "../record-identifier.js";
 import { ActionView } from "../namespaces.js";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 import {
+  buttonTag,
+  convertDirectUploadOptionToUrl,
   embedAuthenticityTokenInRemoteForms,
   formTagHtml,
   formTagWithBody,
@@ -45,7 +49,10 @@ import {
   type FormTagHelperHost,
   FormTagHelper,
 } from "./form-tag-helper.js";
+import { CheckBox } from "./tags/check-box.js";
+import { FileField } from "./tags/file-field.js";
 import { Label, type LabelBuilder } from "./tags/label.js";
+import { RadioButton } from "./tags/radio-button.js";
 import { PasswordField } from "./tags/password-field.js";
 import { HiddenField } from "./tags/hidden-field.js";
 import { TextArea } from "./tags/text-area.js";
@@ -70,6 +77,10 @@ const __LINE__ = 0;
 export interface FormHelperHost extends FormTagHelperHost, CaptureHelperHost {
   fieldsFor: typeof fieldsFor;
   hiddenField: typeof hiddenField;
+  fileField: typeof fileField;
+  checkbox: typeof checkbox;
+  radioButton: typeof radioButton;
+  buttonTag: typeof buttonTag;
   label: typeof label;
   _objectForFormBuilder: typeof _objectForFormBuilder;
   defaultFormBuilder: unknown;
@@ -292,6 +303,22 @@ export function hiddenField(
   return new HiddenField(objectName, method, this, options).render();
 }
 
+export function fileField(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  options = Object.assign({ includeHidden: multipleFileFieldIncludeHidden }, options);
+
+  return new FileField(
+    objectName,
+    method,
+    this,
+    convertDirectUploadOptionToUrl.call(this, { ...options }),
+  ).render();
+}
+
 export function textarea(
   this: FormHelperHost,
   objectName: unknown,
@@ -301,6 +328,28 @@ export function textarea(
   return new TextArea(objectName, method, this, options).render();
 }
 export const textArea = textarea;
+
+export function checkbox(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+  checkedValue: unknown = "1",
+  uncheckedValue: unknown = "0",
+): unknown {
+  return new CheckBox(objectName, method, this, checkedValue, uncheckedValue, options).render();
+}
+export const checkBox = checkbox;
+
+export function radioButton(
+  this: FormHelperHost,
+  objectName: unknown,
+  method: unknown,
+  tagValue: unknown,
+  options: Record<string, unknown> = {},
+): unknown {
+  return new RadioButton(objectName, method, this, tagValue, options).render();
+}
 
 export function colorField(
   this: FormHelperHost,
@@ -791,9 +840,43 @@ export class FormBuilder {
     );
   }
 
+  checkbox(
+    method: unknown,
+    options: Record<string, unknown> = {},
+    checkedValue: unknown = "1",
+    uncheckedValue: unknown = "0",
+  ): unknown {
+    return this._template.checkbox(
+      this.objectName,
+      method,
+      this.objectifyOptions(options),
+      checkedValue,
+      uncheckedValue,
+    );
+  }
+
+  declare checkBox: FormBuilder["checkbox"];
+  static {
+    this.prototype.checkBox = this.prototype.checkbox;
+  }
+
+  radioButton(method: unknown, tagValue: unknown, options: Record<string, unknown> = {}): unknown {
+    return this._template.radioButton(
+      this.objectName,
+      method,
+      tagValue,
+      this.objectifyOptions(options),
+    );
+  }
+
   hiddenField(method: unknown, options: Record<string, unknown> = {}): unknown {
     if (method === "id") this._emittedHiddenId = true;
     return this._template.hiddenField(this.objectName, method, this.objectifyOptions(options));
+  }
+
+  fileField(method: unknown, options: Record<string, unknown> = {}): unknown {
+    this.multipart = true;
+    return this._template.fileField(this.objectName, method, this.objectifyOptions(options));
   }
 
   isEmittedHiddenId(): unknown {
@@ -809,6 +892,41 @@ export class FormBuilder {
     }
     if (value == null || value === false) value = this.submitDefaultValue();
     return this._template.submitTag(value, options);
+  }
+
+  button(
+    value: unknown = null,
+    options: Record<string, unknown> = {},
+    block?: (value: unknown) => unknown,
+  ): SafeBuffer {
+    if (isPlainObject(value) || value instanceof Hash) {
+      [value, options] = [null, value as Record<string, unknown>];
+    } else if (typeof value === "string" && value.startsWith(":")) {
+      [value, options] = [
+        null,
+        Object.assign(
+          { name: this.fieldName(value.slice(1)), id: this.fieldId(value.slice(1)) },
+          options,
+        ),
+      ];
+    }
+    if (value == null || value === false) value = this.submitDefaultValue();
+
+    if (block !== undefined) {
+      value = this._template.capture(() => block(value));
+    }
+
+    const formmethod = options["formmethod"];
+    if (
+      isPresent(formmethod) &&
+      !/post|get/i.test(String(formmethod)) &&
+      !Object.hasOwn(options, "name") &&
+      !Object.hasOwn(options, "value")
+    ) {
+      Object.assign(options, { formmethod: "post", name: "_method", value: formmethod });
+    }
+
+    return this._template.buttonTag(value, options);
   }
 
   private objectifyOptions(options: Record<string, unknown>): Record<string, unknown> {
@@ -941,8 +1059,10 @@ export const FormHelper = new Module((mod) => {
   mod.include(RecordIdentifier);
 
   mod.moduleEval((m) => {
+    attrInternal.call(m, "defaultFormBuilder");
     Object.assign(m, { formFor, applyFormForOptionsBang, formWith, fieldsFor, fields, label });
-    Object.assign(m, { textField, passwordField, hiddenField, textarea, textArea, colorField });
+    Object.assign(m, { textField, passwordField, hiddenField, fileField, textarea, textArea });
+    Object.assign(m, { checkbox, checkBox, radioButton, colorField });
     Object.assign(m, { searchField, telephoneField, phoneField, dateField, timeField });
     Object.assign(m, { datetimeField, datetimeLocalField, monthField, weekField, urlField });
     Object.assign(m, { emailField, numberField, rangeField, _objectForFormBuilder });
