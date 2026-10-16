@@ -19,11 +19,13 @@
 export class Location {
   /**
    * `Thread::Backtrace::Location#path` (`vendor/ruby/v3.3.11/vm_backtrace.c:314`),
-   * nil for a V8 frame whose position is not a plain file (an `eval` frame).
+   * always a String. An `eval` frame answers `(eval at <caller>)`, MRI 3.3's
+   * eval path (`vendor/ruby/v3.3.11/vm_eval.c:1628-1636`), and a frame with no
+   * position answers its location text (`<anonymous>`, `native`).
    *
    * @noRailsEquivalent PERMANENT
    */
-  readonly path: string | null;
+  readonly path: string;
   /** @noRailsEquivalent PERMANENT */
   readonly lineno: number;
   /** @noRailsEquivalent PERMANENT */
@@ -42,8 +44,12 @@ export class Location {
     const body = this._frame.replace(/^at\s+(?:async\s+)?/, "");
     const location =
       body.endsWith(")") && body.includes(" (") ? body.slice(body.indexOf(" (") + 2, -1) : body;
-    const path = location.startsWith("eval at ") ? null : /^(.+):\d+:\d+$/.exec(location);
-    this.path = path ? path[1] : null;
+    const path = /^(.+):\d+:\d+$/.exec(location);
+    if (location.startsWith("eval at ")) {
+      this.path = `(${location.slice(0, location.lastIndexOf(", "))})`;
+    } else {
+      this.path = path ? path[1] : location;
+    }
 
     const position = /:(\d+):(\d+)\)?$/.exec(this._frame);
     this.lineno = position ? Number(position[1]) : 0;

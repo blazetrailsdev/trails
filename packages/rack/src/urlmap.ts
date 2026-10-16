@@ -1,22 +1,23 @@
 import { PATH_INFO, SCRIPT_NAME, SERVER_NAME, SERVER_PORT } from "./constants.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 interface Mapping {
   host: string | null;
   location: string;
   matchPrefix: string;
-  app: RackApp;
+  app: RackApp | { call: RackApp };
 }
 
 export class URLMap {
   private mappings: Mapping[];
 
-  constructor(map: Record<string, RackApp> = {}) {
+  constructor(map: Record<string, RackApp | { call: RackApp }> = {}) {
     this.mappings = [];
     this.remap(map);
   }
 
-  remap(map: Record<string, RackApp>): void {
+  remap(map: Record<string, RackApp | { call: RackApp }>): void {
     this.mappings = [];
     for (const [location, app] of Object.entries(map)) {
       let host: string | null = null;
@@ -67,7 +68,7 @@ export class URLMap {
           [SCRIPT_NAME]: scriptName + mapping.location,
           [PATH_INFO]: rest,
         };
-        return mapping.app(newEnv);
+        return rbFSend(mapping.app, "call", newEnv) as ReturnType<RackApp>;
       }
     }
 

@@ -1,6 +1,7 @@
 import { it, expect, describe } from "vitest";
 import { join } from "path";
 import { Builder } from "./builder.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { MockRequest } from "./mock-request.js";
 
 function configFile(name: string): string {
@@ -52,7 +53,7 @@ it("supports use when mapping", async () => {
       this.app = app;
     }
     async call(env: any) {
-      const [s, h, b] = await this.app(env);
+      const [s, h, b] = await rbFSend(this.app, "call", env);
       return [s, { ...h, "x-middleware": "yes" }, b];
     }
   }
@@ -105,7 +106,7 @@ it("chains apps by default", async () => {
       this.val = val;
     }
     async call(env: any) {
-      const [s, h, b] = await this.app(env);
+      const [s, h, b] = await rbFSend(this.app, "call", env);
       h[this.key] = this.val;
       return [s, h, b];
     }
@@ -136,7 +137,7 @@ it("supports blocks on use", async () => {
       this.app = app;
     }
     async call(env: any) {
-      const [s, h, b] = await this.app(env);
+      const [s, h, b] = await rbFSend(this.app, "call", env);
       h["x-block"] = "used";
       return [s, h, b];
     }
@@ -217,7 +218,7 @@ it("allows use after run", async () => {
       this.app = app;
     }
     async call(env: any) {
-      const [s, h, b] = await this.app(env);
+      const [s, h, b] = await rbFSend(this.app, "call", env);
       h["x-added"] = "yes";
       return [s, h, b];
     }

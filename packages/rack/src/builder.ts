@@ -1,12 +1,12 @@
-import { ArgumentError, File } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, rbFSend } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
 
-type RackApp = (env: Record<string, any>) => any;
-type MiddlewareFactory = new (app: RackApp, ...args: any[]) => { call: RackApp };
+type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, any>) => any);
+type MiddlewareFactory = new (app: RackApp, ...args: any[]) => RackApp;
 
 export class Builder {
   private _middlewares: Array<{
-    klass: MiddlewareFactory | ((app: RackApp) => { call: RackApp });
+    klass: MiddlewareFactory | ((app: RackApp) => RackApp);
     args: any[];
     block?: any;
   }> = [];
@@ -84,14 +84,13 @@ export class Builder {
     return this;
   }
 
-  run(app: RackApp | { call: RackApp }): this;
+  run(app: RackApp): this;
   run(app: null, block: RackApp): this;
-  /** @inventedArm if — PERMANENT */
-  run(app: RackApp | { call: RackApp } | null, block?: RackApp): this {
+  run(app: RackApp | null, block?: RackApp): this {
     if (app && block) {
       throw new ArgumentError("Both app and block given!");
     }
-    this._run = (app !== null && typeof app === "object" ? (env) => app.call(env) : app) || block!;
+    this._run = app || block!;
     return this;
   }
 
@@ -117,7 +116,7 @@ export class Builder {
   }
 
   async call(env: Record<string, any>): Promise<any> {
-    return this.toApp()(env);
+    return rbFSend(this.toApp(), "call", env);
   }
 
   toApp(): RackApp {
@@ -129,11 +128,9 @@ export class Builder {
       const { klass, args } = this._middlewares[i];
       const inner = result;
       if (typeof klass === "function" && klass.prototype && klass.prototype.call) {
-        const mw = new (klass as MiddlewareFactory)(inner, ...args);
-        result = (e) => mw.call(e);
+        result = new (klass as MiddlewareFactory)(inner, ...args);
       } else {
-        const mw = (klass as any)(inner, ...args);
-        result = (e) => mw.call(e);
+        result = (klass as (app: RackApp, ...args: any[]) => RackApp)(inner, ...args);
       }
     }
     if (this._warmupBlock) this._warmupBlock(result);
@@ -145,6 +142,6 @@ export class Builder {
     for (const [r, b] of Object.entries(mapping)) {
       mapped[r] = b;
     }
-    return (env) => new URLMap(mapped).call(env);
+    return new URLMap(mapped);
   }
 }
