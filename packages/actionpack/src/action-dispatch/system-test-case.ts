@@ -1,6 +1,7 @@
-import { classAttribute } from "@blazetrails/activesupport";
+import { classAttribute, TopLevel } from "@blazetrails/activesupport";
+import { Builder, type RackApp } from "@blazetrails/rack";
 import { Driver, type BrowserName, type DriverOptions } from "./system-testing/driver.js";
-import { Server, type ServerApp } from "./system-testing/server.js";
+import { Server, vite } from "./system-testing/server.js";
 
 export const DEFAULT_HOST = "http://127.0.0.1";
 
@@ -23,9 +24,6 @@ export class SystemTestCase {
     classAttribute.call(this, "driver", { instanceAccessor: false });
   }
 
-  private static _server: Server | undefined;
-  private static _serverHost: string | undefined;
-  private static _serverPort: number | undefined;
   private _driverReady: Promise<void>;
 
   constructor() {
@@ -44,15 +42,27 @@ export class SystemTestCase {
   }
 
   static servedBy(options: ServedByOptions): void {
-    this._serverHost = options.host;
-    this._serverPort = options.port;
+    vite.config.server.host = options.host;
+    vite.config.server.port = options.port;
   }
 
-  /** @internal */
-  static async startApplication(app: ServerApp): Promise<void> {
-    const server = new Server();
-    await server.run(app);
-    this._server = server;
+  /**
+   * @internal
+   * @inventedArm afterAll — PERMANENT
+   */
+  static async startApplication(): Promise<void> {
+    vite.app = new Builder(null, {}, (builder) => {
+      builder.map("/", (builder) => {
+        builder.run(TopLevel.Trails!.application as unknown as RackApp);
+      });
+    });
+
+    await new Server().run();
+    const { afterAll } = await import("vitest");
+    afterAll(async () => {
+      await vite.server?.close();
+      vite.server = undefined;
+    });
   }
 
   /** @internal */

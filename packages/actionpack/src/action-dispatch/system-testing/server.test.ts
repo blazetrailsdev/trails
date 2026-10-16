@@ -1,41 +1,45 @@
-import { describe, it, expect, afterEach } from "vitest";
-import http from "http";
-import { Server } from "./server.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { ViteDevServer } from "vite";
+import { Server, vite } from "./server.js";
 
-describe("ActionDispatch::SystemTesting::Server", () => {
-  let server: Server | undefined;
+describe("ServerTest", () => {
+  let oldVitestServer: ViteDevServer | undefined;
+
+  beforeEach(() => {
+    oldVitestServer = vite.server;
+    vite.app = { call: async () => [200, {}, ["ok"]] };
+  });
+
   afterEach(async () => {
-    await server?.stop();
-    server = undefined;
-    Server.silencePuma = false;
+    if (vite.server !== oldVitestServer) await vite.server?.close();
+    vite.server = oldVitestServer;
+    vite.url = undefined;
   });
 
-  it("boots an app on a random port", async () => {
-    const app = http.createServer((_req, res) => {
-      res.writeHead(200);
-      res.end("ok");
-    });
-    server = new Server();
-    await server.run(app);
-    expect(server.port).toBeGreaterThan(0);
-    expect(server.host).toBe("127.0.0.1");
+  it("port is always included", async () => {
+    await new Server().run();
+    expect(vite.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
   });
 
-  it("stops the server and resets port", async () => {
-    const app = http.createServer((_req, res) => {
-      res.writeHead(200);
-      res.end("ok");
-    });
-    server = new Server();
-    await server.run(app);
-    await server.stop();
-    expect(server.port).toBe(0);
-    server = undefined;
-  });
-
-  it("has configurable silence_puma class attribute", () => {
-    expect(Server.silencePuma).toBe(false);
+  it("server is changed from `default` to `puma`", async () => {
+    vite.server = undefined;
     Server.silencePuma = true;
-    expect(Server.silencePuma).toBe(true);
+    try {
+      await new Server().run();
+    } finally {
+      Server.silencePuma = false;
+    }
+    expect(vite.server).not.toBeUndefined();
+    expect(vite.server!.config.logLevel).toBe("silent");
+    const response = await fetch(vite.url!);
+    expect(await response.text()).toBe("ok");
+  });
+
+  it("server is not changed to `puma` when is different than default", async () => {
+    const webrick = { resolvedUrls: { local: ["http://127.0.0.1:3000/"] } } as ViteDevServer;
+    vite.server = webrick;
+    await new Server().run();
+    expect(vite.server).toBe(webrick);
+    vite.server = oldVitestServer;
   });
 });
