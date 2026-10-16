@@ -1,4 +1,4 @@
-import { beforeEach, describe, it } from "vitest";
+import { beforeEach, describe, it, vi } from "vitest";
 import { Lint } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
@@ -8,7 +8,7 @@ import {
   assertMatch,
   assertRaise,
 } from "@blazetrails/activesupport";
-import { RuntimeError, StandardError } from "@blazetrails/ruby-compat";
+import { RuntimeError, StandardError, stderr } from "@blazetrails/ruby-compat";
 import { TemplateError } from "@blazetrails/actionview";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { MethodNotAllowed, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
@@ -180,13 +180,18 @@ describe("ShowExceptionsTest", () => {
   });
 
   it("failsafe prevents raising if exceptions_app raises", async () => {
-    testCase.app = buildApp(async (_env: RackEnv) => {
-      throw new RuntimeError();
-    });
+    const oldStderr = vi.spyOn(stderr, "write").mockReturnValue(true);
+    try {
+      testCase.app = buildApp(async (_env: RackEnv) => {
+        throw new RuntimeError();
+      });
 
-    await testCase.get("/");
+      await testCase.get("/");
 
-    testCase.assertResponse(500);
-    assertMatch(/500 Internal Server Error/, testCase.body!);
+      testCase.assertResponse(500);
+      assertMatch(/500 Internal Server Error/, testCase.body!);
+    } finally {
+      oldStderr.mockRestore();
+    }
   });
 });
