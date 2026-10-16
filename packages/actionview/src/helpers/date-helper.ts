@@ -763,11 +763,17 @@ function discardKey(type: string): string {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
 export interface DateTimeSelector extends Included<typeof import("./tag-helper.js")> {
+  /** @internal */
   sec(): unknown;
+  /** @internal */
   min(): unknown;
+  /** @internal */
   hour(): unknown;
+  /** @internal */
   day(): unknown;
+  /** @internal */
   month(): unknown;
+  /** @internal */
   year(): unknown;
 }
 
