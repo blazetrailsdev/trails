@@ -70,6 +70,7 @@ export class Test {
   /** @noRailsEquivalent PERMANENT */
   time: number | null = null;
   private _assertions: number;
+  private _metadata?: Record<string, unknown>;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(name: string) {
@@ -85,6 +86,20 @@ export class Test {
 
   set assertions(assertions: number) {
     this._assertions = assertions;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get metadata(): Record<string, unknown> {
+    return (this._metadata ??= {});
+  }
+
+  set metadata(metadata: Record<string, unknown>) {
+    this._metadata = metadata;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isMetadata(): boolean {
+    return this._metadata !== undefined;
   }
 
   /** @noRailsEquivalent PERMANENT */

@@ -1,5 +1,12 @@
-import { presence } from "@blazetrails/activesupport";
-import { Encoding, File, getFs, Module, Pathname } from "@blazetrails/ruby-compat";
+import { Minitest, presence } from "@blazetrails/activesupport";
+import {
+  Encoding,
+  File,
+  getFs,
+  Module,
+  Pathname,
+  rbModMethodDefined,
+} from "@blazetrails/ruby-compat";
 import { vite } from "../server.js";
 
 declare module "vitest" {
@@ -19,7 +26,7 @@ export interface ScreenshotHelperHost {
   isPassed(): boolean;
   isSkipped(): boolean;
   _screenshotCounter?: number;
-  metadata?: Record<string, unknown>;
+  metadata: Record<string, unknown>;
 }
 
 export const ScreenshotHelper = Object.assign(new Module(), {
@@ -49,9 +56,8 @@ export function takeScreenshot(
 export async function takeFailedScreenshot(this: ScreenshotHelperHost): Promise<void> {
   if (!(failed.call(this) && supportsScreenshot.call(this) && this._page !== undefined)) return;
   await takeScreenshot.call(this);
-  if (this.metadata) {
+  if (rbModMethodDefined(Minitest.Test, "metadata"))
     this.metadata["failure_screenshot_path"] = relativeImagePath.call(this);
-  }
 }
 
 /** @internal */

@@ -32,22 +32,12 @@ vi.spyOn(firefox, "executablePath").mockImplementation(() => foundExecutable);
 const { DrivenByRackTest, DrivenBySeleniumWithChrome } =
   await import("../../../test-helpers/driven-by.js");
 
-function makeHost(testName: string): ScreenshotHelperHost & { metadata: Record<string, unknown> } {
-  return {
-    methodName: testName,
-    _screenshotCounter: undefined,
-    isPassed: () => true,
-    isSkipped: () => false,
-    metadata: {},
-  };
-}
-
 describe("ScreenshotHelperTest", () => {
-  let host: ReturnType<typeof makeHost>;
+  let host: InstanceType<typeof DrivenBySeleniumWithChrome> & ScreenshotHelperHost;
 
   beforeEach(() => {
-    new DrivenBySeleniumWithChrome("x");
-    host = makeHost("x");
+    host = new DrivenBySeleniumWithChrome("x") as typeof host;
+    host._screenshotCounter = undefined;
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT", "");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
   });
@@ -84,20 +74,20 @@ describe("ScreenshotHelperTest", () => {
   });
 
   it("image path includes failures text if test did not pass", () => {
-    host.isPassed = () => false;
+    vi.spyOn(host, "isPassed").mockReturnValue(false);
     expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/failures_x\.png$/);
     expect(htmlPath.call(host)).toMatch(/tmp\/screenshots\/failures_x\.html$/);
   });
 
   it("image path does not include failures text if test skipped", () => {
-    host.isPassed = () => false;
-    host.isSkipped = () => true;
+    vi.spyOn(host, "isPassed").mockReturnValue(false);
+    vi.spyOn(host, "isSkipped").mockReturnValue(true);
     expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/0_x\.png$/);
     expect(htmlPath.call(host)).toMatch(/tmp\/screenshots\/0_x\.html$/);
   });
 
   it("image name truncates names over 225 characters including counter", () => {
-    const longHost = makeHost("x".repeat(400));
+    const longHost = new DrivenBySeleniumWithChrome("x".repeat(400)) as typeof host;
     const name = imageName.call(longHost);
     expect(name.length).toBeLessThanOrEqual(225);
     expect(name).toMatch(/^0_x+$/);
@@ -108,7 +98,7 @@ describe("ScreenshotHelperTest", () => {
   });
 
   it("Non word characters are replaced with dashes in paths", () => {
-    const h = makeHost("x/y\\z?<br>-span");
+    const h = new DrivenBySeleniumWithChrome("x/y\\z?<br>-span") as typeof host;
     expect(imagePath.call(h)).toMatch(/tmp\/screenshots\/0_x-y-z-br-span\.png$/);
     expect(htmlPath.call(h)).toMatch(/tmp\/screenshots\/0_x-y-z-br-span\.html$/);
   });
@@ -120,7 +110,7 @@ describe("ScreenshotHelperTest", () => {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
       content: vi.fn().mockResolvedValue("<html></html>"),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host, { screenshot: "artifact" }).then(() => {
       const out = msgs.join("\n");
       expect(out).toMatch(/url=artifact:\/\//);
@@ -135,7 +125,7 @@ describe("ScreenshotHelperTest", () => {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
       content: vi.fn().mockResolvedValue("<html></html>"),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host, { html: true }).then(() => {
       const out = msgs.join("\n");
       expect(out).toMatch(/\[Screenshot HTML\]/);
@@ -152,7 +142,7 @@ describe("ScreenshotHelperTest", () => {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
       content: vi.fn().mockResolvedValue("<html></html>"),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host).then(() => {
       const out = msgs.join("\n");
       expect(out).toMatch(/\[Screenshot HTML\]/);
@@ -168,7 +158,7 @@ describe("ScreenshotHelperTest", () => {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
       content: vi.fn().mockResolvedValue("<html></html>"),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host).then(() => {
       expect(msgs.join("\n")).toMatch(/url=artifact:\/\//);
       consoleSpy.mockRestore();
@@ -176,12 +166,12 @@ describe("ScreenshotHelperTest", () => {
   });
 
   it("take_failed_screenshot persists the image path in the test metadata", () => {
-    host.isPassed = () => false;
+    vi.spyOn(host, "isPassed").mockReturnValue(false);
     const page = {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
       content: vi.fn().mockResolvedValue("<html></html>"),
     };
-    host._page = page;
+    host._page = page as unknown as typeof host._page;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     return takeFailedScreenshot.call(host).then(() => {
       expect(host.metadata["failure_screenshot_path"]).toMatch(
