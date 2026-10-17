@@ -3897,7 +3897,7 @@ export class Lowerer {
         // A value with its own `to_f` (a Ruby Time) answers it; `Number(time)` is NaN.
         if (n.args.length === 0) {
           const t = this.typeOf(recvNode, ctx);
-          return t?.k === "prim" ? `Number(${r})` : `${rc("rbToF")}(${r})`;
+          return t?.k === "prim" ? `Number(${r})` : `${rc("toF")}(${r})`;
         }
         break;
       case "to_a":

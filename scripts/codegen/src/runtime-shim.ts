@@ -300,9 +300,6 @@ export function rbNumDuration(x: any, unit: string): any {
   return (RbNumDurationClass as any)[unit](n);
 }`,
   // \`x.to_f\`: a value's own \`toF\` (Time#to_f), else the JS number.
-  rbToF: `export function rbToF(x: any): number {
-  return x != null && typeof x.toF === "function" ? x.toF() : Number(x);
-}`,
   // \`size\` / \`length\` on any Ruby collection: a Set or Map (Set#size), an Array
   // or String, a Hash's pairs.
   rbSize: `export function rbSize(x: any): number {
@@ -360,7 +357,6 @@ export const SHIM_SOURCES: Record<string, string> = {
   rbKernel: "Kernel's module functions (random.c rb_f_rand)",
   rbNumDuration:
     "Numeric#seconds and siblings (activesupport/lib/active_support/core_ext/numeric/time.rb)",
-  rbToF: "#to_f (numeric.c flo_to_f, time.c time_to_f)",
   rbSize: "#size (array.c rb_ary_length, hash.c rb_hash_size, string.c rb_str_length)",
   rbTsName: "a Ruby method name as its trails member name (docs/ruby-ts-conventions.md)",
   count: "Enumerable#count with a block (enum.c enum_count)",
