@@ -3022,6 +3022,14 @@ export class Lowerer {
     )
       return `${rc("rbKernel")}.rand(${argList()})`;
 
+    // ── `x.class_eval("def …")`: Ruby source evaluated at run time has no generated form.
+    if (
+      recvNode &&
+      ["class_eval", "module_eval", "instance_eval"].includes(name) &&
+      (n.args[0]?.k === "str" || n.args[0]?.k === "dstr")
+    )
+      return this.decline(ctx, "ruby-eval", n, name);
+
     // ── `Proc.new { … }` (proc.c `rb_proc_s_new`) is the block itself: a Ruby Proc is
     // a JS function, so the block's arrow is the value.
     if (
