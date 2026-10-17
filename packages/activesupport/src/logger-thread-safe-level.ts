@@ -57,7 +57,6 @@ export class LoggerThreadSafeLevel {
     this._level = coerce(severity);
   }
 
-  /** @inventedArm if — PERMANENT */
   logAt<T>(level: number | LogLevel, fn: () => T): T {
     const oldLocalLevel = this.localLevel;
     this.localLevel = level;
