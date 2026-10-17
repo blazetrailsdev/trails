@@ -7,10 +7,10 @@ import {
   RuntimeError,
   URI,
   include,
-  NoMethodError,
   rbFPublicSend,
   rbModConstSet,
-  rbObjClassname,
+  rbObjDup,
+  Module,
   rbFSend,
   rbObjRespondTo,
   stringSplit,
@@ -43,19 +43,104 @@ export interface IntegrationRequestOptions {
   as?: string;
 }
 
-const DEFAULT_HOST = "www.example.com";
+export function get(
+  this: Session,
+  path: string,
+  options: IntegrationRequestOptions = {},
+): Promise<number> {
+  return this.process("GET", path, options);
+}
 
-const APP_SESSIONS = new Map<unknown, typeof Session>();
+export function post(
+  this: Session,
+  path: string,
+  options: IntegrationRequestOptions = {},
+): Promise<number> {
+  return this.process("POST", path, options);
+}
 
-const DEFAULT_REMOTE_ADDR = "127.0.0.1";
-const DEFAULT_ACCEPT =
-  "text/xml,application/xml,application/xhtml+xml," +
-  "text/html;q=0.9,text/plain;q=0.8,image/png," +
-  "*/*;q=0.5";
+export function patch(
+  this: Session,
+  path: string,
+  options: IntegrationRequestOptions = {},
+): Promise<number> {
+  return this.process("PATCH", path, options);
+}
+
+export function put(
+  this: Session,
+  path: string,
+  options: IntegrationRequestOptions = {},
+): Promise<number> {
+  return this.process("PUT", path, options);
+}
+
+export function delete_(
+  this: Session,
+  path: string,
+  options: IntegrationRequestOptions = {},
+): Promise<number> {
+  return this.process("DELETE", path, options);
+}
+
+export function head(
+  this: Session,
+  path: string,
+  options: IntegrationRequestOptions = {},
+): Promise<number> {
+  return this.process("HEAD", path, options);
+}
+
+export function options(
+  this: Session,
+  path: string,
+  options: IntegrationRequestOptions = {},
+): Promise<number> {
+  return this.process("OPTIONS", path, options);
+}
+
+export async function followRedirectBang(
+  this: Session,
+  { headers = {}, ...args }: IntegrationRequestOptions = {},
+): Promise<number | null> {
+  if (!this.isRedirect) {
+    throw new RuntimeError(`not a redirect! ${this.status} ${this.statusMessage}`);
+  }
+
+  const method = [307, 308].includes(this.response!.status)
+    ? this.request!.method.toLowerCase()
+    : "get";
+
+  if (![":HTTP_REFERER", "HTTP_REFERER"].some((key) => Object.hasOwn(headers, key))) {
+    headers["HTTP_REFERER"] = this.request!.url;
+  }
+
+  await rbFPublicSend(this, method, this.response!.location, { headers, ...args });
+  return this.status;
+}
+
+export { delete_ as delete };
+
+interface RequestHelpersMethods {
+  get: typeof get;
+  post: typeof post;
+  patch: typeof patch;
+  put: typeof put;
+  delete: typeof delete_;
+  head: typeof head;
+  options: typeof options;
+  followRedirectBang: typeof followRedirectBang;
+}
+
+export const RequestHelpers = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, { get, post, patch, put, delete: delete_, head, options, followRedirectBang });
+  });
+});
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Session {
-  static DEFAULT_HOST = DEFAULT_HOST;
+  static DEFAULT_HOST = "www.example.com";
 
   get status(): number | null {
     return this.response == null ? null : this.response.status;
@@ -199,9 +284,12 @@ export class Session {
     this.requestCount = 0;
     this._urlOptions = undefined;
 
-    this.host = DEFAULT_HOST;
-    this.remoteAddr = DEFAULT_REMOTE_ADDR;
-    this.accept = DEFAULT_ACCEPT;
+    this.host = Session.DEFAULT_HOST;
+    this.remoteAddr = "127.0.0.1";
+    this.accept =
+      "text/xml,application/xml,application/xhtml+xml," +
+      "text/html;q=0.9,text/plain;q=0.8,image/png," +
+      "*/*;q=0.5";
   }
 
   httpsBang(flag: boolean = true): void {
@@ -332,61 +420,18 @@ export class Session {
     path = location.path!;
     return location.query != null ? `${path}?${location.query}` : path;
   }
-
-  get(path: string, options: IntegrationRequestOptions = {}): Promise<number> {
-    return this.process("GET", path, options);
-  }
-
-  post(path: string, options: IntegrationRequestOptions = {}): Promise<number> {
-    return this.process("POST", path, options);
-  }
-
-  patch(path: string, options: IntegrationRequestOptions = {}): Promise<number> {
-    return this.process("PATCH", path, options);
-  }
-
-  put(path: string, options: IntegrationRequestOptions = {}): Promise<number> {
-    return this.process("PUT", path, options);
-  }
-
-  delete(path: string, options: IntegrationRequestOptions = {}): Promise<number> {
-    return this.process("DELETE", path, options);
-  }
-
-  head(path: string, options: IntegrationRequestOptions = {}): Promise<number> {
-    return this.process("HEAD", path, options);
-  }
-
-  options(path: string, options: IntegrationRequestOptions = {}): Promise<number> {
-    return this.process("OPTIONS", path, options);
-  }
-
-  async followRedirectBang({ headers = {}, ...args }: IntegrationRequestOptions = {}): Promise<
-    number | null
-  > {
-    if (!this.isRedirect) {
-      throw new RuntimeError(`not a redirect! ${this.status} ${this.statusMessage}`);
-    }
-
-    const method = [307, 308].includes(this.response!.status)
-      ? this.request!.method.toLowerCase()
-      : "get";
-
-    if (![":HTTP_REFERER", "HTTP_REFERER"].some((key) => Object.hasOwn(headers, key))) {
-      headers["HTTP_REFERER"] = this.request!.url;
-    }
-
-    await rbFPublicSend(this, method, this.response!.location, { headers, ...args });
-    return this.status;
-  }
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include TestProcess, RequestHelpers, Assertions` (`actionpack/lib/action_dispatch/testing/integration.rb:95`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Session
-  extends Omit<Included<typeof TestProcess>, "cookies">, Omit<Assertions, "withRouting"> {}
+  extends
+    Omit<Included<typeof TestProcess>, "cookies">,
+    RequestHelpersMethods,
+    Omit<Assertions, "withRouting"> {}
 
-include(Session, Assertions);
 include(Session, TestProcess);
+include(Session, RequestHelpers);
+include(Session, Assertions);
 include(Session, urlForMod.UrlFor);
 
 rbModConstSet(ActionDispatch, "Integration", { name: "ActionDispatch::Integration", Session });
@@ -407,12 +452,13 @@ type SessionMethodMissing = Pick<
   | "isHttps"
   | "hostBang"
   | "process"
-  | "options"
   | "urlOptions"
->;
+> & { options(path: string, options?: IntegrationRequestOptions): Promise<number> };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class IntegrationTest extends TestCase {
+  static APP_SESSIONS = new Map<unknown, typeof Session>();
+
   routes: RouteSet = new RouteSet();
 
   /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
@@ -467,20 +513,14 @@ export class IntegrationTest extends TestCase {
 
   /** @internal */
   createSession(app: unknown): Session {
-    let klass = APP_SESSIONS.get(app);
+    let klass = IntegrationTest.APP_SESSIONS.get(app);
     if (klass === undefined) {
       klass = class extends Session {};
-      const railsApp = app as { routes: RouteSet | (() => RouteSet) };
-      if (
-        rbObjRespondTo(app, "routes") &&
-        (typeof railsApp.routes === "function" ? railsApp.routes() : railsApp.routes) instanceof
-          RouteSet
-      ) {
-        const routes = typeof railsApp.routes === "function" ? railsApp.routes() : railsApp.routes;
-        include(klass, routes.urlHelpers());
-        include(klass, routes.mountedHelpers());
+      if (rbObjRespondTo(app, "routes") && rbFSend(app, "routes") instanceof RouteSet) {
+        include(klass, (rbFSend(app, "routes") as RouteSet).urlHelpers());
+        include(klass, (rbFSend(app, "routes") as RouteSet).mountedHelpers());
       }
-      APP_SESSIONS.set(app, klass);
+      IntegrationTest.APP_SESSIONS.set(app, klass);
     }
     return new klass(app);
   }
@@ -559,11 +599,7 @@ export class IntegrationTest extends TestCase {
   }
 
   openSession(block?: (sess: IntegrationTest) => void): IntegrationTest {
-    const sess: IntegrationTest = Object.assign(
-      Object.create(Object.getPrototypeOf(this) as object),
-      this,
-    );
-    sess._htmlDocument = undefined;
+    const sess = rbObjDup(this);
     sess.resetBang();
     sess.rootSession = this.rootSession ?? this;
     block?.(sess);
@@ -625,19 +661,11 @@ export class IntegrationTest extends TestCase {
       this.copySessionVariablesBang();
       return result;
     } else {
-      const sup = Reflect.get(
+      return Reflect.get(
         Object.getPrototypeOf(IntegrationTest.prototype),
         "methodMissing",
         this,
-      );
-      if (typeof sup === "function") return sup.call(this, method, ...args);
-      throw new NoMethodError(
-        `undefined method '${method}' for an instance of ${rbObjClassname(this)}`,
-        method,
-        args,
-        false,
-        { receiver: this },
-      );
+      ).call(this, method, ...args);
     }
   }
 
