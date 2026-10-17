@@ -163,23 +163,23 @@ describe("ActionView::Base include ControllerHelper", () => {
 
   it("raises DelegationError for a delegate read on a nil-controller view", () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, null) as unknown as {
-      params: unknown;
+      params(): unknown;
     };
-    expect(() => view.params).toThrow(DelegationError);
-    expect(() => view.params).toThrow(/params delegated to controller, but controller is nil/);
+    expect(() => view.params()).toThrow(DelegationError);
+    expect(() => view.params()).toThrow(/params delegated to controller, but controller is nil/);
   });
 
   it("delegates CONTROLLER_DELEGATES to the controller", () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, controller) as unknown as Record<
       string,
-      unknown
+      () => unknown
     >;
-    expect(view.params).toEqual({ id: "1" });
-    expect(view.session).toEqual({ user: "ada" });
-    expect(view.flash).toEqual({ notice: "saved" });
-    expect(view.actionName).toBe("index");
-    expect(view.controllerPath).toBe("admin/posts");
-    expect(view.requestForgeryProtectionToken).toBe("tok");
+    expect(view.params()).toEqual({ id: "1" });
+    expect(view.session()).toEqual({ user: "ada" });
+    expect(view.flash()).toEqual({ notice: "saved" });
+    expect(view.actionName()).toBe("index");
+    expect(view.controllerPath()).toBe("admin/posts");
+    expect(view.requestForgeryProtectionToken()).toBe("tok");
   });
 
   it("assign_controller captures the controller's request", () => {
@@ -209,7 +209,7 @@ describe("ActionView::Base include ControllerHelper", () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
       const view = new (Base.withEmptyTemplateCache())(null, {}, controller);
-      const out = renderTse("<%= params.id %>", {}, view);
+      const out = renderTse("<%= params().id %>", {}, view);
       expect(out).toBe("1");
     } finally {
       TemplateHandlers.clear();

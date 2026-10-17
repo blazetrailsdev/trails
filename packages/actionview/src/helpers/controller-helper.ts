@@ -1,4 +1,4 @@
-import { DelegationError } from "@blazetrails/activesupport";
+import { delegate } from "@blazetrails/activesupport";
 import { basicObjRespondTo, rbObjRespondTo, Module } from "@blazetrails/ruby-compat";
 
 export interface ControllerHelperHost {
@@ -76,21 +76,22 @@ export function isRespondTo(
   return basicObjRespondTo(this, methodName, !includePrivate);
 }
 
-export function installControllerDelegates(prototype: object): void {
-  for (const name of CONTROLLER_DELEGATES) {
-    Object.defineProperty(prototype, name, {
-      get(this: ControllerHelperHost): unknown {
-        const controller = this._controller;
-        if (controller == null) throw DelegationError.nilTarget(name, "controller");
-        const value = controller[name];
-        return typeof value === "function" ? value.bind(controller) : value;
-      },
-      configurable: true,
-    });
-  }
-}
-
 export const ControllerHelper = new Module((mod) => {
+  delegate.call(
+    mod,
+    "requestForgeryProtectionToken",
+    "params",
+    "session",
+    "cookies",
+    "response",
+    "headers",
+    "flash",
+    "actionName",
+    "controllerName",
+    "controllerPath",
+    { to: "controller" },
+  );
+
   mod.moduleEval((m) => {
     Object.assign(m, { assignController, logger, isRespondTo });
   });

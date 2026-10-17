@@ -26,11 +26,7 @@ import {
   type _backUrl,
   type _filteredReferrer,
 } from "./helpers/url-helper.js";
-import {
-  assignController,
-  installControllerDelegates,
-  installControllerInternals,
-} from "./helpers/controller-helper.js";
+import { assignController, installControllerInternals } from "./helpers/controller-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import { StrictLocalsError } from "./template/error.js";
@@ -392,7 +388,6 @@ export class Base {
 }
 
 installControllerInternals(Base.prototype);
-installControllerDelegates(Base.prototype);
 
 Object.defineProperty(Base.prototype, "yield", {
   get(this: Base): SafeBuffer | Promise<SafeBuffer> | null {

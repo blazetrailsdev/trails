@@ -86,7 +86,7 @@ const host = {
   publicComputeAssetPath,
   request,
   urlFor: (..._args: unknown[]) => "http://www.example.com",
-  response,
+  response: () => response,
   contentSecurityPolicyNonce: () => "iyhD0Yc0W+c=",
 } as unknown as AssetTagHelperHost & CaptureHelperHost;
 
@@ -1171,7 +1171,7 @@ describe("AssetTagHelperWithoutRequestTest", () => {
 });
 
 describe("AssetTagHelperWithStreamingRequest", () => {
-  const streaming = { ...host, response: { ...response, isSending: true } };
+  const streaming = { ...host, response: () => ({ ...response, isSending: true }) };
 
   it("stylesheet link tag with streaming", () => {
     withPreloadLinksHeader(() => {

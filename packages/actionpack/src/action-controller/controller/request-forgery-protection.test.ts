@@ -223,14 +223,14 @@ class PerFormTokensController extends Base {
   async index(): Promise<void> {
     await this.render({
       inline:
-        "<%= context.formTag(context.params.get('form_path') ?? '/per_form_tokens/post_one', { method: context.params.get('form_method') }) %>",
+        "<%= context.formTag(context.params().get('form_path') ?? '/per_form_tokens/post_one', { method: context.params().get('form_method') }) %>",
     });
   }
 
   async buttonTo(): Promise<void> {
     await this.render({
       inline:
-        "<%= context.buttonTo('Button', context.params.get('form_path') ?? '/per_form_tokens/post_one', { method: context.params.get('form_method') }) %>",
+        "<%= context.buttonTo('Button', context.params().get('form_path') ?? '/per_form_tokens/post_one', { method: context.params().get('form_method') }) %>",
     });
   }
 
