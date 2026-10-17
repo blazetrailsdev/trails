@@ -4549,6 +4549,26 @@ describe("inlinedModuleMembers", () => {
     ]);
   });
 
+  it("drops an initialize the host's constructor names in an @inlinedFrom tag", () => {
+    const classes = {
+      "Arel::SelectManager": rubyClass({
+        name: "SelectManager",
+        file: "select_manager.rb",
+        includes: ["Crud"],
+      }),
+    };
+    const modules = {
+      "Arel::Crud": rubyClass({ name: "Crud", file: "crud.rb", instance: [method("initialize")] }),
+    };
+    const bodied = new Map([
+      ["select-manager.ts", new Set(["constructor"])],
+      ["crud.ts", new Set<string>()],
+    ]);
+    expect(inlinedModuleMembers("arel", classes, modules, byShort, bodied)).toHaveLength(1);
+    const tagged = new Map([["select-manager.ts", new Set(["Arel::Crud"])]]);
+    expect(inlinedModuleMembers("arel", classes, modules, byShort, bodied, tagged)).toEqual([]);
+  });
+
   it("reports nothing when the module's own twin carries the body", () => {
     // The settled shape: the body stays in the file mirroring the mixin's own
     // Rails file, and the host keeps only the include seam.
