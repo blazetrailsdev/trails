@@ -5,7 +5,6 @@ import { Command } from "commander";
 import { Handler, type RackEnv } from "@blazetrails/rack";
 import { requireApplicationBang } from "../command/actions.js";
 import { Trails } from "../rails.js";
-import { DevServer } from "../server/dev-server.js";
 
 export function serverCommand(): Command {
   const cmd = new Command("server");
@@ -41,6 +40,7 @@ export function serverCommand(): Command {
         console.log("");
         return;
       }
+      const { DevServer } = await import("../server/dev-server.js");
       const server = new DevServer({
         port,
         host: host(options),
