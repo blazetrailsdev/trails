@@ -129,6 +129,8 @@ export interface FileCtx {
   rubyFile: string;
   tsFile: string;
   imports: Map<string, Map<string, string>>; // module specifier → (exported name → local name)
+  /** Each class's ivar types, by class fqn then Ruby ivar name (emit.ts `ivarTypes`). */
+  ivarTypes?: Map<string, Map<string, TypeRef>>;
   usedLocalNames: Set<string>;
   declines: { reason: DeclineReason; line?: number; ruby: string }[];
   stats: Record<string, number>;
@@ -3523,8 +3525,11 @@ export class Lowerer {
         return a?.k === "prim" && b?.k === "prim" && a.name === b.name ? a : null;
       }
       case "ivar": {
+        if (ctx.selfKind === "static") return null;
+        const inferred = ctx.owner ? ctx.f.ivarTypes?.get(ctx.owner)?.get(n.name) : undefined;
+        if (inferred) return inferred;
         const k = this.ownerKey(ctx);
-        return k && ctx.selfKind !== "static" ? T.ivar(k, n.name) : null;
+        return k ? T.ivar(k, n.name) : null;
       }
       case "lvar":
         return this.localType(ctx, n.name);

@@ -36,7 +36,7 @@ import { CITE_PREFIX, GEM, PKG_DIR, handNamespaceFqns } from "./gem.js";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-import { candidates } from "./types.js";
+import { candidates, type TypeRef } from "./types.js";
 
 interface Unit {
   /**
@@ -1277,6 +1277,7 @@ export class Emitter {
     let defs = 0;
     const body = this.flattenDefs(u.body);
     const vis = this.visibilityOf(body);
+    this.ivarTypes(u, f, body);
     const ctxStatic = this.baseCtx(u, f, { selfKind: "static", selfExpr: "this" });
     let ext = "";
     if (u.superclass) {
@@ -1501,7 +1502,7 @@ export class Emitter {
     const sig = [
       "[key: string]: any;",
       "static [key: string]: any;",
-      ...this.ivarDecls(u, f, body, members),
+      ...this.ivarDecls(u, f, members),
     ];
     const text = [
       head,
@@ -1513,14 +1514,12 @@ export class Emitter {
   }
 
   /**
-   * `declare _x: T;` for each ivar the class's instance methods assign, typed by
-   * the hand twin's field, else by the type every assignment agrees on, widened
-   * with `null` (a Ruby ivar reads `nil` until it is assigned) unless `initialize`
-   * assigns it unconditionally. An ivar with
-   * no known type is left to the index signature. `declare` emits no field
-   * initializer, so nothing overwrites a value set before or by `super()`.
+   * The type of each ivar the class's instance methods assign: the hand twin's
+   * field, else the type every assignment agrees on, nullable (a Ruby ivar reads
+   * `nil` until it is assigned) unless `initialize` assigns it unconditionally.
+   * Recorded on the file so `typeOf` reads it while the methods lower.
    */
-  ivarDecls(u: Unit, f: FileCtx, body: N[], members: string[]): string[] {
+  ivarTypes(u: Unit, f: FileCtx, body: N[]): Map<string, TypeRef> {
     const assigned = new Map<string, N[]>();
     for (const d of body) {
       if (d.k !== "def" || d.singleton) continue;
@@ -1541,18 +1540,36 @@ export class Emitter {
     );
     const ctx = this.baseCtx(u, f, { selfKind: "instance" });
     const key = this.resolver.oracleKey(u.fqn);
-    const out: string[] = [];
+    const types = new Map<string, TypeRef>();
     for (const [ivar, values] of assigned) {
+      const twin = key ? this.resolver.types.ivar(key, ivar) : null;
+      if (twin) {
+        types.set(ivar, twin);
+        continue;
+      }
+      const seen = values.filter((v) => v?.k !== "nil").map((v) => this.lw.typeOf(v, ctx));
+      const first = seen[0];
+      if (
+        !first ||
+        first.k === "gemClass" ||
+        !seen.every((t) => JSON.stringify(t) === JSON.stringify(first))
+      )
+        continue;
+      const nullable = !setInInit.has(ivar) && first.k !== "fn" && first.k !== "hash";
+      types.set(ivar, nullable ? ({ ...first, nullable: true } as TypeRef) : first);
+    }
+    (f.ivarTypes ??= new Map()).set(u.fqn, types);
+    return types;
+  }
+
+  /** `declare _x: T;` for each typed ivar; `declare` emits no field initializer. */
+  ivarDecls(u: Unit, f: FileCtx, members: string[]): string[] {
+    const ctx = this.baseCtx(u, f, { selfKind: "instance" });
+    const out: string[] = [];
+    for (const [ivar, t] of f.ivarTypes?.get(u.fqn) ?? []) {
       const field = this.lw.ivar(ivar, ctx).replace(/^this\./, "");
       if (members.some((m) => new RegExp(`^(?:get |set |static )?${field}\\b`).test(m))) continue;
-      let ts = key ? this.lw.tsType(this.resolver.types.ivar(key, ivar), ctx) : "any";
-      if (ts === "any") {
-        const types = values
-          .filter((v) => v?.k !== "nil")
-          .map((v) => this.lw.tsType(this.lw.typeOf(v, ctx), ctx));
-        if (types.length && types.every((t) => t === types[0]) && types[0] !== "any")
-          ts = types[0].endsWith("| null") || setInInit.has(ivar) ? types[0] : `${types[0]} | null`;
-      }
+      const ts = this.lw.tsType(t, ctx);
       if (ts !== "any") out.push(`declare ${field}: ${ts};`);
     }
     return out;
