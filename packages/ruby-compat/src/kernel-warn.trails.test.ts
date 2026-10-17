@@ -20,13 +20,14 @@ describe("Kernel#warn", () => {
     expect(write).toHaveBeenCalledWith(
       expect.stringMatching(/kernel-warn\.trails\.test\.ts:\d+: warning: here\n$/),
     );
+    const lineOf = (stack: string): number =>
+      Number(/:(\d+):\d+\)?$/.exec(stack.split("\n")[1])![1]);
     const caller = (): void => warn("up", { uplevel: 1 });
-    caller();
-    expect(write).toHaveBeenLastCalledWith(
-      expect.stringMatching(/kernel-warn\.trails\.test\.ts:\d+: warning: up\n$/),
+    const callSite = [caller(), lineOf(new Error().stack!)][1];
+    const written = write.mock.lastCall![0];
+    expect(written).toBe(
+      `${/^(.*):\d+: warning: up\n$/.exec(written)![1]}:${callSite}: warning: up\n`,
     );
-    const line = Number(/:(\d+): warning: up/.exec(write.mock.lastCall![0])![1]);
-    expect(line).toBe(Number(/:(\d+):\d+\)?$/.exec(new Error().stack!.split("\n")[1])![1]) - 5);
     warn("far", { uplevel: 1000 });
     expect(write).toHaveBeenLastCalledWith("warning: far\n");
     expect(() => warn("x", { uplevel: -1 })).toThrow("negative level (-1)");
