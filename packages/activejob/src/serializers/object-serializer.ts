@@ -5,8 +5,7 @@ import {
   rbObjIsKindOf,
   update,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "../namespaces.js";
-import { Serializers } from "../serializers.js";
+import { ActiveJob, Serializers } from "../namespaces.js";
 
 export class ObjectSerializer {
   static instance<T extends ObjectSerializer>(this: new () => T): T {

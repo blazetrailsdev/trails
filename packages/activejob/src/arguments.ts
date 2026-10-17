@@ -56,13 +56,29 @@ export class SerializationError extends ArgumentError {
 }
 rbModConstSet(ActiveJob, "SerializationError", SerializationError);
 
-export function serialize(arguments_: unknown[]): unknown[] {
-  return arguments_.map((argument) => serializeArgument(argument));
+type Enumerable = Iterable<unknown> | Record<string, unknown>;
+
+/** @inventedArm entries — PERMANENT */
+export function serialize(arguments_: Enumerable): unknown[] {
+  return Array.from(
+    Symbol.iterator in Object(arguments_)
+      ? (arguments_ as Iterable<unknown>)
+      : Object.entries(arguments_),
+    (argument) => serializeArgument(argument),
+  );
 }
 
-export async function deserialize(arguments_: unknown[]): Promise<unknown[]> {
+/** @inventedArm entries — PERMANENT */
+export async function deserialize(arguments_: Enumerable): Promise<unknown[]> {
   try {
-    return await Promise.all(arguments_.map((argument) => deserializeArgument(argument)));
+    return await Promise.all(
+      Array.from(
+        Symbol.iterator in Object(arguments_)
+          ? (arguments_ as Iterable<unknown>)
+          : Object.entries(arguments_),
+        (argument) => deserializeArgument(argument),
+      ),
+    );
   } catch (error) {
     if (error instanceof Exception && !(error instanceof StandardError)) throw error;
     throw new DeserializationError(error);
