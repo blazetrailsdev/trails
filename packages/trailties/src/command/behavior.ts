@@ -1,3 +1,4 @@
+import { LoadError, regexpEscape } from "@blazetrails/ruby-compat";
 import type { Command as Program } from "commander";
 
 type CommandFactory = () => Program;
@@ -26,28 +27,38 @@ export function subclasses(): CommandFactory[] {
   return (_subclasses ??= []);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 export async function lookup(namespaces: string[]): Promise<void> {
   const paths = namespacesToPaths(namespaces);
 
   for (const rawPath of paths) {
-    if (!Object.hasOwn(LOAD_PATH, rawPath)) continue;
+    const path = rawPath;
 
     try {
-      const factory = await LOAD_PATH[rawPath]();
+      if (!Object.hasOwn(LOAD_PATH, path)) throw new LoadError(`cannot load such file -- ${path}`);
+      const factory = await LOAD_PATH[path]();
       if (!subclasses().includes(factory)) subclasses().push(factory);
       return;
     } catch (e) {
-      const error = e as Error & { code?: string };
-      if (error.code === "ERR_MODULE_NOT_FOUND") throw error;
-      console.warn(
-        `[WARNING] Could not load command ${JSON.stringify(rawPath)}. Error: ${error.message}.\n${error.stack}`,
-      );
+      if (e instanceof LoadError) {
+        if (!new RegExp(`${regexpEscape(path)}$`).test(e.message)) throw e;
+      } else {
+        const error = e as Error;
+        console.warn(
+          `[WARNING] Could not load command ${JSON.stringify(path)}. Error: ${error.message}.\n${error.stack}`,
+        );
+      }
     }
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 export async function lookupBang(): Promise<void> {
   for (const load of Object.values(LOAD_PATH)) {
     try {
