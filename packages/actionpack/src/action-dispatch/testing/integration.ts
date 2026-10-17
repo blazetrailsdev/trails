@@ -235,7 +235,7 @@ export class Session {
   _defaultUrlOptions: Record<string, unknown> = {};
 
   /** @internal */
-  _htmlDocument?: XmlDocument;
+  _htmlDocument?: XmlDocument | null;
 
   private _mockSessionMemo?: RackTestSession;
 
@@ -392,7 +392,7 @@ export class Session {
     const response = this._mockSession.lastResponse();
     this.response = TestResponse.fromResponse(response);
     this.response.request = this.request;
-    this._htmlDocument = undefined;
+    this._htmlDocument = null;
     this._urlOptions = undefined;
 
     this.controller = this.request.controllerInstance as Metal;
@@ -438,7 +438,7 @@ include(Session, urlForMod.UrlFor);
 
 interface RunnerHost {
   _integrationSession: Session | null;
-  _htmlDocument?: XmlDocument;
+  _htmlDocument?: XmlDocument | null;
   _app?: unknown;
   readonly app: unknown;
   rootSession: RunnerHost | null;
@@ -623,7 +623,7 @@ export const Runner = new Module((mod) => {
       });
     } else {
       mod.defineMethod(method, async function (this: RunnerHost, ...args: unknown[]) {
-        this._htmlDocument = undefined;
+        this._htmlDocument = null;
 
         const result = await rbFPublicSend(this.integrationSession, method, ...args);
         this.copySessionVariablesBang();
@@ -727,7 +727,7 @@ export class IntegrationTest extends TestCase {
   declare _integrationSession: Session | null;
 
   /** @internal */
-  declare _htmlDocument?: XmlDocument;
+  declare _htmlDocument?: XmlDocument | null;
 
   static withRouting = routingAssertions.WithIntegrationRouting.ClassMethods.withRouting;
 

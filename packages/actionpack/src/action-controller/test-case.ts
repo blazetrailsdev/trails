@@ -161,7 +161,7 @@ export interface Behavior extends Included<typeof TestProcess> {
   /** @internal */
   _responseKlass: typeof TestResponse | typeof LiveTestResponse;
   /** @internal */
-  _htmlDocument?: XmlDocument;
+  _htmlDocument?: XmlDocument | null;
   readonly htmlDocument: XmlDocument;
   get: OmitThisParameter<typeof get>;
   post: OmitThisParameter<typeof post>;
@@ -255,7 +255,7 @@ async function process(
 
   const httpMethod = String(method).toUpperCase();
 
-  this._htmlDocument = undefined;
+  this._htmlDocument = null;
 
   this.cookies().update(this.request.cookies);
   this.cookies().updateCookiesFromJar();
