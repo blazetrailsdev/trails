@@ -851,13 +851,67 @@
                     "endless": false
                   },
                   {
+                    "k": "def",
+                    "name": "deferred",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "call",
+                          "recv": {
+                            "k": "const",
+                            "path": ["Proc"]
+                          },
+                          "name": "new",
+                          "args": [],
+                          "block": {
+                            "k": "block",
+                            "params": [],
+                            "body": {
+                              "k": "seq",
+                              "body": [
+                                {
+                                  "k": "call",
+                                  "recv": null,
+                                  "name": "note",
+                                  "args": [
+                                    {
+                                      "k": "str",
+                                      "value": "later",
+                                      "frozen": true,
+                                      "heredoc": false
+                                    }
+                                  ],
+                                  "block": null,
+                                  "safe": false,
+                                  "l": 57,
+                                  "vcall": false
+                                }
+                              ]
+                            },
+                            "l": 57
+                          },
+                          "safe": false,
+                          "l": 57,
+                          "vcall": false
+                        }
+                      ]
+                    },
+                    "l": 56,
+                    "lend": 58,
+                    "endless": false
+                  },
+                  {
                     "k": "call",
                     "recv": null,
                     "name": "private",
                     "args": [],
                     "block": null,
                     "safe": false,
-                    "l": 56,
+                    "l": 60,
                     "vcall": true
                   },
                   {
@@ -880,8 +934,8 @@
                         }
                       ]
                     },
-                    "l": 57,
-                    "lend": 59,
+                    "l": 61,
+                    "lend": 63,
                     "endless": false
                   }
                 ]

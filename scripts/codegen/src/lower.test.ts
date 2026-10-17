@@ -174,3 +174,10 @@ describe("typed ivars in active_job/rules.rb", () => {
     expect(rules).toContain("declare _label: string | null;");
   });
 });
+
+describe("Proc.new in active_job/rules.rb", () => {
+  it("is the block's own function, not the JS Function constructor", () => {
+    expect(rules).toContain('return () => this.note("later");');
+    expect(rules).not.toContain("new Function(");
+  });
+});
