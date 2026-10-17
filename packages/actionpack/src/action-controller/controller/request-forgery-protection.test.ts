@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Cookies } from "../../action-dispatch/middleware/cookies.js";
 import {
-  assertNil,
   ActiveSupportJSON,
-  Duration,
+  assert,
+  assertNil,
+  assertNot,
   assertNothingRaised,
   assertRaises,
+  Duration,
   include,
-  isBlank,
   type Included,
+  isBlank,
 } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
@@ -953,7 +955,7 @@ describe("FreeCookieControllerTest", () => {
     const stub = vi.spyOn(SecureRandom, "urlsafeBase64").mockReturnValue(token);
     try {
       await tc.get("meta");
-      expect(isBlank(tc.response.body)).toBe(true);
+      assert(isBlank(tc.response.body));
     } finally {
       stub.mockRestore();
     }
@@ -1439,8 +1441,8 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
 
   it("csrf token is stored in cookie", async () => {
     await tc().get("cookie");
-    expect(tc().session().isKey("_csrf_token")).toBe(false);
-    expect(tc().cookies().isKey("csrf_token")).toBe(true);
+    assertNot(tc().session().isKey("_csrf_token"));
+    assert(tc().cookies().isKey("csrf_token"));
   });
 
   it("csrf token is stored in custom cookie", async () => {
@@ -1448,8 +1450,8 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
       controller() as unknown as { csrfTokenStorageStrategy: CookieStore }
     ).csrfTokenStorageStrategy = new CookieStore("custom_cookie");
     await tc().get("cookie");
-    expect(tc().cookies().isKey("csrf_token")).toBe(false);
-    expect(tc().cookies().isKey("custom_cookie")).toBe(true);
+    assertNot(tc().cookies().isKey("csrf_token"));
+    assert(tc().cookies().isKey("custom_cookie"));
   });
 
   it("csrf token cookie has same site lax", async () => {
@@ -1573,7 +1575,7 @@ describe("CustomCsrfTokenStorageStrategyControllerTest", () => {
   it("csrf token is stored in custom location", async () => {
     await t().post("index");
     (t().controller as Base).commitCsrfToken(t().request);
-    expect(t().session().isKey("_csrf_token")).toBe(false);
+    assertNot(t().session().isKey("_csrf_token"));
     expect(t().request.env["custom_storage"]).not.toBeNull();
   });
 

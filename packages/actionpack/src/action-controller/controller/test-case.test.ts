@@ -33,7 +33,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "@blazetrails/rack-test";
 import { Engine } from "@blazetrails/trailties/engine";
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { describe, it, afterEach, beforeEach, vi } from "vitest";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
@@ -349,8 +349,26 @@ describe("TestCaseTest", () => {
 
   it("process with session", async () => {
     await tc.process("setSession");
-    expect(tc.session().get("string")).toBe("A wonder");
-    expect(tc.session().get("symbol")).toBe("it works");
+    assertEqual(
+      "A wonder",
+      tc.session().get("string"),
+      "A value stored in the session should be available by string key",
+    );
+    assertEqual(
+      "A wonder",
+      tc.session().get("string"),
+      "Test session hash should allow indifferent access",
+    );
+    assertEqual(
+      "it works",
+      tc.session().get("symbol"),
+      "Test session hash should allow indifferent access",
+    );
+    assertEqual(
+      "it works",
+      tc.session().get("symbol"),
+      "Test session hash should allow indifferent access",
+    );
   });
 
   it("process with session kwarg", async () => {

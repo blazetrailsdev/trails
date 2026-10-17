@@ -6,6 +6,7 @@ import {
   Rendering as ActionViewRendering,
 } from "@blazetrails/actionview";
 import {
+  assert,
   assertNil,
   assertNothingRaised,
   assertNotIncludes,
@@ -688,7 +689,7 @@ describe("LastModifiedRenderTest", () => {
     tc.request.setIfModifiedSince(lastModified);
     await tc.get("conditionalHello");
     expect(toI(tc.response.status)).toBe(304);
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
@@ -703,7 +704,7 @@ describe("LastModifiedRenderTest", () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
     await tc.get("conditionalHello");
     expect(toI(tc.response.status)).toBe(200);
-    expect(isPresent(tc.response.body)).toBe(true);
+    assert(isPresent(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
@@ -721,7 +722,7 @@ describe("LastModifiedRenderTest", () => {
     tc.request.setIfModifiedSince(lastModified);
     await tc.get("conditionalHelloWithRecord");
     expect(toI(tc.response.status)).toBe(304);
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     expect(tc.response.etag).not.toBeNull();
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
@@ -737,7 +738,7 @@ describe("LastModifiedRenderTest", () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
     await tc.get("conditionalHelloWithRecord");
     expect(toI(tc.response.status)).toBe(200);
-    expect(isPresent(tc.response.body)).toBe(true);
+    assert(isPresent(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
@@ -750,7 +751,7 @@ describe("LastModifiedRenderTest", () => {
     tc.request.setIfModifiedSince(lastModified);
     await tc.get("conditionalHelloWithArrayOfRecords");
     expect(toI(tc.response.status)).toBe(304);
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
@@ -765,7 +766,7 @@ describe("LastModifiedRenderTest", () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
     await tc.get("conditionalHelloWithArrayOfRecords");
     expect(toI(tc.response.status)).toBe(200);
-    expect(isPresent(tc.response.body)).toBe(true);
+    assert(isPresent(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
@@ -778,7 +779,7 @@ describe("LastModifiedRenderTest", () => {
     tc.request.setIfModifiedSince(lastModified);
     await tc.get("conditionalHelloWithCollectionOfRecords");
     expect(toI(tc.response.status)).toBe(304);
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
@@ -793,7 +794,7 @@ describe("LastModifiedRenderTest", () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
     await tc.get("conditionalHelloWithCollectionOfRecords");
     expect(toI(tc.response.status)).toBe(200);
-    expect(isPresent(tc.response.body)).toBe(true);
+    assert(isPresent(tc.response.body));
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
@@ -1049,20 +1050,20 @@ describe("HeadRenderTest", () => {
 
   it("head created", async () => {
     await tc.post("headCreated");
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     assertResponse("created");
   });
 
   it("head created with application json content type", async () => {
     await tc.post("headCreatedWithApplicationJsonContentType");
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("Content-Type")).toBe("application/json");
     assertResponse("created");
   });
 
   it("head ok with image png content type", async () => {
     await tc.post("headOkWithImagePngContentType");
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("Content-Type")).toBe("image/png");
     assertResponse("ok");
   });
@@ -1074,7 +1075,7 @@ describe("HeadRenderTest", () => {
 
   it("head with location header", async () => {
     await tc.get("headWithLocationHeader");
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("Location")).toBe("/foo");
     assertResponse("ok");
   });
@@ -1090,7 +1091,7 @@ describe("HeadRenderTest", () => {
       });
 
       await tc.get("headWithLocationObject");
-      expect(isBlank(tc.response.body)).toBe(true);
+      assert(isBlank(tc.response.body));
       expect(tc.response.headers.get("Location")).toBe("http://www.nextangle.com/customers/1");
       assertResponse("ok");
     });
@@ -1098,14 +1099,14 @@ describe("HeadRenderTest", () => {
 
   it("head with custom header", async () => {
     await tc.get("headWithCustomHeader");
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("X-Custom-Header")).toBe("something");
     assertResponse("ok");
   });
 
   it("head with www authenticate header", async () => {
     await tc.get("headWithWwwAuthenticateHeader");
-    expect(isBlank(tc.response.body)).toBe(true);
+    assert(isBlank(tc.response.body));
     expect(tc.response.headers.get("WWW-Authenticate")).toBe("something");
     assertResponse("ok");
   });

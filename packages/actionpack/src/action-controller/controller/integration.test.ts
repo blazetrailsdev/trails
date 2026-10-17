@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { bodyFromString, Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
+  assert,
   assertIncludes,
+  assertInstanceOf,
+  assertNot,
   assertNotIncludes,
   include,
+  type Included,
   sole,
   TopLevel,
   underscore,
-  type Included,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
@@ -58,11 +61,11 @@ describe("SessionTest", () => {
   });
 
   it("https bang works and sets truth by default", () => {
-    expect(session.isHttps()).toBe(false);
+    assertNot(session.isHttps());
     session.httpsBang();
-    expect(session.isHttps()).toBe(true);
+    assert(session.isHttps());
     session.httpsBang(false);
-    expect(session.isHttps()).toBe(false);
+    assertNot(session.isHttps());
   });
 
   it("host!", () => {
@@ -428,7 +431,7 @@ describe("IntegrationProcessTest", () => {
         expect(t.cookies.toHash()).toEqual({});
         expect(t.body).toBe("<root></root>");
         expect(t.response.body).toBe("<root></root>");
-        expect(t.htmlDocument.constructor).toBe(XML.Document);
+        assertInstanceOf(XML.Document as unknown as new () => unknown, t.htmlDocument);
         expect(t.requestCount).toBe(1);
       });
     }

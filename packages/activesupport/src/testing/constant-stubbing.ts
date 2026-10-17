@@ -1,5 +1,13 @@
 import { NameError } from "../core-ext/name-error.js";
 
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as { then?: unknown }).then === "function"
+  );
+}
+
 export function stubConst<T>(
   mod: Record<string, unknown>,
   constant: string,
@@ -12,24 +20,36 @@ export function stubConst<T>(
       throw new NameError(`uninitialized constant ${constant}`, constant);
     }
     const oldValue = mod[constant];
+    const ensure = () => {
+      delete mod[constant];
+      mod[constant] = oldValue;
+    };
+    let result: T | undefined;
     try {
       delete mod[constant];
       mod[constant] = newValue;
-      return block();
+      result = block();
+      if (isThenable(result)) return Promise.resolve(result).finally(ensure) as T;
+      return result;
     } finally {
-      delete mod[constant];
-      mod[constant] = oldValue;
+      if (!isThenable(result)) ensure();
     }
   } else {
     if (constant in mod) {
       throw new NameError(`already defined constant ${constant} in ${String(mod.name ?? "")}`);
     }
 
+    const ensure = () => {
+      delete mod[constant];
+    };
+    let result: T | undefined;
     try {
       mod[constant] = newValue;
-      return block();
+      result = block();
+      if (isThenable(result)) return Promise.resolve(result).finally(ensure) as T;
+      return result;
     } finally {
-      delete mod[constant];
+      if (!isThenable(result)) ensure();
     }
   }
 }

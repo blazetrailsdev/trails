@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { assertNot } from "@blazetrails/activesupport";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Parameters } from "../../metal/strong-parameters.js";
 
@@ -30,7 +31,7 @@ describe("ParametersSerializationTest", () => {
     const roundtripped = YAML.unsafeLoad(payload) as Parameters;
 
     expect(roundtripped.equals(params)).toBe(true);
-    expect(roundtripped.isPermitted()).toBe(false);
+    assertNot(roundtripped.isPermitted());
   });
 
   it("YAML backwardscompatible with psych 2.0.8 format", () => {
@@ -40,7 +41,7 @@ key: :value
     const params = YAML.unsafeLoad(payload) as Parameters;
 
     expect(params.get("key")).toEqual(":value");
-    expect(params.isPermitted()).toBe(false);
+    assertNot(params.isPermitted());
   });
 
   it("YAML backwardscompatible with psych 2.0.9+ format", () => {
@@ -53,6 +54,6 @@ ivars:
     const params = YAML.unsafeLoad(payload) as Parameters;
 
     expect(params.get("key")).toEqual(":value");
-    expect(params.isPermitted()).toBe(false);
+    assertNot(params.isPermitted());
   });
 });

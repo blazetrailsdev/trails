@@ -1,12 +1,16 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { assertPredicate } from "@blazetrails/activesupport";
 import { Parameters } from "../../metal/strong-parameters.js";
 
 describe("AlwaysPermittedParametersTest", () => {
-  const originalAlways = [...Parameters.alwaysPermittedParameters];
+  beforeEach(() => {
+    Parameters.actionOnUnpermittedParameters = "raise";
+    Parameters.alwaysPermittedParameters = ["controller", "action", "format"];
+  });
 
   afterEach(() => {
-    Parameters.alwaysPermittedParameters = [...originalAlways];
     Parameters.actionOnUnpermittedParameters = false;
+    Parameters.alwaysPermittedParameters = ["controller", "action"];
   });
 
   it("returns super on missing constant other than NEVER_UNPERMITTED_PARAMS", () => {
@@ -15,10 +19,8 @@ describe("AlwaysPermittedParametersTest", () => {
   });
 
   it("allows both explicitly listed and always-permitted parameters", () => {
-    Parameters.actionOnUnpermittedParameters = "raise";
-    Parameters.alwaysPermittedParameters = ["controller", "action", "format"];
-    const params = new Parameters({ name: "John", format: "json" });
-    const permitted = params.permit("name");
-    expect(permitted.get("name")).toBe("John");
+    const params = new Parameters({ book: { pages: 65 }, format: "json" });
+    const permitted = params.permit({ book: ["pages"] });
+    assertPredicate(permitted, (p) => p.isPermitted());
   });
 });

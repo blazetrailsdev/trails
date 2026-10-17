@@ -1,10 +1,17 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  Assertion,
+  assert,
+  assertEmpty,
   assertEqual,
+  Assertion,
+  assertKindOf,
+  assertNil,
+  assertNot,
   assertNothingRaised,
+  assertPredicate,
   assertRaise,
+  isPresent,
 } from "@blazetrails/activesupport";
 import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
@@ -12,6 +19,7 @@ import { deprecator } from "../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 
 registerConstant("Admin", { name: "Admin" });
+import { TestResponse } from "../../action-dispatch/testing/test-response.js";
 import "../../test-helpers/abstract-unit.js";
 
 class ActionPackAssertionsController extends Base {
@@ -151,24 +159,24 @@ describe("ActionPackAssertionsControllerTest", () => {
   it("get request", async () => {
     await expect(tc.get("raiseExceptionOnGet")).rejects.toThrow("get");
     await tc.get("raiseExceptionOnPost");
-    expect(tc.response.body).toContain("GET");
+    assertEqual("request method: GET", tc.response.body);
   });
 
   it("post request", async () => {
     await expect(tc.post("raiseExceptionOnPost")).rejects.toThrow("post");
     await tc.post("raiseExceptionOnGet");
-    expect(tc.response.body).toContain("POST");
+    assertEqual("request method: POST", tc.response.body);
   });
 
   it("get post request switch", async () => {
     await tc.post("raiseExceptionOnGet");
-    expect(tc.response.body).toContain("POST");
+    assertEqual("request method: POST", tc.response.body);
     await tc.get("raiseExceptionOnPost");
-    expect(tc.response.body).toContain("GET");
+    assertEqual("request method: GET", tc.response.body);
     await tc.post("raiseExceptionOnGet");
-    expect(tc.response.body).toContain("POST");
+    assertEqual("request method: POST", tc.response.body);
     await tc.get("raiseExceptionOnPost");
-    expect(tc.response.body).toContain("GET");
+    assertEqual("request method: GET", tc.response.body);
   });
 
   it("string constraint", async () => {
@@ -282,28 +290,29 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("template objects exist", async () => {
     await tc.get("assignThis");
-    expect((tc.controller as any).howdy).toBe("ho");
+    assertNot("hi" in tc.controller);
+    assert((tc.controller as any).howdy);
   });
 
   it("template objects missing", async () => {
     await tc.get("nothing");
-    expect((tc.controller as any).howdy).toBeUndefined();
+    assertNot((tc.controller as any).howdy);
   });
 
   it("empty flash", async () => {
     await tc.get("flashMeNaked");
-    expect(tc.flash().isEmpty()).toBe(true);
+    assertEmpty(tc.flash());
   });
 
   it("flash exist", async () => {
     await tc.get("flashMe");
-    expect(tc.flash().isEmpty()).toBe(false);
-    expect(tc.flash().get("hello")).toBeTruthy();
+    assertPredicate(tc.flash(), (flash) => !flash.isEmpty());
+    assertPredicate(tc.flash().get("hello"), isPresent);
   });
 
   it("flash does not exist", async () => {
     await tc.get("nothing");
-    expect(tc.flash().isEmpty()).toBe(true);
+    assertEmpty(tc.flash());
   });
 
   it("session exist", async () => {
@@ -322,52 +331,52 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("no redirect url", async () => {
     await tc.get("nothing");
-    expect(tc.response.redirectUrl).toBeFalsy();
+    assertNil(tc.response.redirectUrl);
   });
 
   it("server error response code", async () => {
     await tc.get("response500");
-    expect(tc.response.serverError).toBe(true);
+    assert(tc.response.serverError);
     await tc.get("response599");
-    expect(tc.response.serverError).toBe(true);
+    assert(tc.response.serverError);
     await tc.get("response404");
-    expect(tc.response.serverError).toBe(false);
+    assertNot(tc.response.serverError);
   });
 
   it("missing response code", async () => {
     await tc.get("response404");
-    expect(tc.response.notFound).toBe(true);
+    assert(tc.response.notFound);
   });
 
   it("client error response code", async () => {
     await tc.get("response404");
-    expect(tc.response.clientError).toBe(true);
+    assert(tc.response.clientError);
   });
 
   it("redirect url match", async () => {
     await tc.get("redirectExternal");
-    expect(tc.response.isRedirection).toBe(true);
+    assert(tc.response.isRedirection);
     expect(tc.response.redirectUrl).toMatch(/rubyonrails/);
     expect(tc.response.redirectUrl).not.toMatch(/perloffrails/);
   });
 
   it("redirection", async () => {
     await tc.get("redirectInternal");
-    expect(tc.response.isRedirection).toBe(true);
+    assert(tc.response.isRedirection);
     await tc.get("redirectExternal");
-    expect(tc.response.isRedirection).toBe(true);
+    assert(tc.response.isRedirection);
     await tc.get("nothing");
-    expect(tc.response.isRedirection).toBe(false);
+    assertNot(tc.response.isRedirection);
   });
 
   it("successful response code", async () => {
     await tc.get("nothing");
-    expect(tc.response.successful).toBe(true);
+    assert(tc.response.successful);
   });
 
   it("response object", async () => {
     await tc.get("nothing");
-    expect(tc.response).toBeDefined();
+    assertKindOf(TestResponse, tc.response);
   });
 
   it("render based on parameters", async () => {
@@ -472,6 +481,6 @@ describe("ActionPackHeaderTest", () => {
 
   it("render text with custom content type", async () => {
     await tc.get("renderTextWithCustomContentType");
-    expect(tc.response.getHeader("Content-Type")).toContain("application/rss+xml");
+    assertEqual("application/rss+xml; charset=utf-8", tc.response.getHeader("Content-Type"));
   });
 });

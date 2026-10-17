@@ -2,7 +2,13 @@ import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
-import { assertNothingRaised, assertRaises, type CallbackChain } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertNot,
+  assertNothingRaised,
+  assertRaises,
+  type CallbackChain,
+} from "@blazetrails/activesupport";
 import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { type AbstractController } from "../../abstract-controller/base.js";
 import { Base } from "../base.js";
@@ -588,7 +594,7 @@ describe("FilterTest", () => {
   });
 
   it("non yielding around actions do not raise", async () => {
-    await expect(run(new FT_NonYieldingAroundFilterController(), "index")).resolves.toBeDefined();
+    await assertNothingRaised(() => run(new FT_NonYieldingAroundFilterController(), "index"));
   });
 
   it("around action can use yield inline with passed action", async () => {
@@ -605,7 +611,7 @@ describe("FilterTest", () => {
       (c as C).values.push("after");
     });
     const ctrl = new C();
-    await expect(run(ctrl, "index")).resolves.toBeDefined();
+    await assertNothingRaised(() => run(ctrl, "index"));
     expect(ctrl.values).toEqual(["before", "action", "after"]);
   });
 
@@ -636,7 +642,7 @@ describe("FilterTest", () => {
     C.beforeAction((c) => {
       ivars(c).ranProcAction = true;
     });
-    expect((await run(new C())).ranProcAction).toBe(true);
+    assert((await run(new C())).ranProcAction);
   });
 
   it("running actions with implicit proc", async () => {
@@ -644,7 +650,7 @@ describe("FilterTest", () => {
     C.beforeAction((c) => {
       ivars(c).ranProcAction = true;
     });
-    expect((await run(new C())).ranProcAction).toBe(true);
+    assert((await run(new C())).ranProcAction);
   });
 
   it("running actions with class", async () => {
@@ -659,20 +665,20 @@ describe("FilterTest", () => {
       }
     }
     C.beforeAction((c) => AuditFilter.before(c as Base));
-    expect((await run(new C())).wasAudited).toBe(true);
+    assert((await run(new C())).wasAudited);
   });
 
   it("running anomalous yet valid condition actions", async () => {
     const c1 = await run(new FT_AnomalousYetValidConditionController());
     expect(ivars(c1).ranFilter).toEqual(["ensure_login"]);
-    expect(ivars(c1).ranClassAction).toBe(true);
-    expect(ivars(c1).ranProcAction1).toBe(true);
-    expect(ivars(c1).ranProcAction2).toBe(true);
+    assert(ivars(c1).ranClassAction);
+    assert(ivars(c1).ranProcAction1);
+    assert(ivars(c1).ranProcAction2);
     const c2 = await run(new FT_AnomalousYetValidConditionController(), "showWithoutAction");
-    expect(ivars(c2).ranFilter).toBeUndefined();
-    expect(ivars(c2).ranClassAction).toBeUndefined();
-    expect(ivars(c2).ranProcAction1).toBeUndefined();
-    expect(ivars(c2).ranProcAction2).toBeUndefined();
+    assertNot(ivars(c2).ranFilter);
+    assertNot(ivars(c2).ranClassAction);
+    assertNot(ivars(c2).ranProcAction1);
+    assertNot(ivars(c2).ranProcAction2);
   });
 
   it("running conditional options", async () => {
@@ -687,7 +693,7 @@ describe("FilterTest", () => {
 
   it("if is ignored when used with only", async () => {
     const c = await run(new FT_SkipFilterUsingOnlyAndIf(), "login");
-    expect(ivars(c).ranFilter).toBeUndefined();
+    assertNot(ivars(c).ranFilter);
   });
 
   it("except is ignored when used with if", async () => {
@@ -699,63 +705,55 @@ describe("FilterTest", () => {
     expect((await run(new FT_ClassController())).ranClassAction).toBe(true);
     class Skipped extends FT_ClassController {}
     Skipped.skipBeforeAction(classFilterFn);
-    expect((await run(new Skipped())).ranClassAction).toBeUndefined();
+    assertNot((await run(new Skipped())).ranClassAction);
   });
 
   it("running collection condition actions", async () => {
     expect((await run(new FT_ConditionalCollectionFilterController())).ranFilter).toEqual([
       "ensure_login",
     ]);
-    expect(
+    assertNot(
       (await run(new FT_ConditionalCollectionFilterController(), "showWithoutAction")).ranFilter,
-    ).toBeUndefined();
-    expect(
+    );
+    assertNot(
       (await run(new FT_ConditionalCollectionFilterController(), "anotherAction")).ranFilter,
-    ).toBeUndefined();
+    );
   });
 
   it("running only condition actions", async () => {
     expect((await run(new FT_OnlyConditionSymController())).ranFilter).toEqual(["ensure_login"]);
-    expect(
-      (await run(new FT_OnlyConditionSymController(), "showWithoutAction")).ranFilter,
-    ).toBeUndefined();
-    expect((await run(new FT_OnlyConditionProcController())).ranProcAction).toBe(true);
-    expect(
-      (await run(new FT_OnlyConditionProcController(), "showWithoutAction")).ranProcAction,
-    ).toBeUndefined();
-    expect((await run(new FT_OnlyConditionClassController())).ranClassAction).toBe(true);
-    expect(
+    assertNot((await run(new FT_OnlyConditionSymController(), "showWithoutAction")).ranFilter);
+    assert((await run(new FT_OnlyConditionProcController())).ranProcAction);
+    assertNot((await run(new FT_OnlyConditionProcController(), "showWithoutAction")).ranProcAction);
+    assert((await run(new FT_OnlyConditionClassController())).ranClassAction);
+    assertNot(
       (await run(new FT_OnlyConditionClassController(), "showWithoutAction")).ranClassAction,
-    ).toBeUndefined();
+    );
   });
 
   it("running except condition actions", async () => {
     expect((await run(new FT_ExceptConditionSymController())).ranFilter).toEqual(["ensure_login"]);
-    expect(
-      (await run(new FT_ExceptConditionSymController(), "showWithoutAction")).ranFilter,
-    ).toBeUndefined();
-    expect((await run(new FT_ExceptConditionProcController())).ranProcAction).toBe(true);
-    expect(
+    assertNot((await run(new FT_ExceptConditionSymController(), "showWithoutAction")).ranFilter);
+    assert((await run(new FT_ExceptConditionProcController())).ranProcAction);
+    assertNot(
       (await run(new FT_ExceptConditionProcController(), "showWithoutAction")).ranProcAction,
-    ).toBeUndefined();
-    expect((await run(new FT_ExceptConditionClassController())).ranClassAction).toBe(true);
-    expect(
+    );
+    assert((await run(new FT_ExceptConditionClassController())).ranClassAction);
+    assertNot(
       (await run(new FT_ExceptConditionClassController(), "showWithoutAction")).ranClassAction,
-    ).toBeUndefined();
+    );
   });
 
   it("running only condition and conditional options", async () => {
-    expect(
-      (await run(new FT_OnlyConditionalOptionsFilter())).ranConditionalIndexProc,
-    ).toBeUndefined();
+    assertNot((await run(new FT_OnlyConditionalOptionsFilter())).ranConditionalIndexProc);
   });
 
   it("running before and after condition actions", async () => {
     const c1 = await run(new FT_BeforeAndAfterConditionController());
     expect(ivars(c1).ranFilter).toEqual(["ensure_login", "clean_up_tmp"]);
-    expect(
+    assertNot(
       (await run(new FT_BeforeAndAfterConditionController(), "showWithoutAction")).ranFilter,
-    ).toBeUndefined();
+    );
   });
 
   it("around action", async () => {
@@ -786,13 +784,13 @@ describe("FilterTest", () => {
   it("rendering breaks actioning chain", async () => {
     const response = await testProcess(FT_RenderingController);
     expect(response.body).toBe("something else");
-    expect("ranAction" in tc.controller).toBe(false);
+    assertNot("ranAction" in tc.controller);
   });
 
   it("before action rendering breaks actioning chain for after action", async () => {
     await testProcess(FT_RenderingController);
     expect(ivars(tc.controller).ranFilter).toEqual(["before_action_rendering"]);
-    expect("ranAction" in tc.controller).toBe(false);
+    assertNot("ranAction" in tc.controller);
   });
 
   it("before action redirects breaks actioning chain for after action", async () => {
@@ -807,7 +805,7 @@ describe("FilterTest", () => {
   it("before action rendering breaks actioning chain for prepend after action", async () => {
     await testProcess(FT_RenderingForPrependAfterActionController);
     expect(ivars(tc.controller).ranFilter).toEqual(["before_action_rendering"]);
-    expect("ranAction" in tc.controller).toBe(false);
+    assertNot("ranAction" in tc.controller);
   });
 
   it("before action redirects breaks actioning chain for prepend after action", async () => {
@@ -859,7 +857,7 @@ describe("FilterTest", () => {
     await testProcess(FT_SkippingAndLimitedController, "index");
     expect(ivars(tc.controller).ranFilter).toEqual(["ensure_login"]);
     await testProcess(FT_SkippingAndLimitedController, "public");
-    expect("ranFilter" in tc.controller).toBe(false);
+    assertNot("ranFilter" in tc.controller);
   });
 
   it("skipping and reordering controller", async () => {
@@ -869,12 +867,12 @@ describe("FilterTest", () => {
 
   it("conditional skipping of actions", async () => {
     await testProcess(FT_ConditionalSkippingController, "login");
-    expect("ranFilter" in tc.controller).toBe(false);
+    assertNot("ranFilter" in tc.controller);
     await testProcess(FT_ConditionalSkippingController, "changePassword");
     expect(ivars(tc.controller).ranFilter).toEqual(["ensure_login", "find_user"]);
 
     await testProcess(FT_ConditionalSkippingController, "login");
-    expect("ranAfterAction" in tc.controller).toBe(false);
+    assertNot("ranAfterAction" in tc.controller);
     await testProcess(FT_ConditionalSkippingController, "changePassword");
     expect(ivars(tc.controller).ranAfterAction).toEqual(["clean_up"]);
   });
@@ -886,7 +884,7 @@ describe("FilterTest", () => {
       "conditional_in_parent_after",
     ]);
     await testProcess(FT_ChildOfConditionalParentController, "anotherAction");
-    expect("ranFilter" in tc.controller).toBe(false);
+    assertNot("ranFilter" in tc.controller);
   });
 
   it("condition skipping of actions when siblings also have conditions", async () => {
@@ -906,7 +904,7 @@ describe("FilterTest", () => {
 
   it("changing the requirements", async () => {
     await testProcess(FT_ChangingTheRequirementsController, "goWild");
-    expect("ranFilter" in tc.controller).toBe(false);
+    assertNot("ranFilter" in tc.controller);
   });
 
   it("a rescuing around action", async () => {
@@ -915,7 +913,7 @@ describe("FilterTest", () => {
       response = await testProcess(FT_RescuedController);
     });
 
-    expect(response!.successful).toBe(true);
+    assert(response!.successful);
     expect(response!.body).toBe(
       "I rescued this: #<FilterTest::ErrorToRescue: Something made the bad noise.>",
     );
@@ -924,12 +922,12 @@ describe("FilterTest", () => {
   it("actions obey only and except for implicit actions", async () => {
     await testProcess(FT_ImplicitActionsController, "show");
     expect(ivars(tc.controller).except).toBe("Except");
-    expect("only" in tc.controller).toBe(false);
+    assertNot("only" in tc.controller);
     expect(tc.response.body).toBe("show");
 
     await testProcess(FT_ImplicitActionsController, "edit");
     expect(ivars(tc.controller).only).toBe("Only");
-    expect("except" in tc.controller).toBe(false);
+    assertNot("except" in tc.controller);
     expect(tc.response.body).toBe("edit");
   });
 });

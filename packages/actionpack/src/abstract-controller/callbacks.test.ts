@@ -15,7 +15,7 @@ import {
   type skipBeforeAction,
   type skipAfterAction,
 } from "./callbacks.js";
-import { include } from "@blazetrails/activesupport";
+import { assertIncludes, assertNot, assertRaises, include } from "@blazetrails/activesupport";
 
 class ControllerWithCallbacks extends AbstractController {
   declare static setCallback: ActionCallbackHost["setCallback"];
@@ -175,7 +175,7 @@ describe("TestCallbacksWithConditions", () => {
 
   it("when :except is specified, an after action is not triggered on that action", async () => {
     await controller.process("index");
-    expect(controller.authenticated).toBeUndefined();
+    assertNot(controller.authenticated);
   });
 });
 
@@ -263,7 +263,7 @@ describe("TestCallbacksWithArrayConditions", () => {
 
   it("when :except is specified with an array, an after action is not triggered on that action", async () => {
     await controller.process("index");
-    expect(controller.authenticated).toBeUndefined();
+    assertNot(controller.authenticated);
   });
 });
 
@@ -345,63 +345,66 @@ describe("TestCallbacksWithMissingConditions", () => {
     return C;
   }
 
-  async function runAndCatch(C: typeof ControllerWithCallbacks): Promise<Error> {
-    const c = new C();
-    try {
-      await c.process("index");
-    } catch (e) {
-      return e as Error;
-    }
-    throw new Error("expected process to throw");
-  }
-
   it("callbacks raise exception when their 'only' condition is a missing action", async () => {
     const C = makeController((k) => k.beforeAction(function callback() {}, { only: "showw" }));
-    expect(await runAndCatch(C)).toBeInstanceOf(ActionNotFound);
+    const controller = new C();
+    await assertRaises([ActionNotFound], {}, () => controller.process("index"));
   });
 
   it("callbacks raise exception when their 'only' array condition contains a missing action", async () => {
     const C = makeController((k) =>
       k.beforeAction(function callback() {}, { only: ["index", "showw"] }),
     );
-    expect(await runAndCatch(C)).toBeInstanceOf(ActionNotFound);
+    const controller = new C();
+    await assertRaises([ActionNotFound], {}, () => controller.process("index"));
   });
 
   it("callbacks raise exception when their 'except' condition is a missing action", async () => {
     const C = makeController((k) => k.beforeAction(function callback() {}, { except: "showw" }));
-    expect(await runAndCatch(C)).toBeInstanceOf(ActionNotFound);
+    const controller = new C();
+    await assertRaises([ActionNotFound], {}, () => controller.process("index"));
   });
 
   it("callbacks raise exception when their 'except' array condition contains a missing action", async () => {
     const C = makeController((k) =>
       k.beforeAction(function callback() {}, { except: ["index", "showw"] }),
     );
-    expect(await runAndCatch(C)).toBeInstanceOf(ActionNotFound);
+    const controller = new C();
+    await assertRaises([ActionNotFound], {}, () => controller.process("index"));
   });
 
   it("raised exception message includes the names of callback actions and missing conditional action", async () => {
     const C = makeController((k) => {
       k.beforeAction("callback1", "callback2", () => {}, { only: "showw" });
     });
-    const err = await runAndCatch(C);
-    expect(err.message).toContain(":callback1");
-    expect(err.message).toContain(":callback2");
-    expect(err.message).toContain("#<Proc:");
-    expect(err.message).toContain("only");
-    expect(err.message).toContain("showw");
+    const controller = new C();
+    const error = await assertRaises([ActionNotFound], {}, () => controller.process("index"));
+
+    assertIncludes(error.message, ":callback1");
+    assertIncludes(error.message, ":callback2");
+    assertIncludes(error.message, "#<Proc:");
+    assertIncludes(error.message, "only");
+    assertIncludes(error.message, "showw");
   });
 
   it("raised exception message includes a block callback", async () => {
     const C = makeController((k) => k.beforeAction(() => {}, { only: "showw" }));
-    expect((await runAndCatch(C)).message).toContain("#<Proc:");
+    const controller = new C();
+    const error = await assertRaises([ActionNotFound], {}, () => controller.process("index"));
+
+    assertIncludes(error.message, "#<Proc:");
   });
 
   it("callbacks with both :only and :except options raise an exception with the correct message", async () => {
     const C = makeController((k) =>
       k.beforeAction(function callback() {}, { only: ["index", "show"], except: "showw" }),
     );
-    const err = await runAndCatch(C);
-    for (const s of [":callback", "except", "showw"]) expect(err.message).toContain(s);
+    const controller = new C();
+    const error = await assertRaises([ActionNotFound], {}, () => controller.process("index"));
+
+    assertIncludes(error.message, ":callback");
+    assertIncludes(error.message, "except");
+    assertIncludes(error.message, "showw");
   });
 });
 

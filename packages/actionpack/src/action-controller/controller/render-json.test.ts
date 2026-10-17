@@ -1,149 +1,158 @@
-import { describe, it, expect } from "vitest";
-import { ToJsonWithActiveSupportEncoder } from "@blazetrails/activesupport";
+import { beforeEach, describe, it } from "vitest";
+import {
+  ActiveSupportJSON,
+  assertEqual,
+  Logger,
+  ToJsonWithActiveSupportEncoder,
+} from "@blazetrails/activesupport";
+import "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
-import { Request } from "../../action-dispatch/http/request.js";
-import { Response } from "../../action-dispatch/http/response.js";
-
-function makeRequest(opts: Record<string, unknown> = {}): Request {
-  return new Request({
-    REQUEST_METHOD: "GET",
-    PATH_INFO: "/",
-    HTTP_HOST: "localhost",
-    ...opts,
-  });
-}
-
-function makeResponse(): Response {
-  return new Response();
-}
+import { TestCase } from "../test-case.js";
 
 describe("RenderJsonTest", () => {
-  it("render json nil", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ json: null });
-      }
+  class JsonRenderable {
+    asJson(options: { except?: string[] } | null = {}): Record<string, string> {
+      const hash: Record<string, string> = { a: "b", c: "d", e: "f" };
+      for (const key of options?.except ?? []) delete hash[key];
+      return hash;
     }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("null");
-    expect(c.contentType).toContain("application/json");
+
+    toJSON(_options: Record<string, unknown> = {}): unknown {
+      return ToJsonWithActiveSupportEncoder.toJSON.call(this, { except: ["c", "e"] });
+    }
+  }
+
+  class InspectOptions {
+    asJson(options: Record<string, unknown> = {}): Record<string, unknown> {
+      return { options: options };
+    }
+  }
+
+  class TestController extends Base {
+    static {
+      this.protectFromForgery();
+    }
+
+    static override controllerPath(): string {
+      return "test";
+    }
+
+    async renderJsonNil() {
+      await this.render({ json: null });
+    }
+
+    async renderJsonHelloWorld() {
+      await this.render({ json: ActiveSupportJSON.encode({ hello: "world" }) });
+    }
+
+    async renderJsonHelloWorldWithStatus() {
+      await this.render({ json: ActiveSupportJSON.encode({ hello: "world" }), status: 401 });
+    }
+
+    async renderJsonHelloWorldWithCallback() {
+      await this.render({ json: ActiveSupportJSON.encode({ hello: "world" }), callback: "alert" });
+    }
+
+    async renderJsonWithCustomContentType() {
+      await this.render({
+        json: ActiveSupportJSON.encode({ hello: "world" }),
+        contentType: "text/javascript",
+      });
+    }
+
+    async renderSymbolJson() {
+      await this.render({ json: ActiveSupportJSON.encode({ hello: "world" }) });
+    }
+
+    async renderJsonWithRenderToString() {
+      await this.render({ json: { hello: await this.renderToString({ partial: "partial" }) } });
+    }
+
+    async renderJsonWithExtraOptions() {
+      await this.render({ json: new JsonRenderable(), except: ["c", "e"] } as { json: unknown });
+    }
+
+    async renderJsonWithoutOptions() {
+      await this.render({ json: new JsonRenderable() });
+    }
+
+    async renderJsonInspectOptions() {
+      await this.render({ json: new InspectOptions() });
+    }
+  }
+
+  class RenderJsonTest extends TestCase {
+    static {
+      this.tests(TestController);
+    }
+  }
+
+  let tc: RenderJsonTest;
+
+  beforeEach(async ({ task }) => {
+    tc = new RenderJsonTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
+    TestController.logger = new Logger(null);
+
+    tc.request.host = "www.nextangle.com";
+  });
+
+  it("render json nil", async () => {
+    await tc.get("renderJsonNil");
+    assertEqual("null", tc.response.body);
+    assertEqual("application/json", tc.response.mediaType);
   });
 
   it("render json", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ json: { hello: "world" } });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(JSON.parse(c.responseBody as string)).toEqual({ hello: "world" });
-    expect(c.contentType).toContain("application/json");
+    await tc.get("renderJsonHelloWorld");
+    assertEqual('{"hello":"world"}', tc.response.body);
+    assertEqual("application/json", tc.response.mediaType);
   });
 
   it("render json with status", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ json: { error: "not found" }, status: 404 });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(404);
-    expect(JSON.parse(c.responseBody as string)).toEqual({ error: "not found" });
+    await tc.get("renderJsonHelloWorldWithStatus");
+    assertEqual('{"hello":"world"}', tc.response.body);
+    assertEqual(401, tc.response.status);
   });
 
   it("render json with callback", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ json: { hello: "world" }, callback: "foo" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toContain("foo(");
-    expect(c.responseBody).toContain('"hello"');
-    expect(c.contentType).toContain("text/javascript");
+    await tc.get("renderJsonHelloWorldWithCallback", { xhr: true });
+    assertEqual('/**/alert({"hello":"world"})', tc.response.body);
+    assertEqual("text/javascript", tc.response.mediaType);
   });
 
   it("render json with custom content type", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ json: { a: 1 }, contentType: "application/vnd.api+json" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("application/vnd.api+json; charset=utf-8");
+    await tc.get("renderJsonWithCustomContentType", { xhr: true });
+    assertEqual('{"hello":"world"}', tc.response.body);
+    assertEqual("text/javascript", tc.response.mediaType);
   });
 
   it("render symbol json", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ json: "raw string" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("raw string");
+    await tc.get("renderSymbolJson");
+    assertEqual('{"hello":"world"}', tc.response.body);
+    assertEqual("application/json", tc.response.mediaType);
   });
 
   it("render json with render to string", async () => {
-    class C extends Base {
-      async action() {
-        const str = await this.renderToString({ json: { key: "value" } });
-        await this.render({ plain: `rendered: ${str}` });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toContain("rendered:");
-    expect(c.responseBody).toContain("key");
+    await tc.get("renderJsonWithRenderToString");
+    assertEqual('{"hello":"partial html"}', tc.response.body);
+    assertEqual("application/json", tc.response.mediaType);
   });
 
   it("render json forwards extra options", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ json: { a: 1 }, status: 201 });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(201);
+    await tc.get("renderJsonWithExtraOptions");
+    assertEqual('{"a":"b"}', tc.response.body);
+    assertEqual("application/json", tc.response.mediaType);
   });
 
   it("render json calls to json from object", async () => {
-    class JsonRenderable {
-      asJson(options: { except?: string[] } | null = {}): Record<string, string> {
-        const hash: Record<string, string> = { a: "b", c: "d", e: "f" };
-        for (const key of options?.except ?? []) delete hash[key];
-        return hash;
-      }
-
-      toJSON(_options: Record<string, unknown> = {}): unknown {
-        return ToJsonWithActiveSupportEncoder.toJSON.call(this, { except: ["c", "e"] });
-      }
-    }
-    class C extends Base {
-      async action() {
-        await this.render({ json: new JsonRenderable() });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe('{"a":"b"}');
+    await tc.get("renderJsonWithoutOptions");
+    assertEqual('{"a":"b"}', tc.response.body);
   });
 
   it("render json avoids view options", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ json: [1, 2, 3] });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(JSON.parse(c.responseBody as string)).toEqual([1, 2, 3]);
-    expect(c.contentType).toContain("application/json");
+    await tc.get("renderJsonInspectOptions");
+    assertEqual('{"options":{}}', tc.response.body);
   });
 });

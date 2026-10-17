@@ -352,7 +352,7 @@ describe("RescueControllerTest", () => {
   it("proc rescue handle with argument", async () => {
     class InvalidRequest extends Error {
       constructor() {
-        super("InvalidRequest");
+        super("RescueController::InvalidRequest");
       }
     }
     class C extends Base {
@@ -367,28 +367,28 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("InvalidRequest");
+    expect(c.responseBody).toBe("RescueController::InvalidRequest");
   });
 
   it("proc rescue handle with argument as string", async () => {
-    class InvalidRequestStr extends Error {
+    class InvalidRequestToRescueAsString extends Error {
       constructor() {
-        super("InvalidRequestStr");
+        super("RescueController::InvalidRequestToRescueAsString");
       }
     }
     class C extends Base {
       async action() {
-        throw new InvalidRequestStr();
+        throw new InvalidRequestToRescueAsString();
       }
     }
-    C.rescueFrom(InvalidRequestStr, {
+    C.rescueFrom(InvalidRequestToRescueAsString, {
       with: async function (this: Base, err: Error) {
         await this.render({ plain: err.message });
       },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("InvalidRequestStr");
+    expect(c.responseBody).toBe("RescueController::InvalidRequestToRescueAsString");
   });
 
   it("block rescue handler", async () => {
@@ -428,7 +428,7 @@ describe("RescueControllerTest", () => {
   it("block rescue handler with argument", async () => {
     class ResourceUnavailable extends Error {
       constructor() {
-        super("ResourceUnavailable");
+        super("RescueController::ResourceUnavailable");
       }
     }
     class C extends Base {
@@ -443,28 +443,28 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("ResourceUnavailable");
+    expect(c.responseBody).toBe("RescueController::ResourceUnavailable");
   });
 
   it("block rescue handler with argument as string", async () => {
-    class ResourceUnavailableStr extends Error {
+    class ResourceUnavailableToRescueAsString extends Error {
       constructor() {
-        super("ResourceUnavailableStr");
+        super("RescueController::ResourceUnavailableToRescueAsString");
       }
     }
     class C extends Base {
       async action() {
-        throw new ResourceUnavailableStr();
+        throw new ResourceUnavailableToRescueAsString();
       }
     }
-    C.rescueFrom(ResourceUnavailableStr, {
+    C.rescueFrom(ResourceUnavailableToRescueAsString, {
       with: async function (this: Base, err: Error) {
         await this.render({ plain: err.message });
       },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("ResourceUnavailableStr");
+    expect(c.responseBody).toBe("RescueController::ResourceUnavailableToRescueAsString");
   });
 
   it("rescue when wrapper has more specific handler than cause", async () => {

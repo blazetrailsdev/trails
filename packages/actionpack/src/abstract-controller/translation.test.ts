@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingTranslationData } from "@blazetrails/i18n";
-import { I18n, isHtmlSafe } from "@blazetrails/activesupport";
+import { I18n, assertRespondTo, isHtmlSafe } from "@blazetrails/activesupport";
 import {
   l,
   localize,
@@ -57,19 +57,19 @@ describe("TranslationControllerTest", () => {
   });
 
   it("action controller base responds to translate", () => {
-    expect(typeof controller.translate).toBe("function");
+    assertRespondTo(controller, "translate");
   });
 
   it("action controller base responds to t", () => {
-    expect(typeof controller.t).toBe("function");
+    assertRespondTo(controller, "t");
   });
 
   it("action controller base responds to localize", () => {
-    expect(typeof controller.localize).toBe("function");
+    assertRespondTo(controller, "localize");
   });
 
   it("action controller base responds to l", () => {
-    expect(typeof controller.l).toBe("function");
+    assertRespondTo(controller, "l");
   });
 
   it("raises missing translation message with raise option", () => {
@@ -184,6 +184,11 @@ describe("TranslationControllerTest", () => {
     const translation = controller.t(".interpolated_html", { word: "<World>" });
     expect(String(translation)).toBe("<a>Hello &lt;World&gt;</a>");
     expect(isHtmlSafe(translation)).toBe(true);
+
+    const wordStruct = { toString: () => "<World>" };
+    const translation2 = controller.t(".interpolated_html", { word: wordStruct });
+    expect(String(translation2)).toBe("<a>Hello &lt;World&gt;</a>");
+    expect(isHtmlSafe(translation2)).toBe(true);
   });
 
   it("translate marks translation with missing html key as safe html", () => {
@@ -197,6 +202,13 @@ describe("TranslationControllerTest", () => {
     controller.actionName = "index";
     const translation = controller.t(".<tag>.html");
     expect(isHtmlSafe(translation)).toBe(false);
+    expect(translation).toBe(
+      [
+        "Translation missing. Options considered were:",
+        "- en.abstract_controller.testing.translation.index.<tag>.html",
+        "- en.abstract_controller.testing.translation.<tag>.html",
+      ].join("\n"),
+    );
   });
 });
 
