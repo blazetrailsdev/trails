@@ -673,6 +673,7 @@ export interface Runner {
   beforeSetup(): unknown;
 }
 
+/** @missingRailsCall include — CONVERGEABLE integration-runner-includes-assertions */
 export const Runner = new Module((mod) => {
   mod.attrReader("app");
   mod.attrReader("rootSession");
