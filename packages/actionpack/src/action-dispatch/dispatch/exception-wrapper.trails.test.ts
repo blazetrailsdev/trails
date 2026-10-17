@@ -21,7 +21,7 @@ describe("ExceptionWrapper template spots", () => {
     TemplateHandlers.clear();
   });
 
-  it("remaps a compiled-template frame onto the template's own source", () => {
+  it("remaps a compiled-template frame onto the template's own source", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
     const template = new Template(
       "first line\n<%= [].boom.length %>\nlast line\n",
@@ -34,7 +34,7 @@ describe("ExceptionWrapper template spots", () => {
 
     let raised: unknown;
     try {
-      template.render(new (Base.withEmptyTemplateCache())(null, {}, null));
+      await template.render(new (Base.withEmptyTemplateCache())(null, {}, null));
     } catch (e) {
       raised = e;
     }

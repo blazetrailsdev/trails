@@ -55,7 +55,7 @@ export class PartialRenderer extends AbstractRenderer {
     partial: string,
     context: ViewContext,
     block: ((...args: unknown[]) => unknown) | null | undefined,
-  ): RenderedTemplate {
+  ): Promise<RenderedTemplate> {
     const template = this.findTemplate(partial, this.templateKeys(partial));
 
     let layout: RenderableTemplate | null = null;
@@ -79,25 +79,27 @@ export class PartialRenderer extends AbstractRenderer {
     template: RenderableTemplate,
     layout: RenderableTemplate | null,
     block: ((...args: unknown[]) => unknown) | null | undefined,
-  ): RenderedTemplate {
-    return Notifications.instrument<RenderedTemplate>(
+  ): Promise<RenderedTemplate> {
+    return Notifications.instrument<Promise<RenderedTemplate>>(
       "render_partial.action_view",
       {
         identifier: template.identifier,
         layout: layout && layout.virtualPath,
         locals,
       },
-      (payload) => {
-        let content = template.render(
+      async (payload) => {
+        let content = (await template.render(
           view,
           locals,
           null,
           { addToStack: block == null },
           (...name) => view._layoutFor!(...name, block),
-        ) as string | SafeBuffer;
+        )) as string | SafeBuffer;
 
         if (layout)
-          content = layout.render(view, locals, null, {}, () => content) as string | SafeBuffer;
+          content = (await layout.render(view, locals, null, {}, () => content)) as
+            | string
+            | SafeBuffer;
         payload["cache_hit"] = view.viewRenderer.cacheHits[template.virtualPath as string];
         return this.buildRenderedTemplate(content, template);
       },

@@ -31,10 +31,10 @@ describe("CachedViewRenderTest", () => {
     TemplateHandlers.clear();
   });
 
-  it("render partial collection", () => {
+  it("render partial collection", async () => {
     expect(
       String(
-        view.render({
+        await view.render({
           partial: "test/customer",
           collection: [new Customer("david"), new Customer("mary")],
         }),
@@ -42,10 +42,10 @@ describe("CachedViewRenderTest", () => {
     ).toBe("Hello: davidHello: mary");
   });
 
-  it("render partial collection as by string", () => {
+  it("render partial collection as by string", async () => {
     expect(
       String(
-        view.render({
+        await view.render({
           partial: "test/customer_with_var",
           collection: [new Customer("david"), new Customer("mary")],
           as: "customer",
@@ -54,10 +54,10 @@ describe("CachedViewRenderTest", () => {
     ).toBe("david david davidmary mary mary");
   });
 
-  it("render partial collection as by symbol", () => {
+  it("render partial collection as by symbol", async () => {
     expect(
       String(
-        view.render({
+        await view.render({
           partial: "test/customer_with_var",
           collection: [new Customer("david"), new Customer("mary")],
           as: ":customer",
@@ -66,17 +66,19 @@ describe("CachedViewRenderTest", () => {
     ).toBe("david david davidmary mary mary");
   });
 
-  it("render partial collection without as", () => {
+  it("render partial collection without as", async () => {
     expect(
-      String(view.render({ partial: "test/local_inspector", collection: [new Customer("mary")] })),
+      String(
+        await view.render({ partial: "test/local_inspector", collection: [new Customer("mary")] }),
+      ),
     ).toBe("local_inspector,local_inspector_counter,local_inspector_iteration");
   });
 
-  it("render partial with empty collection should return nil", () => {
-    assertNil(view.render({ partial: "test/customer", collection: [] }));
+  it("render partial with empty collection should return nil", async () => {
+    assertNil(await view.render({ partial: "test/customer", collection: [] }));
   });
 
-  it("render partial with nil collection should return nil", () => {
-    assertNil(view.render({ partial: "test/customer", collection: null as never }));
+  it("render partial with nil collection should return nil", async () => {
+    assertNil(await view.render({ partial: "test/customer", collection: null as never }));
   });
 });

@@ -21,7 +21,7 @@ const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const tag = _tag.bind(view);
 const contentTag = _contentTag.bind(view);
 
-const renderTse = (string: string): string => {
+const renderTse = async (string: string): Promise<string> => {
   const template = new Template(
     string.trim(),
     "test template",
@@ -29,7 +29,7 @@ const renderTse = (string: string): string => {
     { format: ":html", locals: [] },
   );
   const view = Base.withEmptyTemplateCache();
-  return String(template.render(view.empty(), {})).trim();
+  return String(await template.render(view.empty(), {})).trim();
 };
 
 const COMMON_DANGEROUS_CHARS = "&<>\"' %*+,/;=^|";
@@ -319,37 +319,41 @@ describe("TagHelperTest", () => {
     ).toBe('<div id="header"><div class="world"><span>hello</span></div></div>');
   });
 
-  it("content tag with block in tse", () => {
-    const buffer = renderTse(
+  it("content tag with block in tse", async () => {
+    const buffer = await renderTse(
       '<%= contentTag("div", null, null, true, () => { %>Hello world!<% }) %>',
     );
     assertDomEqual("<div>Hello world!</div>", buffer);
   });
 
-  it("tag builder with block in tse", () => {
-    const buffer = renderTse("<%= tag().div(() => { %>Hello world!<% }) %>");
+  it("tag builder with block in tse", async () => {
+    const buffer = await renderTse("<%= tag().div(() => { %>Hello world!<% }) %>");
     assertDomEqual("<div>Hello world!</div>", buffer);
   });
 
-  it("content tag with block in tse containing non displayed tse", () => {
-    const buffer = renderTse('<%= contentTag("p", null, null, true, () => { %><% 1 %><% }) %>');
+  it("content tag with block in tse containing non displayed tse", async () => {
+    const buffer = await renderTse(
+      '<%= contentTag("p", null, null, true, () => { %><% 1 %><% }) %>',
+    );
     assertDomEqual("<p></p>", buffer);
   });
 
-  it("tag builder with block in tse containing non displayed tse", () => {
-    const buffer = renderTse("<%= tag().p(() => { %><% 1 %><% }) %>");
+  it("tag builder with block in tse containing non displayed tse", async () => {
+    const buffer = await renderTse("<%= tag().p(() => { %><% 1 %><% }) %>");
     assertDomEqual("<p></p>", buffer);
   });
 
-  it("content tag with block and options in tse", () => {
-    const buffer = renderTse(
+  it("content tag with block and options in tse", async () => {
+    const buffer = await renderTse(
       '<%= contentTag("div", { class: "green" }, null, true, () => { %>Hello world!<% }) %>',
     );
     assertDomEqual('<div class="green">Hello world!</div>', buffer);
   });
 
-  it("tag builder with block and options in tse", () => {
-    const buffer = renderTse('<%= tag().div({ class: "green" }, () => { %>Hello world!<% }) %>');
+  it("tag builder with block and options in tse", async () => {
+    const buffer = await renderTse(
+      '<%= tag().div({ class: "green" }, () => { %>Hello world!<% }) %>',
+    );
     assertDomEqual('<div class="green">Hello world!</div>', buffer);
   });
 

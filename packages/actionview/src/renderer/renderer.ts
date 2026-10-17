@@ -64,7 +64,10 @@ export class Renderer {
 
   cacheHits: Record<string, unknown> = {};
 
-  private renderTemplateToObject(context: ViewContext, options: RenderOptions): RenderedTemplate {
+  private renderTemplateToObject(
+    context: ViewContext,
+    options: RenderOptions,
+  ): Promise<RenderedTemplate> {
     return new TemplateRenderer(this.lookupContext).render(context, options);
   }
 

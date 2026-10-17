@@ -187,8 +187,8 @@ describe("Base#render (trails)", () => {
     return ctx;
   }
 
-  function renderPartial(ctx: LookupContext, partial: string, locals = {}): string {
-    return String(new (DetailsKey.viewContextClass())(ctx, {}, null).render(partial, locals));
+  async function renderPartial(ctx: LookupContext, partial: string, locals = {}): Promise<string> {
+    return String(await new (DetailsKey.viewContextClass())(ctx, {}, null).render(partial, locals));
   }
 
   beforeEach(() => {
@@ -199,37 +199,37 @@ describe("Base#render (trails)", () => {
     TemplateHandlers.clear();
   });
 
-  it("restores the parent's virtual path after a nested partial returns", () => {
+  it("restores the parent's virtual path after a nested partial returns", async () => {
     const ctx = contextWith({
       "posts/_post":
         '<%= render({ partial: "shared/spacer" }) %>|<%= render({ partial: "byline" }) %>',
       "shared/_spacer": "spacer",
       "posts/_byline": "byline",
     });
-    expect(renderPartial(ctx, "post")).toBe("spacer|byline");
+    expect(await renderPartial(ctx, "post")).toBe("spacer|byline");
   });
 
-  it("renders a partial by bare name against the given prefix", () => {
+  it("renders a partial by bare name against the given prefix", async () => {
     const ctx = contextWith({ "posts/_form": "<%= title %>" });
-    expect(renderPartial(ctx, "form", { title: "New" })).toBe("New");
+    expect(await renderPartial(ctx, "form", { title: "New" })).toBe("New");
   });
 
-  it("takes the prefix from a qualified name", () => {
+  it("takes the prefix from a qualified name", async () => {
     const ctx = contextWith({ "users/_user": "<li><%= user %></li>" });
-    expect(renderPartial(ctx, "users/user", { user: "Ada" })).toBe("<li>Ada</li>");
+    expect(await renderPartial(ctx, "users/user", { user: "Ada" })).toBe("<li>Ada</li>");
   });
 
-  it("resolves a partial nested inside a partial", () => {
+  it("resolves a partial nested inside a partial", async () => {
     const ctx = contextWith({
       "posts/_post": '<%= render({ partial: "posts/byline", locals: { name: name } }) %>',
       "posts/_byline": "by <%= name %>",
     });
-    expect(renderPartial(ctx, "post", { name: "Ada" })).toBe("by Ada");
+    expect(await renderPartial(ctx, "post", { name: "Ada" })).toBe("by Ada");
   });
 
-  it("raises MissingTemplate when the partial does not resolve", () => {
+  it("raises MissingTemplate when the partial does not resolve", async () => {
     const ctx = contextWith({ "posts/_form": "" });
-    expect(() => renderPartial(ctx, "frm")).toThrow(MissingTemplate);
+    await expect(renderPartial(ctx, "frm")).rejects.toThrow(MissingTemplate);
   });
 
   it("is reachable from a template rendered through renderTemplate", async () => {

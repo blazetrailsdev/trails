@@ -86,7 +86,7 @@ export class ActiveRecordTestConnector {
 
 type ControllerClass = Parameters<typeof ActionController.TestCase.tests>[0];
 
-/** @missingRailsCall after_fork_hook — CONVERGEABLE active-record-unit-registers-parallelization-after-fork-hook */
+/** @missingRailsCall after_fork_hook — PERMANENT */
 export class ActiveRecordTestCase extends ActionController.TestCase {
   declare static fixturePaths: string[];
   declare static useTransactionalTests: boolean;

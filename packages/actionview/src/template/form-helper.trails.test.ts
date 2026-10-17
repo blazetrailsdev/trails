@@ -19,16 +19,16 @@ class Post {
 describe("FormHelper includes RecordIdentifier (form_helper.rb:120)", () => {
   const view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
 
-  it("renders domId from a template", () => {
-    const rendered = view.render({
+  it("renders domId from a template", async () => {
+    const rendered = await view.render({
       inline: "<div id=\"<%= domId(post) %>\"></div><%= domId(newPost, 'edit') %>",
       locals: { post: new Post(1), newPost: new Post(null) },
     });
     expect(String(rendered)).toBe('<div id="post_1"></div>edit_post');
   });
 
-  it("renders domClass from a template", () => {
-    const rendered = view.render({
+  it("renders domClass from a template", async () => {
+    const rendered = await view.render({
       inline: "<%= domClass(post) %> <%= domClass(post, 'edit') %>",
       locals: { post: new Post(1) },
     });
@@ -39,17 +39,17 @@ describe("FormHelper includes RecordIdentifier (form_helper.rb:120)", () => {
 describe("FormHelper includes ModelNaming (form_helper.rb:119)", () => {
   const view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
 
-  it("renders convertToModel from a template", () => {
+  it("renders convertToModel from a template", async () => {
     const model = new Post(1);
-    const rendered = view.render({
+    const rendered = await view.render({
       inline: "<%= convertToModel(post) === model %>",
       locals: { post: { toModel: () => model }, model },
     });
     expect(String(rendered)).toBe("true");
   });
 
-  it("renders modelNameFromRecordOrClass from a template", () => {
-    const rendered = view.render({
+  it("renders modelNameFromRecordOrClass from a template", async () => {
+    const rendered = await view.render({
       inline: "<%= modelNameFromRecordOrClass(post).paramKey %>",
       locals: { post: new Post(1) },
     });

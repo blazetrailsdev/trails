@@ -87,7 +87,7 @@ const hashFor = (options: Record<string, unknown> = {}): Record<string, unknown>
 });
 const urlHash = hashFor;
 
-const renderTse = (string: string): string => {
+const renderTse = async (string: string): Promise<string> => {
   const template = new Template(
     string.trim(),
     "test template",
@@ -95,7 +95,7 @@ const renderTse = (string: string): string => {
     { format: ":html", locals: [] },
   );
   const view = Base.withEmptyTemplateCache();
-  return String(template.render(view.empty(), {})).trim();
+  return String(await template.render(view.empty(), {})).trim();
 };
 
 function controllerWithReferer(env: Record<string, unknown>): unknown {
@@ -731,8 +731,8 @@ describe("UrlHelperTest", () => {
     );
   });
 
-  it("link tag using block in erb", () => {
-    const out = renderTse(`<%= linkTo('/', null, null, () => { %>Example site<% }) %>`);
+  it("link tag using block in erb", async () => {
+    const out = await renderTse(`<%= linkTo('/', null, null, () => { %>Example site<% }) %>`);
     expect(out).toBe('<a href="/">Example site</a>');
   });
 

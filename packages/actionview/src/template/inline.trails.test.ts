@@ -14,13 +14,13 @@ describe("ActionView::Template::Inline", () => {
     vi.restoreAllMocks();
   });
 
-  it("registers a finalizer that removes the compiled method from the container", () => {
+  it("registers a finalizer that removes the compiled method from the container", async () => {
     const define = vi.spyOn(ObjectSpace, "defineFinalizer");
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
     const container = view.compiledMethodContainer();
     const template = new Inline("hi", "inline template", echo, { locals: [], format: ":html" });
 
-    expect(template.render(view, {})).toBe("hi");
+    expect(await template.render(view, {})).toBe("hi");
     expect(container._compiledMethods.has(template.methodName())).toBe(true);
 
     expect(define).toHaveBeenCalledTimes(1);

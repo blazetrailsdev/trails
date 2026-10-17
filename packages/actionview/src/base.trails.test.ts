@@ -89,26 +89,26 @@ describe("ActionView::Base#in_rendering_context", () => {
 });
 
 describe("ActionView::Base#render returns the renderer body unwrapped", () => {
-  afterEach(() => {
+  afterEach(async () => {
     TemplateHandlers.clear();
   });
 
-  const renderTse = (source: string): string => {
+  const renderTse = async (source: string): Promise<string> => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     const lookupContext = new LookupContext(null, {}, []);
     lookupContext.appendViewPaths([new FixtureResolver({ "test/_bold.html.tse": "<b>bold</b>" })]);
     const view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
     return String(
-      new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, {}),
+      await new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, {}),
     );
   };
 
-  it("escapes a render plain: body appended by <%= %> (template/text.rb:23-25)", () => {
-    expect(renderTse('<%= render({ plain: "<b>" }) %>')).toBe("&lt;b&gt;");
+  it("escapes a render plain: body appended by <%= %> (template/text.rb:23-25)", async () => {
+    expect(await renderTse('<%= render({ plain: "<b>" }) %>')).toBe("&lt;b&gt;");
   });
 
-  it("does not escape a render partial: body, an OutputBuffer#to_s (template.rb:272)", () => {
-    expect(renderTse('<%= render({ partial: "test/bold" }) %>')).toBe("<b>bold</b>");
+  it("does not escape a render partial: body, an OutputBuffer#to_s (template.rb:272)", async () => {
+    expect(await renderTse('<%= render({ partial: "test/bold" }) %>')).toBe("<b>bold</b>");
   });
 });
 

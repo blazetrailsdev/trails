@@ -29,10 +29,10 @@ describe("Base#render collection: inside a template", () => {
     TemplateHandlers.clear();
   });
 
-  it("renders a partial collection from inside a compiled template", () => {
+  it("renders a partial collection from inside a compiled template", async () => {
     expect(
       String(
-        view.render({
+        await view.render({
           partial: "test/list",
           locals: { customers: [new Customer("david"), new Customer("mary")] },
         }),
@@ -40,10 +40,10 @@ describe("Base#render collection: inside a template", () => {
     ).toBe("Hello: davidHello: mary");
   });
 
-  it("treats as: false like an absent as:, deriving the local from the partial name", () => {
+  it("treats as: false like an absent as:, deriving the local from the partial name", async () => {
     expect(
       String(
-        view.render({
+        await view.render({
           partial: "test/customer_with_var",
           collection: [new Customer("david"), new Customer("mary")],
           as: false,

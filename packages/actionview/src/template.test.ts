@@ -48,9 +48,9 @@ describe("ActionView::Template (smoke)", () => {
     expect(t.source).toBe(afterFirst);
   });
 
-  it("render delegates to the handler and wraps non-TemplateError failures", () => {
+  it("render delegates to the handler and wraps non-TemplateError failures", async () => {
     const t = new Template("hi", "x", echo, { locals: [], format: ":html" });
-    expect(t.render(view(), { name: "ada" })).toBe(`hi::${JSON.stringify({ name: "ada" })}`);
+    expect(await t.render(view(), { name: "ada" })).toBe(`hi::${JSON.stringify({ name: "ada" })}`);
 
     const boom = new Template(
       "hi",
@@ -62,24 +62,24 @@ describe("ActionView::Template (smoke)", () => {
       },
       { locals: [], format: ":html" },
     );
-    expect(() => boom.render(view())).toThrow(TemplateError);
+    await expect(boom.render(view())).rejects.toThrow(TemplateError);
   });
 
-  it("render returns nil when given a buffer and the _run result verbatim otherwise", () => {
+  it("render returns nil when given a buffer and the _run result verbatim otherwise", async () => {
     const handler: TemplateHandler = { call: () => "return 42;" };
     const t = new Template("hi", "z", handler, { locals: [], format: ":html" });
-    expect(t.render(view(), {})).toBe(42);
+    expect(await t.render(view(), {})).toBe(42);
 
     const raw = new Template("<b>", "r", new Raw(), { locals: [], format: ":html" });
-    expect(String(raw.render(view(), {}))).toBe("<b>");
+    expect(String(await raw.render(view(), {}))).toBe("<b>");
 
     const tse = new Template("hi", "w", new Tse(), { locals: [], format: ":html" });
     const buffer = new OutputBuffer();
-    expect(tse.render(view(), {}, buffer)).toBeNull();
+    expect(await tse.render(view(), {}, buffer)).toBeNull();
     expect(buffer.toStr()).toBe("hi");
   });
 
-  it("compile raises SyntaxErrorInTemplate when the compiled source will not parse", () => {
+  it("compile raises SyntaxErrorInTemplate when the compiled source will not parse", async () => {
     const t = new Template(
       "x",
       "posts/show",
@@ -88,7 +88,7 @@ describe("ActionView::Template (smoke)", () => {
     );
     let raised: unknown;
     try {
-      t.render(view());
+      await t.render(view());
     } catch (e) {
       raised = e;
     }
@@ -98,7 +98,7 @@ describe("ActionView::Template (smoke)", () => {
     );
   });
 
-  it("annotated_source_code numbers the offending code string", () => {
+  it("annotated_source_code numbers the offending code string", async () => {
     const t = new Template(
       "one\ntwo",
       "posts/show",
@@ -107,7 +107,7 @@ describe("ActionView::Template (smoke)", () => {
     );
     let raised: unknown;
     try {
-      t.render(view());
+      await t.render(view());
     } catch (e) {
       raised = e;
     }
@@ -179,7 +179,7 @@ describe("ActionView::Template (smoke)", () => {
       expect(t.translateLocation({ lineno: 1 }, spot())).toBe(translated);
     });
 
-    it("reaches the Tse handler's translate_location", () => {
+    it("reaches the Tse handler's translate_location", async () => {
       const source = "<%= 1 %>\n<%= boom %>\n";
       const handler = new Tse();
       const hook = vi.spyOn(handler, "translateLocation");
@@ -198,34 +198,34 @@ describe("ActionView::Template (smoke)", () => {
     const template = (source: string): Template =>
       new Template(source, "t", new Tse(), { locals: [], format: ":html" });
 
-    const render = (
+    const render = async (
       source: string,
       locals: Record<string, unknown> = {},
       extra: { view?: Base; yield?: string } = {},
-    ): string => {
+    ): Promise<string> => {
       const view = extra.view ?? new (Base.withEmptyTemplateCache())(null, {}, null);
       if (extra.yield !== undefined) view.viewFlow.set("layout", extra.yield);
-      return String(template(source).render(view, locals));
+      return String(await template(source).render(view, locals));
     };
 
-    it("executes the compiled template and returns its output", () => {
-      expect(render("<h1>hi</h1>", {}, ctx())).toBe("<h1>hi</h1>");
+    it("executes the compiled template and returns its output", async () => {
+      expect(await render("<h1>hi</h1>", {}, ctx())).toBe("<h1>hi</h1>");
     });
 
-    it("resolves a local as a bare identifier", () => {
-      expect(render("<%= name %>", { name: "Ada" }, ctx())).toBe("Ada");
+    it("resolves a local as a bare identifier", async () => {
+      expect(await render("<%= name %>", { name: "Ada" }, ctx())).toBe("Ada");
     });
 
-    it("escapes an unsafe local", () => {
-      expect(render("<%= name %>", { name: "<b>" }, ctx())).toBe("&lt;b&gt;");
+    it("escapes an unsafe local", async () => {
+      expect(await render("<%= name %>", { name: "<b>" }, ctx())).toBe("&lt;b&gt;");
     });
 
-    it("does not escape a raw() local", () => {
-      expect(render("<%= raw(name) %>", { name: "<b>" }, ctx())).toBe("<b>");
+    it("does not escape a raw() local", async () => {
+      expect(await render("<%= raw(name) %>", { name: "<b>" }, ctx())).toBe("<b>");
     });
 
-    it("runs code tags", () => {
-      const out = render(
+    it("runs code tags", async () => {
+      const out = await render(
         "<% for (const n of names) { %><%= n %>,<% } %>",
         { names: ["a", "b"] },
         ctx(),
@@ -233,28 +233,28 @@ describe("ActionView::Template (smoke)", () => {
       expect(out).toBe("a,b,");
     });
 
-    it("lets a local shadow a same-named view helper", () => {
-      expect(render("<%= raw %>", { raw: "local wins" }, ctx())).toBe("local wins");
+    it("lets a local shadow a same-named view helper", async () => {
+      expect(await render("<%= raw %>", { raw: "local wins" }, ctx())).toBe("local wins");
     });
 
-    it("emits the inner template's output for a bare yield in a layout", () => {
-      const out = render("<main><%= yield %></main>", {}, ctx({ yield: "<p>body</p>" }));
+    it("emits the inner template's output for a bare yield in a layout", async () => {
+      const out = await render("<main><%= yield %></main>", {}, ctx({ yield: "<p>body</p>" }));
       expect(out).toBe("<main><p>body</p></main>");
     });
 
-    it("yields a section to the template's block, as trails-tsc's virtualizer binds it", () => {
+    it("yields a section to the template's block, as trails-tsc's virtualizer binds it", async () => {
       const view = new (Base.withEmptyTemplateCache())(null, {}, null);
       view.viewFlow.set("layout", "body");
       view.viewFlow.set("sidebar", "side");
       view.viewFlow.set("footer", "foot");
-      const out = template(
+      const out = await template(
         '<main><%= yield %></main><%= yield "sidebar" %><%= yield("footer") %><%== yield %>',
       ).render(view, {}, null, {}, (...name: unknown[]) => view._layoutFor(...(name as [string?])));
       expect(String(out)).toBe("<main>body</main>sidefootbody");
     });
 
-    it("round-trips a named contentFor section", () => {
-      const out = render(
+    it("round-trips a named contentFor section", async () => {
+      const out = await render(
         '<% contentFor("side", () => { %>aside<% }) %><%= _layoutFor("side") %>',
         {},
         ctx(),
@@ -262,7 +262,7 @@ describe("ActionView::Template (smoke)", () => {
       expect(out).toBe("aside");
     });
 
-    it("renders a nested partial through the view's render helper", () => {
+    it("renders a nested partial through the view's render helper", async () => {
       const seen: Array<[string, Record<string, unknown>]> = [];
       const view = new (Base.withEmptyTemplateCache())(null, {}, null);
       view.render = (options) => {
@@ -270,7 +270,7 @@ describe("ActionView::Template (smoke)", () => {
         seen.push([hash.partial, hash.locals ?? {}]);
         return htmlSafe("<li>Ada</li>");
       };
-      const out = render(
+      const out = await render(
         '<%= render({ partial: "users/user", locals: { user: user } }) %>',
         { user: "Ada" },
         ctx({ view }),
@@ -279,29 +279,29 @@ describe("ActionView::Template (smoke)", () => {
       expect(seen).toEqual([["users/user", { user: "Ada" }]]);
     });
 
-    it("resolves an ActionView helper mixed onto the view as a bare identifier", () => {
-      expect(render("<%= raw(value) %>", { value: "<b>" }, ctx())).toBe("<b>");
+    it("resolves an ActionView helper mixed onto the view as a bare identifier", async () => {
+      expect(await render("<%= raw(value) %>", { value: "<b>" }, ctx())).toBe("<b>");
     });
 
-    it("runs the compiled method with the view as `this`", () => {
+    it("runs the compiled method with the view as `this`", async () => {
       const view = new (Base.withEmptyTemplateCache())(null, {}, null);
       let seen: unknown;
       (view as unknown as Record<string, unknown>).whoAmI = function (this: Base) {
         seen = this as unknown;
         return "ok";
       };
-      expect(render("<%= whoAmI() %>", {}, ctx({ view }))).toBe("ok");
+      expect(await render("<%= whoAmI() %>", {}, ctx({ view }))).toBe("ok");
       expect(seen).toBe(view);
     });
 
-    it("memoizes the compiled method on the view's compiledMethodContainer", () => {
+    it("memoizes the compiled method on the view's compiledMethodContainer", async () => {
       const view = new (Base.withEmptyTemplateCache())(null, {}, null);
       const container = view.compiledMethodContainer();
       const before = container._compiledMethods.size;
       const t = template("<%= n %>");
-      t.render(view, { n: 1 });
+      await t.render(view, { n: 1 });
       const after = container._compiledMethods.size;
-      t.render(view, { n: 2 });
+      await t.render(view, { n: 2 });
       expect(after).toBe(before + 1);
       expect(container._compiledMethods.size).toBe(after);
     });
@@ -314,18 +314,18 @@ describe("ActionView::Template (smoke)", () => {
       expect(b.compiledMethodContainer()._compiledMethods.size).toBe(0);
     });
 
-    it("does not let the compiled function's own name shadow the render helper", () => {
-      expect(() => render('<%= render({ partial: "p" }) %>', {}, ctx())).toThrow(
+    it("does not let the compiled function's own name shadow the render helper", async () => {
+      await expect(render('<%= render({ partial: "p" }) %>', {}, ctx())).rejects.toThrow(
         /Cannot read properties of null/,
       );
     });
 
-    it("enforces a strict-locals signature against the passed locals, not the helper scope", () => {
+    it("enforces a strict-locals signature against the passed locals, not the helper scope", async () => {
       const source = "<%# locals: (name:) %>\n<%= name %>";
-      expect(render(source, { name: "Ada" }, ctx())).toContain("Ada");
+      expect(await render(source, { name: "Ada" }, ctx())).toContain("Ada");
       let raised: unknown;
       try {
-        render(source, { name: "Ada", extra: 1 }, ctx());
+        await render(source, { name: "Ada", extra: 1 }, ctx());
       } catch (e) {
         raised = e;
       }
@@ -333,14 +333,14 @@ describe("ActionView::Template (smoke)", () => {
       expect((raised as TemplateError).message).toBe("unknown local: :extra for t");
     });
 
-    it("leaves an ArgumentError raised inside a strict-locals template body untranslated", () => {
+    it("leaves an ArgumentError raised inside a strict-locals template body untranslated", async () => {
       const view = new (Base.withEmptyTemplateCache())(null, {}, null);
       (view as unknown as Record<string, unknown>).boom = () => {
         throw new ArgumentError("missing keyword: :other");
       };
       let raised: unknown;
       try {
-        template("<%# locals: (name:) %>\n<%= boom() %>").render(view, { name: "Ada" });
+        await template("<%# locals: (name:) %>\n<%= boom() %>").render(view, { name: "Ada" });
       } catch (e) {
         raised = e;
       }
@@ -348,11 +348,11 @@ describe("ActionView::Template (smoke)", () => {
       expect((raised as TemplateError).cause).not.toBeInstanceOf(StrictLocalsError);
     });
 
-    it("memoizes the compile, so a second render of the same source reuses it", () => {
+    it("memoizes the compile, so a second render of the same source reuses it", async () => {
       const view = new (Base.withEmptyTemplateCache())(null, {}, null);
       const t = template("<%= n %>");
-      expect(String(t.render(view, { n: 1 }))).toBe("1");
-      expect(String(t.render(view, { n: 2 }))).toBe("2");
+      expect(String(await t.render(view, { n: 1 }))).toBe("1");
+      expect(String(await t.render(view, { n: 2 }))).toBe("2");
       expect(view.compiledMethodContainer()._compiledMethods.size).toBe(1);
     });
   });
