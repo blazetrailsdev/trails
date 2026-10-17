@@ -1178,6 +1178,12 @@ export class Emitter {
       const mod = opts.objectMember ? "" : opts.static ? "static " : "";
       return `${doc}${mod}get ${propKey(tsName)}(): any {\n${indent(body).join("\n")}\n}`;
     }
+    const inherited =
+      !opts.module && !opts.objectMember && !opts.asFunction
+        ? this.lw.inheritedDepGetter(u.fqn, d.name, opts.static)
+        : undefined;
+    if (inherited && !awaits && d.params.length === 0 && !/=$/.test(d.name))
+      return `${opts.static ? "static " : ""}get ${propKey(inherited.tsName)}(): any {\n${indent(body).join("\n")}\n}`;
     if (
       !opts.static &&
       !opts.module &&
