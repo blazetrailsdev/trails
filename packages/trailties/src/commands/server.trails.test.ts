@@ -10,14 +10,21 @@ import { Application } from "../application.js";
 const devServerStarts = vi.hoisted(() => [] as unknown[]);
 
 vi.mock("../command/actions.js", () => ({ requireApplicationBang: async () => {} }));
-vi.mock("../server/dev-server.js", () => ({
-  DevServer: class {
-    constructor(options: unknown) {
-      devServerStarts.push(options);
+const devServerLoads = vi.hoisted(() => [] as string[]);
+vi.mock(
+  "../server/dev-server.js",
+  () => (
+    devServerLoads.push("dev-server"),
+    {
+      DevServer: class {
+        constructor(options: unknown) {
+          devServerStarts.push(options);
+        }
+        async start(): Promise<void> {}
+      },
     }
-    async start(): Promise<void> {}
-  },
-}));
+  ),
+);
 
 const { serverCommand } = await import("./server.js");
 
@@ -67,6 +74,7 @@ describe("trails server environment (trails)", () => {
     await serverCommand().parseAsync(["-e", "production"], { from: "user" });
 
     expect(devServerStarts).toEqual([]);
+    expect(devServerLoads).toEqual([]);
     expect(runOptions).toEqual([{ Port: 3000, Host: "0.0.0.0" }]);
     expect(env.TRAILS_ENV).toBe("production");
     expect(console.log).toHaveBeenCalledWith(

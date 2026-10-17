@@ -11,6 +11,9 @@ import { Application } from "../application.js";
 import { createProgram } from "../cli.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
 import { RouteInfo } from "./unused-routes.js";
+import { lookupBang } from "../command/behavior.js";
+
+await lookupBang();
 
 const exit = vi.hoisted(() => vi.fn());
 vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({

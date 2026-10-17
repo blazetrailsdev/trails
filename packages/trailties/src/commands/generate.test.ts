@@ -1,6 +1,9 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { createProgram } from "../cli.js";
 import { Generators } from "../generators.js";
+import { lookupBang } from "../command/behavior.js";
+
+await lookupBang();
 
 afterEach(() => {
   vi.restoreAllMocks();

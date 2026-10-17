@@ -2,6 +2,7 @@ import { presence } from "@blazetrails/activesupport";
 import { env } from "@blazetrails/ruby-compat";
 import type { Command as Program } from "commander";
 import type { Base } from "./command/base.js";
+import { lookup, lookupBang } from "./command/behavior.js";
 
 export const HELP_MAPPINGS: ReadonlySet<string> = new Set(["-h", "-?", "--help"]);
 export const VERSION_MAPPINGS: ReadonlySet<string> = new Set(["-v", "--version"]);
@@ -30,7 +31,6 @@ export async function invoke(fullNamespace: string, args: string[] = []): Promis
   }
 }
 
-/** @missingRailsCall lookup — CONVERGEABLE find-by-namespace-lookup-loads-only-candidates */
 export async function findByNamespace(
   namespace: string,
   commandName?: string,
@@ -38,6 +38,8 @@ export async function findByNamespace(
   const lookups = [namespace];
   if (commandName) lookups.push(`${namespace}:${commandName}`);
   lookups.push(...lookups.map((lookup) => `rails:${lookup}`));
+
+  await lookup(lookups);
 
   const { createProgram } = await import("./cli.js");
   const namespaces = new Map(createProgram().commands.map((c) => [c.name(), c]));
@@ -57,6 +59,7 @@ function splitNamespace(namespace: string): [string, string] {
 
 /** @internal */
 async function invokeRake(task: string, args: string[]): Promise<void> {
+  await lookupBang();
   const { createProgram } = await import("./cli.js");
   const program = createProgram();
   const colon = task.indexOf(":");
