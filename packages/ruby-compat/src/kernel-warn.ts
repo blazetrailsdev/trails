@@ -18,8 +18,8 @@ const WARNING_CATEGORIES: Record<string, boolean> = {
  * disabled one writes nothing (`error.c:157,198`); `:deprecated` and `:performance` start disabled.
  *
  * `uplevel:` prefixes the output with `path:line: warning: ` for the frame that many levels above
- * the caller (`error.c:566-588`), or with a bare `warning: ` where there is no such frame, and
- * raises `ArgumentError` for a negative level (`error.c:568-570`).
+ * the caller (`error.c:563-586`), or with a bare `warning: ` where there is no such frame, and
+ * raises `ArgumentError` for a negative level (`error.c:565-567`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#warn`, which Rails calls without
  * defining.

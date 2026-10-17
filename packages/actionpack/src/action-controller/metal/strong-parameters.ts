@@ -24,6 +24,7 @@ import {
   isModuleIncluded,
   rbBlockGivenP,
   rbEql,
+  rbEqq,
   rbEqual,
   rbFSend,
   rbHash,
@@ -33,7 +34,6 @@ import {
   rbObjClass,
   rbObjClassname,
   rbObjDup,
-  rbEqq,
   rbObjRespondTo,
   toEnum,
   toH,
@@ -148,11 +148,6 @@ type ExpectedHashFilter = readonly [
   ...(string | Record<string, unknown>)[],
 ];
 type ExpectedHash<K extends string> = true extends IsUnion<K> ? Parameters[] : Parameters;
-
-/** @internal */
-function isPermittedScalar(value: unknown): boolean {
-  return PERMITTED_SCALAR_TYPES.some((type) => type(value));
-}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Parameters {
@@ -838,8 +833,13 @@ export class Parameters {
   }
 
   /** @internal */
+  isPermittedScalar(value: unknown): boolean {
+    return PERMITTED_SCALAR_TYPES.some((type) => type(value));
+  }
+
+  /** @internal */
   permittedScalarFilter(params: Parameters, permittedKey: string): void {
-    if (this.hasKey(permittedKey) && isPermittedScalar(this.get(permittedKey))) {
+    if (this.hasKey(permittedKey) && this.isPermittedScalar(this.get(permittedKey))) {
       params.set(permittedKey, this.get(permittedKey));
     }
 
@@ -848,7 +848,7 @@ export class Parameters {
       if (!match) return;
       if (key.slice(0, match.index) !== permittedKey) return;
 
-      if (isPermittedScalar(this.get(key))) params.set(key, this.get(key));
+      if (this.isPermittedScalar(this.get(key))) params.set(key, this.get(key));
     });
   }
 
@@ -906,7 +906,8 @@ export class Parameters {
 
   /** @internal */
   permitArrayOfScalars(value: unknown): unknown {
-    if (Array.isArray(value) && value.every((element) => isPermittedScalar(element))) return value;
+    if (Array.isArray(value) && value.every((element) => this.isPermittedScalar(element)))
+      return value;
     return undefined;
   }
 
@@ -960,7 +961,7 @@ export class Parameters {
   permitAnyInParameters(params: Parameters): Parameters {
     const sanitized = new Parameters();
     params.each(([key, value]) => {
-      if (rbEqq((v: unknown) => isPermittedScalar(v), value)) {
+      if (rbEqq((v: unknown) => this.isPermittedScalar(v), value)) {
         sanitized.set(key, value);
       } else if (Array.isArray(value)) {
         sanitized.set(key, this.permitAnyInArray(value));
@@ -975,7 +976,7 @@ export class Parameters {
   permitAnyInArray(array: unknown[]): unknown[] {
     const sanitized: unknown[] = [];
     for (const element of array) {
-      if (rbEqq((e: unknown) => isPermittedScalar(e), element)) sanitized.push(element);
+      if (rbEqq((e: unknown) => this.isPermittedScalar(e), element)) sanitized.push(element);
       else if (Array.isArray(element)) sanitized.push(this.permitAnyInArray(element));
       else if (element instanceof Parameters) sanitized.push(this.permitAnyInParameters(element));
     }

@@ -7143,18 +7143,20 @@ function collectCalls(
 }
 
 /**
- * A `recv.get("key")` off another object: the port of Ruby's `recv[:key]`, an
- * operator send extract-ruby-api.rb#walk_call_in_order does not record. The
- * ORDER stream leaves it out, so it cannot take the position of a Ruby `get`
- * the same body makes (`Mapper#resource`'s `@scope[:shallow]` beside
- * `get :new`, `mapper.rb:1357-1363`).
+ * A `this._scope.get("key")`: `Mapper::Scope#[]` (`mapper.rb:2359-2361`), ported
+ * as `Scope#get`, read off Mapper's `@scope`. extract-ruby-api.rb#walk_call_in_order
+ * records no `[]` send, so the ORDER stream leaves it out, and it cannot take
+ * the position of the routing `get` the same body makes (`Mapper#resource`'s
+ * `@scope[:shallow]` beside `get :new`, `mapper.rb:1357-1363`).
  */
 function isOperatorIndexRead(n: ts.CallExpression): boolean {
   const callee = n.expression;
   return (
     ts.isPropertyAccessExpression(callee) &&
     memberNameText(callee.name) === "get" &&
-    callee.expression.kind !== ts.SyntaxKind.ThisKeyword &&
+    ts.isPropertyAccessExpression(callee.expression) &&
+    callee.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+    callee.expression.name.text === "_scope" &&
     n.arguments.length === 1 &&
     ts.isStringLiteralLike(n.arguments[0])
   );

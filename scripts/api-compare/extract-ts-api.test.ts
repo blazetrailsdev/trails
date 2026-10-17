@@ -458,14 +458,20 @@ describe("body call capture", () => {
     const cls = extractFromSource(
       `class Foo {
         resource() {
-          this.build(this.scope.get("shallow"));
+          this.build(this._scope.get("shallow"));
+          this.get(":new");
+        }
+        show() {
+          this.build(this.headers.get("x"));
           this.get(":new");
         }
       }`,
     );
     const resource = cls.instanceMethods.find((m) => m.name === "resource")!;
     expect(resource.calls).toContain("get");
-    expect(resource.callSeq).toEqual(["scope", "build", "get"]);
+    expect(resource.callSeq).toEqual(["_scope", "build", "get"]);
+    const show = cls.instanceMethods.find((m) => m.name === "show")!;
+    expect(show.callSeq).toEqual(["headers", "get", "build"]);
   });
 
   it("also records the same calls in source order, for the order-only comparison", () => {

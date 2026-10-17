@@ -1395,14 +1395,20 @@ export class Mapper {
     }
   }
 
-  /** @missingRailsCall read — PERMANENT */
+  /**
+   * @missingRailsCall find — PERMANENT
+   * @missingRailsCall read — PERMANENT
+   */
   async draw(name: string): Promise<void> {
     const fs = getFs();
     const p = getPath();
-    const exists = await Promise.all(
-      this._drawPaths.map((_path) => fs.exists(`${_path}/${name}.ts`)),
-    );
-    const path = this._drawPaths.find((_path, i) => exists[i]);
+    let path: string | undefined;
+    for (const _path of this._drawPaths) {
+      if (await fs.exists(`${_path}/${name}.ts`)) {
+        path = _path;
+        break;
+      }
+    }
 
     if (path == null) {
       let msg =
