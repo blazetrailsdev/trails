@@ -982,7 +982,7 @@ export class Emitter {
     ctx.scope.body = d.body;
     const twin = isCtor ? undefined : this.handTwin(u, d.name, opts);
     if (twin?.info.async) ctx.defAsync = true;
-    if (twin?.info.params) ctx.paramTypes = twin.info.params.map((t) => this.lw.tsType(t));
+    if (twin?.info.params) ctx.paramTypes = twin.info.params.map((t) => this.lw.tsType(t, ctx));
     const ps = this.lw.paramList(params, ctx, false);
     // Seed parameter types from the hand twin's declared parameter types.
     if (twin?.info.params) {
@@ -1205,7 +1205,7 @@ export class Emitter {
         `set ${propKey(tsName)}(value: any) {\n  this._${tsName} = value;\n}`,
       ].join("\n\n");
     const thisParam = opts.module ? (ps ? "this: any, " : "this: any") : "";
-    const retType = this.lw.tsType(twin?.info.ret);
+    const retType = this.lw.tsType(twin?.info.ret, ctx);
     const ret = isCtor ? "" : asy ? `: Promise<${retType}>` : `: ${retType}`;
     if (/^[a-z_]\w*=$/.test(d.name) && opts.asFunction) {
       const fnName = tsName.startsWith("set")

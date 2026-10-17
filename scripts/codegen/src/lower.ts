@@ -1828,16 +1828,21 @@ export class Lowerer {
   }
 
   /**
-   * The TS spelling of an oracle type, for a generated signature. A class type is
-   * not spelled yet (it needs a type import), so it and an unknown type are `any`.
+   * The TS spelling of an oracle type, for a generated signature. A class is
+   * imported from the package or generated file that exports it at run time; one
+   * nothing exports, and an unknown type, are `any`.
    */
-  tsType(t: TypeRef | undefined): string {
+  tsType(t: TypeRef | undefined, ctx?: Ctx): string {
     if (!t) return "any";
     if ("nullable" in t && t.nullable) {
-      const base = this.tsType({ ...t, nullable: false } as TypeRef);
+      const base = this.tsType({ ...t, nullable: false } as TypeRef, ctx);
       return base === "any" ? base : `${base} | null`;
     }
     switch (t.k) {
+      case "class": {
+        const name = ctx ? this.classTypeRef(t.key, ctx) : null;
+        return name ? (t.static ? `typeof ${name}` : name) : "any";
+      }
       case "prim":
         return t.name;
       case "array": {
@@ -1849,6 +1854,25 @@ export class Lowerer {
       default:
         return "any";
     }
+  }
+
+  /** The local name a class from an oracle key is imported as, or null. */
+  classTypeRef(key: string, ctx: Ctx): string | null {
+    const hash = key.indexOf("#");
+    if (hash < 0) return null;
+    const file = key.slice(0, hash);
+    const name = key.slice(hash + 1);
+    if (!/^[A-Z][\w$]*$/.test(name)) return null;
+    if (file.startsWith("@")) {
+      const spec = `@blazetrails/${file.slice(1).split("/")[0]}`;
+      return this.resolver.pkgExports(spec).has(name) ? this.imp(ctx, spec, name) : null;
+    }
+    for (const e of this.resolver.exportNames.values())
+      if (e.tsFile === file && e.name === name)
+        return file === ctx.f.tsFile
+          ? name
+          : this.imp(ctx, `@root/${file.replace(/\.ts$/, ".js")}`, name);
+    return null;
   }
 
   /** Is `name` known in the gem only as an attr reader (→ property access)? */
