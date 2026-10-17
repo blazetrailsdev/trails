@@ -1548,6 +1548,22 @@ export class Emitter {
         continue;
       }
       if (m.endsWith("=")) continue;
+      const twin = module ? undefined : this.handTwin(u, pre + m, { static: false });
+      if (twin && twin.info.kind !== "method" && !twin.info.async) {
+        const gctx = this.baseCtx(u, f, { selfKind: "instance" });
+        const read: N = {
+          k: "call",
+          recv: targetIr,
+          name: m,
+          args: [],
+          block: null,
+          safe: allowNil,
+        };
+        out.push(
+          `get ${twin.tsName}(): ${this.lw.tsType(twin.info.ret, gctx)} {\n  return ${this.lw.expr(read, gctx)};\n}`,
+        );
+        continue;
+      }
       const ctx = this.baseCtx(u, f, {
         selfKind: module ? "module" : "instance",
         isModule: module,
