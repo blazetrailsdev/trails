@@ -991,6 +991,10 @@ export class Lowerer {
       const line = `${recv}${n.safe ? "?" : ""}.${this.attrName(n.name.slice(0, -1))} = ${v};`;
       return tail ? [line, `return ${recv}.${this.attrName(n.name.slice(0, -1))};`] : [line];
     }
+    if (n.name === "[]=" && isExecutionContext(n.recv) && n.args.length === 2) {
+      const set = `${this.expr(n.recv, ctx)}.setKey(${n.args.map((a: N) => this.expr(a, ctx)).join(", ")})`;
+      return [tail ? `return ${set};` : `${set};`];
+    }
     if (n.name === "[]=" && isIsolatedExecutionState(n.recv) && n.args.length === 2) {
       const set = `${this.expr(n.recv, ctx)}.set(${n.args.map((a: N) => this.expr(a, ctx)).join(", ")})`;
       return [tail ? `return ${set};` : `${set};`];
@@ -4175,6 +4179,12 @@ function isIsolatedExecutionState(n: N | null | undefined): boolean {
   if (n?.k !== "const") return false;
   const path = (n.path as string[]).filter((x) => x);
   return path[path.length - 1] === "IsolatedExecutionState";
+}
+
+function isExecutionContext(n: N | null | undefined): boolean {
+  if (n?.k !== "const") return false;
+  const path = (n.path as string[]).filter((x) => x);
+  return path[path.length - 1] === "ExecutionContext";
 }
 
 /**
