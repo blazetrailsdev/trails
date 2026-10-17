@@ -170,10 +170,6 @@ class LoopSymbolName < String; end
 
 LOOP_OPAQUE_HASH = Object.new.freeze
 
-# trails' vendored Rack (vendor/rack/v3.1.14/lib/rack/version.rb:15). A
-# `::Rack::RELEASE.start_with?("2.")` gate
-# (actionpack/test/dispatch/query_parser_test.rb:26) is decided against it
-# statically, so a test defined only under Rack 2 is never defined here.
 RACK_RELEASE = "3.1.14"
 
 class TestExtractor
@@ -1656,8 +1652,6 @@ class TestExtractor
     end
   end
 
-  # `::Rack::RELEASE.start_with?("<prefix>")` evaluated against RACK_RELEASE;
-  # nil for any other condition.
   def rack_release_condition(cond)
     return nil unless cond.is_a?(Array) && cond[0] == :method_add_arg
     call = cond[1]

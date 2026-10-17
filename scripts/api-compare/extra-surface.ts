@@ -2329,8 +2329,6 @@ function buildPackageReport(
   }
   for (const [file, fns] of Object.entries(tsFileFunctions)) addBodied(file, fns);
 
-  // TS file -> modules whose `initialize` a constructor there names in an
-  // `@inlinedFrom` tag: the sanctioned inlining (RFC 0188), not a finding.
   const taggedByTsFile = new Map<string, Set<string>>();
   for (const c of Object.values(tsPkg.classes)) {
     if (c.reExportedFrom) continue;

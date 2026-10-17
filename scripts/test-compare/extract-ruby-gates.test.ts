@@ -71,7 +71,6 @@ describe("Ruby extractor gate detection", () => {
 
   // Fixtures are minimal — the extractor needs no class wrapper or assertion body.
   it("decides a ::Rack::RELEASE gate against trails' Rack 3", () => {
-    // actionpack/test/dispatch/param_builder_test.rb:24-30
     const g = rubyGates({
       "dispatch/param_builder_test.rb": `
         if ::Rack::RELEASE.start_with?("2.")
