@@ -237,7 +237,7 @@ class TestCase extends IntegrationTest {
     }
   }
 
-  override get(thing: string, options: IntegrationRequestOptions = {}): Promise<void> {
+  override get(thing: string, options: IntegrationRequestOptions = {}): Promise<number> {
     if (thing.startsWith(":")) {
       return super.get(
         `${(this.constructor as typeof TestCase).testing() ?? ""}/${thing.slice(1)}`,

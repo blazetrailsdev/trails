@@ -10,7 +10,7 @@ import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { CookieStore } from "../../action-dispatch/middleware/session/cookie-store.js";
 import { ShowExceptions } from "../../action-dispatch/middleware/show-exceptions.js";
 import type { MiddlewareFactory } from "../../action-dispatch/middleware/stack.js";
-import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
+import { IntegrationTest, Session } from "../../action-dispatch/testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
 
 class NoticesController extends Base {
@@ -23,17 +23,23 @@ class NoticesController extends Base {
   }
 }
 
-class NoticesSession extends IntegrationTest {
+class NoticesIntegrationSession extends Session {
   override async process(
     method: string,
     path: string,
-    options: Parameters<IntegrationTest["process"]>[2] = {},
+    options: Parameters<Session["process"]>[2] = {},
   ): Promise<number> {
     const env: Record<string, unknown> = { ...(options.env ?? {}) };
     env["action_dispatch.key_generator"] ??= new KeyGenerator("a".repeat(64), { iterations: 2 });
     env["action_dispatch.cookies_rotations"] ??= new RotationConfiguration();
     env["action_dispatch.signed_cookie_salt"] ??= "signed cookie";
     return super.process(method, path, { ...options, env });
+  }
+}
+
+class NoticesSession extends IntegrationTest {
+  override createSession(app: unknown): Session {
+    return new NoticesIntegrationSession(app);
   }
 }
 

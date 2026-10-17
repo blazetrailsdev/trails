@@ -4254,7 +4254,7 @@ describe("TestUrlConstraints", () => {
   registerConstant("TestUrlConstraints", TestUrlConstraints);
 
   let t: TestUrlConstraints;
-  const get = (path: string): Promise<void> => t.get(path);
+  const get = (path: string): Promise<number> => t.get(path);
   const assertResponse = (type: string): void => t.assertResponse(type);
 
   beforeEach(({ testCase }) => {
