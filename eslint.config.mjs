@@ -135,6 +135,7 @@ export default defineConfig(
   {
     ignores: [
       "vendor/**",
+      "packages/activejob/src/**",
       "**/dist/**",
       // The Journey visualizer's shipped assets: fsm.js and fsm.css are
       // byte-for-byte copies of

@@ -1,51 +1,48 @@
-import {
-  NotImplementedError,
-  rbModConstSet,
-  rbModName,
-  rbObjIsKindOf,
-  update,
-} from "@blazetrails/ruby-compat";
-import { ActiveJob } from "../namespaces.js";
-import { Serializers } from "../serializers.js";
+import { rbModName, NotImplementedError, registerConstant } from "@blazetrails/ruby-compat";
+import { OBJECT_SERIALIZER_KEY } from "../arguments.js";
+import { rbIsA } from "../codegen-runtime.js";
 
 export class ObjectSerializer {
-  static instance<T extends ObjectSerializer>(this: new () => T): T {
+  [key: string]: any;
+  static [key: string]: any;
+
+  static instance(this: any): any {
     if (!Object.hasOwn(this, "_instance")) {
       Object.defineProperty(this, "_instance", { value: new this() });
     }
-    return (this as unknown as { _instance: T })._instance;
+    return this._instance;
   }
 
-  static isSerialize(argument: unknown): boolean {
-    return this.instance().isSerialize(argument);
+  isSerialize(argument: any): any {
+    return rbIsA(argument, this.klass());
   }
 
-  static serialize(argument: unknown): Record<string, unknown> {
-    return this.instance().serialize(argument);
-  }
-
-  static deserialize(argument: Record<string, unknown> | Map<string, unknown>): unknown {
-    return this.instance().deserialize(argument);
-  }
-
-  isSerialize(argument: unknown): boolean {
-    return rbObjIsKindOf(argument, this.klass());
-  }
-
-  serialize(hash: unknown): Record<string, unknown> {
-    return update(
-      { [ActiveJob.Arguments.OBJECT_SERIALIZER_KEY]: rbModName(this.constructor) },
-      hash as Record<string, unknown>,
+  serialize(hash: any): any {
+    return Object.assign(
+      { [OBJECT_SERIALIZER_KEY]: rbModName(this.constructor as typeof ObjectSerializer) },
+      hash,
     );
   }
 
-  deserialize(_json: Record<string, unknown> | Map<string, unknown>): unknown {
+  deserialize(json: any): any {
     throw new NotImplementedError();
   }
 
   /** @internal */
-  protected klass(): unknown {
+  protected klass(): any {
     throw new NotImplementedError();
   }
+
+  static isSerialize(...args: any[]): any {
+    return this.instance().isSerialize(...args);
+  }
+
+  static serialize(...args: any[]): any {
+    return this.instance().serialize(...args);
+  }
+
+  static deserialize(...args: any[]): any {
+    return this.instance().deserialize(...args);
+  }
 }
-rbModConstSet(Serializers, "ObjectSerializer", ObjectSerializer);
+registerConstant("ActiveJob::Serializers::ObjectSerializer", ObjectSerializer);

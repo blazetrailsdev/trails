@@ -1,81 +1,92 @@
 import {
   HashWithIndifferentAccess,
-  transformKeys,
   withIndifferentAccess,
+  transformKeys,
 } from "@blazetrails/activesupport";
+import { Identification, Locator, MissingModelIdError } from "@blazetrails/globalid";
 import {
-  ArgumentError,
-  eachKey,
-  eachPair,
-  Exception,
-  excBacktrace,
-  excSetBacktrace,
-  hashAref,
-  hashAset,
-  hasKey,
-  hashDelete,
-  Hash,
-  rbCFloat,
-  rbCInteger,
-  rbCString,
-  rbHashSRuby2KeywordsHash,
-  rbHashSRuby2KeywordsHashP,
-  rbInspect,
-  rbModConstSet,
-  rbModName,
-  rbObjClass,
-  rbObjIsKindOf,
-  rbObjRespondTo,
-  rtest,
   StandardError,
-  isSymbol,
+  rbObjAsString,
+  excSetBacktrace,
+  excBacktrace,
+  registerConstant,
+  ArgumentError,
+  excSetupMessage,
   stringToSym,
+  rbObjIsKindOf,
+  rbCInteger,
+  rbCFloat,
+  isSymbol,
+  rbCString,
+  rbObjClass,
+  Hash,
+  eachKey,
   symbolToS,
+  rbHashSRuby2KeywordsHashP,
+  rbObjRespondTo,
   toH,
-  transformValues,
+  rbInspect,
+  size,
+  rbEqual,
+  hasKey,
+  rtest,
+  rbHashSRuby2KeywordsHash,
+  rbEqq,
+  rbObjClassname,
+  Module,
+  rbModConstSet,
+  extend,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob } from "./namespaces.js";
-import { Serializers } from "./serializers.js";
+import { rbEnum, rbAsyncEnum, mapBang, eachWithObject, rbDelete } from "./codegen-runtime.js";
+import { ActiveJob as ActiveJobSeat } from "./namespaces.js";
+import { serialize as Baseserialize, deserialize as Basedeserialize } from "./serializers.js";
 
 export class DeserializationError extends StandardError {
-  constructor(errinfo: unknown) {
-    super(`Error while trying to deserialize arguments: ${(errinfo as Error).message}`, {
-      cause: errinfo,
-    });
-    this.name = "ActiveJob::DeserializationError";
-    excSetBacktrace(this, excBacktrace(errinfo as Error)!);
+  [key: string]: any;
+  static [key: string]: any;
+
+  constructor(errinfo: any = null) {
+    super(`Error while trying to deserialize arguments: ${rbObjAsString(errinfo.message)}`);
+    excSetBacktrace(this, excBacktrace(errinfo));
   }
 }
-rbModConstSet(ActiveJob, "DeserializationError", DeserializationError);
-
+registerConstant("ActiveJob::DeserializationError", DeserializationError);
 export class SerializationError extends ArgumentError {
-  constructor(message?: string) {
-    super(message);
-    this.name = "ActiveJob::SerializationError";
-  }
+  [key: string]: any;
+  static [key: string]: any;
 }
-rbModConstSet(ActiveJob, "SerializationError", SerializationError);
-
-export function serialize(arguments_: unknown[]): unknown[] {
-  return arguments_.map((argument) => serializeArgument(argument));
+registerConstant("ActiveJob::SerializationError", SerializationError);
+export function serialize(arguments_: any): any {
+  return arguments_.map((argument?: any) => Arguments.serializeArgument(argument));
 }
 
-export async function deserialize(arguments_: unknown[]): Promise<unknown[]> {
+export async function deserialize(arguments_: any): Promise<any> {
   try {
-    return await Promise.all(arguments_.map((argument) => deserializeArgument(argument)));
-  } catch (error) {
-    if (error instanceof Exception && !(error instanceof StandardError)) throw error;
-    throw new DeserializationError(error);
+    return await await rbAsyncEnum(
+      arguments_,
+      "map",
+      async (argument?: any) => await Arguments.deserializeArgument(argument),
+    );
+  } catch (error: any) {
+    if (error instanceof StandardError) {
+      throw excSetupMessage(new DeserializationError(error), error);
+    } else {
+      throw error;
+    }
   }
 }
 
-const GLOBALID_KEY = "_aj_globalid";
-const SYMBOL_KEYS_KEY = "_aj_symbol_keys";
-const RUBY2_KEYWORDS_KEY = "_aj_ruby2_keywords";
-const WITH_INDIFFERENT_ACCESS_KEY = "_aj_hash_with_indifferent_access";
-export const OBJECT_SERIALIZER_KEY = "_aj_serialized";
+export const GLOBALID_KEY: any = "_aj_globalid";
 
-const RESERVED_KEYS = [
+export const SYMBOL_KEYS_KEY: any = "_aj_symbol_keys";
+
+export const RUBY2_KEYWORDS_KEY: any = "_aj_ruby2_keywords";
+
+export const WITH_INDIFFERENT_ACCESS_KEY: any = "_aj_hash_with_indifferent_access";
+
+export const OBJECT_SERIALIZER_KEY: any = "_aj_serialized";
+
+export const RESERVED_KEYS: any = [
   GLOBALID_KEY,
   stringToSym(GLOBALID_KEY),
   SYMBOL_KEYS_KEY,
@@ -88,10 +99,8 @@ const RESERVED_KEYS = [
   stringToSym(WITH_INDIFFERENT_ACCESS_KEY),
 ];
 
-type AnyHash = Record<string, unknown> | Map<string, unknown>;
-
-/** @internal */
-function serializeArgument(argument: unknown): unknown {
+export function serializeArgument(argument: any): any {
+  let symbolKeys: any, ajHashKey: any, result: any;
   if (
     argument == null ||
     argument === true ||
@@ -100,117 +109,132 @@ function serializeArgument(argument: unknown): unknown {
     rbObjIsKindOf(argument, rbCFloat)
   ) {
     return argument;
-  } else if (rbObjIsKindOf(argument, rbCString)) {
+  } else if (typeof argument === "string" && !isSymbol(argument)) {
     if (rbObjClass(argument) === rbCString) {
       return argument;
     } else {
       try {
-        return Serializers.serialize(argument);
-      } catch (error) {
-        if (!(error instanceof SerializationError)) throw error;
-        return argument;
+        return Baseserialize(argument);
+      } catch (error: any) {
+        if (error instanceof SerializationError) {
+          return argument;
+        } else {
+          throw error;
+        }
       }
     }
+  } else if (rbObjIsKindOf(argument, Identification)) {
+    return Arguments.convertToGlobalIdHash(argument);
   } else if (Array.isArray(argument)) {
-    return argument.map((arg) => serializeArgument(arg));
+    return rbEnum(argument).map((arg?: any) => Arguments.serializeArgument(arg));
   } else if (argument instanceof HashWithIndifferentAccess) {
-    return serializeIndifferentHash(argument);
+    return Arguments.serializeIndifferentHash(argument);
   } else if (rbObjIsKindOf(argument, Hash)) {
-    const symbolKeys = eachKey(argument as AnyHash)
-      .filter((key) => isSymbol(key))
-      .map((key) => symbolToS(key));
-    const ajHashKey = rbHashSRuby2KeywordsHashP(argument as object)
-      ? RUBY2_KEYWORDS_KEY
-      : SYMBOL_KEYS_KEY;
-    const result = serializeHash(argument as AnyHash);
+    symbolKeys = mapBang(
+      rbEnum(eachKey(argument)).filter((e: any) => isSymbol(e)),
+      (x: any) => (isSymbol(x) ? symbolToS(x) : rbObjAsString(x)),
+    );
+    ajHashKey = rbHashSRuby2KeywordsHashP(argument) ? RUBY2_KEYWORDS_KEY : SYMBOL_KEYS_KEY;
+    result = Arguments.serializeHash(argument);
     result[ajHashKey] = symbolKeys;
     return result;
   } else {
     if (rbObjRespondTo(argument, "isPermitted") && rbObjRespondTo(argument, "toH")) {
-      return serializeIndifferentHash((argument as { toH(): AnyHash }).toH());
+      return Arguments.serializeIndifferentHash(toH(argument));
     } else {
-      return Serializers.serialize(argument);
+      return Baseserialize(argument);
     }
   }
 }
 
-/** @internal */
-async function deserializeArgument(argument: unknown): Promise<unknown> {
+export async function deserializeArgument(argument: any): Promise<any> {
   if (
     argument == null ||
     argument === true ||
     argument === false ||
-    rbObjIsKindOf(argument, rbCString) ||
+    (typeof argument === "string" && !isSymbol(argument)) ||
     rbObjIsKindOf(argument, rbCInteger) ||
     rbObjIsKindOf(argument, rbCFloat)
   ) {
     return argument;
   } else if (Array.isArray(argument)) {
-    return Promise.all(argument.map((arg) => deserializeArgument(arg)));
+    return await rbAsyncEnum(
+      argument,
+      "map",
+      async (arg?: any) => await Arguments.deserializeArgument(arg),
+    );
   } else if (rbObjIsKindOf(argument, Hash)) {
-    if (isCustomSerialized(argument as AnyHash)) {
-      return Serializers.deserialize(argument as Record<string, unknown>);
+    if (Arguments.isSerializedGlobalId(argument)) {
+      return await Arguments.deserializeGlobalId(argument);
+    } else if (Arguments.isCustomSerialized(argument)) {
+      return Basedeserialize(argument);
     } else {
-      return deserializeHash(argument as AnyHash);
+      return await Arguments.deserializeHash(argument);
     }
   } else {
     throw new ArgumentError(`Can only deserialize primitive arguments: ${rbInspect(argument)}`);
   }
 }
 
-/** @internal */
-function isCustomSerialized(hash: AnyHash): boolean {
+export function isSerializedGlobalId(hash: any): any {
+  return rbEqual(size(hash), 1) && hasKey(hash, GLOBALID_KEY);
+}
+
+export async function deserializeGlobalId(hash: any): Promise<any> {
+  return await Locator.locate(hash[GLOBALID_KEY]);
+}
+
+export function isCustomSerialized(hash: any): any {
   return hasKey(hash, OBJECT_SERIALIZER_KEY);
 }
 
-/** @internal */
-function serializeHash(argument: AnyHash): Record<string, unknown> {
-  const hash: Record<string, unknown> = {};
-  eachPair(argument, (key, value) => {
-    hashAset(hash, serializeHashKey(key), serializeArgument(value));
-  });
-  return hash;
+export function serializeHash(argument: any): any {
+  return eachWithObject(
+    argument,
+    {},
+    ([key, value]: any, hash?: any) =>
+      (hash[Arguments.serializeHashKey(key)] = Arguments.serializeArgument(value)),
+  );
 }
 
-/** @internal */
-async function deserializeHash(serializedHash: AnyHash): Promise<unknown> {
-  let result = transformValues(serializedHash, (v) => deserializeArgument(v)) as AnyHash;
-  for (const key of eachKey(result)) hashAset(result, key, await hashAref(result, key));
-  let symbolKeys: unknown;
-  if (rtest(hashDelete(result, WITH_INDIFFERENT_ACCESS_KEY))) {
-    result = withIndifferentAccess(result as Record<string, unknown>);
-  } else if (rtest((symbolKeys = hashDelete(result, SYMBOL_KEYS_KEY)))) {
-    result = transformSymbolKeys(result, symbolKeys as string[]);
-  } else if (rtest((symbolKeys = hashDelete(result, RUBY2_KEYWORDS_KEY)))) {
-    result = transformSymbolKeys(result, symbolKeys as string[]);
+export async function deserializeHash(serializedHash: any): Promise<any> {
+  let symbolKeys: any;
+  let result: any = await rbAsyncEnum(
+    serializedHash,
+    "transform_values",
+    async (v?: any) => await Arguments.deserializeArgument(v),
+  );
+  if (rtest(rbDelete(result, WITH_INDIFFERENT_ACCESS_KEY))) {
+    result = withIndifferentAccess(result);
+  } else if (rtest((symbolKeys = rbDelete(result, SYMBOL_KEYS_KEY)))) {
+    result = Arguments.transformSymbolKeys(result, symbolKeys);
+  } else if (rtest((symbolKeys = rbDelete(result, RUBY2_KEYWORDS_KEY)))) {
+    result = Arguments.transformSymbolKeys(result, symbolKeys);
     result = rbHashSRuby2KeywordsHash(result);
   }
   return result;
 }
 
-/** @internal */
-function serializeHashKey(key: unknown): string {
-  if (RESERVED_KEYS.includes(key as string)) {
+export function serializeHashKey(key: any): any {
+  if (RESERVED_KEYS.some((x: any) => rbEqq(x, key))) {
     throw new SerializationError(`Can't serialize a Hash with reserved key ${rbInspect(key)}`);
-  } else if (typeof key === "string") {
-    return isSymbol(key) ? symbolToS(key) : key;
+  } else if ((typeof key === "string" && !isSymbol(key)) || isSymbol(key)) {
+    return isSymbol(key) ? symbolToS(key) : rbObjAsString(key);
   } else {
     throw new SerializationError(
-      `Only string and symbol hash keys may be serialized as job arguments, but ${rbInspect(key)} is a ${rbModName(rbObjClass(key))}`,
+      `Only string and symbol hash keys may be serialized as job arguments, but ${rbInspect(key)} is a ${rbObjClassname(key)}`,
     );
   }
 }
 
-/** @internal */
-function serializeIndifferentHash(indifferentHash: AnyHash): Record<string, unknown> {
-  const result = serializeHash(indifferentHash);
-  result[WITH_INDIFFERENT_ACCESS_KEY] = serializeArgument(true);
+export function serializeIndifferentHash(indifferentHash: any): any {
+  const result: any = Arguments.serializeHash(indifferentHash);
+  result[WITH_INDIFFERENT_ACCESS_KEY] = Arguments.serializeArgument(true);
   return result;
 }
 
-/** @internal */
-function transformSymbolKeys(hash: AnyHash, symbolKeys: string[]): AnyHash {
-  return transformKeys(toH(hash), (key: string) => {
+export function transformSymbolKeys(hash: any, symbolKeys: any): any {
+  return transformKeys(toH(hash), (key?: any) => {
     if (symbolKeys.includes(key)) {
       return stringToSym(key);
     } else {
@@ -219,5 +243,52 @@ function transformSymbolKeys(hash: AnyHash, symbolKeys: string[]): AnyHash {
   });
 }
 
-export const Arguments = { serialize, deserialize, OBJECT_SERIALIZER_KEY };
-rbModConstSet(ActiveJob, "Arguments", Arguments);
+export function convertToGlobalIdHash(argument: any): any {
+  try {
+    return {
+      [GLOBALID_KEY]: ((v: any) => (isSymbol(v) ? symbolToS(v) : rbObjAsString(v)))(
+        argument.toGlobalId(),
+      ),
+    };
+  } catch (error: any) {
+    if (error instanceof MissingModelIdError) {
+      throw excSetupMessage(
+        new SerializationError(
+          `${`Unable to serialize ${rbObjClassname(argument)} `}without an id. (Maybe you forgot to call save?)`,
+        ),
+        error,
+      );
+    } else {
+      throw error;
+    }
+  }
+}
+
+export const Arguments: any = new Module();
+rbModConstSet(Arguments, "GLOBALID_KEY", GLOBALID_KEY);
+rbModConstSet(Arguments, "SYMBOL_KEYS_KEY", SYMBOL_KEYS_KEY);
+rbModConstSet(Arguments, "RUBY2_KEYWORDS_KEY", RUBY2_KEYWORDS_KEY);
+rbModConstSet(Arguments, "WITH_INDIFFERENT_ACCESS_KEY", WITH_INDIFFERENT_ACCESS_KEY);
+rbModConstSet(Arguments, "OBJECT_SERIALIZER_KEY", OBJECT_SERIALIZER_KEY);
+rbModConstSet(Arguments, "RESERVED_KEYS", RESERVED_KEYS);
+Object.assign(Arguments, {
+  serialize,
+  deserialize,
+  serializeArgument,
+  deserializeArgument,
+  isSerializedGlobalId,
+  deserializeGlobalId,
+  isCustomSerialized,
+  serializeHash,
+  deserializeHash,
+  serializeHashKey,
+  serializeIndifferentHash,
+  transformSymbolKeys,
+  convertToGlobalIdHash,
+});
+{
+  extend(Arguments, Arguments);
+}
+rbModConstSet(ActiveJobSeat, "DeserializationError", DeserializationError);
+rbModConstSet(ActiveJobSeat, "SerializationError", SerializationError);
+rbModConstSet(ActiveJobSeat, "Arguments", Arguments);
