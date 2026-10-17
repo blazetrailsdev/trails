@@ -343,7 +343,7 @@ export const SHIM_SOURCES: Record<string, string> = {
   rbSingletonPublicMethods:
     "Module#public_instance_methods(false) on a singleton class (class.c rb_class_public_instance_methods)",
   rbMakeException:
-    "raise's exception construction (eval.c rb_make_exception; a String is a RuntimeError, eval.c rb_exc_new_str)",
+    "eval.c rb_make_exception: a String is RuntimeError.new(str) (rb_exc_new_str); otherwise arg.exception(*rest). Exception.exception is rb_class_new_instance (error.c:3297, Init_Exception) and no ruby-compat Exception class defines exception, so for a class it is new(*rest); an instance with no message is itself",
   rbIsA: "Object#is_a? (object.c rb_obj_is_kind_of)",
   mapBang: "Array#map! (array.c rb_ary_collect_bang)",
   flattenBang: "Array#flatten! (array.c rb_ary_flatten_bang)",
