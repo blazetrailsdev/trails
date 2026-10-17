@@ -55,7 +55,8 @@ export const TOKEN_RENAMES: Record<string, string> = {
 
 /**
  * Per-class TS renames that don't fit the systematic alias patterns
- * (`Abstract<X>`, `Base<X>`, `ActiveModel<X>`, `<X>Type`). Keyed by the Ruby
+ * (`Abstract<X>`, `Base<X>`, `ActiveModel<X>`) or the fqn-keyed
+ * {@link TS_CONSTANT_RENAMES}. Keyed by the Ruby
  * short name → the literal TS class name in the expected file.
  *
  * - `Name` → `ModelName`: Rails `ActiveModel::Name` (`naming.rb:9`). `Name`
@@ -81,6 +82,62 @@ export const TS_CLASS_RENAMES: Record<string, string> = {
   Rails: "Trails",
   Registry: "TypeRegistry",
 };
+
+/**
+ * Ruby constants whose trails export carries a `Type` suffix, keyed by the
+ * fully qualified Ruby name. The bare names collide in JS: `String`,
+ * `Boolean`, `Date`, `Float`, `Integer` and `Time` shadow globals or core
+ * classes every type file also needs, and PostgreSQL's `OID::Range` shares its
+ * file with the bounds value `Range`. The rest of `ActiveModel::Type` follows
+ * so the family has one spelling. Ruled by the repo owner on 2026-10-16.
+ *
+ * Keyed by fqn, not short name like {@link TS_CLASS_RENAMES}, because a short
+ * key would rename every other `String` or `Value` too.
+ */
+export const TS_CONSTANT_RENAMES: Record<string, string> = {
+  "ActiveModel::Type::Value": "ValueType",
+  "ActiveModel::Type::BigInteger": "BigIntegerType",
+  "ActiveModel::Type::Binary": "BinaryType",
+  "ActiveModel::Type::Boolean": "BooleanType",
+  "ActiveModel::Type::Date": "DateType",
+  "ActiveModel::Type::DateTime": "DateTimeType",
+  "ActiveModel::Type::Decimal": "DecimalType",
+  "ActiveModel::Type::Float": "FloatType",
+  "ActiveModel::Type::ImmutableString": "ImmutableStringType",
+  "ActiveModel::Type::Integer": "IntegerType",
+  "ActiveModel::Type::String": "StringType",
+  "ActiveModel::Type::Time": "TimeType",
+  "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range": "RangeType",
+};
+
+/**
+ * The {@link TS_CONSTANT_RENAMES} spelling of a Ruby constant reference, or
+ * undefined. `ref` is resolved the way Ruby resolves a constant: against each
+ * lexical scope of `nesting` (innermost first), then as written. A relative
+ * reference no scope resolves (`Type::Value` written inside
+ * `ActiveRecord::Type`, which aliases ActiveModel's) falls back to the one
+ * table key it is a `::`-suffix of, if exactly one is; a bare name never does.
+ */
+export function tsConstantRename(ref: string, nesting = ""): string | undefined {
+  const key = tsConstantRenameKey(ref, nesting);
+  return key === undefined ? undefined : TS_CONSTANT_RENAMES[key];
+}
+
+/** The {@link TS_CONSTANT_RENAMES} key `ref` resolves to; see {@link tsConstantRename}. */
+export function tsConstantRenameKey(ref: string, nesting = ""): string | undefined {
+  const bare = ref.replace(/^::/, "");
+  if (ref.startsWith("::")) return bare in TS_CONSTANT_RENAMES ? bare : undefined;
+  const scopes = nesting.split("::").filter(Boolean);
+  for (let i = scopes.length; i >= 0; i--) {
+    const key = [...scopes.slice(0, i), bare].join("::");
+    if (key in TS_CONSTANT_RENAMES) return key;
+  }
+  // A bare name no scope resolves is a top-level constant (`String` inside
+  // `ActiveRecord` is `::String`), so only a qualified reference falls back.
+  if (!bare.includes("::")) return undefined;
+  const suffixed = Object.keys(TS_CONSTANT_RENAMES).filter((k) => k.endsWith(`::${bare}`));
+  return suffixed.length === 1 ? suffixed[0] : undefined;
+}
 
 /**
  * Alternation built from `TOKEN_RENAMES` itself, so an entry added to the table
@@ -1775,6 +1832,10 @@ export function explainConventions(): string {
     .map(([from, to]) => `| \`${from}\` | \`${to}\` |`)
     .join("\n");
 
+  const constantRenameRows = Object.entries(TS_CONSTANT_RENAMES)
+    .map(([from, to]) => `| \`${from}\` | \`${to}\` |`)
+    .join("\n");
+
   const pathAliasRows = Object.entries(PATH_SEGMENT_ALIASES)
     .map(([from, to]) => `| \`${from}\` | \`${to}\` |`)
     .join("\n");
@@ -1960,6 +2021,17 @@ same key. \`ERB\` survives in trails only where the text quotes the Ruby side �
 a JSDoc \`Mirrors:\` line naming \`ERB::Util\`, a Rails path like
 \`core_ext/erb/util.rb\`, or fixtures-compare's statuses for Rails YAML that
 genuinely is ERB.
+
+## Constant renames
+
+A Ruby constant whose bare name collides in JS keeps a \`Type\` suffix in
+trails. Keyed by the fully qualified Ruby name; \`parity:api\` and
+\`parity:api:extra\` match only these pairs, so no other \`FooType\` credits a
+Ruby \`Foo\`:
+
+| Ruby constant | trails export |
+| ------------- | ------------- |
+${constantRenameRows}
 
 ## File paths
 
