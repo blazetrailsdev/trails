@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat";
 
 /** @internal */
@@ -26,3 +28,5 @@ export const BasicImplicitRender = new Module((mod) => {
     Object.assign(m, { sendAction, defaultRender });
   });
 });
+
+rbModConstSet(ActionController, "BasicImplicitRender", BasicImplicitRender);

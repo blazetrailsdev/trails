@@ -1,3 +1,5 @@
+import { ActionController } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, Module, classAttribute, extend } from "@blazetrails/activesupport";
 
 interface FormBuilderClassHost {
@@ -25,3 +27,5 @@ export const FormBuilder = new Module((mod) => {
   });
 }) as Module & { ClassMethods: typeof ClassMethods };
 FormBuilder.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "FormBuilder", FormBuilder);

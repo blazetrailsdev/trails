@@ -1,3 +1,5 @@
+import * as namespaces from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
   mattrAccessor,
@@ -350,3 +352,5 @@ export const Callbacks = new Module((mod) => {
   mod.defineMethod("processAction", processAction);
 }) as Module & { ClassMethods: typeof ClassMethods };
 Callbacks.ClassMethods = ClassMethods;
+
+rbModConstSet(namespaces.AbstractController, "Callbacks", Callbacks);

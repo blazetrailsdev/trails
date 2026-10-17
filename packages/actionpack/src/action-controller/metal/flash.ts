@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { classAttribute, Concern, extend, Module } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
@@ -97,3 +99,5 @@ export const Flash = new Module((mod) => {
   mod.defineMethod("redirectTo", redirectTo);
 }) as Module<{ redirectTo: typeof redirectTo }> & { ClassMethods: typeof ClassMethods };
 Flash.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "Flash", Flash);

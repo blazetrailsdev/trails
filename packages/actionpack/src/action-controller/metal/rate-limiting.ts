@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   Module,
@@ -98,3 +100,5 @@ export async function rateLimiting(
     );
   }
 }
+
+rbModConstSet(ActionController, "RateLimiting", RateLimiting);

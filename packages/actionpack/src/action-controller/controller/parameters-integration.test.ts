@@ -28,16 +28,14 @@ describe("ActionControllerParametersIntegrationTest", () => {
     await tc.beforeSetup();
   });
 
-  // BLOCKED: psych-dump-puts-root-tag-on-its-own-line
-  // BLOCKED: parameters-holds-a-plain-object-not-hash-with-indifferent-access
-  it.skip("parameters can be serialized as YAML", async () => {
+  it("parameters can be serialized as YAML", async () => {
     await tc.post("yamlParams", { params: { person: { name: "Mjallo!" } } });
     const expected = `--- !ruby/object:ActionController::Parameters
 parameters: !ruby/hash:ActiveSupport::HashWithIndifferentAccess
   person: !ruby/hash:ActiveSupport::HashWithIndifferentAccess
     name: Mjallo!
   controller: integration
-  action: yaml_params
+  action: yamlParams
 permitted: false
 `;
     expect(tc.response.body).toBe(expected);

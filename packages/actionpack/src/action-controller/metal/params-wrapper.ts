@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   deleteAt,
   except,
@@ -351,3 +353,5 @@ export const ParamsWrapper = new Module((mod) => {
   mod.defineMethod("_performParameterWrapping", _performParameterWrapping);
 }) as Module & { ClassMethods: typeof ClassMethods };
 ParamsWrapper.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "ParamsWrapper", ParamsWrapper);

@@ -1,3 +1,7 @@
+import { Concern, Module, extend, include } from "@blazetrails/activesupport";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Caching as AbstractControllerCaching } from "../abstract-controller/caching.js";
+import { ActionController } from "../namespaces.js";
 interface CachingInstrumentHost {
   controllerName(): string | null;
   actionName: string;
@@ -15,6 +19,20 @@ export function instrumentPayload(
 export function instrumentName(this: unknown): string {
   return "action_controller";
 }
+
+export const Caching = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as { included(base: null, block: (this: any) => void): void }).included(
+    null,
+    function () {
+      include(this, AbstractControllerCaching);
+    },
+  );
+
+  mod.defineMethod("instrumentPayload", instrumentPayload);
+  mod.defineMethod("instrumentName", instrumentName);
+});
 
 function serializeValue(value: unknown): string {
   if (value === null || value === undefined) return "";
@@ -75,3 +93,5 @@ export function fragmentCacheKey(
     .join("/");
   return controller ? `${controller}/${sorted}` : sorted;
 }
+
+rbModConstSet(ActionController, "Caching", Caching);

@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   extend,
@@ -213,3 +215,5 @@ export const Rendering = new Module((mod) => {
   mod.defineMethod("_processOptions", _processOptions);
 }) as Module & { ClassMethods: Module };
 Rendering.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "Rendering", Rendering);

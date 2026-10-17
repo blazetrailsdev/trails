@@ -1,3 +1,4 @@
+import { rbModName } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { htmlSafe } from "@blazetrails/activesupport";
 import { FixtureResolver } from "@blazetrails/actionview";
@@ -550,18 +551,22 @@ describe("DoubleRenderError", () => {
 describe("withoutModules", () => {
   it("returns MODULES minus the named entries", () => {
     const result = Base.withoutModules("ParamsWrapper", "Streaming");
-    expect(result).not.toContain("ParamsWrapper");
-    expect(result).not.toContain("Streaming");
-    expect(result).toContain("Cookies");
+    expect(result.map((m) => rbModName(m))).not.toContain("ActionController::ParamsWrapper");
+    expect(result.map((m) => rbModName(m))).not.toContain("ActionController::Streaming");
+    expect(result.map((m) => rbModName(m))).toContain("ActionController::Cookies");
     expect(result.length).toBe(MODULES.length - 2);
+  });
+
+  it("accepts the modules themselves", () => {
+    expect(Base.withoutModules(MODULES[0])).toEqual(MODULES.slice(1));
   });
 
   it("returns the full list when no names are passed", () => {
     expect(Base.withoutModules()).toEqual(MODULES);
   });
 
-  it("ignores unknown names", () => {
-    expect(Base.withoutModules("NotAModule")).toEqual(MODULES);
+  it("raises NameError for an unknown name", () => {
+    expect(() => Base.withoutModules("NotAModule")).toThrow(/uninitialized constant/);
   });
 });
 

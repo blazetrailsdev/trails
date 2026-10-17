@@ -5,8 +5,10 @@ import {
   type ClassMethods as RateLimitingClassMethods,
 } from "./metal/rate-limiting.js";
 import { Logging, type logAt } from "./metal/logging.js";
-import { include, type Included } from "@blazetrails/activesupport";
-import { Caching } from "../abstract-controller/caching.js";
+import { include, runLoadHooks, type Included } from "@blazetrails/activesupport";
+import { rbModConstGet } from "@blazetrails/ruby-compat";
+import { ActionController } from "../namespaces.js";
+import { Caching } from "./caching.js";
 import { ConditionalGet } from "./metal/conditional-get.js";
 import { BasicImplicitRender } from "./metal/basic-implicit-render.js";
 import { DataStreaming } from "./metal/data-streaming.js";
@@ -64,8 +66,13 @@ export class API extends Metal {
   }
 
   declare static render: Renderer["render"];
-  static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
-    return this;
+  static withoutModules(
+    ...modules: Array<string | Parameters<typeof include>[1]>
+  ): Array<Parameters<typeof include>[1]> {
+    const mods = modules.map((m) =>
+      typeof m === "string" ? rbModConstGet(ActionController, m) : m,
+    );
+    return API.MODULES.filter((m) => !mods.includes(m));
   }
 
   static MODULES: Array<Parameters<typeof include>[1]> = [
@@ -146,3 +153,6 @@ export class API extends Metal {
 for (const mod of API.MODULES) {
   include(API, mod);
 }
+
+runLoadHooks("action_controller_api", API);
+runLoadHooks("action_controller", API);

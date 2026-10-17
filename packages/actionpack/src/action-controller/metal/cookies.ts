@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { included } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
@@ -15,3 +17,5 @@ export class Cookies {
     return this.request.cookieJar();
   }
 }
+
+rbModConstSet(ActionController, "Cookies", Cookies);

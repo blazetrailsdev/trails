@@ -134,6 +134,9 @@ Session.resolveStore = function (sessionStore: string): unknown {
 };
 ActionDispatch.Session = Session;
 
+export const AbstractController = { name: "AbstractController" };
+registerConstant("AbstractController", AbstractController);
+
 export const ActionController = { name: "ActionController", loadPath } as AutoloadModule & {
   Base: typeof ControllerBase;
   Parameters: typeof Parameters;

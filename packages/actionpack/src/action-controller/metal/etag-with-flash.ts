@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, Module, extend, include } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
@@ -22,3 +24,5 @@ export const EtagWithFlash = new Module((mod) => {
     },
   );
 });
+
+rbModConstSet(ActionController, "EtagWithFlash", EtagWithFlash);

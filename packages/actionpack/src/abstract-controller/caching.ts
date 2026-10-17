@@ -1,3 +1,5 @@
+import { AbstractController } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 /** @internal */
 
 import { expandCacheKey, lookupStore } from "@blazetrails/activesupport/cache";
@@ -131,3 +133,5 @@ export async function cache<T>(
     return await block();
   }
 }
+
+rbModConstSet(AbstractController, "Caching", Caching);

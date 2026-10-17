@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/activesupport";
 import { Collector as AbstractCollector } from "../../abstract-controller/collector.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
@@ -170,3 +172,5 @@ const VARIANT_COLLECTOR_HANDLER: ProxyHandler<VariantCollector> = {
     return (block?: FormatHandler): void => target.methodMissing(prop, block);
   },
 };
+
+rbModConstSet(ActionController, "MimeResponds", MimeResponds);

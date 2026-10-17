@@ -5,12 +5,8 @@ type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, a
 type MiddlewareFactory = new (app: RackApp, ...args: any[]) => RackApp;
 
 export class Builder {
-  private _middlewares: Array<{
-    klass: MiddlewareFactory | ((app: RackApp) => RackApp);
-    args: any[];
-    block?: any;
-  }> = [];
-  private _map: Record<string, RackApp> = {};
+  private _use: Array<(app: RackApp) => RackApp> = [];
+  private _map: Record<string, (builder: Builder) => void> | null = null;
   private _run: RackApp | null = null;
   private _warmupBlock: ((app: RackApp) => void) | null = null;
   private _frozen = false;
@@ -80,7 +76,16 @@ export class Builder {
   }
 
   use(middleware: any, ...args: any[]): this {
-    this._middlewares.push({ klass: middleware, args });
+    if (this._map) {
+      const mapping = this._map;
+      this._map = null;
+      this._use.push((app) => this.generateMap(app, mapping));
+    }
+    this._use.push((app) =>
+      typeof middleware === "function" && middleware.prototype && middleware.prototype.call
+        ? new (middleware as MiddlewareFactory)(app, ...args)
+        : (middleware as (app: RackApp, ...args: any[]) => RackApp)(app, ...args),
+    );
     return this;
   }
 
@@ -95,9 +100,8 @@ export class Builder {
   }
 
   map(path: string, block: (builder: Builder) => void): this {
-    const inner = new Builder();
-    block(inner);
-    this._map[path] = inner.toApp();
+    this._map ??= {};
+    this._map[path] = block;
     return this;
   }
 
@@ -120,27 +124,20 @@ export class Builder {
   }
 
   toApp(): RackApp {
-    const app =
-      Object.keys(this._map).length > 0 ? this.generateMap(this._run, this._map) : this._run;
+    let app = this._map ? this.generateMap(this._run, this._map) : this._run;
     if (!app) throw new Error("missing run or map statement");
-    let result = app;
-    for (let i = this._middlewares.length - 1; i >= 0; i--) {
-      const { klass, args } = this._middlewares[i];
-      const inner = result;
-      if (typeof klass === "function" && klass.prototype && klass.prototype.call) {
-        result = new (klass as MiddlewareFactory)(inner, ...args);
-      } else {
-        result = (klass as (app: RackApp, ...args: any[]) => RackApp)(inner, ...args);
-      }
-    }
-    if (this._warmupBlock) this._warmupBlock(result);
-    return result;
+    app = this._use.reduceRight((a, e) => e(a), app);
+    if (this._warmupBlock) rbFSend(this._warmupBlock, "call", app);
+    return app;
   }
 
-  private generateMap(defaultApp: RackApp | null, mapping: Record<string, RackApp>): RackApp {
+  private generateMap(
+    defaultApp: RackApp | null,
+    mapping: Record<string, (builder: Builder) => void>,
+  ): RackApp {
     const mapped: Record<string, RackApp> = defaultApp ? { "/": defaultApp } : {};
     for (const [r, b] of Object.entries(mapping)) {
-      mapped[r] = b;
+      mapped[r] = new (this.constructor as typeof Builder)(defaultApp, {}, b).toApp();
     }
     return new URLMap(mapped);
   }
