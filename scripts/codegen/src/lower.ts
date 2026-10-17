@@ -3907,6 +3907,12 @@ export class Lowerer {
       case "sort_by":
         if (blk) return `${rc("sortBy")}(${r}, ${fn()})`;
         break;
+      case "tally":
+        if (!blk && n.args.length === 0) {
+          this.resolver.wanted.set("tally", (this.resolver.wanted.get("tally") ?? 0) + 1);
+          return `${this.imp(ctx, "@root/codegen-runtime.js", "tally")}(${r})`;
+        }
+        break;
       case "group_by":
         if (blk) return `${rc("groupBy")}(${r}, ${fn()})`;
         break;
@@ -3975,7 +3981,6 @@ export class Lowerer {
       case "stringify_keys":
       case "deep_dup":
       case "to_set":
-      case "tally":
       case "sum_by":
       case "chars":
       case "lines":

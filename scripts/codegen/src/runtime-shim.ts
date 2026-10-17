@@ -268,6 +268,11 @@ export function sortBy(xs: any, fn: (x: any) => any): any[] {
   const items: any[] = xs instanceof Map ? [...xs.entries()] : Array.isArray(xs) ? xs : Object.entries(xs ?? {});
   return items.map((x) => [fn(x), x] as const).sort((a, b) => sortByCmp(a[0], b[0]) ?? 0).map((p) => p[1]);
 }`,
+  tally: `export function tally(xs: any[]): Map<any, number> {
+  const hash = new Map<any, number>();
+  for (const x of xs) hash.set(x, (hash.get(x) ?? 0) + 1);
+  return hash;
+}`,
   // Enumerable#each_with_object (enum.c enum_each_with_object): a Hash yields [key, value].
   eachWithObject: `export function eachWithObject(xs: any, memo: any, fn: (x: any, memo: any) => any): any {
   const items: any[] = xs instanceof Map ? [...xs.entries()] : Array.isArray(xs) ? xs : Object.entries(xs ?? {});
@@ -348,6 +353,7 @@ export const SHIM_SOURCES: Record<string, string> = {
   mapBang: "Array#map! (array.c rb_ary_collect_bang)",
   flattenBang: "Array#flatten! (array.c rb_ary_flatten_bang)",
   sortBy: "Enumerable#sort_by (enum.c enum_sort_by)",
+  tally: "Enumerable#tally, keyed by the element itself (enum.c enum_tally)",
   eachWithObject: "Enumerable#each_with_object (enum.c enum_each_with_object)",
   isAny: "Enumerable#any? (enum.c enum_any)",
   RubyObject: "Object.new (object.c rb_cObject)",
