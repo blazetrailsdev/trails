@@ -23,6 +23,7 @@ export type TypeRef =
   | { k: "prim"; name: "boolean" | "string" | "number" | "null" }
   | { k: "array"; el: TypeRef | null }
   | { k: "fn" }
+  | { k: "hash" }
   | { k: "gemClass"; fqn: string }
   | null;
 

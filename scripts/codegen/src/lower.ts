@@ -1085,6 +1085,10 @@ export class Lowerer {
     if (n.k === "and") return `${this.condP(n.left, ctx)} && ${this.condP(n.right, ctx)}`;
     if (n.k === "or") return `${this.condP(n.left, ctx)} || ${this.condP(n.right, ctx)}`;
     if (n.k === "call" && n.name === "!" && n.recv) return `!(${this.cond(n.recv, ctx)})`;
+    if (n.k === "defined") {
+      const e = this.expr(n, ctx);
+      return `${needsParens(e) ? `(${e})` : e} != null`;
+    }
     return `${this.rc(ctx, "rtest")}(${this.expr(n, ctx)})`;
   }
 
@@ -1364,6 +1368,7 @@ export class Lowerer {
           break;
         case "opt":
           out.push(`${nm}: any = ${this.expr(p.default!, ctx)}`);
+          this.noteParamType(ctx, p.name!, p.default!);
           break;
         case "rest":
           out.push(`...${nm ?? "rest"}: any[]`);
@@ -1372,6 +1377,7 @@ export class Lowerer {
           break;
         case "key":
           kw.push(`${jsIdent(p.name!)} = ${this.expr(p.default!, ctx)}`);
+          this.noteParamType(ctx, p.name!, p.default!);
           break;
         case "keyreq":
           kw.push(jsIdent(p.name!));
@@ -1386,6 +1392,7 @@ export class Lowerer {
           ctx.scope.locals.add("args");
           break;
         case "block":
+          if (p.name) (ctx.scope.types ??= new Map()).set(p.name, { k: "fn" });
           break;
       }
     }
@@ -1394,6 +1401,16 @@ export class Lowerer {
     const blk = params.find((p) => p.kind === "block");
     if (blk) out.push(`${jsIdent(blk.name ?? "block")}?: any`);
     return out.join(", ");
+  }
+
+  /**
+   * A parameter's type from its default: a literal `false` / `true`, a String,
+   * a number, an Array or Hash. `nil` says nothing about what a caller passes.
+   */
+  noteParamType(ctx: Ctx, name: string, def: N): void {
+    const t = this.typeOf(def, ctx);
+    if (t?.k === "prim" || t?.k === "array" || t?.k === "hash")
+      (ctx.scope.types ??= new Map()).set(name, t);
   }
 
   expr(n: N, ctx: Ctx): string {
@@ -3339,6 +3356,10 @@ export class Lowerer {
         return { k: "prim", name: "number" };
       case "array":
         return { k: "array", el: null };
+      case "hash":
+        return { k: "hash" };
+      case "lasgn":
+        return this.typeOf(n.value, ctx);
       case "ivar": {
         const k = this.ownerKey(ctx);
         return k && ctx.selfKind !== "static" ? T.ivar(k, n.name) : null;
