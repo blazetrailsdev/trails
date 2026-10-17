@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import { htmlSafe } from "@blazetrails/activesupport";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { Base, DoubleRenderError, PROTECTED_IVARS } from "../base.js";
+import { HttpAuthentication } from "../metal/http-authentication.js";
 import { API } from "../api.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
@@ -582,5 +583,49 @@ describe("PROTECTED_IVARS", () => {
   it("is returned by Base#_protectedIvars", () => {
     const c = new Base();
     expect(c._protectedIvars()).toBe(PROTECTED_IVARS);
+  });
+});
+
+describe("Base.MODULES", () => {
+  it("names every module outside HttpAuthentication as base.rb lists it", () => {
+    expect(
+      Base.MODULES.filter(
+        (m) => !Object.values(HttpAuthentication).some((ns) => ns.ControllerMethods === m),
+      ).map((m) => String(rbModName(m)).replace(/^ActionController::/, "")),
+    ).toEqual([
+      "AbstractController::Rendering",
+      "AbstractController::Translation",
+      "AbstractController::AssetPaths",
+      "Helpers",
+      "UrlFor",
+      "Redirecting",
+      "ActionView::Layouts",
+      "Rendering",
+      "Renderers::All",
+      "ConditionalGet",
+      "EtagWithTemplateDigest",
+      "EtagWithFlash",
+      "Caching",
+      "MimeResponds",
+      "ImplicitRender",
+      "StrongParameters",
+      "ParameterEncoding",
+      "Cookies",
+      "Flash",
+      "FormBuilder",
+      "RequestForgeryProtection",
+      "ContentSecurityPolicy",
+      "PermissionsPolicy",
+      "RateLimiting",
+      "AllowBrowser",
+      "Streaming",
+      "DataStreaming",
+      "DefaultHeaders",
+      "Logging",
+      "AbstractController::Callbacks",
+      "Rescue",
+      "Instrumentation",
+      "ParamsWrapper",
+    ]);
   });
 });

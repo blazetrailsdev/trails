@@ -1,7 +1,9 @@
 import { it, expect, describe } from "vitest";
 import { join } from "path";
 import { Builder } from "./builder.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { block, rbFSend } from "@blazetrails/ruby-compat";
+import { Basic } from "./auth/basic.js";
+import { ShowExceptions } from "./show-exceptions.js";
 import { MockRequest } from "./mock-request.js";
 
 function configFile(name: string): string {
@@ -131,23 +133,25 @@ it("has implicit #to_app", async () => {
 });
 
 it("supports blocks on use", async () => {
-  class BlockMiddleware {
-    private app: any;
-    constructor(app: any) {
-      this.app = app;
-    }
-    async call(env: any) {
-      const [s, h, b] = (await rbFSend(this.app, "call", env)) as any;
-      h["x-block"] = "used";
-      return [s, h, b];
-    }
-  }
   const builder = new Builder();
-  builder.use(BlockMiddleware);
-  builder.run(async () => [200, {}, ["block"]]);
+  builder.use(ShowExceptions);
+  builder.use(
+    Basic,
+    undefined,
+    block((_username: string, password: string) => "secret" === password),
+  );
+  builder.run(async () => [200, { "content-type": "text/plain" }, ["Hi Boss"]]);
   const app = builder.toApp();
-  const res = await new MockRequest(app).get("/");
-  expect(res.headers["x-block"]).toBe("used");
+
+  let response = await new MockRequest(app).get("/");
+  expect(response.isClientError).toBe(true);
+  expect(response.status).toBe(401);
+
+  response = await new MockRequest(app).get("/", {
+    HTTP_AUTHORIZATION: "Basic " + btoa("joe:secret"),
+  });
+  expect(response.status).toBe(200);
+  expect(String(response.body)).toBe("Hi Boss");
 });
 
 it("has explicit #to_app", async () => {

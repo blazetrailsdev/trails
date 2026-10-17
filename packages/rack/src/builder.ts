@@ -1,4 +1,4 @@
-import { ArgumentError, File, rbFSend } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, rbBlockGivenP, rbFSend } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
 
 type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, any>) => any);
@@ -76,6 +76,7 @@ export class Builder {
   }
 
   use(middleware: any, ...args: any[]): this {
+    const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
     if (this._map) {
       const mapping = this._map;
       this._map = null;
@@ -83,8 +84,12 @@ export class Builder {
     }
     this._use.push((app) =>
       typeof middleware === "function" && middleware.prototype && middleware.prototype.call
-        ? new (middleware as MiddlewareFactory)(app, ...args)
-        : (middleware as (app: RackApp, ...args: any[]) => RackApp)(app, ...args),
+        ? new (middleware as MiddlewareFactory)(app, ...args, ...(block ? [block] : []))
+        : (middleware as (app: RackApp, ...args: any[]) => RackApp)(
+            app,
+            ...args,
+            ...(block ? [block] : []),
+          ),
     );
     return this;
   }
