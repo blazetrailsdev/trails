@@ -63,9 +63,18 @@ describe("runtimeShim", () => {
     expect(shim.rbSingletonPublicMethods(Job)).toEqual(["_queue_adapter"]);
   });
 
-  it("rbMakeException raises a class with no message carrying its name", () => {
-    class Boom extends Error {}
-    expect((shim.rbMakeException(Boom) as Error).message).toBe("Boom");
+  it("rbMakeException builds the class with the arguments raise was given", () => {
+    class Boom extends Error {
+      constructor(
+        readonly code: number,
+        message = "",
+      ) {
+        super(message);
+      }
+    }
+    const e = shim.rbMakeException(Boom, 7) as Boom;
+    expect(e).toBeInstanceOf(Boom);
+    expect(e.code).toBe(7);
   });
 
   it("rbRaise raises the class it is given, with the message", async () => {
@@ -80,6 +89,11 @@ describe("runtimeShim", () => {
     const xs = [1, 2, 3];
     expect(await shim.rbAsyncEnum(xs, "inject", async (a: number, b: number) => a + b)).toBe(6);
     expect(xs).toEqual([1, 2, 3]);
+  });
+
+  it("rbAsyncEnum sum adds Strings and Arrays with their +", async () => {
+    expect(await shim.rbAsyncEnum(["a", "b"], "sum", "", async (x: string) => x)).toBe("ab");
+    expect(await shim.rbAsyncEnum([[1], [2]], "sum", [], async (x: number[]) => x)).toEqual([1, 2]);
   });
 
   it("rbAsyncEnum sum raises TypeError where Integer#+ would", async () => {
