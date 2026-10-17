@@ -443,6 +443,24 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "nokogiri",
+    origin: {
+      type: "git",
+      url: "https://github.com/sparklemotion/nokogiri.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:398; a read-anchor for
+      // packages/nokogiri, like rails-dom-testing.
+      ref: "v1.18.3",
+    },
+    packages: [
+      {
+        name: "nokogiri",
+        libPath: "lib/nokogiri",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "ruby",
     origin: {
       type: "git",

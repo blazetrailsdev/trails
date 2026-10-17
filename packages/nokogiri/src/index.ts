@@ -12,8 +12,8 @@ export type { XmlNode, XmlDocument };
 export type { AttrNode } from "./xml/node.js";
 export type { SyntaxError };
 export type { Readable } from "./readable.js";
+import { Document as Html5Document } from "./html5/document.js";
 import {
-  Document as Html5Document,
   DocumentFragment as Html5DocumentFragment,
   Node as Html5Node,
 } from "./html5/document-fragment.js";
