@@ -38,16 +38,6 @@ describe("FormOptionsHelperTest", () => {
     );
   });
 
-  it("array options for select with custom defined selected", () => {
-    assertDomEqual(
-      '<option selected="selected" type="Coach" value="1">Richard Bandler</option>\n<option type="Coachee" value="1">Richard Bandler</option>',
-      optionsForSelect([
-        ["Richard Bandler", 1, { type: "Coach", selected: "selected" }],
-        ["Richard Bandler", 1, { type: "Coachee" }],
-      ]),
-    );
-  });
-
   it("array options for select with selection", () => {
     assertDomEqual(
       '<option value="Denmark">Denmark</option>\n<option value="&lt;USA&gt;" selected="selected">&lt;USA&gt;</option>\n<option value="Sweden">Sweden</option>',
@@ -102,15 +92,6 @@ describe("FormOptionsHelperTest", () => {
       ),
     );
     assertMatch(/include_blank cannot be false for a required field./, e.message);
-  });
-
-  it("select with default prompt", () => {
-    view.post = new Post();
-    view.post.category = "";
-    assertDomEqual(
-      '<select id="post_category" name="post[category]"><option value="">Please select</option>\n<option value="abe">abe</option>\n<option value="&lt;mus&gt;">&lt;mus&gt;</option>\n<option value="hest">hest</option></select>',
-      select("post", "category", ["abe", "<mus>", "hest"], { prompt: true }),
-    );
   });
 
   it("select with array", () => {

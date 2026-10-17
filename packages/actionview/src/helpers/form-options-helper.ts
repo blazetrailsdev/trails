@@ -17,6 +17,7 @@ import {
   rbFPublicSend,
   rbObjAsString,
   rbObjRespondTo,
+  rtest,
 } from "@blazetrails/ruby-compat";
 
 import { contentTag, tagBuilder, type TagHelperHost } from "./tag-helper.js";
@@ -55,8 +56,10 @@ export function optionsForSelect(
         const htmlAttributes = optionHtmlAttributes(element);
         const [text, value] = optionTextAndValue(element).map(rbObjAsString);
 
-        htmlAttributes["selected"] ||= isOptionValueSelected(value, selectedValues);
-        htmlAttributes["disabled"] ||= disabled != null && isOptionValueSelected(value, disabled);
+        if (!rtest(htmlAttributes["selected"]))
+          htmlAttributes["selected"] = isOptionValueSelected(value, selectedValues);
+        if (!rtest(htmlAttributes["disabled"]))
+          htmlAttributes["disabled"] = rtest(disabled) && isOptionValueSelected(value, disabled);
         htmlAttributes["value"] = value;
 
         return tagBuilder.call(this).contentTagString("option", text, htmlAttributes);
@@ -201,7 +204,7 @@ export function extractValuesFromCollection(
 ): unknown {
   if (typeof selected === "function") {
     return filterMap(globalThis.Array.from(collection), (element) => {
-      if (selected(element)) return rbFPublicSend(element, String(valueMethod));
+      if (rtest(selected(element))) return rbFPublicSend(element, String(valueMethod));
     });
   } else {
     return selected;

@@ -1,11 +1,14 @@
-import { isBlank } from "@blazetrails/activesupport";
+import { isBlank, isPlainObject } from "@blazetrails/activesupport";
 import {
   block as rbBlock,
   fetch,
+  first,
   include,
   Range,
+  rbFSend,
   rbModConstSet,
   rbObjRespondTo,
+  rtest,
 } from "@blazetrails/ruby-compat";
 
 import { Tags } from "../../namespaces.js";
@@ -29,7 +32,10 @@ export class Select extends Base {
   ) {
     super(objectName, methodName, templateObject, options);
     let selectChoices: unknown = block
-      ? (templateObject as { capture(b: () => unknown): unknown }).capture(() => block() ?? "")
+      ? (templateObject as { capture(b: () => unknown): unknown }).capture(() => {
+          const yielded = block();
+          return rtest(yielded) ? yielded : "";
+        })
       : choices;
     if (selectChoices instanceof Range) selectChoices = selectChoices.toA();
     this._choices = selectChoices;
@@ -57,9 +63,10 @@ export class Select extends Base {
   /** @internal */
   private isGroupedChoices(): boolean {
     if (isBlank(this._choices)) return false;
-    const choices = this._choices as unknown[];
-    const head = Array.isArray(choices) ? choices[0] : Object.entries(choices)[0];
-    return rbObjRespondTo(head, "second") && Array.isArray((head as unknown[])[1]);
+    const head = first(
+      isPlainObject(this._choices) ? Object.entries(this._choices) : (this._choices as unknown[]),
+    );
+    return rbObjRespondTo(head, "second") && Array.isArray(rbFSend(head, "second"));
   }
 }
 

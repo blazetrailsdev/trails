@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Range } from "@blazetrails/ruby-compat";
 import { inGroupsOf, kernelArray, toFs } from "./array-utils.js";
 
 describe("KernelArrayTest (trails)", () => {
@@ -10,6 +11,11 @@ describe("KernelArrayTest (trails)", () => {
   it("returns the same array it was given", () => {
     const arr = [1, 2, 3];
     expect(kernelArray(arr)).toBe(arr);
+  });
+
+  it("converts a non-iterable object through its to_a, as rb_Array does", () => {
+    expect(kernelArray(new Range(1, 3))).toEqual([1, 2, 3]);
+    expect(kernelArray({ toA: () => ["a"] })).toEqual(["a"]);
   });
 
   it("wraps a scalar", () => {

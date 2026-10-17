@@ -1,5 +1,5 @@
 import { isBlank, stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
-import { ArgumentError, block, fetch, hashDelete } from "@blazetrails/ruby-compat";
+import { ArgumentError, block, fetch, hashDelete, rtest, toI } from "@blazetrails/ruby-compat";
 
 import type { TagBuilder } from "../tag-helper.js";
 
@@ -10,6 +10,8 @@ interface SelectRendererHost {
   tagBuilder(): TagBuilder;
   value(): unknown;
   promptText(prompt: unknown): unknown;
+  isPlaceholderRequired(htmlOptions: Record<string, unknown>): boolean;
+  addOptions(optionTags: unknown, options: Record<string, unknown>, value?: unknown): unknown;
 }
 
 export const SelectRenderer = {
@@ -27,11 +29,11 @@ export const SelectRenderer = {
 
     this.addDefaultNameAndId(htmlOptions);
 
-    if (SelectRenderer.isPlaceholderRequired.call(this, htmlOptions)) {
+    if (this.isPlaceholderRequired(htmlOptions)) {
       if (options["includeBlank"] === false)
         throw new ArgumentError("include_blank cannot be false for a required field.");
-      if (options["prompt"] == null || options["prompt"] === false)
-        options["includeBlank"] ||= true;
+      if (!rtest(options["prompt"]) && !rtest(options["includeBlank"]))
+        options["includeBlank"] = true;
     }
 
     const value = fetch(
@@ -41,12 +43,11 @@ export const SelectRenderer = {
     );
     const select = this.contentTag(
       "select",
-      SelectRenderer.addOptions.call(this, optionTags, options, value),
+      this.addOptions(optionTags, options, value),
       htmlOptions,
     );
 
-    const includeHidden = fetch<unknown>(options, "includeHidden", true);
-    if (htmlOptions["multiple"] && includeHidden != null && includeHidden !== false) {
+    if (rtest(htmlOptions["multiple"]) && rtest(fetch<unknown>(options, "includeHidden", true))) {
       return (
         this.tag("input", {
           disabled: htmlOptions["disabled"],
@@ -64,10 +65,9 @@ export const SelectRenderer = {
   /** @internal */
   isPlaceholderRequired(this: SelectRendererHost, htmlOptions: Record<string, unknown>): boolean {
     return (
-      htmlOptions["required"] != null &&
-      htmlOptions["required"] !== false &&
-      !htmlOptions["multiple"] &&
-      Math.trunc(Number(fetch(htmlOptions, "size", 1))) === 1
+      rtest(htmlOptions["required"]) &&
+      !rtest(htmlOptions["multiple"]) &&
+      toI(fetch<unknown>(htmlOptions, "size", 1)) === 1
     );
   },
 
@@ -78,7 +78,7 @@ export const SelectRenderer = {
     options: Record<string, unknown>,
     value: unknown = null,
   ): unknown {
-    if (options["includeBlank"] != null && options["includeBlank"] !== false) {
+    if (rtest(options["includeBlank"])) {
       const content = typeof options["includeBlank"] === "string" ? options["includeBlank"] : null;
       const label = content == null ? " " : null;
       optionTags = this.tagBuilder()
@@ -87,7 +87,7 @@ export const SelectRenderer = {
         .plus(optionTags);
     }
 
-    if (isBlank(value) && options["prompt"] != null && options["prompt"] !== false) {
+    if (isBlank(value) && rtest(options["prompt"])) {
       const tagOptions: Record<string, unknown> = { value: "" };
       if (options["disabled"] === "") tagOptions["disabled"] = true;
       if (options["selected"] === "") tagOptions["selected"] = true;
