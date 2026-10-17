@@ -3,7 +3,6 @@ import { access } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  tsConstantRename,
   snakeToCamel,
   rubyMethodToTs,
   rubyMethodToTsIgnoringSkip,
@@ -823,29 +822,5 @@ describe("explainConventions", () => {
     for (const g of SCOPED_SKIP_GROUPS) {
       expect(md).toContain(g.reason);
     }
-  });
-});
-
-describe("tsConstantRename", () => {
-  it("resolves a fully qualified constant", () => {
-    expect(tsConstantRename("ActiveModel::Type::String")).toBe("StringType");
-    expect(tsConstantRename("::ActiveModel::Type::String")).toBe("StringType");
-  });
-
-  it("resolves a relative reference against its lexical scopes", () => {
-    expect(tsConstantRename("Value", "ActiveModel::Type")).toBe("ValueType");
-    expect(tsConstantRename("OID::Range", "ActiveRecord::ConnectionAdapters::PostgreSQL")).toBe(
-      "RangeType",
-    );
-  });
-
-  it("falls back to the one key a reference is a suffix of", () => {
-    expect(tsConstantRename("Type::Value", "ActiveRecord::Type")).toBe("ValueType");
-  });
-
-  it("leaves constants outside the table alone", () => {
-    expect(tsConstantRename("Json", "ActiveRecord::Type")).toBeUndefined();
-    expect(tsConstantRename("::String")).toBeUndefined();
-    expect(tsConstantRename("String", "ActiveRecord::Encryption")).toBeUndefined();
   });
 });

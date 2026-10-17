@@ -9,11 +9,8 @@
  * to change.
  */
 const IMPLEMENTED: Record<string, string> = {
-  rbOr: `export function rbOr(a: any, b: () => any): any {\n  return a !== null && a !== undefined && a !== false ? a : b();\n}`,
-  rbAnd: `export function rbAnd(a: any, b: () => any): any {\n  return a !== null && a !== undefined && a !== false ? b() : a;\n}`,
   rbAryEnsure: `export function rbAryEnsure(a: any): any[] {\n  return a == null ? [] : Array.isArray(a) ? a : [a];\n}`,
   rbRaise: `export function rbRaise(...args: any[]): never {\n  throw args[0] instanceof Error ? args[0] : new Error(String(args[1] ?? args[0]));\n}`,
-  isPlainObject: `export function isPlainObject(x: any): boolean {\n  return x !== null && typeof x === "object" && (Object.getPrototypeOf(x) === Object.prototype || Object.getPrototypeOf(x) === null);\n}`,
   rbAsyncEnum: `export async function rbAsyncEnum(recv: any, method: string, ...rest: any[]): Promise<any> {
   const fn = rest.pop();
   const items: any[] = recv instanceof Map ? [...recv.entries()] : Array.isArray(recv) ? recv : Object.entries(recv ?? {});
@@ -318,6 +315,47 @@ export function rbNumDuration(x: any, unit: string): any {
   rbEntries: `export function rbEntries(x: any): any[] {\n  return x instanceof Map ? [...x.entries()] : Array.isArray(x) ? x : Object.entries(x ?? {});\n}`,
 };
 
+/** The Ruby each {@link runtimeShim} helper stands in for, emitted as its `Mirrors:` line. */
+export const SHIM_SOURCES: Record<string, string> = {
+  rbAryEnsure: "Kernel#Array (object.c rb_f_array, rb_Array)",
+  rbRaise: "Kernel#raise (eval.c rb_f_raise)",
+  rbAsyncEnum: "Enumerable / Array iteration (enum.c, array.c), run in order",
+  rbBinop:
+    "Array#+ #- #& #| (array.c rb_ary_plus, rb_ary_diff, rb_ary_and, rb_ary_or); Comparable#< #> #<= #>= (compar.c)",
+  times: "Integer#times (numeric.c int_dotimes)",
+  rbDelete: "Array#delete (array.c rb_ary_delete); Hash#delete (hash.c rb_hash_delete_m)",
+  rbEnum: "Enumerable#to_a over a Set or Hash (enum.c enum_to_a)",
+  rbAppend:
+    "Array#<< (array.c rb_ary_push); String#<< (string.c rb_str_concat); Set#<< (set.rb add)",
+  jsInstanceExec: "BasicObject#instance_exec (vm_eval.c rb_obj_instance_exec)",
+  clear: "Array#clear (array.c rb_ary_clear); Hash#clear (hash.c rb_hash_clear)",
+  TestHost: "ActiveSupport::TestCase (activesupport/lib/active_support/test_case.rb)",
+  rbExtractKeywords: "keyword arguments from a trailing Hash (vm_args.c)",
+  rbSingletonPublicMethods:
+    "Module#public_instance_methods(false) on a singleton class (class.c rb_class_public_instance_methods)",
+  rbMakeException: "raise's exception construction (eval.c rb_make_exception)",
+  rbIsA: "Object#is_a? (object.c rb_obj_is_kind_of)",
+  mapBang: "Array#map! (array.c rb_ary_collect_bang)",
+  flattenBang: "Array#flatten! (array.c rb_ary_flatten_bang)",
+  sortBy: "Enumerable#sort_by (enum.c enum_sort_by)",
+  eachWithObject: "Enumerable#each_with_object (enum.c enum_each_with_object)",
+  isAny: "Enumerable#any? (enum.c enum_any)",
+  RubyObject: "Object.new (object.c rb_cObject)",
+  rbKernel: "Kernel's module functions (random.c rb_f_rand)",
+  rbNumDuration:
+    "Numeric#seconds and siblings (activesupport/lib/active_support/core_ext/numeric/time.rb)",
+  rbToF: "#to_f (numeric.c flo_to_f, time.c time_to_f)",
+  rbSize: "#size (array.c rb_ary_length, hash.c rb_hash_size, string.c rb_str_length)",
+  rbTsName: "a Ruby method name as its trails member name (docs/ruby-ts-conventions.md)",
+  count: "Enumerable#count with a block (enum.c enum_count)",
+  rbEntries: "Hash#each yielding [key, value] pairs (hash.c rb_hash_each_pair)",
+};
+
+/** The names the shim implements; any other wanted name throws when called. */
+export function implementedShimNames(): string[] {
+  return Object.keys(IMPLEMENTED);
+}
+
 export function runtimeShim(wanted: Iterable<string>): string {
   const lines = [
     "/* eslint-disable */",
@@ -325,6 +363,7 @@ export function runtimeShim(wanted: Iterable<string>): string {
     "",
   ];
   for (const name of [...new Set(wanted)].sort()) {
+    if (SHIM_SOURCES[name]) lines.push(`/** Mirrors: ${SHIM_SOURCES[name]} */`);
     lines.push(
       IMPLEMENTED[name] ??
         `export function ${name}(..._args: any[]): any {\n  throw new Error("codegen-runtime: ${name} is not in @blazetrails/ruby-compat");\n}`,
