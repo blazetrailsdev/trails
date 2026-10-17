@@ -9,7 +9,14 @@ import {
   mattrAccessor,
   titleize,
 } from "@blazetrails/activesupport";
-import { Module, RuntimeError, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  RuntimeError,
+  hashDelete,
+  isSymbol,
+  rbInspect,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { ActionView } from "../namespaces.js";
 import { contentTag, TagHelper, type TagHelperHost } from "./tag-helper.js";
 
@@ -41,9 +48,9 @@ export function translate(
 
   let alternatives: unknown[] | undefined;
   if ("default" in options) {
-    const default_ = options.default;
-    delete options.default;
-    alternatives = Array.isArray(default_) ? default_.filter((d) => d != null) : [default_];
+    alternatives = Array.isArray(options.default)
+      ? (hashDelete(options, "default") as unknown[]).filter((d) => d != null)
+      : [hashDelete(options, "default")];
   }
 
   if (options.raise == null && TranslationHelper.raiseOnMissingTranslations()) options.raise = true;
