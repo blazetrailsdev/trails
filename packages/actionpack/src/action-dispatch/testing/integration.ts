@@ -77,6 +77,7 @@ export function put(
   return this.process("PUT", path, options);
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function delete_(
   this: Session,
   path: string,

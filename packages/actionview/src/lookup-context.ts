@@ -20,6 +20,7 @@ import { Requested } from "./template-details.js";
 
 type DetailValue = ReadonlyArray<string | symbol>;
 type DetailsMap = Record<string, DetailValue>;
+type DetailsHash = Record<string, DetailValue | "any">;
 type DefaultProc = () => DetailValue;
 
 const REGISTERED_DETAILS: string[] = [];
@@ -57,21 +58,21 @@ export class DetailsKey {
   /** @internal */
   static _digestCache = new Map<Requested, DigestCache>();
 
-  static detailsCacheKey(details: DetailsMap): Requested {
-    let formats = details.formats;
+  static detailsCacheKey(details: DetailsHash): Requested {
+    let formats = details.formats as DetailValue | undefined;
     if (formats && !Template.Types.isValidSymbols(formats)) {
       formats = formats.filter(
         (f) => typeof f === "string" && Template.Types.symbols().includes(f),
       ) as DetailValue;
     }
-    const normalized: DetailsMap = { ...details, formats: formats ?? [] };
+    const normalized: DetailsHash = { ...details, formats: formats ?? [] };
     const key = DetailsKey._stableKey(normalized);
     let req = DetailsKey._detailsKeys.get(key);
     if (req) return req;
     req = new Requested({
-      locale: normalized.locale ?? [],
-      handlers: normalized.handlers ?? [],
-      formats: normalized.formats ?? [],
+      locale: (normalized.locale ?? []) as DetailValue,
+      handlers: (normalized.handlers ?? []) as DetailValue,
+      formats: (normalized.formats ?? []) as DetailValue,
       variants: normalized.variants ?? [],
     });
     DetailsKey._detailsKeys.set(key, req);
@@ -123,12 +124,17 @@ export class DetailsKey {
   }
 
   /** @internal */
-  private static _stableKey(details: DetailsMap): string {
+  private static _stableKey(details: DetailsHash): string {
     return JSON.stringify(
-      REGISTERED_DETAILS.map((k) => [
-        k,
-        (details[k] ?? []).map((v) => (typeof v === "symbol" ? DetailsKey._tagSymbol(v) : v)),
-      ]),
+      REGISTERED_DETAILS.map((k) => {
+        const value = details[k] ?? [];
+        return [
+          k,
+          value === "any"
+            ? value
+            : value.map((v) => (typeof v === "symbol" ? DetailsKey._tagSymbol(v) : v)),
+        ];
+      }),
     );
   }
 }
@@ -170,7 +176,7 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
   private _detailsCache = true;
   private _htmlFallbackForJs = false;
   private _viewPaths: PathSet;
-  private _detailArgsForAny: [DetailsMap, Requested | null] | null = null;
+  private _detailArgsForAny: [DetailsHash, Requested | null] | null = null;
 
   constructor(
     viewPaths: PathSet | ReadonlyArray<PathSetResolver | string> | null = null,
@@ -358,21 +364,23 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
   }
 
   /** @internal */
-  detailArgsForAny(): [DetailsMap, Requested | null] {
+  detailArgsForAny(): [DetailsHash, Requested | null] {
     if (this._detailArgsForAny) return this._detailArgsForAny;
-    const details: DetailsMap = {};
+    const details: DetailsHash = {};
+
     for (const k of REGISTERED_DETAILS) {
-      details[k] = Accessors.DEFAULT_PROCS[k]();
+      if (k === "variants") {
+        details[k] = "any";
+      } else {
+        details[k] = Accessors.DEFAULT_PROCS[k].call(undefined);
+      }
     }
-    const key = this._detailsCache
-      ? new Requested({
-          locale: details.locale,
-          handlers: details.handlers,
-          formats: details.formats,
-          variants: "any",
-        })
-      : null;
-    this._detailArgsForAny = [details, key];
+
+    if (this._detailsCache) {
+      this._detailArgsForAny = [details, DetailsKey.detailsCacheKey(details)];
+    } else {
+      this._detailArgsForAny = [details, null];
+    }
     return this._detailArgsForAny;
   }
 

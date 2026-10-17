@@ -3438,6 +3438,7 @@ function importedName(id: ts.Identifier, sourceFile: ts.SourceFile): string {
 }
 
 function isClassAttributeCallee(expr: ts.Expression): boolean {
+  if (isConfigAccessorCallee(expr)) return true;
   return (
     ts.isPropertyAccessExpression(expr) &&
     ts.isIdentifier(expr.expression) &&
@@ -3452,6 +3453,7 @@ function readClassAttributeCall(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
+  if (isConfigAccessorCallee(node.expression)) return readConfigAccessorCall(node, sourceFile);
   const callee = node.expression as ts.PropertyAccessExpression;
   const internal =
     callee.name.text === "call"
@@ -3505,6 +3507,37 @@ function readClassAttributeCall(
     instanceReader: macro.reader && (optionBool(options, "instanceReader") ?? instanceAccessor),
     instanceWriter: macro.writer && (optionBool(options, "instanceWriter") ?? instanceAccessor),
     instancePredicate: macro.predicate && (optionBool(options, "instancePredicate") ?? true),
+    line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+  };
+}
+
+function isConfigAccessorCallee(expr: ts.Expression): boolean {
+  return (
+    ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === "configAccessor" &&
+    (ts.isIdentifier(expr.expression) || expr.expression.kind === ts.SyntaxKind.ThisKeyword)
+  );
+}
+
+function readConfigAccessorCall(
+  node: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): ClassAttributeCall | null {
+  const names = node.arguments.filter(ts.isStringLiteralLike).map((arg) => arg.text);
+  if (names.length === 0) return null;
+  const opts = node.arguments.at(-1);
+  const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
+  const instanceAccessor = optionBool(options, "instanceAccessor") ?? true;
+  const enclosing = enclosingEntity(node);
+  return {
+    ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+    ...(enclosing?.seatsModule === true ? { enclosingSeatsModule: true } : {}),
+    names,
+    reader: true,
+    writer: true,
+    instanceReader: instanceAccessor && optionBool(options, "instanceReader") !== false,
+    instanceWriter: instanceAccessor && optionBool(options, "instanceWriter") !== false,
+    instancePredicate: false,
     line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
   };
 }
@@ -6986,7 +7019,7 @@ function collectCalls(
       } else if (ts.isPropertyAccessExpression(callee)) {
         visit(callee.expression);
         const prop = memberNameText(callee.name);
-        called.push(prop);
+        if (!(skipHoistedClosures && isOperatorIndexRead(n))) called.push(prop);
         negated.push(prop);
         if (!skipHoistedClosures && prop === "unshift") {
           names.add(`${NATIVE_FORM_PREFIX}unshift`);
@@ -7109,6 +7142,26 @@ function collectCalls(
   return [...names, ...hashForms];
 }
 
+/**
+ * A `this._scope.get("key")`: `Mapper::Scope#[]` (`mapper.rb:2359-2361`), ported
+ * as `Scope#get`, read off Mapper's `@scope`. extract-ruby-api.rb#walk_call_in_order
+ * records no `[]` send, so the ORDER stream leaves it out, and it cannot take
+ * the position of the routing `get` the same body makes (`Mapper#resource`'s
+ * `@scope[:shallow]` beside `get :new`, `mapper.rb:1357-1363`).
+ */
+function isOperatorIndexRead(n: ts.CallExpression): boolean {
+  const callee = n.expression;
+  return (
+    ts.isPropertyAccessExpression(callee) &&
+    memberNameText(callee.name) === "get" &&
+    ts.isPropertyAccessExpression(callee.expression) &&
+    callee.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+    callee.expression.name.text === "_scope" &&
+    n.arguments.length === 1 &&
+    ts.isStringLiteralLike(n.arguments[0])
+  );
+}
+
 function nativeHashForms(
   n: ts.Node,
 ): [form: string, receiver: ts.Expression | undefined, key?: string][] {
@@ -7226,6 +7279,18 @@ function receiverTailName(receiver: ts.Expression): string | undefined {
     ts.isAsExpression(e)
   ) {
     e = e.expression;
+  }
+  if (ts.isElementAccessExpression(e) && ts.isStringLiteralLike(e.argumentExpression)) {
+    return e.argumentExpression.text;
+  }
+  if (
+    ts.isCallExpression(e) &&
+    ts.isPropertyAccessExpression(e.expression) &&
+    e.expression.name.text === "get" &&
+    e.arguments.length === 1 &&
+    ts.isStringLiteralLike(e.arguments[0])
+  ) {
+    return e.arguments[0].text;
   }
   if (ts.isCallExpression(e)) e = e.expression;
   if (

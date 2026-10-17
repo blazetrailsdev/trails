@@ -627,6 +627,7 @@ export class TestRequest extends AbstractTestRequest {
     this.setHeader("CONTENT_TYPE", type);
   }
 
+  /** @missingRailsName b — PERMANENT */
   assignParameters(
     _routes: unknown,
     controllerPath: string,

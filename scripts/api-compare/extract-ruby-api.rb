@@ -1055,7 +1055,7 @@ class ApiExtractor
       process_define_method(args, nil)
     when "class_attribute"
       process_mattr(args, reader: true, writer: true, predicate: true, class_attr: true)
-    when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor"
+    when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor", "config_accessor"
       process_mattr(args, reader: true, writer: true, predicate: false, class_attr: false)
     when "cattr_reader", "mattr_reader", "thread_cattr_reader", "thread_mattr_reader"
       process_mattr(args, reader: true, writer: false, predicate: false, class_attr: false)
@@ -1141,7 +1141,7 @@ class ApiExtractor
         process_define_model_callbacks(node[2])
       when "class_attribute"
         process_mattr(node[2], reader: true, writer: true, predicate: true, class_attr: true)
-      when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor"
+      when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor", "config_accessor"
         process_mattr(node[2], reader: true, writer: true, predicate: false, class_attr: false)
       when "cattr_reader", "mattr_reader", "thread_cattr_reader", "thread_mattr_reader"
         process_mattr(node[2], reader: true, writer: false, predicate: false, class_attr: false)

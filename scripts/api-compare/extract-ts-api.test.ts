@@ -454,6 +454,26 @@ describe("body call capture", () => {
     expect(writer.callSeq).toEqual(["store"]);
   });
 
+  it("leaves an index read off another object out of the order stream only", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        resource() {
+          this.build(this._scope.get("shallow"));
+          this.get(":new");
+        }
+        show() {
+          this.build(this.headers.get("x"));
+          this.get(":new");
+        }
+      }`,
+    );
+    const resource = cls.instanceMethods.find((m) => m.name === "resource")!;
+    expect(resource.calls).toContain("get");
+    expect(resource.callSeq).toEqual(["_scope", "build", "get"]);
+    const show = cls.instanceMethods.find((m) => m.name === "show")!;
+    expect(show.callSeq).toEqual(["headers", "get", "build"]);
+  });
+
   it("also records the same calls in source order, for the order-only comparison", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -7529,6 +7549,25 @@ describe("extractFromProgram — a Module on a static property", () => {
       ["column", undefined],
       ["change", "column"],
     ]);
+  });
+});
+
+describe("extractFromProgram — configAccessor() generated accessors", () => {
+  it("credits the class and instance accessors on the module whose included hook calls it", () => {
+    const info = extractFromFiles("/p", {
+      "request-forgery-protection.ts": `
+        export const RequestForgeryProtection = {
+          included(base: any): void {
+            base.configAccessor("perFormCsrfTokens");
+          },
+        };
+      `,
+    });
+    const mod = info.modules["request-forgery-protection.ts:RequestForgeryProtection"];
+    const seat = (members: MethodInfo[]) =>
+      members.filter((m) => m.name === "perFormCsrfTokens").map((m) => m.writer === true);
+    expect(seat(mod.classMethods)).toEqual([false, true]);
+    expect(seat(mod.instanceMethods)).toEqual([false, true]);
   });
 });
 

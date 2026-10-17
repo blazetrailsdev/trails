@@ -49,7 +49,7 @@ import {
   QueryParser,
   unescape,
 } from "./utils.js";
-import { block as rbBlock, fetch, hashDelete, include } from "@blazetrails/ruby-compat";
+import { block as rbBlock, fetch, hashDelete, include, warn } from "@blazetrails/ruby-compat";
 import * as MediaTypeModule from "./media-type.js";
 import * as Multipart from "./multipart.js";
 
@@ -310,8 +310,13 @@ export abstract class Helpers {
   get forwardedFor(): Array<string | undefined> | null {
     for (const type of this.forwardedPriority()) {
       if (type === "forwarded") {
-        const forwardedFor = this.getHttpForwarded("for");
-        if (forwardedFor) return forwardedFor.map((authority) => this.splitAuthority(authority)[1]);
+        const forwardedFor: Array<string | undefined> | null = this.getHttpForwarded("for");
+        if (forwardedFor) {
+          for (const [i, authority] of forwardedFor.entries()) {
+            forwardedFor[i] = this.splitAuthority(authority)[1];
+          }
+          return forwardedFor;
+        }
       } else if (type === "x_forwarded") {
         const value = this.getHeader(HTTP_X_FORWARDED_FOR);
         if (value)
@@ -410,8 +415,9 @@ export abstract class Helpers {
       return this.getHeader(RACK_REQUEST_QUERY_HASH);
     } else {
       if (rrQueryString != null) {
-        console.warn(
+        warn(
           "query string used for GET parsing different from current query string. Starting in Rack 3.2, Rack will used the cached GET value instead of parsing the current query string.",
+          { uplevel: 1 },
         );
       }
       const queryHash = this.parseQuery(queryString, "&");
@@ -436,8 +442,9 @@ export abstract class Helpers {
         if (formInput === rackInput) {
           return formHash;
         } else if (formInput) {
-          console.warn(
+          warn(
             "input stream used for POST parsing different from current input stream. Starting in Rack 3.2, Rack will used the cached POST value instead of parsing the current input stream.",
+            { uplevel: 1 },
           );
         }
       }

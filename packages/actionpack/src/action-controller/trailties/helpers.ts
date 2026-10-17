@@ -10,6 +10,7 @@ export interface HelpersPathControllerClass extends HelpersClassMethods {
   helper?: HelpersClass["helper"];
 }
 
+/** @noRailsEquivalent PERMANENT */
 export async function inherited(klass: HelpersPathControllerClass): Promise<void> {
   if (!rbObjRespondTo(klass, "helpersPath=")) return;
 

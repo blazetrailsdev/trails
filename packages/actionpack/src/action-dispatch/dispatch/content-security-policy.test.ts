@@ -399,10 +399,11 @@ class CspIntegrationController extends Base {
     this.head("not_modified");
   }
 }
-CspIntegrationController.contentSecurityPolicy({ only: ["inline"] }, (p) => {
+CspIntegrationController.contentSecurityPolicy(undefined, { only: ["inline"] }, (p) => {
   p.defaultSrc("https://example.com");
 });
 CspIntegrationController.contentSecurityPolicy(
+  undefined,
   {
     only: ["conditional"],
     if: [(c: AbstractController) => (c as CspIntegrationController).conditionTrue()],
@@ -412,6 +413,7 @@ CspIntegrationController.contentSecurityPolicy(
   },
 );
 CspIntegrationController.contentSecurityPolicy(
+  undefined,
   {
     only: ["conditional"],
     unless: [(c: AbstractController) => (c as CspIntegrationController).conditionTrue()],
@@ -420,20 +422,20 @@ CspIntegrationController.contentSecurityPolicy(
     p.defaultSrc("https://false.example.com");
   },
 );
-CspIntegrationController.contentSecurityPolicy({ only: ["reportOnly"] }, (p) => {
+CspIntegrationController.contentSecurityPolicy(undefined, { only: ["reportOnly"] }, (p) => {
   p.reportUri("/violations");
 });
-CspIntegrationController.contentSecurityPolicyReportOnly({ only: ["reportOnly"] });
-CspIntegrationController.contentSecurityPolicy({ only: ["scriptSrc"] }, (p) => {
+CspIntegrationController.contentSecurityPolicyReportOnly(undefined, { only: ["reportOnly"] });
+CspIntegrationController.contentSecurityPolicy(undefined, { only: ["scriptSrc"] }, (p) => {
   p.defaultSrc(false);
   p.scriptSrc(":self");
 });
-CspIntegrationController.contentSecurityPolicy({ only: ["styleSrc"] }, (p) => {
+CspIntegrationController.contentSecurityPolicy(undefined, { only: ["styleSrc"] }, (p) => {
   p.defaultSrc(false);
   p.styleSrc(":self");
 });
 CspIntegrationController.contentSecurityPolicy(false, { only: ["noPolicy"] });
-CspIntegrationController.contentSecurityPolicy({ only: ["api"] }, (p) => {
+CspIntegrationController.contentSecurityPolicy(undefined, { only: ["api"] }, (p) => {
   p.defaultSrc(":none");
   p.frameAncestors(":none");
 });
@@ -705,7 +707,7 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
 
   class PolicyController extends ApplicationController {
     static {
-      this.contentSecurityPolicy(function (this: unknown, p) {
+      this.contentSecurityPolicy(undefined, undefined, function (this: unknown, p) {
         const helpers = (this as PolicyController).helpers() as unknown as Probe;
         p.defaultSrc("https://example.com");
         if (helpers.isSkyIsBlue()) p.scriptSrc("https://example.com");

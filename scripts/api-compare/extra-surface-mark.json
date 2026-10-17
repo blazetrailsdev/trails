@@ -1,4 +1,12 @@
 {
+  "actioncontroller": {
+    "novel": 0,
+    "total": 10
+  },
+  "actiondispatch": {
+    "novel": 0,
+    "total": 11
+  },
   "ruby-compat": {
     "novel": 0,
     "total": 52

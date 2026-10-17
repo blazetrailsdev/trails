@@ -1,5 +1,11 @@
 import { constantize, include as includeMixin } from "@blazetrails/activesupport";
-import { ArgumentError, LoadError, NameError, SecureRandom } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  LoadError,
+  NameError,
+  SecureRandom,
+  hashDelete,
+} from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
@@ -28,9 +34,9 @@ export const Compatibility = {
   },
 
   /** @internal */
-  initializeSid(this: Persisted): void {
+  initializeSid(this: Persisted): unknown {
     delete this.defaultOptions.sidbits;
-    delete this.defaultOptions.secureRandom;
+    return hashDelete(this.defaultOptions, "secureRandom");
   },
 
   /** @internal */

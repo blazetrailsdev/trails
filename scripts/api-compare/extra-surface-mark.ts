@@ -129,7 +129,12 @@ export const COUNTED_PACKAGES = [] as const;
  * a row, because `total` stays gated in both modes. Only-grow: a package joins
  * on reaching zero and never leaves.
  */
-export const TAGGED_ONLY_PACKAGES = ["ruby-compat", "thor"] as const;
+export const TAGGED_ONLY_PACKAGES = [
+  "actioncontroller",
+  "actiondispatch",
+  "ruby-compat",
+  "thor",
+] as const;
 
 /**
  * Gated packages pinned at the constant 0 in BOTH `novel` and `total`, which

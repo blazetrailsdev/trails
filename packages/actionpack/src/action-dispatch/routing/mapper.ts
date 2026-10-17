@@ -1395,6 +1395,10 @@ export class Mapper {
     }
   }
 
+  /**
+   * @missingRailsCall find — PERMANENT
+   * @missingRailsCall read — PERMANENT
+   */
   async draw(name: string): Promise<void> {
     const fs = getFs();
     const p = getPath();
