@@ -35,7 +35,7 @@ export class Document {
     if (rbObjRespondTo(stringOrIo, "read") && rbObjRespondTo(stringOrIo, "path")) {
       url ??= (stringOrIo as unknown as { path: string }).path;
     }
-    if (!(rbObjRespondTo(stringOrIo, "read") || typeof stringOrIo === "string")) {
+    if (!(rbObjRespondTo(stringOrIo, "read") || rbObjRespondTo(stringOrIo, "toStr"))) {
       throw new ArgumentError("not a string or IO object");
     }
 
