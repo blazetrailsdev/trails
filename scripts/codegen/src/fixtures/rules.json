@@ -639,13 +639,94 @@
                     "endless": false
                   },
                   {
+                    "k": "def",
+                    "name": "locals",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "lasgn",
+                          "name": "opts",
+                          "value": {
+                            "k": "hash",
+                            "pairs": []
+                          },
+                          "l": 38
+                        },
+                        {
+                          "k": "call",
+                          "recv": {
+                            "k": "lvar",
+                            "name": "opts"
+                          },
+                          "name": "[]=",
+                          "args": [
+                            {
+                              "k": "sym",
+                              "value": "a"
+                            },
+                            {
+                              "k": "int",
+                              "value": "1"
+                            }
+                          ],
+                          "block": null,
+                          "safe": false,
+                          "l": 39,
+                          "vcall": false
+                        },
+                        {
+                          "k": "lasgn",
+                          "name": "total",
+                          "value": {
+                            "k": "int",
+                            "value": "0"
+                          },
+                          "l": 40
+                        },
+                        {
+                          "k": "opasgn",
+                          "op": "+",
+                          "target": {
+                            "k": "lvar",
+                            "name": "total"
+                          },
+                          "value": {
+                            "k": "int",
+                            "value": "1"
+                          },
+                          "l": 41
+                        },
+                        {
+                          "k": "array",
+                          "elems": [
+                            {
+                              "k": "lvar",
+                              "name": "opts"
+                            },
+                            {
+                              "k": "lvar",
+                              "name": "total"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "l": 37,
+                    "lend": 43,
+                    "endless": false
+                  },
+                  {
                     "k": "call",
                     "recv": null,
                     "name": "private",
                     "args": [],
                     "block": null,
                     "safe": false,
-                    "l": 37,
+                    "l": 45,
                     "vcall": true
                   },
                   {
@@ -668,8 +749,8 @@
                         }
                       ]
                     },
-                    "l": 38,
-                    "lend": 40,
+                    "l": 46,
+                    "lend": 48,
                     "endless": false
                   }
                 ]

@@ -118,3 +118,21 @@ describe("Ruby truthiness and interpolation in active_job/rules.rb, natively", (
     expect(rules).toContain('return `checked ${options ?? ""}`;');
   });
 });
+
+describe("local declarations in active_job/rules.rb", () => {
+  it("lets TypeScript infer a local the method assigns once", () => {
+    expect(rules).toContain("const counts = sortBy(");
+  });
+
+  it("types an empty Hash literal as an open record", () => {
+    expect(rules).toContain("const opts: Record<string, any> = {};");
+  });
+
+  it("keeps a reassigned local untyped, as Ruby may change its type", () => {
+    expect(rules).toContain("let total: any = 0;");
+  });
+
+  it("keeps a ruby-compat helper's unknown-typed result untyped", () => {
+    expect(rules).toContain("const line: any = aryJoin(");
+  });
+});

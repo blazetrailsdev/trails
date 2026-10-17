@@ -120,6 +120,9 @@ interface Scope {
   types?: Map<string, TypeRef>;
   /** Locals first assigned inside a nested block, declared at the function's top. */
   hoisted?: Set<string>;
+  /** The Ruby body this function scope lowers, for counting a local's assignments. */
+  body?: N;
+  assigns?: Map<string, number>;
 }
 
 export interface FileCtx {
@@ -339,10 +342,61 @@ export class Lowerer {
     return "";
   }
 
-  /** `let x: any` for a new local (or bare `x` when it already exists / is hoisted). */
-  decl(ctx: Ctx, name: string): string {
+  /**
+   * The declaration for a new local, or the bare name when it already exists or is
+   * hoisted. A local its function assigns once is a `const` whose type TypeScript
+   * infers; one Ruby reassigns, possibly to another type, stays `let x: any`.
+   */
+  decl(ctx: Ctx, name: string, value?: string): string {
     const pre = this.letFor(ctx, name);
-    return pre ? `let ${jsIdent(name)}: any` : jsIdent(name);
+    if (!pre) return jsIdent(name);
+    const id = jsIdent(name);
+    if (this.assignCount(ctx, name) !== 1 || value === undefined || value === "null")
+      return `let ${id}: any`;
+    if (value === "{}") return `const ${id}: Record<string, any>`;
+    if (value === "[]") return `const ${id}: any[]`;
+    if (this.helperResult(ctx, value)) return `const ${id}: any`;
+    return `const ${id}`;
+  }
+
+  /**
+   * Whether `value` is the result of a ruby-compat or activesupport helper. Those
+   * helpers type an arbitrary Ruby value as `unknown`, which the Ruby code reads
+   * members off freely.
+   */
+  helperResult(ctx: Ctx, value: string): boolean {
+    const head = /^\(?(?:await )?\(?([\w$]+)(?:\.[\w$]+)?\(/.exec(value)?.[1];
+    if (!head) return false;
+    for (const spec of ["@blazetrails/ruby-compat", "@blazetrails/activesupport"])
+      for (const local of ctx.f.imports.get(spec)?.values() ?? []) if (local === head) return true;
+    return false;
+  }
+
+  assignCount(ctx: Ctx, name: string): number {
+    const fs = ctx.fnScope;
+    if (!fs?.body) return Infinity;
+    if (!fs.assigns) {
+      const counts = new Map<string, number>();
+      const bump = (x: string) => counts.set(x, (counts.get(x) ?? 0) + 1);
+      walk(fs.body, (n) => {
+        if (n.k === "def" || n.k === "class" || n.k === "module" || n.k === "sclass") return false;
+        if (n.k === "lasgn") bump(n.name);
+        else if (
+          n.k === "call" &&
+          n.recv?.k === "lvar" &&
+          (n.name === "<<" || n.name.endsWith("!"))
+        )
+          bump(n.recv.name);
+        else if (n.k === "masgn" || n.k === "opasgn" || n.k === "for") {
+          walk(n, (m) => {
+            if (m.k === "lasgn" || m.k === "lvar") bump(m.name);
+          });
+          if (n.k === "for" && n.var) bump(n.var);
+        }
+      });
+      fs.assigns = counts;
+    }
+    return fs.assigns.get(name) ?? 0;
   }
 
   nest(ctx: Ctx): Ctx {
@@ -461,7 +515,7 @@ export class Lowerer {
         ctx.assigning = jsIdent(name);
         const v = this.expr(n.value, ctx);
         ctx.assigning = prevAssigning;
-        const line = `${this.decl(ctx, name)} = ${v};`;
+        const line = `${this.decl(ctx, name, v)} = ${v};`;
         this.noteLocalType(ctx, name, n.value);
         return tail ? [line, `return ${jsIdent(name)};`] : [line];
       }
@@ -691,7 +745,7 @@ export class Lowerer {
           .join(" || ");
         const lines: string[] = [];
         if (r.var?.k === "lvar" && jsIdent(r.var.name) !== err)
-          lines.push(`${this.decl(ctx, r.var.name)} = ${err};`);
+          lines.push(`${this.decl(ctx, r.var.name, err)} = ${err};`);
         // Type the rescued variable as the (single) rescued class.
         if (r.var?.k === "lvar" && classes.length === 1 && classes[0].k === "const") {
           const t = this.typeOf(classes[0], ctx);
@@ -752,7 +806,7 @@ export class Lowerer {
   assignTo(t: N, v: string, ctx: Ctx): string[] {
     switch (t.k) {
       case "lvar":
-        return [`${this.decl(ctx, t.name)} = ${v};`];
+        return [`${this.decl(ctx, t.name, v)} = ${v};`];
       case "ivar":
         return [`${this.ivar(t.name, ctx)} = ${v};`];
       case "call":
@@ -1249,7 +1303,7 @@ export class Lowerer {
   }
 
   arrow(params: Param[], body: N, ctx: Ctx): string {
-    const scope: Scope = { locals: new Set(), parent: ctx.scope };
+    const scope: Scope = { locals: new Set(), parent: ctx.scope, body };
     const inner = this.child(ctx, {
       scope,
       fnScope: scope,
@@ -1279,7 +1333,7 @@ export class Lowerer {
    * object, not an arrow closing over the defining scope's `self`.
    */
   selfFunction(params: Param[], body: N, ctx: Ctx, over: Partial<Ctx> = {}): string {
-    const scope: Scope = { locals: new Set(), parent: ctx.scope };
+    const scope: Scope = { locals: new Set(), parent: ctx.scope, body };
     const inner = this.child(ctx, {
       ...over,
       scope,
