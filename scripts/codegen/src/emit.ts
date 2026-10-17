@@ -725,6 +725,21 @@ export class Emitter {
       const stmts = file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : [];
       const fake = { nesting: [], fqn: undefined, body: [], sbody: [] } as unknown as Unit;
       const tctx = this.baseCtx(fake, f, {});
+      if (
+        stmts.some(
+          (s: N) =>
+            s.k === "call" &&
+            s.recv === null &&
+            s.name === "require" &&
+            s.args[0]?.value === GEM.rubyRoot,
+        )
+      )
+        this.lw.imp(
+          tctx,
+          `@root/${this.lw.resolver.tsFileOf(`${GEM.rubyRoot}.rb`).replace(/\.ts$/, ".js")}`,
+          "",
+          "",
+        );
       // `@adapter = ENV["AJ_ADAPTER"] ||= "inline"` (helper.rb:9): the `ENV`
       // default is what later reads see; the top-level ivar has no reader.
       for (const s of stmts)
