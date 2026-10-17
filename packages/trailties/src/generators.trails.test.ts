@@ -8,6 +8,9 @@ import { createProgram } from "./cli.js";
 import { AuthenticationGenerator } from "./generators/rails/authentication/authentication-generator.js";
 import { GeneratorGenerator } from "./generators/rails/generator/generator-generator.js";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { lookupBang } from "./command/behavior.js";
+
+await lookupBang();
 
 beforeAll(async () => {
   await Generators.lookupBang();

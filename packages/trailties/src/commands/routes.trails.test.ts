@@ -4,6 +4,9 @@ import { env, getFs, getOsAsync, getPath, setEnv, rbFLoad } from "@blazetrails/r
 import { Application } from "../application.js";
 import { createProgram } from "../cli.js";
 import { Trails, _resetTrailsEnv } from "../rails.js";
+import { lookupBang } from "../command/behavior.js";
+
+await lookupBang();
 
 describe("RoutesCommand", () => {
   let savedEnv: string | undefined;
