@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { I18n, isHtmlSafe } from "@blazetrails/activesupport";
 import { Hash } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
@@ -101,7 +101,21 @@ describe("TranslationHelperTest", () => {
     await I18n.backend().reloadBang();
   });
 
-  it.skip("delegates setting to i18n", () => {});
+  it("delegates setting to i18n", () => {
+    let matcherCalled = false;
+    const spy = vi.spyOn(I18n.backend(), "translate").mockImplementation((locale, key) => {
+      matcherCalled = true;
+      expect(key).toBe(":foo");
+      expect(locale).toBe("en");
+      return null;
+    });
+    try {
+      translate(":foo", { locale: "en" });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(matcherCalled).toBe(true);
+  });
 
   it("delegates localize to i18n", () => {
     const time = Time.utc(2008, 7, 8, 12, 18, 38);
@@ -494,5 +508,6 @@ describe("TranslationHelperTest", () => {
     expect(options).toEqual({});
   });
 
+  // BLOCKED: i18n-backend-cache
   it.skip("translate caching backend", () => {});
 });

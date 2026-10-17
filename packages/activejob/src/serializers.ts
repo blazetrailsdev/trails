@@ -1,4 +1,4 @@
-import { Autoload, extend, mattrAccessor, safeConstantize } from "@blazetrails/activesupport";
+import { mattrAccessor, safeConstantize } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   hashAref,
@@ -8,20 +8,8 @@ import {
   rbModName,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
-import { ActiveJob, loadPath, type AutoloadModule, type SerializerLike } from "./namespaces.js";
-import type { DurationSerializer } from "./serializers/duration-serializer.js";
-import type { ObjectSerializer } from "./serializers/object-serializer.js";
-
-export const Serializers = { name: "ActiveJob::Serializers", loadPath } as AutoloadModule & {
-  _additionalSerializers: Set<SerializerLike>;
-  serialize: typeof serialize;
-  deserialize: typeof deserialize;
-  serializers: typeof serializers;
-  addSerializers: typeof addSerializers;
-  ObjectSerializer: typeof ObjectSerializer;
-  DurationSerializer: typeof DurationSerializer;
-};
-extend(Serializers, Autoload);
+import { ActiveJob, Serializers, type SerializerLike } from "./namespaces.js";
+import { DurationSerializer } from "./serializers/duration-serializer.js";
 
 Serializers.autoload("ObjectSerializer");
 Serializers.autoload("DurationSerializer");
@@ -65,4 +53,7 @@ export function addSerializers(...newSerializers: (SerializerLike | SerializerLi
 }
 
 Object.assign(Serializers, { serialize, deserialize, serializers, addSerializers });
+
+addSerializers(DurationSerializer);
 rbModConstSet(ActiveJob, "Serializers", Serializers);
+export { Serializers };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Duration, days, years } from "@blazetrails/activesupport";
+import { Duration, HashWithIndifferentAccess, days, years } from "@blazetrails/activesupport";
+import { Hash } from "@blazetrails/ruby-compat";
 import "../index.js";
 import { deserialize, serialize } from "../arguments.js";
 
@@ -30,5 +31,17 @@ describe("ActiveJob::Arguments with a Hash", () => {
       ["b", "x"],
     ]);
     expect(await deserialize(serialized)).toEqual(serialized);
+  });
+
+  it("maps a ruby-compat Hash over its [key, value] pairs", async () => {
+    const serialized = serialize(new Hash<string, number>().set("a", 1));
+    expect(serialized).toEqual([["a", 1]]);
+    expect(await deserialize(serialized)).toEqual([["a", 1]]);
+  });
+
+  it("maps a HashWithIndifferentAccess over its [key, value] pairs", async () => {
+    const serialized = serialize(new HashWithIndifferentAccess({ a: 1 }));
+    expect(serialized).toEqual([["a", 1]]);
+    expect(await deserialize(serialized)).toEqual([["a", 1]]);
   });
 });
