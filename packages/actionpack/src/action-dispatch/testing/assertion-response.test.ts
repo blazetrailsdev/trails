@@ -22,10 +22,8 @@ describe("AssertionResponse", () => {
     expect(r.code).toBe(404);
   });
 
-  it("constructs from a string code", () => {
-    const r = new AssertionResponse("422");
-    expect(r.code).toBe("422");
-    expect(r.name).toMatch(/unprocessable/i);
+  it("raises on a string code, as HTTP_STATUS_CODES is keyed by Integer", () => {
+    expect(() => new AssertionResponse("422")).toThrow(/Invalid response code: 422/);
   });
 
   it("constructs from a generic code via GENERIC_RESPONSE_CODES.invert", () => {

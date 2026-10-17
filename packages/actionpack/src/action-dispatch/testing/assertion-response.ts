@@ -44,7 +44,7 @@ function codeFromName(name: string): number | string | null {
 function nameFromCode(code: number | string): string | null {
   return (
     Object.keys(GENERIC_RESPONSE_CODES).find((name) => GENERIC_RESPONSE_CODES[name] === code) ??
-    HTTP_STATUS_CODES[code as number] ??
+    (typeof code === "number" ? HTTP_STATUS_CODES[code] : undefined) ??
     null
   );
 }
