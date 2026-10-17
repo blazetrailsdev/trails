@@ -138,7 +138,7 @@ export async function writeFragment(
   key = combinedFragmentCacheKey.call(this, key);
   await instrumentFragmentCache.call(this, "write_fragment", key, async () => {
     content = toStr(content);
-    await this.cacheStore!.write(key as string, content, options);
+    await this.cacheStore!.write(key, content, options);
   });
   return content;
 }
@@ -151,7 +151,7 @@ export async function readFragment(
   if (!this.isCacheConfigured()) return undefined;
   key = combinedFragmentCacheKey.call(this, key);
   return await instrumentFragmentCache.call(this, "read_fragment", key, async () => {
-    const result = await this.cacheStore!.read(key as string, options);
+    const result = await this.cacheStore!.read(key, options);
     return typeof result === "string" ? htmlSafe(result) : result;
   });
 }
@@ -164,7 +164,7 @@ export async function fragmentExist(
   if (!this.isCacheConfigured()) return undefined;
   key = combinedFragmentCacheKey.call(this, key);
   return (await instrumentFragmentCache.call(this, "exist_fragment?", key, () =>
-    this.cacheStore!.exist(key as string, options),
+    this.cacheStore!.exist(key, options),
   )) as boolean | undefined;
 }
 
@@ -180,7 +180,7 @@ export async function expireFragment(
     if (key instanceof RegExp) {
       return this.cacheStore!.deleteMatched(key, options);
     } else {
-      return this.cacheStore!.delete(key as string, options);
+      return this.cacheStore!.delete(key, options);
     }
   });
 }
