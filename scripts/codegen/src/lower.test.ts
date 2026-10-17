@@ -156,3 +156,10 @@ describe("a hand twin's oracle type as a TS signature type", () => {
     expect(tsType({ k: "class", key: "@activesupport/duration.ts#Duration" })).toBe("any");
   });
 });
+
+describe("option hashes in active_job/rules.rb", () => {
+  it("spells an options literal's keys camelCase, as its later writes are", () => {
+    expect(rules).toContain("const options: Record<string, any> = { primaryKey: 1 };");
+    expect(rules).toContain("options.onDelete = 2;");
+  });
+});
