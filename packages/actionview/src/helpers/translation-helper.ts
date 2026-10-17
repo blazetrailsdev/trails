@@ -41,13 +41,9 @@ export function translate(
 
   let alternatives: unknown[] | undefined;
   if ("default" in options) {
-    if (Array.isArray(options.default)) {
-      alternatives = (options.default as unknown[]).filter((d) => d != null);
-      delete options.default;
-    } else {
-      alternatives = [options.default];
-      delete options.default;
-    }
+    const default_ = options.default;
+    delete options.default;
+    alternatives = Array.isArray(default_) ? default_.filter((d) => d != null) : [default_];
   }
 
   if (options.raise == null && TranslationHelper.raiseOnMissingTranslations()) options.raise = true;

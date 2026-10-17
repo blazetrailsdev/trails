@@ -11,44 +11,17 @@ import { localize, translate as translateHelper } from "../helpers/translation-h
 
 const CustomExceptionHandler = { call: () => "from CustomExceptionHandler" };
 
-const blockTemplate = (call: string, args: string, body: string) =>
-  `<%= ${call.slice(0, -1)}, (${args}) => { %>\n  ${body}\n<% }) %>`;
-
 const TEMPLATES: Record<string, string> = {
   "translations/templates/array.html.tse": "<%= t('.foo.bar') %>",
   "translations/templates/default.html.tse": "<%= t('.missing', { default: ':.foo' }) %>",
   "translations/templates/found.html.tse": "<%= t('.foo') %>",
-  "translations/templates/found_yield_block.html.tse": blockTemplate(
-    "t('.foo', {})",
-    "translation, key",
-    "<%= key %>: <%= translation %>",
-  ),
-  "translations/templates/found_yield_single_argument.html.tse": blockTemplate(
-    "t('.foo', {})",
-    "translation",
-    "<%= translation %>",
-  ),
+  "translations/templates/found_yield_block.html.tse": `<%= t('.foo', {}, (translation, key) => { %> <%= key %>: <%= translation %> <% }) %>`,
+  "translations/templates/found_yield_single_argument.html.tse": `<%= t('.foo', {}, (translation) => { %> <%= translation %> <% }) %>`,
   "translations/templates/missing.html.tse": "<%= t('.missing') %>",
-  "translations/templates/missing_with_default_yield_block.html.tse": blockTemplate(
-    'translate(".missing", { default: "Default" })',
-    "translation, key",
-    "<%= key %>: <%= translation %>",
-  ),
-  "translations/templates/missing_with_default_yield_single_argument_block.html.tse": blockTemplate(
-    'translate(".missing", { default: "Default" })',
-    "translation",
-    "<%= translation %>",
-  ),
-  "translations/templates/missing_yield_block.html.tse": blockTemplate(
-    "t('.missing', {})",
-    "translation, key",
-    "<%= key %>: <%= translation %>",
-  ),
-  "translations/templates/missing_yield_single_argument_block.html.tse": blockTemplate(
-    "t('.missing', {})",
-    "translation",
-    "<%= translation %>",
-  ),
+  "translations/templates/missing_with_default_yield_block.html.tse": `<%= translate(".missing", { default: "Default" }, (translation, key) => { %> <%= key %>: <%= translation %> <% }) %>`,
+  "translations/templates/missing_with_default_yield_single_argument_block.html.tse": `<%= translate(".missing", { default: "Default" }, (translation) => { %> <%= translation %> <% }) %>`,
+  "translations/templates/missing_yield_block.html.tse": `<%= t('.missing', {}, (translation, key) => { %> <%= key %>: <%= translation %> <% }) %>`,
+  "translations/templates/missing_yield_single_argument_block.html.tse": `<%= t('.missing', {}, (translation) => { %> <%= translation %> <% }) %>`,
   "translations/templates/_partial.html.tse": "<%= t('.foo') %>\n<%= yield %>",
   "translations/templates/partial_lazy_translation_block.html.tse":
     '<%= render("translations/templates/partial", () => { %>\n<% }) %>',
