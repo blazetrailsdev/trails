@@ -5,6 +5,9 @@
 
 import type { UnportedFile } from "./types.js";
 
+const SOLID_STACK_ONLY =
+  "trails targets the Solid stack (Solid Cache/Queue/Cable); memcached and Redis backends are deferred by owner ruling (2026-10-17).";
+
 export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
   {
     pattern: "i18n_railtie.rb",
@@ -79,15 +82,13 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     pattern: "cache/redis_cache_store.rb",
     testFile: "redis_cache_store_test.rb",
     package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+    reason: SOLID_STACK_ONLY,
   },
   {
     pattern: "cache/mem_cache_store.rb",
     testFile: "mem_cache_store_test.rb",
     package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
+    reason: SOLID_STACK_ONLY,
   },
   {
     pattern: "cache/strategy/local_cache.rb",

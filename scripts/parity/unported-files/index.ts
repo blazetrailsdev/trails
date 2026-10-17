@@ -8,6 +8,8 @@
  */
 
 import type { UnportedFile } from "./types.js";
+import { ACTIONCABLE_UNPORTED_FILES } from "./actioncable.js";
+import { ACTIONPACK_UNPORTED_FILES } from "./actionpack.js";
 import { ACTIVERECORD_TEST_SUPPORT_UNPORTED_FILES } from "./activerecord-test-support.js";
 import { ACTIONVIEW_UNPORTED_FILES } from "./actionview.js";
 import { ACTIVEJOB_UNPORTED_FILES } from "./activejob.js";
@@ -24,6 +26,8 @@ import { VERSION_UNPORTED_FILES } from "./version.js";
 export type { UnportedFile } from "./types.js";
 
 export const UNPORTED_FILES: UnportedFile[] = [
+  ...ACTIONCABLE_UNPORTED_FILES,
+  ...ACTIONPACK_UNPORTED_FILES,
   ...ACTIONVIEW_UNPORTED_FILES,
   ...ACTIVEJOB_UNPORTED_FILES,
   ...ACTIVERECORD_TEST_SUPPORT_UNPORTED_FILES,
