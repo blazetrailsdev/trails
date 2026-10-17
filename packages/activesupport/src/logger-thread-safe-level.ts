@@ -57,21 +57,21 @@ export class LoggerThreadSafeLevel {
     this._level = coerce(severity);
   }
 
+  /** @inventedArm if — PERMANENT */
   logAt<T>(level: number | LogLevel, fn: () => T): T {
     const oldLocalLevel = this.localLevel;
     this.localLevel = level;
-    let result: T;
+    let async = false;
     try {
-      result = fn();
-    } catch (error) {
-      this.localLevel = oldLocalLevel;
-      throw error;
+      const result = fn();
+      if (typeof (result as PromiseLike<unknown> | null)?.then === "function") {
+        async = true;
+        return Promise.resolve(result).finally(() => (this.localLevel = oldLocalLevel)) as T;
+      }
+      return result;
+    } finally {
+      if (!async) this.localLevel = oldLocalLevel;
     }
-    if (result instanceof Promise) {
-      return result.finally(() => (this.localLevel = oldLocalLevel)) as T;
-    }
-    this.localLevel = oldLocalLevel;
-    return result;
   }
 }
 

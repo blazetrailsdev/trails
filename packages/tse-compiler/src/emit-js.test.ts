@@ -51,6 +51,21 @@ describe("compileJs", () => {
     expect(code).toContain("_ob.safeExprAppend(await ( y ));");
   });
 
+  it("awaits a block-expr call whose opener leaves parens unbalanced, inside an if but not inside a function", () => {
+    const { code } = compileJs(
+      "<% if (x) { %><%= cache((a), { b: (1) }, () => { %>bar<% }) %><% } %>" +
+        "<% items.forEach((i) => { %><%= cache(i, () => { %>baz<% }) %><% }) %>",
+      { async: true },
+    );
+    expect(code).toContain("_ob.append(await ( cache((a), { b: (1) }, () => {");
+    expect(code).toContain("}) ));");
+    expect(code).toContain("_ob.append( cache(i, () => {");
+    expect(
+      () =>
+        new Function(`return async function () { ${code.replace(/^export default /, "return ")} }`),
+    ).not.toThrow();
+  });
+
   it("does not count braces inside string literals when deciding what an async render awaits", () => {
     const { code } = compileJs('<% const s = "a{b"; const t = `}`; %><%= yield %>', {
       async: true,

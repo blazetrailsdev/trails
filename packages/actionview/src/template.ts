@@ -263,7 +263,7 @@ export class Template {
     return this.strictLocalsBang() != null;
   }
 
-  render(
+  async render(
     view: Base,
     locals: Record<string, unknown> = {},
     buffer: OutputBuffer | StreamingBuffer | null = null,
@@ -275,45 +275,40 @@ export class Template {
   ): Promise<string | SafeBuffer | null> {
     const streaming = buffer instanceof StreamingBuffer;
     try {
-      const rendered = this.instrumentRenderTemplate<Promise<string | SafeBuffer | null>>(
-        async () => {
-          this.compileBang(view, streaming);
+      return await this.instrumentRenderTemplate<Promise<string | SafeBuffer | null>>(async () => {
+        this.compileBang(view, streaming);
 
-          if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
-            const localsToIgnore = implicitLocals.filter(
-              (l) => !this._strictLocalKeys!.includes(l),
-            );
-            for (const key of localsToIgnore) delete locals[key];
-          }
+        if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
+          const localsToIgnore = implicitLocals.filter((l) => !this._strictLocalKeys!.includes(l));
+          for (const key of localsToIgnore) delete locals[key];
+        }
 
-          if (buffer) {
-            await view._run(
-              streaming ? this.streamingMethodName() : this.methodName(),
-              this,
-              locals,
-              buffer as OutputBuffer,
-              { addToStack, hasStrictLocals: this.isStrictLocals() },
-              block,
-            );
-            return null;
-          } else {
-            const result = await view._run(
-              this.methodName(),
-              this,
-              locals,
-              new OutputBuffer(),
-              { addToStack, hasStrictLocals: this.isStrictLocals() },
-              block,
-            );
-            return result instanceof OutputBuffer
-              ? result.toString()
-              : (result as string | SafeBuffer);
-          }
-        },
-      );
-      return rendered.catch((e: unknown) => this.handleRenderError(view, e));
+        if (buffer) {
+          await view._run(
+            streaming ? this.streamingMethodName() : this.methodName(),
+            this,
+            locals,
+            buffer as OutputBuffer,
+            { addToStack, hasStrictLocals: this.isStrictLocals() },
+            block,
+          );
+          return null;
+        } else {
+          const result = await view._run(
+            this.methodName(),
+            this,
+            locals,
+            new OutputBuffer(),
+            { addToStack, hasStrictLocals: this.isStrictLocals() },
+            block,
+          );
+          return result instanceof OutputBuffer
+            ? result.toString()
+            : (result as string | SafeBuffer);
+        }
+      });
     } catch (e) {
-      return Promise.reject(e).catch((e: unknown) => this.handleRenderError(view, e));
+      return this.handleRenderError(view, e);
     }
   }
 
