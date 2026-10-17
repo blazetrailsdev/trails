@@ -21,11 +21,7 @@ import { Context } from "./context.js";
 import { Helpers } from "./helpers.js";
 import type * as HelperExports from "./helpers/index.js";
 import type { _objectForFormBuilder } from "./helpers/form-helper.js";
-import {
-  ClassMethods as UrlHelperClassMethods,
-  type _backUrl,
-  type _filteredReferrer,
-} from "./helpers/url-helper.js";
+import type { _backUrl, _filteredReferrer } from "./helpers/url-helper.js";
 import { assignController } from "./helpers/controller-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
@@ -35,7 +31,6 @@ import { Renderer } from "./renderer/renderer.js";
 import {
   ArgumentError,
   excBacktraceLocations,
-  extend,
   include,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -411,7 +406,6 @@ export interface Base
 include(Base, Context);
 include(Base, TseUtil);
 include(Base, Helpers);
-extend(Base, UrlHelperClassMethods);
 
 runLoadHooks("action_view", Base);
 

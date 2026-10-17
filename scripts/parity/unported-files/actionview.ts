@@ -23,6 +23,17 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "(handlers.rb:12-18) registers the other four handlers and not `:builder`.",
   },
   {
+    pattern: "helpers/atom_feed_helper.rb",
+    testFile: "template/atom_feed_helper_test.rb",
+    package: "actionview",
+    reason:
+      "`AtomFeedHelper#atom_feed` (atom_feed_helper.rb:96-125) reads `xml` from the block's " +
+      "binding, where only a `.builder` template's compiled code sets it, and every " +
+      "`AtomBuilder` / `AtomFeedBuilder` method forwards to `::Builder::XmlMarkup`. The " +
+      "`:builder` handler is unported above for want of XmlMarkup, and every test in " +
+      "atom_feed_helper_test.rb renders a `.builder` template, so neither half has a caller.",
+  },
+  {
     pattern: "/test_case.rb",
     package: "actionview",
     reason:

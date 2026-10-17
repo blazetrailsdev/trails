@@ -1,4 +1,4 @@
-import { SafeBuffer, htmlSafe, mattrAccessor } from "@blazetrails/activesupport";
+import { Concern, SafeBuffer, extend, htmlSafe, mattrAccessor } from "@blazetrails/activesupport";
 import { HTML4 } from "@blazetrails/html-sanitizer";
 import { Module } from "@blazetrails/ruby-compat";
 
@@ -23,121 +23,106 @@ export interface SanitizerVendor {
   };
 }
 
-export const SanitizeHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { sanitize, sanitizeCss, stripTags, stripLinks });
-  });
-}) as Module & { sanitizerVendor: SanitizerVendor };
-mattrAccessor.call(SanitizeHelper, "sanitizerVendor", { default: HTML4.Sanitizer });
-
-/** @noRailsEquivalent CONVERGEABLE actionview-url-and-sanitize-helper-concerns-and-sanitizer-memos */
-export function getSanitizerVendor(): SanitizerVendor {
-  return SanitizeHelper.sanitizerVendor;
+export interface SanitizeHelperClass {
+  readonly sanitizerVendor: SanitizerVendor;
+  fullSanitizer: Sanitizer;
+  linkSanitizer: Sanitizer;
+  safeListSanitizer: Sanitizer;
+  _fullSanitizer?: Sanitizer;
+  _linkSanitizer?: Sanitizer;
+  _safeListSanitizer?: Sanitizer;
 }
 
-export function setSanitizerVendor(vendor: SanitizerVendor): void {
-  SanitizeHelper.sanitizerVendor = vendor;
-  _fullSanitizer = null;
-  _linkSanitizer = null;
-  _safeListSanitizer = null;
-}
-
-let _fullSanitizer: Sanitizer | null = null;
-let _linkSanitizer: Sanitizer | null = null;
-let _safeListSanitizer: Sanitizer | null = null;
-
-/** @noRailsEquivalent CONVERGEABLE actionview-url-and-sanitize-helper-concerns-and-sanitizer-memos */
-export function getFullSanitizer(): Sanitizer {
-  if (!_fullSanitizer) {
-    _fullSanitizer = new SanitizeHelper.sanitizerVendor.fullSanitizer();
-  }
-  return _fullSanitizer;
-}
-
-export function setFullSanitizer(sanitizer: Sanitizer): void {
-  _fullSanitizer = sanitizer;
-}
-
-/** @noRailsEquivalent CONVERGEABLE actionview-url-and-sanitize-helper-concerns-and-sanitizer-memos */
-export function getLinkSanitizer(): Sanitizer {
-  if (!_linkSanitizer) {
-    _linkSanitizer = new SanitizeHelper.sanitizerVendor.linkSanitizer();
-  }
-  return _linkSanitizer;
-}
-
-export function setLinkSanitizer(sanitizer: Sanitizer): void {
-  _linkSanitizer = sanitizer;
-}
-
-/** @noRailsEquivalent CONVERGEABLE actionview-url-and-sanitize-helper-concerns-and-sanitizer-memos */
-export function getSafeListSanitizer(): Sanitizer {
-  if (!_safeListSanitizer) {
-    _safeListSanitizer = new SanitizeHelper.sanitizerVendor.safeListSanitizer();
-  }
-  return _safeListSanitizer;
-}
-
-export function setSafeListSanitizer(sanitizer: Sanitizer): void {
-  _safeListSanitizer = sanitizer;
-}
-
-export function sanitizedAllowedTags(): Iterable<string> {
-  return SanitizeHelper.sanitizerVendor.safeListSanitizer.allowedTags;
-}
-
-export function sanitizedAllowedAttributes(): Iterable<string> {
-  return SanitizeHelper.sanitizerVendor.safeListSanitizer.allowedAttributes;
-}
+type SanitizeHelperHost = { constructor: unknown };
 
 export function sanitize(
+  this: SanitizeHelperHost,
   html: string | null | undefined,
   options: Record<string, unknown> = {},
 ): SafeBuffer | null {
-  const result = getSafeListSanitizer().sanitize(html, options);
+  const result = (this.constructor as SanitizeHelperClass).safeListSanitizer.sanitize(
+    html,
+    options,
+  );
   return result == null ? null : htmlSafe(result);
 }
 
-export function sanitizeCss(style: string): string {
-  const sanitizer = getSafeListSanitizer();
-  if (sanitizer.sanitizeCss) {
-    return sanitizer.sanitizeCss(style);
-  }
-  return style;
+export function sanitizeCss(this: SanitizeHelperHost, style: string): string {
+  return (this.constructor as SanitizeHelperClass).safeListSanitizer.sanitizeCss!(style);
 }
 
-export function stripTags(html: string | null | undefined): SafeBuffer | null {
-  const result = getFullSanitizer().sanitize(html);
+export function stripTags(
+  this: SanitizeHelperHost,
+  html: string | null | undefined,
+): SafeBuffer | null {
+  const result = (this.constructor as SanitizeHelperClass).fullSanitizer.sanitize(html);
   return result == null ? null : htmlSafe(result);
 }
 
-export function stripLinks(html: string | null | undefined): string | null | undefined {
-  return getLinkSanitizer().sanitize(html);
+export function stripLinks(
+  this: SanitizeHelperHost,
+  html: string | null | undefined,
+): string | null | undefined {
+  return (this.constructor as SanitizeHelperClass).linkSanitizer.sanitize(html);
 }
 
-export class ClassMethods {
-  static get fullSanitizer(): Sanitizer {
-    return getFullSanitizer();
-  }
-  static set fullSanitizer(value: Sanitizer) {
-    setFullSanitizer(value);
-  }
+export const ClassMethods = {
+  set fullSanitizer(value: Sanitizer) {
+    (this as unknown as SanitizeHelperClass)._fullSanitizer = value;
+  },
 
-  static get linkSanitizer(): Sanitizer {
-    return getLinkSanitizer();
-  }
-  static set linkSanitizer(value: Sanitizer) {
-    setLinkSanitizer(value);
-  }
+  set linkSanitizer(value: Sanitizer) {
+    (this as unknown as SanitizeHelperClass)._linkSanitizer = value;
+  },
 
-  static get safeListSanitizer(): Sanitizer {
-    return getSafeListSanitizer();
-  }
-  static set safeListSanitizer(value: Sanitizer) {
-    setSafeListSanitizer(value);
-  }
+  set safeListSanitizer(value: Sanitizer) {
+    (this as unknown as SanitizeHelperClass)._safeListSanitizer = value;
+  },
 
-  static get sanitizerVendor(): SanitizerVendor {
-    return getSanitizerVendor();
-  }
-}
+  get sanitizerVendor(): SanitizerVendor {
+    return SanitizeHelper.sanitizerVendor;
+  },
+
+  sanitizedAllowedTags(this: SanitizeHelperClass): Iterable<string> {
+    return this.sanitizerVendor.safeListSanitizer.allowedTags;
+  },
+
+  sanitizedAllowedAttributes(this: SanitizeHelperClass): Iterable<string> {
+    return this.sanitizerVendor.safeListSanitizer.allowedAttributes;
+  },
+
+  get fullSanitizer(): Sanitizer {
+    const self = this as unknown as SanitizeHelperClass;
+    if (!Object.hasOwn(self, "_fullSanitizer") || self._fullSanitizer == null) {
+      self._fullSanitizer = new self.sanitizerVendor.fullSanitizer();
+    }
+    return self._fullSanitizer;
+  },
+
+  get linkSanitizer(): Sanitizer {
+    const self = this as unknown as SanitizeHelperClass;
+    if (!Object.hasOwn(self, "_linkSanitizer") || self._linkSanitizer == null) {
+      self._linkSanitizer = new self.sanitizerVendor.linkSanitizer();
+    }
+    return self._linkSanitizer;
+  },
+
+  get safeListSanitizer(): Sanitizer {
+    const self = this as unknown as SanitizeHelperClass;
+    if (!Object.hasOwn(self, "_safeListSanitizer") || self._safeListSanitizer == null) {
+      self._safeListSanitizer = new self.sanitizerVendor.safeListSanitizer();
+    }
+    return self._safeListSanitizer;
+  },
+};
+
+export const SanitizeHelper = new Module((mod) => {
+  extend(mod, Concern);
+
+  mod.moduleEval((m) => {
+    Object.assign(m, { sanitize, sanitizeCss, stripTags, stripLinks });
+  });
+
+  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
+}) as Module & { sanitizerVendor: SanitizerVendor };
+mattrAccessor.call(SanitizeHelper, "sanitizerVendor", { default: HTML4.Sanitizer });

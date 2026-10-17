@@ -7,7 +7,7 @@ import {
   currentCycle,
   cycle,
   excerpt,
-  highlight,
+  highlight as _highlight,
   pluralize,
   resetCycle,
   simpleFormat as _simpleFormat,
@@ -21,6 +21,7 @@ import { assertNil } from "@blazetrails/activesupport";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const simpleFormat = _simpleFormat.bind(view);
+const highlight = _highlight.bind(view);
 
 function newHost(initial = ""): TextHelperHost {
   return { outputBuffer: new OutputBuffer(initial) };

@@ -1,4 +1,4 @@
-import { Benchmarkable } from "@blazetrails/activesupport";
+import { Benchmarkable, Concern, extend } from "@blazetrails/activesupport";
 import { Module } from "@blazetrails/ruby-compat";
 import { ActiveModelHelper } from "./helpers/active-model-helper.js";
 import { AssetTagHelper } from "./helpers/asset-tag-helper.js";
@@ -25,6 +25,8 @@ import { TextHelper } from "./helpers/text-helper.js";
 import { UrlHelper } from "./helpers/url-helper.js";
 
 export const Helpers = new Module((mod) => {
+  extend(mod, Concern);
+
   mod.include(Benchmarkable);
   mod.include(ActiveModelHelper);
   mod.include(AssetTagHelper);

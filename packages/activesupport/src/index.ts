@@ -636,6 +636,7 @@ export {
 } from "./testing/assertions.js";
 export { assertErrorReported, assertNoErrorReported } from "./testing/error-reporter-assertions.js";
 export { ConstantLookup } from "./testing/constant-lookup.js";
+export { Parallelization } from "./testing/parallelization.js";
 export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { Stream, silenceStream, quietly, capture } from "./testing/stream.js";
 export * as SetupAndTeardown from "./testing/setup-and-teardown.js";
