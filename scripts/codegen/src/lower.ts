@@ -3631,7 +3631,7 @@ export class Lowerer {
     if (m.info.kind !== "method") {
       if (n.args.length || n.block) return null;
       e = `${recv}${nav}${m.tsName}`;
-    } else e = `${recv}${nav}${m.tsName}(${argList()})`;
+    } else e = `${recv}${nav}${m.tsName}(${this.typedArgs(n, m.info.params, ctx) ?? argList()})`;
     if (m.info.async && ctx.isCtor && !ctx.inBlock) {
       // A JS constructor cannot await (plan: hard stop). Keep the call, count it.
       ctx.f.declines.push({ reason: "async-in-constructor", line: n.l, ruby: n.name });
@@ -3644,6 +3644,49 @@ export class Lowerer {
       return `(await ${e})`;
     }
     return e;
+  }
+
+  /**
+   * A typed call's positional arguments, each asserted non-null (`!`) where its
+   * own type admits `null` and the callee's parameter does not: Ruby passes the
+   * value unguarded, and a `nil` there raises in the callee as the JS `TypeError`
+   * would. Null when the call has a splat, keywords or a block.
+   */
+  typedArgs(n: N, params: TypeRef[] | undefined, ctx: Ctx): string | null {
+    if (
+      !params ||
+      n.block ||
+      n.args.some(
+        (a: N) =>
+          a.k !== "lvar" &&
+          a.k !== "ivar" &&
+          a.k !== "call" &&
+          a.k !== "const" &&
+          ![
+            "str",
+            "dstr",
+            "int",
+            "float",
+            "sym",
+            "true",
+            "false",
+            "nil",
+            "array",
+            "hash",
+            "self",
+          ].includes(a.k),
+      )
+    )
+      return null;
+    return n.args
+      .map((a: N, i: number) => {
+        const e = this.argExpr(a, ctx);
+        const pt = params[i];
+        const at = this.typeOf(a, ctx);
+        const nullable = (t: TypeRef) => !!t && "nullable" in t && !!t.nullable;
+        return pt && at && !nullable(pt) && nullable(at) ? `${needsParens(e) ? `(${e})` : e}!` : e;
+      })
+      .join(", ");
   }
 
   operator(n: N, r: string, ctx: Ctx): string {
