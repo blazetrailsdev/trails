@@ -95,10 +95,7 @@ const MISSING_TRANSLATION = -(2 ** 60);
 
 const NO_DEFAULT = Object.freeze([]);
 
-/**
- * @inventedArm symbolToS — PERMANENT
- * @internal
- */
+/** @internal */
 function scopeKeyByPartial(
   this: TranslationHelperHost,
   key: string | null | undefined,
