@@ -606,7 +606,9 @@ export class Resolver {
   get trailsSeat(): Map<string, { method: boolean; nullable: boolean }> {
     if (this._trailsSeat) return this._trailsSeat;
     const src = readFileSync(path.join(ROOT, "packages/activesupport/src/namespaces.ts"), "utf8");
-    const body = /\n {2}Trails\?: \{\n([\s\S]*?)\n {2}\};/.exec(src)?.[1] ?? "";
+    const body = /\n {2}Trails\?: \{\n([\s\S]*?)\n {2}\};/.exec(src)?.[1];
+    if (body === undefined)
+      throw new Error("namespaces.ts: no `Trails?: { … };` seat type to read");
     const seat = new Map<string, { method: boolean; nullable: boolean }>();
     let cur: { name: string; method: boolean; text: string } | undefined;
     let depth = 0;
@@ -621,6 +623,8 @@ export class Resolver {
         cur = undefined;
       }
     }
+    if (!seat.has("env") || cur !== undefined)
+      throw new Error("namespaces.ts: the `Trails` seat type did not parse member by member");
     return (this._trailsSeat = seat);
   }
   private _trailsSeat?: Map<string, { method: boolean; nullable: boolean }>;
