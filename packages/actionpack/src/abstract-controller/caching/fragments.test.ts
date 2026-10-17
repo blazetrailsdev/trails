@@ -159,7 +159,7 @@ describe("read/write/expire fragment", () => {
   it("round-trips content, reports existence, and expires by key", async () => {
     expect(await fragmentExist.call(host, "n")).toBe(false);
     expect(await writeFragment.call(host, "n", "body")).toBe("body");
-    expect(await readFragment.call(host, "n")).toBe("body");
+    expect(String(await readFragment.call(host, "n"))).toBe("body");
     expect(await fragmentExist.call(host, "n")).toBe(true);
     await expireFragment.call(host, "n");
     expect(await readFragment.call(host, "n")).toBeNull();
@@ -171,13 +171,13 @@ describe("read/write/expire fragment", () => {
     await writeFragment.call(host, "other", "c");
     await expireFragment.call(host, /pages\/\d+\/notes/);
     expect(await readFragment.call(host, "pages/45/notes")).toBeNull();
-    expect(await readFragment.call(host, "other")).toBe("c");
+    expect(String(await readFragment.call(host, "other"))).toBe("c");
   });
 
   it("write_fragment converts the body with to_str and raises for a non-string body", async () => {
     const stringLike = { toStr: () => "converted" };
     expect(await writeFragment.call(host, "n", stringLike)).toBe("converted");
-    expect(await readFragment.call(host, "n")).toBe("converted");
+    expect(String(await readFragment.call(host, "n"))).toBe("converted");
     await expect(writeFragment.call(host, "m", 42)).rejects.toThrow(
       "undefined method 'to_str' for 42",
     );
@@ -196,8 +196,8 @@ describe("read/write/expire fragment", () => {
     await fragmentExist.call(host, "n", { namespace: "ns" });
     await expireFragment.call(host, "n", { namespace: "ns" });
     await expireFragment.call(host, /n/, { namespace: "ns" });
-    expect(exist).toHaveBeenCalledWith("views/n", { namespace: "ns" });
-    expect(del).toHaveBeenCalledWith("views/n", { namespace: "ns" });
+    expect(exist).toHaveBeenCalledWith(["views", "n"], { namespace: "ns" });
+    expect(del).toHaveBeenCalledWith(["views", "n"], { namespace: "ns" });
     expect(deleteMatched).toHaveBeenCalledWith(/n/, { namespace: "ns" });
   });
 

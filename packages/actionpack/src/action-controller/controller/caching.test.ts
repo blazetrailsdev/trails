@@ -1,6 +1,20 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import {
+  assert,
+  assertEmpty,
+  assertEqual,
+  assertNil,
+  assertNot,
+  assertPredicate,
+  htmlSafe,
+  isHtmlSafe,
+  MemoryStore,
+} from "@blazetrails/activesupport";
+import { rbFSend, setEnv } from "@blazetrails/ruby-compat";
+import "../../test-helpers/abstract-unit.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "../base.js";
+import { TestCase } from "../test-case.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 
@@ -243,53 +257,230 @@ describe("FragmentCachingTest", () => {
   });
 });
 
-describe("FragmentCachingMetalTest", () => {
-  it.skip("combined fragment cache key", () => {});
-});
+class CachingController extends Base {
+  static {
+    this.abstractBang();
+    this.cacheStore = "memory_store";
+  }
+}
+
+class FragmentCachingTestController extends CachingController {
+  someAction() {}
+}
 
 describe("FragmentCachingTest", () => {
-  it.skip("combined fragment cache key", () => {});
-  it.skip("read fragment with caching enabled", () => {});
-  it.skip("read fragment with caching disabled", () => {});
-  it.skip("read fragment with versioned model", () => {});
-  it.skip("fragment exist with caching enabled", () => {});
-  it.skip("fragment exist with caching disabled", () => {});
-  it.skip("write fragment with caching enabled", () => {});
-  it.skip("write fragment with caching disabled", () => {});
-  it.skip("expire fragment with simple key", () => {});
-  it.skip("expire fragment with regexp", () => {});
-  it.skip("fragment for", () => {});
-  it.skip("html safety", () => {});
-});
+  class ModelWithKeyAndVersion {
+    constructor(
+      private _cacheKey: string,
+      private _cacheVersion: string,
+    ) {}
 
-describe("FunctionalFragmentCachingTest", () => {
-  it.skip("fragment caching", () => {});
-  it.skip("fragment caching in partials", () => {});
-  it.skip("skipping fragment cache digesting", () => {});
-  it.skip("fragment caching with options", () => {});
-  it.skip("render inline before fragment caching", () => {});
-  it.skip("fragment cache instrumentation", () => {});
-  it.skip("html formatted fragment caching", () => {});
-  it.skip("xml formatted fragment caching", () => {});
-  it.skip("fragment caching with variant", () => {});
-  it.skip("fragment caching with html partials in xml", () => {});
-  it.skip("output buffer", () => {});
-  it.skip("caching works with beginning comment", () => {});
-  it.skip("caching with callable cache key", () => {});
+    cacheKey(): string {
+      return this._cacheKey;
+    }
+
+    cacheVersion(): string {
+      return this._cacheVersion;
+    }
+  }
+
+  let tc: TestCase;
+  let store: MemoryStore;
+  let controller: FragmentCachingTestController;
+  let params: Record<string, unknown>;
+  let m1v1: ModelWithKeyAndVersion;
+  let m1v2: ModelWithKeyAndVersion;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    await tc.beforeSetup();
+    store = new MemoryStore();
+    controller = new FragmentCachingTestController();
+    controller.performCaching = true;
+    controller.cacheStore = store;
+    params = { controller: "posts", action: "index" };
+    controller.params = params;
+    controller.request = tc.request;
+    controller.response = tc.response;
+
+    m1v1 = new ModelWithKeyAndVersion("model/1", "1");
+    m1v2 = new ModelWithKeyAndVersion("model/1", "2");
+  });
+
+  it("combined fragment cache key", () => {
+    assertEqual(["views", "what a key"], controller.combinedFragmentCacheKey("what a key"));
+    assertEqual(
+      ["views", "test.host/fragment_caching_test/some_action"],
+      controller.combinedFragmentCacheKey({
+        controller: "fragment_caching_test",
+        action: "some_action",
+      }),
+    );
+  });
+
+  it("read fragment with caching enabled", async () => {
+    await store.write("views/name", "value");
+    assertEqual("value", await controller.readFragment("name"));
+  });
+
+  it("read fragment with caching disabled", async () => {
+    controller.performCaching = false;
+    await store.write("views/name", "value");
+    assertNil(await controller.readFragment("name"));
+  });
+
+  it("read fragment with versioned model", async () => {
+    await controller.writeFragment(["stuff", m1v1], "hello");
+    assertEqual("hello", await controller.readFragment(["stuff", m1v1]));
+    assertNil(await controller.readFragment(["stuff", m1v2]));
+  });
+
+  it("fragment exist with caching enabled", async () => {
+    await store.write("views/name", "value");
+    assert(await controller.fragmentExist("name"));
+    assertNot(await controller.fragmentExist("other_name"));
+  });
+
+  it("fragment exist with caching disabled", async () => {
+    controller.performCaching = false;
+    await store.write("views/name", "value");
+    assertNot(await controller.fragmentExist("name"));
+    assertNot(await controller.fragmentExist("other_name"));
+  });
+
+  it("write fragment with caching enabled", async () => {
+    assertNil(await store.read("views/name"));
+    assertEqual("value", await controller.writeFragment("name", "value"));
+    assertEqual("value", await store.read("views/name"));
+  });
+
+  it("write fragment with caching disabled", async () => {
+    assertNil(await store.read("views/name"));
+    controller.performCaching = false;
+    assertEqual("value", await controller.writeFragment("name", "value"));
+    assertNil(await store.read("views/name"));
+  });
+
+  it("expire fragment with simple key", async () => {
+    await store.write("views/name", "value");
+    await controller.expireFragment("name");
+    assertNil(await store.read("views/name"));
+  });
+
+  it("expire fragment with regexp", async () => {
+    await store.write("views/name", "value");
+    await store.write("views/another_name", "another_value");
+    await store.write("views/primalgrasp", "will not expire ;-)");
+
+    await controller.expireFragment(/name/);
+
+    assertNil(await store.read("views/name"));
+    assertNil(await store.read("views/another_name"));
+    assertEqual("will not expire ;-)", await store.read("views/primalgrasp"));
+  });
+
+  it("fragment for", async () => {
+    await store.write("views/expensive", "fragment content");
+    let fragmentComputed = false;
+
+    const viewContext = controller.viewContext();
+
+    const buffer = htmlSafe("generated till now -> ");
+    buffer.concat(
+      await rbFSend(viewContext, "fragmentFor", "expensive", undefined, () => {
+        fragmentComputed = true;
+      }),
+    );
+
+    assertNot(fragmentComputed);
+    assertEqual("generated till now -> fragment content", buffer.toString());
+  });
+
+  it("html safety", async () => {
+    assertNil(await store.read("views/name"));
+    const content = htmlSafe("value");
+    assertEqual(content, await controller.writeFragment("name", content));
+
+    const cached = await store.read("views/name");
+    assertEqual(content, cached);
+    assertEqual("string", typeof cached);
+
+    const htmlSafeValue = await controller.readFragment("name");
+    assertEqual(content, htmlSafeValue);
+    assertPredicate(htmlSafeValue, isHtmlSafe);
+  });
 });
 
 describe("ViewCacheDependencyTest", () => {
-  it.skip("view cache dependencies are empty by default", () => {});
-  it.skip("view cache dependencies are listed in declaration order", () => {});
+  class NoDependenciesController extends Base {}
+
+  class HasDependenciesController extends Base {
+    static {
+      this.viewCacheDependency(() => "trombone");
+      this.viewCacheDependency(() => "flute");
+    }
+  }
+
+  it("view cache dependencies are empty by default", () => {
+    assertEmpty(new NoDependenciesController().viewCacheDependencies());
+  });
+
+  it("view cache dependencies are listed in declaration order", () => {
+    assertEqual(["trombone", "flute"], new HasDependenciesController().viewCacheDependencies());
+  });
 });
 
-describe("CollectionCacheTest", () => {
-  it.skip("collection fetches cached views", () => {});
-  it.skip("preserves order when reading from cache plus rendering", () => {});
-  it.skip("explicit render call with options", () => {});
-});
+class FragmentCacheKeyTestController extends CachingController {
+  declare accountId: string | null;
+
+  static {
+    this.fragmentCacheKey("v1");
+    this.fragmentCacheKey(null, function (this: FragmentCacheKeyTestController) {
+      return this.accountId;
+    });
+  }
+}
 
 describe("FragmentCacheKeyTest", () => {
-  it.skip("combined fragment cache key", () => {});
-  it.skip("combined fragment cache key with envs", () => {});
+  let store: MemoryStore;
+  let controller: FragmentCacheKeyTestController;
+
+  beforeEach(async ({ task }) => {
+    const tc = new TestCase(task.name);
+    await tc.beforeSetup();
+    store = new MemoryStore();
+    controller = new FragmentCacheKeyTestController();
+    controller.performCaching = true;
+    controller.cacheStore = store;
+  });
+
+  afterEach(() => {
+    setEnv("RAILS_CACHE_ID", undefined);
+    setEnv("RAILS_APP_VERSION", undefined);
+  });
+
+  it("combined fragment cache key", () => {
+    controller.accountId = "123";
+    assertEqual(
+      ["views", "v1", "123", "what a key"],
+      controller.combinedFragmentCacheKey("what a key"),
+    );
+
+    controller.accountId = null;
+    assertEqual(["views", "v1", "what a key"], controller.combinedFragmentCacheKey("what a key"));
+  });
+
+  it("combined fragment cache key with envs", () => {
+    setEnv("RAILS_APP_VERSION", "55");
+    assertEqual(
+      ["views", "55", "v1", "what a key"],
+      controller.combinedFragmentCacheKey("what a key"),
+    );
+
+    setEnv("RAILS_CACHE_ID", "66");
+    assertEqual(
+      ["views", "66", "v1", "what a key"],
+      controller.combinedFragmentCacheKey("what a key"),
+    );
+  });
 });

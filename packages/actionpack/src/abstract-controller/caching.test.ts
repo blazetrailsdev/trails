@@ -157,7 +157,7 @@ describe("AbstractController::Caching", () => {
       const store = new MemoryStore();
       const host = makeHost(store);
       await writeFragment.call(host, "post/1", "rendered body");
-      expect(await readFragment.call(host, "post/1")).toBe("rendered body");
+      expect(String(await readFragment.call(host, "post/1"))).toBe("rendered body");
     });
   });
 });

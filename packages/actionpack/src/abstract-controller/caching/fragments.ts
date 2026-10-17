@@ -5,6 +5,7 @@ import {
   classAttribute,
   Concern,
   extend,
+  htmlSafe,
   mattrWriter,
   Notifications,
 } from "@blazetrails/activesupport";
@@ -134,7 +135,7 @@ export async function writeFragment(
   options?: CacheOptions,
 ): Promise<unknown> {
   if (!this.isCacheConfigured()) return content;
-  key = stringifyKey(combinedFragmentCacheKey.call(this, key));
+  key = combinedFragmentCacheKey.call(this, key);
   await instrumentFragmentCache.call(this, "write_fragment", key, async () => {
     content = toStr(content);
     await this.cacheStore!.write(key as string, content, options);
@@ -148,10 +149,11 @@ export async function readFragment(
   options?: CacheOptions,
 ): Promise<unknown> {
   if (!this.isCacheConfigured()) return undefined;
-  key = stringifyKey(combinedFragmentCacheKey.call(this, key));
-  return await instrumentFragmentCache.call(this, "read_fragment", key, () =>
-    this.cacheStore!.read(key as string, options),
-  );
+  key = combinedFragmentCacheKey.call(this, key);
+  return await instrumentFragmentCache.call(this, "read_fragment", key, async () => {
+    const result = await this.cacheStore!.read(key as string, options);
+    return typeof result === "string" ? htmlSafe(result) : result;
+  });
 }
 
 export async function fragmentExist(
@@ -160,7 +162,7 @@ export async function fragmentExist(
   options?: CacheOptions,
 ): Promise<boolean | undefined> {
   if (!this.isCacheConfigured()) return undefined;
-  key = stringifyKey(combinedFragmentCacheKey.call(this, key));
+  key = combinedFragmentCacheKey.call(this, key);
   return (await instrumentFragmentCache.call(this, "exist_fragment?", key, () =>
     this.cacheStore!.exist(key as string, options),
   )) as boolean | undefined;
@@ -172,7 +174,7 @@ export async function expireFragment(
   options?: CacheOptions,
 ): Promise<unknown> {
   if (!this.isCacheConfigured()) return undefined;
-  if (!(key instanceof RegExp)) key = stringifyKey(combinedFragmentCacheKey.call(this, key));
+  if (!(key instanceof RegExp)) key = combinedFragmentCacheKey.call(this, key);
 
   return await instrumentFragmentCache.call(this, "expire_fragment", key, () => {
     if (key instanceof RegExp) {
@@ -194,23 +196,4 @@ export function instrumentFragmentCache<T>(
     this.instrumentPayload(key),
     block,
   ) as T;
-}
-
-function stringifyKey(parts: unknown[]): string {
-  return parts.map(stringifyPart).join("/");
-}
-
-function stringifyPart(part: unknown): string {
-  if (part == null) return "";
-  if (typeof part === "string") return part;
-  if (typeof part === "number" || typeof part === "boolean" || typeof part === "bigint") {
-    return String(part);
-  }
-  const maybe = (part as { cacheKey?: () => string }).cacheKey;
-  if (typeof maybe === "function") return maybe.call(part);
-  try {
-    return JSON.stringify(part) ?? "";
-  } catch {
-    return String(part);
-  }
 }

@@ -212,6 +212,6 @@ export const CachingRegistry = {
 export const CacheHelper = new Module((mod) => {
   mod.moduleEval((m) => {
     Object.assign(m, { cache, isCaching, uncacheableBang, cacheIf, cacheUnless });
-    Object.assign(m, { cacheFragmentName, digestPathFromTemplate });
+    Object.assign(m, { cacheFragmentName, digestPathFromTemplate, fragmentFor });
   });
 });
