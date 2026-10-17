@@ -82,7 +82,7 @@ class MyLogSubscriber extends LogSubscriber {
 
   foo(_event: Event | null): void {
     this.debug("debug");
-    this.info(() => "info");
+    this.info(null, () => "info");
     this.warn("warn");
   }
 

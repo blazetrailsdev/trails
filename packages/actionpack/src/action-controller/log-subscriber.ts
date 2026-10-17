@@ -48,7 +48,7 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   processAction(event: Event): void {
-    this.info(() => {
+    this.info(null, () => {
       const payload = event.payload as {
         status?: number | null;
         exception?: [string, string] | null;
@@ -74,28 +74,31 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   haltedCallback(event: Event): void {
     this.info(
+      null,
       () => `Filter chain halted as ${rbInspect(event.payload.filter)} rendered or redirected`,
     );
   }
 
   sendFile(event: Event): void {
     this.info(
+      null,
       () => `Sent file ${rbObjAsString(event.payload.path)} (${round(event.duration, 1)}ms)`,
     );
   }
 
   redirectTo(event: Event): void {
-    this.info(() => `Redirected to ${rbObjAsString(event.payload.location)}`);
+    this.info(null, () => `Redirected to ${rbObjAsString(event.payload.location)}`);
   }
 
   sendData(event: Event): void {
     this.info(
+      null,
       () => `Sent data ${rbObjAsString(event.payload.filename)} (${round(event.duration, 1)}ms)`,
     );
   }
 
   unpermittedParameters(event: Event): void {
-    this.debug(() => {
+    this.debug(null, () => {
       const unpermittedKeys = event.payload.keys as string[];
       const displayUnpermittedKeys = unpermittedKeys.map((e) => `:${e}`).join(", ");
       const context = Object.entries(event.payload.context as Record<string, unknown>)

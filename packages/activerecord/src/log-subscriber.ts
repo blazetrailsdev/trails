@@ -60,7 +60,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     });
   }
 
-  sql(event: Event): null | undefined {
+  sql(event: Event): boolean | null | undefined {
     const payload = event.payload as Event["payload"] & { binds?: any[] | null };
 
     if (LogSubscriber.IGNORE_PAYLOAD_NAMES.includes(payload.name as string)) return;
@@ -116,23 +116,15 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   /** @internal */
-  protected override debug(
-    progname: string | (() => string) | null = null,
-    block?: () => string,
-  ): null {
+  protected override debug(progname: string | null = null, block?: () => string): boolean | null {
     if (!super.debug(progname, block)) return null;
 
-    if (verboseQueryLogs()) {
-      this.logQuerySource();
-    }
-    return null;
+    return verboseQueryLogs() ? this.logQuerySource() : null;
   }
 
-  private logQuerySource(): void {
+  private logQuerySource(): boolean | null {
     const source = this.querySourceLocation();
-    if (source) {
-      this.logger!.debug(`  ↳ ${source}`);
-    }
+    return source ? this.logger!.debug(`  ↳ ${source}`) : null;
   }
 
   private querySourceLocation(): string | null {

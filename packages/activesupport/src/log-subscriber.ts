@@ -175,45 +175,27 @@ export class LogSubscriber extends Subscriber {
     }
   }
 
-  protected info(
-    progname: string | (() => string) | null = null,
-    block?: () => string,
-  ): boolean | null {
+  protected info(progname: string | null = null, block?: () => string): boolean | null {
     return this.logger ? this.logger.info(progname, block) : null;
   }
 
-  protected debug(
-    progname: string | (() => string) | null = null,
-    block?: () => string,
-  ): boolean | null {
+  protected debug(progname: string | null = null, block?: () => string): boolean | null {
     return this.logger ? this.logger.debug(progname, block) : null;
   }
 
-  protected warn(
-    progname: string | (() => string) | null = null,
-    block?: () => string,
-  ): boolean | null {
+  protected warn(progname: string | null = null, block?: () => string): boolean | null {
     return this.logger ? this.logger.warn(progname, block) : null;
   }
 
-  protected error(
-    progname: string | (() => string) | null = null,
-    block?: () => string,
-  ): boolean | null {
+  protected error(progname: string | null = null, block?: () => string): boolean | null {
     return this.logger ? this.logger.error(progname, block) : null;
   }
 
-  protected fatal(
-    progname: string | (() => string) | null = null,
-    block?: () => string,
-  ): boolean | null {
+  protected fatal(progname: string | null = null, block?: () => string): boolean | null {
     return this.logger ? this.logger.fatal(progname, block) : null;
   }
 
-  protected unknown(
-    progname: string | (() => string) | null = null,
-    block?: () => string,
-  ): boolean | null {
+  protected unknown(progname: string | null = null, block?: () => string): boolean | null {
     return this.logger ? this.logger.unknown(progname, block) : null;
   }
 
