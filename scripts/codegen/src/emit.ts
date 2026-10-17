@@ -979,6 +979,7 @@ export class Emitter {
         : undefined,
       ...(opts.selfExpr ? { selfExpr: opts.selfExpr } : {}),
     });
+    ctx.scope.body = d.body;
     const twin = isCtor ? undefined : this.handTwin(u, d.name, opts);
     if (twin?.info.async) ctx.defAsync = true;
     const ps = this.lw.paramList(params, ctx, false);
