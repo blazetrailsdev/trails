@@ -3438,6 +3438,7 @@ function importedName(id: ts.Identifier, sourceFile: ts.SourceFile): string {
 }
 
 function isClassAttributeCallee(expr: ts.Expression): boolean {
+  if (isConfigAccessorCallee(expr)) return true;
   return (
     ts.isPropertyAccessExpression(expr) &&
     ts.isIdentifier(expr.expression) &&
@@ -3452,6 +3453,7 @@ function readClassAttributeCall(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
+  if (isConfigAccessorCallee(node.expression)) return readConfigAccessorCall(node, sourceFile);
   const callee = node.expression as ts.PropertyAccessExpression;
   const internal =
     callee.name.text === "call"
@@ -3505,6 +3507,47 @@ function readClassAttributeCall(
     instanceReader: macro.reader && (optionBool(options, "instanceReader") ?? instanceAccessor),
     instanceWriter: macro.writer && (optionBool(options, "instanceWriter") ?? instanceAccessor),
     instancePredicate: macro.predicate && (optionBool(options, "instancePredicate") ?? true),
+    line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+  };
+}
+
+/**
+ * A `base.configAccessor("name")` / `this.configAccessor("name")` site — the
+ * trails port of `ActiveSupport::Configurable::ClassMethods#config_accessor`
+ * (activesupport/lib/active_support/configurable.rb:111-128), called on the
+ * includer inside an `included` block. Ruby's macro defines the class reader
+ * and writer always, and the instance pair only when `instance_accessor` and
+ * `instance_<x>` are both true, which extract-ruby-api.rb#process_mattr credits
+ * as it does `mattr_accessor`. The receiver is the includer, so the names are
+ * credited on the enclosing module.
+ */
+function isConfigAccessorCallee(expr: ts.Expression): boolean {
+  return (
+    ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === "configAccessor" &&
+    (ts.isIdentifier(expr.expression) || expr.expression.kind === ts.SyntaxKind.ThisKeyword)
+  );
+}
+
+function readConfigAccessorCall(
+  node: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): ClassAttributeCall | null {
+  const names = node.arguments.filter(ts.isStringLiteralLike).map((arg) => arg.text);
+  if (names.length === 0) return null;
+  const opts = node.arguments.at(-1);
+  const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
+  const instanceAccessor = optionBool(options, "instanceAccessor") ?? true;
+  const enclosing = enclosingEntity(node);
+  return {
+    ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+    ...(enclosing?.seatsModule === true ? { enclosingSeatsModule: true } : {}),
+    names,
+    reader: true,
+    writer: true,
+    instanceReader: instanceAccessor && optionBool(options, "instanceReader") !== false,
+    instanceWriter: instanceAccessor && optionBool(options, "instanceWriter") !== false,
+    instancePredicate: false,
     line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
   };
 }

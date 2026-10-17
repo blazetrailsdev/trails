@@ -7532,6 +7532,25 @@ describe("extractFromProgram — a Module on a static property", () => {
   });
 });
 
+describe("extractFromProgram — configAccessor() generated accessors", () => {
+  it("credits the class and instance accessors on the module whose included hook calls it", () => {
+    const info = extractFromFiles("/p", {
+      "request-forgery-protection.ts": `
+        export const RequestForgeryProtection = {
+          included(base: any): void {
+            base.configAccessor("perFormCsrfTokens");
+          },
+        };
+      `,
+    });
+    const mod = info.modules["request-forgery-protection.ts:RequestForgeryProtection"];
+    const seat = (members: MethodInfo[]) =>
+      members.filter((m) => m.name === "perFormCsrfTokens").map((m) => m.writer === true);
+    expect(seat(mod.classMethods)).toEqual([false, true]);
+    expect(seat(mod.instanceMethods)).toEqual([false, true]);
+  });
+});
+
 describe("extractFromProgram — classAttribute() generated accessors", () => {
   const TZ = `
     import { classAttribute } from "@blazetrails/activesupport";

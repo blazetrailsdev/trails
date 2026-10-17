@@ -4967,6 +4967,51 @@ describe("Ruby extractor Concern included-block class methods", () => {
   });
 });
 
+describe("Ruby extractor config_accessor", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  it("credits the class and instance accessors config_accessor defines", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "config-accessor-rb-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "rfp.rb"),
+        `
+          module ActionController
+            module RequestForgeryProtection
+              extend ActiveSupport::Concern
+              included do
+                config_accessor :per_form_csrf_tokens
+                config_accessor(:hidden, instance_reader: false)
+              end
+            end
+          end
+        `,
+      );
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "rfp.rb"), ${JSON.stringify(dir)})
+        mod = ex.modules["ActionController::RequestForgeryProtection"]
+        puts JSON.generate({
+          klass: mod[:classMethods].map { |m| m[:name] }.sort,
+          inst: mod[:instanceMethods].map { |m| m[:name] }.sort,
+        })
+      `;
+      const out = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      expect(out.klass).toEqual([
+        "hidden",
+        "hidden=",
+        "per_form_csrf_tokens",
+        "per_form_csrf_tokens=",
+      ]);
+      expect(out.inst).toEqual(["hidden=", "per_form_csrf_tokens", "per_form_csrf_tokens="]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("Ruby extractor base.class_attribute in self.extended", () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
 

@@ -1055,7 +1055,7 @@ class ApiExtractor
       process_define_method(args, nil)
     when "class_attribute"
       process_mattr(args, reader: true, writer: true, predicate: true, class_attr: true)
-    when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor"
+    when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor", "config_accessor"
       process_mattr(args, reader: true, writer: true, predicate: false, class_attr: false)
     when "cattr_reader", "mattr_reader", "thread_cattr_reader", "thread_mattr_reader"
       process_mattr(args, reader: true, writer: false, predicate: false, class_attr: false)
@@ -1141,7 +1141,7 @@ class ApiExtractor
         process_define_model_callbacks(node[2])
       when "class_attribute"
         process_mattr(node[2], reader: true, writer: true, predicate: true, class_attr: true)
-      when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor"
+      when "cattr_accessor", "mattr_accessor", "thread_cattr_accessor", "thread_mattr_accessor", "config_accessor"
         process_mattr(node[2], reader: true, writer: true, predicate: false, class_attr: false)
       when "cattr_reader", "mattr_reader", "thread_cattr_reader", "thread_mattr_reader"
         process_mattr(node[2], reader: true, writer: false, predicate: false, class_attr: false)
@@ -1765,6 +1765,8 @@ class ApiExtractor
   #   reader/writer always; instance reader/writer only when BOTH
   #   `instance_<x>` and `instance_accessor` are truthy (AND, both default
   #   true); no predicate.
+  # - config_accessor (activesupport configurable.rb:111-128) gates exactly as
+  #   cattr/mattr do, so it shares their arm.
   #
   # All generated methods are public — class_attribute defines them via a fresh
   # `class_eval` string, and mattr/cattr document them as public "even if this
