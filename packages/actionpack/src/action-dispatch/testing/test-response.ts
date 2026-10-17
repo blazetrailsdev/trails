@@ -23,13 +23,13 @@ export class TestResponse extends Response {
 
   get parsedBody(): unknown {
     if (this._parsedBody === undefined) {
-      this._parsedBody = this.responseParser(this.body);
+      this._parsedBody = this.responseParser.call(undefined, this.body);
     }
     return this._parsedBody;
   }
 
   get responseParser(): ResponseParser {
-    this._responseParser ??= RequestEncoder.parser(this.contentType);
+    this._responseParser ??= RequestEncoder.parser(this.mediaType);
     return this._responseParser;
   }
 }

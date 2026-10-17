@@ -1,3 +1,4 @@
+import { QUERY_STRING } from "@blazetrails/rack";
 import {
   ActiveSupportJSON,
   camelize,
@@ -615,7 +616,7 @@ export class TestRequest extends AbstractTestRequest {
   }
 
   set queryString(string: string) {
-    this.setHeader("QUERY_STRING", string);
+    this.setHeader(QUERY_STRING, string);
   }
 
   get contentType(): string | null {
