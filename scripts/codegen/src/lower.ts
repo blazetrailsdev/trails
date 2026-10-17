@@ -1096,12 +1096,12 @@ export class Lowerer {
   }
 
   /**
-   * An ivar receiver typed `T | null`, asserted non-null: Ruby raises
+   * An ivar or call receiver typed `T | null`, asserted non-null: Ruby raises
    * NoMethodError for a method sent to nil, which the JS TypeError of a null
    * receiver stands for.
    */
   nonNullRecv(node: N | null, e: string, ctx: Ctx): string {
-    if (node?.k !== "ivar" || e.endsWith("!")) return e;
+    if ((node?.k !== "ivar" && node?.k !== "call") || node.safe || e.endsWith("!")) return e;
     const t = this.typeOf(node, ctx);
     return t && "nullable" in t && t.nullable ? `${e}!` : e;
   }
