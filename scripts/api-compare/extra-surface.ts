@@ -2159,6 +2159,7 @@ export function inlinedModuleMembers(
   rubyModules: Record<string, ClassInfo>,
   moduleFqnByShort: Map<string, string[]>,
   bodiedByTsFile: ReadonlyMap<string, ReadonlySet<string>>,
+  taggedByTsFile: ReadonlyMap<string, ReadonlySet<string>> = new Map(),
 ): InlinedFromFinding[] {
   const out: InlinedFromFinding[] = [];
   const seen = new Set<string>();
@@ -2185,6 +2186,7 @@ export function inlinedModuleMembers(
         const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
         if (!candidates) continue;
         if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
+        if (m.name === "initialize" && taggedByTsFile.get(hostTs)?.has(fqn) === true) continue;
         if (m.name.endsWith("?") && candidates.some((c) => moduleBodies?.has(c) === true)) continue;
         const tsName = candidates.find(
           (c) =>
@@ -2327,12 +2329,27 @@ function buildPackageReport(
   }
   for (const [file, fns] of Object.entries(tsFileFunctions)) addBodied(file, fns);
 
+  const taggedByTsFile = new Map<string, Set<string>>();
+  for (const c of Object.values(tsPkg.classes)) {
+    if (c.reExportedFrom) continue;
+    const ctor = c.instanceMethods.find((m) => m.name === "constructor");
+    const file = ctor?.file ?? c.file;
+    if (!file) continue;
+    for (const tag of ctor?.inlinedFrom ?? []) {
+      if (tag.hook !== "initialize") continue;
+      const modules = taggedByTsFile.get(file) ?? new Set<string>();
+      modules.add(tag.module);
+      taggedByTsFile.set(file, modules);
+    }
+  }
+
   result.inlinedFrom = inlinedModuleMembers(
     pkg,
     rubyPkg.classes,
     rubyPkg.modules,
     moduleFqnByShort,
     bodiedByTsFile,
+    taggedByTsFile,
   );
 
   // A Ruby file can declare file-level constants and no class/module at all

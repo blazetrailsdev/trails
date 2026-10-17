@@ -170,6 +170,12 @@ class LoopSymbolName < String; end
 
 LOOP_OPAQUE_HASH = Object.new.freeze
 
+def rack_release
+  @rack_release ||= JSON.parse(
+    File.read(File.join(SCRIPT_DIR, "..", "..", "vendor", "sources.lock.json"))
+  ).dig("sources", "rack", "ref").delete_prefix("v")
+end
+
 class TestExtractor
   attr_reader :test_files, :unexpanded_loops
 
@@ -1623,6 +1629,12 @@ class TestExtractor
     els  = node[3] # nil for *_mod forms
     # Body runs when COND is true for if/elsif, false for unless.
     positive = kind != :unless && kind != :unless_mod
+    release = rack_release_condition(cond)
+    unless release.nil?
+      taken = release == positive ? body : els
+      walk(taken) if taken.is_a?(Array)
+      return
+    end
     gate = gate_from_run_condition(cond, positive)
 
     if gate
@@ -1642,6 +1654,22 @@ class TestExtractor
     else
       walk(els)
     end
+  end
+
+  def rack_release_condition(cond)
+    return nil unless cond.is_a?(Array) && cond[0] == :method_add_arg
+    call = cond[1]
+    return nil unless call.is_a?(Array) && call[0] == :call && call[3].is_a?(Array) && call[3][0..1] == [:@ident, "start_with?"]
+    recv = call[1]
+    return nil unless recv.is_a?(Array) && recv[0] == :const_path_ref &&
+                      recv[1].is_a?(Array) && recv[1][0] == :top_const_ref &&
+                      recv[1][1][1] == "Rack" && recv[2][1] == "RELEASE"
+    args = cond[2].is_a?(Array) && cond[2][1].is_a?(Array) ? cond[2][1][1] : nil
+    return nil unless args.is_a?(Array) && args.length == 1
+    lit = args[0]
+    return nil unless lit.is_a?(Array) && lit[0] == :string_literal && lit[1].is_a?(Array) && lit[1].length == 2 &&
+                      lit[1][1][0] == :@tstring_content
+    rack_release.start_with?(lit[1][1][1])
   end
 
   # Attach a :gate to a test_case from its dir gate, the enclosing
