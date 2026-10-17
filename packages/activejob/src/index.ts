@@ -7,3 +7,4 @@ export { Base } from "./base.js";
 export { Arguments, DeserializationError, SerializationError } from "./arguments.js";
 export { Serializers } from "./serializers.js";
 export { ObjectSerializer } from "./serializers/object-serializer.js";
+export { DurationSerializer } from "./serializers/duration-serializer.js";

@@ -9,6 +9,7 @@ import {
   rbObjClass,
 } from "@blazetrails/ruby-compat";
 import { ActiveJob, loadPath, type AutoloadModule, type SerializerLike } from "./namespaces.js";
+import type { DurationSerializer } from "./serializers/duration-serializer.js";
 import type { ObjectSerializer } from "./serializers/object-serializer.js";
 
 export const Serializers = { name: "ActiveJob::Serializers", loadPath } as AutoloadModule & {
@@ -18,10 +19,12 @@ export const Serializers = { name: "ActiveJob::Serializers", loadPath } as Autol
   serializers: typeof serializers;
   addSerializers: typeof addSerializers;
   ObjectSerializer: typeof ObjectSerializer;
+  DurationSerializer: typeof DurationSerializer;
 };
 extend(Serializers, Autoload);
 
 Serializers.autoload("ObjectSerializer");
+Serializers.autoload("DurationSerializer");
 
 mattrAccessor.call(Serializers, "_additionalSerializers");
 Serializers._additionalSerializers = new Set();
