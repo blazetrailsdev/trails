@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   attrInternal,
   Benchmark,
@@ -175,3 +177,5 @@ export const ClassMethods: Module = new Module((mod) => {
 });
 
 Instrumentation.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "Instrumentation", Instrumentation);

@@ -1,5 +1,7 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, Module, extend } from "@blazetrails/activesupport";
-import { ArgumentError, File, slice } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, rbFSend, slice } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Base, RenderOptions } from "../base.js";
@@ -91,7 +93,7 @@ export function sendFileHeadersBang(
     if (!typeProvided && options.filename != null) {
       contentType =
         MimeType.lookupByExtension(
-          File.extname(options.filename).toLowerCase().replaceAll(".", ""),
+          rbFSend(File.extname(options.filename).toLowerCase(), "delete", ".") as string,
         ) || contentType;
     }
     this.contentType = contentType;
@@ -125,3 +127,5 @@ export const DataStreaming: Module<{
   mod.defineMethod("sendData", sendData);
   mod.defineMethod("sendFileHeadersBang", sendFileHeadersBang);
 });
+
+rbModConstSet(ActionController, "DataStreaming", DataStreaming);

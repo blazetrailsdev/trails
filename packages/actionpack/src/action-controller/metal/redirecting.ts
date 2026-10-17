@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { statusCode, type StatusSymbol } from "@blazetrails/rack";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import type { UrlOptions } from "../../action-dispatch/http/url.js";
@@ -254,3 +256,5 @@ export const Redirecting = new Module((mod) => {
   urlFrom: typeof urlFrom;
 }> & { _computeRedirectToLocation: OmitThisParameter<typeof _computeRedirectToLocation> };
 Redirecting._computeRedirectToLocation = _computeRedirectToLocation;
+
+rbModConstSet(ActionController, "Redirecting", Redirecting);

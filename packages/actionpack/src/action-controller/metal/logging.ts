@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { aroundAction, CallbackOptions } from "../../abstract-controller/callbacks.js";
 import { Concern, Module, extend, type LogLevel } from "@blazetrails/activesupport";
 
@@ -22,3 +24,5 @@ export const Logging = new Module((mod) => {
   extend(mod, Concern);
 }) as Module & { ClassMethods: typeof ClassMethods };
 Logging.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "Logging", Logging);

@@ -1,3 +1,5 @@
+import { AbstractController } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   I18n,
   HtmlSafeTranslation,
@@ -68,3 +70,5 @@ export const Translation = new Module((mod) => {
   mod.defineMethod("localize", localize);
   mod.aliasMethod("l", "localize");
 });
+
+rbModConstSet(AbstractController, "Translation", Translation);

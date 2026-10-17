@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, Module, extend } from "@blazetrails/activesupport";
 import { rbObjClone } from "@blazetrails/ruby-compat";
 import type { CallbackOptions, beforeAction } from "../../abstract-controller/callbacks.js";
@@ -30,3 +32,5 @@ export const PermissionsPolicy = new Module((mod) => {
   extend(mod, Concern);
 }) as Module<object> & { ClassMethods: typeof ClassMethods };
 PermissionsPolicy.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "PermissionsPolicy", PermissionsPolicy);

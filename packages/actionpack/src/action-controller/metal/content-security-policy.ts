@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, Module, extend, include } from "@blazetrails/activesupport";
 import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Callbacks, type CallbackOptions } from "../../abstract-controller/callbacks.js";
@@ -122,3 +124,5 @@ export const ContentSecurityPolicy = new Module((mod) => {
   mod.defineMethod("currentContentSecurityPolicy", currentContentSecurityPolicy);
 }) as Module & { ClassMethods: typeof ClassMethods };
 ContentSecurityPolicy.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "ContentSecurityPolicy", ContentSecurityPolicy);

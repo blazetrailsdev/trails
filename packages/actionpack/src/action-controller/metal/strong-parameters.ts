@@ -311,13 +311,13 @@ export class Parameters {
   }
 
   except(...keys: string[]): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.except(...keys));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.except(...keys));
   }
 
   declare without: Parameters["except"];
 
   slice(...keys: string[]): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.slice(...keys));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.slice(...keys));
   }
 
   sliceBang(...keys: string[]): this {
@@ -326,11 +326,13 @@ export class Parameters {
   }
 
   extractBang(...keys: string[]): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.extractBang(...keys));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.extractBang(...keys));
   }
 
   merge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.merge(toH<OtherHash>(otherHash)));
+    return this.newInstanceWithInheritedPermittedStatus(
+      this.parameters.merge(toH<OtherHash>(otherHash)),
+    );
   }
 
   mergeBang(otherHash: Parameters | Record<string, unknown>, block?: ConflictBlock<unknown>): this {
@@ -349,7 +351,9 @@ export class Parameters {
   }
 
   reverseMerge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    return this._newWithInheritedPermitted(merge(toH<OtherHash>(otherHash), this.parameters));
+    return this.newInstanceWithInheritedPermittedStatus(
+      merge(toH<OtherHash>(otherHash), this.parameters),
+    );
   }
 
   declare withDefaults: Parameters["reverseMerge"];
@@ -368,7 +372,7 @@ export class Parameters {
   transformKeys(fn: (key: string) => string): Parameters;
   transformKeys(fn?: (key: string) => string): Parameters | Enumerator<string> {
     if (!fn) return toEnum(this, "transformKeys");
-    return this._newWithInheritedPermitted(this.parameters.transformKeys(fn));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.transformKeys(fn));
   }
 
   transformKeysBang(): Enumerator<string>;
@@ -380,7 +384,7 @@ export class Parameters {
   }
 
   deepTransformKeys(fn: (key: string) => string): Parameters {
-    return this._newWithInheritedPermitted(
+    return this.newInstanceWithInheritedPermittedStatus(
       (this._deepTransformKeysInObject(this.parameters, fn) as Parameters).toUnsafeH(),
     );
   }
@@ -396,7 +400,7 @@ export class Parameters {
   transformValues(fn: (value: unknown) => unknown): Parameters;
   transformValues(fn?: (value: unknown) => unknown): Parameters | Enumerator<unknown> {
     if (!fn) return toEnum(this, "transformValues");
-    return this._newWithInheritedPermitted(
+    return this.newInstanceWithInheritedPermittedStatus(
       this.parameters.transformValues((v) => fn(this.convertValueToParameters(v))),
     );
   }
@@ -410,7 +414,7 @@ export class Parameters {
   }
 
   select(fn: (key: string, value: unknown) => boolean): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.select(fn));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.select(fn));
   }
 
   selectBang(fn: (key: string, value: unknown) => boolean): this {
@@ -421,7 +425,7 @@ export class Parameters {
   declare keepIf: Parameters["selectBang"];
 
   reject(fn: (key: string, value: unknown) => boolean): Parameters {
-    return this._newWithInheritedPermitted(this.parameters.reject(fn));
+    return this.newInstanceWithInheritedPermittedStatus(this.parameters.reject(fn));
   }
 
   rejectBang(fn: (key: string, value: unknown) => boolean): this {
@@ -432,7 +436,7 @@ export class Parameters {
   declare deleteIf: Parameters["rejectBang"];
 
   compact(): Parameters {
-    return this._newWithInheritedPermitted(
+    return this.newInstanceWithInheritedPermittedStatus(
       this.parameters.compact() as HashWithIndifferentAccess<unknown>,
     );
   }
@@ -645,14 +649,6 @@ export class Parameters {
     });
   }
 
-  private _newWithInheritedPermitted(
-    data: Record<string, unknown> | Hash<string, unknown>,
-  ): Parameters {
-    const p = new Parameters(data, this.loggingContext);
-    p._permitted = this._permitted;
-    return p;
-  }
-
   private _convertParametersToHashes(
     value: unknown,
     using: "toH" | "toUnsafeH",
@@ -678,6 +674,11 @@ export class Parameters {
       this.parameters.set(key, converted);
     }
     return converted;
+  }
+
+  /** @internal */
+  protected set permitted(value: boolean) {
+    this._permitted = value;
   }
 
   /** @internal */
@@ -718,8 +719,12 @@ export class Parameters {
   }
 
   /** @internal */
-  newInstanceWithInheritedPermittedStatus(hash: Record<string, unknown>): Parameters {
-    return this._newWithInheritedPermitted(hash);
+  newInstanceWithInheritedPermittedStatus(
+    hash: Record<string, unknown> | Hash<string, unknown>,
+  ): Parameters {
+    const newInstance = new (this.constructor as typeof Parameters)(hash, this.loggingContext);
+    newInstance.permitted = this._permitted;
+    return newInstance;
   }
 
   /** @internal */
@@ -1058,3 +1063,5 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 rbModConstSet(ActionController, "ParameterMissing", ParameterMissing);
 rbModConstSet(ActionController, "Parameters", Parameters);
 Parameters.hookIntoYamlLoading();
+
+rbModConstSet(ActionController, "StrongParameters", StrongParameters);

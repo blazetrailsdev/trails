@@ -11,7 +11,7 @@ import {
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstGet, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
 import type { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -141,9 +141,8 @@ import {
 import { type Resolution, type HelpersClass } from "../abstract-controller/helpers.js";
 import { Helpers, type helperAttr, type modulesForHelpers } from "./metal/helpers.js";
 import { FormBuilder, type defaultFormBuilder } from "./form-builder.js";
-import { instrumentPayload, instrumentName } from "./caching.js";
+import { Caching, type instrumentPayload, type instrumentName } from "./caching.js";
 import {
-  Caching,
   type cache,
   type CachingClassMethods,
   type LookupStoreArgument,
@@ -261,45 +260,6 @@ type RenderArgs<P extends string> =
   | [string | ToModel | NonNullable<RenderOptions["renderable"]>, RenderOptionsFor<P>?];
 
 type StreamingBody = { each(block: (chunk: string) => void): Promise<unknown> };
-
-export const MODULES: readonly string[] = [
-  "AbstractController::Rendering",
-  "AbstractController::Translation",
-  "AbstractController::AssetPaths",
-  "Helpers",
-  "UrlFor",
-  "Redirecting",
-  "ActionView::Layouts",
-  "Rendering",
-  "Renderers::All",
-  "ConditionalGet",
-  "EtagWithTemplateDigest",
-  "EtagWithFlash",
-  "Caching",
-  "MimeResponds",
-  "ImplicitRender",
-  "StrongParameters",
-  "ParameterEncoding",
-  "Cookies",
-  "Flash",
-  "FormBuilder",
-  "RequestForgeryProtection",
-  "ContentSecurityPolicy",
-  "PermissionsPolicy",
-  "RateLimiting",
-  "AllowBrowser",
-  "Streaming",
-  "DataStreaming",
-  "HttpAuthentication::Basic::ControllerMethods",
-  "HttpAuthentication::Digest::ControllerMethods",
-  "HttpAuthentication::Token::ControllerMethods",
-  "DefaultHeaders",
-  "Logging",
-  "AbstractController::Callbacks",
-  "Rescue",
-  "Instrumentation",
-  "ParamsWrapper",
-];
 
 export const PROTECTED_IVARS: readonly string[] = [
   ...DEFAULT_PROTECTED_INSTANCE_VARIABLES,
@@ -481,9 +441,15 @@ export class Base extends Metal {
 
   declare viewRenderer: typeof viewRenderer;
 
-  static withoutModules(...modules: string[]): readonly string[] {
-    const drop = new Set(modules);
-    return MODULES.filter((m) => !drop.has(m));
+  declare static MODULES: Array<Parameters<typeof include>[1]>;
+
+  static withoutModules(
+    ...modules: Array<string | Parameters<typeof include>[1]>
+  ): Array<Parameters<typeof include>[1]> {
+    const mods = modules.map((m) =>
+      typeof m === "string" ? rbModConstGet(ActionController, m) : m,
+    );
+    return Base.MODULES.filter((m) => !mods.includes(m));
   }
 
   /** @internal */
@@ -596,14 +562,9 @@ export class Base extends Metal {
   declare defaultFormBuilder: () => unknown;
 
   /** @internal */
-  instrumentPayload(key: unknown): { controller: string | null; action: string; key: unknown } {
-    return instrumentPayload.call(this, key);
-  }
-
+  declare instrumentPayload: typeof instrumentPayload;
   /** @internal */
-  instrumentName(): string {
-    return instrumentName.call(this);
-  }
+  declare instrumentName: typeof instrumentName;
 
   declare static _parameterEncodings: ParameterEncodingHost["_parameterEncodings"];
   /** @internal */
@@ -615,6 +576,8 @@ export class Base extends Metal {
 
   declare static _wrapperOptions: ParamsWrapperOptions;
   declare _wrapperOptions: ParamsWrapperOptions;
+  declare static is_wrapperOptions: boolean;
+  declare is_wrapperOptions: boolean;
   /** @internal */
   declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
   declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
@@ -726,42 +689,48 @@ export class Base extends Metal {
   declare handlerForRescue: Rescuable["handlerForRescue"];
 }
 
-include(Base, AbstractControllerRendering);
-include(Base, Translation);
-include(Base, AssetPaths);
-include(Base, Helpers);
-include(Base, UrlFor);
-include(Base, Redirecting);
-include(Base, Layouts);
-include(Base, Rendering);
-include(Base, Renderers.All);
-include(Base, ConditionalGet);
-include(Base, EtagWithTemplateDigest);
-include(Base, EtagWithFlash);
-include(Base, Caching);
-include(Base, MimeResponds);
-include(Base, ImplicitRender);
-include(Base, StrongParametersModule);
-include(Base, ParameterEncoding);
-include(Base, Cookies);
-include(Base, Flash);
-include(Base, FormBuilder);
-include(Base, RequestForgeryProtection);
-include(Base, ContentSecurityPolicy);
-include(Base, PermissionsPolicy);
-include(Base, RateLimiting);
-include(Base, AllowBrowser);
-include(Base, Streaming);
-include(Base, DataStreaming);
-include(Base, HttpAuthentication.Basic.ControllerMethods);
-include(Base, HttpAuthentication.Digest.ControllerMethods);
-include(Base, HttpAuthentication.Token.ControllerMethods);
-include(Base, DefaultHeaders);
-include(Base, Logging);
-include(Base, Callbacks);
-include(Base, Rescue);
-include(Base, Instrumentation);
-include(Base, ParamsWrapper);
+Base.MODULES = [
+  AbstractControllerRendering,
+  Translation,
+  AssetPaths,
+  Helpers,
+  UrlFor,
+  Redirecting,
+  Layouts,
+  Rendering,
+  Renderers.All,
+  ConditionalGet,
+  EtagWithTemplateDigest,
+  EtagWithFlash,
+  Caching,
+  MimeResponds,
+  ImplicitRender,
+  StrongParametersModule,
+  ParameterEncoding,
+  Cookies,
+  Flash,
+  FormBuilder,
+  RequestForgeryProtection,
+  ContentSecurityPolicy,
+  PermissionsPolicy,
+  RateLimiting,
+  AllowBrowser,
+  Streaming,
+  DataStreaming,
+  HttpAuthentication.Basic.ControllerMethods,
+  HttpAuthentication.Digest.ControllerMethods,
+  HttpAuthentication.Token.ControllerMethods,
+  DefaultHeaders,
+  Logging,
+  Callbacks,
+  Rescue,
+  Instrumentation,
+  ParamsWrapper,
+];
+
+for (const mod of Base.MODULES) {
+  include(Base, mod);
+}
 Base.setupRendererBang();
 
 rbModConstSet(ActionController, "Base", Base);

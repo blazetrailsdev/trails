@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   Concern,
@@ -98,3 +100,5 @@ export const Helpers = new Module((mod) => {
   mod.defineMethod("helpers", helpers);
 }) as Module<{ helpers: typeof helpers }> & { ClassMethods: typeof ClassMethods };
 Helpers.ClassMethods = ClassMethods;
+
+rbModConstSet(ActionController, "Helpers", Helpers);

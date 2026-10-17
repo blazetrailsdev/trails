@@ -527,13 +527,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
-    "rubyName": "_normalize_text",
-    "digest": "cdeaf81c9378b79f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
     "rubyName": "_process_options",
     "digest": "40e852079cb768b1",
     "ref": "v8.0.2"
@@ -550,13 +543,6 @@
     "rubyFile": "base.rb",
     "rubyName": "_protected_ivars",
     "digest": "107104a30409dea2",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "_render_in_priorities",
-    "digest": "b56d9152d3418829",
     "ref": "v8.0.2"
   },
   {
@@ -718,20 +704,6 @@
     "rubyFile": "base.rb",
     "rubyName": "params=",
     "digest": "484c055dff166b3a",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "process_action",
-    "digest": "267e83f1a7f29b00",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "rate_limiting",
-    "digest": "895ca33f785077d2",
     "ref": "v8.0.2"
   },
   {
@@ -1248,13 +1220,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/data_streaming.rb",
-    "rubyName": "_normalize_text",
-    "digest": "cdeaf81c9378b79f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "metal/data_streaming.rb",
     "rubyName": "_process_options",
     "digest": "40e852079cb768b1",
     "ref": "v8.0.2"
@@ -1264,13 +1229,6 @@
     "rubyFile": "metal/data_streaming.rb",
     "rubyName": "_process_variant",
     "digest": "5367879b2fce514b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "metal/data_streaming.rb",
-    "rubyName": "_render_in_priorities",
-    "digest": "b56d9152d3418829",
     "ref": "v8.0.2"
   },
   {

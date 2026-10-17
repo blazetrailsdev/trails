@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   Module,
@@ -79,3 +81,5 @@ export const EtagWithTemplateDigest = new Module((mod) => {
     },
   );
 });
+
+rbModConstSet(ActionController, "EtagWithTemplateDigest", EtagWithTemplateDigest);

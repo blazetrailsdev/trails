@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { UAParser } from "ua-parser-js";
 import {
   Concern,
@@ -176,3 +178,5 @@ function compareVersions(a: string, b: string): number {
   }
   return 0;
 }
+
+rbModConstSet(ActionController, "AllowBrowser", AllowBrowser);

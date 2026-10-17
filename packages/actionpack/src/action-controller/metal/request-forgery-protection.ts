@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   Base64,
@@ -763,3 +765,5 @@ Object.defineProperty(NullSessionHash, "name", {
   value:
     "ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash",
 });
+
+rbModConstSet(ActionController, "RequestForgeryProtection", RequestForgeryProtection);

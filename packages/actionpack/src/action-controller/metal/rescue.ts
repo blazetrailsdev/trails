@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, Module, Rescuable, extend, include } from "@blazetrails/activesupport";
 import { rtest } from "@blazetrails/ruby-compat";
 
@@ -31,3 +33,5 @@ export async function processAction(this: RescueHost, ...args: unknown[]): Promi
     return handled;
   }
 }
+
+rbModConstSet(ActionController, "Rescue", Rescue);

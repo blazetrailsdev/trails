@@ -1,3 +1,5 @@
+import { ActionController } from "../../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Concern, extend, include, Module } from "@blazetrails/activesupport";
 import { Rendering } from "../metal/rendering.js";
 
@@ -21,3 +23,5 @@ export const ApiRendering = new Module((mod) => {
 
   mod.defineMethod("renderToBody", renderToBody);
 });
+
+rbModConstSet(ActionController, "ApiRendering", ApiRendering);

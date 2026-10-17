@@ -168,7 +168,7 @@ export function clearHelpers(this: HelpersClass): void {
   if (!isAnonymous(this)) this.defaultHelperModuleBang();
 }
 
-/** @inventedArm if — CONVERGEABLE helpers-inherited-resets-helpers-and-includes-default-module-first */
+/** @inventedArm if — PERMANENT */
 export function _helpersForModification(this: HelpersClass): Module {
   if (!rbObjIvarDefined(this, "@_helpers") && !rbModSingletonP(this as never)) {
     inherited.call(rbClassSuperclass(this)!, this);
@@ -225,7 +225,7 @@ export const ClassMethods = new Module((mod) => {
   mod.defineMethod("defaultHelperModuleBang", defaultHelperModuleBang);
 });
 
-/** @inventedArm if — CONVERGEABLE helpers-inherited-resets-helpers-and-includes-default-module-first */
+/** @inventedArm if — PERMANENT */
 export const Helpers = new Module((mod) => {
   extend(mod, Concern);
 
