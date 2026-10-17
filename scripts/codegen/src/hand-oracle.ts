@@ -19,9 +19,9 @@ import { ORACLE_PATH, PKG_DIR } from "./gem.js";
 const SRC = path.join(PKG_DIR, "src");
 
 export type TypeRef =
-  | { k: "class"; key: string; static?: boolean }
-  | { k: "prim"; name: "boolean" | "string" | "number" | "null" }
-  | { k: "array"; el: TypeRef | null }
+  | { k: "class"; key: string; static?: boolean; nullable?: boolean }
+  | { k: "prim"; name: "boolean" | "string" | "number" | "null"; nullable?: boolean }
+  | { k: "array"; el: TypeRef | null; nullable?: boolean }
   | { k: "fn" }
   | { k: "hash" }
   | { k: "gemClass"; fqn: string }
@@ -93,9 +93,15 @@ function main(): void {
       const parts = t.types.filter(
         (x) => !(x.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined)),
       );
+      const nullable = parts.length < t.types.length ? { nullable: true as const } : {};
       if (parts.every((x) => x.flags & ts.TypeFlags.BooleanLike))
-        return { k: "prim", name: "boolean" };
-      if (parts.length === 1) return refOf(parts[0], depth + 1);
+        return { k: "prim", name: "boolean", ...nullable };
+      if (parts.length === 1) {
+        const one = refOf(parts[0], depth + 1);
+        return one && one.k !== "fn" && one.k !== "gemClass" && one.k !== "hash"
+          ? { ...one, ...nullable }
+          : one;
+      }
       return null;
     }
     if (t.flags & ts.TypeFlags.BooleanLike) return { k: "prim", name: "boolean" };

@@ -164,6 +164,8 @@ interface Ctx {
   inLoop: boolean;
   defName?: string;
   defParams?: Param[];
+  /** The hand twin's TS types for the method's positional parameters, by position. */
+  paramTypes?: (string | null)[];
   /** Ruby `def` is singleton (static). */
   singleton?: boolean;
   isModule?: boolean;
@@ -1306,6 +1308,7 @@ export class Lowerer {
     const scope: Scope = { locals: new Set(), parent: ctx.scope, body };
     const inner = this.child(ctx, {
       scope,
+      paramTypes: undefined,
       fnScope: scope,
       inBlock: true,
       inLoop: false,
@@ -1337,6 +1340,7 @@ export class Lowerer {
     const inner = this.child(ctx, {
       ...over,
       scope,
+      paramTypes: undefined,
       fnScope: scope,
       inBlock: true,
       inLoop: false,
@@ -1440,6 +1444,8 @@ export class Lowerer {
     const out: string[] = [];
     const kw: string[] = [];
     let kwRequired = false;
+    let position = 0;
+    const positionalType = () => (isBlock ? null : ctx.paramTypes?.[position++]) ?? "any";
     for (const p of params) {
       const nm = p.name ? jsIdent(p.name) : null;
       if (p.name) ctx.scope.locals.add(p.name);
@@ -1448,10 +1454,10 @@ export class Lowerer {
           if (p.destructure) {
             p.destructure.forEach((d) => d && ctx.scope.locals.add(d));
             out.push(`[${p.destructure.map((d) => (d ? jsIdent(d) : "")).join(", ")}]: any`);
-          } else out.push(`${nm}${isBlock ? "?" : ""}: any`);
+          } else out.push(`${nm}${isBlock ? "?" : ""}: ${positionalType()}`);
           break;
         case "opt":
-          out.push(`${nm}: any = ${this.expr(p.default!, ctx)}`);
+          out.push(`${nm}: ${positionalType()} = ${this.expr(p.default!, ctx)}`);
           this.noteParamType(ctx, p.name!, p.default!);
           break;
         case "rest":
@@ -1819,6 +1825,30 @@ export class Lowerer {
       (p.length && !sc!.superclassFqn ? this.resolver.types.depClass(p) : undefined);
     const m = key ? this.resolver.types.member(key, rubyName, isStatic) : undefined;
     return m?.info.kind === "get" && m.owner.startsWith("@") ? m : undefined;
+  }
+
+  /**
+   * The TS spelling of an oracle type, for a generated signature. A class type is
+   * not spelled yet (it needs a type import), so it and an unknown type are `any`.
+   */
+  tsType(t: TypeRef | undefined): string {
+    if (!t) return "any";
+    if ("nullable" in t && t.nullable) {
+      const base = this.tsType({ ...t, nullable: false } as TypeRef);
+      return base === "any" ? base : `${base} | null`;
+    }
+    switch (t.k) {
+      case "prim":
+        return t.name;
+      case "array": {
+        const el = t.el ? this.tsType(t.el) : "any";
+        return /\s/.test(el) ? `(${el})[]` : `${el}[]`;
+      }
+      case "fn":
+        return "(...args: any[]) => any";
+      default:
+        return "any";
+    }
   }
 
   /** Is `name` known in the gem only as an attr reader (→ property access)? */
