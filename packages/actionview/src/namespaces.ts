@@ -4,6 +4,10 @@ import type { FileSystemResolver } from "./template/resolver.js";
 import type { Select } from "./helpers/tags/select.js";
 import type { CollectionCheckBoxes } from "./helpers/tags/collection-check-boxes.js";
 import type { CollectionRadioButtons } from "./helpers/tags/collection-radio-buttons.js";
+import type { CollectionSelect } from "./helpers/tags/collection-select.js";
+import type { GroupedCollectionSelect } from "./helpers/tags/grouped-collection-select.js";
+import type { TimeZoneSelect } from "./helpers/tags/time-zone-select.js";
+import type { WeekdaySelect } from "./helpers/tags/weekday-select.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -27,4 +31,8 @@ export const Tags = { name: "ActionView::Helpers::Tags" } as {
   Select: typeof Select;
   CollectionCheckBoxes: typeof CollectionCheckBoxes;
   CollectionRadioButtons: typeof CollectionRadioButtons;
+  CollectionSelect: typeof CollectionSelect;
+  GroupedCollectionSelect: typeof GroupedCollectionSelect;
+  TimeZoneSelect: typeof TimeZoneSelect;
+  WeekdaySelect: typeof WeekdaySelect;
 };
