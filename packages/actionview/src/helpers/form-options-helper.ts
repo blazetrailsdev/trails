@@ -24,6 +24,7 @@ import { contentTag, tagBuilder, type TagHelperHost } from "./tag-helper.js";
 import { TextHelper } from "./text-helper.js";
 import { Tags } from "../namespaces.js";
 import { FormBuilder, type FormHelperHost } from "./form-helper.js";
+import type { Builder } from "./tags/collection-helpers.js";
 
 export type FormOptionsHelperHost = TagHelperHost;
 
@@ -165,8 +166,8 @@ export function collectionRadioButtons(
   textMethod: unknown,
   options: Record<string, unknown> = {},
   htmlOptions: Record<string, unknown> = {},
-  block?: (builder: unknown) => unknown,
-): unknown {
+  block?: (builder: Builder) => unknown,
+): SafeBuffer {
   return new Tags.CollectionRadioButtons(
     object,
     method,
@@ -188,8 +189,8 @@ export function collectionCheckboxes(
   textMethod: unknown,
   options: Record<string, unknown> = {},
   htmlOptions: Record<string, unknown> = {},
-  block?: (builder: unknown) => unknown,
-): unknown {
+  block?: (builder: Builder) => unknown,
+): SafeBuffer {
   return new Tags.CollectionCheckBoxes(
     object,
     method,
@@ -299,10 +300,18 @@ declare module "./form-helper.js" {
       textMethod: unknown,
       options?: Record<string, unknown>,
       htmlOptions?: Record<string, unknown>,
-      block?: (builder: unknown) => unknown,
-    ): unknown;
+      block?: (builder: Builder) => unknown,
+    ): SafeBuffer;
     collectionCheckBoxes: FormBuilder["collectionCheckboxes"];
-    collectionRadioButtons: FormBuilder["collectionCheckboxes"];
+    collectionRadioButtons(
+      method: unknown,
+      collection: unknown,
+      valueMethod: unknown,
+      textMethod: unknown,
+      options?: Record<string, unknown>,
+      htmlOptions?: Record<string, unknown>,
+      block?: (builder: Builder) => unknown,
+    ): SafeBuffer;
   }
 }
 
@@ -335,7 +344,7 @@ rbModDefineMethod(
 
 type FormBuilderSelf = {
   objectName: unknown;
-  _template: FormHelperHost & Record<string, (...args: unknown[]) => unknown>;
+  _template: FormHelperHost & Record<string, (...args: unknown[]) => SafeBuffer>;
   _defaultHtmlOptions: Record<string, unknown>;
   objectifyOptions(options: Record<string, unknown>): Record<string, unknown>;
 };
@@ -351,8 +360,8 @@ rbModDefineMethod(
     textMethod: unknown,
     options: Record<string, unknown> = {},
     htmlOptions: Record<string, unknown> = {},
-    block?: (builder: unknown) => unknown,
-  ): unknown {
+    block?: (builder: Builder) => unknown,
+  ): SafeBuffer {
     return this._template.collectionCheckboxes(
       this.objectName,
       method,
@@ -378,8 +387,8 @@ rbModDefineMethod(
     textMethod: unknown,
     options: Record<string, unknown> = {},
     htmlOptions: Record<string, unknown> = {},
-    block?: (builder: unknown) => unknown,
-  ): unknown {
+    block?: (builder: Builder) => unknown,
+  ): SafeBuffer {
     return this._template.collectionRadioButtons(
       this.objectName,
       method,

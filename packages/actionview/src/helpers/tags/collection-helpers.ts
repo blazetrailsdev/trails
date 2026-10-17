@@ -1,5 +1,10 @@
-import { htmlSafe, kernelArray as Array, type SafeBuffer } from "@blazetrails/activesupport";
-import { fetch, rbObjAsString, rtest, slice } from "@blazetrails/ruby-compat";
+import {
+  htmlSafe,
+  kernelArray as Array,
+  stringifyKeys,
+  type SafeBuffer,
+} from "@blazetrails/activesupport";
+import { fetch, rbObjAsString, rbObjRespondTo, rtest, slice } from "@blazetrails/ruby-compat";
 
 export interface CollectionTemplateObject {
   label(
@@ -146,10 +151,11 @@ export const CollectionHelpers = {
       const currentValue = this._options[option];
       if (currentValue == null) continue;
 
-      const accept =
-        typeof currentValue === "function"
-          ? currentValue(item)
-          : Array(currentValue).map(rbObjAsString).includes(rbObjAsString(value));
+      const accept = rbObjRespondTo(currentValue, "call")
+        ? (currentValue as (item: unknown) => unknown)(item)
+        : Array(currentValue)
+            .map((v) => rbObjAsString(v))
+            .includes(rbObjAsString(value));
 
       if (rtest(accept)) {
         htmlOptions[option] = true;
@@ -198,6 +204,7 @@ export const CollectionHelpers = {
     builderClass: typeof Builder,
     block?: (builder: Builder) => unknown,
   ): SafeBuffer {
+    const options = stringifyKeys(this._options);
     const renderedCollection = this.renderCollection((item, value, text, defaultHtmlOptions) => {
       const builder = this.instantiateBuilder(builderClass, item, value, text, defaultHtmlOptions);
 
@@ -208,7 +215,7 @@ export const CollectionHelpers = {
       }
     });
 
-    if (rtest(fetch<unknown>(this._options, "includeHidden", true))) {
+    if (rtest(fetch<unknown>(options, "includeHidden", true))) {
       return this.hiddenField().plus(renderedCollection);
     } else {
       return renderedCollection;
