@@ -2079,7 +2079,11 @@ export class Lowerer {
     if (ctx.objSingletonSuper)
       return `Object.getPrototypeOf(this).${this.defTsName(ctx)}.call(${["this", args].filter(Boolean).join(", ")})`;
     if (ctx.isCtor) {
-      if (derived) return `super(${args})`;
+      if (derived) {
+        const sup = this.index.scopes.get(ctx.owner!)?.superclassPath;
+        const parent = sup ? this.constRef({ k: "const", path: sup }, ctx) : null;
+        return `super(${parent && /^[\w$.]+$/.test(parent) ? typedSplat(args, `ConstructorParameters<typeof ${parent}>`) : args})`;
+      }
       this.stat(ctx, "ctor-super-into-module");
       return `${this.rc(ctx, "rbCallSuper")}(this, "initialize", ${JSON.stringify(ctx.owner)}${args ? ", " + args : ""})`;
     }
@@ -3104,7 +3108,10 @@ export class Lowerer {
         sc?.superclassPath?.filter((x: string) => x).join("::") === "String" &&
         !sc.defs.has("initialize");
       if (r.includes("(") || (coreSuper && n.args.length)) return `new (${r} as any)(${argList()})`;
-      return `new ${needsParens(r) ? `(${r})` : r}(${argList()})`;
+      const nargs = argList();
+      return /^[\w$.]+$/.test(r)
+        ? `new ${r}(${typedSplat(nargs, `ConstructorParameters<typeof ${r}>`)})`
+        : `new ${needsParens(r) ? `(${r})` : r}(${nargs})`;
     }
 
     // `ActiveJob::Base.include(M)` on a gem constant is ruby-compat `include(Base, M)`.
@@ -3283,7 +3290,15 @@ export class Lowerer {
         a = parts.join(", ");
       }
     }
-    const call = `${recv}${nav}${callee}(${a})`;
+    const calleeType =
+      nav !== "." || !/^[\w$]+$/.test(callee)
+        ? null
+        : recv === "this"
+          ? `this["${callee}"]`
+          : /^[\w$]+(\.[\w$]+)*$/.test(recv)
+            ? `typeof ${recv}.${callee}`
+            : null;
+    const call = `${recv}${nav}${callee}(${calleeType ? typedSplat(a, `Parameters<${calleeType}>`) : a})`;
     // A method that yields hands back its block's value (`instrument(…) { enqueue }`),
     // so a block that became async makes the call's result a promise.
     // An untyped receiver (`queue_adapter.enqueue(self)`, `job.enqueue`) answers
@@ -4639,4 +4654,20 @@ function isBoolExpr(e: string): boolean {
       return true;
   }
   return false;
+}
+
+/**
+ * `...xs` alone as an argument list, typed as the callee's parameters: a Ruby
+ * splat is an untyped Array, which TS spreads only into a rest parameter or as a
+ * tuple. `paramsOf` is `Parameters<…>` / `ConstructorParameters<…>` of the callee.
+ */
+function typedSplat(args: string, paramsOf: string): string {
+  if (!args.startsWith("...")) return args;
+  let depth = 0;
+  for (const c of args) {
+    if ("([{".includes(c)) depth++;
+    else if (")]}".includes(c)) depth--;
+    else if (c === "," && depth === 0) return args;
+  }
+  return `...(${args.slice(3)} as ${paramsOf})`;
 }
