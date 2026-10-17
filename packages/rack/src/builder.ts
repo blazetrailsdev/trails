@@ -126,7 +126,12 @@ export class Builder {
   toApp(): RackApp {
     let app = this._map ? this.generateMap(this._run, this._map) : this._run;
     if (!app) throw new Error("missing run or map statement");
-    app = this._use.reduceRight((a, e) => e(a), app);
+    if (this._frozen) Object.freeze(app);
+    app = this._use.reduceRight((a, e) => {
+      const x = e(a);
+      if (this._frozen) Object.freeze(x);
+      return x;
+    }, app);
     if (this._warmupBlock) rbFSend(this._warmupBlock, "call", app);
     return app;
   }

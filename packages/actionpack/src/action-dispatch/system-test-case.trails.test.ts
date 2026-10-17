@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterAll, describe, it, expect } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { getFs } from "@blazetrails/ruby-compat";
 import { requirePlaywright } from "./system-testing/driver.js";
@@ -20,11 +20,13 @@ TopLevel.Trails = {
   },
 } as unknown as typeof TopLevel.Trails;
 Server.silencePuma = true;
+afterAll(() => {
+  TopLevel.Trails = trails;
+});
 try {
   await SystemTestCase.startApplication();
 } finally {
   Server.silencePuma = false;
-  TopLevel.Trails = trails;
 }
 
 describe("SystemTestCase.startApplication", () => {

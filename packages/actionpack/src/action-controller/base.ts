@@ -441,13 +441,15 @@ export class Base extends Metal {
 
   declare viewRenderer: typeof viewRenderer;
 
+  declare static MODULES: Array<Parameters<typeof include>[1]>;
+
   static withoutModules(
     ...modules: Array<string | Parameters<typeof include>[1]>
   ): Array<Parameters<typeof include>[1]> {
     const mods = modules.map((m) =>
       typeof m === "string" ? rbModConstGet(ActionController, m) : m,
     );
-    return MODULES.filter((m) => !mods.includes(m));
+    return Base.MODULES.filter((m) => !mods.includes(m));
   }
 
   /** @internal */
@@ -685,7 +687,7 @@ export class Base extends Metal {
   declare handlerForRescue: Rescuable["handlerForRescue"];
 }
 
-export const MODULES: Array<Parameters<typeof include>[1]> = [
+Base.MODULES = [
   AbstractControllerRendering,
   Translation,
   AssetPaths,
@@ -724,7 +726,7 @@ export const MODULES: Array<Parameters<typeof include>[1]> = [
   ParamsWrapper,
 ];
 
-for (const mod of MODULES) {
+for (const mod of Base.MODULES) {
   include(Base, mod);
 }
 Base.setupRendererBang();

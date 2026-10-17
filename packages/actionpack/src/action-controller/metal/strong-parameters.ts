@@ -677,6 +677,11 @@ export class Parameters {
   }
 
   /** @internal */
+  protected set permitted(value: boolean) {
+    this._permitted = value;
+  }
+
+  /** @internal */
   isNestedAttributes(): boolean {
     return this.parameters.any(([k, v]) => Parameters.nestedAttribute(k, v));
   }
@@ -718,7 +723,7 @@ export class Parameters {
     hash: Record<string, unknown> | Hash<string, unknown>,
   ): Parameters {
     const newInstance = new (this.constructor as typeof Parameters)(hash, this.loggingContext);
-    newInstance._permitted = this._permitted;
+    newInstance.permitted = this._permitted;
     return newInstance;
   }
 

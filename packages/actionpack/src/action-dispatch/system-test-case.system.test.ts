@@ -1,4 +1,4 @@
-import { describe, it, expect, inject } from "vitest";
+import { afterAll, describe, it, expect, inject } from "vitest";
 import { assertEqual, TopLevel } from "@blazetrails/activesupport";
 import { getFs } from "@blazetrails/ruby-compat";
 import { SystemTestCase } from "./system-test-case.js";
@@ -16,11 +16,10 @@ TopLevel.Trails = {
     ],
   },
 } as unknown as typeof TopLevel.Trails;
-try {
-  await SystemTestCase.startApplication();
-} finally {
+afterAll(() => {
   TopLevel.Trails = trails;
-}
+});
+await SystemTestCase.startApplication();
 
 class PostsTest extends SystemTestCase {
   async testVisitingThePosts(): Promise<void> {

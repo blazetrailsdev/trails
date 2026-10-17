@@ -2,7 +2,7 @@ import { rbModName } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { htmlSafe } from "@blazetrails/activesupport";
 import { FixtureResolver } from "@blazetrails/actionview";
-import { Base, DoubleRenderError, MODULES, PROTECTED_IVARS } from "../base.js";
+import { Base, DoubleRenderError, PROTECTED_IVARS } from "../base.js";
 import { API } from "../api.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
@@ -554,15 +554,15 @@ describe("withoutModules", () => {
     expect(result.map((m) => rbModName(m))).not.toContain("ActionController::ParamsWrapper");
     expect(result.map((m) => rbModName(m))).not.toContain("ActionController::Streaming");
     expect(result.map((m) => rbModName(m))).toContain("ActionController::Cookies");
-    expect(result.length).toBe(MODULES.length - 2);
+    expect(result.length).toBe(Base.MODULES.length - 2);
   });
 
   it("accepts the modules themselves", () => {
-    expect(Base.withoutModules(MODULES[0])).toEqual(MODULES.slice(1));
+    expect(Base.withoutModules(Base.MODULES[0])).toEqual(Base.MODULES.slice(1));
   });
 
   it("returns the full list when no names are passed", () => {
-    expect(Base.withoutModules()).toEqual(MODULES);
+    expect(Base.withoutModules()).toEqual(Base.MODULES);
   });
 
   it("raises NameError for an unknown name", () => {

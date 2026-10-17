@@ -12,7 +12,7 @@ import {
 import { ModelName } from "@blazetrails/activemodel";
 import { domClass, domId } from "@blazetrails/actionview";
 import { include, publicInstanceMethods, rbModConstSet } from "@blazetrails/ruby-compat";
-import { Base, MODULES } from "../base.js";
+import { Base } from "../base.js";
 import { deprecator } from "../deprecator.js";
 import { TestCase } from "../test-case.js";
 import { deprecator as actionDispatchDeprecator } from "../../action-dispatch/deprecator.js";
@@ -420,7 +420,9 @@ describe("EmptyUrlOptionsTest", () => {
 describe("BaseTest", () => {
   // BLOCKED: http-authentication-controller-methods-are-namespaces-not-modules
   it.skip("included modules are tracked", () => {
-    expect(MODULES.map((m) => String(rbModName(m)).replace(/^ActionController::/, ""))).toEqual([
+    expect(
+      Base.MODULES.map((m) => String(rbModName(m)).replace(/^ActionController::/, "")),
+    ).toEqual([
       "AbstractController::Rendering",
       "AbstractController::Translation",
       "AbstractController::AssetPaths",
