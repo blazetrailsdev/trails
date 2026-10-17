@@ -17,6 +17,8 @@ import {
   presence,
   reverseMergeBang,
   underscore,
+  Concern,
+  extend,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
@@ -1055,6 +1057,8 @@ onLoad("action_view", (base: unknown) => {
 });
 
 export const FormHelper = new Module((mod) => {
+  extend(mod, Concern);
+
   mod.include(FormTagHelper);
   mod.include(UrlHelper);
   mod.include(ModelNaming);

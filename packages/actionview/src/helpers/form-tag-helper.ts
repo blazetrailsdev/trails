@@ -10,6 +10,8 @@ import {
   isPlainObject,
   presence,
   stringifyKeys,
+  Concern,
+  extend,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
@@ -631,6 +633,8 @@ export function convertDirectUploadOptionToUrl(
 }
 
 export const FormTagHelper = new Module((mod) => {
+  extend(mod, Concern);
+
   mod.include(UrlHelper);
   mod.include(TextHelper);
   mod.include(ContentExfiltrationPreventionHelper);

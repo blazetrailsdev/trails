@@ -1,6 +1,8 @@
 import {
+  Concern,
   SafeBuffer,
   dasherize,
+  extend,
   htmlEscape,
   htmlSafe,
   isBlank,
@@ -62,11 +64,11 @@ type Block = (...args: unknown[]) => unknown;
 
 export const BUTTON_TAG_METHOD_VERBS = ["patch", "put", "delete"];
 
-export class ClassMethods {
-  static _urlForModules(): typeof RoutingUrlFor {
+export const ClassMethods = {
+  _urlForModules(): typeof RoutingUrlFor {
     return RoutingUrlFor;
-  }
-}
+  },
+};
 
 export let buttonToGeneratesButtonTag: boolean = false;
 
@@ -514,6 +516,8 @@ export function removeTrailingSlashBang(urlString: string): string {
 }
 
 export const UrlHelper = new Module((mod) => {
+  extend(mod, Concern);
+
   mod.include(TagHelper);
   mod.include(ContentExfiltrationPreventionHelper);
 
@@ -525,4 +529,6 @@ export const UrlHelper = new Module((mod) => {
     Object.assign(m, { addMethodToAttributesBang, methodForOptions, isMethodNotGetMethod });
     Object.assign(m, { tokenTag, methodTag, toFormParams, removeTrailingSlashBang });
   });
+
+  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
 });

@@ -5,6 +5,8 @@ import {
   isBlank,
   pluralize as inflectorPluralize,
   truncate as stringTruncate,
+  Concern,
+  extend,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
 import { Module, chomp, fetch, regexpEscape } from "@blazetrails/ruby-compat";
@@ -81,6 +83,7 @@ export interface HighlightOptions {
 }
 
 export function highlight(
+  this: TagHelperHost,
   text: string | SafeBuffer | null | undefined,
   phrases: string | RegExp | Array<string | RegExp> | null | undefined,
   options: HighlightOptions = {},
@@ -91,7 +94,7 @@ export function highlight(
   if (text == null) {
     working = "";
   } else {
-    working = doSanitize ? sanitize(String(text))!.toString() : String(text);
+    working = doSanitize ? sanitize.call(this, String(text))!.toString() : String(text);
   }
 
   const phrasesBlank =
@@ -230,7 +233,9 @@ export function simpleFormat(
 
   let working: string;
   if (options.sanitize !== false) {
-    working = sanitize(text == null ? "" : String(text), options.sanitizeOptions ?? {})!.toString();
+    working = sanitize
+      .call(this, text == null ? "" : String(text), options.sanitizeOptions ?? {})!
+      .toString();
   } else {
     working = text == null ? "" : String(text);
   }
@@ -373,6 +378,8 @@ function splitParagraphs(text: string): string[] {
 }
 
 export const TextHelper = new Module((mod) => {
+  extend(mod, Concern);
+
   mod.include(SanitizeHelper);
   mod.include(TagHelper);
   mod.include(OutputSafetyHelper);

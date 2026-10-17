@@ -15,7 +15,8 @@ import {
   setImageLoading,
   setPreloadLinksHeader,
   setPrependContentExfiltrationPrevention,
-  setSanitizerVendor,
+  SanitizeHelper,
+  type SanitizerVendor,
   Template,
   ViewReloader,
 } from "@blazetrails/actionview";
@@ -34,7 +35,7 @@ export interface ActionViewConfig {
   cacheTemplateLoading?: boolean | null;
   formWithGeneratesRemoteForms?: boolean;
   formWithGeneratesIds?: boolean | null;
-  sanitizerVendor?: Parameters<typeof setSanitizerVendor>[0] | null;
+  sanitizerVendor?: SanitizerVendor | null;
   buttonToGeneratesButtonTag?: boolean | null;
   frozenStringLiteral?: boolean | null;
 }
@@ -112,7 +113,7 @@ export class Trailtie extends BaseTrailtie {
       const klass = actionView.sanitizerVendor;
       delete actionView.sanitizerVendor;
       if (klass != null) {
-        setSanitizerVendor(klass);
+        SanitizeHelper.sanitizerVendor = klass;
       }
     });
 
