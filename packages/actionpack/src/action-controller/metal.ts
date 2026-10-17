@@ -40,13 +40,11 @@ export class MiddlewareStack extends AbstractMiddlewareStack {
   ): RackApp | RackAppObject {
     action = String(action);
 
-    let current = app as RackApp | RackAppObject;
-    const middlewares = this.middlewares as Middleware[];
-    for (let i = middlewares.length - 1; i >= 0; i--) {
-      const middleware = middlewares[i];
-      current = middleware.valid(action) ? middleware.build(current) : current;
-    }
-    return current;
+    return [...(this.middlewares as Middleware[])]
+      .reverse()
+      .reduce<
+        RackApp | RackAppObject
+      >((a, middleware) => (middleware.valid(action) ? middleware.build(a) : a), app as RackApp | RackAppObject);
   }
 
   /** @internal */
@@ -55,13 +53,12 @@ export class MiddlewareStack extends AbstractMiddlewareStack {
     args: unknown[],
     block?: MiddlewareBlock,
   ): Middleware {
-    const next = [...args];
-    const options: Record<string, unknown> = extractOptionsBang(next);
+    const options: Record<string, unknown> = extractOptionsBang(args);
     const only = ([] as string[]).concat((options.only as string | string[]) ?? []).map(String);
     const except = ([] as string[]).concat((options.except as string | string[]) ?? []).map(String);
     delete options.only;
     delete options.except;
-    if (Object.keys(options).length > 0) next.push(options);
+    if (Object.keys(options).length > 0) args.push(options);
 
     let strategy: Strategy = NULL;
     let list: string[] | null = null;
@@ -72,7 +69,7 @@ export class MiddlewareStack extends AbstractMiddlewareStack {
       strategy = EXCLUDE;
       list = except;
     }
-    return new Middleware(klass, next, list, strategy, block);
+    return new Middleware(klass, args, list, strategy, block);
   }
 }
 

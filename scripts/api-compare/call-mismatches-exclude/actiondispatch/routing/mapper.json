@@ -4,13 +4,13 @@
     "tsFile": "routing/mapper.ts",
     "rubyName": "resource",
     "call": "order:get,constructor",
-    "reason": "Order-only: the Ruby skeleton records the block's get :new ahead of new do (mapper.rb:1362-1364); the port's this.new(() => this.get(...)) records them the other way. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+    "reason": "Order-only: the Ruby skeleton records the block's get :new ahead of new do (mapper.rb:1362-1364); the port's this.new(() => this.get(...)) records them the other way. Tracked by call-order-gate-pairs-scope-get-with-routing-get."
   },
   {
     "package": "actiondispatch",
     "tsFile": "routing/mapper.ts",
     "rubyName": "resources",
     "call": "order:get,constructor",
-    "reason": "Order-only: the Ruby skeleton records the block's get :new ahead of new do (mapper.rb:1537-1539); the port's this.new(() => this.get(...)) records them the other way. Tracked by converge-call-rows-surfaced-by-same-file-mixin-owner."
+    "reason": "Order-only: the Ruby skeleton records the block's get :new ahead of new do (mapper.rb:1537-1539); the port's this.new(() => this.get(...)) records them the other way. Tracked by call-order-gate-pairs-scope-get-with-routing-get."
   }
 ]

@@ -66,7 +66,10 @@ export function render(
   });
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsName name — CONVERGEABLE instrumentation-status-code-reads-the-exception-class-path
+ */
 export async function processAction(
   this: InstrumentationHost,
   ...args: unknown[]

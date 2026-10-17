@@ -566,16 +566,19 @@ export function perFormCsrfToken(
 
 /** @internal */
 export function maskToken(this: CsrfController, rawToken: Bytes): string {
-  const otp = SecureRandom.randomBytes(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
-  return this.encodeCsrfToken(Buffer.concat([otp, this.xorByteStrings(otp, rawToken)]));
+  const oneTimePad = SecureRandom.randomBytes(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
+  const encryptedCsrfToken = this.xorByteStrings(oneTimePad, rawToken);
+  const maskedToken = Buffer.concat([oneTimePad, encryptedCsrfToken]);
+  return this.encodeCsrfToken(maskedToken);
 }
 
 /** @internal */
 export function unmaskToken(this: CsrfController, maskedToken: Bytes): Bytes {
-  return this.xorByteStrings(
-    maskedToken.subarray(0, RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH),
-    maskedToken.subarray(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH),
+  const oneTimePad = maskedToken.subarray(0, RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
+  const encryptedCsrfToken = maskedToken.subarray(
+    RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH,
   );
+  return this.xorByteStrings(oneTimePad, encryptedCsrfToken);
 }
 
 /** @internal */
@@ -659,17 +662,17 @@ export function isValidAuthenticityToken(
   encodedMaskedToken: unknown,
 ): boolean {
   if (typeof encodedMaskedToken !== "string" || encodedMaskedToken.length === 0) return false;
-  let masked: Bytes;
+  let maskedToken: Bytes;
   try {
-    masked = this.decodeCsrfToken(encodedMaskedToken);
+    maskedToken = this.decodeCsrfToken(encodedMaskedToken);
   } catch (e) {
     if (e instanceof ArgumentError) return false;
     throw e;
   }
-  if (masked.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH)
-    return this.compareWithRealToken(masked);
-  if (masked.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH * 2) {
-    const csrfToken = this.unmaskToken(masked);
+  if (maskedToken.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH)
+    return this.compareWithRealToken(maskedToken);
+  if (maskedToken.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH * 2) {
+    const csrfToken = this.unmaskToken(maskedToken);
     return (
       this.compareWithGlobalToken(csrfToken) ||
       this.compareWithRealToken(csrfToken) ||

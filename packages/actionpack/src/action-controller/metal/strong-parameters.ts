@@ -33,6 +33,7 @@ import {
   rbObjClass,
   rbObjClassname,
   rbObjDup,
+  rbEqq,
   rbObjRespondTo,
   toEnum,
   toH,
@@ -905,7 +906,7 @@ export class Parameters {
 
   /** @internal */
   permitArrayOfScalars(value: unknown): unknown {
-    if (Array.isArray(value) && value.every((el) => isPermittedScalar(el))) return value;
+    if (Array.isArray(value) && value.every((element) => isPermittedScalar(element))) return value;
     return undefined;
   }
 
@@ -958,13 +959,13 @@ export class Parameters {
   /** @internal */
   permitAnyInParameters(params: Parameters): Parameters {
     const sanitized = new Parameters();
-    params.each(([k, v]) => {
-      if (isPermittedScalar(v)) {
-        sanitized.set(k, v);
-      } else if (Array.isArray(v)) {
-        sanitized.set(k, this.permitAnyInArray(v));
-      } else if (v instanceof Parameters) {
-        sanitized.set(k, this.permitAnyInParameters(v));
+    params.each(([key, value]) => {
+      if (rbEqq((v: unknown) => isPermittedScalar(v), value)) {
+        sanitized.set(key, value);
+      } else if (Array.isArray(value)) {
+        sanitized.set(key, this.permitAnyInArray(value));
+      } else if (value instanceof Parameters) {
+        sanitized.set(key, this.permitAnyInParameters(value));
       }
     });
     return sanitized;
@@ -973,10 +974,10 @@ export class Parameters {
   /** @internal */
   permitAnyInArray(array: unknown[]): unknown[] {
     const sanitized: unknown[] = [];
-    for (const el of array) {
-      if (isPermittedScalar(el)) sanitized.push(el);
-      else if (Array.isArray(el)) sanitized.push(this.permitAnyInArray(el));
-      else if (el instanceof Parameters) sanitized.push(this.permitAnyInParameters(el));
+    for (const element of array) {
+      if (rbEqq((e: unknown) => isPermittedScalar(e), element)) sanitized.push(element);
+      else if (Array.isArray(element)) sanitized.push(this.permitAnyInArray(element));
+      else if (element instanceof Parameters) sanitized.push(this.permitAnyInParameters(element));
     }
     return sanitized;
   }
