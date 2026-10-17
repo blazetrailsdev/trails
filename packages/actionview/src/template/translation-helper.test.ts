@@ -83,7 +83,7 @@ describe("TranslationHelperTest", () => {
     } finally {
       spy.mockRestore();
     }
-    expect(matcherCalled).toBe(true);
+    expect(matcherCalled).toBeTruthy();
   });
 
   it("delegates localize to i18n", () => {
@@ -104,7 +104,7 @@ describe("TranslationHelperTest", () => {
   it("returns default for nil key with default", () => {
     expect(translate(null, { default: "Foo" })).toBe("Foo");
     expect(String(translate(null, { default: ":translations.foo" }))).toBe("Foo");
-    expect(isHtmlSafe(translate(null, { default: ":translations.html" }))).toBe(true);
+    expect(isHtmlSafe(translate(null, { default: ":translations.html" }))).toBeTruthy();
   });
 
   it("returns missing translation message without span wrap", () => {
@@ -138,7 +138,7 @@ describe("TranslationHelperTest", () => {
         }),
       ),
     ).toBe(expected);
-    expect(isHtmlSafe(translate(":translations.missing"))).toBe(true);
+    expect(isHtmlSafe(translate(":translations.missing"))).toBeTruthy();
   });
 
   it("returns missing translation message does filters out i18n options", () => {
@@ -270,11 +270,11 @@ describe("TranslationHelperTest", () => {
   });
 
   it("translate marks translations named html as safe html", () => {
-    expect(isHtmlSafe(translate(":translations.html"))).toBe(true);
+    expect(isHtmlSafe(translate(":translations.html"))).toBeTruthy();
   });
 
   it("translate marks translations with a html suffix as safe html", () => {
-    expect(isHtmlSafe(translate(":translations.hello_html"))).toBe(true);
+    expect(isHtmlSafe(translate(":translations.hello_html"))).toBeTruthy();
   });
 
   it("translate escapes interpolations in translations with a html suffix", () => {
@@ -298,7 +298,7 @@ describe("TranslationHelperTest", () => {
   it("translate marks array of translations with a html safe suffix as safe html", () => {
     const translated = translate(":translations.array_html") as unknown[];
     expect(translated.map(String)).toEqual(["foo", "bar"]);
-    expect(translated.every((t) => isHtmlSafe(t))).toBe(true);
+    expect(translated.every((t) => isHtmlSafe(t))).toBeTruthy();
   });
 
   it("translate with default and raise false", () => {
@@ -323,7 +323,7 @@ describe("TranslationHelperTest", () => {
       raise: false,
     });
     expect(String(translation)).toBe("<a>Hello World</a>");
-    expect(isHtmlSafe(translation)).toBe(true);
+    expect(isHtmlSafe(translation)).toBeTruthy();
   });
 
   it("translate with missing default", () => {
@@ -379,7 +379,7 @@ describe("TranslationHelperTest", () => {
       default: [":translations.missing_html", untrustedString],
     });
     expect(translation).toBe(untrustedString);
-    expect(isHtmlSafe(translation)).toBe(false);
+    expect(isHtmlSafe(translation)).toBeFalsy();
   });
 
   it("translate with string default", () => {
@@ -460,7 +460,7 @@ describe("TranslationHelperTest", () => {
   it("translate bulk lookup html", () => {
     const translations = translate([":translations.html", ":translations.hello_html"]) as unknown[];
     expect(translations.map(String)).toEqual(["<a>Hello World</a>", "<a>Hello World</a>"]);
-    for (const translation of translations) expect(isHtmlSafe(translation)).toBe(true);
+    for (const translation of translations) expect(isHtmlSafe(translation)).toBeTruthy();
   });
 
   it("translate bulk lookup html with default", () => {
@@ -468,7 +468,7 @@ describe("TranslationHelperTest", () => {
       default: ":translations.html",
     }) as unknown[];
     expect(translations.map(String)).toEqual(["<a>Hello World</a>", "<a>Hello World</a>"]);
-    for (const translation of translations) expect(isHtmlSafe(translation)).toBe(true);
+    for (const translation of translations) expect(isHtmlSafe(translation)).toBeTruthy();
   });
 
   it("translate does not change options", () => {
