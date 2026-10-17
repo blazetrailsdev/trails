@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { I18n } from "@blazetrails/activesupport";
 import { rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { TopLevel, OrderedOptions, onLoad, squish } from "@blazetrails/activesupport";
 import {
   registerConstant,

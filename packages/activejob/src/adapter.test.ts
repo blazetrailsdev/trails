@@ -23,8 +23,9 @@ describe("AdapterTest", () => {
       ),
     );
   });
-  if (isAdapterIs("sucker_punch")) {
-    it("sucker_punch adapter should be deprecated", async ({ testCase }: any) => {
+  const run = isAdapterIs("sucker_punch");
+  {
+    (run ? it : it.skip)("sucker_punch adapter should be deprecated", async ({ testCase }: any) => {
       let beforeAdapter: any, msg: any;
       try {
         beforeAdapter = await Base.queueAdapter();
@@ -39,7 +40,7 @@ describe("AdapterTest", () => {
         Base.setQueueAdapter(beforeAdapter);
       }
     });
-    it("sucker_punch check_adapter should warn", async ({ testCase }: any) => {
+    (run ? it : it.skip)("sucker_punch check_adapter should warn", async ({ testCase }: any) => {
       const msg: any = await squish(
         `The \`sucker_punch\` adapter is deprecated and will be removed in Rails 8.1.\nPlease use the \`async\` adapter instead.\n`,
       );

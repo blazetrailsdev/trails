@@ -49,8 +49,9 @@ describe("InstrumentationTest", () => {
     );
     expect(await rbSize(events)).toEqual(1);
   });
-  if (!isAdapterIs("inline", "sneakers")) {
-    it("retry emits an enqueue retry event", async ({ testCase }: any) => {
+  const run = !isAdapterIs("inline", "sneakers");
+  {
+    (run ? it : it.skip)("retry emits an enqueue retry event", async ({ testCase }: any) => {
       const events: any = await await testCase.subscribed(
         "enqueue_retry.active_job",
         async () =>
@@ -61,17 +62,20 @@ describe("InstrumentationTest", () => {
       );
       expect(await rbSize(events)).toEqual(1);
     });
-    it("retry exhaustion emits a retry_stopped event", async ({ testCase }: any) => {
-      const events: any = await await testCase.subscribed(
-        "retry_stopped.active_job",
-        async () =>
-          await await testCase.performEnqueuedJobs(
-            undefined,
-            async () => await await RetryJob.performLater("CustomCatchError", 6),
-          ),
-      );
-      expect(await rbSize(events)).toEqual(1);
-    });
+    (run ? it : it.skip)(
+      "retry exhaustion emits a retry_stopped event",
+      async ({ testCase }: any) => {
+        const events: any = await await testCase.subscribed(
+          "retry_stopped.active_job",
+          async () =>
+            await await testCase.performEnqueuedJobs(
+              undefined,
+              async () => await await RetryJob.performLater("CustomCatchError", 6),
+            ),
+        );
+        expect(await rbSize(events)).toEqual(1);
+      },
+    );
   }
   it("discard emits a discard event", async ({ testCase }: any) => {
     const events: any = await await testCase.subscribed(

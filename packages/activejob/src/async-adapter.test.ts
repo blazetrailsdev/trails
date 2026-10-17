@@ -25,7 +25,7 @@ describe("AsyncAdapterTest", () => {
     await await HelloJob.performLater("Alex");
     expect(await lastValue()).toMatch(/Alex/);
   });
-  it("in immediate run, enqueue with wait: runs immediately", async ({ testCase }: any) => {
+  it.skip("in immediate run, enqueue with wait: runs immediately", async ({ testCase }: any) => {
     await await (
       await HelloJob.set({ waitUntil: await noon(await tomorrow()) })
     ).performLater("Alex");

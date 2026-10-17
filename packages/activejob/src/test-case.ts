@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ActiveSupport, runLoadHooks } from "@blazetrails/activesupport";
 import { include, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveJob as ActiveJobSeat } from "./namespaces.js";

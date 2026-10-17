@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { zone } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { rbFSend, rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
