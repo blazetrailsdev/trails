@@ -1,5 +1,5 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { setApp, _resetApp } from "./config.js";
 import { assertNil, assertEqual } from "@blazetrails/activesupport";
 import { rbHash, registerConstant, resetConstants, uniq } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
@@ -82,19 +82,19 @@ describe("GlobalIDTest", () => {
   });
 
   it("invalid app name", () => {
-    expect(() => GlobalID.validateApp("")).toThrow();
-    expect(() => GlobalID.validateApp("blog_app")).toThrow();
-    expect(() => GlobalID.validateApp(null)).toThrow();
+    expect(() => GlobalID.setApp("")).toThrow(ArgumentError);
+    expect(() => GlobalID.setApp("blog_app")).toThrow(ArgumentError);
+    expect(() => GlobalID.setApp(null)).toThrow(ArgumentError);
   });
 });
 
 describe("GlobalIDParamEncodedTest", () => {
   beforeEach(() => {
-    setApp("bcx");
+    GlobalID.setApp("bcx");
     registerConstants(FIXTURE_REGISTRY);
   });
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetConstants();
   });
 
@@ -121,7 +121,7 @@ describe("GlobalIDCreationTest", () => {
   let cpkModelGid: GlobalID;
 
   beforeEach(() => {
-    setApp("bcx");
+    GlobalID.setApp("bcx");
     registerConstants(FIXTURE_REGISTRY);
     personGid = GlobalID.create(new Person(5));
     personUuidGid = GlobalID.create(new PersonUuid(uuid));
@@ -132,7 +132,7 @@ describe("GlobalIDCreationTest", () => {
     );
   });
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetConstants();
   });
 
@@ -321,7 +321,7 @@ describe("GlobalIDCreationTest", () => {
   it(":app option", () => {
     expect(GlobalID.create(new Person(5)).toString()).toBe("gid://bcx/Person/5");
     expect(GlobalID.create(new Person(5), { app: "foo" }).toString()).toBe("gid://foo/Person/5");
-    _resetApp();
+    GlobalID["_app"] = undefined;
     expect(() => GlobalID.create(new Person(5), { app: null as unknown as string })).toThrow();
   });
 
@@ -348,8 +348,8 @@ describe("GlobalIDCreationTest", () => {
 });
 
 describe("GlobalIDCustomParamsTest", () => {
-  beforeEach(() => setApp("bcx"));
-  afterEach(() => _resetApp());
+  beforeEach(() => GlobalID.setApp("bcx"));
+  afterEach(() => (GlobalID["_app"] = undefined));
 
   it("create custom params", () => {
     const gid = GlobalID.create(fakeModel(5), { hello: "world" });

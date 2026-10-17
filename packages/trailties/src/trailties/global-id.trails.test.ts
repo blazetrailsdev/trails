@@ -1,8 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { ArgumentError, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
-import { GlobalID, getApp } from "@blazetrails/globalid";
-import { _resetApp } from "@blazetrails/globalid";
+import { GlobalID } from "@blazetrails/globalid";
 import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "@blazetrails/globalid";
 import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./global-id.js";
 import { Application } from "../application.js";
@@ -20,7 +19,7 @@ describe("GlobalID::Railtie class body", () => {
 
 describe("GlobalID::Railtie verifier derivation", () => {
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     _resetSignedGlobalIDClassConfig();
     resetLoadHooks();
   });
@@ -64,7 +63,7 @@ describe("GlobalID::Railtie verifier derivation", () => {
 
 describe("GlobalID::Railtie against a real Application", () => {
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     _resetSignedGlobalIDClassConfig();
     resetLoadHooks();
   });
@@ -80,7 +79,7 @@ describe("GlobalID::Railtie against a real Application", () => {
         config: app.config,
         keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
       } as TrailtieApp);
-      expect(getApp()).toBe("boot-app");
+      expect(GlobalID.app).toBe("boot-app");
       expect(Object.prototype.hasOwnProperty.call(app.config, "globalId")).toBe(false);
     } finally {
       app.config.set("globalId", previous);
@@ -90,7 +89,7 @@ describe("GlobalID::Railtie against a real Application", () => {
 
 describe("GlobalID::Railtie Active Record identification", () => {
   afterEach(() => {
-    _resetApp();
+    GlobalID["_app"] = undefined;
     resetLoadHooks();
   });
 

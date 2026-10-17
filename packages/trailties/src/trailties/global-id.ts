@@ -12,7 +12,6 @@ import type { MessageVerifier } from "@blazetrails/activesupport/message-verifie
 import {
   FixtureSet,
   type FixtureSetHost,
-  setApp,
   GlobalID,
   Identification,
   SignedGlobalID,
@@ -47,12 +46,12 @@ export class Trailtie extends BaseTrailtie {
       );
 
       const config = (app as TrailtieApp).config.get("globalId") as GlobalIdConfig;
-      setApp((config.app ??= defaultAppName));
+      GlobalID.setApp((config.app ??= defaultAppName));
       SignedGlobalID.expiresIn =
         "expiresIn" in config ? (config.expiresIn ?? null) : defaultExpiresIn;
 
       this.config.afterInitialize(() => {
-        setApp((config.app ??= defaultAppName));
+        GlobalID.setApp((config.app ??= defaultAppName));
         SignedGlobalID.expiresIn =
           "expiresIn" in config ? (config.expiresIn ?? null) : defaultExpiresIn;
 

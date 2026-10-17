@@ -1,4 +1,3 @@
-import { getApp } from "./config.js";
 import { GID, type GidComponents } from "./uri/gid.js";
 import type { Identification as IdentificationModule } from "./identification.js";
 import type {
@@ -16,7 +15,7 @@ import {
   extend,
   type Extended,
 } from "@blazetrails/activesupport";
-import { ArgumentError, rbHash } from "@blazetrails/ruby-compat";
+import { ArgumentError, block, fetch, rbHash } from "@blazetrails/ruby-compat";
 
 let _deprecator: Deprecation | undefined;
 
@@ -37,6 +36,12 @@ export interface GlobalIDOptions {
 }
 
 export class GlobalID {
+  private static _app: string | undefined;
+
+  static get app(): string | undefined {
+    return this._app;
+  }
+
   readonly uri: GID;
 
   constructor(gid: string | GID, _options: GlobalIDOptions = {}) {
@@ -66,10 +71,14 @@ export class GlobalID {
     options?: O,
   ): T {
     const opts: GlobalIDOptions = options ?? {};
-    const app = opts.app ?? getApp();
-    if (!app) {
-      throw new Error(
-        "An app is required to create a GlobalID. Pass the :app option or set the default GlobalID.app via setApp().",
+    const app = fetch<string | undefined>(
+      opts,
+      "app",
+      block(() => GlobalID.app),
+    );
+    if (app == null) {
+      throw new ArgumentError(
+        "An app is required to create a GlobalID. Pass the :app option or set the default GlobalID.app.",
       );
     }
     const { app: _a, verifier: _v, for: _f, ...rest } = opts;
@@ -88,6 +97,10 @@ export class GlobalID {
     } catch {
       return this.parseEncodedGid(gid, options);
     }
+  }
+
+  static setApp(app: string | null | undefined): void {
+    this._app = GID.validateApp(app);
   }
 
   private static parseEncodedGid(gid: string, options: GlobalIDOptions): GlobalID | null {
