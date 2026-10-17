@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 let text: string;
 let rules: string;
+let tsType: (t: unknown) => string;
 
 async function emitFixture(name: string): Promise<string> {
   process.env.CODEGEN_GEM = "activejob";
@@ -23,6 +24,7 @@ async function emitFixture(name: string): Promise<string> {
   index.finish((f) => resolver.tsFileOf(f));
   const emitter = new Emitter(index, resolver);
   emitter.register(ir);
+  tsType = (t) => emitter.lw.tsType(t as never);
   return emitter.emitFile(ir).text;
 }
 
@@ -134,5 +136,23 @@ describe("local declarations in active_job/rules.rb", () => {
 
   it("keeps a ruby-compat helper's unknown-typed result untyped", () => {
     expect(rules).toContain("const line: any = aryJoin(");
+  });
+});
+
+describe("a hand twin's oracle type as a TS signature type", () => {
+  it("spells primitives, nullable ones with null", () => {
+    expect(tsType({ k: "prim", name: "string" })).toBe("string");
+    expect(tsType({ k: "prim", name: "number", nullable: true })).toBe("number | null");
+  });
+
+  it("parenthesizes a nullable array element", () => {
+    expect(tsType({ k: "array", el: { k: "prim", name: "string", nullable: true } })).toBe(
+      "(string | null)[]",
+    );
+  });
+
+  it("leaves an unknown or class type as any until it can be imported", () => {
+    expect(tsType(null)).toBe("any");
+    expect(tsType({ k: "class", key: "@activesupport/duration.ts#Duration" })).toBe("any");
   });
 });
