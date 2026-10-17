@@ -1,0 +1,470 @@
+{
+  "file": "active_job/rules.rb",
+  "body": {
+    "k": "seq",
+    "body": [
+      {
+        "k": "module",
+        "path": ["ActiveJob"],
+        "body": {
+          "k": "seq",
+          "body": [
+            {
+              "k": "call",
+              "recv": {
+                "k": "call",
+                "recv": null,
+                "name": "singleton_class",
+                "args": [],
+                "block": null,
+                "safe": false,
+                "l": 4,
+                "vcall": true
+              },
+              "name": "attr_accessor",
+              "args": [
+                {
+                  "k": "sym",
+                  "value": "verbose_logs"
+                }
+              ],
+              "block": null,
+              "safe": false,
+              "l": 4,
+              "vcall": false
+            },
+            {
+              "k": "call",
+              "recv": {
+                "k": "self"
+              },
+              "name": "verbose_logs=",
+              "args": [
+                {
+                  "k": "false"
+                }
+              ],
+              "block": null,
+              "safe": false,
+              "l": 5,
+              "vcall": false
+            },
+            {
+              "k": "module",
+              "path": ["Core"],
+              "body": {
+                "k": "seq",
+                "body": [
+                  {
+                    "k": "call",
+                    "recv": null,
+                    "name": "attr_accessor",
+                    "args": [
+                      {
+                        "k": "sym",
+                        "value": "job_id"
+                      }
+                    ],
+                    "block": null,
+                    "safe": false,
+                    "l": 8,
+                    "vcall": false
+                  }
+                ]
+              },
+              "l": 7
+            },
+            {
+              "k": "class",
+              "path": ["Rules"],
+              "superclass": null,
+              "struct": null,
+              "body": {
+                "k": "seq",
+                "body": [
+                  {
+                    "k": "call",
+                    "recv": null,
+                    "name": "include",
+                    "args": [
+                      {
+                        "k": "const",
+                        "path": ["Core"]
+                      }
+                    ],
+                    "block": null,
+                    "safe": false,
+                    "l": 12,
+                    "vcall": false
+                  },
+                  {
+                    "k": "call",
+                    "recv": null,
+                    "name": "class_attribute",
+                    "args": [
+                      {
+                        "k": "sym",
+                        "value": "log_arguments"
+                      },
+                      {
+                        "k": "kwargs",
+                        "pairs": [
+                          {
+                            "key": {
+                              "k": "sym",
+                              "value": "instance_accessor"
+                            },
+                            "value": {
+                              "k": "false"
+                            }
+                          },
+                          {
+                            "key": {
+                              "k": "sym",
+                              "value": "default"
+                            },
+                            "value": {
+                              "k": "true"
+                            }
+                          }
+                        ]
+                      }
+                    ],
+                    "block": null,
+                    "safe": false,
+                    "l": 13,
+                    "vcall": false
+                  },
+                  {
+                    "k": "def",
+                    "name": "job_id",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "str",
+                          "value": "FIXED-ID",
+                          "frozen": true,
+                          "heredoc": false
+                        }
+                      ]
+                    },
+                    "l": 15,
+                    "lend": 17,
+                    "endless": false
+                  },
+                  {
+                    "k": "def",
+                    "name": "summary",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [
+                      {
+                        "kind": "req",
+                        "name": "job"
+                      },
+                      {
+                        "kind": "req",
+                        "name": "jobs"
+                      }
+                    ],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "call",
+                          "recv": {
+                            "k": "const",
+                            "path": ["ActiveSupport", "ExecutionContext"]
+                          },
+                          "name": "[]=",
+                          "args": [
+                            {
+                              "k": "sym",
+                              "value": "job"
+                            },
+                            {
+                              "k": "lvar",
+                              "name": "job"
+                            }
+                          ],
+                          "block": null,
+                          "safe": false,
+                          "l": 20,
+                          "vcall": false
+                        },
+                        {
+                          "k": "lasgn",
+                          "name": "counts",
+                          "value": {
+                            "k": "call",
+                            "recv": {
+                              "k": "call",
+                              "recv": {
+                                "k": "call",
+                                "recv": {
+                                  "k": "lvar",
+                                  "name": "jobs"
+                                },
+                                "name": "map",
+                                "args": [],
+                                "block": {
+                                  "k": "symproc",
+                                  "name": "class"
+                                },
+                                "safe": false,
+                                "l": 21,
+                                "vcall": false
+                              },
+                              "name": "tally",
+                              "args": [],
+                              "block": null,
+                              "safe": false,
+                              "l": 21,
+                              "vcall": false
+                            },
+                            "name": "sort_by",
+                            "args": [],
+                            "block": {
+                              "k": "block",
+                              "params": [
+                                {
+                                  "kind": "req",
+                                  "name": "_klass"
+                                },
+                                {
+                                  "kind": "req",
+                                  "name": "count"
+                                }
+                              ],
+                              "body": {
+                                "k": "seq",
+                                "body": [
+                                  {
+                                    "k": "call",
+                                    "recv": {
+                                      "k": "lvar",
+                                      "name": "count"
+                                    },
+                                    "name": "-@",
+                                    "args": [],
+                                    "block": null,
+                                    "safe": false,
+                                    "l": 21,
+                                    "vcall": false
+                                  }
+                                ]
+                              },
+                              "l": 21
+                            },
+                            "safe": false,
+                            "l": 21,
+                            "vcall": false
+                          },
+                          "l": 21
+                        },
+                        {
+                          "k": "lasgn",
+                          "name": "line",
+                          "value": {
+                            "k": "call",
+                            "recv": {
+                              "k": "call",
+                              "recv": {
+                                "k": "lvar",
+                                "name": "counts"
+                              },
+                              "name": "map",
+                              "args": [],
+                              "block": {
+                                "k": "block",
+                                "params": [
+                                  {
+                                    "kind": "req",
+                                    "name": "klass"
+                                  },
+                                  {
+                                    "kind": "req",
+                                    "name": "count"
+                                  }
+                                ],
+                                "body": {
+                                  "k": "seq",
+                                  "body": [
+                                    {
+                                      "k": "dstr",
+                                      "parts": [
+                                        {
+                                          "k": "lvar",
+                                          "name": "count"
+                                        },
+                                        {
+                                          "k": "str",
+                                          "value": " "
+                                        },
+                                        {
+                                          "k": "lvar",
+                                          "name": "klass"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "l": 22
+                              },
+                              "safe": false,
+                              "l": 22,
+                              "vcall": false
+                            },
+                            "name": "join",
+                            "args": [
+                              {
+                                "k": "str",
+                                "value": ", ",
+                                "frozen": true,
+                                "heredoc": false
+                              }
+                            ],
+                            "block": null,
+                            "safe": false,
+                            "l": 22,
+                            "vcall": false
+                          },
+                          "l": 22
+                        },
+                        {
+                          "k": "if",
+                          "cond": {
+                            "k": "call",
+                            "recv": {
+                              "k": "call",
+                              "recv": {
+                                "k": "lvar",
+                                "name": "job"
+                              },
+                              "name": "class",
+                              "args": [],
+                              "block": null,
+                              "safe": false,
+                              "l": 23,
+                              "vcall": false
+                            },
+                            "name": "log_arguments?",
+                            "args": [],
+                            "block": null,
+                            "safe": false,
+                            "l": 23,
+                            "vcall": false
+                          },
+                          "then": {
+                            "k": "seq",
+                            "body": [
+                              {
+                                "k": "call",
+                                "recv": {
+                                  "k": "lvar",
+                                  "name": "jobs"
+                                },
+                                "name": "map",
+                                "args": [],
+                                "block": {
+                                  "k": "block",
+                                  "params": [
+                                    {
+                                      "kind": "req",
+                                      "name": "arg"
+                                    }
+                                  ],
+                                  "body": {
+                                    "k": "seq",
+                                    "body": [
+                                      {
+                                        "k": "call",
+                                        "recv": null,
+                                        "name": "format",
+                                        "args": [
+                                          {
+                                            "k": "lvar",
+                                            "name": "arg"
+                                          }
+                                        ],
+                                        "block": null,
+                                        "safe": false,
+                                        "l": 23,
+                                        "vcall": false
+                                      }
+                                    ]
+                                  },
+                                  "l": 23
+                                },
+                                "safe": false,
+                                "l": 23,
+                                "vcall": false
+                              }
+                            ]
+                          },
+                          "else": {
+                            "k": "seq",
+                            "body": [
+                              {
+                                "k": "lvar",
+                                "name": "line"
+                              }
+                            ]
+                          },
+                          "l": 23
+                        }
+                      ]
+                    },
+                    "l": 19,
+                    "lend": 24,
+                    "endless": false
+                  },
+                  {
+                    "k": "call",
+                    "recv": null,
+                    "name": "private",
+                    "args": [],
+                    "block": null,
+                    "safe": false,
+                    "l": 26,
+                    "vcall": true
+                  },
+                  {
+                    "k": "def",
+                    "name": "format",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [
+                      {
+                        "kind": "req",
+                        "name": "arg"
+                      }
+                    ],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "lvar",
+                          "name": "arg"
+                        }
+                      ]
+                    },
+                    "l": 27,
+                    "lend": 29,
+                    "endless": false
+                  }
+                ]
+              },
+              "l": 11
+            }
+          ]
+        },
+        "l": 3
+      }
+    ]
+  }
+}
