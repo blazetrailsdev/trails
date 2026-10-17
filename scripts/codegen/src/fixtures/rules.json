@@ -98,6 +98,91 @@
                     "vcall": false
                   },
                   {
+                    "k": "def",
+                    "name": "initialize",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [
+                      {
+                        "kind": "req",
+                        "name": "name"
+                      }
+                    ],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "iasgn",
+                          "name": "@name",
+                          "value": {
+                            "k": "call",
+                            "recv": {
+                              "k": "lvar",
+                              "name": "name"
+                            },
+                            "name": "to_s",
+                            "args": [],
+                            "block": null,
+                            "safe": false,
+                            "l": 14,
+                            "vcall": false
+                          },
+                          "l": 14
+                        },
+                        {
+                          "k": "iasgn",
+                          "name": "@hits",
+                          "value": {
+                            "k": "int",
+                            "value": "0"
+                          },
+                          "l": 15
+                        }
+                      ]
+                    },
+                    "l": 13,
+                    "lend": 16,
+                    "endless": false
+                  },
+                  {
+                    "k": "def",
+                    "name": "note",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [
+                      {
+                        "kind": "req",
+                        "name": "label"
+                      }
+                    ],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "iasgn",
+                          "name": "@label",
+                          "value": {
+                            "k": "call",
+                            "recv": {
+                              "k": "lvar",
+                              "name": "label"
+                            },
+                            "name": "to_s",
+                            "args": [],
+                            "block": null,
+                            "safe": false,
+                            "l": 19,
+                            "vcall": false
+                          },
+                          "l": 19
+                        }
+                      ]
+                    },
+                    "l": 18,
+                    "lend": 20,
+                    "endless": false
+                  },
+                  {
                     "k": "call",
                     "recv": null,
                     "name": "class_attribute",
@@ -132,7 +217,7 @@
                     ],
                     "block": null,
                     "safe": false,
-                    "l": 13,
+                    "l": 22,
                     "vcall": false
                   },
                   {
@@ -152,8 +237,8 @@
                         }
                       ]
                     },
-                    "l": 15,
-                    "lend": 17,
+                    "l": 24,
+                    "lend": 26,
                     "endless": false
                   },
                   {
@@ -193,7 +278,7 @@
                           ],
                           "block": null,
                           "safe": false,
-                          "l": 20,
+                          "l": 29,
                           "vcall": false
                         },
                         {
@@ -216,14 +301,14 @@
                                   "name": "class"
                                 },
                                 "safe": false,
-                                "l": 21,
+                                "l": 30,
                                 "vcall": false
                               },
                               "name": "tally",
                               "args": [],
                               "block": null,
                               "safe": false,
-                              "l": 21,
+                              "l": 30,
                               "vcall": false
                             },
                             "name": "sort_by",
@@ -253,18 +338,18 @@
                                     "args": [],
                                     "block": null,
                                     "safe": false,
-                                    "l": 21,
+                                    "l": 30,
                                     "vcall": false
                                   }
                                 ]
                               },
-                              "l": 21
+                              "l": 30
                             },
                             "safe": false,
-                            "l": 21,
+                            "l": 30,
                             "vcall": false
                           },
-                          "l": 21
+                          "l": 30
                         },
                         {
                           "k": "lasgn",
@@ -313,10 +398,10 @@
                                     }
                                   ]
                                 },
-                                "l": 22
+                                "l": 31
                               },
                               "safe": false,
-                              "l": 22,
+                              "l": 31,
                               "vcall": false
                             },
                             "name": "join",
@@ -330,10 +415,10 @@
                             ],
                             "block": null,
                             "safe": false,
-                            "l": 22,
+                            "l": 31,
                             "vcall": false
                           },
-                          "l": 22
+                          "l": 31
                         },
                         {
                           "k": "if",
@@ -349,14 +434,14 @@
                               "args": [],
                               "block": null,
                               "safe": false,
-                              "l": 23,
+                              "l": 32,
                               "vcall": false
                             },
                             "name": "log_arguments?",
                             "args": [],
                             "block": null,
                             "safe": false,
-                            "l": 23,
+                            "l": 32,
                             "vcall": false
                           },
                           "then": {
@@ -393,15 +478,15 @@
                                         ],
                                         "block": null,
                                         "safe": false,
-                                        "l": 23,
+                                        "l": 32,
                                         "vcall": false
                                       }
                                     ]
                                   },
-                                  "l": 23
+                                  "l": 32
                                 },
                                 "safe": false,
-                                "l": 23,
+                                "l": 32,
                                 "vcall": false
                               }
                             ]
@@ -415,12 +500,12 @@
                               }
                             ]
                           },
-                          "l": 23
+                          "l": 32
                         }
                       ]
                     },
-                    "l": 19,
-                    "lend": 24,
+                    "l": 28,
+                    "lend": 33,
                     "endless": false
                   },
                   {
@@ -446,14 +531,14 @@
                               "args": [],
                               "block": null,
                               "safe": false,
-                              "l": 27,
+                              "l": 36,
                               "vcall": false
                             },
                             "name": "test?",
                             "args": [],
                             "block": null,
                             "safe": false,
-                            "l": 27,
+                            "l": 36,
                             "vcall": false
                           },
                           "then": {
@@ -469,7 +554,7 @@
                                 "args": [],
                                 "block": null,
                                 "safe": false,
-                                "l": 27,
+                                "l": 36,
                                 "vcall": false
                               }
                             ]
@@ -487,17 +572,17 @@
                                 "args": [],
                                 "block": null,
                                 "safe": false,
-                                "l": 27,
+                                "l": 36,
                                 "vcall": false
                               }
                             ]
                           },
-                          "l": 27
+                          "l": 36
                         }
                       ]
                     },
-                    "l": 26,
-                    "lend": 28,
+                    "l": 35,
+                    "lend": 37,
                     "endless": false
                   },
                   {
@@ -540,12 +625,12 @@
                                   "k": "sym",
                                   "value": "forced"
                                 },
-                                "l": 31
+                                "l": 40
                               }
                             ]
                           },
                           "else": null,
-                          "l": 31
+                          "l": 40
                         },
                         {
                           "k": "if",
@@ -562,12 +647,12 @@
                                   "k": "sym",
                                   "value": "blocked"
                                 },
-                                "l": 32
+                                "l": 41
                               }
                             ]
                           },
                           "else": null,
-                          "l": 32
+                          "l": 41
                         },
                         {
                           "k": "if",
@@ -584,12 +669,12 @@
                                   "k": "sym",
                                   "value": "optioned"
                                 },
-                                "l": 33
+                                "l": 42
                               }
                             ]
                           },
                           "else": null,
-                          "l": 33
+                          "l": 42
                         },
                         {
                           "k": "if",
@@ -608,7 +693,7 @@
                             ],
                             "block": null,
                             "safe": false,
-                            "l": 34,
+                            "l": 43,
                             "vcall": false
                           },
                           "then": {
@@ -630,12 +715,12 @@
                             ]
                           },
                           "else": null,
-                          "l": 34
+                          "l": 43
                         }
                       ]
                     },
-                    "l": 30,
-                    "lend": 35,
+                    "l": 39,
+                    "lend": 44,
                     "endless": false
                   },
                   {
@@ -654,7 +739,7 @@
                             "k": "hash",
                             "pairs": []
                           },
-                          "l": 38
+                          "l": 47
                         },
                         {
                           "k": "call",
@@ -675,7 +760,7 @@
                           ],
                           "block": null,
                           "safe": false,
-                          "l": 39,
+                          "l": 48,
                           "vcall": false
                         },
                         {
@@ -685,7 +770,7 @@
                             "k": "int",
                             "value": "0"
                           },
-                          "l": 40
+                          "l": 49
                         },
                         {
                           "k": "opasgn",
@@ -698,7 +783,7 @@
                             "k": "int",
                             "value": "1"
                           },
-                          "l": 41
+                          "l": 50
                         },
                         {
                           "k": "lasgn",
@@ -718,7 +803,7 @@
                               }
                             ]
                           },
-                          "l": 42
+                          "l": 51
                         },
                         {
                           "k": "call",
@@ -739,7 +824,7 @@
                           ],
                           "block": null,
                           "safe": false,
-                          "l": 43,
+                          "l": 52,
                           "vcall": false
                         },
                         {
@@ -761,8 +846,8 @@
                         }
                       ]
                     },
-                    "l": 37,
-                    "lend": 45,
+                    "l": 46,
+                    "lend": 54,
                     "endless": false
                   },
                   {
@@ -772,7 +857,7 @@
                     "args": [],
                     "block": null,
                     "safe": false,
-                    "l": 47,
+                    "l": 56,
                     "vcall": true
                   },
                   {
@@ -795,8 +880,8 @@
                         }
                       ]
                     },
-                    "l": 48,
-                    "lend": 50,
+                    "l": 57,
+                    "lend": 59,
                     "endless": false
                   }
                 ]

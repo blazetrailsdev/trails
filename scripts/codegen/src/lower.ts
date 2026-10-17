@@ -2327,6 +2327,12 @@ export class Lowerer {
   callInner(n: N, ctx: Ctx): string {
     const name: string = n.name;
     let r = n.recv ? this.expr(n.recv, ctx) : null;
+    // A method sent to an ivar the hand twin types `T | null`: Ruby raises
+    // NoMethodError on nil, which the JS TypeError of a null receiver stands for.
+    if (r !== null && n.recv?.k === "ivar" && !n.safe) {
+      const it = this.typeOf(n.recv, ctx);
+      if (it && "nullable" in it && it.nullable) r = `${r}!`;
+    }
     if (r !== null && (n.recv.k === "int" || n.recv.k === "float")) r = `(${r})`;
     const recvNode: N | null = n.recv;
     const args = (): string[] => {
