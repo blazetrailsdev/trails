@@ -270,6 +270,8 @@ export class Resolver {
         root === "ActiveSupport" ? "@blazetrails/activesupport" : "@blazetrails/activemodel";
       const flat = this.flatExportRef(spec, rest, root, ctx, lw);
       if (flat !== undefined) return flat;
+      const sub = rest.length === 1 ? this.subpathExport(root, rest[0]) : undefined;
+      if (sub) return lw.imp(ctx, sub, rest[0]);
       if (this.pkgExports(spec).has(root))
         return [this.importPkg(spec, root, "", ctx, lw), ...rest].join(".");
     }
@@ -628,6 +630,27 @@ export class Resolver {
     return (this._trailsSeat = seat);
   }
   private _trailsSeat?: Map<string, { method: boolean; nullable: boolean }>;
+
+  /**
+   * The package subpath a top-level ActiveSupport or ActiveModel constant is
+   * exported from (`ActiveSupport::KeyGenerator` → `@blazetrails/activesupport/key-generator`):
+   * the module the repo's file conventions map its Ruby file to, when that module
+   * exports the name.
+   */
+  subpathExport(root: string, name: string): string | undefined {
+    const gem = root === "ActiveSupport" ? "activesupport" : "activemodel";
+    const rel = `${name.replace(/([a-z\d])([A-Z])/g, "$1_$2").toLowerCase()}.rb`;
+    const tsFile = rubyFileToTs(rel, gem);
+    const abs = path.join(ROOT, "packages", gem, "src", tsFile);
+    if (!existsSync(abs)) return undefined;
+    const exported = new RegExp(
+      `^export (?:abstract )?(?:class|const|function|let) ${name}\\b`,
+      "m",
+    );
+    return exported.test(readFileSync(abs, "utf8"))
+      ? `@blazetrails/${gem}/${tsFile.replace(/\.ts$/, "")}`
+      : undefined;
+  }
 
   isProperty(rubyName: string): boolean {
     return this.types.onlyPropertyOnDeps(propName(rubyName));
