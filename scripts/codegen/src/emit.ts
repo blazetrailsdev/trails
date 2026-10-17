@@ -1178,6 +1178,22 @@ export class Emitter {
       const mod = opts.objectMember ? "" : opts.static ? "static " : "";
       return `${doc}${mod}get ${propKey(tsName)}(): any {\n${indent(body).join("\n")}\n}`;
     }
+    if (
+      !opts.static &&
+      !opts.module &&
+      !opts.objectMember &&
+      !opts.asFunction &&
+      !isCtor &&
+      !awaits &&
+      d.params.length === 0 &&
+      u.fqn &&
+      this.lw.index.instanceWriters.has(d.name) &&
+      this.lw.index.ancestors(u.fqn).some((sc) => sc.fqn !== u.fqn && sc.attrs.has(d.name))
+    )
+      return [
+        `${doc}get ${propKey(tsName)}(): any {\n${indent(body).join("\n")}\n}`,
+        `set ${propKey(tsName)}(value: any) {\n  this._${tsName} = value;\n}`,
+      ].join("\n\n");
     const thisParam = opts.module ? (ps ? "this: any, " : "this: any") : "";
     const ret = isCtor ? "" : asy ? ": Promise<any>" : ": any";
     if (/^[a-z_]\w*=$/.test(d.name) && opts.asFunction) {
