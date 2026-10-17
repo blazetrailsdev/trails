@@ -2530,7 +2530,7 @@ export class Lowerer {
       case "instance_variable_defined?":
         return `${rc("rbIvarDefined")}(${R}, ${argList()})`;
       case "singleton_class":
-        return `${rc("rbObjSingletonClass")}(${R})`;
+        return `(${rc("rbObjSingletonClass")}(${R}) as any)`;
       // `Module#ancestors` on a class: ruby-compat walks the prototype chain and
       // the modules `include` spliced into it.
       case "ancestors":
@@ -2947,8 +2947,16 @@ export class Lowerer {
       this.resolver.newables.has(recvNode.path[recvNode.path.length - 1])
     )
       return `${r}.new(${argList()})`;
-    if (name === "new" && r !== null)
-      return `new ${needsParens(r) || r.includes("(") ? `(${r})` : r}(${argList()})`;
+    if (name === "new" && r !== null) {
+      const hit =
+        recvNode?.k === "const" ? this.index.resolveConst(recvNode.path, ctx.nesting) : null;
+      const sc = hit?.kind === "scope" ? this.index.scopes.get(hit.fqn) : undefined;
+      const coreSuper =
+        sc?.superclassPath?.filter((x: string) => x).join("::") === "String" &&
+        !sc.defs.has("initialize");
+      if (r.includes("(") || (coreSuper && n.args.length)) return `new (${r} as any)(${argList()})`;
+      return `new ${needsParens(r) ? `(${r})` : r}(${argList()})`;
+    }
 
     // `ActiveJob::Base.include(M)` on a gem constant is ruby-compat `include(Base, M)`.
     if (
