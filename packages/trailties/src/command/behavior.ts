@@ -1,4 +1,3 @@
-import { dasherize } from "@blazetrails/activesupport";
 import type { Command as Program } from "commander";
 
 type CommandFactory = () => Program;
@@ -9,7 +8,7 @@ const LOAD_PATH: Readonly<Record<string, () => Promise<CommandFactory>>> = {
   server: async () => (await import("../commands/server.js")).serverCommand,
   db: async () => (await import("../commands/db.js")).dbCommand,
   routes: async () => (await import("../commands/routes.js")).routesCommand,
-  "unused-routes": async () => (await import("../commands/unused-routes.js")).unusedRoutesCommand,
+  unused_routes: async () => (await import("../commands/unused-routes.js")).unusedRoutesCommand,
   console: async () => (await import("../commands/console.js")).consoleCommand,
   dbconsole: async () => (await import("../commands/dbconsole.js")).dbconsoleCommand,
   destroy: async () => (await import("../commands/destroy.js")).destroyCommand,
@@ -32,19 +31,31 @@ export async function lookup(namespaces: string[]): Promise<void> {
   const paths = namespacesToPaths(namespaces);
 
   for (const rawPath of paths) {
-    const load = LOAD_PATH[dasherize(rawPath)];
-    if (load === undefined) continue;
-    const factory = await load();
-    if (!subclasses().includes(factory)) subclasses().push(factory);
-    return;
+    if (!Object.hasOwn(LOAD_PATH, rawPath)) continue;
+
+    try {
+      const factory = await LOAD_PATH[rawPath]();
+      if (!subclasses().includes(factory)) subclasses().push(factory);
+      return;
+    } catch (e) {
+      const error = e as Error & { code?: string };
+      if (error.code === "ERR_MODULE_NOT_FOUND") throw error;
+      console.warn(
+        `[WARNING] Could not load command ${JSON.stringify(rawPath)}. Error: ${error.message}.\n${error.stack}`,
+      );
+    }
   }
 }
 
 /** @internal */
 export async function lookupBang(): Promise<void> {
   for (const load of Object.values(LOAD_PATH)) {
-    const factory = await load();
-    if (!subclasses().includes(factory)) subclasses().push(factory);
+    try {
+      const factory = await load();
+      if (!subclasses().includes(factory)) subclasses().push(factory);
+    } catch {
+      continue;
+    }
   }
 }
 
