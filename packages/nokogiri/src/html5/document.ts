@@ -2,7 +2,7 @@ import { parse, type DefaultTreeAdapterMap } from "parse5";
 import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { readSource, type Readable } from "../readable.js";
-import { childNodes, type Node } from "./document-fragment.js";
+import { childNodes, type Node } from "./node.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 

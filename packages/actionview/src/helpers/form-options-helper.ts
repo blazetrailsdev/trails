@@ -1,5 +1,8 @@
 import {
+  DAYS_INTO_WEEK,
+  DateCalculations,
   I18n,
+  TimeZone,
   extractOptionsBang,
   filterMap,
   htmlSafe,
@@ -15,6 +18,8 @@ import {
   Module,
   rbModDefineMethod,
   rbFPublicSend,
+  rbEql,
+  rbFSend,
   rbObjAsString,
   rbObjRespondTo,
   rtest,
@@ -38,6 +43,83 @@ export function select(
   block?: () => unknown,
 ): unknown {
   return new Tags.Select(object, method, this, choices, options, htmlOptions, block).render();
+}
+
+export function collectionSelect(
+  this: FormOptionsHelperHost,
+  object: unknown,
+  method: unknown,
+  collection: unknown,
+  valueMethod: unknown,
+  textMethod: unknown,
+  options: Record<string, unknown> = {},
+  htmlOptions: Record<string, unknown> = {},
+): unknown {
+  return new Tags.CollectionSelect(
+    object,
+    method,
+    this,
+    collection,
+    valueMethod,
+    textMethod,
+    options,
+    htmlOptions,
+  ).render();
+}
+
+export function groupedCollectionSelect(
+  this: FormOptionsHelperHost,
+  object: unknown,
+  method: unknown,
+  collection: unknown,
+  groupMethod: unknown,
+  groupLabelMethod: unknown,
+  optionKeyMethod: unknown,
+  optionValueMethod: unknown,
+  options: Record<string, unknown> = {},
+  htmlOptions: Record<string, unknown> = {},
+): unknown {
+  return new Tags.GroupedCollectionSelect(
+    object,
+    method,
+    this,
+    collection,
+    groupMethod,
+    groupLabelMethod,
+    optionKeyMethod,
+    optionValueMethod,
+    options,
+    htmlOptions,
+  ).render();
+}
+
+export function timeZoneSelect(
+  this: FormOptionsHelperHost,
+  object: unknown,
+  method: unknown,
+  priorityZones: unknown = null,
+  options: Record<string, unknown> = {},
+  htmlOptions: Record<string, unknown> = {},
+): unknown {
+  return new Tags.TimeZoneSelect(
+    object,
+    method,
+    this,
+    priorityZones,
+    options,
+    htmlOptions,
+  ).render();
+}
+
+export function weekdaySelect(
+  this: FormOptionsHelperHost,
+  object: unknown,
+  method: unknown,
+  options: Record<string, unknown> = {},
+  htmlOptions: Record<string, unknown> = {},
+  block?: () => unknown,
+): unknown {
+  return new Tags.WeekdaySelect(object, method, this, options, htmlOptions, block).render();
 }
 
 export function optionsForSelect(
@@ -155,6 +237,56 @@ export function groupedOptionsForSelect(
   }
 
   return body;
+}
+
+export function timeZoneOptionsForSelect(
+  this: FormOptionsHelperHost,
+  selected: unknown = null,
+  priorityZones: unknown = null,
+  model: { all(): TimeZone[] } = TimeZone,
+): SafeBuffer {
+  const zoneOptions = htmlSafe("");
+
+  let zones = model.all();
+  const convertZones = (list: TimeZone[]) => list.map((z) => [z.toString(), z.name]);
+
+  if (rtest(priorityZones)) {
+    if (priorityZones instanceof RegExp) {
+      const pattern = priorityZones;
+      priorityZones = zones.filter((z) => z.isMatch(pattern));
+    }
+
+    const priority = priorityZones as TimeZone[];
+    zoneOptions.safeConcat(optionsForSelect.call(this, convertZones(priority), selected));
+    zoneOptions.safeConcat(
+      contentTag.call(this, "option", "-------------", { value: "", disabled: true }),
+    );
+    zoneOptions.safeConcat("\n");
+
+    zones = zones.filter((z) => !priority.some((p) => rbEql(p, z)));
+  }
+
+  return zoneOptions.safeConcat(optionsForSelect.call(this, convertZones(zones), selected));
+}
+
+export function weekdayOptionsForSelect(
+  this: FormOptionsHelperHost,
+  selected: unknown = null,
+  {
+    indexAsValue = false,
+    dayFormat = "day_names",
+    beginningOfWeek = DateCalculations.beginningOfWeek(),
+  }: { indexAsValue?: unknown; dayFormat?: unknown; beginningOfWeek?: unknown } = {},
+): SafeBuffer | string {
+  let dayNames = I18n.translate(`date.${dayFormat}`) as unknown[];
+  if (rtest(indexAsValue)) dayNames = dayNames.map((name, index) => [name, index]);
+  dayNames = rbFSend(
+    dayNames,
+    "rotate",
+    fetch(DAYS_INTO_WEEK, beginningOfWeek as string),
+  ) as unknown[];
+
+  return optionsForSelect.call(this, dayNames, selected);
 }
 
 export function collectionRadioButtons(
@@ -275,8 +407,10 @@ export const FormOptionsHelper = new Module((mod) => {
   mod.include(TextHelper);
 
   mod.moduleEval((m) => {
-    Object.assign(m, { select, optionsForSelect, optionsFromCollectionForSelect });
+    Object.assign(m, { select, collectionSelect, groupedCollectionSelect, timeZoneSelect });
+    Object.assign(m, { weekdaySelect, optionsForSelect, optionsFromCollectionForSelect });
     Object.assign(m, { optionGroupsFromCollectionForSelect, groupedOptionsForSelect });
+    Object.assign(m, { timeZoneOptionsForSelect, weekdayOptionsForSelect });
     Object.assign(m, { optionHtmlAttributes, optionTextAndValue, isOptionValueSelected });
     Object.assign(m, { extractSelectedAndDisabled, extractValuesFromCollection });
     Object.assign(m, { collectionRadioButtons, collectionCheckboxes, collectionCheckBoxes });
@@ -292,6 +426,35 @@ declare module "./form-helper.js" {
       options?: Record<string, unknown>,
       htmlOptions?: Record<string, unknown>,
       block?: () => unknown,
+    ): unknown;
+    collectionSelect(
+      method: unknown,
+      collection: unknown,
+      valueMethod: unknown,
+      textMethod: unknown,
+      options?: Record<string, unknown>,
+      htmlOptions?: Record<string, unknown>,
+    ): unknown;
+    groupedCollectionSelect(
+      method: unknown,
+      collection: unknown,
+      groupMethod: unknown,
+      groupLabelMethod: unknown,
+      optionKeyMethod: unknown,
+      optionValueMethod: unknown,
+      options?: Record<string, unknown>,
+      htmlOptions?: Record<string, unknown>,
+    ): unknown;
+    timeZoneSelect(
+      method: unknown,
+      priorityZones?: unknown,
+      options?: Record<string, unknown>,
+      htmlOptions?: Record<string, unknown>,
+    ): unknown;
+    weekdaySelect(
+      method: unknown,
+      options?: Record<string, unknown>,
+      htmlOptions?: Record<string, unknown>,
     ): unknown;
     collectionCheckboxes(
       method: unknown,
@@ -348,6 +511,94 @@ type FormBuilderSelf = {
   _defaultHtmlOptions: Record<string, unknown>;
   objectifyOptions(options: Record<string, unknown>): Record<string, unknown>;
 };
+
+rbModDefineMethod(
+  FormBuilder,
+  "collectionSelect",
+  function (
+    this: FormBuilderSelf,
+    method: unknown,
+    collection: unknown,
+    valueMethod: unknown,
+    textMethod: unknown,
+    options: Record<string, unknown> = {},
+    htmlOptions: Record<string, unknown> = {},
+  ): unknown {
+    return this._template.collectionSelect(
+      this.objectName,
+      method,
+      collection,
+      valueMethod,
+      textMethod,
+      this.objectifyOptions(options),
+      { ...this._defaultHtmlOptions, ...htmlOptions },
+    );
+  },
+);
+
+rbModDefineMethod(
+  FormBuilder,
+  "groupedCollectionSelect",
+  function (
+    this: FormBuilderSelf,
+    method: unknown,
+    collection: unknown,
+    groupMethod: unknown,
+    groupLabelMethod: unknown,
+    optionKeyMethod: unknown,
+    optionValueMethod: unknown,
+    options: Record<string, unknown> = {},
+    htmlOptions: Record<string, unknown> = {},
+  ): unknown {
+    return this._template.groupedCollectionSelect(
+      this.objectName,
+      method,
+      collection,
+      groupMethod,
+      groupLabelMethod,
+      optionKeyMethod,
+      optionValueMethod,
+      this.objectifyOptions(options),
+      { ...this._defaultHtmlOptions, ...htmlOptions },
+    );
+  },
+);
+
+rbModDefineMethod(
+  FormBuilder,
+  "timeZoneSelect",
+  function (
+    this: FormBuilderSelf,
+    method: unknown,
+    priorityZones: unknown = null,
+    options: Record<string, unknown> = {},
+    htmlOptions: Record<string, unknown> = {},
+  ): unknown {
+    return this._template.timeZoneSelect(
+      this.objectName,
+      method,
+      priorityZones,
+      this.objectifyOptions(options),
+      { ...this._defaultHtmlOptions, ...htmlOptions },
+    );
+  },
+);
+
+rbModDefineMethod(
+  FormBuilder,
+  "weekdaySelect",
+  function (
+    this: FormBuilderSelf,
+    method: unknown,
+    options: Record<string, unknown> = {},
+    htmlOptions: Record<string, unknown> = {},
+  ): unknown {
+    return this._template.weekdaySelect(this.objectName, method, this.objectifyOptions(options), {
+      ...this._defaultHtmlOptions,
+      ...htmlOptions,
+    });
+  },
+);
 
 rbModDefineMethod(
   FormBuilder,
