@@ -83,7 +83,7 @@ describe("LoggingTest", () => {
   afterEach(async ({ testCase }: any) => {
     await testCase.teardown();
   });
-  it.skip("uses active job as tag", async ({ testCase }: any) => {
+  it("uses active job as tag", async ({ testCase }: any) => {
     await await HelloJob.performLater("Cristian");
     expect(await testCase._logger.messages()).toMatch(/\[ActiveJob\]/);
   });
