@@ -23,6 +23,9 @@ export function kernelArray<T>(value: T | T[] | null | undefined): T[] {
   if (typeof value === "object" && typeof (value as any)[Symbol.iterator] === "function") {
     return [...(value as unknown as Iterable<T>)];
   }
+  if (typeof (value as { toA?: unknown } | null)?.toA === "function") {
+    return (value as unknown as { toA(): T[] }).toA();
+  }
   return [value] as T[];
 }
 

@@ -12,6 +12,7 @@ import {
   ArgumentError,
   File,
   NoMethodError,
+  rbObjRespondTo,
   rtest,
   stringToSym,
   symbolToS,
@@ -59,7 +60,7 @@ export const MAX_HEADER_SIZE = 1_000;
 
 interface PreloadHeaderHost {
   request?: { sendEarlyHints(links: Record<string, string>): void } | null;
-  response?: {
+  response?(): {
     readonly isSending: boolean;
     headers: { get(key: string): string | undefined; set(key: string, value: string): void };
   } | null;
@@ -476,8 +477,8 @@ export function sendPreloadLinksHeader(
   maxHeaderSize: number = MAX_HEADER_SIZE,
 ): void {
   if (preloadLinks.length === 0) return;
-  const responsePresent = this.response ?? null;
-  if (responsePresent && responsePresent.isSending) return;
+  const responsePresent = rbObjRespondTo(this, "response") && this.response!();
+  if (rtest(responsePresent) && responsePresent.isSending) return;
 
   if (this.request) {
     this.request.sendEarlyHints({ link: preloadLinks.join(",") });

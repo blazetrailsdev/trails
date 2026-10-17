@@ -8,7 +8,7 @@ class TestController extends ActionController.Base {
   }
 
   async accessingParamsInTemplate(): Promise<void> {
-    await this.render({ inline: "Hello: <%= params.get('name') %>" });
+    await this.render({ inline: "Hello: <%= params().get('name') %>" });
   }
 
   async accessingLocalAssignsInInlineTemplate(): Promise<void> {

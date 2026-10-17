@@ -1156,6 +1156,8 @@ export const ARRAY_METHOD_TABLE: Record<string, ArrayMethod> = Object.assign(Obj
   collect: (self, block?: Block) => (block ? self.map((v) => block(v)) : [...self]),
   /** `rb_ary_compact` (`vendor/ruby/v3.3.11/array.c:6240`). */
   compact: (self) => compact(self),
+  /** `rb_ary_last` (`vendor/ruby/v3.3.11/array.c:1914`). */
+  last: (self, ...argv: [number?]) => (argv.length === 0 ? last(self) : last(self, argv[0]!)),
   /** `rb_ary_reject` (`vendor/ruby/v3.3.11/array.c:4301`). */
   reject: (self, block?: Block) => (block ? self.filter((v) => !rtest(block(v))) : [...self]),
   /** `rb_ary_rotate_m` (`vendor/ruby/v3.3.11/array.c:3240`). */

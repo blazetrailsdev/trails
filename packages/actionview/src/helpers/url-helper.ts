@@ -39,7 +39,7 @@ export interface UrlHelperHost {
   _filteredReferrer(): string | null;
   isProtectAgainstForgery?(): boolean;
   formAuthenticityToken?(options: { formOptions: Record<string, unknown> }): string;
-  requestForgeryProtectionToken?: unknown;
+  requestForgeryProtectionToken?(): unknown;
 }
 
 interface UrlHelperController {
@@ -456,7 +456,7 @@ export function tokenTag(
         : token;
     return tag.call(this, "input", {
       type: "hidden",
-      name: String(this.requestForgeryProtectionToken),
+      name: String(this.requestForgeryProtectionToken!()),
       value: token,
       autocomplete: "off",
     }) as SafeBuffer;

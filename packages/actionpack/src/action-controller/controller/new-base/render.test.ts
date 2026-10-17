@@ -20,7 +20,7 @@ class BlankRenderController extends Base {
         "render/blank-render/index.html.tse": "Hello world!",
         "render/blank-render/access-request.html.tse":
           "The request: <%= request.method.toString().toUpperCase() %>",
-        "render/blank-render/access-action-name.html.tse": "Action Name: <%= actionName %>",
+        "render/blank-render/access-action-name.html.tse": "Action Name: <%= actionName() %>",
         "render/blank-render/access-controller-name.html.tse":
           "Controller Name: <%= controllerName() %>",
         "render/blank-render/overridden-with-own-view-paths-appended.html.tse": "parent content",

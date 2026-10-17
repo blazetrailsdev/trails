@@ -12,6 +12,8 @@ import { CsrfHelper } from "./helpers/csrf-helper.js";
 import { DateHelper } from "./helpers/date-helper.js";
 import { DebugHelper } from "./helpers/debug-helper.js";
 import { FormHelper } from "./helpers/form-helper.js";
+import "./helpers/tags/select.js";
+import { FormOptionsHelper } from "./helpers/form-options-helper.js";
 import { FormTagHelper } from "./helpers/form-tag-helper.js";
 import { JavaScriptHelper } from "./helpers/javascript-helper.js";
 import { NumberHelper } from "./helpers/number-helper.js";
@@ -36,6 +38,7 @@ export const Helpers = new Module((mod) => {
   mod.include(DateHelper);
   mod.include(DebugHelper);
   mod.include(FormHelper);
+  mod.include(FormOptionsHelper);
   mod.include(FormTagHelper);
   mod.include(JavaScriptHelper);
   mod.include(NumberHelper);
