@@ -299,7 +299,6 @@ export function rbNumDuration(x: any, unit: string): any {
   const n = x instanceof RbNumDurationClass ? (x as any).value : x;
   return (RbNumDurationClass as any)[unit](n);
 }`,
-  // \`x.to_f\`: a value's own \`toF\` (Time#to_f), else the JS number.
   // \`size\` / \`length\` on any Ruby collection: a Set or Map (Set#size), an Array
   // or String, a Hash's pairs.
   rbSize: `export function rbSize(x: any): number {
