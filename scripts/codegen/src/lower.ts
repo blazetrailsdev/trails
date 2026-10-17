@@ -661,7 +661,9 @@ export class Lowerer {
     // `ensure` wrap the whole call, so the value is awaited there.
     if (ctx0.asyncBox?.awaits || ctx0.defAsync)
       body = body.map((l) =>
-        /^return (?!await )\S/.test(l) && l !== "return null;"
+        /^return (?!await )\S/.test(l) &&
+        l !== "return null;" &&
+        !isAwaited(l.slice("return ".length).replace(/;$/, ""))
           ? l.replace(/^return /, "return await ")
           : l,
       );
@@ -2030,6 +2032,8 @@ export class Lowerer {
     // Construction is synchronous in trails (a JS constructor cannot await).
     if (n.name === "new") return out;
     if (["lambda", "proc", "raise", "fail", "throw"].includes(n.name) && n.recv === null)
+      return out;
+    if (isAwaited(out) || ["[]", "==", "!=", "!", "<", ">", "<=", ">="].includes(n.name))
       return out;
     if (ctx.asyncBox) ctx.asyncBox.awaits = true;
     return `(await ${out})`;
@@ -4417,4 +4421,14 @@ function calcExports(cls: string): Set<string> {
     calcMemo.set(cls, m);
   }
   return m;
+}
+
+function isAwaited(e: string): boolean {
+  if (!e.startsWith("(await ")) return false;
+  let depth = 0;
+  for (let i = 0; i < e.length; i++) {
+    if (e[i] === "(") depth++;
+    else if (e[i] === ")" && --depth === 0) return i === e.length - 1;
+  }
+  return false;
 }
