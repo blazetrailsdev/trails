@@ -249,7 +249,7 @@ class FlashIntegrationTestSession extends IntegrationTest {
   override async get(
     path: string,
     options: Parameters<IntegrationTest["get"]>[1] = {},
-  ): Promise<void> {
+  ): Promise<number> {
     const env: Record<string, unknown> = { ...(options.env ?? {}) };
     env[Cookies.GENERATOR_KEY] ??= Generator;
     env[Cookies.COOKIES_ROTATIONS] = Rotations;

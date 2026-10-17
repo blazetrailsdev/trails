@@ -18,8 +18,8 @@ import { Assertion, assertEqual, Concern, message } from "@blazetrails/activesup
 import { RouteSet, type Config } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
 import type { TestRequest } from "../../../action-controller/test-case.js";
-import { ActionController } from "../../../namespaces.js";
-import type { IntegrationTest } from "../integration.js";
+import { ActionController, ActionDispatch } from "../../../namespaces.js";
+import type { IntegrationTest, Session } from "../integration.js";
 
 export interface RoutingAssertionsHost {
   routes?: RouteSet;
@@ -50,7 +50,7 @@ export namespace WithIntegrationRouting {
     ): void {
       let oldRoutes: RouteSet | undefined;
       let oldRoutesCallMethod: Method | undefined;
-      let oldIntegrationSession: IntegrationTest | undefined;
+      let oldIntegrationSession: Session | undefined;
 
       this.setup(function () {
         oldRoutes = (this.app as { routes: RouteSet }).routes;
@@ -100,8 +100,12 @@ export namespace WithIntegrationRouting {
     const host = this.integrationSession.host;
 
     app.routes = routes;
-    this.integrationSession.httpsBang(https);
-    this.integrationSession.hostBang(host);
+    const klass = class extends ActionDispatch.Integration.Session {};
+    include(klass, app.routes.urlHelpers());
+    include(klass, app.routes.mountedHelpers());
+    this._integrationSession = new klass(app);
+    this._integrationSession.httpsBang(https);
+    this._integrationSession.hostBang(host);
     this.routes = routes;
 
     return block(routes);
@@ -112,12 +116,13 @@ export namespace WithIntegrationRouting {
     this: IntegrationTest,
     oldRoutes: RouteSet,
     oldRoutesCallMethod: Method,
-    _oldIntegrationSession: IntegrationTest,
+    oldIntegrationSession: Session,
   ): void {
     (this.app as { routes: RouteSet }).routes = oldRoutes;
     (rbObjSingletonClass(this._originalRoutes!).prototype as { call: unknown }).call = (
       ...args: unknown[]
     ) => oldRoutesCallMethod.call(...args);
+    this._integrationSession = oldIntegrationSession;
     this.routes = oldRoutes;
   }
 }

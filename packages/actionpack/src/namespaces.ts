@@ -23,6 +23,7 @@ import type { TestCase, TestRequest } from "./action-controller/test-case.js";
 import type { MissingController, Request } from "./action-dispatch/http/request.js";
 import type { Assertions } from "./action-dispatch/testing/assertions.js";
 import type { TestProcess } from "./action-dispatch/testing/test-process.js";
+import type { Session as IntegrationSession } from "./action-dispatch/testing/integration.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
 import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
 import type { ActionableExceptions } from "./action-dispatch/middleware/actionable-exceptions.js";
@@ -44,6 +45,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_dispatch/http/request": () => import("./action-dispatch/http/request.js"),
   "action_dispatch/testing/assertions": () => import("./action-dispatch/testing/assertions.js"),
   "action_dispatch/testing/test_process": () => import("./action-dispatch/testing/test-process.js"),
+  "action_dispatch/testing/integration": () => import("./action-dispatch/testing/integration.js"),
   "action_dispatch/routing/polymorphic_routes": () =>
     import("./action-dispatch/routing/polymorphic-routes.js"),
   "action_dispatch/routing/routes_proxy": () => import("./action-dispatch/routing/routes-proxy.js"),
@@ -68,6 +70,7 @@ export const ActionDispatch = {
   Routing: typeof Routing;
   Assertions: typeof Assertions;
   TestProcess: typeof TestProcess;
+  Integration: { name: string; Session: typeof IntegrationSession };
   Session: typeof Session;
   testApp: unknown;
 };
@@ -80,6 +83,7 @@ ActionDispatch.eagerAutoload(() => {
 
 ActionDispatch.autoloadUnder("testing", () => {
   ActionDispatch.autoload("Assertions");
+  ActionDispatch.autoload("Integration");
   ActionDispatch.autoload("TestProcess");
 });
 

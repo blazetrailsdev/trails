@@ -23,7 +23,7 @@ import {
 import { XML } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
-import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
+import { IntegrationTest, Session } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
@@ -51,11 +51,10 @@ describe("SessionTest", () => {
     bodyFromString("Hello, World!"),
   ];
 
-  let session: IntegrationTest;
+  let session: Session;
 
-  beforeEach(({ task }) => {
-    session = new IntegrationTest(task.name);
-    session.app = StubApp;
+  beforeEach(() => {
+    session = new Session(StubApp);
   });
 
   it("https bang works and sets truth by default", () => {

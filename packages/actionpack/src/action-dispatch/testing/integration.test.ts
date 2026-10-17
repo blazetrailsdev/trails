@@ -1,7 +1,7 @@
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { IntegrationTest } from "./integration.js";
+import { IntegrationTest, Session } from "./integration.js";
 import { Base } from "../../action-controller/base.js";
 import { controllerConstants } from "../http/request.js";
 import { DebugExceptions } from "../middleware/debug-exceptions.js";
@@ -14,11 +14,11 @@ import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 const Generator = new KeyGenerator("a".repeat(64), { iterations: 2 });
 const Rotations = new RotationConfiguration();
 
-class IntegrationTestWithSession extends IntegrationTest {
+class SessionWithCookieEnv extends Session {
   override async process(
     method: string,
     path: string,
-    options: Parameters<IntegrationTest["process"]>[2] = {},
+    options: Parameters<Session["process"]>[2] = {},
   ): Promise<number> {
     const env: Record<string, unknown> = { ...(options.env ?? {}) };
     env["action_dispatch.key_generator"] ??= Generator;
@@ -27,6 +27,12 @@ class IntegrationTestWithSession extends IntegrationTest {
     env["action_dispatch.encrypted_cookie_salt"] ??= "encrypted cookie";
     env["action_dispatch.encrypted_signed_cookie_salt"] ??= "signed encrypted cookie";
     return super.process(method, path, { ...options, env });
+  }
+}
+
+class IntegrationTestWithSession extends IntegrationTest {
+  override createSession(app: unknown): Session {
+    return new SessionWithCookieEnv(app);
   }
 }
 
@@ -523,10 +529,9 @@ describe("ActionDispatch::IntegrationTest", () => {
       const sentinel = IntegrationTest.buildApp(app.routes, useCookieStore);
       app.app = sentinel;
       const sess = app.createSession(sentinel);
-      expect(sess.routes).toBe(app.routes);
-      expect(sess.app).toBe(sentinel);
-      await sess.get("/posts");
-      sess.assertResponse("success");
+      expect(sess).toBeInstanceOf(Session);
+      expect(sess._app).toBe(sentinel);
+      expect(await sess.get("/posts")).toBe(200);
 
       const fresh = new IntegrationTest(task.name);
       expect(fresh.app).toBe(IntegrationTest.app);
@@ -618,22 +623,22 @@ describe("ActionDispatch::IntegrationTest", () => {
 
   describe("_mock_session", () => {
     it("_mock_session owns the session's cookie jar", async () => {
-      const mockSession = app._mockSession;
+      const mockSession = app.integrationSession._mockSession;
       expect(app.cookies).toBe(mockSession.cookieJar);
 
       app.cookies.set("stored", "value");
       await app.get("/posts");
-      expect(app._mockSession).toBe(mockSession);
+      expect(app.integrationSession._mockSession).toBe(mockSession);
       expect(app.cookies.get("stored")).toBe("value");
     });
 
     it("reset! drops the mock session, and with it the cookies", () => {
       app.cookies.set("stored", "value");
-      const mockSession = app._mockSession;
+      const mockSession = app.integrationSession._mockSession;
 
       app.resetBang();
 
-      expect(app._mockSession).not.toBe(mockSession);
+      expect(app.integrationSession._mockSession).not.toBe(mockSession);
       expect(app.cookies.get("stored")).toBeUndefined();
     });
   });
