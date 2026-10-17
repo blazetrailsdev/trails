@@ -1203,18 +1203,17 @@ describe("nameMatches", () => {
       expect(nameMatches("Time", "ActiveModelTime")).toBe(true);
     });
 
-    it("accepts a TS_CONSTANT_RENAMES spelling and no other <X>Type", () => {
-      expect(nameMatches("Integer", "IntegerType", "ActiveModel::Type")).toBe(true);
-      expect(nameMatches("String", "StringType", "ActiveRecord")).toBe(false);
-      expect(nameMatches("Type::Value", "ValueType", "ActiveRecord::Type")).toBe(true);
-      expect(nameMatches("Value", "ValueType", "ActiveModel::Type")).toBe(true);
-      expect(nameMatches("Value", "NumericValueType", "ActiveModel::Type")).toBe(true);
-      expect(nameMatches("Json", "JsonType")).toBe(false);
-      expect(nameMatches("Foo", "FooType")).toBe(false);
+    it("accepts <X>Type (suffix to distinguish value vs cast type)", () => {
+      // Rails's `Type::Json` value type; our TS class is `JsonType` so
+      // the file can still export `Json` as the value constructor.
+      expect(nameMatches("Json", "JsonType")).toBe(true);
+      expect(nameMatches("Integer", "IntegerType")).toBe(true);
+      expect(nameMatches("Binary", "BinaryType")).toBe(true);
     });
 
     it("rejects unrelated names that happen to share a prefix/suffix", () => {
-      // "FooBar" isn't "Abstract" / "Base" / "ActiveModel" + rubyName.
+      // "FooBar" isn't "Abstract" / "Base" / "ActiveModel" + rubyName,
+      // nor rubyName + "Type".
       expect(nameMatches("Foo", "FooBar")).toBe(false);
       expect(nameMatches("Foo", "BarFoo")).toBe(false);
     });
@@ -1376,16 +1375,10 @@ describe("resolveTsClassForRuby", () => {
     expect(resolveTsClassForRuby("Integer", file, map)).toBe(direct);
   });
 
-  it("falls back to the TS_CONSTANT_RENAMES spelling when the direct name is absent", () => {
+  it("falls back to an alias match when the direct name is absent", () => {
     const aliased = cls(file, "IntegerType", "ValueType");
     const map = new Map([[`${file}::IntegerType`, aliased]]);
-    expect(resolveTsClassForRuby("Integer", file, map, "ActiveModel::Type::Integer")).toBe(aliased);
-  });
-
-  it("does not resolve a <X>Type spelling the table does not name", () => {
-    const aliased = cls(file, "JsonType", "ValueType");
-    const map = new Map([[`${file}::JsonType`, aliased]]);
-    expect(resolveTsClassForRuby("Json", file, map, "ActiveRecord::Type::Json")).toBeUndefined();
+    expect(resolveTsClassForRuby("Integer", file, map)).toBe(aliased);
   });
 
   it("prefers an alias match with a super over a direct match without one", () => {
@@ -1397,14 +1390,7 @@ describe("resolveTsClassForRuby", () => {
       ["oid/range.ts::Range", direct],
       ["oid/range.ts::RangeType", alias],
     ]);
-    expect(
-      resolveTsClassForRuby(
-        "Range",
-        "oid/range.ts",
-        map,
-        "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range",
-      ),
-    ).toBe(alias);
+    expect(resolveTsClassForRuby("Range", "oid/range.ts", map)).toBe(alias);
   });
 
   it("keeps the direct match when it has a super, even if an alias also exists", () => {

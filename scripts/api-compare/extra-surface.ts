@@ -94,7 +94,6 @@ import {
   SKIP,
   SKIP_TS_MIRROR_IS_DRIFT,
   TS_CLASS_RENAMES,
-  TS_CONSTANT_RENAMES,
   applyTokenRenames,
   rubyFileToTs,
   overriddenRubyFiles,
@@ -1843,14 +1842,12 @@ function collectAllowedNames(
       const renamed = TS_CLASS_RENAMES[short];
       if (renamed !== undefined) allowed.add(renamed);
       // Same disagreement, one rule over: `resolveTsClassForRuby` also resolves
-      // a Ruby class through `TS_CONSTANT_RENAMES` (`ActiveModel::Type::Integer`
-      // is `IntegerType`) and `TS_PARENT_ALIASES` (`Abstract<X>`, `Base<X>`,
-      // `ActiveModel<X>`), so without these every one of ActiveModel's type
-      // classes read as novel surface here. Both tools are scoped to the Ruby
-      // file the entity came from, so this allows the alias spelling only in
-      // the file that mirrors it.
-      const constantRename = TS_CONSTANT_RENAMES[fqn];
-      if (constantRename !== undefined) allowed.add(constantRename);
+      // a Ruby class through `TS_PARENT_ALIASES` (`<X>Type`, `Abstract<X>`,
+      // `Base<X>`, `ActiveModel<X>`, `Numeric<X>Type`), so `Type::Integer` is
+      // already matched to `IntegerType` there while every one of ActiveModel's
+      // type classes read as novel surface here. Both tools are scoped to the
+      // Ruby file the entity came from, so this allows the alias spelling only
+      // in the file that mirrors it.
       for (const { transform } of TS_PARENT_ALIASES) allowed.add(transform(short));
     }
     if (nameOnly) continue;
@@ -2605,7 +2602,7 @@ function buildPackageReport(
     // into a namespace object (`export const Types = { StringType, ... }` in
     // ActiveModel's barrel) reaches the surface without a `reExportedFrom` edge.
     // A sanctioned class rename is allowed only in the file that mirrors its
-    // `.rb` (`TS_CONSTANT_RENAMES`: `ActiveModel::Type::String` is `StringType`),
+    // `.rb` (`TS_PARENT_ALIASES`: `ActiveModel::Type::String` is `StringType`),
     // so gathering the twelve renamed type classes re-charged every one as novel.
     for (const name of tsNames) {
       if (allowed.has(name)) continue;

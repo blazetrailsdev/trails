@@ -109,8 +109,6 @@ import {
   COPY_HOOKS,
   OPERATORS,
   TS_CLASS_RENAMES,
-  TS_CONSTANT_RENAMES,
-  tsConstantRename,
   isArityOverridden,
   isRubyOnlyClass,
   isScopedSkip,
@@ -3169,29 +3167,23 @@ function shortName(fqn: string | undefined | null): string | null {
 //   `BaseAbsenceValidator`) — Rails has a single class Trails splits in two.
 // - `ActiveModel<X>`: ActiveRecord's `Type::Date` collides with the JS
 //   `Date` constructor, so we import the ActiveModel type aliased.
-// The `<X>Type` spellings are not a pattern here: they are the explicit
-// fqn-keyed `TS_CONSTANT_RENAMES` table in `scripts/parity/conventions.ts`.
+// - `<X>Type` suffix: Trails suffixes attribute-type classes to avoid
+//   clashing with the value they represent (e.g. `Json` value vs
+//   `JsonType` the cast type).
 export const TS_PARENT_ALIASES: { transform: (ruby: string) => string }[] = [
   { transform: (r) => `Abstract${r}` },
   { transform: (r) => `Base${r}` },
   { transform: (r) => `ActiveModel${r}` },
+  { transform: (r) => `${r}Type` },
+  // `Numeric<X>Type`: ActiveModel's `Helpers::Numeric` is mixed into
+  // Integer/Float/Decimal via the `applyNumericMixin(ValueType)` HOC. The
+  // returned class is bound to a local const `NumericValueType` that the
+  // extractor sees as the immediate TS superclass; conceptually it is
+  // `ValueType` with the Numeric helper applied.
+  { transform: (r) => `Numeric${r}Type` },
 ];
 
-/**
- * `ActiveModel`'s `Helpers::Numeric` is mixed into Integer/Float/Decimal by the
- * `applyNumericMixin(ValueType)` HOC, bound to a local `NumericValueType` that
- * the extractor sees as the immediate TS superclass. It is `ValueType` with the
- * helper applied, so it stands for `ValueType` in a superclass chain.
- */
-const TS_MIXIN_APPLIED_LOCALS = new Map<string, string>([["NumericValueType", "ValueType"]]);
-
-export function nameMatches(rubyName: string, tsName: string, nesting = ""): boolean {
-  if (rubyName === tsName) return true;
-  const renamed = tsConstantRename(rubyName, nesting);
-  if (renamed !== undefined) {
-    if (tsName === renamed || TS_MIXIN_APPLIED_LOCALS.get(tsName) === renamed) return true;
-  }
-  rubyName = rubyName.replace(/^::/, "").split("::").pop() ?? rubyName;
+export function nameMatches(rubyName: string, tsName: string): boolean {
   if (rubyName === tsName) return true;
   if (RUBY_ERROR_BUILTINS.has(rubyName) && tsName === "Error") return true;
   for (const { transform } of TS_PARENT_ALIASES) {
@@ -3253,16 +3245,11 @@ export function resolveTsClassForRuby(
   short: string,
   expectedFile: string,
   tsByFileName: Map<string, ClassInfo>,
-  fqn?: string,
 ): ClassInfo | undefined {
   const direct = tsByFileName.get(`${expectedFile}::${short}`);
-  const constantRename = fqn !== undefined ? TS_CONSTANT_RENAMES[fqn] : undefined;
-  const aliasMatches = [
-    ...(constantRename !== undefined ? [constantRename] : []),
-    ...TS_PARENT_ALIASES.map(({ transform }) => transform(short)),
-  ]
-    .map((name) => tsByFileName.get(`${expectedFile}::${name}`))
-    .filter((c): c is ClassInfo => Boolean(c));
+  const aliasMatches = TS_PARENT_ALIASES.map(({ transform }) =>
+    tsByFileName.get(`${expectedFile}::${transform(short)}`),
+  ).filter((c): c is ClassInfo => Boolean(c));
 
   let resolved = direct;
   if (!resolved) {
@@ -3309,18 +3296,17 @@ export function superclassesMatch(
   rubySuper: string | null,
   tsChain: string[],
   tsName: string,
-  nesting = "",
 ): boolean {
   // `class X < ::Foo` records the absolute marker; TS names never carry it.
   rubySuper = rubySuper?.replace(/^::/, "") ?? null;
   if (!rubySuper && tsChain.length === 0) return true;
   // Ruby builtins have no faithful TS superclass; accept whatever TS uses.
-  if (rubySuper && RUBY_UNEXTENDABLE_BUILTINS.has(rubySuper.split("::").pop()!)) return true;
+  if (rubySuper && RUBY_UNEXTENDABLE_BUILTINS.has(rubySuper)) return true;
   // Rails-idiomatic "plain object" classes extend Arel.Node in TS.
   const expectedIntermediate = TS_ROOT_INTERMEDIATE.get(tsName);
   if (!rubySuper && expectedIntermediate && tsChain.includes(expectedIntermediate)) return true;
   if (!rubySuper || tsChain.length === 0) return false;
-  return tsChain.some((ancestor) => nameMatches(rubySuper, ancestor, nesting));
+  return tsChain.some((ancestor) => nameMatches(rubySuper, ancestor));
 }
 
 /**
@@ -6761,9 +6747,8 @@ export function main() {
         const expectedTs = rubyFileToTs(info.file, pkg);
         const short = shortName(fqn)!;
         const rubySuper = shortName(info.superclass);
-        const nesting = fqn.split("::").slice(0, -1).join("::");
 
-        const tsCls = resolveTsClassForRuby(short, expectedTs, tsByFileName, fqn);
+        const tsCls = resolveTsClassForRuby(short, expectedTs, tsByFileName);
         inheritance.checked++;
 
         if (!tsCls) {
@@ -6794,7 +6779,7 @@ export function main() {
         // Pass the resolved TS class name (not the Ruby short name) so
         // the `TS_ROOT_INTERMEDIATE` whitelist keys on what the TS file
         // actually declares (e.g. "ValueType", not Ruby's "Value").
-        if (superclassesMatch(info.superclass ?? null, chain, tsCls.name, nesting)) {
+        if (superclassesMatch(rubySuper, chain, tsCls.name)) {
           inheritance.matched++;
         } else if (
           inheritanceExcludes.has(

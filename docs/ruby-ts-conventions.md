@@ -149,29 +149,6 @@ a JSDoc `Mirrors:` line naming `ERB::Util`, a Rails path like
 `core_ext/erb/util.rb`, or fixtures-compare's statuses for Rails YAML that
 genuinely is ERB.
 
-## Constant renames
-
-A Ruby constant whose bare name collides in JS keeps a `Type` suffix in
-trails. Keyed by the fully qualified Ruby name; `parity:api` and
-`parity:api:extra` match only these pairs, so no other `FooType` credits a
-Ruby `Foo`:
-
-| Ruby constant                                              | trails export         |
-| ---------------------------------------------------------- | --------------------- |
-| `ActiveModel::Type::Value`                                 | `ValueType`           |
-| `ActiveModel::Type::BigInteger`                            | `BigIntegerType`      |
-| `ActiveModel::Type::Binary`                                | `BinaryType`          |
-| `ActiveModel::Type::Boolean`                               | `BooleanType`         |
-| `ActiveModel::Type::Date`                                  | `DateType`            |
-| `ActiveModel::Type::DateTime`                              | `DateTimeType`        |
-| `ActiveModel::Type::Decimal`                               | `DecimalType`         |
-| `ActiveModel::Type::Float`                                 | `FloatType`           |
-| `ActiveModel::Type::ImmutableString`                       | `ImmutableStringType` |
-| `ActiveModel::Type::Integer`                               | `IntegerType`         |
-| `ActiveModel::Type::String`                                | `StringType`          |
-| `ActiveModel::Type::Time`                                  | `TimeType`            |
-| `ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range` | `RangeType`           |
-
 ## File paths
 
 Ruby `foo_bar.rb` → `foo-bar.ts` (kebab-case), with these path-segment aliases

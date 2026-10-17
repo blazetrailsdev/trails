@@ -72,6 +72,7 @@ packages/trailties/src/thor/test-helpers/sandbox/
 scripts/codegen/.ir*/
 scripts/codegen/__pycache__/
 scripts/codegen/data/hand-oracle*.json
-packages/*/codegen-out/
+packages/*/codegen-out/*
+!packages/*/codegen-out/tsconfig.json
 packages/*/codegen-out[0-9]/
 packages/activerecord/.swap-*/

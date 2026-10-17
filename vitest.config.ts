@@ -531,6 +531,7 @@ export default defineConfig({
             "packages/*/src/**/*.test.ts",
             "scripts/guides-typecheck/*.test.ts",
             "scripts/api-compare/*.test.ts",
+            "scripts/codegen/src/*.test.ts",
             "scripts/fixtures-compare/*.test.ts",
             "scripts/schema-compare/*.test.ts",
             "scripts/parity/**/*.test.ts",

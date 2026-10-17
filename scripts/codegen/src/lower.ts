@@ -5,7 +5,7 @@
  * Every Ruby idiom CLAUDE.md lists as "does not translate literally" is decided
  * here exactly once:
  *   - truthiness       → `rtest(x)` unless the node is statically boolean
- *   - `a || b` (value) → `rtest(a) ? a : b` through a temp-free helper `rbOr`
+ *   - `a || b` (value) → `rtest((_t = a)) ? _t : b` through a hoisted temp
  *   - `h.fetch`        → ruby-compat `fetch`, never `??`
  *   - present?/blank?  → activesupport `isPresent` / `isBlank` / `presence`
  *   - kwargs           → one trailing options object, camelCase keys (RFC 0149)
