@@ -181,39 +181,27 @@ export class Logger {
   declare log: Logger["add"];
 
   debug(progname: unknown = null, block?: () => unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.DEBUG, null, null, progname as () => unknown)
-      : this.add(Logger.DEBUG, null, progname, block);
+    return this.add(Logger.DEBUG, null, progname, block);
   }
 
   info(progname: unknown = null, block?: () => unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.INFO, null, null, progname as () => unknown)
-      : this.add(Logger.INFO, null, progname, block);
+    return this.add(Logger.INFO, null, progname, block);
   }
 
   warn(progname: unknown = null, block?: () => unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.WARN, null, null, progname as () => unknown)
-      : this.add(Logger.WARN, null, progname, block);
+    return this.add(Logger.WARN, null, progname, block);
   }
 
   error(progname: unknown = null, block?: () => unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.ERROR, null, null, progname as () => unknown)
-      : this.add(Logger.ERROR, null, progname, block);
+    return this.add(Logger.ERROR, null, progname, block);
   }
 
   fatal(progname: unknown = null, block?: () => unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.FATAL, null, null, progname as () => unknown)
-      : this.add(Logger.FATAL, null, progname, block);
+    return this.add(Logger.FATAL, null, progname, block);
   }
 
   unknown(progname: unknown = null, block?: () => unknown): boolean {
-    return typeof progname === "function"
-      ? this.add(Logger.UNKNOWN, null, null, progname as () => unknown)
-      : this.add(Logger.UNKNOWN, null, progname, block);
+    return this.add(Logger.UNKNOWN, null, progname, block);
   }
 
   get "debug?"(): boolean {

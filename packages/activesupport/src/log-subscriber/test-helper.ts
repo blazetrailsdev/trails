@@ -46,17 +46,17 @@ export class MockLogger {
   private _logged: Hash<LogLevel, unknown[]>;
 
   /** @noRailsEquivalent PERMANENT */
-  declare debug: (message?: unknown) => void;
+  declare debug: (message?: unknown, block?: () => unknown) => void;
   /** @noRailsEquivalent PERMANENT */
-  declare info: (message?: unknown) => void;
+  declare info: (message?: unknown, block?: () => unknown) => void;
   /** @noRailsEquivalent PERMANENT */
-  declare warn: (message?: unknown) => void;
+  declare warn: (message?: unknown, block?: () => unknown) => void;
   /** @noRailsEquivalent PERMANENT */
-  declare error: (message?: unknown) => void;
+  declare error: (message?: unknown, block?: () => unknown) => void;
   /** @noRailsEquivalent PERMANENT */
-  declare fatal: (message?: unknown) => void;
+  declare fatal: (message?: unknown, block?: () => unknown) => void;
   /** @noRailsEquivalent PERMANENT */
-  declare unknown: (message?: unknown) => void;
+  declare unknown: (message?: unknown, block?: () => unknown) => void;
   /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
   declare readonly "debug?": boolean;
   /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
@@ -104,12 +104,8 @@ export class MockLogger {
 for (const [severity, value] of Object.entries(LOG_LEVELS) as [LogLevel, number][]) {
   Object.defineProperty(MockLogger, severity.slice(1).toUpperCase(), { value });
   Object.defineProperty(MockLogger.prototype, severity.slice(1), {
-    value(this: MockLogger, message: unknown = null): void {
-      if (typeof message === "function") {
-        this.methodMissing(severity, null, message as () => unknown);
-      } else {
-        this.methodMissing(severity, message);
-      }
+    value(this: MockLogger, message: unknown = null, block?: () => unknown): void {
+      this.methodMissing(severity, message, block);
     },
     writable: true,
     configurable: true,

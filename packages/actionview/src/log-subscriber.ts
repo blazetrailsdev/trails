@@ -56,7 +56,7 @@ export class Start implements UtilsHost {
 
     if (qualifier === undefined) return;
 
-    this.logger()!.debug(() => {
+    this.logger()!.debug(null, () => {
       let message = `  Rendering ${qualifier}${this.fromRailsRoot(payload["identifier"] as string)}`;
       if (payload["layout"] != null && payload["layout"] !== false) {
         message += ` within ${this.fromRailsRoot(payload["layout"] as string)}`;
