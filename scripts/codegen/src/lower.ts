@@ -1706,6 +1706,20 @@ export class Lowerer {
     return tsMethodName(name);
   }
 
+  /**
+   * The getter a gem class inherits from a dependency superclass under Ruby name
+   * `rubyName` (`ActiveSupport::LogSubscriber#logger`), from the type oracle.
+   */
+  inheritedDepGetter(fqn: string | undefined, rubyName: string, isStatic: boolean) {
+    const sc = fqn ? this.index.scopes.get(fqn) : undefined;
+    const p = sc?.superclassPath?.filter((x: string) => x) ?? [];
+    const key =
+      (fqn && this.resolver.oracleKey(fqn)) ??
+      (p.length && !sc!.superclassFqn ? this.resolver.types.depClass(p) : undefined);
+    const m = key ? this.resolver.types.member(key, rubyName, isStatic) : undefined;
+    return m?.info.kind === "get" && m.owner.startsWith("@") ? m : undefined;
+  }
+
   /** Is `name` known in the gem only as an attr reader (→ property access)? */
   /**
    * Whether a zero-argument call on a receiver of unknown type reads a
@@ -3034,6 +3048,11 @@ export class Lowerer {
     const resolved = this.resolver.member(n, recvNode, ctx, this);
     if (resolved?.kind === "property" && n.args.length === 0 && !n.block)
       return `${recv}${nav}${resolved.name}`;
+    const depGetter =
+      (!recvNode || recvNode.k === "self") && n.args.length === 0 && !n.block
+        ? this.inheritedDepGetter(ctx.owner, name, ctx.selfKind === "static")
+        : undefined;
+    if (depGetter) return `${recv}${nav}${depGetter.tsName}`;
     const callee = resolved?.name ?? this.callName(name);
     if (
       this.index.classAttrPredicates.has(name) &&
