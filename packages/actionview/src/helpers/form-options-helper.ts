@@ -1,6 +1,7 @@
 import {
   I18n,
   extractOptionsBang,
+  filterMap,
   htmlSafe,
   isPlainObject,
   kernelArray as Array,
@@ -199,9 +200,9 @@ export function extractValuesFromCollection(
   selected: unknown,
 ): unknown {
   if (typeof selected === "function") {
-    return globalThis.Array.from(collection).flatMap((element) =>
-      selected(element) ? [rbFPublicSend(element, String(valueMethod))] : [],
-    );
+    return filterMap(globalThis.Array.from(collection), (element) => {
+      if (selected(element)) return rbFPublicSend(element, String(valueMethod));
+    });
   } else {
     return selected;
   }

@@ -1,4 +1,4 @@
-import { isBlank, stringifyKeys } from "@blazetrails/activesupport";
+import { isBlank, stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
 import { ArgumentError, block, fetch, hashDelete } from "@blazetrails/ruby-compat";
 
 import type { TagBuilder } from "../tag-helper.js";
@@ -47,13 +47,15 @@ export const SelectRenderer = {
 
     const includeHidden = fetch<unknown>(options, "includeHidden", true);
     if (htmlOptions["multiple"] && includeHidden != null && includeHidden !== false) {
-      return `${this.tag("input", {
-        disabled: htmlOptions["disabled"],
-        name: htmlOptions["name"],
-        type: "hidden",
-        value: "",
-        autocomplete: "off",
-      })}${select}`;
+      return (
+        this.tag("input", {
+          disabled: htmlOptions["disabled"],
+          name: htmlOptions["name"],
+          type: "hidden",
+          value: "",
+          autocomplete: "off",
+        }) as SafeBuffer
+      ).plus(select);
     } else {
       return select;
     }
