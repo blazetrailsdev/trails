@@ -3022,6 +3022,17 @@ export class Lowerer {
     )
       return `${rc("rbKernel")}.rand(${argList()})`;
 
+    // ── `Proc.new { … }` (proc.c `rb_proc_s_new`) is the block itself: a Ruby Proc is
+    // a JS function, so the block's arrow is the value.
+    if (
+      recvNode?.k === "const" &&
+      recvNode.path.filter((x: string) => x).join("::") === "Proc" &&
+      name === "new" &&
+      n.args.length === 0 &&
+      n.block?.k === "block"
+    )
+      return this.arrow(n.block.params, n.block.body, ctx);
+
     // ── `Object.new`: an instance of Ruby's Object. A plain JS object is a Hash
     // in trails, so it is the shim's `RubyObject` (named `Object`).
     if (
