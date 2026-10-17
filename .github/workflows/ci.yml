@@ -866,6 +866,7 @@ jobs:
           scripts/guides-typecheck
           scripts/tasks
           scripts/api-compare
+          scripts/codegen/src
           scripts/test-compare
           scripts/fixtures-compare
           scripts/test-deps
