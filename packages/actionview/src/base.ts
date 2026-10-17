@@ -76,6 +76,7 @@ export class Base {
   declare static defaultFormats: readonly string[] | null | undefined;
   declare defaultFormats: readonly string[] | null | undefined;
   declare static automaticallyDisableSubmitTag: boolean;
+  declare static debugMissingTranslation: boolean;
   declare automaticallyDisableSubmitTag: boolean;
   declare static annotateRenderedViewWithFilenames: boolean;
   declare annotateRenderedViewWithFilenames: boolean;

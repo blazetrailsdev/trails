@@ -24,6 +24,7 @@ import { RenderingHelper } from "./helpers/rendering-helper.js";
 import { SanitizeHelper } from "./helpers/sanitize-helper.js";
 import { TagHelper } from "./helpers/tag-helper.js";
 import { TextHelper } from "./helpers/text-helper.js";
+import { TranslationHelper } from "./helpers/translation-helper.js";
 import { UrlHelper } from "./helpers/url-helper.js";
 
 export const Helpers = new Module((mod) => {
@@ -51,5 +52,6 @@ export const Helpers = new Module((mod) => {
   mod.include(SanitizeHelper);
   mod.include(TagHelper);
   mod.include(TextHelper);
+  mod.include(TranslationHelper);
   mod.include(UrlHelper);
 });
