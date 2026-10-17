@@ -1086,7 +1086,7 @@ export class Emitter {
     const awaits = ctx.asyncBox!.awaits;
     // Record an async gem method, so the next emission pass awaits its callers
     // (cli.ts runs passes until no new method turns async).
-    if (!isCtor && (awaits || twin?.info.async))
+    if (!isCtor && (awaits || twin?.info.async || body.some((l) => /^return .*, async \(/.test(l))))
       this.resolver.asyncDefs.add(`${u.fqn}${opts.static ? "." : "#"}${d.name}`);
     const asy = !isCtor && (awaits || twin?.info.async) ? "async " : "";
     if (twin) f.stats["hand-twin"] = (f.stats["hand-twin"] ?? 0) + 1;
