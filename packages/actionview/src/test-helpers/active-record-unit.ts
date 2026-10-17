@@ -4,7 +4,7 @@ import {
   ClassMethods as TestFixturesClassMethods,
   TestFixtures,
 } from "@blazetrails/activerecord/test-fixtures";
-import { Notifications, Parallelization, cattrAccessor, isBlank } from "@blazetrails/activesupport";
+import { Notifications, cattrAccessor, isBlank } from "@blazetrails/activesupport";
 import { ActionController } from "@blazetrails/actionpack";
 import {
   Dir,
@@ -86,6 +86,7 @@ export class ActiveRecordTestConnector {
 
 type ControllerClass = Parameters<typeof ActionController.TestCase.tests>[0];
 
+/** @missingRailsCall after_fork_hook — PERMANENT */
 export class ActiveRecordTestCase extends ActionController.TestCase {
   declare static fixturePaths: string[];
   declare static useTransactionalTests: boolean;
@@ -168,5 +169,3 @@ export class ActiveRecordTestCase extends ActionController.TestCase {
 }
 
 await ActiveRecordTestConnector.setup();
-
-Parallelization.afterForkHook(() => ActiveRecordTestConnector.reconnect());
