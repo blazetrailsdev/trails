@@ -9,11 +9,7 @@ import { Tse } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { localize, translate as translateHelper } from "../helpers/translation-helper.js";
 
-const CustomExceptionHandler = {
-  call(_exception: unknown, _locale: unknown, _key: unknown, _options: unknown) {
-    return "from CustomExceptionHandler";
-  },
-};
+const CustomExceptionHandler = { call: () => "from CustomExceptionHandler" };
 
 const blockTemplate = (call: string, args: string, body: string) =>
   `<%= ${call.slice(0, -1)}, (${args}) => { %>\n  ${body}\n<% }) %>`;

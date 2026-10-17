@@ -24,24 +24,12 @@ describe("ArgumentSerializationTest", () => {
 });
 
 describe("ActiveJob::Arguments with a Hash", () => {
-  it("maps a plain-object Hash over its [key, value] pairs", async () => {
-    const serialized = serialize({ a: 1, b: "x" });
-    expect(serialized).toEqual([
-      ["a", 1],
-      ["b", "x"],
-    ]);
-    expect(await deserialize(serialized)).toEqual(serialized);
-  });
-
-  it("maps a ruby-compat Hash over its [key, value] pairs", async () => {
-    const serialized = serialize(new Hash<string, number>().set("a", 1));
-    expect(serialized).toEqual([["a", 1]]);
-    expect(await deserialize(serialized)).toEqual([["a", 1]]);
-  });
-
-  it("maps a HashWithIndifferentAccess over its [key, value] pairs", async () => {
-    const serialized = serialize(new HashWithIndifferentAccess({ a: 1 }));
-    expect(serialized).toEqual([["a", 1]]);
-    expect(await deserialize(serialized)).toEqual([["a", 1]]);
+  it.each([
+    ["a plain object", { a: 1 }],
+    ["a ruby-compat Hash", new Hash<string, number>().set("a", 1)],
+    ["a HashWithIndifferentAccess", new HashWithIndifferentAccess({ a: 1 })],
+  ])("maps %s over its [key, value] pairs", async (_name, hash) => {
+    expect(serialize(hash)).toEqual([["a", 1]]);
+    expect(await deserialize(serialize(hash))).toEqual([["a", 1]]);
   });
 });
