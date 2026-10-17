@@ -9,7 +9,7 @@ export class Builder {
   private _map: Record<string, (builder: Builder) => void> | null = null;
   private _run: RackApp | null = null;
   private _warmupBlock: ((app: RackApp) => void) | null = null;
-  private _frozen = false;
+  private _freezeApp = false;
   readonly options: Record<string, unknown>;
 
   constructor(
@@ -111,7 +111,7 @@ export class Builder {
   }
 
   freezeApp(): this {
-    this._frozen = true;
+    this._freezeApp = true;
     return this;
   }
 
@@ -126,10 +126,10 @@ export class Builder {
   toApp(): RackApp {
     let app = this._map ? this.generateMap(this._run, this._map) : this._run;
     if (!app) throw new Error("missing run or map statement");
-    if (this._frozen) Object.freeze(app);
+    if (this._freezeApp) Object.freeze(app);
     app = this._use.reduceRight((a, e) => {
       const x = e(a);
-      if (this._frozen) Object.freeze(x);
+      if (this._freezeApp) Object.freeze(x);
       return x;
     }, app);
     if (this._warmupBlock) rbFSend(this._warmupBlock, "call", app);
