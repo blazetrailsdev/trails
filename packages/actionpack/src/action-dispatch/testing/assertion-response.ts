@@ -9,16 +9,16 @@ const GENERIC_RESPONSE_CODES: Record<string, string> = {
 };
 
 export class AssertionResponse {
-  readonly code: string;
-  readonly name: string;
+  readonly code: number | string | null;
+  readonly name: string | null;
 
   constructor(codeOrName: number | string) {
-    if (typeof codeOrName === "string" && !/^\d+$/.test(codeOrName)) {
+    if (typeof codeOrName === "string" && !/^\d/.test(codeOrName)) {
       this.name = codeOrName;
-      this.code = codeFromName(codeOrName)!;
+      this.code = codeFromName(codeOrName);
     } else {
-      this.name = nameFromCode(Number(codeOrName))!;
-      this.code = String(codeOrName);
+      this.name = nameFromCode(codeOrName);
+      this.code = codeOrName;
     }
 
     if (this.code == null) throw new ArgumentError(`Invalid response name: ${this.name}`);
@@ -31,16 +31,20 @@ export class AssertionResponse {
 }
 
 /** @internal */
-function codeFromName(name: string): string | undefined {
+function codeFromName(name: string): number | string | null {
   if (Object.hasOwn(GENERIC_RESPONSE_CODES, name)) return GENERIC_RESPONSE_CODES[name];
   try {
-    return String(rackStatusCode(name));
+    return rackStatusCode(name);
   } catch {
-    return undefined;
+    return null;
   }
 }
 
 /** @internal */
-function nameFromCode(code: number): string | undefined {
-  return HTTP_STATUS_CODES[code];
+function nameFromCode(code: number | string): string | null {
+  return (
+    Object.keys(GENERIC_RESPONSE_CODES).find((name) => GENERIC_RESPONSE_CODES[name] === code) ??
+    HTTP_STATUS_CODES[code as number] ??
+    null
+  );
 }

@@ -40,7 +40,7 @@ export function assertResponse(
   if (Object.hasOwn(RESPONSE_PREDICATES, type)) {
     assert(RESPONSE_PREDICATES[type](this.response.status), message);
   } else {
-    assertEqual(parseInt(new AssertionResponse(type).code, 10), this.response.status, message);
+    assertEqual(new AssertionResponse(type).code, this.response.status, message);
   }
 }
 

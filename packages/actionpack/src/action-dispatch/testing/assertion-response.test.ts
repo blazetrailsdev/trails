@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { AssertionResponse } from "./assertion-response.js";
 
 describe("AssertionResponse", () => {
@@ -12,19 +13,29 @@ describe("AssertionResponse", () => {
   it("constructs from a Rack status symbol", () => {
     const r = new AssertionResponse("not_found");
     expect(r.name).toBe("not_found");
-    expect(r.code).toBe("404");
+    expect(r.code).toBe(404);
   });
 
   it("constructs from an integer code (falls through to HTTP_STATUS_CODES)", () => {
     const r = new AssertionResponse(404);
     expect(r.name).toBe("Not Found");
-    expect(r.code).toBe("404");
+    expect(r.code).toBe(404);
   });
 
   it("constructs from a string code", () => {
     const r = new AssertionResponse("422");
     expect(r.code).toBe("422");
     expect(r.name).toMatch(/unprocessable/i);
+  });
+
+  it("constructs from a generic code via GENERIC_RESPONSE_CODES.invert", () => {
+    const r = new AssertionResponse("2XX");
+    expect(r.name).toBe("success");
+    expect(r.code).toBe("2XX");
+  });
+
+  it("raises ArgumentError on an invalid code", () => {
+    expect(() => new AssertionResponse(999)).toThrow(ArgumentError);
   });
 
   it("throws on invalid name", () => {
