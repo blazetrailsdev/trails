@@ -175,40 +175,46 @@ export class LogSubscriber extends Subscriber {
     }
   }
 
-  protected _info(progname?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.info(progname);
+  protected info(
+    progname: string | (() => string) | null = null,
+    block?: () => string,
+  ): boolean | null {
+    return this.logger ? this.logger.info(progname, block) : null;
   }
 
-  protected _debug(progname?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.debug(progname);
+  protected debug(
+    progname: string | (() => string) | null = null,
+    block?: () => string,
+  ): boolean | null {
+    return this.logger ? this.logger.debug(progname, block) : null;
   }
 
-  protected _warn(progname?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.warn(progname);
+  protected warn(
+    progname: string | (() => string) | null = null,
+    block?: () => string,
+  ): boolean | null {
+    return this.logger ? this.logger.warn(progname, block) : null;
   }
 
-  protected _error(progname?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.error(progname);
+  protected error(
+    progname: string | (() => string) | null = null,
+    block?: () => string,
+  ): boolean | null {
+    return this.logger ? this.logger.error(progname, block) : null;
   }
 
-  protected _fatal(progname?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.fatal(progname);
+  protected fatal(
+    progname: string | (() => string) | null = null,
+    block?: () => string,
+  ): boolean | null {
+    return this.logger ? this.logger.fatal(progname, block) : null;
   }
 
-  protected _unknown(progname?: string | (() => string)): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    return l.unknown(progname);
+  protected unknown(
+    progname: string | (() => string) | null = null,
+    block?: () => string,
+  ): boolean | null {
+    return this.logger ? this.logger.unknown(progname, block) : null;
   }
 
   protected color(

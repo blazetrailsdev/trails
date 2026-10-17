@@ -84,8 +84,11 @@ class TestDebugLogSubscriber extends LogSubscriber {
     return (this.constructor as typeof LogSubscriber).logger;
   }
 
-  protected override debug(progname: string | null = null, block?: () => string): undefined {
-    this.debugs.push(progname);
+  protected override debug(
+    progname: string | (() => string) | null = null,
+    block?: () => string,
+  ): null {
+    this.debugs.push(progname as string | null);
     return super.debug(progname, block);
   }
 }

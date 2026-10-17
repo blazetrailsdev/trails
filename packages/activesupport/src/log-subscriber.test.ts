@@ -77,21 +77,21 @@ class MyLogSubscriber extends LogSubscriber {
 
   someEvent(event: Event): void {
     this.event = event;
-    this._info(event.name);
+    this.info(event.name);
   }
 
   foo(_event: Event | null): void {
-    this._debug("debug");
-    this._info(() => "info");
-    this._warn("warn");
+    this.debug("debug");
+    this.info(() => "info");
+    this.warn("warn");
   }
 
   bar(_event: Event | null): void {
-    this._info(`${this.color("cool", "red")}, ${this.color("isn't it?", "blue", { bold: true })}`);
+    this.info(`${this.color("cool", "red")}, ${this.color("isn't it?", "blue", { bold: true })}`);
   }
 
   baz(_event: Event | null): void {
-    this._info(
+    this.info(
       `${this.color("rad", "green", { bold: true, underline: true })}, ${this.color("isn't it?", "yellow", { italic: true })}`,
     );
   }
@@ -101,7 +101,7 @@ class MyLogSubscriber extends LogSubscriber {
   }
 
   debugOnly(_event: Event | null): void {
-    this._debug("debug logs are enabled");
+    this.debug("debug logs are enabled");
   }
 }
 
