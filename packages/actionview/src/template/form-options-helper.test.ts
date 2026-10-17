@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "../test-helpers/abstract-unit.js";
-import { beforeEach, describe, it } from "vitest";
-import { assertMatch, assertRaises } from "@blazetrails/activesupport";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  DateCalculations,
+  TimeZone,
+  assertMatch,
+  assertRaises,
+  isHtmlSafe,
+} from "@blazetrails/activesupport";
 import { ArgumentError, Range, Struct } from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
@@ -18,11 +24,44 @@ const Post = Struct.new(
   "allow_comments",
 );
 const Continent = Struct.new("continent_name", "countries");
+const Country = Struct.new("country_id", "country_name");
+
+class Firm {
+  constructor(public time_zone: unknown = null) {}
+}
+
+class FakeZone {
+  constructor(public name: string) {}
+  toString(): string {
+    return this.name;
+  }
+  isMatch(_re: unknown): unknown {
+    return null;
+  }
+}
 
 type View = Base & Record<string, any>;
 
 describe("FormOptionsHelperTest", () => {
   let view: View;
+
+  let fakeZones: Record<string, FakeZone>;
+  let fakeTimezones: FakeZone[];
+
+  beforeEach(() => {
+    fakeZones = Object.fromEntries(["A", "B", "C", "D", "E"].map((id) => [id, new FakeZone(id)]));
+    vi.spyOn(TimeZone, "find").mockImplementation(
+      (id) => fakeZones[id as string] as unknown as TimeZone,
+    );
+    vi.spyOn(TimeZone, "all").mockImplementation(
+      () => Object.values(fakeZones) as unknown as TimeZone[],
+    );
+    fakeTimezones = TimeZone.all() as unknown as FakeZone[];
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   beforeEach(() => {
     view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null) as View;
@@ -30,6 +69,18 @@ describe("FormOptionsHelperTest", () => {
 
   const optionsForSelect = (...args: unknown[]) => view.optionsForSelect(...args);
   const select = (...args: unknown[]) => view.select(...args);
+  const dummyPosts = () => [
+    new Post("<Abe> went home", "<Abe>", "To a little house", "shh!"),
+    new Post("Babe went home", "Babe", "To a little house", "shh!"),
+    new Post("Cabe went home", "Cabe", "To a little house", "shh!"),
+  ];
+  const dummyContinents = () => [
+    new Continent("<Africa>", [
+      new Country("<sa>", "<South Africa>"),
+      new Country("so", "Somalia"),
+    ]),
+    new Continent("Europe", [new Country("dk", "Denmark"), new Country("ie", "Ireland")]),
+  ];
 
   it("array options for select", () => {
     assertDomEqual(
@@ -148,6 +199,331 @@ describe("FormOptionsHelperTest", () => {
         ["North America", [["United States", "US"], "Canada"]],
         ["Europe", [["Great Britain", "GB"], "Germany"]],
       ]),
+    );
+  });
+  it("collection select", () => {
+    view.post = new Post();
+    view.post.author_name = "Babe";
+
+    assertDomEqual(
+      '<select id="post_author_name" name="post[author_name]"><option value="&lt;Abe&gt;">&lt;Abe&gt;</option>\n<option value="Babe" selected="selected">Babe</option>\n<option value="Cabe">Cabe</option></select>',
+      view.collectionSelect("post", "author_name", dummyPosts(), "author_name", "author_name"),
+    );
+  });
+
+  it("collection select with blank and style", () => {
+    view.post = new Post();
+    view.post.author_name = "Babe";
+
+    assertDomEqual(
+      '<select id="post_author_name" name="post[author_name]" style="width: 200px"><option value="" label=" "></option>\n<option value="&lt;Abe&gt;">&lt;Abe&gt;</option>\n<option value="Babe" selected="selected">Babe</option>\n<option value="Cabe">Cabe</option></select>',
+      view.collectionSelect(
+        "post",
+        "author_name",
+        dummyPosts(),
+        "author_name",
+        "author_name",
+        { includeBlank: true },
+        { style: "width: 200px" },
+      ),
+    );
+  });
+
+  it("collection select with blank and selected", () => {
+    view.post = new Post();
+    view.post.author_name = "Babe";
+
+    assertDomEqual(
+      '<select id="post_author_name" name="post[author_name]"><option value="" label=" "></option>\n<option value="&lt;Abe&gt;" selected="selected">&lt;Abe&gt;</option>\n<option value="Babe">Babe</option>\n<option value="Cabe">Cabe</option></select>',
+      view.collectionSelect("post", "author_name", dummyPosts(), "author_name", "author_name", {
+        includeBlank: true,
+        selected: "<Abe>",
+      }),
+    );
+  });
+
+  it("collection select with disabled", () => {
+    view.post = new Post();
+    view.post.author_name = "Babe";
+
+    assertDomEqual(
+      '<select id="post_author_name" name="post[author_name]"><option value="&lt;Abe&gt;">&lt;Abe&gt;</option>\n<option value="Babe" selected="selected">Babe</option>\n<option value="Cabe" disabled="disabled">Cabe</option></select>',
+      view.collectionSelect("post", "author_name", dummyPosts(), "author_name", "author_name", {
+        disabled: "Cabe",
+      }),
+    );
+  });
+
+  it("collection select with proc for value method", () => {
+    view.post = new Post();
+
+    assertDomEqual(
+      '<select id="post_author_name" name="post[author_name]"><option value="&lt;Abe&gt;">&lt;Abe&gt; went home</option>\n<option value="Babe">Babe went home</option>\n<option value="Cabe">Cabe went home</option></select>',
+      view.collectionSelect(
+        "post",
+        "author_name",
+        dummyPosts(),
+        (p: any) => p.author_name,
+        "title",
+      ),
+    );
+  });
+
+  it("collection select with proc for text method", () => {
+    view.post = new Post();
+
+    assertDomEqual(
+      '<select id="post_author_name" name="post[author_name]"><option value="&lt;Abe&gt;">&lt;Abe&gt; went home</option>\n<option value="Babe">Babe went home</option>\n<option value="Cabe">Cabe went home</option></select>',
+      view.collectionSelect(
+        "post",
+        "author_name",
+        dummyPosts(),
+        "author_name",
+        (p: any) => p.title,
+      ),
+    );
+  });
+
+  it("grouped collection select", () => {
+    view.post = new Post();
+    view.post.origin = "dk";
+
+    assertDomEqual(
+      '<select id="post_origin" name="post[origin]"><optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>\n<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option value="dk" selected="selected">Denmark</option>\n<option value="ie">Ireland</option></optgroup></select>',
+      view.groupedCollectionSelect(
+        "post",
+        "origin",
+        dummyContinents(),
+        "countries",
+        "continent_name",
+        "country_id",
+        "country_name",
+      ),
+    );
+  });
+
+  it("grouped collection select with selected", () => {
+    view.post = new Post();
+
+    assertDomEqual(
+      '<select id="post_origin" name="post[origin]"><optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>\n<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option value="dk" selected="selected">Denmark</option>\n<option value="ie">Ireland</option></optgroup></select>',
+      view.groupedCollectionSelect(
+        "post",
+        "origin",
+        dummyContinents(),
+        "countries",
+        "continent_name",
+        "country_id",
+        "country_name",
+        { selected: "dk" },
+      ),
+    );
+  });
+
+  it("grouped collection select with disabled value", () => {
+    view.post = new Post();
+
+    assertDomEqual(
+      '<select id="post_origin" name="post[origin]"><optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>\n<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option disabled="disabled" value="dk">Denmark</option>\n<option value="ie">Ireland</option></optgroup></select>',
+      view.groupedCollectionSelect(
+        "post",
+        "origin",
+        dummyContinents(),
+        "countries",
+        "continent_name",
+        "country_id",
+        "country_name",
+        { disabled: "dk" },
+      ),
+    );
+  });
+
+  it("weekday options for select with no params", () => {
+    assertDomEqual(
+      '<option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>\n<option value="Sunday">Sunday</option>',
+      view.weekdayOptionsForSelect(),
+    );
+  });
+
+  it("weekday options for select with index as value", () => {
+    assertDomEqual(
+      '<option value="1">Monday</option>\n<option value="2">Tuesday</option>\n<option value="3">Wednesday</option>\n<option value="4">Thursday</option>\n<option value="5">Friday</option>\n<option value="6">Saturday</option>\n<option value="0">Sunday</option>',
+      view.weekdayOptionsForSelect(null, { indexAsValue: true }),
+    );
+  });
+
+  it("weekday options for select with abberviated day names", () => {
+    assertDomEqual(
+      '<option value="Mon">Mon</option>\n<option value="Tue">Tue</option>\n<option value="Wed">Wed</option>\n<option value="Thu">Thu</option>\n<option value="Fri">Fri</option>\n<option value="Sat">Sat</option>\n<option value="Sun">Sun</option>',
+      view.weekdayOptionsForSelect(null, { dayFormat: "abbr_day_names" }),
+    );
+  });
+
+  it("weekday options for select with beginning of week set to sunday", () => {
+    assertDomEqual(
+      '<option value="Sunday">Sunday</option>\n<option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>',
+      view.weekdayOptionsForSelect(null, { beginningOfWeek: ":sunday" }),
+    );
+  });
+
+  it("weekday options for select with beginning of week set to saturday", () => {
+    assertDomEqual(
+      '<option value="Saturday">Saturday</option>\n<option value="Sunday">Sunday</option>\n<option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>',
+      view.weekdayOptionsForSelect(null, { beginningOfWeek: ":saturday" }),
+    );
+  });
+
+  it("weekday options for select with beginning of week set elsewhere", () => {
+    DateCalculations.setBeginningOfWeek(":sunday");
+    assertDomEqual(
+      '<option value="Sunday">Sunday</option>\n<option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>',
+      view.weekdayOptionsForSelect(),
+    );
+    DateCalculations.setBeginningOfWeek(":monday");
+  });
+
+  it("weekday options for select with selected value", () => {
+    assertDomEqual(
+      '<option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option selected="selected" value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>\n<option value="Sunday">Sunday</option>',
+      view.weekdayOptionsForSelect("Friday"),
+    );
+  });
+
+  it("weekday select", () => {
+    assertDomEqual(
+      '<select name="model[weekday]" id="model_weekday"><option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>\n<option value="Sunday">Sunday</option></select>',
+      view.weekdaySelect("model", "weekday"),
+    );
+  });
+
+  it("weekday select with selected value", () => {
+    assertDomEqual(
+      '<select name="model[weekday]" id="model_weekday"><option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option selected="selected" value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>\n<option value="Sunday">Sunday</option></select>',
+      view.weekdaySelect("model", "weekday", { selected: "Friday" }),
+    );
+  });
+  it("time zone options no params", () => {
+    const opts = view.timeZoneOptionsForSelect();
+    assertDomEqual(
+      '<option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D">D</option>\n<option value="E">E</option>',
+      opts,
+    );
+  });
+
+  it("time zone options with selected", () => {
+    const opts = view.timeZoneOptionsForSelect("D");
+    assertDomEqual(
+      '<option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option>',
+      opts,
+    );
+  });
+
+  it("time zone options with unknown selected", () => {
+    const opts = view.timeZoneOptionsForSelect("K");
+    assertDomEqual(
+      '<option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D">D</option>\n<option value="E">E</option>',
+      opts,
+    );
+  });
+
+  it("time zone options with priority zones", () => {
+    const zones = [new TimeZone("B"), new TimeZone("E")];
+    const opts = view.timeZoneOptionsForSelect(null, zones);
+    assertDomEqual(
+      '<option value="B">B</option>\n<option value="E">E</option><option value="" disabled="disabled">-------------</option>\n<option value="A">A</option>\n<option value="C">C</option>\n<option value="D">D</option>',
+      opts,
+    );
+  });
+
+  it("time zone options with selected priority zones", () => {
+    const zones = [new TimeZone("B"), new TimeZone("E")];
+    const opts = view.timeZoneOptionsForSelect("E", zones);
+    assertDomEqual(
+      '<option value="B">B</option>\n<option value="E" selected="selected">E</option><option value="" disabled="disabled">-------------</option>\n<option value="A">A</option>\n<option value="C">C</option>\n<option value="D">D</option>',
+      opts,
+    );
+  });
+
+  it("time zone options with unselected priority zones", () => {
+    const zones = [new TimeZone("B"), new TimeZone("E")];
+    const opts = view.timeZoneOptionsForSelect("C", zones);
+    assertDomEqual(
+      '<option value="B">B</option>\n<option value="E">E</option><option value="" disabled="disabled">-------------</option>\n<option value="A">A</option>\n<option value="C" selected="selected">C</option>\n<option value="D">D</option>',
+      opts,
+    );
+  });
+
+  it("time zone options with priority zones does not mutate time zones", () => {
+    const originalZones = [...TimeZone.all()];
+    const zones = [new TimeZone("B"), new TimeZone("E")];
+    view.timeZoneOptionsForSelect(null, zones);
+    expect(TimeZone.all()).toEqual(originalZones);
+  });
+
+  it("time zone options returns html safe string", () => {
+    expect(isHtmlSafe(view.timeZoneOptionsForSelect())).toBe(true);
+  });
+
+  it("time zone select", () => {
+    view.firm = new Firm("D");
+    const html = view.timeZoneSelect("firm", "time_zone");
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      html,
+    );
+  });
+
+  it("time zone select with blank", () => {
+    view.firm = new Firm("D");
+    const html = view.timeZoneSelect("firm", "time_zone", null, { includeBlank: true });
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]"><option value="" label=" "></option>\n<option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      html,
+    );
+  });
+
+  it("time zone select with priority zones", () => {
+    view.firm = new Firm("D");
+    const zones = [new TimeZone("A"), new TimeZone("D")];
+    const html = view.timeZoneSelect("firm", "time_zone", zones);
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="D" selected="selected">D</option><option value="" disabled="disabled">-------------</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="E">E</option></select>',
+      html,
+    );
+  });
+
+  it("time zone select with priority zones as regexp", () => {
+    view.firm = new Firm("D");
+
+    for (const tz of fakeTimezones) {
+      tz.isMatch = () => ["A", "D"].includes(tz.name);
+    }
+
+    const html = view.timeZoneSelect("firm", "time_zone", /A|D/);
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="D" selected="selected">D</option><option value="" disabled="disabled">-------------</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="E">E</option></select>',
+      html,
+    );
+  });
+
+  it("time zone select with default time zone and nil value", () => {
+    view.firm = new Firm();
+    view.firm.time_zone = null;
+
+    const html = view.timeZoneSelect("firm", "time_zone", null, { default: "B" });
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="B" selected="selected">B</option>\n<option value="C">C</option>\n<option value="D">D</option>\n<option value="E">E</option></select>',
+      html,
+    );
+  });
+
+  it("time zone select with default time zone and value", () => {
+    view.firm = new Firm("D");
+
+    const html = view.timeZoneSelect("firm", "time_zone", null, { default: "B" });
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      html,
     );
   });
 });
