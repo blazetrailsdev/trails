@@ -9,15 +9,24 @@
  * to change.
  */
 const IMPLEMENTED: Record<string, string> = {
-  rbAryEnsure: `export function rbAryEnsure(a: any): any[] {\n  return a == null ? [] : Array.isArray(a) ? a : [a];\n}`,
-  rbRaise: `export function rbRaise(...args: any[]): never {\n  throw args[0] instanceof Error ? args[0] : new Error(String(args[1] ?? args[0]));\n}`,
-  rbAsyncEnum: `export async function rbAsyncEnum(recv: any, method: string, ...rest: any[]): Promise<any> {
+  rbAryEnsure: `import { rbCheckArrayType as rbAryEnsureCheck } from "@blazetrails/ruby-compat";
+export function rbAryEnsure(a: any): any[] {
+  if (a == null) return [];
+  return (rbAryEnsureCheck(a) as any[] | null) ?? [a];
+}`,
+  rbRaise: `import { RuntimeError as RbRaiseRuntimeError } from "@blazetrails/ruby-compat";
+export function rbRaise(...args: any[]): never {
+  if (!args.length) throw new RbRaiseRuntimeError("unhandled exception");
+  throw rbMakeException(...args);
+}`,
+  rbAsyncEnum: `import { TypeError as RbAsyncEnumTypeError, rbObjClassname as rbAsyncEnumClassname } from "@blazetrails/ruby-compat";
+export async function rbAsyncEnum(recv: any, method: string, ...rest: any[]): Promise<any> {
   const fn = rest.pop();
   const items: any[] = recv instanceof Map ? [...recv.entries()] : Array.isArray(recv) ? recv : Object.entries(recv ?? {});
   const out: any[] = [];
   switch (method) {
     case "each": case "each_pair": case "each_value": case "each_key":
-      for (const x of items) await fn(...(Array.isArray(x) && fn.length > 1 ? x : [x]));
+      for (const x of items) await fn(x);
       return recv;
     case "each_with_index":
       for (let i = 0; i < items.length; i++) await fn(items[i], i);
@@ -56,9 +65,23 @@ const IMPLEMENTED: Record<string, string> = {
       for (const x of items) if (truthy(await fn(x))) return false;
       return true;
     case "count": { let n = 0; for (const x of items) if (truthy(await fn(x))) n++; return n; }
-    case "sum": { let s = rest[0] ?? 0; for (const x of items) s += await fn(x); return s; }
+    case "sum": {
+      let s = rest[0] ?? 0;
+      for (const x of items) {
+        const v = await fn(x);
+        if (typeof s === "number" && typeof v === "number") s += v;
+        else if (s != null && typeof s.plus === "function") s = s.plus(v);
+        else throw new RbAsyncEnumTypeError(\`\${rbAsyncEnumClassname(v)} can't be coerced into \${rbAsyncEnumClassname(s)}\`);
+      }
+      return s;
+    }
     case "each_with_object": { const memo = rest[0]; for (const x of items) await fn(x, memo); return memo; }
-    case "inject": case "reduce": { let acc = rest.length ? rest[0] : items.shift(); for (const x of items) acc = await fn(acc, x); return acc; }
+    case "inject": case "reduce": {
+      const xs = [...items];
+      let acc = rest.length ? rest[0] : xs.shift();
+      for (const x of xs) acc = await fn(acc, x);
+      return acc;
+    }
     default:
       throw new Error("codegen-runtime: rbAsyncEnum " + method);
   }
@@ -178,32 +201,19 @@ export function rbDelete(x: any, k: any): any {
   // ports as flat functions (activesupport testing/assertions.ts), as methods.
   TestHost: `import * as AS from "@blazetrails/activesupport";
 import { TestCase as AsTestCase } from "@blazetrails/activesupport/test-case";
-import { expect as vitestExpect } from "vitest";
 // ActiveSupport::TestCase (test_case.rb), with SetupAndTeardown's class-level
 // \`setup\` / \`teardown\` callbacks.
 export class TestHost extends AsTestCase {
   [key: string]: any;
-  constructor(name = "") {
-    super(name);
-  }
-  // ActiveSupport::Testing::TimeHelpers#after_teardown (time_helpers.rb): travel_back, then super.
-  // Minitest counts each assertion on the test (\`self.assertions += 1\`); a ported
-  // \`assert_equal\` is a vitest \`expect\`, so its count is added here, before
-  // TestsWithoutAssertions#after_teardown reads it.
-  override afterTeardown(): any {
-    this.assertions += vitestExpect.getState().assertionCalls;
-    AS.travelBack();
-    return super.afterTeardown();
-  }
 }
 // Minitest::Assertions#pass (minitest/assertions.rb): an assertion that passes.
-(TestHost.prototype as any).pass = function (this: any, _msg?: any) { this.assertions += 1; return AS.assert(true); };
+(TestHost.prototype as any).pass = function (_msg?: any) { return AS.assert(true); };
 // ActiveSupport::TestCase includes Testing::TimeHelpers (test_case.rb).
 for (const k of ["travel", "travelTo", "travelBack", "freezeTime", "unfreezeTime"])
   (TestHost.prototype as any)[k] = function (this: any, ...args: any[]) { return (AS as any)[k](...args); };
 for (const [k, v] of Object.entries(AS))
   if (/^_?assert/.test(k) && typeof v === "function")
-    (TestHost.prototype as any)[k] = function (this: any, ...args: any[]) { this.assertions += 1; return (v as any)(...args); };`,
+    (TestHost.prototype as any)[k] = function (this: any, ...args: any[]) { return (v as any)(...args); };`,
   // A method with \`*rest\` and keywords (\`retry_on(*exceptions, wait: ...)\`): a
   // trailing plain object in the rest array is the keyword hash (vm_args.c).
   rbExtractKeywords: `export function rbExtractKeywords(rest: any[]): any {
@@ -224,8 +234,9 @@ export function rbSingletonPublicMethods(klass: any): string[] {
 }`,
   // eval.c \`rb_make_exception\`: \`raise Klass, msg\` calls \`Klass.exception(msg)\`
   // (Exception.exception is \`new\`); an instance is raised as is, or re-messaged.
-  rbMakeException: `import { rbModName as rbMakeExceptionName } from "@blazetrails/ruby-compat";
+  rbMakeException: `import { rbModName as rbMakeExceptionName, RuntimeError as RbMakeExceptionRuntimeError } from "@blazetrails/ruby-compat";
 export function rbMakeException(x: any, ...rest: any[]): any {
+  if (typeof x === "string") return new RbMakeExceptionRuntimeError(x);
   // With no message Ruby's \`message\` is the class name (error.c exc_to_s); ruby-compat's
   // Exception has no such default, so the name is passed.
   if (typeof x === "function" && !rest.length && typeof x.exception !== "function")
@@ -317,8 +328,9 @@ export function rbNumDuration(x: any, unit: string): any {
 
 /** The Ruby each {@link runtimeShim} helper stands in for, emitted as its `Mirrors:` line. */
 export const SHIM_SOURCES: Record<string, string> = {
-  rbAryEnsure: "Kernel#Array (object.c rb_f_array, rb_Array)",
-  rbRaise: "Kernel#raise (eval.c rb_f_raise)",
+  rbAryEnsure:
+    "multiple assignment and splat (vm_insnhelper.c vm_expandarray, rb_check_array_type)",
+  rbRaise: "Kernel#raise (eval.c rb_f_raise, rb_make_exception)",
   rbAsyncEnum: "Enumerable / Array iteration (enum.c, array.c), run in order",
   rbBinop:
     "Array#+ #- #& #| (array.c rb_ary_plus, rb_ary_diff, rb_ary_and, rb_ary_or); Comparable#< #> #<= #>= (compar.c)",
@@ -333,7 +345,8 @@ export const SHIM_SOURCES: Record<string, string> = {
   rbExtractKeywords: "keyword arguments from a trailing Hash (vm_args.c)",
   rbSingletonPublicMethods:
     "Module#public_instance_methods(false) on a singleton class (class.c rb_class_public_instance_methods)",
-  rbMakeException: "raise's exception construction (eval.c rb_make_exception)",
+  rbMakeException:
+    "raise's exception construction (eval.c rb_make_exception; a String is a RuntimeError, eval.c rb_exc_new_str)",
   rbIsA: "Object#is_a? (object.c rb_obj_is_kind_of)",
   mapBang: "Array#map! (array.c rb_ary_collect_bang)",
   flattenBang: "Array#flatten! (array.c rb_ary_flatten_bang)",
@@ -362,7 +375,9 @@ export function runtimeShim(wanted: Iterable<string>): string {
     "// Generated by scripts/codegen: Ruby helpers ruby-compat does not export yet.",
     "",
   ];
-  for (const name of [...new Set(wanted)].sort()) {
+  const names = new Set(wanted);
+  if (names.has("rbRaise")) names.add("rbMakeException");
+  for (const name of [...names].sort()) {
     if (SHIM_SOURCES[name]) lines.push(`/** Mirrors: ${SHIM_SOURCES[name]} */`);
     lines.push(
       IMPLEMENTED[name] ??

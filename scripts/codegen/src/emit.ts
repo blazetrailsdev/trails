@@ -29,6 +29,7 @@ import {
   type Ctx,
   type FileCtx,
   type InlineHook,
+  type Scope,
 } from "./lower.js";
 import { Resolver, rubyFileToTsAr } from "./resolve.js";
 import { CITE_PREFIX, GEM, PKG_DIR, handNamespaceFqns } from "./gem.js";
@@ -350,7 +351,7 @@ export class Emitter {
       });
       for (const l of loopLocals) ctx.scope.locals.add(l);
       const lines = this.lw.block(this.lw.seqBody(b), ctx, false);
-      const hz: Set<string> | undefined = (ctx.scope as any).hoisted;
+      const hz: Set<string> | undefined = ctx.scope.hoisted;
       if (hz?.size) lines.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
       void params;
       return lines;
@@ -380,7 +381,11 @@ export class Emitter {
             s.args[0].k === "str"
               ? JSON.stringify(s.args[0].value)
               : this.lw.expr(s.args[0], nameCtx());
-          out.push(`${vitest("it")}(${nm}, async () => {`, ...indent(body(s.block.body)), "});");
+          out.push(
+            `${vitest("it")}(${nm}, async ({ testCase }: any) => {`,
+            ...indent(body(s.block.body)),
+            "});",
+          );
         } else if (s.k === "if") {
           // A test defined under a condition (`if adapter_is?(:sucker_punch)`).
           const ctx = nameCtx();
@@ -394,7 +399,7 @@ export class Emitter {
         } else if (s.k === "def" && /^test_/.test(s.name)) {
           const nm = s.name.replace(/^test_/, "").replace(/_/g, " ");
           out.push(
-            `${vitest("it")}(${JSON.stringify(nm)}, async () => {`,
+            `${vitest("it")}(${JSON.stringify(nm)}, async ({ testCase }: any) => {`,
             ...indent(body(s.body)),
             "});",
           );
@@ -405,7 +410,7 @@ export class Emitter {
           s.block?.k === "block"
         ) {
           const hook = vitest(s.name === "setup" ? "beforeEach" : "afterEach");
-          out.push(`${hook}(async () => {`, ...indent(body(s.block.body)), "});");
+          out.push(`${hook}(async ({ testCase }: any) => {`, ...indent(body(s.block.body)), "});");
         } else if (s.k === "call" && s.recv === null && s.name === "include" && s.args.length) {
           // `include ActiveJob::TestHelper`: the module joins the test class's
           // ancestors, so its methods and `before_setup` / `after_teardown` reach
@@ -529,12 +534,15 @@ export class Emitter {
       classLines.push(fn, `${short}.${nm} = ${nm};`);
     }
     emitBody(u.body, out);
-    // Each test runs on a fresh instance of the test class, between Minitest's
-    // `before_setup` and `after_teardown` (minitest/test.rb `run`). vitest runs
-    // `afterEach` hooks in reverse, so `afterTeardown` is registered first.
+    // activesupport's testing/autorun runs each test on a fresh instance of the
+    // class its describe names, between Minitest's `before_setup` and
+    // `after_teardown`, and counts its assertions (minitest/test.rb `run`);
+    // `setup` / `teardown` run inside them.
     const hctx = this.baseCtx(u, f, {});
     this.lw.resolver.wanted.set("TestHost", (this.lw.resolver.wanted.get("TestHost") ?? 0) + 1);
     const host = this.lw.imp(hctx, "@root/codegen-runtime.js", "TestHost");
+    this.lw.imp(hctx, "@blazetrails/activesupport/testing/autorun", "", "");
+    const register = this.lw.rc(hctx, "registerConstant");
     return [
       `${desc}(${JSON.stringify(short)}, () => {`,
       ...indent([
@@ -545,19 +553,13 @@ export class Emitter {
               "}",
             ].join("\n")
           : `class ${short} extends ${host} {}`,
+        `${register}(${JSON.stringify(short)}, ${short});`,
         ...classLines,
-        "let testCase: any;",
-        `${vitest("beforeEach")}(async () => {`,
-        `  testCase = new ${short}();`,
-        // Minitest::Test#run (minitest/test.rb): before_setup, setup, the test,
-        // then before_teardown, teardown, after_teardown. A test's `def setup`
-        // is the method, so its `super` reaches the host's.
-        "  await testCase.beforeSetup();",
+        `${vitest("beforeEach")}(async ({ testCase }: any) => {`,
         "  await testCase.setup();",
         "});",
-        `${vitest("afterEach")}(async () => {`,
+        `${vitest("afterEach")}(async ({ testCase }: any) => {`,
         "  await testCase.teardown();",
-        "  await testCase.afterTeardown();",
         "});",
         ...out,
       ]),
@@ -583,7 +585,7 @@ export class Emitter {
         });
         const lines = this.lw.block(this.lw.seqBody(s.block.body), ctx, false);
         const hook = this.lw.imp(ctx, "vitest", s.name === "setup" ? "beforeEach" : "afterEach");
-        out.push(`${hook}(async () => {`, ...indent(lines), "});");
+        out.push(`${hook}(async ({ testCase }: any) => {`, ...indent(lines), "});");
       } else {
         const ctx = this.baseCtx(u, f, { selfKind: "static", selfExpr: "testCase" });
         out.push(
@@ -650,8 +652,8 @@ export class Emitter {
         f.usedLocalNames.add(nm);
       }
     }
-    (f as any).fileFns = new Set(sfnNames);
-    (f as any).sfnNames = sfnNames;
+    f.fileFns = new Set(sfnNames);
+    f.sfnNames = sfnNames;
     const chunks: string[] = [];
     let defs = 0;
     {
@@ -834,7 +836,7 @@ export class Emitter {
   }
 
   baseCtx(u: Unit, f: FileCtx, over: Partial<Ctx>): Ctx {
-    const scope = { locals: new Set<string>() };
+    const scope: Scope = { locals: new Set<string>() };
     return {
       fnScope: scope,
       asyncBox: { awaits: false },
@@ -992,8 +994,8 @@ export class Emitter {
     // spelled with `=` (`==`, `<=`) answers its body.
     const writer = /^(\w+|\[\])=$/.test(d.name);
     let body = this.lw.block(this.lw.seqBody(d.body), ctx, !isCtor && !writer);
-    if ((ctx as any).prologue) body = [...(ctx as any).prologue, ...body];
-    const hoisted: Set<string> | undefined = (ctx.scope as any).hoisted;
+    if (ctx.prologue) body = [...ctx.prologue, ...body];
+    const hoisted: Set<string> | undefined = ctx.scope.hoisted;
     if (hoisted?.size)
       body = [`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`, ...body];
     if (isCtor && u.superclass && !body.some((l) => /\bsuper\(/.test(l))) {
@@ -1095,7 +1097,7 @@ export class Emitter {
         });
         const recvSuper = recvSupers > 0;
         const bareSuper = supers > recvSupers;
-        const scope = { locals: new Set<string>(), parent: ctx.scope };
+        const scope: Scope = { locals: new Set<string>(), parent: ctx.scope };
         const nctx = this.lw.child(ctx, {
           scope,
           fnScope: scope,
@@ -1107,7 +1109,7 @@ export class Emitter {
           defParams: h.def.params,
         });
         let hb = this.lw.block(this.lw.seqBody(h.def.body), nctx, true);
-        const hz: Set<string> | undefined = (scope as any).hoisted;
+        const hz: Set<string> | undefined = scope.hoisted;
         if (hz?.size) hb = [`let ${[...hz].map((x) => `${jsIdent(x)}: any`).join(", ")};`, ...hb];
         if (recvSuper && !bareSuper)
           body = [...body, `if (new.target === ${exportName}) {`, ...indent(hb), "}"];
@@ -1448,7 +1450,7 @@ export class Emitter {
     if (staticStmts.length) {
       const sc = this.baseCtx(u, f, { selfKind: "static", selfExpr: name });
       const lines = this.lw.block(staticStmts, sc, false);
-      const hoisted: Set<string> | undefined = (sc.scope as any).hoisted;
+      const hoisted: Set<string> | undefined = sc.scope.hoisted;
       if (hoisted?.size)
         lines.unshift(`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
       if (lines.length) after.push(`{\n${indent(lines).join("\n")}\n}`);
@@ -1529,7 +1531,7 @@ export class Emitter {
   }
 
   emitModule(u: Unit, name: string, f: FileCtx): { text: string; defs: number } {
-    const fileFns: Set<string> = ((f as any).fileFns ??= new Set<string>());
+    const fileFns: Set<string> = (f.fileFns ??= new Set<string>());
     const members: string[] = [];
     const fns: string[] = [];
     const after: string[] = [];
@@ -1726,7 +1728,7 @@ export class Emitter {
       const scVar = `${name}Singleton`;
       const tc = this.baseCtx(u, f, { selfKind: "static", selfExpr: scVar });
       const lines = this.lw.block(sclassStmts, tc, false);
-      const hoisted: Set<string> | undefined = (tc.scope as any).hoisted;
+      const hoisted: Set<string> | undefined = tc.scope.hoisted;
       if (hoisted?.size)
         lines.unshift(`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
       if (lines.some((l) => l.includes(scVar))) {
@@ -1748,7 +1750,7 @@ export class Emitter {
     if (includedBlock) {
       const ic = this.baseCtx(u, f, { selfKind: "static", selfExpr: "base" });
       const lines = this.lw.block(this.lw.seqBody(includedBlock.body), ic, false);
-      const hoisted: Set<string> | undefined = (ic.scope as any).hoisted;
+      const hoisted: Set<string> | undefined = ic.scope.hoisted;
       if (hoisted?.size)
         lines.unshift(`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
       if (isConcern) {
@@ -1851,7 +1853,7 @@ export class Emitter {
     if (tops.length) {
       const tc = this.baseCtx(u, f, { selfKind: "static", selfExpr: name });
       const lines = this.lw.block(tops, tc, false);
-      const hoisted: Set<string> | undefined = (tc.scope as any).hoisted;
+      const hoisted: Set<string> | undefined = tc.scope.hoisted;
       if (hoisted?.size)
         lines.unshift(`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
       if (lines.length) after.push(`{\n${indent(lines).join("\n")}\n}`);
