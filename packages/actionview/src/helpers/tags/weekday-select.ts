@@ -1,5 +1,5 @@
 import { DateCalculations, type SafeBuffer } from "@blazetrails/activesupport";
-import { include, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
+import { fetch, include, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
 
 import { Tags } from "../../namespaces.js";
 import { FormOptionsHelper } from "../form-options-helper.js";
@@ -25,12 +25,13 @@ export class WeekdaySelect extends Base {
     const value = this.value();
     return this.selectContentTag(
       this.weekdayOptionsForSelect(rtest(value) ? value : this._options["selected"], {
-        indexAsValue: "indexAsValue" in this._options ? this._options["indexAsValue"] : false,
-        dayFormat: "dayFormat" in this._options ? this._options["dayFormat"] : "day_names",
-        beginningOfWeek:
-          "beginningOfWeek" in this._options
-            ? this._options["beginningOfWeek"]
-            : DateCalculations.beginningOfWeek(),
+        indexAsValue: fetch(this._options, "indexAsValue", false),
+        dayFormat: fetch(this._options, "dayFormat", "day_names"),
+        beginningOfWeek: fetch(
+          this._options,
+          "beginningOfWeek",
+          DateCalculations.beginningOfWeek(),
+        ),
       }),
       this._options,
       this._htmlOptions,

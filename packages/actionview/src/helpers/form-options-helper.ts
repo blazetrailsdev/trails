@@ -18,6 +18,7 @@ import {
   Module,
   rbModDefineMethod,
   rbFPublicSend,
+  rbEql,
   rbFSend,
   rbObjAsString,
   rbObjRespondTo,
@@ -261,7 +262,7 @@ export function timeZoneOptionsForSelect(
     );
     zoneOptions.safeConcat("\n");
 
-    zones = zones.filter((z) => !priority.includes(z));
+    zones = zones.filter((z) => !priority.some((p) => rbEql(p, z)));
   }
 
   return zoneOptions.safeConcat(optionsForSelect.call(this, convertZones(zones), selected));
