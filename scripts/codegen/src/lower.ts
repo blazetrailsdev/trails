@@ -2238,7 +2238,13 @@ export class Lowerer {
     }
 
     // ── implicit-self intrinsics
-    if (r === null) {
+    const ownDef =
+      r === null &&
+      !!ctx.owner &&
+      this.index
+        .ancestors(ctx.owner)
+        .some((sc) => (ctx.selfKind === "static" ? sc.sdefs : sc.defs).has(name));
+    if (r === null && !ownDef) {
       const macro = ATTR_MACROS[name];
       if (macro) {
         const a = n.args.map((x: N) =>
