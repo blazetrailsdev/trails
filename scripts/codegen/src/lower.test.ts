@@ -163,3 +163,14 @@ describe("option hashes in active_job/rules.rb", () => {
     expect(rules).toContain("options.onDelete = 2;");
   });
 });
+
+describe("typed ivars in active_job/rules.rb", () => {
+  it("declares an ivar initialize assigns unconditionally with its assigned type", () => {
+    expect(rules).toContain("declare _name: string;");
+    expect(rules).toContain("declare _hits: number;");
+  });
+
+  it("widens an ivar assigned elsewhere with null, as Ruby reads nil before it is set", () => {
+    expect(rules).toContain("declare _label: string | null;");
+  });
+});

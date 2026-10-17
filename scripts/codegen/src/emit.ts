@@ -1498,7 +1498,11 @@ export class Emitter {
       if (lines.length) after.push(`{\n${indent(lines).join("\n")}\n}`);
     }
     const head = `export class ${name}${ext} {`;
-    const sig = ["[key: string]: any;", "static [key: string]: any;"];
+    const sig = [
+      "[key: string]: any;",
+      "static [key: string]: any;",
+      ...this.ivarDecls(u, f, body, members),
+    ];
     const text = [
       head,
       ...indent([...sig, ...dedupeMembers(members).flatMap((m) => ["", m])]),
@@ -1506,6 +1510,52 @@ export class Emitter {
       ...after,
     ].join("\n");
     return { text, defs };
+  }
+
+  /**
+   * `declare _x: T;` for each ivar the class's instance methods assign, typed by
+   * the hand twin's field, else by the type every assignment agrees on, widened
+   * with `null` (a Ruby ivar reads `nil` until it is assigned) unless `initialize`
+   * assigns it unconditionally. An ivar with
+   * no known type is left to the index signature. `declare` emits no field
+   * initializer, so nothing overwrites a value set before or by `super()`.
+   */
+  ivarDecls(u: Unit, f: FileCtx, body: N[], members: string[]): string[] {
+    const assigned = new Map<string, N[]>();
+    for (const d of body) {
+      if (d.k !== "def" || d.singleton) continue;
+      walk(d.body, (n) => {
+        if (n.k === "def" || n.k === "class" || n.k === "module" || n.k === "sclass") return false;
+        if (n.k === "iasgn") {
+          const list = assigned.get(n.name) ?? [];
+          list.push(n.value);
+          assigned.set(n.name, list);
+        }
+      });
+    }
+    const init = body.find((d) => d.k === "def" && !d.singleton && d.name === "initialize");
+    const setInInit = new Set(
+      (init ? this.lw.seqBody(init.body) : [])
+        .filter((st: N) => st.k === "iasgn" && st.value?.k !== "nil")
+        .map((st: N) => st.name),
+    );
+    const ctx = this.baseCtx(u, f, { selfKind: "instance" });
+    const key = this.resolver.oracleKey(u.fqn);
+    const out: string[] = [];
+    for (const [ivar, values] of assigned) {
+      const field = this.lw.ivar(ivar, ctx).replace(/^this\./, "");
+      if (members.some((m) => new RegExp(`^(?:get |set |static )?${field}\\b`).test(m))) continue;
+      let ts = key ? this.lw.tsType(this.resolver.types.ivar(key, ivar), ctx) : "any";
+      if (ts === "any") {
+        const types = values
+          .filter((v) => v?.k !== "nil")
+          .map((v) => this.lw.tsType(this.lw.typeOf(v, ctx), ctx));
+        if (types.length && types.every((t) => t === types[0]) && types[0] !== "any")
+          ts = types[0].endsWith("| null") || setInInit.has(ivar) ? types[0] : `${types[0]} | null`;
+      }
+      if (ts !== "any") out.push(`declare ${field}: ${ts};`);
+    }
+    return out;
   }
 
   delegate(s: N, u: Unit, f: FileCtx, module: boolean): string[] {
