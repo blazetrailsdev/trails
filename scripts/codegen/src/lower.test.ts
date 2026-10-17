@@ -3,17 +3,16 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 let text: string;
+let rules: string;
 
-beforeAll(async () => {
+async function emitFixture(name: string): Promise<string> {
   process.env.CODEGEN_GEM = "activejob";
   const { GemIndex } = await import("./gem-index.js");
   const { Resolver } = await import("./resolve.js");
   const { TypeOracle } = await import("./types.js");
   const { Emitter } = await import("./emit.js");
   const { ROOT } = await import("./gem.js");
-  const ir = JSON.parse(
-    readFileSync(path.join(import.meta.dirname, "fixtures/sample.json"), "utf8"),
-  );
+  const ir = JSON.parse(readFileSync(path.join(import.meta.dirname, `fixtures/${name}`), "utf8"));
   const index = new GemIndex();
   index.add(ir);
   const resolver = new Resolver(
@@ -24,7 +23,12 @@ beforeAll(async () => {
   index.finish((f) => resolver.tsFileOf(f));
   const emitter = new Emitter(index, resolver);
   emitter.register(ir);
-  text = emitter.emitFile(ir).text;
+  return emitter.emitFile(ir).text;
+}
+
+beforeAll(async () => {
+  text = await emitFixture("sample.json");
+  rules = await emitFixture("rules.json");
 });
 
 describe("lowering ActiveJob::Sample#collect", () => {
@@ -51,5 +55,35 @@ describe("lowering ActiveJob::Sample#collect", () => {
   it("runs Integer#times and Array#join through their Ruby forms", () => {
     expect(text).toContain("times((3), (i?: any) =>");
     expect(text).toContain('aryJoin(jobs, ", ")');
+  });
+});
+
+describe("lowering active_job/rules.rb", () => {
+  it("writes a singleton_class attr_accessor through its setX function", () => {
+    expect(rules).toContain("ActiveJob.setVerboseLogs(false);");
+  });
+
+  it("emits a def overriding an inherited attr_accessor as a getter/setter pair", () => {
+    expect(rules).toContain('get jobId(): any {\n    return "FIXED-ID";');
+    expect(rules).toContain("set jobId(value: any) {\n    this._jobId = value;");
+  });
+
+  it("writes ExecutionContext[k] through its setKey", () => {
+    expect(rules).toContain('ExecutionContext.setKey("job", job);');
+  });
+
+  it("tallies by identity and splats each pair across a two-parameter block", () => {
+    expect(rules).toContain("tally(rbEnum(jobs).map((x: any) => (x.constructor as any)))");
+    expect(rules).toContain("([_klass, count]: any) => -count");
+    expect(rules).toContain("counts.map(([klass, count]: any) =>");
+  });
+
+  it("reads a class_attribute predicate as a getter", () => {
+    expect(rules).toContain("if ((job.constructor as any).isLogArguments) {");
+  });
+
+  it("dispatches a bare call to the class's own method before Kernel#format", () => {
+    expect(rules).toContain("this.format(arg)");
+    expect(rules).not.toContain("rbFormat");
   });
 });
