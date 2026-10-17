@@ -1,6 +1,8 @@
-import type { Gem } from "@blazetrails/ruby-compat";
-import { gemVersion } from "./gem-version.js";
+import { ActiveJob as ActiveJobSeat } from "./namespaces.js";
 
-export function version(): InstanceType<typeof Gem.Version> {
-  return gemVersion();
+export function version(): any {
+  return ActiveJob.gemVersion();
 }
+
+export const ActiveJob: any = ActiveJobSeat;
+Object.assign(ActiveJob, { version });

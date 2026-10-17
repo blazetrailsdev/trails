@@ -1648,6 +1648,7 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "object") {
+    if (value.toString === Object.prototype.toString) return rbAnyToS(value);
     const str: unknown = value.toString();
     if (typeof str === "string" || str instanceof Uint8Array) return str;
     return rbAnyToS(value);

@@ -1,18 +1,26 @@
-import { Gem } from "@blazetrails/ruby-compat";
+import { Gem, Module, compact, aryJoin, rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActiveJob as ActiveJobSeat } from "./namespaces.js";
 
-export function gemVersion(): InstanceType<typeof Gem.Version> {
-  return new Gem.Version(VERSION.STRING);
+export function gemVersion(): any {
+  return new Gem.Version(STRING);
 }
 
-const MAJOR = 8;
-const MINOR = 0;
-const TINY = 2;
-const PRE: string | null = null;
+export const ActiveJob: any = ActiveJobSeat;
+Object.assign(ActiveJob, { gemVersion });
+export const MAJOR: any = 8;
 
-export const VERSION = {
-  MAJOR,
-  MINOR,
-  TINY,
-  PRE,
-  STRING: [MAJOR, MINOR, TINY, PRE].filter((p) => p != null).join("."),
-};
+export const MINOR: any = 0;
+
+export const TINY: any = 2;
+
+export const PRE: any = null;
+
+export const STRING: any = aryJoin(compact([MAJOR, MINOR, TINY, PRE]), ".");
+
+export const VERSION: any = new Module();
+rbModConstSet(VERSION, "MAJOR", MAJOR);
+rbModConstSet(VERSION, "MINOR", MINOR);
+rbModConstSet(VERSION, "TINY", TINY);
+rbModConstSet(VERSION, "PRE", PRE);
+rbModConstSet(VERSION, "STRING", STRING);
+rbModConstSet(ActiveJobSeat, "VERSION", VERSION);
