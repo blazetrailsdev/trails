@@ -81,9 +81,12 @@ describe("Ruby extractor gate detection", () => {
         unless ::Rack::RELEASE.start_with?("3.")
           test "not rack 3" do; end
         end
+        if ::Rack::RELEASE.start_with?(prefix)
+          test "non-literal prefix" do; end
+        end
       `,
     });
-    expect(Object.keys(g)).toEqual(["rack 3 arm"]);
+    expect(Object.keys(g)).toEqual(["rack 3 arm", "non-literal prefix"]);
     expect(g["rack 3 arm"]).toBeNull();
   });
 

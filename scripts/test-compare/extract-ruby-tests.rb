@@ -170,7 +170,11 @@ class LoopSymbolName < String; end
 
 LOOP_OPAQUE_HASH = Object.new.freeze
 
-RACK_RELEASE = "3.1.14"
+def rack_release
+  @rack_release ||= JSON.parse(
+    File.read(File.join(SCRIPT_DIR, "..", "..", "vendor", "sources.lock.json"))
+  ).dig("sources", "rack", "ref").delete_prefix("v")
+end
 
 class TestExtractor
   attr_reader :test_files, :unexpanded_loops
@@ -1663,9 +1667,9 @@ class TestExtractor
     args = cond[2].is_a?(Array) && cond[2][1].is_a?(Array) ? cond[2][1][1] : nil
     return nil unless args.is_a?(Array) && args.length == 1
     lit = args[0]
-    return nil unless lit[0] == :string_literal && lit[1].is_a?(Array) && lit[1].length == 2 &&
+    return nil unless lit.is_a?(Array) && lit[0] == :string_literal && lit[1].is_a?(Array) && lit[1].length == 2 &&
                       lit[1][1][0] == :@tstring_content
-    RACK_RELEASE.start_with?(lit[1][1][1])
+    rack_release.start_with?(lit[1][1][1])
   end
 
   # Attach a :gate to a test_case from its dir gate, the enclosing
