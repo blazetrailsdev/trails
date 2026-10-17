@@ -108,8 +108,6 @@ import {
   OPERATORS,
   TS_CLASS_RENAMES,
   applyTokenRenames,
-  TS_CONSTANT_RENAMES,
-  tsConstantRename,
   isArityOverridden,
   isRubyOnlyClass,
   isScopedSkip,
