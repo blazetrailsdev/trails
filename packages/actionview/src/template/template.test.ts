@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
 import { TemplateHandlers } from "./handlers.js";
@@ -41,10 +42,12 @@ describe("TestTSETemplate", () => {
 
   it("rails injected locals does not raise error if not passed", async () => {
     const template = newTemplate("<%# locals: (message:) -%>");
-    await render(template, { message: "Hi", message_counter: 1, message_iteration: 1 }, [
-      "message_counter",
-      "message_iteration",
-    ]);
+    await assertNothingRaised(() =>
+      render(template, { message: "Hi", message_counter: 1, message_iteration: 1 }, [
+        "message_counter",
+        "message_iteration",
+      ]),
+    );
   });
 
   it("rails injected locals can be specified", async () => {
