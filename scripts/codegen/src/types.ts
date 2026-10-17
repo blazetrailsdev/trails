@@ -161,7 +161,7 @@ export function isBool(t: TypeRef): boolean {
 
 /** An object type (class instance, array, function): Ruby-truthy iff non-nil. */
 export function isObjectLike(t: TypeRef): boolean {
-  return t?.k === "class" || t?.k === "array" || t?.k === "fn";
+  return t?.k === "class" || t?.k === "array" || t?.k === "fn" || t?.k === "hash";
 }
 
 export type { TypeRef, N };
