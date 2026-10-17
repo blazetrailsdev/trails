@@ -55,6 +55,7 @@ export class Node {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function childNodes(parent: Parse5Parent): Node[] {
   const nodes = (parent as { childNodes?: Parse5Node[] }).childNodes ?? [];
   return nodes.map((node) => new Node(node));

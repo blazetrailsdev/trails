@@ -50,8 +50,12 @@ describe("FormOptionsHelperTest", () => {
 
   beforeEach(() => {
     fakeZones = Object.fromEntries(["A", "B", "C", "D", "E"].map((id) => [id, new FakeZone(id)]));
-    vi.spyOn(TimeZone, "find").mockImplementation((id) => fakeZones[id as string] as any);
-    vi.spyOn(TimeZone, "all").mockImplementation(() => Object.values(fakeZones) as any);
+    vi.spyOn(TimeZone, "find").mockImplementation(
+      (id) => fakeZones[id as string] as unknown as TimeZone,
+    );
+    vi.spyOn(TimeZone, "all").mockImplementation(
+      () => Object.values(fakeZones) as unknown as TimeZone[],
+    );
     fakeTimezones = TimeZone.all() as unknown as FakeZone[];
   });
 

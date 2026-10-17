@@ -15,6 +15,8 @@ import {
   type Included,
   rbFPublicSend,
   rbInspect,
+  rbObjRespondTo,
+  Range,
   rbFSend,
   sprintf,
 } from "@blazetrails/ruby-compat";
@@ -51,8 +53,8 @@ export function distanceOfTimeInWords(
     [from, to] = [to, from];
   }
 
+  const distanceInMinutes = Math.round((to.getTime() - from.getTime()) / 1000 / 60.0);
   const distanceInSeconds = Math.round((to.getTime() - from.getTime()) / 1000);
-  const distanceInMinutes = Math.round(distanceInSeconds / 60);
 
   return withOptions(I18n, { locale: options.locale, scope: options.scope }, (locale) => {
     if (distanceInMinutes <= 1) {
@@ -84,13 +86,12 @@ export function distanceOfTimeInWords(
     if (from.getUTCMonth() + 1 >= 3) fromYear += 1;
     let toYear = to.getUTCFullYear();
     if (to.getUTCMonth() + 1 < 3) toYear -= 1;
-    let leapYears = 0;
-    if (fromYear <= toYear) {
-      for (let y = fromYear; y <= toYear; y++) {
-        if ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) leapYears += 1;
-      }
-    }
-    const minutesWithOffset = distanceInMinutes - leapYears * 1440;
+    const leapYears =
+      fromYear > toYear
+        ? 0
+        : new Range(fromYear, toYear).toA().filter((x) => RubyDate.isLeap(x)).length;
+    const minuteOffsetForLeapYear = leapYears * 1440;
+    const minutesWithOffset = distanceInMinutes - minuteOffsetForLeapYear;
     const remainder = ((minutesWithOffset % MINUTES_IN_YEAR) + MINUTES_IN_YEAR) % MINUTES_IN_YEAR;
     const distanceInYears = Math.trunc(minutesWithOffset / MINUTES_IN_YEAR);
     if (remainder < MINUTES_IN_QUARTER_YEAR)
@@ -101,22 +102,23 @@ export function distanceOfTimeInWords(
   }) as string;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 function normalizeDistanceOfTimeArgumentToTime(value: DistanceOfTimeInput): Date {
   if (typeof value === "number") {
     // boundary: Ruby `Time.at(value)`, as the JS Date the arithmetic above is over.
     return new Date(value * 1000);
-    // boundary: a JS Date is its own `to_time`.
-  } else if (value instanceof Date) {
-    return value;
-  } else if (value instanceof Temporal.Instant) {
-    // boundary: ActiveRecord answers a datetime column as a Temporal.Instant, its `to_time`.
-    return new Date(value.epochMilliseconds);
-  } else if (value != null && typeof (value as { toTime?: unknown }).toTime === "function") {
+  } else if (rbObjRespondTo(value, "toTime")) {
     const time = (value as { toTime: () => Date | { toF: () => number } }).toTime();
     // boundary: a Ruby `::Time` from `to_time` is read back as a JS Date by its epoch seconds.
     return time instanceof Date ? time : new Date(time.toF() * 1000);
   } else {
+    // boundary: a JS Date has no `to_time`; it is already the value the arithmetic reads.
+    if (value instanceof Date) return value;
+    // boundary: ActiveRecord answers a datetime column as a Temporal.Instant, which has no `to_time`.
+    if (value instanceof Temporal.Instant) return new Date(value.epochMilliseconds);
     throw new ArgumentError(`${rbInspect(value)} can't be converted to a Time value`);
   }
 }

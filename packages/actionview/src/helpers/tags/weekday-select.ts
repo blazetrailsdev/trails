@@ -16,6 +16,7 @@ export class WeekdaySelect extends Base {
     templateObject: unknown,
     options: Record<string, unknown>,
     htmlOptions: Record<string, unknown>,
+    _block?: () => unknown,
   ) {
     super(objectName, methodName, templateObject, options);
     this._htmlOptions = htmlOptions;

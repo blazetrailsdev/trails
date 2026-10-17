@@ -117,8 +117,9 @@ export function weekdaySelect(
   method: unknown,
   options: Record<string, unknown> = {},
   htmlOptions: Record<string, unknown> = {},
+  block?: () => unknown,
 ): unknown {
-  return new Tags.WeekdaySelect(object, method, this, options, htmlOptions).render();
+  return new Tags.WeekdaySelect(object, method, this, options, htmlOptions, block).render();
 }
 
 export function optionsForSelect(
