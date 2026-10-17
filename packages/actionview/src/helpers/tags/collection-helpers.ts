@@ -167,7 +167,10 @@ export const CollectionHelpers = {
     return `${this.sanitizedMethodName()}_${this.sanitizedValue(value)}`;
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs join — PERMANENT
+   */
   renderCollection(
     this: CollectionHelpersHost,
     block: (

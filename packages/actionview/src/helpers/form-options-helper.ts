@@ -340,29 +340,32 @@ type FormBuilderSelf = {
   objectifyOptions(options: Record<string, unknown>): Record<string, unknown>;
 };
 
-function formBuilderCollectionCheckboxes(
-  this: FormBuilderSelf,
-  method: unknown,
-  collection: unknown,
-  valueMethod: unknown,
-  textMethod: unknown,
-  options: Record<string, unknown> = {},
-  htmlOptions: Record<string, unknown> = {},
-  block?: (builder: unknown) => unknown,
-): unknown {
-  return this._template.collectionCheckboxes(
-    this.objectName,
-    method,
-    collection,
-    valueMethod,
-    textMethod,
-    this.objectifyOptions(options),
-    { ...this._defaultHtmlOptions, ...htmlOptions },
-    block,
-  );
-}
-rbModDefineMethod(FormBuilder, "collectionCheckboxes", formBuilderCollectionCheckboxes);
-rbModDefineMethod(FormBuilder, "collectionCheckBoxes", formBuilderCollectionCheckboxes);
+rbModDefineMethod(
+  FormBuilder,
+  "collectionCheckboxes",
+  function (
+    this: FormBuilderSelf,
+    method: unknown,
+    collection: unknown,
+    valueMethod: unknown,
+    textMethod: unknown,
+    options: Record<string, unknown> = {},
+    htmlOptions: Record<string, unknown> = {},
+    block?: (builder: unknown) => unknown,
+  ): unknown {
+    return this._template.collectionCheckboxes(
+      this.objectName,
+      method,
+      collection,
+      valueMethod,
+      textMethod,
+      this.objectifyOptions(options),
+      { ...this._defaultHtmlOptions, ...htmlOptions },
+      block,
+    );
+  },
+);
+rbModDefineMethod(FormBuilder, "collectionCheckBoxes", FormBuilder.prototype.collectionCheckboxes);
 
 rbModDefineMethod(
   FormBuilder,
