@@ -250,6 +250,12 @@ export class Resolver {
     }
     // An activesupport module ported on a subpath of its own, not the package root.
     const AS_SUBPATH: Record<string, [string, string, string]> = {
+      // The package root's `JSON` is ruby-compat's stdlib JSON; Rails' module is json.ts's.
+      "ActiveSupport::JSON": [
+        "@blazetrails/activesupport/json",
+        "ActiveSupportJSON",
+        "ActiveSupportJSON",
+      ],
       "ActiveSupport::TestCase": [
         "@blazetrails/activesupport/test-case",
         "TestCase",

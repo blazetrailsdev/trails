@@ -10,6 +10,7 @@ export const TS_CONSTANT_RENAMES: Record<string, string> = {
   "ActiveModel::Type::Value": "ValueType",
   "ActiveModel::Type::BigInteger": "BigIntegerType",
   "ActiveModel::Type::Binary": "BinaryType",
+  "ActiveModel::Type::Binary::Data": "BinaryData",
   "ActiveModel::Type::Boolean": "BooleanType",
   "ActiveModel::Type::Date": "DateType",
   "ActiveModel::Type::DateTime": "DateTimeType",
