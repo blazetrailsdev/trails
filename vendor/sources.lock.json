@@ -36,6 +36,10 @@
       "ref": "0.5.6",
       "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
     },
+    "nokogiri": {
+      "ref": "v1.18.3",
+      "sha": "fd3ca2e22df67fd25fd5c25c466f6896b6547cb8"
+    },
     "pg": {
       "ref": "v1.5.9",
       "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
