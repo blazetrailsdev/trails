@@ -18,6 +18,16 @@ export interface TranslationHelperHost extends TagHelperHost {
   _scopeKeyByPartialCache?: Record<string, string>;
 }
 
+let _raiseOnMissingTranslations: boolean | null = null;
+
+export function raiseOnMissingTranslations(): boolean | null {
+  return _raiseOnMissingTranslations;
+}
+
+export function setRaiseOnMissingTranslations(raiseOnMissingTranslations: boolean | null): void {
+  _raiseOnMissingTranslations = raiseOnMissingTranslations;
+}
+
 type TranslateBlock = (translation: unknown, key: unknown) => unknown;
 
 export function translate(
@@ -40,7 +50,7 @@ export function translate(
     }
   }
 
-  if (options.raise == null && TranslationHelper.raiseOnMissingTranslations) options.raise = true;
+  if (options.raise == null && TranslationHelper.raiseOnMissingTranslations()) options.raise = true;
   let defaultValue: unknown = MISSING_TRANSLATION;
 
   let translation: unknown = null;
@@ -161,4 +171,8 @@ export const TranslationHelper = new Module((mod) => {
   mod.moduleEval((m) => {
     Object.assign(m, { translate, t, localize, l });
   });
-}) as Module & { raiseOnMissingTranslations: boolean | null | undefined };
+}) as Module & {
+  raiseOnMissingTranslations: typeof raiseOnMissingTranslations;
+  setRaiseOnMissingTranslations: typeof setRaiseOnMissingTranslations;
+};
+Object.assign(TranslationHelper, { raiseOnMissingTranslations, setRaiseOnMissingTranslations });
