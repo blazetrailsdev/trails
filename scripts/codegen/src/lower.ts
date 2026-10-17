@@ -117,6 +117,8 @@ interface Scope {
   parent?: Scope;
   /** Flow-insensitive local types: first typed assignment wins; a conflict clears it. */
   types?: Map<string, TypeRef>;
+  /** Locals first assigned inside a nested block, declared at the function's top. */
+  hoisted?: Set<string>;
 }
 
 export interface FileCtx {
@@ -132,9 +134,17 @@ export interface FileCtx {
    * on `Symbol === x`. Taken from the hand port: its twin imports `isSymbol`.
    */
   symbolColon?: boolean;
+  /** The file's top-level function names, so a module function is not emitted twice. */
+  fileFns?: Set<string>;
+  /** The file's singleton (`def self.x`) function names. */
+  sfnNames?: Set<string>;
 }
 
 interface Ctx {
+  /** The local an assignment being lowered writes (`x = x(...)` keeps `x` the call). */
+  assigning?: string;
+  /** Statements a parameter list needs ahead of the body (a `*rest` block's split). */
+  prologue?: string[];
   f: FileCtx;
   /** Lexical nesting of fqns (for constant lookup). */
   nesting: string[];
@@ -446,10 +456,10 @@ export class Lowerer {
         const name = n.name;
         // Ruby makes `name` a local from its left-hand side on (parse.y), so the
         // right-hand side already sees it shadowing a same-named function.
-        const prevAssigning = (ctx as any).assigning;
-        (ctx as any).assigning = jsIdent(name);
+        const prevAssigning = ctx.assigning;
+        ctx.assigning = jsIdent(name);
         const v = this.expr(n.value, ctx);
-        (ctx as any).assigning = prevAssigning;
+        ctx.assigning = prevAssigning;
         const line = `${this.decl(ctx, name)} = ${v};`;
         this.noteLocalType(ctx, name, n.value);
         return tail ? [line, `return ${jsIdent(name)};`] : [line];
@@ -1212,14 +1222,11 @@ export class Lowerer {
       asyncBox: { awaits: false },
     });
     // The enclosing method's prologue is its own, not this block's.
-    (inner as any).prologue = undefined;
+    inner.prologue = undefined;
     const ps = this.paramList(params, inner, true);
-    const stmts = [
-      ...((inner as any).prologue ?? []),
-      ...this.block(this.seqBody(body), inner, true),
-    ];
-    (inner as any).prologue = undefined;
-    const hz: Set<string> | undefined = (scope as any).hoisted;
+    const stmts = [...(inner.prologue ?? []), ...this.block(this.seqBody(body), inner, true)];
+    inner.prologue = undefined;
+    const hz: Set<string> | undefined = scope.hoisted;
     if (hz?.size) stmts.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
     const asy = inner.asyncBox!.awaits ? "async " : "";
     if (stmts.length === 1 && stmts[0].startsWith("return ") && !stmts[0].includes("\n")) {
@@ -1247,30 +1254,13 @@ export class Lowerer {
       selfExpr: "this",
       asyncBox: { awaits: false },
     });
-    (inner as any).prologue = undefined;
+    inner.prologue = undefined;
     const ps = this.paramList(params, inner, true);
-    const stmts = [
-      ...((inner as any).prologue ?? []),
-      ...this.block(this.seqBody(body), inner, true),
-    ];
-    const hz: Set<string> | undefined = (scope as any).hoisted;
+    const stmts = [...(inner.prologue ?? []), ...this.block(this.seqBody(body), inner, true)];
+    const hz: Set<string> | undefined = scope.hoisted;
     if (hz?.size) stmts.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
     const asy = inner.asyncBox!.awaits ? "async " : "";
     return `${asy}function (${["this: any", ps].filter(Boolean).join(", ")}) {\n${indent(stmts).join("\n")}\n}`;
-  }
-
-  /**
-   * An activesupport assertion. In a ported test it is the test's own method,
-   * so Minitest's per-test assertion count sees it (TestsWithoutAssertions).
-   */
-  asAssertion(ctx: Ctx, name: string): string {
-    if (
-      ctx.f.rubyFile.startsWith("test/") &&
-      ctx.selfKind === "instance" &&
-      ctx.selfExpr !== "this"
-    )
-      return `${ctx.selfExpr}.${name}`;
-    return this.imp(ctx, "@blazetrails/activesupport", name);
   }
 
   /** The gem scope whose `def` a writer call resolves to (self or a constant receiver). */
@@ -1351,7 +1341,7 @@ export class Lowerer {
         pro.unshift(`const ${jsIdent(p.name ?? "_")} = ${restName}.pop();`);
       }
       this.stat(ctx, "params-after-rest");
-      (ctx as any).prologue = [...((ctx as any).prologue ?? []), ...pro];
+      ctx.prologue = [...(ctx.prologue ?? []), ...pro];
       return head;
     }
     const out: string[] = [];
@@ -1589,8 +1579,8 @@ export class Lowerer {
 
   hoist(ctx: Ctx, name: string): void {
     this.stat(ctx, "hoisted-local");
-    (ctx.scope as any).hoisted ??= new Set();
-    (ctx.scope as any).hoisted.add(name);
+    ctx.scope.hoisted ??= new Set();
+    ctx.scope.hoisted.add(name);
   }
 
   isSimple(n: N | undefined): boolean {
@@ -2112,7 +2102,7 @@ export class Lowerer {
         // ActiveSupport's `assertRaises` answers the raised error, as Minitest's
         // `assert_raises` does (`err = assert_raises(...) { }`).
         const classes = n.args.filter((x: N) => x.k !== "kwargs").map((x: N) => this.expr(x, ctx));
-        return `(await ${this.asAssertion(ctx, "assertRaises")}([${classes.join(", ")}], {}, ${f}))`;
+        return `(await ${this.imp(ctx, "@blazetrails/activesupport", "assertRaises")}([${classes.join(", ")}], {}, ${f}))`;
       }
       // `assert_difference(expression, difference = 1, message = nil, &block)` and
       // `assert_no_difference(expression, message = nil, &block)`
@@ -2125,7 +2115,7 @@ export class Lowerer {
         const given = n.args.map((x: N) => this.argExpr(x, ctx));
         while (given.length < slots) given.push("undefined");
         if (ctx.asyncBox) ctx.asyncBox.awaits = true;
-        return `(await ${this.asAssertion(ctx, snakeToCamel(n.name))}(${[...given, f].join(", ")}))`;
+        return `(await ${this.imp(ctx, "@blazetrails/activesupport", snakeToCamel(n.name))}(${[...given, f].join(", ")}))`;
       }
       // `stub_const(mod, constant, new_value, exists: true, &block)`
       // (active_support/testing/constant_stubbing.rb) is activesupport's
@@ -2335,7 +2325,7 @@ export class Lowerer {
         case "sprintf":
           return `${rc("rbFormat")}(${argList()})`;
         case "Array":
-          return `${rc("rbAryEnsure")}(${argList()})`;
+          return `${rc("rbFArray")}(${argList()})`;
         case "Integer":
           return `${rc("rbInteger")}(${argList()})`;
         case "Float":
@@ -2484,7 +2474,7 @@ export class Lowerer {
       case "tap":
         if (n.block?.k === "block") {
           const p = n.block.params[0]?.name ?? "_";
-          const scope = { locals: new Set([p]), parent: ctx.scope };
+          const scope: Scope = { locals: new Set([p]), parent: ctx.scope };
           const inner = this.child(ctx, {
             scope,
             fnScope: scope,
@@ -2493,7 +2483,7 @@ export class Lowerer {
             asyncBox: { awaits: false },
           });
           const body = this.block(this.seqBody(n.block.body), inner, false);
-          const hz: Set<string> | undefined = (scope as any).hoisted;
+          const hz: Set<string> | undefined = scope.hoisted;
           if (hz?.size) body.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
           const asy = inner.asyncBox!.awaits;
           if (asy && ctx.asyncBox) ctx.asyncBox.awaits = true;
@@ -2650,8 +2640,7 @@ export class Lowerer {
         const fn = this.resolver.importFrom(tsFile, tsMethodName(name, s.fqn, true), ctx, this);
         // A local of the same name (`adapter_name = ActiveJob.adapter_name(x)`)
         // shadows the function: keep Ruby's qualified call on the module object.
-        if (this.isLocal(ctx, fn) || (ctx as any).assigning === fn)
-          return `${r}.${fn}(${argList()})`;
+        if (this.isLocal(ctx, fn) || ctx.assigning === fn) return `${r}.${fn}(${argList()})`;
         return `${fn}(${argList()})`;
       }
     }
@@ -3600,7 +3589,25 @@ export class Lowerer {
       if (f.startsWith("async ")) {
         this.stat(ctx, "async-enumerable");
         if (ctx.asyncBox) ctx.asyncBox.awaits = true;
-        return `(await ${rc("rbAsyncEnum")}(${[r, JSON.stringify(name), ...n.args.map((x: N) => this.argExpr(x, ctx)), f].join(", ")}))`;
+        const pairs =
+          blk.k === "block" &&
+          blk.params.length >= 2 &&
+          blk.params.every((p: Param) => p.kind === "req" && p.name) &&
+          !["each_with_index", "each_with_object", "inject", "reduce"].includes(name);
+        const g = pairs
+          ? this.arrow(
+              [
+                {
+                  kind: "req",
+                  name: undefined,
+                  destructure: blk.params.map((p: Param) => p.name!),
+                } as Param,
+              ],
+              blk.body,
+              ctx,
+            )
+          : f;
+        return `(await ${rc("rbAsyncEnum")}(${[r, JSON.stringify(name), ...n.args.map((x: N) => this.argExpr(x, ctx)), g].join(", ")}))`;
       }
     }
     // A splatted argument list has no fixed native form.

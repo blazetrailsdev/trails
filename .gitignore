@@ -75,6 +75,7 @@ log/
 scripts/codegen/.ir*/
 scripts/codegen/__pycache__/
 scripts/codegen/data/hand-oracle*.json
+scripts/codegen/measurements*.jsonl
 packages/*/codegen-out/*
 !packages/*/codegen-out/tsconfig.json
 packages/*/codegen-out[0-9]/

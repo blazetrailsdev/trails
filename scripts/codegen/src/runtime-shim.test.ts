@@ -17,6 +17,9 @@ beforeAll(async () => {
       "rbDelete",
       "rbSingletonPublicMethods",
       "rbMakeException",
+      "rbRaise",
+      "rbAsyncEnum",
+      "rbAryEnsure",
       "notPorted",
     ]),
   );
@@ -63,6 +66,41 @@ describe("runtimeShim", () => {
   it("rbMakeException raises a class with no message carrying its name", () => {
     class Boom extends Error {}
     expect((shim.rbMakeException(Boom) as Error).message).toBe("Boom");
+  });
+
+  it("rbRaise raises the class it is given, with the message", async () => {
+    const { ArgumentError, RuntimeError } = await import("@blazetrails/ruby-compat");
+    expect(() => shim.rbRaise(ArgumentError, "bad")).toThrow(ArgumentError);
+    expect(() => shim.rbRaise(ArgumentError, "bad")).toThrow("bad");
+    expect(() => shim.rbRaise("plain")).toThrow(RuntimeError);
+    expect(() => shim.rbRaise()).toThrow("unhandled exception");
+  });
+
+  it("rbAsyncEnum inject leaves the receiver's elements in place", async () => {
+    const xs = [1, 2, 3];
+    expect(await shim.rbAsyncEnum(xs, "inject", async (a: number, b: number) => a + b)).toBe(6);
+    expect(xs).toEqual([1, 2, 3]);
+  });
+
+  it("rbAsyncEnum sum raises TypeError where Integer#+ would", async () => {
+    const { TypeError: RbTypeError } = await import("@blazetrails/ruby-compat");
+    await expect(shim.rbAsyncEnum(["a"], "sum", async (x: string) => x)).rejects.toThrow(
+      RbTypeError,
+    );
+  });
+
+  it("rbAsyncEnum each yields a Hash pair as one value", async () => {
+    const seen: unknown[] = [];
+    await shim.rbAsyncEnum({ a: 1 }, "each", async (...args: unknown[]) => {
+      seen.push(args);
+    });
+    expect(seen).toEqual([[["a", 1]]]);
+  });
+
+  it("rbAryEnsure splats an Array, wraps any other value, and yields nothing for nil", () => {
+    expect(shim.rbAryEnsure([1, 2])).toEqual([1, 2]);
+    expect(shim.rbAryEnsure({ a: 1 })).toEqual([{ a: 1 }]);
+    expect(shim.rbAryEnsure(null)).toEqual([]);
   });
 
   it("an unported helper throws, naming itself", () => {
