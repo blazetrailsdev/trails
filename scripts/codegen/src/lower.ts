@@ -3064,6 +3064,21 @@ export class Lowerer {
     const resolved = this.resolver.member(n, recvNode, ctx, this);
     if (resolved?.kind === "property" && n.args.length === 0 && !n.block)
       return `${recv}${nav}${resolved.name}`;
+    if (
+      recvNode?.k === "call" &&
+      recvNode.name === "env" &&
+      recvNode.recv?.k === "const" &&
+      recvNode.recv.path.filter((x: string) => x).join("::") === "Rails" &&
+      name.endsWith("?") &&
+      n.args.length === 0
+    )
+      return `${recv}[${JSON.stringify(name)}]()`;
+    if (recvNode?.k === "const" && recvNode.path.filter((x: string) => x).join("::") === "Rails") {
+      const member = this.resolver.trailsSeat.get(propName(name));
+      if (member && !member.method && n.args.length === 0 && !n.block)
+        return `${recv}.${propName(name)}${member.nullable ? "!" : ""}`;
+      if (!member) return `(${recv} as any).${this.callName(name)}(${argList()})`;
+    }
     const depGetter =
       (!recvNode || recvNode.k === "self") && n.args.length === 0 && !n.block
         ? this.inheritedDepGetter(ctx.owner, name, ctx.selfKind === "static")
