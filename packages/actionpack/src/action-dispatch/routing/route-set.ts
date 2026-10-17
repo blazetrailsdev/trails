@@ -952,10 +952,10 @@ export class RouteSet {
   /** @internal */
   private _defaultEnv?: Readonly<RackEnv>;
 
-  draw(callback: DrawCallback): void {
+  draw(block: DrawCallback): void {
     const railsSemantics = this._prepend.length > 0 || this._append.length > 0;
     if (railsSemantics && !this.disableClearAndFinalize) this.clearBang();
-    this.evalBlock(callback);
+    this.evalBlock(block);
     if (railsSemantics && !this.disableClearAndFinalize) this.finalizeBang();
   }
 

@@ -404,8 +404,8 @@ export class Response {
     return parseInt(cl, 10);
   }
 
-  write(data: string): void {
-    (this.stream as { write(string: string): void }).write(data);
+  write(string: string): void {
+    (this.stream as { write(string: string): void }).write(string);
   }
 
   close(): void {
@@ -616,9 +616,9 @@ export class Response {
 
   /** @internal */
   setContentType(contentType: string | null | undefined, charset: string | null | undefined): void {
-    const type = contentType ?? "";
-    const value = charset ? `${type}; charset=${String(charset).toLowerCase()}` : type;
-    this.setHeader(CONTENT_TYPE, value);
+    let type = contentType ?? "";
+    if (charset) type = `${type}; charset=${String(charset).toLowerCase()}`;
+    this.setHeader(CONTENT_TYPE, type);
   }
 
   /** @internal */
@@ -711,9 +711,9 @@ export class Response {
     body: string | string[] = [],
     { defaultHeaders }: { defaultHeaders?: Record<string, string> } = {},
   ): InstanceType<T> {
-    const merged = this.mergeDefaultHeaders(headers, defaultHeaders ?? this.defaultHeaders);
-    const parts = Array.isArray(body) ? body : [body];
-    return new this(status, merged, parts) as InstanceType<T>;
+    headers = this.mergeDefaultHeaders(headers, defaultHeaders ?? this.defaultHeaders);
+    body = Array.isArray(body) ? body : [body];
+    return new this(status, headers, body) as InstanceType<T>;
   }
 }
 

@@ -101,7 +101,7 @@ export class AnchoredRegexp extends Visitor {
   }
 
   protected override visitOR(node: Node): string {
-    const children = (node as Or).children().map((c) => this.visit(c) as string);
+    const children = (node as Or).children().map((n) => this.visit(n) as string);
     return `(?:${children.join("|")})`;
   }
 }
@@ -234,10 +234,9 @@ export class Pattern {
   }
 
   match(other: string): MatchData | undefined {
-    const re = this.toRegexp();
-    const m = other.match(re);
-    if (!m) return undefined;
-    return new MatchData(this.names, this.offsets, m);
+    const match = other.match(this.toRegexp());
+    if (!match) return undefined;
+    return new MatchData(this.names, this.offsets, match);
   }
 
   isMatch(other: string): boolean {

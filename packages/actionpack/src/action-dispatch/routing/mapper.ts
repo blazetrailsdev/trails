@@ -358,14 +358,16 @@ export class Constraints extends Endpoint {
   }
 
   override matches(req: Request): boolean {
-    return this.constraints.every((constraint) => {
-      const c = constraint as ConstraintLike;
-      if (rbObjRespondTo(c, "matches")) {
-        const matched = c.matches!(req);
+    return (this.constraints as ConstraintLike[]).every((constraint) => {
+      if (rbObjRespondTo(constraint, "matches")) {
+        const matched = constraint.matches!(req);
         if (matched != null && matched !== false) return true;
       }
-      if (rbObjRespondTo(c, "call")) {
-        const called = callableOf(c).apply(c, this.constraintArgs(c, req));
+      if (rbObjRespondTo(constraint, "call")) {
+        const called = callableOf(constraint).apply(
+          constraint,
+          this.constraintArgs(constraint, req),
+        );
         if (called != null && called !== false) return true;
       }
       return false;

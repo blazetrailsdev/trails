@@ -207,15 +207,15 @@ export class MiddlewareStack implements Iterable<Middleware> {
   build(app: RackApp | RackAppObject): RackApp | RackAppObject {
     const instrumenting = Notifications.notifier.listening(InstrumentationProxy.EVENT_NAME);
     const middlewares = Object.freeze(this.middlewares);
-    let current: RackApp | RackAppObject = app;
+    let a: RackApp | RackAppObject = app;
     for (let i = middlewares.length - 1; i >= 0; i--) {
       if (instrumenting) {
-        current = middlewares[i].buildInstrumented(current);
+        a = middlewares[i].buildInstrumented(a);
       } else {
-        current = middlewares[i].build(current);
+        a = middlewares[i].build(a);
       }
     }
-    return current;
+    return a;
   }
 
   /** @internal */

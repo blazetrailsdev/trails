@@ -16,6 +16,7 @@ import {
   rbStrDump,
   toI,
   excSetupMessage,
+  rbObjDup,
 } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
@@ -511,7 +512,7 @@ export class Request {
 
   /** @internal */
   setEngineScriptName(name: string): void {
-    this.setHeader((this.routes as { envKey: string }).envKey, name);
+    this.setHeader((this.routes as { envKey: string }).envKey, rbObjDup(name));
   }
 
   get httpAuthSalt(): unknown {

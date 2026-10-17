@@ -116,7 +116,8 @@ export class RoutesInspector {
     filter: RoutesFilter = {},
   ): ReturnType<F["result"]> {
     this.engines = {};
-    const routes = this.collectRoutes(this.filterRoutes(this.normalizeFilter(filter)));
+    const routesToDisplay = this.filterRoutes(this.normalizeFilter(filter));
+    const routes = this.collectRoutes(routesToDisplay);
     if (routes.length === 0) {
       formatter.noRoutes(this.collectRoutes(this.routes), filter);
       return formatter.result() as ReturnType<F["result"]>;
@@ -153,26 +154,31 @@ export class RoutesInspector {
 
   /** @internal */
   private filterRoutes(filter: NormalizedFilter): Iterable<Route> {
-    if (!filter) return this.routes;
-    return Array.from(this.routes).filter((route) => {
-      const w = new RouteWrapper(route);
-      return Object.entries(filter).some(([k, v]) => w.isMatchesFilter(k, v));
-    });
+    if (filter) {
+      return Array.from(this.routes).filter((route) => {
+        const routeWrapper = new RouteWrapper(route);
+        return Object.entries(filter).some(([filterType, value]) =>
+          routeWrapper.isMatchesFilter(filterType, value),
+        );
+      });
+    } else {
+      return this.routes;
+    }
   }
 
   /** @internal */
   private collectRoutes(routes: Iterable<Route>): CollectedRoute[] {
     return Array.from(routes)
-      .map((r) => new RouteWrapper(r))
-      .filter((w) => !w.isInternal())
-      .map((w) => {
-        this.collectEngineRoutes(w);
+      .map((route) => new RouteWrapper(route))
+      .filter((route) => !route.isInternal())
+      .map((route) => {
+        this.collectEngineRoutes(route);
         return {
-          name: w.name,
-          verb: w.verb,
-          path: w.path,
-          reqs: w.reqs,
-          sourceLocation: w.sourceLocation ?? undefined,
+          name: route.name,
+          verb: route.verb,
+          path: route.path,
+          reqs: route.reqs,
+          sourceLocation: route.sourceLocation ?? undefined,
         };
       });
   }

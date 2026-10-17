@@ -248,13 +248,11 @@ export class CookieJar implements Iterable<[string, string]> {
       value = options as string;
       options = { value };
     }
-    const opts = options as SetCookieOptions;
+    this.handleOptions(options as SetCookieOptions);
 
-    this.handleOptions(opts);
-
-    if (this._cookies.get(name) !== value || opts.expires) {
+    if (this._cookies.get(name) !== value || (options as SetCookieOptions).expires) {
       this._cookies.set(name, value);
-      this._setCookies.set(name, opts);
+      this._setCookies.set(name, options as SetCookieOptions);
       this._deletedCookies.delete(name);
     }
 

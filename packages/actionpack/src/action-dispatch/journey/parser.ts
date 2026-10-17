@@ -71,8 +71,7 @@ export class Parser {
 
   /** @internal */
   private parseStar(): Node {
-    const sym = new SymbolNode(this._scanner.lastString(), SymbolNode.GREEDY_EXP);
-    const node = new Star(sym);
+    const node = new Star(new SymbolNode(this._scanner.lastString(), SymbolNode.GREEDY_EXP));
     this.advanceToken();
     return node;
   }
@@ -80,13 +79,14 @@ export class Parser {
   /** @internal */
   private parseGroup(): Node {
     this.advanceToken();
-    const inner = this.parseExpressions();
-    if (this._nextToken !== "RPAREN") {
+    let node = this.parseExpressions();
+    if (this._nextToken === "RPAREN") {
+      node = new Group(node!);
+      this.advanceToken();
+      return node;
+    } else {
       throw new ArgumentError("missing right parenthesis.");
     }
-    const node = new Group(inner!);
-    this.advanceToken();
-    return node;
   }
 
   /** @internal */

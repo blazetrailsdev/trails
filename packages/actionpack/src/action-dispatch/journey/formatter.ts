@@ -88,14 +88,14 @@ export class Formatter {
       missingKeys = this.missingKeys(route, parameterizedParts);
       if (missingKeys && missingKeys.length > 0) continue;
 
-      const remainingOptions = { ...options };
-      for (const key of Object.keys(remainingOptions)) {
+      const params = { ...options };
+      for (const key of Object.keys(params)) {
         if (
           Object.hasOwn(parameterizedParts, key) ||
           Object.hasOwn(route.defaults, key) ||
           (pathParams && Object.hasOwn(pathParams, key) && !Object.hasOwn(originalOptions, key))
         ) {
-          delete remainingOptions[key];
+          delete params[key];
         }
       }
 
@@ -112,14 +112,14 @@ export class Formatter {
         delete parameterizedParts[key];
       }
 
-      return new RouteWithParams(route, parameterizedParts, remainingOptions);
+      return new RouteWithParams(route, parameterizedParts, params);
     }
 
     const constraintKeys = Object.keys(constraints);
     const unmatchedKeys = (missingKeys ?? []).filter((k) => constraintKeys.includes(k));
-    const trulyMissing = (missingKeys ?? []).filter((k) => !unmatchedKeys.includes(k));
+    missingKeys = (missingKeys ?? []).filter((k) => !unmatchedKeys.includes(k));
 
-    return new MissingRoute(constraints, trulyMissing, unmatchedKeys, this.routes, name);
+    return new MissingRoute(constraints, missingKeys, unmatchedKeys, this.routes, name);
   }
 
   clear(): void {
