@@ -250,6 +250,11 @@ export class Resolver {
     }
     // An activesupport module ported on a subpath of its own, not the package root.
     const AS_SUBPATH: Record<string, [string, string, string]> = {
+      "ActiveSupport::TestCase": [
+        "@blazetrails/activesupport/test-case",
+        "TestCase",
+        "ActiveSupportTestCase",
+      ],
       "ActiveSupport::LogSubscriber::TestHelper": [
         "@blazetrails/activesupport/log-subscriber/test-helper",
         "TestHelper",
@@ -272,12 +277,12 @@ export class Resolver {
       "Float::INFINITY": "Infinity",
       "Float::NAN": "NaN",
       ENV: "process.env",
-      Rails: "TopLevel.Trails!",
+      Rails: "(TopLevel.Trails as any)",
       "Float::EPSILON": "Number.EPSILON",
     };
     if (SPECIAL[segs.join("::")]) {
       const v = SPECIAL[segs.join("::")];
-      if (v.startsWith("TopLevel.")) lw.imp(ctx, "@blazetrails/activesupport", "TopLevel");
+      if (v.includes("TopLevel.")) lw.imp(ctx, "@blazetrails/activesupport", "TopLevel");
       return v;
     }
     // `include ActiveSupport::Logger::Severity` (Ruby stdlib logger/severity.rb)
@@ -299,7 +304,7 @@ export class Resolver {
       // CLAUDE.md "Call-time constant resolution": Ruby's top-level Object is
       // TopLevel; the Rails application constant is read at call time.
       lw.imp(ctx, "@blazetrails/activesupport", "TopLevel");
-      return ["TopLevel.Trails!", ...rest].join(".");
+      return ["(TopLevel.Trails as any)", ...rest].join(".");
     }
     // Ruby namespaces that are their own trails packages.
     const NS_PKG: Record<string, string> = {
