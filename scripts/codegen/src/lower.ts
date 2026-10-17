@@ -1181,7 +1181,7 @@ export class Lowerer {
     if (b.k === "symproc") {
       const name = b.name as string;
       // `&:to_s` / `&:to_sym` go through the call lowering (Symbol convention).
-      if (name === "to_s" || name === "to_sym") {
+      if (name === "to_s" || name === "to_sym" || name === "class") {
         const inner = this.child(ctx, { scope: { locals: new Set(["x"]), parent: ctx.scope } });
         const call: N = {
           k: "call",
@@ -3596,7 +3596,27 @@ export class Lowerer {
     const name: string = n.name;
     const rc = (x: string) => this.rc(ctx, x);
     const blk: N | null = n.block;
-    const fn = () => (blk ? this.blockArg(blk, ctx) : null);
+    const fn = () => {
+      if (!blk) return null;
+      if (
+        SPLAT_YIELD_ONE.has(name) &&
+        blk.k === "block" &&
+        blk.params.length >= 2 &&
+        blk.params.every((p: Param) => p.kind === "req" && p.name)
+      )
+        return this.arrow(
+          [
+            {
+              kind: "req",
+              name: undefined,
+              destructure: blk.params.map((p: Param) => p.name!),
+            } as Param,
+          ],
+          blk.body,
+          ctx,
+        );
+      return this.blockArg(blk, ctx);
+    };
     const R = needsParens(r) ? `(${r})` : r;
     const recvIsString = () => {
       const t = this.typeOf(recvNode, ctx);
@@ -4057,6 +4077,11 @@ const ASYNC_ENUM = new Set(
   ),
 );
 
+const SPLAT_YIELD_ONE = new Set(
+  "map collect flat_map collect_concat select filter find_all reject find detect sort_by min_by max_by group_by partition filter_map sum count".split(
+    " ",
+  ),
+);
 /** Operator → the named member spellings a typed receiver may define. */
 const OP_SPELL: Record<string, string[]> = {
   "[]": ["get", "at", "fetch"],
