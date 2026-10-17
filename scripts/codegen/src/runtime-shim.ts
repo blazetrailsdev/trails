@@ -70,6 +70,8 @@ export async function rbAsyncEnum(recv: any, method: string, ...rest: any[]): Pr
       for (const x of items) {
         const v = await fn(x);
         if (typeof s === "number" && typeof v === "number") s += v;
+        else if (typeof s === "string" && typeof v === "string") s += v;
+        else if (Array.isArray(s) && Array.isArray(v)) s = [...s, ...v];
         else if (s != null && typeof s.plus === "function") s = s.plus(v);
         else throw new RbAsyncEnumTypeError(\`\${rbAsyncEnumClassname(v)} can't be coerced into \${rbAsyncEnumClassname(s)}\`);
       }
@@ -232,17 +234,11 @@ export function rbSingletonPublicMethods(klass: any): string[] {
     .map((n) => (n.startsWith("__class_attr_") ? n.slice("__class_attr_".length) : n))
     .map((n) => { const u = asUnderscore(n); return n.startsWith("_") && !u.startsWith("_") ? "_" + u : u; });
 }`,
-  // eval.c \`rb_make_exception\`: \`raise Klass, msg\` calls \`Klass.exception(msg)\`
-  // (Exception.exception is \`new\`); an instance is raised as is, or re-messaged.
-  rbMakeException: `import { rbModName as rbMakeExceptionName, RuntimeError as RbMakeExceptionRuntimeError } from "@blazetrails/ruby-compat";
+  rbMakeException: `import { RuntimeError as RbMakeExceptionRuntimeError } from "@blazetrails/ruby-compat";
 export function rbMakeException(x: any, ...rest: any[]): any {
   if (typeof x === "string") return new RbMakeExceptionRuntimeError(x);
-  // With no message Ruby's \`message\` is the class name (error.c exc_to_s); ruby-compat's
-  // Exception has no such default, so the name is passed.
-  if (typeof x === "function" && !rest.length && typeof x.exception !== "function")
-    return new x(rbMakeExceptionName(x) ?? x.name);
-  if (typeof x === "function") return typeof x.exception === "function" ? x.exception(...rest) : new x(...rest);
-  if (rest.length && x != null && typeof x.exception === "function") return x.exception(...rest);
+  if (x != null && typeof x.exception === "function") return x.exception(...rest);
+  if (typeof x === "function") return new x(...rest);
   return x;
 }`,
   // \`obj.is_a?(klass)\` where Symbols are colon strings (CLAUDE.md "A Ruby Symbol is
@@ -331,7 +327,8 @@ export const SHIM_SOURCES: Record<string, string> = {
   rbAryEnsure:
     "multiple assignment and splat (vm_insnhelper.c vm_expandarray, rb_check_array_type)",
   rbRaise: "Kernel#raise (eval.c rb_f_raise, rb_make_exception)",
-  rbAsyncEnum: "Enumerable / Array iteration (enum.c, array.c), run in order",
+  rbAsyncEnum:
+    "Enumerable / Array iteration run in order (enum.c, array.c); sum adds with the accumulator's + (enum.c enum_sum, array.c rb_ary_sum), raising TypeError where Integer#+ cannot coerce",
   rbBinop:
     "Array#+ #- #& #| (array.c rb_ary_plus, rb_ary_diff, rb_ary_and, rb_ary_or); Comparable#< #> #<= #>= (compar.c)",
   times: "Integer#times (numeric.c int_dotimes)",

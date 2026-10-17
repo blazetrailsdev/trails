@@ -332,7 +332,7 @@ export class Lowerer {
   letFor(ctx: Ctx, name: string): string {
     if (!this.declareLocal(ctx, name)) return "";
     if (!ctx.nested) return "let ";
-    const target = (ctx.fnScope ?? ctx.scope) as any;
+    const target = ctx.fnScope ?? ctx.scope;
     (target.hoisted ??= new Set()).add(name);
     this.stat(ctx, "hoisted-local");
     return "";
@@ -1276,8 +1276,8 @@ export class Lowerer {
               return hit?.kind === "scope" ? this.index.ancestors(hit.fqn) : [];
             })()
           : // A local holding `Class.new(ActiveJob::Base)` is a subclass of that gem class.
-            recvNode.k === "lvar" && (this.localType(ctx, recvNode.name) as any)?.k === "gemClass"
-            ? this.index.ancestors((this.localType(ctx, recvNode.name) as any).fqn)
+            recvNode.k === "lvar"
+            ? this.index.ancestors(this.gemClassFqn(this.localType(ctx, recvNode.name)) ?? "")
             : [];
     const own = scopes.find((sc) => sc.defs.has(name) || sc.sdefs.has(name));
     if (own || (recvNode.k !== "const" && !scopes.length)) return own;
@@ -1651,7 +1651,7 @@ export class Lowerer {
   once(e: string, n: N, ctx: Ctx): [string, string] {
     if (["lvar", "ivar", "self", "const", "nil", "true", "false"].includes(n.k)) return [e, e];
     const t = this.tmp(ctx, "_t");
-    const target = (ctx.fnScope ?? ctx.scope) as any;
+    const target = ctx.fnScope ?? ctx.scope;
     (target.hoisted ??= new Set()).add(t);
     return [t, `(${t} = ${e})`];
   }
@@ -2224,7 +2224,7 @@ export class Lowerer {
       name === "name" &&
       n.args.length === 0 &&
       recvNode &&
-      (this.typeOf(recvNode, ctx) as any)?.key === "@ruby-compat/include.ts#Module"
+      this.classKey(this.typeOf(recvNode, ctx)) === "@ruby-compat/include.ts#Module"
     )
       return `${this.rc(ctx, "rbModName")}(${r})`;
 
@@ -2663,7 +2663,7 @@ export class Lowerer {
         const send = `${this.rc(ctx, "rbStrSend")}(${[r, JSON.stringify(ts0), ...args()].join(", ")})`;
         if (name.endsWith("!") && (recvNode.k === "lvar" || recvNode.k === "ivar")) {
           const t = this.tmp(ctx, "_r");
-          const target = (ctx.fnScope ?? ctx.scope) as any;
+          const target = ctx.fnScope ?? ctx.scope;
           (target.hoisted ??= new Set()).add(t);
           const bt = rt ? STRING_RESULT_TYPES[ts0] : undefined;
           return bt
@@ -2771,7 +2771,7 @@ export class Lowerer {
       n.args.length === 0 &&
       recvNode &&
       ((recvNode.k === "call" && recvNode.name === "class") ||
-        (this.typeOf(recvNode, ctx)?.k === "class" && (this.typeOf(recvNode, ctx) as any).static))
+        this.isStaticClass(this.typeOf(recvNode, ctx)))
     ) {
       return `${r}.name`;
     }
@@ -3196,6 +3196,21 @@ export class Lowerer {
     return k ? { k: "class", key: k, static: ctx.selfKind === "static" } : null;
   }
 
+  /** The oracle key of a class-typed value. */
+  classKey(t: TypeRef): string | undefined {
+    return t?.k === "class" ? t.key : undefined;
+  }
+
+  /** The value is a class itself (its static side). */
+  isStaticClass(t: TypeRef): boolean {
+    return t?.k === "class" && !!t.static;
+  }
+
+  /** The gem class a `Class.new(GemClass)` local holds. */
+  gemClassFqn(t: TypeRef): string | undefined {
+    return t?.k === "gemClass" ? t.fqn : undefined;
+  }
+
   localType(ctx: Ctx, name: string): TypeRef {
     for (let s: Scope | undefined = ctx.scope; s; s = s.parent) {
       if (s.locals.has(name)) return s.types?.get(name) ?? null;
@@ -3234,7 +3249,7 @@ export class Lowerer {
       n.name === "time_zone" &&
       n.args.length === 0 &&
       n.recv &&
-      (this.typeOf(n.recv, ctx) as any)?.key === "@activesupport/time-with-zone.ts#TimeWithZone"
+      this.classKey(this.typeOf(n.recv, ctx)) === "@activesupport/time-with-zone.ts#TimeWithZone"
     )
       return { k: "class", key: "@activesupport/values/time-zone.ts#TimeZone" } as TypeRef;
     // `Class.new(Super)` with a gem class: a subclass of it (class-level writers resolve).
@@ -3246,7 +3261,7 @@ export class Lowerer {
       n.args[0]?.k === "const"
     ) {
       const hit = this.index.resolveConst(n.args[0].path, ctx.nesting);
-      if (hit?.kind === "scope") return { k: "gemClass", fqn: hit.fqn } as any;
+      if (hit?.kind === "scope") return { k: "gemClass", fqn: hit.fqn };
     }
     switch (n.k) {
       case "self":
@@ -3736,7 +3751,7 @@ export class Lowerer {
           n.args.length === 0 &&
           !blk &&
           ctx.f.rubyFile.startsWith("test/") &&
-          !["array", "prim"].includes((this.typeOf(recvNode, ctx) as any)?.k)
+          !["array", "prim"].includes(this.typeOf(recvNode, ctx)?.k ?? "")
         )
           return `${rc("rbSize")}(${r})`;
         if (n.args.length === 0 && !blk) return `${R}${nav}length`;
