@@ -102,10 +102,7 @@ export function distanceOfTimeInWords(
   }) as string;
 }
 
-/**
- * @internal
- * @inventedArm if — PERMANENT
- */
+/** @internal */
 function normalizeDistanceOfTimeArgumentToTime(value: DistanceOfTimeInput): Date {
   if (typeof value === "number") {
     // boundary: Ruby `Time.at(value)`, as the JS Date the arithmetic above is over.
