@@ -34,6 +34,8 @@ export interface ScopeInfo {
   sdefs: Map<string, DefInfo>;
   attrs: Set<string>;
   sattrs: Set<string>;
+  /** `singleton_class.attr_accessor` names: module functions, written through `setX`. */
+  sclassAttrs: Set<string>;
   includes: string[][];
   extends: string[][];
   consts: Set<string>;
@@ -106,6 +108,7 @@ export class GemIndex {
         sdefs: new Map(),
         attrs: new Set(),
         sattrs: new Set(),
+        sclassAttrs: new Set(),
         includes: [],
         extends: [],
         consts: new Set(),
@@ -218,6 +221,19 @@ export class GemIndex {
           path: node.value.path,
           nesting: [...nesting],
         });
+      return;
+    }
+    if (
+      node.k === "call" &&
+      node.recv?.k === "call" &&
+      node.recv.name === "singleton_class" &&
+      node.recv.recv === null &&
+      /^(attr_reader|attr_accessor|attr_writer|attr)$/.test(node.name)
+    ) {
+      for (const a of node.args.filter((x: N) => x.k === "sym")) {
+        s.sattrs.add(a.value);
+        s.sclassAttrs.add(a.value);
+      }
       return;
     }
     if (node.k === "call" && node.recv === null) {

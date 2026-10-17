@@ -975,10 +975,7 @@ export class Lowerer {
       // A writer `def x=` in a module is the function `setX` (CLAUDE.md's
       // `setX()` spelling), not a property: `self.queue_adapter = :async` calls it.
       const w = this.resolver.member(n, n.recv ?? { k: "self" }, ctx, this);
-      const owner =
-        w || n.recv?.k === "lvar"
-          ? this.writerOwner(n.name, n.recv ?? { k: "self" }, ctx)
-          : undefined;
+      const owner = this.writerOwner(n.name, n.recv ?? { k: "self" }, ctx);
       if ((w?.kind === "method" || (!w && owner)) && owner?.kind === "module") {
         // The emitter's name for a module writer function (emit.ts `fnName`).
         const wn = w?.name ?? propName(n.name.slice(0, -1));
@@ -1279,7 +1276,9 @@ export class Lowerer {
             recvNode.k === "lvar"
             ? this.index.ancestors(this.gemClassFqn(this.localType(ctx, recvNode.name)) ?? "")
             : [];
-    const own = scopes.find((sc) => sc.defs.has(name) || sc.sdefs.has(name));
+    const own = scopes.find(
+      (sc) => sc.defs.has(name) || sc.sdefs.has(name) || sc.sclassAttrs.has(name.replace(/=$/, "")),
+    );
     if (own || (recvNode.k !== "const" && !scopes.length)) return own;
     // `ActiveJob::Base.queue_adapter = :inline`: the writer is on an included
     // concern's `ClassMethods`, which `append_features` extends the class with.
