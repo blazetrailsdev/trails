@@ -3763,9 +3763,17 @@ export class Lowerer {
     )
       return null;
     // A Ruby Enumerable that is not an Array (a `Set`, a `Hash` as a `Map`) has
-    // none of the Array methods these forms use: `rbEnum` converts a Set / Map
-    // and passes anything else through (an Array, a Relation answering its own).
-    const E = this.typeOf(recvNode, ctx)?.k === "array" ? R : `${rc("rbEnum")}(${r})`;
+    // none of the Array methods these forms use: a Set / Map is spread, and
+    // anything else passes through (an Array, a Relation answering its own).
+    const recvType = this.typeOf(recvNode, ctx);
+    const enumOf = (x: string) =>
+      `${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map ? [...${x}] : ${x}`;
+    const E =
+      recvType?.k === "array"
+        ? R
+        : /^[\w$]+(\.[\w$]+)*$/.test(r)
+          ? `(${enumOf(`(${r} as any)`)})`
+          : `((x: any) => ${enumOf("x")})(${r})`;
     switch (name) {
       case "clear":
         // Reached through a namespace import so the call keeps Ruby's name

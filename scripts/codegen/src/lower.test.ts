@@ -73,7 +73,9 @@ describe("lowering active_job/rules.rb", () => {
   });
 
   it("tallies by identity and splats each pair across a two-parameter block", () => {
-    expect(rules).toContain("tally(rbEnum(jobs).map((x: any) => (x.constructor as any)))");
+    expect(rules).toContain(
+      "tally(((jobs as any) instanceof globalThis.Set || (jobs as any) instanceof globalThis.Map ? [...(jobs as any)] : (jobs as any)).map((x: any) => (x.constructor as any)))",
+    );
     expect(rules).toContain("([_klass, count]: any) => -count");
     expect(rules).toContain("counts.map(([klass, count]: any) =>");
   });

@@ -166,9 +166,6 @@ function truthy(v: any): boolean {
 export function rbDelete(x: any, k: any): any {
   return Array.isArray(x) ? rbDeleteAry(x, k) : rbDeleteHash(x, k);
 }`,
-  rbEnum: `export function rbEnum(x: any): any {
-  return x instanceof Set || x instanceof Map ? [...x] : x;
-}`,
   // \`Array#map!\` (array.c rb_ary_collect_bang): replaces each element in place
   // and answers the receiver.
   // \`Enumerable#each_with_object\` (enum.c enum_each_with_object): yields each
@@ -334,7 +331,6 @@ export const SHIM_SOURCES: Record<string, string> = {
     "Array#+ #- #& #| (array.c rb_ary_plus, rb_ary_diff, rb_ary_and, rb_ary_or); Comparable#< #> #<= #>= (compar.c)",
   times: "Integer#times (numeric.c int_dotimes)",
   rbDelete: "Array#delete (array.c rb_ary_delete); Hash#delete (hash.c rb_hash_delete_m)",
-  rbEnum: "Enumerable#to_a over a Set or Hash (enum.c enum_to_a)",
   rbAppend:
     "Array#<< (array.c rb_ary_push); String#<< (string.c rb_str_concat); Set#<< (set.rb add)",
   jsInstanceExec: "BasicObject#instance_exec (vm_eval.c rb_obj_instance_exec)",
