@@ -454,6 +454,20 @@ describe("body call capture", () => {
     expect(writer.callSeq).toEqual(["store"]);
   });
 
+  it("leaves an index read off another object out of the order stream only", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        resource() {
+          this.build(this.scope.get("shallow"));
+          this.get(":new");
+        }
+      }`,
+    );
+    const resource = cls.instanceMethods.find((m) => m.name === "resource")!;
+    expect(resource.calls).toContain("get");
+    expect(resource.callSeq).toEqual(["scope", "build", "get"]);
+  });
+
   it("also records the same calls in source order, for the order-only comparison", () => {
     const cls = extractFromSource(
       `class Foo {

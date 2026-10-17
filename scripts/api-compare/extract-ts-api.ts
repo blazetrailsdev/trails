@@ -7019,7 +7019,7 @@ function collectCalls(
       } else if (ts.isPropertyAccessExpression(callee)) {
         visit(callee.expression);
         const prop = memberNameText(callee.name);
-        called.push(prop);
+        if (!(skipHoistedClosures && isOperatorIndexRead(n))) called.push(prop);
         negated.push(prop);
         if (!skipHoistedClosures && prop === "unshift") {
           names.add(`${NATIVE_FORM_PREFIX}unshift`);
@@ -7140,6 +7140,24 @@ function collectCalls(
   }
   if (names.size === 0 && hashForms.size === 0) return undefined;
   return [...names, ...hashForms];
+}
+
+/**
+ * A `recv.get("key")` off another object: the port of Ruby's `recv[:key]`, an
+ * operator send extract-ruby-api.rb#walk_call_in_order does not record. The
+ * ORDER stream leaves it out, so it cannot take the position of a Ruby `get`
+ * the same body makes (`Mapper#resource`'s `@scope[:shallow]` beside
+ * `get :new`, `mapper.rb:1357-1363`).
+ */
+function isOperatorIndexRead(n: ts.CallExpression): boolean {
+  const callee = n.expression;
+  return (
+    ts.isPropertyAccessExpression(callee) &&
+    memberNameText(callee.name) === "get" &&
+    callee.expression.kind !== ts.SyntaxKind.ThisKeyword &&
+    n.arguments.length === 1 &&
+    ts.isStringLiteralLike(n.arguments[0])
+  );
 }
 
 function nativeHashForms(
