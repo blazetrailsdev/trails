@@ -3511,16 +3511,6 @@ function readClassAttributeCall(
   };
 }
 
-/**
- * A `base.configAccessor("name")` / `this.configAccessor("name")` site — the
- * trails port of `ActiveSupport::Configurable::ClassMethods#config_accessor`
- * (activesupport/lib/active_support/configurable.rb:111-128), called on the
- * includer inside an `included` block. Ruby's macro defines the class reader
- * and writer always, and the instance pair only when `instance_accessor` and
- * `instance_<x>` are both true, which extract-ruby-api.rb#process_mattr credits
- * as it does `mattr_accessor`. The receiver is the includer, so the names are
- * credited on the enclosing module.
- */
 function isConfigAccessorCallee(expr: ts.Expression): boolean {
   return (
     ts.isPropertyAccessExpression(expr) &&
@@ -7270,8 +7260,6 @@ function receiverTailName(receiver: ts.Expression): string | undefined {
   ) {
     e = e.expression;
   }
-  // Ruby's `h[:k]` receiver is named `k` (extract-ruby-api.rb#receiver_tail_name's
-  // `:aref` arm); its port is `h["k"]` or, on a class porting `[]` as `get`, `h.get("k")`.
   if (ts.isElementAccessExpression(e) && ts.isStringLiteralLike(e.argumentExpression)) {
     return e.argumentExpression.text;
   }

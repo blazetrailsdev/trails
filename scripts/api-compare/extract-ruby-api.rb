@@ -1765,8 +1765,6 @@ class ApiExtractor
   #   reader/writer always; instance reader/writer only when BOTH
   #   `instance_<x>` and `instance_accessor` are truthy (AND, both default
   #   true); no predicate.
-  # - config_accessor (activesupport configurable.rb:111-128) gates exactly as
-  #   cattr/mattr do, so it shares their arm.
   #
   # All generated methods are public — class_attribute defines them via a fresh
   # `class_eval` string, and mattr/cattr document them as public "even if this
