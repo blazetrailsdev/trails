@@ -3676,7 +3676,21 @@ export class Lowerer {
         .some((sc) =>
           this.resolver.asyncDefs.has(`${sc.fqn}${ctx.selfKind === "static" ? "." : "#"}${n.name}`),
         );
-    if (asyncSelfDef && m.info.kind !== "method" && !n.args.length && !n.block) {
+    // A hand getter that answers a Promise, where the gem defines an async `def` of
+    // that name: the generated member is that def, a method.
+    const asyncDefOfName =
+      m.info.kind !== "method" &&
+      m.info.async &&
+      (this.index.methodNames.get(n.name)?.def ?? 0) > 0 &&
+      [...this.resolver.asyncDefs].some(
+        (k) => k.endsWith(`#${n.name}`) || k.endsWith(`.${n.name}`),
+      );
+    if (
+      (asyncSelfDef || asyncDefOfName) &&
+      m.info.kind !== "method" &&
+      !n.args.length &&
+      !n.block
+    ) {
       if (ctx.asyncBox) ctx.asyncBox.awaits = true;
       return `(await ${recv}${nav}${m.tsName}())`;
     }
