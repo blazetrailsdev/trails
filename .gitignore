@@ -70,3 +70,11 @@ packages/trailties/src/thor/test-helpers/sandbox/
 
 # Trails application logs (log/<env>.log), written by apps booted in tests
 log/
+# Ruby-to-TS generator (scripts/codegen): IR caches, the generated trees and
+# their measurements, and the oracles hand-oracle.ts rebuilds.
+scripts/codegen/.ir*/
+scripts/codegen/__pycache__/
+scripts/codegen/data/hand-oracle*.json
+packages/*/codegen-out/
+packages/*/codegen-out[0-9]/
+packages/activerecord/.swap-*/
