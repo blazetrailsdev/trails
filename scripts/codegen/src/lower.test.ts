@@ -40,8 +40,8 @@ describe("lowering ActiveJob::Sample#collect", () => {
     expect(text).toContain('(message = rbAppend(message, "\\n\\nNone"))');
   });
 
-  it("interpolates an untyped value by its Ruby to_s", () => {
-    expect(text).toContain("No job found with ${rbObjAsString(expected)}");
+  it("interpolates an untyped value natively, nil as the empty string", () => {
+    expect(text).toContain('No job found with ${expected ?? ""}');
   });
 
   it("splats each Hash pair across an all? block's parameters", () => {
@@ -94,5 +94,25 @@ describe("lowering Rails reads in active_job/rules.rb", () => {
     expect(rules).toContain("return TopLevel.Trails!.logger!;");
     expect(rules).toContain("return TopLevel.Trails!.backtraceCleaner;");
     expect(rules).not.toContain("TopLevel.Trails as any");
+  });
+});
+
+describe("Ruby truthiness and interpolation in active_job/rules.rb, natively", () => {
+  it("tests a parameter typed by its boolean default as a JS boolean", () => {
+    expect(rules).toContain("if (force) {");
+  });
+
+  it("tests a block parameter for presence", () => {
+    expect(rules).toContain("if (block != null) {");
+  });
+
+  it("tests an untyped value as neither nil nor false", () => {
+    expect(rules).toContain("if (options != null && options !== false) {");
+    expect(rules).toContain('if ((fetch(options, "check") ?? false) !== false) {');
+    expect(rules).not.toContain("rtest(");
+  });
+
+  it("interpolates an untyped value with nil as the empty string", () => {
+    expect(rules).toContain('return `checked ${options ?? ""}`;');
   });
 });

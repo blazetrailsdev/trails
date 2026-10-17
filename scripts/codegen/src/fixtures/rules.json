@@ -501,13 +501,151 @@
                     "endless": false
                   },
                   {
+                    "k": "def",
+                    "name": "truthiness",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [
+                      {
+                        "kind": "req",
+                        "name": "options"
+                      },
+                      {
+                        "kind": "key",
+                        "name": "force",
+                        "default": {
+                          "k": "false"
+                        }
+                      },
+                      {
+                        "kind": "block",
+                        "name": "block"
+                      }
+                    ],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "if",
+                          "cond": {
+                            "k": "lvar",
+                            "name": "force"
+                          },
+                          "then": {
+                            "k": "seq",
+                            "body": [
+                              {
+                                "k": "return",
+                                "value": {
+                                  "k": "sym",
+                                  "value": "forced"
+                                },
+                                "l": 31
+                              }
+                            ]
+                          },
+                          "else": null,
+                          "l": 31
+                        },
+                        {
+                          "k": "if",
+                          "cond": {
+                            "k": "lvar",
+                            "name": "block"
+                          },
+                          "then": {
+                            "k": "seq",
+                            "body": [
+                              {
+                                "k": "return",
+                                "value": {
+                                  "k": "sym",
+                                  "value": "blocked"
+                                },
+                                "l": 32
+                              }
+                            ]
+                          },
+                          "else": null,
+                          "l": 32
+                        },
+                        {
+                          "k": "if",
+                          "cond": {
+                            "k": "lvar",
+                            "name": "options"
+                          },
+                          "then": {
+                            "k": "seq",
+                            "body": [
+                              {
+                                "k": "return",
+                                "value": {
+                                  "k": "sym",
+                                  "value": "optioned"
+                                },
+                                "l": 33
+                              }
+                            ]
+                          },
+                          "else": null,
+                          "l": 33
+                        },
+                        {
+                          "k": "if",
+                          "cond": {
+                            "k": "call",
+                            "recv": {
+                              "k": "lvar",
+                              "name": "options"
+                            },
+                            "name": "fetch",
+                            "args": [
+                              {
+                                "k": "sym",
+                                "value": "check"
+                              }
+                            ],
+                            "block": null,
+                            "safe": false,
+                            "l": 34,
+                            "vcall": false
+                          },
+                          "then": {
+                            "k": "seq",
+                            "body": [
+                              {
+                                "k": "dstr",
+                                "parts": [
+                                  {
+                                    "k": "str",
+                                    "value": "checked "
+                                  },
+                                  {
+                                    "k": "lvar",
+                                    "name": "options"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          "else": null,
+                          "l": 34
+                        }
+                      ]
+                    },
+                    "l": 30,
+                    "lend": 35,
+                    "endless": false
+                  },
+                  {
                     "k": "call",
                     "recv": null,
                     "name": "private",
                     "args": [],
                     "block": null,
                     "safe": false,
-                    "l": 30,
+                    "l": 37,
                     "vcall": true
                   },
                   {
@@ -530,8 +668,8 @@
                         }
                       ]
                     },
-                    "l": 31,
-                    "lend": 33,
+                    "l": 38,
+                    "lend": 40,
                     "endless": false
                   }
                 ]
