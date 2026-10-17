@@ -166,3 +166,15 @@ describe("Integration::Runner#integration_session", () => {
     expect(Object.getPrototypeOf(new HelperSession(task.name).integrationSession)).toBe(klass);
   });
 });
+
+describe("IntegrationTest#app", () => {
+  it("reads Runner's app reader before the class's app (integration.rb:693-695)", () => {
+    const t = new IntegrationTest("app");
+    const app = () => [200, {}, bodyFromString("")];
+    t.app = app;
+    expect(t.app).toBe(app);
+
+    t.beforeSetup();
+    expect(t.app).toBe(IntegrationTest.app);
+  });
+});

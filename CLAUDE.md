@@ -1339,6 +1339,12 @@ Rules that apply across the table:
 - A "named method, no trap" row answers only an explicit `methodMissing` call.
   A "nothing" row with a dispatch-dependent Rails test is a gap, filed against
   its package; the rows are decided per class, not ratified.
+- `action_dispatch/testing/integration.rb` holds two definers.
+  `Integration::Runner` is a module carrying `respondToMissing` /
+  `methodMissing` as named methods, so a class that includes it on its own
+  answers `respond_to?` for the session's names but has no trap.
+  `IntegrationTest` splices the Proxy into its own prototype chain above the
+  `Runner` link.
 - A class-level pair `extend`ed onto a class (`dynamic_matchers.rb`,
   `railtie.rb:216-230`) is a Proxy spliced into the static prototype chain
   directly above `Base` / `Trailtie`: it forwards only a read that missed every

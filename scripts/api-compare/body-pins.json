@@ -11854,13 +11854,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
-    "rubyName": "assertions",
-    "digest": "c61da66dfc1a9c29",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "testing/integration.rb",
     "rubyName": "assertions=",
     "digest": "c7c8339a31264afb",
     "ref": "v8.0.2"

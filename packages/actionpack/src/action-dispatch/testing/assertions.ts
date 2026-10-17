@@ -6,7 +6,7 @@ import { ResponseAssertions } from "./assertions/response.js";
 import { RoutingAssertions } from "./assertions/routing.js";
 
 export interface HtmlDocumentHost {
-  _htmlDocument?: XmlDocument;
+  _htmlDocument?: XmlDocument | null;
   response: { mediaType: string | undefined; body: string };
 }
 
@@ -23,7 +23,7 @@ export function htmlDocument(this: HtmlDocumentHost): XmlDocument {
 export type Assertions = ResponseAssertions &
   RoutingAssertions & {
     /** @internal */
-    _htmlDocument?: XmlDocument;
+    _htmlDocument?: XmlDocument | null;
     readonly htmlDocument: XmlDocument;
   };
 
