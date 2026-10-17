@@ -3077,7 +3077,6 @@ export class Lowerer {
       const member = this.resolver.trailsSeat.get(propName(name));
       if (member && !member.method && n.args.length === 0 && !n.block)
         return `${recv}.${propName(name)}${member.nullable ? "!" : ""}`;
-      if (!member) return `(${recv} as any).${this.callName(name)}(${argList()})`;
     }
     const depGetter =
       (!recvNode || recvNode.k === "self") && n.args.length === 0 && !n.block
