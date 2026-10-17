@@ -478,7 +478,7 @@ export function sendPreloadLinksHeader(
 ): void {
   if (preloadLinks.length === 0) return;
   const responsePresent = rbObjRespondTo(this, "response") && this.response!();
-  if (rtest(responsePresent) && this.response!()!.isSending) return;
+  if (rtest(responsePresent) && responsePresent.isSending) return;
 
   if (this.request) {
     this.request.sendEarlyHints({ link: preloadLinks.join(",") });
