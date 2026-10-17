@@ -2839,7 +2839,7 @@ export class Lowerer {
     ) {
       const rest = n.args.slice(1).map((x: N) => this.argExpr(x, ctx));
       if (ctx.asyncBox) ctx.asyncBox.awaits = true;
-      return `(await ${this.imp(ctx, "@blazetrails/activesupport", "stub")}(${r}, ${JSON.stringify(tsMethodName(n.args[0].value))}, ${rest[0] ?? "undefined"}, [${rest.slice(1).join(", ")}], ${this.blockArg(n.block, ctx)}))`;
+      return `(await ${this.imp(ctx, "@blazetrails/activesupport", "stub")}(${r} as any, ${JSON.stringify(tsMethodName(n.args[0].value))}, ${rest[0] ?? "undefined"}, [${rest.slice(1).join(", ")}], ${this.blockArg(n.block, ctx)}))`;
     }
     // ── `Kernel.rand` reads `rand` off ruby-compat's `Kernel`, which the shim
     // seats with `kernelRand` (random.c rb_f_rand) so a test can stub it.
