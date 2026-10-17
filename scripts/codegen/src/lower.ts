@@ -3029,6 +3029,13 @@ export class Lowerer {
     if (resolved?.kind === "property" && n.args.length === 0 && !n.block)
       return `${recv}${nav}${resolved.name}`;
     const callee = resolved?.name ?? this.callName(name);
+    if (
+      this.index.classAttrPredicates.has(name) &&
+      n.args.length === 0 &&
+      !n.block &&
+      (recvNode?.k === "const" || (recvNode?.k === "call" && recvNode.name === "class"))
+    )
+      return `${recv}${nav}${callee}`;
     // The gem's attr names say nothing about a dependency constant's members
     // (`I18n.locale` is a method, though the gem has `attr_accessor :locale`).
     const depConstRecv =
