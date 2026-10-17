@@ -27,11 +27,14 @@ async function generatedLayout(): Promise<string> {
   );
 }
 
-function render(view: Base, source: string, identifier: string): string {
+async function render(view: Base, source: string, identifier: string): Promise<string> {
   (view as unknown as Record<string, unknown>)["isContentSecurityPolicy"] = () => false;
-  return new Template(source, identifier, new TseHandler(), { locals: [], format: ":html" })
-    .render(view, {}, null, undefined, (...name) => view._layoutFor(...(name as [string])))
-    .toString();
+  return String(
+    await new Template(source, identifier, new TseHandler(), {
+      locals: [],
+      format: ":html",
+    }).render(view, {}, null, undefined, (...name) => view._layoutFor(...(name as [string]))),
+  );
 }
 
 describe("the generated application layout", () => {
@@ -39,10 +42,14 @@ describe("the generated application layout", () => {
     const layout = await generatedLayout();
 
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
-    render(view, `<% contentFor("title", "Posts") %><h1>Posts</h1>`, "posts/index.html.tse");
-    expect(render(view, layout, "layouts/application.html.tse")).toContain("<title>Posts</title>");
+    await render(view, `<% contentFor("title", "Posts") %><h1>Posts</h1>`, "posts/index.html.tse");
+    expect(await render(view, layout, "layouts/application.html.tse")).toContain(
+      "<title>Posts</title>",
+    );
 
     const bare = new (Base.withEmptyTemplateCache())(null, {}, null);
-    expect(render(bare, layout, "layouts/application.html.tse")).toContain("<title>Blog</title>");
+    expect(await render(bare, layout, "layouts/application.html.tse")).toContain(
+      "<title>Blog</title>",
+    );
   }, 30_000);
 });

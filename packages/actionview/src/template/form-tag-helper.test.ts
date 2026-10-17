@@ -10,7 +10,7 @@ import { assertDomEqual } from "../testing/dom-assertions.js";
 import { defaultEnforceUtf8, setDefaultEnforceUtf8 } from "../helpers/form-tag-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
 
-const renderErb = (string: string): string => {
+const renderErb = async (string: string): Promise<string> => {
   const template = new Template(
     string.trim(),
     "test template",
@@ -18,7 +18,7 @@ const renderErb = (string: string): string => {
     { format: ":html", locals: [] },
   );
   const view = Base.withEmptyTemplateCache();
-  return String(template.render(view.empty(), {})).trim();
+  return String(await template.render(view.empty(), {})).trim();
 };
 
 describe("FormTagHelperTest", () => {
@@ -210,8 +210,8 @@ describe("FormTagHelperTest", () => {
     });
   });
 
-  it("form tag with block in tse", () => {
-    const outputBuffer = renderErb(
+  it("form tag with block in tse", async () => {
+    const outputBuffer = await renderErb(
       `<%= formTag("http://www.example.com", {}, () => { %>Hello world!<% }) %>`,
     );
 
@@ -219,8 +219,8 @@ describe("FormTagHelperTest", () => {
     assertDomEqual(expected, outputBuffer);
   });
 
-  it("form tag with block and method in tse", () => {
-    const outputBuffer = renderErb(
+  it("form tag with block and method in tse", async () => {
+    const outputBuffer = await renderErb(
       `<%= formTag("http://www.example.com", { method: "put" }, () => { %>Hello world!<% }) %>`,
     );
 

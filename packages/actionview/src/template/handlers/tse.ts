@@ -33,7 +33,6 @@ export interface TseTemplate {
   type?: unknown;
   format?: string | null;
   shortIdentifier?: string | null;
-  _streaming?: boolean;
 }
 
 export type TseImplementation = (source: string, options?: EmitJsOptions) => EmitResult;
@@ -97,7 +96,7 @@ export class Tse implements TemplateHandler {
     const options: EmitJsOptions = {
       escapeIgnore: ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
       trim: ctor.tseTrimMode === "-",
-      async: template._streaming === true,
+      async: true,
     };
     if (
       ActionView.Base.annotateRenderedViewWithFilenames &&

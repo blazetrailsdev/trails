@@ -60,11 +60,18 @@ export class LoggerThreadSafeLevel {
   logAt<T>(level: number | LogLevel, fn: () => T): T {
     const oldLocalLevel = this.localLevel;
     this.localLevel = level;
+    let result: T;
     try {
-      return fn();
-    } finally {
+      result = fn();
+    } catch (error) {
       this.localLevel = oldLocalLevel;
+      throw error;
     }
+    if (result instanceof Promise) {
+      return result.finally(() => (this.localLevel = oldLocalLevel)) as T;
+    }
+    this.localLevel = oldLocalLevel;
+    return result;
   }
 }
 

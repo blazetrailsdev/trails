@@ -24,7 +24,7 @@ export interface RenderableTemplate {
     buffer?: null,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer | Uint8Array | Promise<string | SafeBuffer>;
+  ): string | SafeBuffer | Uint8Array | Promise<string | SafeBuffer | null>;
   render(
     view: ViewContext,
     locals: Record<string, unknown>,

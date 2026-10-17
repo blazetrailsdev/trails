@@ -22,23 +22,24 @@ describe("Template#compile! across DetailsKey.clear", () => {
     DetailsKey.clear();
   });
 
-  it("finds a fresh template for the fresh view-context class once the caches are cleared", () => {
+  it("finds a fresh template for the fresh view-context class once the caches are cleared", async () => {
     const resolver = new FixtureResolver({ "posts/_n.html.tse": "<%= 1 + 1 %>" });
     PathRegistry.setViewPaths(ViewPathsOwner, new PathSet([resolver]));
     const ctx = new LookupContext(null, {}, ["posts"]);
     ctx.appendViewPaths([resolver]);
-    const renderN = () => String(new (DetailsKey.viewContextClass())(ctx, {}, null).render("n"));
+    const renderN = async () =>
+      String(await new (DetailsKey.viewContextClass())(ctx, {}, null).render("n"));
 
     const before = ctx.findTemplate("n", ["posts"], true);
     const containerBefore = DetailsKey.viewContextClass();
-    expect(renderN()).toBe("2");
+    expect(await renderN()).toBe("2");
 
     DetailsKey.clear();
 
     const after = ctx.findTemplate("n", ["posts"], true);
     expect(DetailsKey.viewContextClass()).not.toBe(containerBefore);
     expect(after).not.toBe(before);
-    expect(renderN()).toBe("2");
+    expect(await renderN()).toBe("2");
   });
 });
 
@@ -62,7 +63,7 @@ describe("Template#compile", () => {
 });
 
 describe("Template#compiled_source", () => {
-  it("raises WrongEncodingError when the handler returns code that is not valid UTF-16", () => {
+  it("raises WrongEncodingError when the handler returns code that is not valid UTF-16", async () => {
     const t = new Template(
       "hi",
       "posts/show",
@@ -71,7 +72,7 @@ describe("Template#compiled_source", () => {
     );
     let raised: unknown;
     try {
-      t.render(new (Base.withEmptyTemplateCache())(null, {}, null));
+      await t.render(new (Base.withEmptyTemplateCache())(null, {}, null));
     } catch (e) {
       raised = e;
     }
@@ -85,19 +86,19 @@ describe("Template#compiled_source", () => {
 });
 
 describe("Template#compiled_source resolves top-level constants", () => {
-  const renderTse = (source: string): string =>
+  const renderTse = async (source: string): Promise<string> =>
     String(
-      new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(
+      await new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(
         new (Base.withEmptyTemplateCache())(null, {}, null),
         {},
       ),
     );
 
-  it("resolves a seated TopLevel constant with no local passed", () => {
-    expect(renderTse("<%= I18n.locale() %>")).toBe("en");
+  it("resolves a seated TopLevel constant with no local passed", async () => {
+    expect(await renderTse("<%= I18n.locale() %>")).toBe("en");
   });
 
-  it("still resolves JS globals past the TopLevel scope", () => {
-    expect(renderTse("<%= Math.max(1, 2) %> <%= JSON.stringify([1]) %>")).toBe("2 [1]");
+  it("still resolves JS globals past the TopLevel scope", async () => {
+    expect(await renderTse("<%= Math.max(1, 2) %> <%= JSON.stringify([1]) %>")).toBe("2 [1]");
   });
 });

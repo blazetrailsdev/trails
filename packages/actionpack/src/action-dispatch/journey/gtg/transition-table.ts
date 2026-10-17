@@ -211,7 +211,7 @@ export class TransitionTable implements TransitionTableLike, DotHost {
   }
 
   /** @missingRailsArgs join — PERMANENT */
-  visualizer(paths: readonly Node[], title = "FSM"): string | SafeBuffer {
+  async visualizer(paths: readonly Node[], title = "FSM"): Promise<string | SafeBuffer> {
     const vizDir = File.join(__dir__, "..", "visualizer");
     const fsmJs = File.read(File.join(vizDir, "fsm.js"));
     const fsmCss = File.read(File.join(vizDir, "fsm.css"));
@@ -240,14 +240,14 @@ export class TransitionTable implements TransitionTableLike, DotHost {
       format: "html",
       locals: ["title", "funRoutes", "stylesheets", "svg", "javascripts", "paths"],
     });
-    return template.render(Base.withEmptyTemplateCache().empty(), {
+    return (await template.render(Base.withEmptyTemplateCache().empty(), {
       title,
       funRoutes,
       stylesheets,
       svg,
       javascripts,
       paths,
-    });
+    })) as string | SafeBuffer;
   }
 
   /** @internal */

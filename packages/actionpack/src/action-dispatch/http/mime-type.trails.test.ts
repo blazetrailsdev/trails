@@ -47,7 +47,7 @@ describe("ActionView::Template::Types once Action Dispatch loads", () => {
     });
     expect(template.type).toBe(Mime.get(":text"));
     expect(new TseHandler().call(template, template.source)).toMatch(
-      /_ob\.safeExprAppend\( name \)/,
+      /_ob\.safeExprAppend\(await \( name \)\)/,
     );
   });
 });

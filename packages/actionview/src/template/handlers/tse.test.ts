@@ -55,22 +55,22 @@ describe("Template::Handlers::Tse", () => {
 
   it("emits the escaping append for html templates", () => {
     const code = new Tse().call({ type: "text/html" }, "<%= name %>");
-    expect(code).toMatch(/_ob\.append\( name \)/);
+    expect(code).toMatch(/_ob\.append\(await \( name \)\)/);
   });
 
   it("emits the non-escaping append for templates in escapeIgnoreList", () => {
     const code = new Tse().call({ type: "text/plain" }, "<%= name %>");
-    expect(code).toMatch(/_ob\.safeExprAppend\( name \)/);
+    expect(code).toMatch(/_ob\.safeExprAppend\(await \( name \)\)/);
   });
 
   it("treats unknown template.type as escaping (not in ignore list)", () => {
     const code = new Tse().call({ type: "application/json" }, "<%= name %>");
-    expect(code).toMatch(/_ob\.append\( name \)/);
+    expect(code).toMatch(/_ob\.append\(await \( name \)\)/);
   });
 
   it("treats missing template.type as escaping", () => {
     const code = new Tse().call({}, "<%= name %>");
-    expect(code).toMatch(/_ob\.append\( name \)/);
+    expect(code).toMatch(/_ob\.append\(await \( name \)\)/);
   });
 
   it("strips a single trailing newline when stripTrailingNewlines is enabled", () => {
@@ -117,7 +117,7 @@ describe("Template::Handlers::Tse", () => {
 
   it("Tse.call delegates to a fresh instance", () => {
     const code = Tse.call({ type: "text/html" }, "<%= name %>");
-    expect(code).toMatch(/_ob\.append\( name \)/);
+    expect(code).toMatch(/_ob\.append\(await \( name \)\)/);
   });
 
   describe("translateLocation", () => {

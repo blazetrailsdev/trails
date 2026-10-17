@@ -90,7 +90,7 @@ export class Router {
     }
   }
 
-  visualizer(): string | SafeBuffer {
+  visualizer(): Promise<string | SafeBuffer> {
     const ast = this.ast();
     if (!ast) throw new Error("Router#visualizer requires a non-empty route set");
     const tt = new Builder(ast).transitionTable();

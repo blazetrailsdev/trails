@@ -14,7 +14,7 @@ import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
 /** @internal */
-export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRenderer {
+export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends AbstractRenderer {
   /** @internal */
   protected details: Record<string, readonly (string | symbol)[]> = {};
 
@@ -94,7 +94,7 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
     locals: Record<string, unknown>,
   ): Rendered {
     return this.renderWithLayout(view, template, layoutName, locals, (layout) =>
-      Notifications.instrument<string | SafeBuffer>(
+      Notifications.instrument<Promise<string | SafeBuffer>>(
         "render_template.action_view",
         {
           identifier: template.identifier,
@@ -102,21 +102,21 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
           locals,
         },
         () =>
-          template.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)) as
-            | string
-            | SafeBuffer,
+          template.render(view, locals, null, {}, (...name) =>
+            view._layoutFor!(...name),
+          ) as Promise<string | SafeBuffer>,
       ),
     ) as unknown as Rendered;
   }
 
   /** @internal */
-  private renderWithLayout(
+  private async renderWithLayout(
     view: ViewContext,
     template: RenderableTemplate,
     path: RenderOptions["layout"],
     locals: Record<string, unknown>,
-    block: (layout: RenderableTemplate | null) => string | SafeBuffer,
-  ): RenderedTemplate {
+    block: (layout: RenderableTemplate | null) => Promise<string | SafeBuffer>,
+  ): Promise<RenderedTemplate> {
     const layout =
       path != null && path !== false
         ? this.findLayout(path, Object.keys(locals), [this.formats[0] as string])
@@ -124,18 +124,18 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
 
     let body: string | SafeBuffer;
     if (layout) {
-      body = Notifications.instrument<string | SafeBuffer>(
+      body = await Notifications.instrument<Promise<string | SafeBuffer>>(
         "render_layout.action_view",
         { identifier: layout.identifier },
-        () => {
-          view.viewFlow?.set("layout", block(layout));
-          return layout.render(view, locals, null, {}, (...name) => view._layoutFor!(...name)) as
-            | string
-            | SafeBuffer;
+        async () => {
+          view.viewFlow?.set("layout", await block(layout));
+          return (await layout.render(view, locals, null, {}, (...name) =>
+            view._layoutFor!(...name),
+          )) as string | SafeBuffer;
         },
       );
     } else {
-      body = block(null);
+      body = await block(null);
     }
     return this.buildRenderedTemplate(body, template);
   }

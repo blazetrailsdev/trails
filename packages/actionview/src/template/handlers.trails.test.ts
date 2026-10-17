@@ -22,11 +22,13 @@ describe("Template::Handlers.extended", () => {
     expect(TemplateHandlers.extensions()).toEqual([":raw", ":tse", ":html", ":ruby"]);
   });
 
-  it("renders a .html template through the Html handler", () => {
-    expect(String(buildView().render({ template: "test/greeting" }))).toBe("<p>Hello</p>");
+  it("renders a .html template through the Html handler", async () => {
+    expect(String(await buildView().render({ template: "test/greeting" }))).toBe("<p>Hello</p>");
   });
 
-  it("renders a .ruby template's source verbatim as code", () => {
-    expect(String(buildView().render({ template: "ruby_template" }))).toBe("Hello from Ruby code");
+  it("renders a .ruby template's source verbatim as code", async () => {
+    expect(String(await buildView().render({ template: "ruby_template" }))).toBe(
+      "Hello from Ruby code",
+    );
   });
 });

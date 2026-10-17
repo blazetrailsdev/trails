@@ -357,10 +357,11 @@ export class HtmlTableFormatter {
 `);
   }
 
-  result(): SafeBuffer {
+  async result(): Promise<SafeBuffer> {
+    const buffer = await Promise.all(this.buffer);
     return this.view.raw(
-      this.view.render({ layout: "routes/table" }, {}, () => {
-        return this.view.raw(this.buffer.join("\n"));
+      await this.view.render({ layout: "routes/table" }, {}, () => {
+        return this.view.raw(buffer.join("\n"));
       }),
     );
   }

@@ -100,11 +100,11 @@ export class SameCollectionIterator extends CollectionIterator {
     ) => SameCollectionIterator)(collection, this.path, this.variables);
   }
 
-  eachWithInfo(
-    blk: (object: unknown, variables: IterationVariables) => void,
-  ): void | Promise<void> {
+  async eachWithInfo(
+    blk: (object: unknown, variables: IterationVariables) => Promise<void>,
+  ): Promise<void> {
     const variables = [this.path, ...this.variables];
-    this.collection.forEach((o) => blk(o, variables));
+    for (const o of this.collection) await blk(o, variables);
   }
 }
 
@@ -128,10 +128,10 @@ export class PreloadCollectionIterator extends SameCollectionIterator {
   }
 
   override async eachWithInfo(
-    blk: (object: unknown, variables: IterationVariables) => void,
+    blk: (object: unknown, variables: IterationVariables) => Promise<void>,
   ): Promise<void> {
     await this.preloadBang();
-    super.eachWithInfo(blk);
+    await super.eachWithInfo(blk);
   }
 
   override async preloadBang(): Promise<void> {
@@ -148,8 +148,10 @@ export class MixedCollectionIterator extends CollectionIterator {
     this.paths = paths;
   }
 
-  eachWithInfo(blk: (object: unknown, variables: IterationVariables) => void): void {
-    this.collection.forEach((o, i) => blk(o, this.paths[i]));
+  async eachWithInfo(
+    blk: (object: unknown, variables: IterationVariables) => Promise<void>,
+  ): Promise<void> {
+    for (const [i, o] of this.collection.entries()) await blk(o, this.paths[i]);
   }
 }
 
@@ -257,7 +259,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
         layout: layout && layout.virtualPath,
         count: collection.length(),
       },
-      (payload) => {
+      async (payload) => {
         let spacer: RenderedTemplate;
         if ("spacerTemplate" in this.options) {
           const spacerTemplate = this.findTemplate(
@@ -265,7 +267,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
             Object.keys(this.locals),
           );
           spacer = this.buildRenderedTemplate(
-            spacerTemplate.render(view, this.locals) as string | SafeBuffer,
+            (await spacerTemplate.render(view, this.locals)) as string | SafeBuffer,
             spacerTemplate,
           );
         } else {
@@ -298,19 +300,19 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
   }
 
   /** @internal */
-  protected collectionWithTemplate(
+  protected async collectionWithTemplate(
     view: ViewContext,
     template: RenderableTemplate | null,
     layout: RenderableTemplate | null,
     collection: SameCollectionIterator | MixedCollectionIterator,
-  ): RenderedTemplate[] | Promise<RenderedTemplate[]> {
+  ): Promise<RenderedTemplate[]> {
     const locals = this.locals;
     const cache: Record<string, RenderableTemplate> = {};
 
     const partialIteration = new PartialIteration(collection.size());
 
     const rendered: RenderedTemplate[] = [];
-    const each = collection.eachWithInfo((object, [path, as, counter, iteration]) => {
+    await collection.eachWithInfo(async (object, [path, as, counter, iteration]) => {
       const index = partialIteration.index;
 
       locals[as] = object;
@@ -320,14 +322,16 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
       const _template = (cache[path] ??=
         template ?? this.findTemplate(path, [...Object.keys(this.locals), as, counter, iteration]));
 
-      let content = _template.render(view, locals, null, {
+      let content = (await _template.render(view, locals, null, {
         implicitLocals: [counter, iteration],
-      }) as string | SafeBuffer;
+      })) as string | SafeBuffer;
       if (layout)
-        content = layout.render(view, locals, null, {}, () => content) as string | SafeBuffer;
+        content = (await layout.render(view, locals, null, {}, () => content)) as
+          | string
+          | SafeBuffer;
       partialIteration.iterateBang();
       rendered.push(this.buildRenderedTemplate(content, _template));
     });
-    return each instanceof Promise ? each.then(() => rendered) : rendered;
+    return rendered;
   }
 }

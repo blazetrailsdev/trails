@@ -53,16 +53,16 @@ describe("FileSystemResolver", () => {
     ]);
     const ctx = new LookupContext(null, {}, []);
     ctx.appendViewPaths([new FileSystemResolver(dir)]);
-    const render = (name: string) =>
+    const render = async (name: string) =>
       String(
-        (ctx.findTemplate(name, ["posts"]) as Template).render(
+        await (ctx.findTemplate(name, ["posts"]) as Template).render(
           new (Base.withEmptyTemplateCache())(null, {}, null),
           {},
         ),
       );
 
-    expect(render("utf8")).toBe("hello \u{fc}mlat");
-    expect(render("latin1")).toBe("\nhello \u{fc}mlat");
+    expect(await render("utf8")).toBe("hello \u{fc}mlat");
+    expect(await render("latin1")).toBe("\nhello \u{fc}mlat");
   });
 
   it("resolves a template through the same paths as exists?", () => {

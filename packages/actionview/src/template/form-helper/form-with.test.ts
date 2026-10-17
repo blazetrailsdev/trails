@@ -167,8 +167,8 @@ describe("FormWithActsLikeFormTagTest", () => {
     });
   });
 
-  it("form with with block in tse", () => {
-    const rendered = view.render({
+  it("form with with block in tse", async () => {
+    const rendered = await view.render({
       inline: "<%= formWith({ url: 'http://www.example.com' }, () => { %>Hello world!<% }) %>",
     });
     const expected = wholeForm("http://www.example.com", {}, () => "Hello world!");

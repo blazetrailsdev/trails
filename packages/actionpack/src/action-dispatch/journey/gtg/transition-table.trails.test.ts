@@ -98,9 +98,9 @@ describe("ActionDispatch::Journey::GTG::TransitionTable — toJSON structure", (
 });
 
 describe("ActionDispatch::Journey::GTG::TransitionTable — visualizer", () => {
-  it("renders index.html.tse with the fsm.css and fsm.js shipped beside it", () => {
+  it("renders index.html.tse with the fsm.css and fsm.js shipped beside it", async () => {
     const html = String(
-      tt(["/articles(.:format)"]).visualizer(asts(["/articles(.:format)"]), "FSM"),
+      await tt(["/articles(.:format)"]).visualizer(asts(["/articles(.:format)"]), "FSM"),
     );
     expect(html.startsWith("<!DOCTYPE html>")).toBe(true);
     expect(html).toContain("<title>FSM</title>");

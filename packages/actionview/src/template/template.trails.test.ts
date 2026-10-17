@@ -32,7 +32,7 @@ function withExternalEncoding<T>(encoding: string | Encoding, block: () => T): T
 }
 
 describe("Template#encode!", () => {
-  afterEach(() => {
+  afterEach(async () => {
     TemplateHandlers.clear();
     for (const dir of dirs.splice(0)) getFs().rmSync(dir, { recursive: true, force: true });
   });
@@ -44,27 +44,28 @@ describe("Template#encode!", () => {
       locals: [],
     });
 
-  const render = (template: Template): string =>
-    String(template.render(new (Base.withEmptyTemplateCache())(null, {}, null), {}, null, {}));
+  const render = async (template: Template): Promise<string> =>
+    String(
+      await template.render(new (Base.withEmptyTemplateCache())(null, {}, null), {}, null, {}),
+    );
 
-  it("passes a String source to the handler untouched", () => {
-    expect(render(newTemplate("hello \u{fc}mlat"))).toBe("hello \u{fc}mlat");
+  it("passes a String source to the handler untouched", async () => {
+    expect(await render(newTemplate("hello \u{fc}mlat"))).toBe("hello \u{fc}mlat");
   });
 
   it("decodes a file source in Encoding.default_external", async () => {
     const source = await binarySource("hello \xFCmlat");
-    withExternalEncoding("ISO-8859-1", () => {
-      expect(render(newTemplate(source))).toBe("hello \u{fc}mlat");
-    });
+    const rendered = withExternalEncoding("ISO-8859-1", () => render(newTemplate(source)));
+    expect(await rendered).toBe("hello \u{fc}mlat");
   });
 
   it("decodes a file source in its magic-comment encoding, leaving a blank line", async () => {
     const template = newTemplate(await binarySource("# encoding: ISO-8859-1\nhello \xFCmlat"));
-    expect(render(template)).toBe("\nhello \u{fc}mlat");
+    expect(await render(template)).toBe("\nhello \u{fc}mlat");
   });
 
   it("raises WrongEncodingError for bytes invalid in the magic-comment encoding", async () => {
     const template = newTemplate(await binarySource("# encoding: UTF-8\nhello \xFCmlat"));
-    expect(() => render(template)).toThrow(/Your template was not saved as valid UTF-8/);
+    await expect(render(template)).rejects.toThrow(/Your template was not saved as valid UTF-8/);
   });
 });

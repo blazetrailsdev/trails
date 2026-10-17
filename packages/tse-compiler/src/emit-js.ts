@@ -241,8 +241,8 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
         );
       }
       innerDepths.push(0);
-      innerCallExprParens.push(netUnclosedParens(node.value));
-      push(`${bufRef}.${exprAppend}(${node.value}`, node.srcLine);
+      innerCallExprParens.push(netUnclosedParens(node.value) + (awaits ? 1 : 0));
+      push(`${bufRef}.${exprAppend}(${awaits ? "await (" : ""}${node.value}`, node.srcLine);
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {

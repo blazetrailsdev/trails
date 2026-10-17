@@ -58,7 +58,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
     locals: Record<string, unknown> = {},
   ): Promise<Body | (string | SafeBuffer | null)[]> {
     if (!(layoutName != null && layoutName !== false && template.supportsStreaming?.())) {
-      const rendered = super.renderTemplate(view, template, layoutName, locals);
+      const rendered = await super.renderTemplate(view, template, layoutName, locals);
       return [(rendered as unknown as RenderedTemplate).body];
     }
 

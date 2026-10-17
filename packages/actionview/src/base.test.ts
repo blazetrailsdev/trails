@@ -9,9 +9,16 @@ import { Tse } from "./template/handlers/tse.js";
 import { Template } from "./template.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
-const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
+const renderTse = async (
+  source: string,
+  locals: Record<string, unknown>,
+  view: Base,
+): Promise<string> =>
   String(
-    new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, locals),
+    await new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(
+      view,
+      locals,
+    ),
   );
 
 describe("ActionView::Base", () => {
@@ -95,9 +102,9 @@ describe("ActionView::Base", () => {
     expect(typeof view.contentFor).toBe("function");
   });
 
-  it("lets a local shadow a helper of the same name, as locals_code does", () => {
+  it("lets a local shadow a helper of the same name, as locals_code does", async () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
-    expect(renderTse("<%= raw %>", { raw: "local wins" }, view)).toBe("local wins");
+    expect(await renderTse("<%= raw %>", { raw: "local wins" }, view)).toBe("local wins");
   });
 });
 
@@ -124,20 +131,20 @@ describe("ActionView::Base include Helpers", () => {
     expect(v.TagBuilder).toBeUndefined();
   });
 
-  it("resolves a helper as a bare identifier in a template", () => {
+  it("resolves a helper as a bare identifier in a template", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
-      const out = renderTse('<%= contentTag("p", name) %>', { name: "Ada" }, view());
+      const out = await renderTse('<%= contentTag("p", name) %>', { name: "Ada" }, view());
       expect(out).toBe("<p>Ada</p>");
     } finally {
       TemplateHandlers.clear();
     }
   });
 
-  it("resolves a number helper as a bare identifier in a template", () => {
+  it("resolves a number helper as a bare identifier in a template", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
-      const out = renderTse("<%= numberToCurrency(amount) %>", { amount: 12.5 }, view());
+      const out = await renderTse("<%= numberToCurrency(amount) %>", { amount: 12.5 }, view());
       expect(out).toContain("12.50");
     } finally {
       TemplateHandlers.clear();
@@ -205,11 +212,11 @@ describe("ActionView::Base include ControllerHelper", () => {
     expect((view as unknown as { logger: unknown }).logger).toBe(Base.logger);
   });
 
-  it("makes params reachable as a bare identifier in a template", () => {
+  it("makes params reachable as a bare identifier in a template", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
       const view = new (Base.withEmptyTemplateCache())(null, {}, controller);
-      const out = renderTse("<%= params().id %>", {}, view);
+      const out = await renderTse("<%= params().id %>", {}, view);
       expect(out).toBe("1");
     } finally {
       TemplateHandlers.clear();
@@ -218,10 +225,10 @@ describe("ActionView::Base include ControllerHelper", () => {
 });
 
 describe("ActionView::Base include TSE::Util", () => {
-  it("resolves h() as a bare identifier in a template", () => {
+  it("resolves h() as a bare identifier in a template", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
-      const out = renderTse(
+      const out = await renderTse(
         "<%= h(name) %>",
         { name: "<b>" },
         new (Base.withEmptyTemplateCache())(null, {}, null),
@@ -307,10 +314,10 @@ describe("ActionView::Base attr_internal readers", () => {
     expect(view._assigns).toEqual({ a: 1 });
   });
 
-  it("resolves request as a bare identifier in a template", () => {
+  it("resolves request as a bare identifier in a template", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
-      const out = renderTse(
+      const out = await renderTse(
         "<%= request.host %>",
         {},
         new (Base.withEmptyTemplateCache())(null, {}, controller),
@@ -342,36 +349,36 @@ describe("ActionView::Base#render", () => {
     return new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
   };
 
-  it("renders a template through the template: option", () => {
-    expect(String(buildView().render({ template: "test/hello_world" }))).toBe("Hello world!");
+  it("renders a template through the template: option", async () => {
+    expect(String(await buildView().render({ template: "test/hello_world" }))).toBe("Hello world!");
   });
 
-  it("renders a partial through the partial: option", () => {
-    expect(String(buildView().render({ partial: "test/partial_only" }))).toBe("only partial");
+  it("renders a partial through the partial: option", async () => {
+    expect(String(await buildView().render({ partial: "test/partial_only" }))).toBe("only partial");
   });
 
-  it("treats a non-Hash options as a partial name", () => {
-    expect(String(buildView().render("test/partial_only"))).toBe("only partial");
+  it("treats a non-Hash options as a partial name", async () => {
+    expect(String(await buildView().render("test/partial_only"))).toBe("only partial");
   });
 
-  it("renders the layout: option around the block's content", () => {
+  it("renders the layout: option around the block's content", async () => {
     const view = buildView();
-    expect(String(view.render({ layout: "test/layout" }, {}, () => "inside"))).toBe(
+    expect(String(await view.render({ layout: "test/layout" }, {}, () => "inside"))).toBe(
       "<div>inside</div>",
     );
   });
 
-  it("renders the plain:, html:, body: and renderable: options", () => {
+  it("renders the plain:, html:, body: and renderable: options", async () => {
     const view = buildView();
-    expect(String(view.render({ body: "b" }))).toBe("b");
-    expect(String(view.render({ plain: "p" }))).toBe("p");
-    expect(String(view.render({ html: "<p>hello world</p>" }))).toBe(
+    expect(String(await view.render({ body: "b" }))).toBe("b");
+    expect(String(await view.render({ plain: "p" }))).toBe("p");
+    expect(String(await view.render({ html: "<p>hello world</p>" }))).toBe(
       "&lt;p&gt;hello world&lt;/p&gt;",
     );
-    expect(String(view.render({ html: htmlSafe("<p>hello world</p>") }))).toBe(
+    expect(String(await view.render({ html: htmlSafe("<p>hello world</p>") }))).toBe(
       "<p>hello world</p>",
     );
-    expect(String(view.render({ renderable: { renderIn: () => "r" } }))).toBe("r");
+    expect(String(await view.render({ renderable: { renderIn: () => "r" } }))).toBe("r");
   });
 
   it("raises when given none of the render options", () => {
@@ -381,19 +388,19 @@ describe("ActionView::Base#render", () => {
     );
   });
 
-  it("renders through the formats-prepended lookup context in_rendering_context built", () => {
-    expect(String(buildView().render({ template: "test/hello_world", formats: [":json"] }))).toBe(
-      '{"hello":"world"}',
-    );
-  });
-
-  it("render inline", () => {
-    expect(String(buildView().render({ inline: "Hello, World!" }))).toBe("Hello, World!");
-  });
-
-  it("render inline with locals", () => {
+  it("renders through the formats-prepended lookup context in_rendering_context built", async () => {
     expect(
-      String(buildView().render({ inline: "Hello, <%= name %>!", locals: { name: "Josh" } })),
+      String(await buildView().render({ template: "test/hello_world", formats: [":json"] })),
+    ).toBe('{"hello":"world"}');
+  });
+
+  it("render inline", async () => {
+    expect(String(await buildView().render({ inline: "Hello, World!" }))).toBe("Hello, World!");
+  });
+
+  it("render inline with locals", async () => {
+    expect(
+      String(await buildView().render({ inline: "Hello, <%= name %>!", locals: { name: "Josh" } })),
     ).toBe("Hello, Josh!");
   });
 
@@ -404,10 +411,10 @@ describe("ActionView::Base#render", () => {
     );
   });
 
-  it("restores the lookup context after in_rendering_context prepends formats", () => {
+  it("restores the lookup context after in_rendering_context prepends formats", async () => {
     const view = buildView();
     const before = view.lookupContext;
-    view.render({ template: "test/hello_world", formats: [":html"] });
+    await view.render({ template: "test/hello_world", formats: [":html"] });
     expect(view.lookupContext).toBe(before);
   });
 });

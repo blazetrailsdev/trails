@@ -138,8 +138,6 @@ export class Template {
   private readonly _objectId = ++nextObjectId;
   private _compiled = false;
   private _compiledStreaming = false;
-  /** @internal */
-  _streaming = false;
 
   constructor(
     source: string | SourcesFile,
@@ -267,27 +265,6 @@ export class Template {
 
   render(
     view: Base,
-    locals?: Record<string, unknown>,
-    buffer?: null,
-    options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
-    block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer;
-  render(
-    view: Base,
-    locals: Record<string, unknown>,
-    buffer: StreamingBuffer,
-    options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
-    block?: (...name: unknown[]) => unknown,
-  ): Promise<null>;
-  render(
-    view: Base,
-    locals: Record<string, unknown>,
-    buffer: OutputBuffer,
-    options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
-    block?: (...name: unknown[]) => unknown,
-  ): null;
-  render(
-    view: Base,
     locals: Record<string, unknown> = {},
     buffer: OutputBuffer | StreamingBuffer | null = null,
     {
@@ -295,11 +272,11 @@ export class Template {
       addToStack = true,
     }: { implicitLocals?: readonly string[]; addToStack?: boolean } = {},
     block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer | null | Promise<null> {
+  ): Promise<string | SafeBuffer | null> {
     const streaming = buffer instanceof StreamingBuffer;
     try {
-      const rendered = this.instrumentRenderTemplate<string | SafeBuffer | null | Promise<null>>(
-        () => {
+      const rendered = this.instrumentRenderTemplate<Promise<string | SafeBuffer | null>>(
+        async () => {
           this.compileBang(view, streaming);
 
           if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
@@ -310,7 +287,7 @@ export class Template {
           }
 
           if (buffer) {
-            const result = view._run(
+            await view._run(
               streaming ? this.streamingMethodName() : this.methodName(),
               this,
               locals,
@@ -318,9 +295,9 @@ export class Template {
               { addToStack, hasStrictLocals: this.isStrictLocals() },
               block,
             );
-            return streaming ? (result as Promise<unknown>).then(() => null) : null;
+            return null;
           } else {
-            const result = view._run(
+            const result = await view._run(
               this.methodName(),
               this,
               locals,
@@ -334,11 +311,9 @@ export class Template {
           }
         },
       );
-      return rendered instanceof Promise
-        ? rendered.catch((e: unknown) => this.handleRenderError(view, e))
-        : rendered;
+      return rendered.catch((e: unknown) => this.handleRenderError(view, e));
     } catch (e) {
-      return this.handleRenderError(view, e);
+      return Promise.reject(e).catch((e: unknown) => this.handleRenderError(view, e));
     }
   }
 
@@ -384,13 +359,7 @@ export class Template {
     const setStrictLocals = this.strictLocalsBang();
     let source = this.encodeBang();
     const handler = this.handler;
-    let code: string;
-    this._streaming = streaming;
-    try {
-      code = handler.call(this, source);
-    } finally {
-      this._streaming = false;
-    }
+    const code = handler.call(this, source);
 
     let methodArguments: string;
     if (setStrictLocals != null) {
@@ -405,7 +374,7 @@ export class Template {
     const parameters = methodParameters(methodArguments);
     const scope = setStrictLocals != null ? "__strictLocals" : "localAssigns";
 
-    source = `Object.assign(${streaming ? "async " : ""}function ${streaming ? this.streamingMethodName() : this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (TopLevel) { with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
+    source = `Object.assign(async function ${streaming ? this.streamingMethodName() : this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (TopLevel) { with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
   } } } }
 }, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
 

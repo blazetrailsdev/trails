@@ -491,7 +491,7 @@ describe("FormHelperTest", () => {
     });
   });
 
-  it("label with block in erb", () => {
+  it("label with block in erb", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
       const erbView = Base.withEmptyTemplateCache().withViewPaths(
@@ -508,7 +508,7 @@ describe("FormHelperTest", () => {
       );
       assertDomEqual(
         '<label for="post_message">\n  Message\n  <input id="post_message" name="post[message]" type="text" />\n</label>',
-        erbView.render("test/label_with_block"),
+        await erbView.render("test/label_with_block"),
       );
     } finally {
       TemplateHandlers.clear();
