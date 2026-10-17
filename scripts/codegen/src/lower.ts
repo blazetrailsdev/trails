@@ -355,7 +355,7 @@ export class Lowerer {
     const id = jsIdent(name);
     if (this.assignCount(ctx, name) !== 1 || value === undefined || value === "null")
       return `let ${id}: any`;
-    if (value === "{}") return `const ${id}: Record<string, any>`;
+    if (value.startsWith("{")) return `const ${id}: Record<string, any>`;
     if (value === "[]") return `const ${id}: any[]`;
     if (this.helperResult(ctx, value)) return `const ${id}: any`;
     return `const ${id}`;
@@ -515,7 +515,10 @@ export class Lowerer {
         // right-hand side already sees it shadowing a same-named function.
         const prevAssigning = ctx.assigning;
         ctx.assigning = jsIdent(name);
-        const v = this.expr(n.value, ctx);
+        const v =
+          n.value?.k === "hash" && OPTIONS_NAME.test(name)
+            ? this.hashLit(n.value.pairs, ctx, true)
+            : this.expr(n.value, ctx);
         ctx.assigning = prevAssigning;
         const line = `${this.decl(ctx, name, v)} = ${v};`;
         this.noteLocalType(ctx, name, n.value);
@@ -1252,7 +1255,8 @@ export class Lowerer {
     return `{ ${parts.join(", ")} }`;
   }
 
-  hashLit(pairs: any[], ctx: Ctx): string {
+  /** `camelKeys`: an option hash, whose Symbol keys are camelCase (CLAUDE.md, the option-key rule). */
+  hashLit(pairs: any[], ctx: Ctx, camelKeys = false): string {
     if (!pairs.length) return "{}";
     // An Integer key (`{ 1 => 2 }`) does not survive as a JS object key, which
     // is always a string: the literal is a ruby-compat `Hash` (a Map).
@@ -1266,7 +1270,7 @@ export class Lowerer {
       if (p.key.k === "sym")
         return symColonHere(ctx)
           ? `${JSON.stringify(":" + p.key.value)}: ${this.expr(p.value, ctx)}`
-          : `${propKey(p.key.value)}: ${this.expr(p.value, ctx)}`;
+          : `${propKey(camelKeys && /^[a-z_][a-z0-9_]*$/.test(p.key.value) ? propName(p.key.value) : p.key.value)}: ${this.expr(p.value, ctx)}`;
       if (p.key.k === "str") return `${JSON.stringify(p.key.value)}: ${this.expr(p.value, ctx)}`;
       return `[${this.expr(p.key, ctx)}]: ${this.expr(p.value, ctx)}`;
     });
@@ -3357,7 +3361,7 @@ export class Lowerer {
         : recv?.k === "call" && !recv.args?.length
           ? recv.name
           : "";
-    if (/^@?(options|opts|.*_options)$/.test(nm)) {
+    if (OPTIONS_NAME.test(nm)) {
       this.stat(ctx, "option-key-camel");
       return camel;
     }
@@ -4726,3 +4730,5 @@ function typedSplat(args: string, paramsOf: string): string {
   }
   return `...(${args.slice(3)} as ${paramsOf})`;
 }
+
+const OPTIONS_NAME = /^@?(options|opts|.*_options)$/;

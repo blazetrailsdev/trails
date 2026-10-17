@@ -701,6 +701,48 @@
                           "l": 41
                         },
                         {
+                          "k": "lasgn",
+                          "name": "options",
+                          "value": {
+                            "k": "hash",
+                            "pairs": [
+                              {
+                                "key": {
+                                  "k": "sym",
+                                  "value": "primary_key"
+                                },
+                                "value": {
+                                  "k": "int",
+                                  "value": "1"
+                                }
+                              }
+                            ]
+                          },
+                          "l": 42
+                        },
+                        {
+                          "k": "call",
+                          "recv": {
+                            "k": "lvar",
+                            "name": "options"
+                          },
+                          "name": "[]=",
+                          "args": [
+                            {
+                              "k": "sym",
+                              "value": "on_delete"
+                            },
+                            {
+                              "k": "int",
+                              "value": "2"
+                            }
+                          ],
+                          "block": null,
+                          "safe": false,
+                          "l": 43,
+                          "vcall": false
+                        },
+                        {
                           "k": "array",
                           "elems": [
                             {
@@ -710,13 +752,17 @@
                             {
                               "k": "lvar",
                               "name": "total"
+                            },
+                            {
+                              "k": "lvar",
+                              "name": "options"
                             }
                           ]
                         }
                       ]
                     },
                     "l": 37,
-                    "lend": 43,
+                    "lend": 45,
                     "endless": false
                   },
                   {
@@ -726,7 +772,7 @@
                     "args": [],
                     "block": null,
                     "safe": false,
-                    "l": 45,
+                    "l": 47,
                     "vcall": true
                   },
                   {
@@ -749,8 +795,8 @@
                         }
                       ]
                     },
-                    "l": 46,
-                    "lend": 48,
+                    "l": 48,
+                    "lend": 50,
                     "endless": false
                   }
                 ]
