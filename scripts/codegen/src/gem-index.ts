@@ -77,6 +77,8 @@ export class GemIndex {
   gemRestBlock = new Set<string>();
   /** Instance writers any gem scope declares (`attr_writer :priority` in Core). */
   instanceWriters = new Set<string>();
+  /** `x?` predicates `class_attribute` defines: activesupport ports each as a getter. */
+  classAttrPredicates = new Set<string>();
   /** Constants a module declares with `autoload :X` (Ruby loads them on first read), as `Mod::X`. */
   autoloads = new Set<string>();
   /** Ruby files that `require` a library outside trails and Ruby's stdlib. */
@@ -265,6 +267,8 @@ export class GemIndex {
           s.sattrs.add(a);
           if (instance) s.attrs.add(a);
           this.noteMethod(a, "attr");
+          if (name === "class_attribute" && !off("instance_predicate"))
+            this.classAttrPredicates.add(`${a}?`);
         }
       } else if (name === "include" || name === "prepend") {
         for (const a of node.args) if (a.k === "const") s.includes.push(a.path);
