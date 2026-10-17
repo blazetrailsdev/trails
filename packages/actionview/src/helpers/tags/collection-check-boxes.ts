@@ -20,10 +20,9 @@ export class CheckBoxBuilder extends Builder {
     );
   }
 
-  checkBox(extraHtmlOptions: Record<string, unknown> = {}): SafeBuffer {
-    return this.checkbox(extraHtmlOptions);
-  }
+  declare checkBox: CheckBoxBuilder["checkbox"];
 }
+CheckBoxBuilder.prototype.checkBox = CheckBoxBuilder.prototype.checkbox;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include CollectionHelpers, FormOptionsHelper` (tags/collection_check_boxes.rb:8-9); the class/interface merge is how the mixins surface on the type side.
 export class CollectionCheckBoxes extends Base {
