@@ -4,8 +4,9 @@
  *
  * Every Ruby idiom CLAUDE.md lists as "does not translate literally" is decided
  * here exactly once:
- *   - truthiness       → `rtest(x)` unless the node is statically boolean
- *   - `a || b` (value) → `rtest((_t = a)) ? _t : b` through a hoisted temp
+ *   - truthiness       → `x != null && x !== false` (or `(e ?? false) !== false`)
+ *                        unless the node is statically boolean or object-typed
+ *   - `a || b` (value) → a truthiness test of a hoisted temp, `? _t : b`
  *   - `h.fetch`        → ruby-compat `fetch`, never `??`
  *   - present?/blank?  → activesupport `isPresent` / `isBlank` / `presence`
  *   - kwargs           → one trailing options object, camelCase keys (RFC 0149)
@@ -784,7 +785,7 @@ export class Lowerer {
     ) {
       const R = this.expr(t.recv, ctx);
       const k = this.expr(t.args[0], ctx);
-      const cond = `${this.rc(ctx, "rtest")}(${R}.get(${k}))`;
+      const cond = this.truthy(`${R}.get(${k})`);
       const line = `if (${n.op === "||" ? "!" : ""}${cond}) ${R}.set(${k}, ${this.expr(n.value, ctx)});`;
       return tail ? [line, `return ${R}.get(${k});`] : [line];
     }
@@ -809,11 +810,11 @@ export class Lowerer {
         line = `${lhs} ??= ${v};`;
         this.stat(ctx, "or-assign-typed");
       } else {
-        line = `if (!${this.rc(ctx, "rtest")}(${lhs})) ${lhs} = ${v};`;
+        line = `if (!${this.truthy(lhs, true)}) ${lhs} = ${v};`;
         this.stat(ctx, "or-assign");
       }
     } else if (n.op === "&&") {
-      line = `if (${this.rc(ctx, "rtest")}(${lhs})) ${lhs} = ${v};`;
+      line = `if (${this.truthy(lhs)}) ${lhs} = ${v};`;
     } else {
       // `x op= v` is `x = x op v` with Ruby's operator semantics (array `|`, `+`, `-`, `<<`).
       const read = t.k === "lvar" ? { k: "lvar", name: t.name } : t;
@@ -1074,7 +1075,7 @@ export class Lowerer {
         this.stat(ctx, "cond-typed-bool");
         return this.expr(n, ctx);
       }
-      if (isObjectLike(t)) {
+      if (isObjectLike(t) || (t?.k === "prim" && t.name !== "boolean")) {
         this.stat(ctx, "cond-typed-object");
         const e = this.expr(n, ctx);
         return `${needsParens(e) ? `(${e})` : e} != null`;
@@ -1089,7 +1090,36 @@ export class Lowerer {
       const e = this.expr(n, ctx);
       return `${needsParens(e) ? `(${e})` : e} != null`;
     }
-    return `${this.rc(ctx, "rtest")}(${this.expr(n, ctx)})`;
+    return this.truthy(this.expr(n, ctx));
+  }
+
+  /**
+   * One `#{x}` of a Ruby string, natively: a primitive as itself, an unknown value
+   * with `nil` read as `""` (string.c rb_obj_as_string, NilClass#to_s). A constant
+   * or a value known to be a class keeps its Ruby `to_s`, the class name, which a
+   * JS template would print as the class's source.
+   */
+  interpolate(p: N, ctx: Ctx): string {
+    const e = this.expr(p, ctx);
+    const t = this.typeOf(p, ctx);
+    if (["str", "dstr", "int", "float"].includes(p.k) || t?.k === "prim") return "${" + e + "}";
+    if (p.k === "const" || (t?.k === "class" && t.static) || t?.k === "gemClass")
+      return "${" + `${this.rc(ctx, "rbObjAsString")}(${e})` + "}";
+    return "${" + `${needsParens(e) ? `(${e})` : e} ?? ""` + "}";
+  }
+
+  /**
+   * Ruby truthiness (`RTEST`, ruby.h: anything but `nil` and `false`) as a native
+   * JS test: `x != null && x !== false` for a plain read, which is evaluated twice,
+   * else `(e ?? false) !== false`, which evaluates `e` once. `wrap` parenthesizes
+   * the first form for use under `!` or a `?:`.
+   */
+  truthy(e: string, wrap = false): string {
+    if (isBoolExpr(e)) return wrap && !/^[!(]/.test(e) ? `(${e})` : e;
+    const t = /^[\w$]+(\.[\w$]+)*$/.test(e)
+      ? `${e} != null && ${e} !== false`
+      : `(${e} ?? false) !== false`;
+    return wrap ? `(${t})` : t;
   }
 
   condP(n: N, ctx: Ctx): string {
@@ -1456,13 +1486,7 @@ export class Lowerer {
                       p.recv &&
                       p.recv.k !== "self"
                     ? "${" + `${this.rc(ctx, "rbObjClassname")}(${this.expr(p.recv, ctx)})` + "}"
-                    : // A value not known to be a primitive is interpolated by its Ruby `to_s` (string.c
-                      // rb_obj_as_string), which for a Hash is `inspect` (activejob only).
-                      GEM.gem === "activejob" &&
-                        !["str", "dstr", "int", "float"].includes(p.k) &&
-                        this.typeOf(p, ctx)?.k !== "prim"
-                      ? "${" + `${this.rc(ctx, "rbObjAsString")}(${this.expr(p, ctx)})` + "}"
-                      : "${" + this.expr(p, ctx) + "}",
+                    : this.interpolate(p, ctx),
             )
             .join("") +
           "`"
@@ -1637,8 +1661,8 @@ export class Lowerer {
   opasgnExpr(n: N, ctx: Ctx): string {
     const lhs = this.lvalue(n.target, ctx);
     const v = this.expr(n.value, ctx);
-    if (n.op === "||") return `(${this.rc(ctx, "rtest")}(${lhs}) ? ${lhs} : (${lhs} = ${v}))`;
-    if (n.op === "&&") return `(${this.rc(ctx, "rtest")}(${lhs}) ? (${lhs} = ${v}) : ${lhs})`;
+    if (n.op === "||") return `(${this.truthy(lhs, true)} ? ${lhs} : (${lhs} = ${v}))`;
+    if (n.op === "&&") return `(${this.truthy(lhs, true)} ? (${lhs} = ${v}) : ${lhs})`;
     return `(${lhs} = ${this.operator({ k: "call", recv: n.target, name: n.op, args: [n.value], l: n.l }, lhs, ctx)})`;
   }
 
@@ -1646,7 +1670,7 @@ export class Lowerer {
    * Value-position `a || b` / `a && b` (Ruby truthiness, value of the deciding
    * operand). A boolean left side uses JS `||`/`&&`; a left side that is an
    * object or never `false` uses `??` / `!= null`; anything else tests a temp
-   * with `rtest` so the left side is evaluated once and the right side stays
+   * for Ruby truthiness so the left side is evaluated once and the right side stays
    * lazy (and may `await`).
    */
   orExpr(n: N, ctx: Ctx): string {
@@ -1656,7 +1680,7 @@ export class Lowerer {
     if (this.isBoolean(n.left) || isBool(lt)) return `(${l} || ${r})`;
     if (isObjectLike(lt) || this.neverFalse(n.left)) return `(${l} ?? ${r})`;
     const [t, init] = this.once(l, n.left, ctx);
-    return `(${this.rc(ctx, "rtest")}(${init}) ? ${t} : ${r})`;
+    return `(${this.truthy(init, true)} ? ${t} : ${r})`;
   }
 
   andExpr(n: N, ctx: Ctx): string {
@@ -1666,7 +1690,7 @@ export class Lowerer {
     if (this.isBoolean(n.left) || isBool(lt)) return `(${l} && ${r})`;
     const [t, init] = this.once(l, n.left, ctx);
     if (isObjectLike(lt)) return `(${init} != null ? ${r} : ${t})`;
-    return `(${this.rc(ctx, "rtest")}(${init}) ? ${r} : ${t})`;
+    return `(${this.truthy(init, true)} ? ${r} : ${t})`;
   }
 
   /** Evaluate `e` once: a plain read is reused; anything else goes through a hoisted temp. */
@@ -1942,7 +1966,7 @@ export class Lowerer {
     // (CLAUDE.md "Method visibility is compile-time only").
     if (ctx.objSingletonSuper && ctx.defName === "respond_to?") {
       const [m, priv] = (ctx.defParams ?? []).map((p) => jsIdent(p.name!));
-      return `${this.rc(ctx, "basicObjRespondTo")}(this, ${m}${priv ? `, !${this.rc(ctx, "rtest")}(${priv})` : ""})`;
+      return `${this.rc(ctx, "basicObjRespondTo")}(this, ${m}${priv ? `, !${this.truthy(priv, true)}` : ""})`;
     }
     if (ctx.objSingletonSuper)
       return `Object.getPrototypeOf(this).${this.defTsName(ctx)}.call(${["this", args].filter(Boolean).join(", ")})`;
@@ -2094,7 +2118,7 @@ export class Lowerer {
           { k: "call", recv: n.args[0], name: n.args[1].value, args: [], l: n.l },
           ctx,
         );
-        return `expect(${this.rc(ctx, "rtest")}(${v})).toBe(${n.name === "assert_predicate"})`;
+        return `expect(${this.truthy(v)}).toBe(${n.name === "assert_predicate"})`;
       }
       case "assert_nil":
         return n.args.length >= 1 ? `expect(${a(0)} ?? null).toBeNull()` : null;
@@ -3360,6 +3384,11 @@ export class Lowerer {
         return { k: "hash" };
       case "lasgn":
         return this.typeOf(n.value, ctx);
+      case "if": {
+        const a = n.then ? this.typeOf(this.seqBody(n.then).at(-1), ctx) : null;
+        const b = n.else ? this.typeOf(this.seqBody(n.else).at(-1), ctx) : null;
+        return a?.k === "prim" && b?.k === "prim" && a.name === b.name ? a : null;
+      }
       case "ivar": {
         const k = this.ownerKey(ctx);
         return k && ctx.selfKind !== "static" ? T.ivar(k, n.name) : null;
@@ -3535,7 +3564,7 @@ export class Lowerer {
       case "!=":
         return `!${rc("rbEqual")}(${r}, ${a[0]})`;
       case "!":
-        return `!${rc("rtest")}(${r})`;
+        return `!${this.truthy(r, true)}`;
       case "===":
         if (n.recv.k === "const") {
           const t = this.typeTest(n.recv, needsParens(a[0]) ? `(${a[0]})` : a[0], ctx);
@@ -3769,7 +3798,7 @@ export class Lowerer {
       case "reject":
         // Typed variadic so forwarding `...xs` into a one-parameter block type-checks.
         if (blk)
-          return `${E}${nav}filter((...xs: any[]) => !${rc("rtest")}(((${fn()}) as (...a: any[]) => unknown)(...xs)))`;
+          return `${E}${nav}filter((...xs: any[]) => !${this.truthy(`((${fn()}) as (...a: any[]) => unknown)(...xs)`, true)})`;
         break;
       case "detect":
       case "find":
@@ -4472,6 +4501,26 @@ function isAwaited(e: string): boolean {
   for (let i = 0; i < e.length; i++) {
     if (e[i] === "(") depth++;
     else if (e[i] === ")" && --depth === 0) return i === e.length - 1;
+  }
+  return false;
+}
+
+function isBoolExpr(e: string): boolean {
+  if (/^!/.test(e)) return true;
+  if (!e.startsWith("(") || !e.endsWith(")")) return false;
+  let depth = 0;
+  for (let i = 0; i < e.length; i++) {
+    if (e[i] === "(") depth++;
+    else if (e[i] === ")" && --depth === 0 && i !== e.length - 1) return false;
+  }
+  const inner = e.slice(1, -1);
+  let d = 0;
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (c === "(" || c === "[" || c === "{") d++;
+    else if (c === ")" || c === "]" || c === "}") d--;
+    else if (d === 0 && /^(===|!==|==|!=|<=|>=| instanceof | in )/.test(inner.slice(i)))
+      return true;
   }
   return false;
 }
