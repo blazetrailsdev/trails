@@ -1034,7 +1034,7 @@ export class Lowerer {
       !["==", "!=", "<=", ">=", "==="].includes(n.name) &&
       n.name !== "[]="
     ) {
-      const recv = n.recv ? this.expr(n.recv, ctx) : ctx.selfExpr;
+      const recv = n.recv ? this.nonNullRecv(n.recv, this.expr(n.recv, ctx), ctx) : ctx.selfExpr;
       const v = this.expr(n.args[0], ctx);
       // A writer `def x=` in a module is the function `setX` (CLAUDE.md's
       // `setX()` spelling), not a property: `self.queue_adapter = :async` calls it.
@@ -1092,7 +1092,18 @@ export class Lowerer {
   iter(node: N, ctx: Ctx, pre?: string): string {
     const e = pre ?? this.expr(node, ctx);
     if (node.k === "array" || node.k === "range") return e;
-    return e;
+    return this.nonNullRecv(node, e, ctx);
+  }
+
+  /**
+   * An ivar receiver typed `T | null`, asserted non-null: Ruby raises
+   * NoMethodError for a method sent to nil, which the JS TypeError of a null
+   * receiver stands for.
+   */
+  nonNullRecv(node: N | null, e: string, ctx: Ctx): string {
+    if (node?.k !== "ivar" || e.endsWith("!")) return e;
+    const t = this.typeOf(node, ctx);
+    return t && "nullable" in t && t.nullable ? `${e}!` : e;
   }
 
   raise(n: N, ctx: Ctx): string {
@@ -2329,12 +2340,7 @@ export class Lowerer {
   callInner(n: N, ctx: Ctx): string {
     const name: string = n.name;
     let r = n.recv ? this.expr(n.recv, ctx) : null;
-    // A method sent to an ivar the hand twin types `T | null`: Ruby raises
-    // NoMethodError on nil, which the JS TypeError of a null receiver stands for.
-    if (r !== null && n.recv?.k === "ivar" && !n.safe) {
-      const it = this.typeOf(n.recv, ctx);
-      if (it && "nullable" in it && it.nullable) r = `${r}!`;
-    }
+    if (r !== null && !n.safe) r = this.nonNullRecv(n.recv, r, ctx);
     if (r !== null && (n.recv.k === "int" || n.recv.k === "float")) r = `(${r})`;
     const recvNode: N | null = n.recv;
     const args = (): string[] => {
