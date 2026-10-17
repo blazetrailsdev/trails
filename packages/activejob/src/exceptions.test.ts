@@ -1,4 +1,3 @@
-// @ts-nocheck
 import "./test-helpers/helper.js";
 import { assertRaises, stub, Duration } from "@blazetrails/activesupport";
 import "@blazetrails/activesupport/testing/autorun";
@@ -25,7 +24,9 @@ import { clear, values, lastValue } from "./test-helpers/support/job-buffer.js";
 import { describe, beforeEach, it, expect, afterEach } from "vitest";
 
 describe("ExceptionsTest", () => {
-  class ExceptionsTest extends TestHost {}
+  class ExceptionsTest extends TestHost {
+    static isAdapterSkipsScheduling: (queueAdapter: any) => any;
+  }
   registerConstant("ExceptionsTest", ExceptionsTest);
   function isAdapterSkipsScheduling(queueAdapter: any): any {
     return [InlineAdapter, AsyncAdapter, (QueueAdapters as any).SneakersAdapter].includes(
@@ -169,7 +170,7 @@ describe("ExceptionsTest", () => {
       await testCase.travelTo(await RubyTime.now());
       const randomAmount: any = 1;
       const delayForJitter: any = await ((await (randomAmount * 3600)) * (await Base.retryJitter));
-      await await stub(Kernel, "rand", randomAmount, [], async () => {
+      await await stub(Kernel as any, "rand", randomAmount, [], async () => {
         await await RetryJob.performLater("LongWaitError", 2, "log_scheduled_at");
         return expect(await values()).toEqual([
           "Raised LongWaitError for the 1st time",
@@ -183,7 +184,7 @@ describe("ExceptionsTest", () => {
       const randomAmount: any = 2;
       const delayForJitter: any = async (delay?: any) =>
         await ((await (randomAmount * delay)) * (await Base.retryJitter));
-      await await stub(Kernel, "rand", randomAmount, [], async () => {
+      await await stub(Kernel as any, "rand", randomAmount, [], async () => {
         await await RetryJob.performLater("PolynomialWaitTenAttemptsError", 5, "log_scheduled_at");
         return expect(await values()).toEqual([
           "Raised PolynomialWaitTenAttemptsError for the 1st time",
@@ -207,7 +208,7 @@ describe("ExceptionsTest", () => {
           Base.retryJitter = new Number(4.0);
           await testCase.travelTo(await RubyTime.now());
           randomAmount = 1;
-          await await stub(Kernel, "rand", randomAmount, [], async () => {
+          await await stub(Kernel as any, "rand", randomAmount, [], async () => {
             await await RetryJob.performLater(
               "PolynomialWaitTenAttemptsError",
               5,
@@ -349,7 +350,7 @@ describe("ExceptionsTest", () => {
           "CustomWaitTenAttemptsError",
         ];
         const randomAmount: any = 1;
-        await await stub(Kernel, "rand", randomAmount, [], async () => {
+        await await stub(Kernel as any, "rand", randomAmount, [], async () => {
           await await RetryJob.performLater(exceptionsToRaise, 5, "log_scheduled_at");
           const delayForJitter: any = async (delay?: any) =>
             await ((await (randomAmount * delay)) * (await Base.retryJitter));

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { I18n } from "@blazetrails/activesupport";
 import { rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
@@ -10,7 +9,7 @@ export class TranslatedHelloJob extends Base {
 
   perform(greeter: any = "David"): any {
     const translations: any = { en: "Hello", de: "Guten Tag" };
-    const hello: any = translations[I18n.locale()];
+    const hello: any = translations[I18n.locale() as string];
     return add(`${rbObjAsString(greeter)} says ${rbObjAsString(hello)}`);
   }
 }

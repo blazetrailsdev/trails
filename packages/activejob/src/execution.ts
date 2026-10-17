@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ExecutionContext, Concern, Rescuable } from "@blazetrails/activesupport";
 import {
   rtest,
@@ -39,7 +38,7 @@ export function perform(this: any, ...rest: any[]): any {
 
 /** @internal */
 export async function _performJob(this: any): Promise<any> {
-  ExecutionContext["job"] = this;
+  ExecutionContext.setKey("job", this);
   return await this.runCallbacks("perform", () => this.perform(...rbAryEnsure(this.arguments)));
 }
 

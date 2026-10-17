@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   demodulize,
   classAttribute,
@@ -27,7 +26,7 @@ export function adapterName(adapter: any): any {
   }
   const adapterClass: any =
     typeof adapter === "function" || adapter instanceof Module ? adapter : adapter.constructor;
-  return `${rbObjAsString(rbStrSend(demodulize(rbModName(adapterClass)), "deleteSuffix", "Adapter")[0])}`;
+  return `${rbObjAsString(rbStrSend(demodulize(rbModName(adapterClass)!), "deleteSuffix", "Adapter")[0])}`;
 }
 
 export const ActiveJob: any = ActiveJobSeat;

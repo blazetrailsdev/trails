@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { isAdapterIs } from "./test-helpers/helper.js";
 import {
   Concern,
@@ -935,7 +934,7 @@ describe("EnqueuedJobsTest", () => {
       async ({ testCase }: any) => {
         const timeWithZone: any = new TimeWithZone(
           await RubyTime.utc(1999, 12, 31, 23, 59, await rational(59123456789n, 1000000000n)),
-          await TimeZone.find("Tokyo"),
+          await TimeZone.find("Tokyo")!,
         );
         const time: any = await RubyTime.at(946702800, 1234567, "nanosecond");
         const dateTime: any = new RubyDateTime(2001, 2, 3, 4, 5, 6.123456, "+03:00");

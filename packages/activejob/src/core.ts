@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { I18n, zone, Concern, constantize } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import {
@@ -143,7 +142,7 @@ export const Core: any = new Module((mod: any) => {
 extend(Core, Concern);
 export const ClassMethods: any = new Module((mod: any) => {
   mod.defineMethod("deserialize", function (this: any, jobData: any): any {
-    const job: any = new (constantize(jobData["job_class"]))();
+    const job: any = new (constantize(jobData["job_class"]) as any)();
     job.deserialize(jobData);
     return job;
   });

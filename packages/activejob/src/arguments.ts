@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   HashWithIndifferentAccess,
   withIndifferentAccess,
@@ -48,7 +47,7 @@ export class DeserializationError extends StandardError {
 
   constructor(errinfo: any = null) {
     super(`Error while trying to deserialize arguments: ${rbObjAsString(errinfo.message)}`);
-    excSetBacktrace(this, excBacktrace(errinfo));
+    excSetBacktrace(this, excBacktrace(errinfo)!);
   }
 }
 registerConstant("ActiveJob::DeserializationError", DeserializationError);

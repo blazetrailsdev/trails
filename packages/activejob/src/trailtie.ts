@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { TopLevel, OrderedOptions, onLoad, squish } from "@blazetrails/activesupport";
 import {
   registerConstant,
@@ -24,7 +23,7 @@ import { ActiveJob } from "./namespaces.js";
 import { addSerializers } from "./serializers.js";
 import { TestHelper } from "./test-helper.js";
 
-export class Railtie extends TopLevel.Trails!.Railtie {
+export class Railtie extends (TopLevel.Trails as any).Railtie {
   [key: string]: any;
   static [key: string]: any;
 }
@@ -40,7 +39,7 @@ registerConstant("ActiveJob::Railtie", Railtie);
   );
   Railtie.initializer("active_job.logger", () => {
     return onLoad("active_job", () => {
-      Railtie.logger = TopLevel.Trails!.logger();
+      Railtie.logger = (TopLevel.Trails as any).logger();
       return Railtie.logger;
     });
   });
@@ -81,7 +80,7 @@ registerConstant("ActiveJob::Railtie", Railtie);
   Railtie.initializer("active_job.set_configs", (app?: any) => {
     let options: any = app.config().activeJob();
     if (!rtest(options.queueAdapter))
-      options.queueAdapter = TopLevel.Trails!.env().isTest() ? "test" : "async";
+      options.queueAdapter = (TopLevel.Trails as any).env().isTest() ? "test" : "async";
     Railtie.config().afterInitialize(() => {
       return rbEntries(options).forEach(([k, v]: any) => {
         k = `${rbObjAsString(k)}=`;
@@ -112,7 +111,7 @@ registerConstant("ActiveJob::Railtie", Railtie);
   });
   Railtie.initializer("active_job.set_reloader_hook", (app?: any) =>
     onLoad("active_job", () =>
-      rbObjSingletonClass(Callbacks).setCallback(
+      (rbObjSingletonClass(Callbacks) as any).setCallback(
         "execute",
         "around",
         { prepend: true },
@@ -154,7 +153,7 @@ registerConstant("ActiveJob::Railtie", Railtie);
   });
   Railtie.initializer("active_job.backtrace_cleaner", () => {
     return onLoad("active_job", () => {
-      LogSubscriber.backtraceCleaner = TopLevel.Trails!.backtraceCleaner();
+      LogSubscriber.backtraceCleaner = (TopLevel.Trails as any).backtraceCleaner();
       return LogSubscriber.backtraceCleaner;
     });
   });

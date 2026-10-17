@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   LogSubscriber as ActiveSupportLogSubscriber,
   pluralize,
@@ -234,14 +233,13 @@ export class LogSubscriber extends ActiveSupportLogSubscriber {
     return RubyTime.at(event.payload["job"].scheduledAt).utc();
   }
 
-  /** @internal */
-  protected logger(): any {
+  get logger(): any {
     return Base.logger;
   }
 
   /** @internal */
   protected info(progname: any = null, block?: any): any {
-    if (!rtest(super.info(progname, block))) {
+    if (!rtest(super._info(progname))) {
       return null;
     }
     if ((ActiveJob as any).verboseEnqueueLogs()) {
@@ -252,7 +250,7 @@ export class LogSubscriber extends ActiveSupportLogSubscriber {
 
   /** @internal */
   protected error(progname: any = null, block?: any): any {
-    if (!rtest(super.error(progname, block))) {
+    if (!rtest(super._error(progname))) {
       return null;
     }
     if ((ActiveJob as any).verboseEnqueueLogs()) {
@@ -265,14 +263,14 @@ export class LogSubscriber extends ActiveSupportLogSubscriber {
   protected logEnqueueSource(): any {
     const source: any = this.enqueueSourceLocation();
     if (rtest(source)) {
-      return this.logger().info(`↳ ${rbObjAsString(source)}`);
+      return this.logger.info(`↳ ${rbObjAsString(source)}`);
     }
     return null;
   }
 
   /** @internal */
   protected enqueueSourceLocation(): any {
-    Thread.eachCallerLocation((location?: any) => {
+    (Thread as any).eachCallerLocation((location?: any) => {
       const frame: any = this.backtraceCleaner.cleanFrame(location);
       if (rtest(frame)) {
         return frame;

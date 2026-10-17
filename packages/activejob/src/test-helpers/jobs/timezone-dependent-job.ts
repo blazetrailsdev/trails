@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { zone } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { rbFSend, rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
@@ -25,9 +24,9 @@ export class TimezoneDependentJob extends Base {
   /** @internal */
   protected localtime(...args: any[]): any {
     if (zone() != null) {
-      return zone().local(...args);
+      return zone()!.local(...(args as [any]));
     } else {
-      return RubyTime.utc(...args);
+      return RubyTime.utc(...(args as [any]));
     }
   }
 }

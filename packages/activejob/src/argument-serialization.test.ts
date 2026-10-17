@@ -1,4 +1,3 @@
-// @ts-nocheck
 import "./test-helpers/helper.js";
 import {
   Duration,
@@ -83,7 +82,7 @@ describe("ArgumentSerializationTest", () => {
     new RubyDateTime(2001, 2, 3, 4, 5, rational(95679n, 15625n), "+03:00"),
     new TimeWithZone(
       RubyTime.utc(1999, 12, 31, 23, 59, rational(59123456789n, 1000000000n)),
-      TimeZone.find("UTC"),
+      TimeZone.find("UTC")!,
     ),
     [1, "a"],
     { a: 1 },
@@ -97,7 +96,7 @@ describe("ArgumentSerializationTest", () => {
     new Range("a", "z", false),
     new Range("A", "Z", false),
     new Range(new RubyDate(2001, 2, 3), null, false),
-    new Range(Duration.days(10).ago(), RubyDate.today(), false),
+    new Range(Duration.days(10).ago(), RubyDate.today() as any, false),
     new Range(
       new RubyTime(2002, 10, 31, 2, 2, rational(2123456789n, 1000000000n), "+02:00"),
       null,
@@ -109,7 +108,7 @@ describe("ArgumentSerializationTest", () => {
     new Range(
       new TimeWithZone(
         RubyTime.utc(1999, 12, 31, 23, 59, rational(59123456789n, 1000000000n)),
-        TimeZone.find("UTC"),
+        TimeZone.find("UTC")!,
       ),
       null,
       false,
@@ -175,7 +174,7 @@ describe("ArgumentSerializationTest", () => {
     try {
       originalSerializers = await serializers();
       await addSerializers(MyStringSerializer);
-      myString = new MyString("foo");
+      myString = new (MyString as any)("foo");
       serialized = await Arguments.serialize([myString]);
       deserialized = await first(
         await await Arguments.deserialize(await JSON.load(await JSON.dump(serialized))),
@@ -187,7 +186,7 @@ describe("ArgumentSerializationTest", () => {
     }
   });
   it.skip("serialize a String subclass object without a serializer", async ({ testCase }: any) => {
-    const stringWithoutSerializer: any = new StringWithoutSerializer("foo");
+    const stringWithoutSerializer: any = new (StringWithoutSerializer as any)("foo");
     const serialized: any = await Arguments.serialize([stringWithoutSerializer]);
     const deserialized: any = await first(
       await await Arguments.deserialize(await JSON.load(await JSON.dump(serialized))),
@@ -349,7 +348,7 @@ export class MyStringSerializer extends ObjectSerializer {
   }
 
   deserialize(hash: any): any {
-    return new MyString(hash["value"]);
+    return new (MyString as any)(hash["value"]);
   }
 
   /** @internal */

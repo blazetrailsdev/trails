@@ -1,10 +1,10 @@
-// @ts-nocheck
-import { ActiveSupport, runLoadHooks } from "@blazetrails/activesupport";
+import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
+import { runLoadHooks } from "@blazetrails/activesupport";
 import { include, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveJob as ActiveJobSeat } from "./namespaces.js";
 import { TestHelper } from "./test-helper.js";
 
-export class TestCase extends ActiveSupport.TestCase {
+export class TestCase extends ActiveSupportTestCase {
   [key: string]: any;
   static [key: string]: any;
 }
