@@ -1515,8 +1515,9 @@ export class Emitter {
 
   /**
    * The type of each ivar the class's instance methods assign: the hand twin's
-   * field, else the type every assignment agrees on, nullable (a Ruby ivar reads
-   * `nil` until it is assigned) unless `initialize` assigns it unconditionally.
+   * field, else the type every assignment agrees on. It is nullable where any
+   * assignment is `nil`, and for an inferred type also unless `initialize`
+   * assigns it unconditionally (a Ruby ivar reads `nil` until it is assigned).
    * Recorded on the file so `typeOf` reads it while the methods lower.
    */
   ivarTypes(u: Unit, f: FileCtx, body: N[]): Map<string, TypeRef> {
@@ -1542,9 +1543,15 @@ export class Emitter {
     const key = this.resolver.oracleKey(u.fqn);
     const types = new Map<string, TypeRef>();
     for (const [ivar, values] of assigned) {
+      const assignsNil = values.some((v) => v?.k === "nil");
       const twin = key ? this.resolver.types.ivar(key, ivar) : null;
       if (twin) {
-        types.set(ivar, twin);
+        types.set(
+          ivar,
+          assignsNil && twin.k !== "fn" && twin.k !== "gemClass" && twin.k !== "hash"
+            ? ({ ...twin, nullable: true } as TypeRef)
+            : twin,
+        );
         continue;
       }
       const seen = values.filter((v) => v?.k !== "nil").map((v) => this.lw.typeOf(v, ctx));
@@ -1555,7 +1562,8 @@ export class Emitter {
         !seen.every((t) => JSON.stringify(t) === JSON.stringify(first))
       )
         continue;
-      const nullable = !setInInit.has(ivar) && first.k !== "fn" && first.k !== "hash";
+      const nullable =
+        (assignsNil || !setInInit.has(ivar)) && first.k !== "fn" && first.k !== "hash";
       types.set(ivar, nullable ? ({ ...first, nullable: true } as TypeRef) : first);
     }
     (f.ivarTypes ??= new Map()).set(u.fqn, types);
