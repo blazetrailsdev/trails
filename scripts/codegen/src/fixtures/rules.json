@@ -424,13 +424,90 @@
                     "endless": false
                   },
                   {
+                    "k": "def",
+                    "name": "boot",
+                    "singleton": false,
+                    "receiver": null,
+                    "params": [],
+                    "body": {
+                      "k": "seq",
+                      "body": [
+                        {
+                          "k": "if",
+                          "cond": {
+                            "k": "call",
+                            "recv": {
+                              "k": "call",
+                              "recv": {
+                                "k": "const",
+                                "path": ["Rails"]
+                              },
+                              "name": "env",
+                              "args": [],
+                              "block": null,
+                              "safe": false,
+                              "l": 27,
+                              "vcall": false
+                            },
+                            "name": "test?",
+                            "args": [],
+                            "block": null,
+                            "safe": false,
+                            "l": 27,
+                            "vcall": false
+                          },
+                          "then": {
+                            "k": "seq",
+                            "body": [
+                              {
+                                "k": "call",
+                                "recv": {
+                                  "k": "const",
+                                  "path": ["Rails"]
+                                },
+                                "name": "logger",
+                                "args": [],
+                                "block": null,
+                                "safe": false,
+                                "l": 27,
+                                "vcall": false
+                              }
+                            ]
+                          },
+                          "else": {
+                            "k": "seq",
+                            "body": [
+                              {
+                                "k": "call",
+                                "recv": {
+                                  "k": "const",
+                                  "path": ["Rails"]
+                                },
+                                "name": "backtrace_cleaner",
+                                "args": [],
+                                "block": null,
+                                "safe": false,
+                                "l": 27,
+                                "vcall": false
+                              }
+                            ]
+                          },
+                          "l": 27
+                        }
+                      ]
+                    },
+                    "l": 26,
+                    "lend": 28,
+                    "endless": false
+                  },
+                  {
                     "k": "call",
                     "recv": null,
                     "name": "private",
                     "args": [],
                     "block": null,
                     "safe": false,
-                    "l": 26,
+                    "l": 30,
                     "vcall": true
                   },
                   {
@@ -453,8 +530,8 @@
                         }
                       ]
                     },
-                    "l": 27,
-                    "lend": 29,
+                    "l": 31,
+                    "lend": 33,
                     "endless": false
                   }
                 ]

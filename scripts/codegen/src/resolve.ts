@@ -10,7 +10,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { GEM, ROOT, handNamespaceFqns } from "./gem.js";
-import { rubyFileToTs } from "../../parity/conventions.js";
+import { TS_CLASS_RENAMES, rubyFileToTs } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES, tsConstantRenameKey } from "./constant-renames.js";
 import type { N, Param } from "./ir.js";
 import { GemIndex, lexicalChain, type ScopeInfo } from "./gem-index.js";
@@ -277,12 +277,12 @@ export class Resolver {
       "Float::INFINITY": "Infinity",
       "Float::NAN": "NaN",
       ENV: "process.env",
-      Rails: "(TopLevel.Trails as any)",
+      Rails: "TopLevel.Trails!",
       "Float::EPSILON": "Number.EPSILON",
     };
     if (SPECIAL[segs.join("::")]) {
       const v = SPECIAL[segs.join("::")];
-      if (v.includes("TopLevel.")) lw.imp(ctx, "@blazetrails/activesupport", "TopLevel");
+      if (v.startsWith("TopLevel.")) lw.imp(ctx, "@blazetrails/activesupport", "TopLevel");
       return v;
     }
     // `include ActiveSupport::Logger::Severity` (Ruby stdlib logger/severity.rb)
@@ -304,7 +304,7 @@ export class Resolver {
       // CLAUDE.md "Call-time constant resolution": Ruby's top-level Object is
       // TopLevel; the Rails application constant is read at call time.
       lw.imp(ctx, "@blazetrails/activesupport", "TopLevel");
-      return ["(TopLevel.Trails as any)", ...rest].join(".");
+      return ["TopLevel.Trails!", ...rest.map((x) => TS_CLASS_RENAMES[x] ?? x)].join(".");
     }
     // Ruby namespaces that are their own trails packages.
     const NS_PKG: Record<string, string> = {
@@ -597,6 +597,33 @@ export class Resolver {
     const k = this.types.depClass(segs);
     return k ? { k: "class", key: k, static: true } : null;
   }
+
+  /**
+   * Members the `TopLevel.Trails` seat declares (activesupport `namespaces.ts`):
+   * whether each is a method, and whether its type admits `null`. A Rails module
+   * reader trailties ports as a property (`Trails.env`) is read without a call.
+   */
+  get trailsSeat(): Map<string, { method: boolean; nullable: boolean }> {
+    if (this._trailsSeat) return this._trailsSeat;
+    const src = readFileSync(path.join(ROOT, "packages/activesupport/src/namespaces.ts"), "utf8");
+    const body = /\n {2}Trails\?: \{\n([\s\S]*?)\n {2}\};/.exec(src)?.[1] ?? "";
+    const seat = new Map<string, { method: boolean; nullable: boolean }>();
+    let cur: { name: string; method: boolean; text: string } | undefined;
+    let depth = 0;
+    for (const line of body.split("\n")) {
+      const m = depth === 0 ? /^ {4}(\w+)\??(\(|:)/.exec(line) : null;
+      if (m) cur = { name: m[1], method: m[2] === "(", text: "" };
+      if (!cur) continue;
+      cur.text += line;
+      depth += (line.match(/[{(]/g) ?? []).length - (line.match(/[})]/g) ?? []).length;
+      if (depth === 0 && /;\s*$/.test(line)) {
+        seat.set(cur.name, { method: cur.method, nullable: /\|\s*null\s*;\s*$/.test(cur.text) });
+        cur = undefined;
+      }
+    }
+    return (this._trailsSeat = seat);
+  }
+  private _trailsSeat?: Map<string, { method: boolean; nullable: boolean }>;
 
   isProperty(rubyName: string): boolean {
     return this.types.onlyPropertyOnDeps(propName(rubyName));

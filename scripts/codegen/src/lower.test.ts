@@ -87,3 +87,12 @@ describe("lowering active_job/rules.rb", () => {
     expect(rules).not.toContain("rbFormat");
   });
 });
+
+describe("lowering Rails reads in active_job/rules.rb", () => {
+  it("reads the TopLevel.Trails seat with a non-null assertion, not a cast", () => {
+    expect(rules).toContain('if (TopLevel.Trails!.env["test?"]()) {');
+    expect(rules).toContain("return TopLevel.Trails!.logger!;");
+    expect(rules).toContain("return TopLevel.Trails!.backtraceCleaner;");
+    expect(rules).not.toContain("TopLevel.Trails as any");
+  });
+});
