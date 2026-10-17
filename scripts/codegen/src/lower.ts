@@ -3628,6 +3628,18 @@ export class Lowerer {
     const recv = r ?? ctx.selfExpr;
     this.stat(ctx, "typed-call");
     let e: string;
+    const asyncSelfDef =
+      (!recvNode || recvNode.k === "self") &&
+      !!ctx.owner &&
+      this.index
+        .ancestors(ctx.owner)
+        .some((sc) =>
+          this.resolver.asyncDefs.has(`${sc.fqn}${ctx.selfKind === "static" ? "." : "#"}${n.name}`),
+        );
+    if (asyncSelfDef && m.info.kind !== "method" && !n.args.length && !n.block) {
+      if (ctx.asyncBox) ctx.asyncBox.awaits = true;
+      return `(await ${recv}${nav}${m.tsName}())`;
+    }
     if (m.info.kind !== "method") {
       if (n.args.length || n.block) return null;
       e = `${recv}${nav}${m.tsName}`;
