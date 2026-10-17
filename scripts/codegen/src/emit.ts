@@ -471,6 +471,7 @@ export class Emitter {
             }).replace(/^export /, "");
             const nm = /function (\w+)/.exec(fn)![1];
             classLines.push(fn, `${short}.${nm} = ${nm};`);
+            hostMembers.push(`static ${nm}: any;`);
           }
         } else if (
           s.k === "call" &&
@@ -532,6 +533,7 @@ export class Emitter {
       }).replace(/^export /, "");
       const nm = /function (\w+)/.exec(fn)![1];
       classLines.push(fn, `${short}.${nm} = ${nm};`);
+      hostMembers.push(`static ${nm}: any;`);
     }
     emitBody(u.body, out);
     // activesupport's testing/autorun runs each test on a fresh instance of the
