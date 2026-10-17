@@ -13,7 +13,8 @@
  *   CONST = v            → `static CONST = v` / `export const CONST = v`
  *   other class-body call→ `static { this.macro(...) }`
  */
-import { TS_CONSTANT_RENAMES, rubyMethodToTsIgnoringSkip } from "../../parity/conventions.js";
+import { rubyMethodToTsIgnoringSkip } from "../../parity/conventions.js";
+import { TS_CONSTANT_RENAMES } from "./constant-renames.js";
 import type { IrFile, N, Param } from "./ir.js";
 import { walk } from "./ir.js";
 import { GemIndex, lexicalChain, qualify, type ScopeInfo } from "./gem-index.js";

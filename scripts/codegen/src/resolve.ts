@@ -10,11 +10,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { GEM, ROOT, handNamespaceFqns } from "./gem.js";
-import {
-  TS_CONSTANT_RENAMES,
-  rubyFileToTs,
-  tsConstantRenameKey,
-} from "../../parity/conventions.js";
+import { rubyFileToTs } from "../../parity/conventions.js";
+import { TS_CONSTANT_RENAMES, tsConstantRenameKey } from "./constant-renames.js";
 import type { N, Param } from "./ir.js";
 import { GemIndex, lexicalChain, type ScopeInfo } from "./gem-index.js";
 import type { Ctx, Lowerer } from "./lower.js";
