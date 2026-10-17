@@ -1853,9 +1853,9 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toEqual(["GenuinelyNovelTracker"]);
   });
 
-  it("admits a TS_PARENT_ALIASES declaration name (Type::Integer -> IntegerType)", () => {
+  it("admits a TS_CONSTANT_RENAMES declaration name (Type::Integer -> IntegerType)", () => {
     // `resolveTsClassForRuby` already matches Ruby `Type::Integer` to TS
-    // `IntegerType` through TS_PARENT_ALIASES, so the declaration-name pass
+    // `IntegerType` through TS_CONSTANT_RENAMES, so the declaration-name pass
     // has to admit the same spelling or every ActiveModel type class reads as
     // novel surface here while scoring 100% in parity:api.
     const ruby: ApiManifest = {
