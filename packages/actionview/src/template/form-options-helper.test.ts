@@ -58,6 +58,10 @@ describe("FormOptionsHelperTest", () => {
       optionsForSelect({ $: "Dollar", "<DKR>": "<Kroner>" }),
     );
     assertDomEqual(
+      '<option value="Dollar" selected="selected">$</option>\n<option value="&lt;Kroner&gt;">&lt;DKR&gt;</option>',
+      optionsForSelect({ $: "Dollar", "<DKR>": "<Kroner>" }, "Dollar"),
+    );
+    assertDomEqual(
       '<option value="Dollar" selected="selected">$</option>\n<option value="&lt;Kroner&gt;" selected="selected">&lt;DKR&gt;</option>',
       optionsForSelect({ $: "Dollar", "<DKR>": "<Kroner>" }, ["Dollar", "<Kroner>"]),
     );
@@ -102,6 +106,10 @@ describe("FormOptionsHelperTest", () => {
     const expectedWithoutHiddenField =
       '<select name="continent[countries]" id="continent_countries"><option selected="selected" value="Africa">Africa</option>\n<option selected="selected" value="Europe">Europe</option>\n<option value="America">America</option></select>';
     const choices = ["Africa", "Europe", "America"];
+    assertDomEqual(
+      expectedWithHiddenFieldAndMultiple,
+      select("continent", "countries", choices, { multiple: true }),
+    );
     assertDomEqual(
       expectedWithHiddenFieldAndMultiple,
       select("continent", "countries", choices, { multiple: true }),
