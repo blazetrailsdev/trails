@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { HTTP_STATUS_CODES, statusCode as rackStatusCode } from "@blazetrails/rack";
 
 const GENERIC_RESPONSE_CODES: Record<string, string> = {
@@ -12,23 +13,16 @@ export class AssertionResponse {
   readonly name: string;
 
   constructor(codeOrName: number | string) {
-    const isNumeric = typeof codeOrName === "number" || /^\d+$/.test(codeOrName);
-    if (isNumeric) {
-      const code = typeof codeOrName === "number" ? codeOrName : parseInt(codeOrName, 10);
-      const n = nameFromCode(code);
-      if (n === undefined) {
-        throw new Error(`Invalid response code: ${codeOrName}`);
-      }
-      this.name = n;
-      this.code = String(codeOrName);
-    } else {
+    if (typeof codeOrName === "string" && !/^\d+$/.test(codeOrName)) {
       this.name = codeOrName;
-      const c = codeFromName(codeOrName);
-      if (c === undefined) {
-        throw new Error(`Invalid response name: ${codeOrName}`);
-      }
-      this.code = c;
+      this.code = codeFromName(codeOrName)!;
+    } else {
+      this.name = nameFromCode(Number(codeOrName))!;
+      this.code = String(codeOrName);
     }
+
+    if (this.code == null) throw new ArgumentError(`Invalid response name: ${this.name}`);
+    if (this.name == null) throw new ArgumentError(`Invalid response code: ${this.code}`);
   }
 
   codeAndName(): string {
