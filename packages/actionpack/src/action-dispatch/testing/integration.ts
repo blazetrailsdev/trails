@@ -454,7 +454,7 @@ interface RunnerHost {
 
 function beforeSetup(this: RunnerHost): unknown {
   this._app = null;
-  return Runner.superMethod(this, "beforeSetup")?.();
+  return Runner.superMethod(this, "beforeSetup")!();
 }
 
 function integrationSession(this: RunnerHost): Session {
@@ -481,101 +481,6 @@ function createSession(this: RunnerHost, app: unknown): Session {
 
 function removeBang(this: RunnerHost): void {
   this._integrationSession = null;
-}
-
-async function runnerGet(
-  this: RunnerHost,
-  path: string,
-  options: IntegrationRequestOptions = {},
-): Promise<number> {
-  this._htmlDocument = undefined;
-
-  const result = await this.integrationSession.get(path, options);
-  this.copySessionVariablesBang();
-  return result;
-}
-
-async function runnerPost(
-  this: RunnerHost,
-  path: string,
-  options: IntegrationRequestOptions = {},
-): Promise<number> {
-  this._htmlDocument = undefined;
-
-  const result = await this.integrationSession.post(path, options);
-  this.copySessionVariablesBang();
-  return result;
-}
-
-async function runnerPatch(
-  this: RunnerHost,
-  path: string,
-  options: IntegrationRequestOptions = {},
-): Promise<number> {
-  this._htmlDocument = undefined;
-
-  const result = await this.integrationSession.patch(path, options);
-  this.copySessionVariablesBang();
-  return result;
-}
-
-async function runnerPut(
-  this: RunnerHost,
-  path: string,
-  options: IntegrationRequestOptions = {},
-): Promise<number> {
-  this._htmlDocument = undefined;
-
-  const result = await this.integrationSession.put(path, options);
-  this.copySessionVariablesBang();
-  return result;
-}
-
-async function runnerHead(
-  this: RunnerHost,
-  path: string,
-  options: IntegrationRequestOptions = {},
-): Promise<number> {
-  this._htmlDocument = undefined;
-
-  const result = await this.integrationSession.head(path, options);
-  this.copySessionVariablesBang();
-  return result;
-}
-
-async function runnerDelete(
-  this: RunnerHost,
-  path: string,
-  options: IntegrationRequestOptions = {},
-): Promise<number> {
-  this._htmlDocument = undefined;
-
-  const result = await this.integrationSession.delete(path, options);
-  this.copySessionVariablesBang();
-  return result;
-}
-
-function cookies(this: RunnerHost): CookieJar {
-  const result = this.integrationSession.cookies;
-  this.copySessionVariablesBang();
-  return result;
-}
-
-function assigns(this: RunnerHost, key?: string | symbol): never {
-  const result = this.integrationSession.assigns(key);
-  this.copySessionVariablesBang();
-  return result;
-}
-
-async function runnerFollowRedirectBang(
-  this: RunnerHost,
-  options: IntegrationRequestOptions = {},
-): Promise<number | null> {
-  this._htmlDocument = undefined;
-
-  const result = await this.integrationSession.followRedirectBang(options);
-  this.copySessionVariablesBang();
-  return result;
 }
 
 function openSession<T extends RunnerHost>(this: T, block?: (session: T) => void): T {
@@ -683,21 +588,55 @@ export const Runner = new Module((mod) => {
   mod.defineMethod("resetBang", resetBang);
   mod.defineMethod("createSession", createSession);
   mod.defineMethod("removeBang", removeBang);
-  mod.defineMethod("get", runnerGet);
-  mod.defineMethod("post", runnerPost);
-  mod.defineMethod("patch", runnerPatch);
-  mod.defineMethod("put", runnerPut);
-  mod.defineMethod("head", runnerHead);
-  mod.defineMethod("delete", runnerDelete);
-  mod.defineMethod("assigns", assigns);
-  mod.defineMethod("followRedirectBang", runnerFollowRedirectBang);
+  for (const method of [
+    "get",
+    "post",
+    "patch",
+    "put",
+    "head",
+    "delete",
+    "cookies",
+    "assigns",
+    "followRedirectBang",
+  ] as const) {
+    if (method === "cookies" || method === "assigns") {
+      mod.moduleEval((m) => {
+        Object.defineProperty(m, method, {
+          ...(method === "cookies"
+            ? {
+                get(this: RunnerHost) {
+                  const result = this.integrationSession[method];
+                  this.copySessionVariablesBang();
+                  return result;
+                },
+              }
+            : {
+                value(this: RunnerHost, ...args: unknown[]) {
+                  const result = rbFPublicSend(this.integrationSession, method, ...args);
+                  this.copySessionVariablesBang();
+                  return result;
+                },
+                writable: true,
+              }),
+          configurable: true,
+        });
+      });
+    } else {
+      mod.defineMethod(method, async function (this: RunnerHost, ...args: unknown[]) {
+        this._htmlDocument = undefined;
+
+        const result = await rbFPublicSend(this.integrationSession, method, ...args);
+        this.copySessionVariablesBang();
+        return result;
+      });
+    }
+  }
   mod.defineMethod("openSession", openSession);
   mod.defineMethod("copySessionVariablesBang", copySessionVariablesBang);
   mod.defineMethod("respondToMissing", respondToMissing);
   mod.defineMethod("methodMissing", methodMissing);
   mod.moduleEval((m) => {
     Object.defineProperty(m, "integrationSession", { get: integrationSession, configurable: true });
-    Object.defineProperty(m, "cookies", { get: cookies, configurable: true });
     Object.defineProperty(m, "assertions", {
       get: getAssertions,
       set: setAssertions,
@@ -736,6 +675,9 @@ type SessionMethodMissing = Pick<
   | "hostBang"
   | "process"
   | "urlOptions"
+  | "session"
+  | "flash"
+  | "redirectToUrl"
 > & { options(path: string, options?: IntegrationRequestOptions): Promise<number> };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
@@ -793,10 +735,13 @@ export class IntegrationTest extends TestCase {
   _originalRoutes?: RouteSet;
 
   /** @internal */
-  _app?: unknown;
+  declare _app?: unknown;
 
   get app(): unknown {
-    return this._app ?? (this.constructor as typeof IntegrationTest).app;
+    return (
+      Reflect.get(Object.getPrototypeOf(IntegrationTest.prototype) as object, "app", this) ??
+      (this.constructor as typeof IntegrationTest).app
+    );
   }
 
   set app(value: unknown) {
@@ -910,7 +855,6 @@ export function spliceMethodMissing(proto: object): void {
 export interface IntegrationTest
   extends
     SessionMethodMissing,
-    Omit<Included<typeof TestProcess>, "cookies" | "assigns">,
     Included<typeof FixtureFile>,
     Omit<Assertions, "withRouting" | "createRoutes" | "resetRoutes">,
     Runner {}
