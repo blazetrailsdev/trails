@@ -7270,6 +7270,20 @@ function receiverTailName(receiver: ts.Expression): string | undefined {
   ) {
     e = e.expression;
   }
+  // Ruby's `h[:k]` receiver is named `k` (extract-ruby-api.rb#receiver_tail_name's
+  // `:aref` arm); its port is `h["k"]` or, on a class porting `[]` as `get`, `h.get("k")`.
+  if (ts.isElementAccessExpression(e) && ts.isStringLiteralLike(e.argumentExpression)) {
+    return e.argumentExpression.text;
+  }
+  if (
+    ts.isCallExpression(e) &&
+    ts.isPropertyAccessExpression(e.expression) &&
+    e.expression.name.text === "get" &&
+    e.arguments.length === 1 &&
+    ts.isStringLiteralLike(e.arguments[0])
+  ) {
+    return e.arguments[0].text;
+  }
   if (ts.isCallExpression(e)) e = e.expression;
   if (
     ts.isBinaryExpression(e) &&

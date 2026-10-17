@@ -17,16 +17,37 @@ const WARNING_CATEGORIES: Record<string, boolean> = {
  * `category:` names a warning category (`error.c:168` `rb_warning_category_from_name`) and a
  * disabled one writes nothing (`error.c:157,198`); `:deprecated` and `:performance` start disabled.
  *
+ * `uplevel:` prefixes the output with `path:line: warning: ` for the frame that many levels above
+ * the caller (`error.c:566-588`), or with a bare `warning: ` where there is no such frame, and
+ * raises `ArgumentError` for a negative level (`error.c:568-570`).
+ *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#warn`, which Rails calls without
  * defining.
  */
-export function warn(...msgs: (string | { category?: string | null })[]): void {
+export function warn(
+  ...msgs: (string | { uplevel?: number | null; category?: string | null })[]
+): void {
   const last = msgs[msgs.length - 1];
-  const { category = null } = typeof last === "object" ? (msgs.pop() as typeof last) : {};
+  const { uplevel = null, category = null } =
+    typeof last === "object" ? (msgs.pop() as typeof last) : {};
   if (msgs.length === 0 || verbose() == null) return;
+  let location: RegExpExecArray | null = null;
+  if (uplevel != null) {
+    if (uplevel < 0) throw new ArgumentError(`negative level (${uplevel})`);
+    const frame = new Error().stack?.split("\n")[2 + uplevel] ?? "";
+    location = /(?:\(|at )(?:file:\/\/)?([^()\s]+):(\d+):\d+\)?$/.exec(frame.trim());
+  }
   if (category != null) {
     if (!(category in WARNING_CATEGORIES)) throw new ArgumentError(`unknown category: ${category}`);
     if (!WARNING_CATEGORIES[category]) return;
   }
-  stderr.write((msgs as string[]).map((msg) => (msg.endsWith("\n") ? msg : `${msg}\n`)).join(""));
+  const str =
+    uplevel == null
+      ? ""
+      : location == null
+        ? "warning: "
+        : `${location[1]}:${location[2]}: warning: `;
+  stderr.write(
+    str + (msgs as string[]).map((msg) => (msg.endsWith("\n") ? msg : `${msg}\n`)).join(""),
+  );
 }
