@@ -156,6 +156,53 @@ export function groupedOptionsForSelect(
   return body;
 }
 
+export function collectionRadioButtons(
+  this: FormOptionsHelperHost,
+  object: unknown,
+  method: unknown,
+  collection: unknown,
+  valueMethod: unknown,
+  textMethod: unknown,
+  options: Record<string, unknown> = {},
+  htmlOptions: Record<string, unknown> = {},
+  block?: (builder: unknown) => unknown,
+): unknown {
+  return new Tags.CollectionRadioButtons(
+    object,
+    method,
+    this,
+    collection,
+    valueMethod,
+    textMethod,
+    options,
+    htmlOptions,
+  ).render(block);
+}
+
+export function collectionCheckboxes(
+  this: FormOptionsHelperHost,
+  object: unknown,
+  method: unknown,
+  collection: unknown,
+  valueMethod: unknown,
+  textMethod: unknown,
+  options: Record<string, unknown> = {},
+  htmlOptions: Record<string, unknown> = {},
+  block?: (builder: unknown) => unknown,
+): unknown {
+  return new Tags.CollectionCheckBoxes(
+    object,
+    method,
+    this,
+    collection,
+    valueMethod,
+    textMethod,
+    options,
+    htmlOptions,
+  ).render(block);
+}
+export const collectionCheckBoxes = collectionCheckboxes;
+
 /** @internal */
 export function optionHtmlAttributes(element: unknown): Record<string, unknown> {
   if (globalThis.Array.isArray(element)) {
@@ -231,6 +278,7 @@ export const FormOptionsHelper = new Module((mod) => {
     Object.assign(m, { optionGroupsFromCollectionForSelect, groupedOptionsForSelect });
     Object.assign(m, { optionHtmlAttributes, optionTextAndValue, isOptionValueSelected });
     Object.assign(m, { extractSelectedAndDisabled, extractValuesFromCollection });
+    Object.assign(m, { collectionRadioButtons, collectionCheckboxes, collectionCheckBoxes });
     Object.assign(m, { valueForCollection, promptText });
   });
 });
@@ -244,6 +292,17 @@ declare module "./form-helper.js" {
       htmlOptions?: Record<string, unknown>,
       block?: () => unknown,
     ): unknown;
+    collectionCheckboxes(
+      method: unknown,
+      collection: unknown,
+      valueMethod: unknown,
+      textMethod: unknown,
+      options?: Record<string, unknown>,
+      htmlOptions?: Record<string, unknown>,
+      block?: (builder: unknown) => unknown,
+    ): unknown;
+    collectionCheckBoxes: FormBuilder["collectionCheckboxes"];
+    collectionRadioButtons: FormBuilder["collectionCheckboxes"];
   }
 }
 
@@ -267,6 +326,63 @@ rbModDefineMethod(
       this.objectName,
       method,
       choices,
+      this.objectifyOptions(options),
+      { ...this._defaultHtmlOptions, ...htmlOptions },
+      block,
+    );
+  },
+);
+
+type FormBuilderSelf = {
+  objectName: unknown;
+  _template: FormHelperHost & Record<string, (...args: unknown[]) => unknown>;
+  _defaultHtmlOptions: Record<string, unknown>;
+  objectifyOptions(options: Record<string, unknown>): Record<string, unknown>;
+};
+
+function formBuilderCollectionCheckboxes(
+  this: FormBuilderSelf,
+  method: unknown,
+  collection: unknown,
+  valueMethod: unknown,
+  textMethod: unknown,
+  options: Record<string, unknown> = {},
+  htmlOptions: Record<string, unknown> = {},
+  block?: (builder: unknown) => unknown,
+): unknown {
+  return this._template.collectionCheckboxes(
+    this.objectName,
+    method,
+    collection,
+    valueMethod,
+    textMethod,
+    this.objectifyOptions(options),
+    { ...this._defaultHtmlOptions, ...htmlOptions },
+    block,
+  );
+}
+rbModDefineMethod(FormBuilder, "collectionCheckboxes", formBuilderCollectionCheckboxes);
+rbModDefineMethod(FormBuilder, "collectionCheckBoxes", formBuilderCollectionCheckboxes);
+
+rbModDefineMethod(
+  FormBuilder,
+  "collectionRadioButtons",
+  function (
+    this: FormBuilderSelf,
+    method: unknown,
+    collection: unknown,
+    valueMethod: unknown,
+    textMethod: unknown,
+    options: Record<string, unknown> = {},
+    htmlOptions: Record<string, unknown> = {},
+    block?: (builder: unknown) => unknown,
+  ): unknown {
+    return this._template.collectionRadioButtons(
+      this.objectName,
+      method,
+      collection,
+      valueMethod,
+      textMethod,
       this.objectifyOptions(options),
       { ...this._defaultHtmlOptions, ...htmlOptions },
       block,

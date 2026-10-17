@@ -13,6 +13,8 @@ import { DateHelper } from "./helpers/date-helper.js";
 import { DebugHelper } from "./helpers/debug-helper.js";
 import { FormHelper } from "./helpers/form-helper.js";
 import "./helpers/tags/select.js";
+import "./helpers/tags/collection-check-boxes.js";
+import "./helpers/tags/collection-radio-buttons.js";
 import { FormOptionsHelper } from "./helpers/form-options-helper.js";
 import { FormTagHelper } from "./helpers/form-tag-helper.js";
 import { JavaScriptHelper } from "./helpers/javascript-helper.js";
