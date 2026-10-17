@@ -247,7 +247,7 @@ export abstract class Store {
     }
   }
 
-  async read(name: string, options?: StoreOptions): Promise<unknown> {
+  async read(name: unknown, options?: StoreOptions): Promise<unknown> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
     const version = this.normalizeVersion(name, options);
@@ -349,7 +349,7 @@ export abstract class Store {
     return ordered;
   }
 
-  async write(name: string, value: unknown, options?: StoreOptions): Promise<boolean> {
+  async write(name: unknown, value: unknown, options?: StoreOptions): Promise<boolean> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
     return await this.instrument("write", key, options, () =>
@@ -364,7 +364,7 @@ export abstract class Store {
     );
   }
 
-  async delete(name: string, options?: StoreOptions): Promise<boolean> {
+  async delete(name: unknown, options?: StoreOptions): Promise<boolean> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
     return await this.instrument("delete", key, options, () => this.deleteEntry(key, options));
@@ -379,7 +379,7 @@ export abstract class Store {
     );
   }
 
-  async exist(name: string, options?: StoreOptions): Promise<boolean> {
+  async exist(name: unknown, options?: StoreOptions): Promise<boolean> {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
     return await this.instrument("exist?", key, undefined, async () => {

@@ -16,10 +16,10 @@ export interface CacheOptions {
 
 /** @noRailsEquivalent PERMANENT */
 export interface CacheStore {
-  read(key: string, options?: CacheOptions): Promise<unknown>;
-  write(key: string, value: unknown, options?: CacheOptions): Promise<boolean>;
-  delete(key: string, options?: CacheOptions): Promise<boolean>;
-  exist(key: string, options?: CacheOptions): Promise<boolean>;
+  read(key: unknown, options?: CacheOptions): Promise<unknown>;
+  write(key: unknown, value: unknown, options?: CacheOptions): Promise<boolean>;
+  delete(key: unknown, options?: CacheOptions): Promise<boolean>;
+  exist(key: unknown, options?: CacheOptions): Promise<boolean>;
   fetch(key: string, options: CacheOptions, fallback: () => unknown): Promise<unknown>;
   fetch(key: string, fallback: () => unknown): Promise<unknown>;
   clear(): Promise<void>;
