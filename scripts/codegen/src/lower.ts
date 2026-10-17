@@ -3891,6 +3891,16 @@ export class Lowerer {
         if (n.args.length === 1) return `${R}${nav}push(...${args()[0]})`;
         break;
       case "call":
+        if (
+          recvNode.k === "lvar" &&
+          jsIdent(recvNode.name) === ctx.blockVar &&
+          ctx.asyncBox &&
+          ctx.defName &&
+          this.resolver.asyncYielders.has(ctx.defName)
+        ) {
+          ctx.asyncBox.awaits = true;
+          return `(await ${R}${nav === "?." ? "?." : ""}(${args().join(", ")}))`;
+        }
         if (recvNode.k !== "self") return `${R}${nav === "?." ? "?." : ""}(${args().join(", ")})`;
         break;
       case "delete":
