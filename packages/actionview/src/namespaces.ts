@@ -1,6 +1,7 @@
 import { Autoload, extend, TopLevel, type Extended } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { FileSystemResolver } from "./template/resolver.js";
+import type { Select } from "./helpers/tags/select.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -18,3 +19,8 @@ ActionView.eagerAutoload(() => {
 });
 
 TopLevel.ActionView = ActionView;
+
+export const Tags = { name: "ActionView::Helpers::Tags" } as {
+  name: string;
+  Select: typeof Select;
+};

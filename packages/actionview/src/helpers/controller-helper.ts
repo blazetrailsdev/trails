@@ -1,4 +1,4 @@
-import { delegate } from "@blazetrails/activesupport";
+import { attrInternal, delegate } from "@blazetrails/activesupport";
 import { basicObjRespondTo, rbObjRespondTo, Module } from "@blazetrails/ruby-compat";
 
 export interface ControllerHelperHost {
@@ -28,21 +28,6 @@ export const CONTROLLER_DELEGATES = [
   "controllerName",
   "controllerPath",
 ] as const;
-
-export function installControllerInternals(prototype: object): void {
-  for (const name of ["controller", "request"] as const) {
-    const internalName = `_${name}` as const;
-    Object.defineProperty(prototype, name, {
-      get(this: Record<string, unknown>): unknown {
-        return this[internalName];
-      },
-      set(this: Record<string, unknown>, value: unknown) {
-        this[internalName] = value;
-      },
-      configurable: true,
-    });
-  }
-}
 
 export function assignController(
   this: ControllerHelperHost,
@@ -77,6 +62,8 @@ export function isRespondTo(
 }
 
 export const ControllerHelper = new Module((mod) => {
+  mod.moduleEval((m) => attrInternal.call(m, "controller", "request"));
+
   delegate.call(
     mod,
     "requestForgeryProtectionToken",

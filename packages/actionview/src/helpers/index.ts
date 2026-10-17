@@ -95,7 +95,6 @@ export {
   assignController,
   logger,
   isRespondTo,
-  installControllerInternals,
   CONTROLLER_DELEGATES,
 } from "./controller-helper.js";
 export type { ControllerHelperHost } from "./controller-helper.js";

@@ -55,6 +55,7 @@ import { Label, type LabelBuilder } from "./tags/label.js";
 import { RadioButton } from "./tags/radio-button.js";
 import { PasswordField } from "./tags/password-field.js";
 import { HiddenField } from "./tags/hidden-field.js";
+import type { select } from "./form-options-helper.js";
 import { TextArea } from "./tags/text-area.js";
 import { ColorField } from "./tags/color-field.js";
 import { TelField } from "./tags/tel-field.js";
@@ -78,6 +79,7 @@ export interface FormHelperHost extends FormTagHelperHost, CaptureHelperHost {
   fieldsFor: typeof fieldsFor;
   hiddenField: typeof hiddenField;
   fileField: typeof fileField;
+  select?: typeof select;
   checkbox: typeof checkbox;
   radioButton: typeof radioButton;
   buttonTag: typeof buttonTag;
