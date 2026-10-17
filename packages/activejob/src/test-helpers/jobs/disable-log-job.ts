@@ -9,8 +9,12 @@ export class DisableLogJob extends Base {
     return this.logger.info(`Dummy, here is it: ${rbObjAsString(dummy)}`);
   }
 
-  jobId(): any {
+  get jobId(): any {
     return "LOGGING-JOB-ID";
+  }
+
+  set jobId(value: any) {
+    this._jobId = value;
   }
 }
 registerConstant("DisableLogJob", DisableLogJob);

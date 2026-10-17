@@ -194,7 +194,7 @@ export class LogSubscriber extends ActiveSupportLogSubscriber {
 
   /** @internal */
   protected argsInfo(job: any): any {
-    if (job.constructor.isLogArguments() && isAny(job.arguments)) {
+    if (job.constructor.isLogArguments && isAny(job.arguments)) {
       return (
         " with arguments: " +
         aryJoin(
@@ -239,7 +239,7 @@ export class LogSubscriber extends ActiveSupportLogSubscriber {
 
   /** @internal */
   protected info(progname: any = null, block?: any): any {
-    if (!rtest(super._info(progname))) {
+    if (!rtest(super._info(block ?? progname))) {
       return null;
     }
     if ((ActiveJob as any).verboseEnqueueLogs()) {
@@ -250,7 +250,7 @@ export class LogSubscriber extends ActiveSupportLogSubscriber {
 
   /** @internal */
   protected error(progname: any = null, block?: any): any {
-    if (!rtest(super._error(progname))) {
+    if (!rtest(super._error(block ?? progname))) {
       return null;
     }
     if ((ActiveJob as any).verboseEnqueueLogs()) {

@@ -9,8 +9,12 @@ export class LoggingJob extends Base {
     return this.logger.info(`Dummy, here is it: ${rbObjAsString(aryJoin(dummy, " "))}`);
   }
 
-  jobId(): any {
+  get jobId(): any {
     return "LOGGING-JOB-ID";
+  }
+
+  set jobId(value: any) {
+    this._jobId = value;
   }
 }
 registerConstant("LoggingJob", LoggingJob);

@@ -24,5 +24,5 @@ Object.assign(ActiveJob, { verboseEnqueueLogs, setVerboseEnqueueLogs });
   ActiveJob.autoload("ConfiguredJob");
   ActiveJob.autoload("TestCase");
   ActiveJob.autoload("TestHelper");
-  ActiveJob.verboseEnqueueLogs = false;
+  ActiveJob.setVerboseEnqueueLogs(false);
 }

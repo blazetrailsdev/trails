@@ -1,5 +1,6 @@
 import { GlobalID } from "@blazetrails/globalid";
 import { rtest, include, rbObjAsString } from "@blazetrails/ruby-compat";
+import "../active-job.js";
 import { Base } from "../base.js";
 import { EnqueueAfterTransactionCommit } from "../enqueue-after-transaction-commit.js";
 

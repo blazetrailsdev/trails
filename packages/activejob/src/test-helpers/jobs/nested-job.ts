@@ -10,8 +10,12 @@ export class NestedJob extends Base {
     return await LoggingJob.performLater("NestedJob");
   }
 
-  jobId(): any {
+  get jobId(): any {
     return "NESTED-JOB-ID";
+  }
+
+  set jobId(value: any) {
+    this._jobId = value;
   }
 }
 registerConstant("NestedJob", NestedJob);

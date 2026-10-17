@@ -87,19 +87,19 @@ describe("LoggingTest", () => {
     await await HelloJob.performLater("Cristian");
     expect(await testCase._logger.messages()).toMatch(/\[ActiveJob\]/);
   });
-  it.skip("uses job name as tag", async ({ testCase }: any) => {
+  it("uses job name as tag", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       await await LoggingJob.performLater("Dummy");
       return expect(await testCase._logger.messages()).toMatch(/\[LoggingJob\]/);
     });
   });
-  it.skip("uses job id as tag", async ({ testCase }: any) => {
+  it("uses job id as tag", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       await await LoggingJob.performLater("Dummy");
       return expect(await testCase._logger.messages()).toMatch(/\[LOGGING-JOB-ID\]/);
     });
   });
-  it.skip("logs correct queue name", async ({ testCase }: any) => {
+  it("logs correct queue name", async ({ testCase }: any) => {
     let originalQueueName: any;
     try {
       originalQueueName = await LoggingJob.queueName;
@@ -110,7 +110,7 @@ describe("LoggingTest", () => {
       LoggingJob.queueName = originalQueueName;
     }
   });
-  it.skip("globalid parameter logging", async ({ testCase }: any) => {
+  it("globalid parameter logging", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       const person: any = new Person(123);
       await await LoggingJob.performLater(person);
@@ -121,7 +121,7 @@ describe("LoggingTest", () => {
       );
     });
   });
-  it.skip("globalid nested parameter logging", async ({ testCase }: any) => {
+  it("globalid nested parameter logging", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       const person: any = new Person(123);
       await await LoggingJob.performLater({ person: person });
@@ -132,7 +132,7 @@ describe("LoggingTest", () => {
       );
     });
   });
-  it.skip("enqueue job logging", async ({ testCase }: any) => {
+  it("enqueue job logging", async ({ testCase }: any) => {
     const events: any = await await testCase.subscribed(
       async () => await await HelloJob.performLater("Cristian"),
     );
@@ -143,7 +143,7 @@ describe("LoggingTest", () => {
     const [key] = rbAryEnsure(await first(events));
     expect(key).toEqual("enqueue.active_job");
   });
-  it.skip("enqueue job log error when callback chain is halted", async ({ testCase }: any) => {
+  it("enqueue job log error when callback chain is halted", async ({ testCase }: any) => {
     const events: any = await await testCase.subscribed(
       async () => await await AbortBeforeEnqueueJob.performLater(),
     );
@@ -154,7 +154,7 @@ describe("LoggingTest", () => {
     const [key] = rbAryEnsure(await first(events));
     expect(key).toEqual("enqueue.active_job");
   });
-  it.skip("enqueue job log error when error is raised during callback chain", async ({
+  it("enqueue job log error when error is raised during callback chain", async ({
     testCase,
   }: any) => {
     const events: any = await await testCase.subscribed(
@@ -170,7 +170,7 @@ describe("LoggingTest", () => {
     const [key] = rbAryEnsure(await first(events));
     expect(key).toEqual("enqueue.active_job");
   });
-  it.skip("perform job logging", async ({ testCase }: any) => {
+  it("perform job logging", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       await await LoggingJob.performLater("Dummy");
       expect(await testCase._logger.messages()).toMatch(
@@ -183,7 +183,7 @@ describe("LoggingTest", () => {
       );
     });
   });
-  it.skip("perform job logging when job is not enqueued", async ({ testCase }: any) => {
+  it("perform job logging when job is not enqueued", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       await await LoggingJob.performNow("Dummy");
       expect(await testCase._logger.messages()).toMatch(
@@ -192,7 +192,7 @@ describe("LoggingTest", () => {
       return expect(await testCase._logger.messages()).not.toMatch(/enqueued at /);
     });
   });
-  it.skip("perform job log error when callback chain is halted", async ({ testCase }: any) => {
+  it("perform job log error when callback chain is halted", async ({ testCase }: any) => {
     await await testCase.subscribed(async () => await await AbortBeforeEnqueueJob.performNow());
     expect(await testCase._logger.messages()).toMatch(
       /Error performing AbortBeforeEnqueueJob.* a before_perform callback halted/,
@@ -211,7 +211,7 @@ describe("LoggingTest", () => {
       /Error performing AbortBeforeEnqueueJob.* a before_perform callback halted/,
     );
   });
-  it.skip("perform job doesnt log error when job is performed multiple times and fail the first time", async ({
+  it("perform job doesnt log error when job is performed multiple times and fail the first time", async ({
     testCase,
   }: any) => {
     const job: any = new (class extends Base {
@@ -243,7 +243,7 @@ describe("LoggingTest", () => {
       ),
     ).toEqual(1);
   });
-  it.skip("perform disabled job logging", async ({ testCase }: any) => {
+  it("perform disabled job logging", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       await await DisableLogJob.performLater("Dummy");
       expect(await testCase._logger.messages()).not.toMatch(
@@ -259,7 +259,7 @@ describe("LoggingTest", () => {
       );
     });
   });
-  it.skip("perform nested jobs logging", async ({ testCase }: any) => {
+  it("perform nested jobs logging", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       await await NestedJob.performLater();
       expect(await testCase._logger.messages()).toMatch(/\[LoggingJob\] \[.*?\]/);
@@ -303,7 +303,7 @@ describe("LoggingTest", () => {
       expect(key).toEqual("enqueue_at.active_job");
     });
   }
-  it.skip("enqueue at job log error when callback chain is halted", async ({ testCase }: any) => {
+  it("enqueue at job log error when callback chain is halted", async ({ testCase }: any) => {
     const events: any = await await testCase.subscribed(
       async () =>
         await await (
@@ -317,7 +317,7 @@ describe("LoggingTest", () => {
     const [key] = rbAryEnsure(await first(events));
     expect(key).toEqual("enqueue_at.active_job");
   });
-  it.skip("enqueue at job log error when error is raised during callback chain", async ({
+  it("enqueue at job log error when error is raised during callback chain", async ({
     testCase,
   }: any) => {
     const events: any = await await testCase.subscribed(
@@ -353,14 +353,14 @@ describe("LoggingTest", () => {
       expect(key).toEqual("enqueue_at.active_job");
     });
   }
-  it.skip("enqueue log when enqueue error is set", async ({ testCase }: any) => {
+  it("enqueue log when enqueue error is set", async ({ testCase }: any) => {
     await EnqueueErrorJob.disableTestAdapter();
     await await EnqueueErrorJob.performLater();
     expect(await testCase._logger.messages()).toMatch(
       /Failed enqueuing EnqueueErrorJob to EnqueueError\(default\): ActiveJob::EnqueueError \(There was an error enqueuing the job\)/,
     );
   });
-  it.skip("enqueue at log when enqueue error is set", async ({ testCase }: any) => {
+  it("enqueue at log when enqueue error is set", async ({ testCase }: any) => {
     await EnqueueErrorJob.disableTestAdapter();
     await await (await EnqueueErrorJob.set({ wait: await Duration.hours(1) })).performLater();
     expect(await testCase._logger.messages()).toMatch(
@@ -373,7 +373,7 @@ describe("LoggingTest", () => {
       (async () => await await OverriddenLoggingJob.performLater("Dummy"))(),
     ).resolves.not.toThrow();
   });
-  it.skip("job error logging", async ({ testCase }: any) => {
+  it("job error logging", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       try {
         return await await await RescueJob.performLater("other");
@@ -391,7 +391,7 @@ describe("LoggingTest", () => {
       }
     });
   });
-  it.skip("job no error logging on rescuable job", async ({ testCase }: any) => {
+  it("job no error logging on rescuable job", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(
       undefined,
       async () => await await RescueJob.performLater("david"),
@@ -414,7 +414,7 @@ describe("LoggingTest", () => {
       });
     });
   }
-  it.skip("enqueue retry logging on retry job", async ({ testCase }: any) => {
+  it("enqueue retry logging on retry job", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(
       undefined,
       async () => await await RescueJob.performLater("david"),
@@ -450,7 +450,7 @@ describe("LoggingTest", () => {
       });
     });
   }
-  it.skip("discard logging", async ({ testCase }: any) => {
+  it("discard logging", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       await await RetryJob.performLater("DiscardableError", 2);
       return expect(await testCase._logger.messages()).toMatch(
@@ -458,7 +458,7 @@ describe("LoggingTest", () => {
       );
     });
   });
-  it.skip("enqueue all job logging some jobs failed enqueuing", async ({ testCase }: any) => {
+  it("enqueue all job logging some jobs failed enqueuing", async ({ testCase }: any) => {
     try {
       await EnqueueErrorJob.disableTestAdapter();
       EnqueueErrorAdapter.shouldRaiseSequence = [false, true];
@@ -470,7 +470,7 @@ describe("LoggingTest", () => {
       EnqueueErrorAdapter.shouldRaiseSequence = [];
     }
   });
-  it.skip("enqueue all job logging all jobs failed enqueuing", async ({ testCase }: any) => {
+  it("enqueue all job logging all jobs failed enqueuing", async ({ testCase }: any) => {
     try {
       await EnqueueErrorJob.disableTestAdapter();
       EnqueueErrorAdapter.shouldRaiseSequence = [true, true];
@@ -480,26 +480,26 @@ describe("LoggingTest", () => {
       EnqueueErrorAdapter.shouldRaiseSequence = [];
     }
   });
-  it.skip("verbose enqueue logs", async ({ testCase }: any) => {
+  it("verbose enqueue logs", async ({ testCase }: any) => {
     try {
-      (ActiveJob as any).verboseEnqueueLogs = true;
+      (ActiveJob as any).setVerboseEnqueueLogs(true);
       await await LoggingJob.performLater("Dummy");
       expect(await testCase._logger.messages()).toMatch("↳");
     } finally {
-      (ActiveJob as any).verboseEnqueueLogs = false;
+      (ActiveJob as any).setVerboseEnqueueLogs(false);
     }
   });
   it("verbose enqueue logs disabled by default", async ({ testCase }: any) => {
     await await LoggingJob.performLater("Dummy");
     expect(await testCase._logger.messages()).not.toMatch("↳");
   });
-  it.skip("enqueue all job logging", async ({ testCase }: any) => {
+  it("enqueue all job logging", async ({ testCase }: any) => {
     await performAllLater(new LoggingJob("Dummy"), new HelloJob("Jamie"), new HelloJob("John"));
     expect(await testCase._logger.messages()).toMatch(
       /Enqueued 3 jobs to .+ \(2 HelloJob, 1 LoggingJob\)/,
     );
   });
-  it.skip("enqueue all graceful failure when enqueued count is nil", async ({ testCase }: any) => {
+  it("enqueue all graceful failure when enqueued count is nil", async ({ testCase }: any) => {
     let originalAdapter: any, stubbedInlineAdapter: any;
     try {
       originalAdapter = await Base.queueAdapter();
@@ -524,7 +524,7 @@ describe("LoggingTest", () => {
       Base.setQueueAdapter(originalAdapter);
     }
   });
-  it.skip("enqueue log level", async ({ testCase }: any) => {
+  it("enqueue log level", async ({ testCase }: any) => {
     testCase._logger.level = Logger.WARN;
     await await HelloJob.performLater("Dummy");
     expect(await testCase._logger.messages()).not.toMatch(/HelloJob/);
@@ -553,7 +553,7 @@ describe("LoggingTest", () => {
       );
     });
   }
-  it.skip("enqueue all log level", async ({ testCase }: any) => {
+  it("enqueue all log level", async ({ testCase }: any) => {
     testCase._logger.level = Logger.WARN;
     await performAllLater(new LoggingJob("Dummy"), new HelloJob("Jamie"), new HelloJob("John"));
     expect(await testCase._logger.messages()).not.toMatch(/\(2 HelloJob, 1 LoggingJob\)/);
@@ -564,7 +564,7 @@ describe("LoggingTest", () => {
       /Enqueued 3 jobs to .+ \(2 HelloJob, 1 LoggingJob\)/,
     );
   });
-  it.skip("perform start log level", async ({ testCase }: any) => {
+  it("perform start log level", async ({ testCase }: any) => {
     testCase._logger.level = Logger.WARN;
     await await testCase.performEnqueuedJobs(
       undefined,
@@ -616,7 +616,7 @@ describe("LoggingTest", () => {
       );
     });
   }
-  it.skip("enqueue retry log level on retry job", async ({ testCase }: any) => {
+  it("enqueue retry log level on retry job", async ({ testCase }: any) => {
     testCase._logger.level = Logger.WARN;
     await await testCase.performEnqueuedJobs(
       undefined,
@@ -653,7 +653,7 @@ describe("LoggingTest", () => {
       );
     });
   }
-  it.skip("discard log level", async ({ testCase }: any) => {
+  it("discard log level", async ({ testCase }: any) => {
     testCase._logger.level = Logger.FATAL;
     await await testCase.performEnqueuedJobs(
       undefined,
