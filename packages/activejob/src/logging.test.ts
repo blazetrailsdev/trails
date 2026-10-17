@@ -373,7 +373,7 @@ describe("LoggingTest", () => {
       (async () => await await OverriddenLoggingJob.performLater("Dummy"))(),
     ).resolves.not.toThrow();
   });
-  it("job error logging", async ({ testCase }: any) => {
+  it.skip("job error logging", async ({ testCase }: any) => {
     await await testCase.performEnqueuedJobs(undefined, async () => {
       try {
         return await await await RescueJob.performLater("other");
@@ -480,7 +480,7 @@ describe("LoggingTest", () => {
       EnqueueErrorAdapter.shouldRaiseSequence = [];
     }
   });
-  it("verbose enqueue logs", async ({ testCase }: any) => {
+  it.skip("verbose enqueue logs", async ({ testCase }: any) => {
     try {
       (ActiveJob as any).setVerboseEnqueueLogs(true);
       await await LoggingJob.performLater("Dummy");

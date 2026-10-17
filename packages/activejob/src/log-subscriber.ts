@@ -2,7 +2,6 @@ import {
   LogSubscriber as ActiveSupportLogSubscriber,
   pluralize,
   isPresent,
-  tally,
   BacktraceCleaner,
   classAttribute,
 } from "@blazetrails/activesupport";
@@ -19,7 +18,7 @@ import {
   rbFArray,
   excBacktrace,
   aryJoin,
-  format,
+  rbObjClass,
   rbInspect,
   rbObjIsKindOf,
   Hash,
@@ -30,7 +29,7 @@ import {
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
-import { rbEnum, rbBinop, isAny, sortBy } from "./codegen-runtime.js";
+import { rbEnum, rbBinop, isAny, sortBy, tally } from "./codegen-runtime.js";
 import { ActiveJob } from "./namespaces.js";
 import { adapterName } from "./queue-adapter.js";
 
@@ -198,7 +197,7 @@ export class LogSubscriber extends ActiveSupportLogSubscriber {
       return (
         " with arguments: " +
         aryJoin(
-          rbEnum(job.arguments).map((arg?: any) => rbInspect(format(arg))),
+          rbEnum(job.arguments).map((arg?: any) => rbInspect(this.format(arg))),
           ", ",
         )
       );
@@ -210,9 +209,9 @@ export class LogSubscriber extends ActiveSupportLogSubscriber {
   /** @internal */
   protected format(arg: any): any {
     if (rbObjIsKindOf(arg, Hash)) {
-      return transformValues(arg, (value?: any) => format(value));
+      return transformValues(arg, (value?: any) => this.format(value));
     } else if (Array.isArray(arg)) {
-      return rbEnum(arg).map((value?: any) => format(value));
+      return rbEnum(arg).map((value?: any) => this.format(value));
     } else if (rbObjIsKindOf(arg, Identification)) {
       try {
         return arg.toGlobalId();
@@ -284,13 +283,13 @@ export class LogSubscriber extends ActiveSupportLogSubscriber {
   protected enqueuedJobsMessage(adapter: any, enqueuedJobs: any): any {
     const enqueuedCount: any = enqueuedJobs.length;
     const jobClassesCounts: any = sortBy(
-      tally(rbEnum(enqueuedJobs).map((x: any) => x.class())),
-      (_k?: any, v?: any) => -v,
+      tally(rbEnum(enqueuedJobs).map((x: any) => rbObjClass(x))),
+      ([_k, v]: any) => -v,
     );
     return `${`Enqueued ${enqueuedCount} ${rbObjAsString(pluralize("job", enqueuedCount))} to ${rbObjAsString(adapterName(adapter))}`}${` (${rbObjAsString(
       aryJoin(
         jobClassesCounts.map(
-          (klass?: any, count?: any) => `${rbObjAsString(count)} ${rbObjAsString(klass)}`,
+          ([klass, count]: any) => `${rbObjAsString(count)} ${rbObjAsString(klass)}`,
         ),
         ", ",
       ),

@@ -27,8 +27,8 @@ export function performNow(this: any): any {
 }
 
 /** @internal */
-export function _performJob(this: any): any {
-  this.instrument("perform_start");
+export async function _performJob(this: any): Promise<any> {
+  await this.instrument("perform_start");
   return Instrumentation.superMethod(this, "_performJob")!();
 }
 
@@ -36,10 +36,10 @@ export function _performJob(this: any): any {
 export function instrument(this: any, operation: any, payload: any = {}, block?: any): any {
   payload["job"] = this;
   payload["adapter"] = this.queueAdapter();
-  return Notifications.instrument(`${rbObjAsString(operation)}.active_job`, payload, () => {
+  return Notifications.instrument(`${rbObjAsString(operation)}.active_job`, payload, async () => {
     let value: any;
     if (rtest(block)) {
-      value = block();
+      value = await block();
     }
     if (rtest(this._haltedCallbackHookCalled !== undefined)) {
       payload["aborted"] = this._haltedCallbackHookCalled;

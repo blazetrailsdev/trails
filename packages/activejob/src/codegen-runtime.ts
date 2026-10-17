@@ -428,6 +428,13 @@ export function sortBy(xs: any, fn: (x: any) => any): any[] {
     .map((p) => p[1]);
 }
 
+/** Mirrors: Enumerable#tally (enum.c enum_tally) */
+export function tally(xs: any[]): Map<any, number> {
+  const hash = new Map<any, number>();
+  for (const x of xs) hash.set(x, (hash.get(x) ?? 0) + 1);
+  return hash;
+}
+
 /** Mirrors: Integer#times (numeric.c int_dotimes) */
 export function times(n: number, fn: (i: number) => any): any {
   let i = 0;
