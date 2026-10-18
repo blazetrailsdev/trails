@@ -445,8 +445,8 @@ function rewarmDataSourceCache(host: SchemaHost): PromiseLike<void> | void {
 }
 
 /**
- * @inventedArm try — CONVERGEABLE reset-column-information-rewarm-is-not-in-rails
- * @inventedArm rescue — CONVERGEABLE reset-column-information-rewarm-is-not-in-rails
+ * @inventedArm try — PERMANENT
+ * @inventedArm rescue — PERMANENT
  */
 export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | void {
   try {
@@ -590,8 +590,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void 
  * own guard latches its answer while the cache is known warm. The guard is
  * spelled out because the reader (`getPrimaryKeyAttr`) latches only after its
  * own peek of the cache succeeds and answers the convention unlatched when it
- * does not, so reading it here would not guarantee the latch. It retires with
- * story `latch-primary-key-resolution-into-reset-primary-key-memo`.
+ * does not, so reading it here would not guarantee the latch.
  *
  * @internal
  * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.

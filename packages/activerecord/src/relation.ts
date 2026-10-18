@@ -564,7 +564,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return await this.scoping(() => this._createBang(attributes, restoring));
   }
 
-  /** @noRailsEquivalent CONVERGEABLE relation-to-yaml-is-an-awaited-member-not-object-to-yaml */
+  /** @noRailsEquivalent PERMANENT */
   async toYaml(): Promise<string> {
     await this.load();
     return toYaml(this);

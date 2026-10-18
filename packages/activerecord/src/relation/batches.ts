@@ -20,7 +20,7 @@ export function findEach<T extends Base>(
   this: any,
   opts?: FindEachOptions,
 ): AsyncGenerator<T> & { size(): Promise<number> };
-/** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
+/** @inventedArm loop — PERMANENT */
 export function findEach<T extends Base>(
   this: any,
   {
@@ -73,7 +73,7 @@ export function findInBatches<T extends Base>(
   this: any,
   opts?: FindEachOptions,
 ): AsyncGenerator<T[]> & { size(): Promise<number> };
-/** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
+/** @inventedArm loop — PERMANENT */
 export function findInBatches<T extends Base>(
   this: any,
   {
@@ -124,7 +124,7 @@ export function inBatches<T extends Base>(
   opts?: InBatchesOptions,
 ): BatchEnumerator<LoadedRelation<Relation<T>>>;
 /**
- * @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator
+ * @inventedArm loop — PERMANENT
  * @inventedArm indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
  */
 export function inBatches<T extends Base>(
