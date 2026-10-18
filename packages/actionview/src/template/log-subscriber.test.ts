@@ -43,7 +43,7 @@ class AVLogSubscriberTest extends TestCase {
   }
 
   override setup(): void {
-    testHelperSetup.call(this);
+    testHelperSetup.call(this as never);
 
     LookupContext.DetailsKey.clear();
 
@@ -61,10 +61,10 @@ class AVLogSubscriberTest extends TestCase {
   }
 
   override teardown(): void {
-    testHelperTeardown.call(this);
+    testHelperTeardown.call(this as never);
     ActionController.Base.viewPaths()
       .toAry()
-      .map((p) => p.clearCache());
+      .map((p) => p.clearCache!());
 
     ActiveSupportLogSubscriber.logSubscribers().length = 0;
 
@@ -76,7 +76,9 @@ class AVLogSubscriberTest extends TestCase {
   }
 
   setCacheController(): void {
-    const controller = new ActionController.Base();
+    const controller = new ActionController.Base() as InstanceType<typeof ActionController.Base> & {
+      performCaching: boolean;
+    };
     controller.performCaching = true;
     controller.cacheStore = new MemoryStore();
     this.view.controller = controller as never;
@@ -281,6 +283,7 @@ describe("AVLogSubscriberTest", () => {
       );
     }));
 
+  // BLOCKED: cache-helper-write-fragment-for-awaits-async-block
   it.skip("render cached outer partial with cached inner partial", () =>
     stubRoot(async () => {
       tc.setViewCacheDependencies();
@@ -301,6 +304,7 @@ describe("AVLogSubscriberTest", () => {
       await assertDifference(
         () => tc.logger.logged(":debug").length,
         +1,
+        null,
         async () => {
           await tc.view.render({
             partial: "test/cached_nested_cached_customer",

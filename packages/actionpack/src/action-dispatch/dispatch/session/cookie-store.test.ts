@@ -1,327 +1,559 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
+import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
+import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
-  CookieStore,
-  SessionId as CookieSessionId,
-  DEFAULT_SAME_SITE,
-  type CookieStoreRequest,
-  type CookieJarLike,
-} from "../../middleware/session/cookie-store.js";
-import { SessionId as RackSessionId } from "@blazetrails/rack-session";
+  assertEqual,
+  assertMatch,
+  assertNil,
+  assertNoMatch,
+  assertNotEqual,
+  assertNotNil,
+  assertRaise,
+  Duration,
+  stub,
+} from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
+import { Utils } from "@blazetrails/rack";
+import {
+  type Hash,
+  include,
+  Marshal,
+  rbInspect,
+  rbModToS,
+  rbObjClass,
+  registerConstant,
+  slice,
+  type Included,
+} from "@blazetrails/ruby-compat";
+import { Base } from "../../../action-controller/base.js";
+import { deprecator } from "../../deprecator.js";
 import { Session } from "../../request/session.js";
+import { CookieOverflow } from "../../middleware/cookies.js";
+import { CookieStore } from "../../middleware/session/cookie-store.js";
+import { ShowExceptions } from "../../middleware/show-exceptions.js";
+import type { MiddlewareFactory } from "../../middleware/stack.js";
+import type { RouteSet } from "../../routing/route-set.js";
+import { IntegrationTest } from "../../testing/integration.js";
+import { CookieAssertions } from "../../../test-helpers/abstract-unit.js";
 
-const opts = (o: Record<string, unknown> = {}) => new Session.Options(null, o);
+const SessionKey = "_myapp_session";
+const SessionSecret = "b3c631c314c0bbca50c1b2843150fe33";
+const SessionSalt = "authenticated encrypted cookie";
 
-class FakeJar {
-  store = new Map<string, unknown>();
-  signedOrEncrypted: CookieJarLike;
-  constructor() {
-    const store = this.store;
-    this.signedOrEncrypted = {
-      get: (key: string) => store.get(key),
-      set: (key: string, value: unknown) => void store.set(key, value),
-    };
+const Generator = new KeyGenerator(SessionSecret, { iterations: 1000 });
+const Rotations = new RotationConfiguration();
+
+const SameSite = () => ":lax";
+
+const Encryptor = new MessageEncryptor(Generator.generateKey(SessionSalt, 32) as never, {
+  cipher: "aes-256-gcm",
+  serializer: Marshal,
+});
+
+class TestController extends Base {
+  noSessionAccess(): void {
+    this.head("ok");
+  }
+
+  async persistentSessionId(): Promise<void> {
+    await this.render({ plain: this.session.get("session_id") as string });
+  }
+
+  async setSessionValue(): Promise<void> {
+    this.session.set("foo", "bar");
+    await this.render({ body: null });
+  }
+
+  async getSessionValue(): Promise<void> {
+    await this.render({ plain: `foo: ${rbInspect(this.session.get("foo"))}` });
+  }
+
+  async getSessionId(): Promise<void> {
+    await this.render({
+      plain: `id: ${(this.request.session.id() as { publicId: string } | null)?.publicId ?? ""}`,
+    });
+  }
+
+  async getClassAfterResetSession(): Promise<void> {
+    this.resetSession();
+    await this.render({ plain: `class: ${rbModToS(rbObjClass(this.session))}` });
+  }
+
+  callSessionClear(): void {
+    this.session.clear();
+    this.head("ok");
+  }
+
+  callResetSession(): void {
+    this.resetSession();
+    this.head("ok");
+  }
+
+  raiseDataOverflow(): void {
+    this.session.set("foo", "bye!".repeat(1024));
+    this.head("ok");
+  }
+
+  async changeSessionId(): Promise<void> {
+    this.request.session.options()!.set("id", null);
+    await this.getSessionId();
+  }
+
+  renewSessionId(): void {
+    (this.request.sessionOptions as unknown as InstanceType<typeof Session.Options>).set(
+      "renew",
+      true,
+    );
+    this.head("ok");
   }
 }
 
-function makeReq(initial: Record<string, unknown> = {}): CookieStoreRequest & {
-  headers: Record<string, unknown>;
-  jar: FakeJar;
-} {
-  const headers: Record<string, unknown> = { ...initial };
-  const jar = new FakeJar();
-  return {
-    headers,
-    jar,
-    cookieJar: () => jar as unknown as ReturnType<CookieStoreRequest["cookieJar"]>,
-    fetchHeader<T>(key: string, fallback: (key: string) => T) {
-      if (Object.prototype.hasOwnProperty.call(headers, key)) return headers[key];
-      return fallback(key);
-    },
-    setHeader(key: string, value: unknown) {
-      headers[key] = value;
-    },
-  };
-}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include CookieAssertions` (`cookie_store_test.rb:75`)
+class CookieStoreTest extends IntegrationTest {
+  static TestController = TestController;
 
-function makeStore(opts: Record<string, unknown> = {}): CookieStore {
-  return new CookieStore(undefined, opts);
+  declare _cookieOptions?: Record<string, unknown>;
+
+  assertSessionCookie(attributesString: string | null, contents: Record<string, unknown>): void {
+    const cookies = this.parseSetCookiesHeaders(this.headers!.get("Set-Cookie"));
+
+    let sessionData: Hash<string, unknown> | null = null;
+    const sessionCookie = cookies[SessionKey];
+    if (sessionCookie) {
+      if (attributesString) {
+        const expectedAttributes = this.parseSetCookieAttributes(attributesString);
+
+        for (const [key, value] of Object.entries(expectedAttributes)) {
+          assertEqual(
+            value,
+            sessionCookie[key],
+            `expected ${key} to be ${rbInspect(value)}, but was ${rbInspect(sessionCookie[key])}`,
+          );
+        }
+      }
+
+      const sessionValue = sessionCookie["value"] as string;
+      try {
+        sessionData = Encryptor.decryptAndVerify(Utils.unescape(sessionValue)) as Hash<
+          string,
+          unknown
+        >;
+      } catch {
+        sessionData = null;
+      }
+    }
+
+    assertNotNil(sessionData, "session failed to decrypt");
+    assertEqual(Object.fromEntries(slice(sessionData!, ...Object.keys(contents))), contents);
+  }
+
+  override async get(
+    path: string,
+    options: Parameters<IntegrationTest["get"]>[1] = {},
+  ): Promise<number> {
+    options.headers ??= {};
+    const config = options.headers;
+    config["action_dispatch.secret_key_base"] = SessionSecret;
+    config["action_dispatch.authenticated_encrypted_cookie_salt"] = SessionSalt;
+    config["action_dispatch.use_authenticated_cookie_encryption"] = true;
+
+    config["action_dispatch.key_generator"] ??= Generator;
+    config["action_dispatch.cookies_rotations"] ??= Rotations;
+
+    config["action_dispatch.cookies_same_site_protection"] ??= SameSite;
+
+    return super.get(path, options);
+  }
+
+  cookieOptions(options: Record<string, unknown> = {}): Record<string, unknown> {
+    return Object.assign((this._cookieOptions ??= { key: SessionKey }), options);
+  }
+
+  override get app(): unknown {
+    return (this._app ??= IntegrationTest.buildApp(null, (middleware) => {
+      middleware.use(CookieStore as MiddlewareFactory, this.cookieOptions());
+      middleware.delete(ShowExceptions as MiddlewareFactory);
+    }));
+  }
+
+  override set app(value: unknown) {
+    this._app = value;
+  }
+
+  async withTestRouteSet(block: () => Promise<void>): Promise<void> {
+    await this.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        deprecator().silence(() => {
+          this.get("/:action", { to: CookieStoreTest.TestController });
+        });
+      });
+
+      await block();
+    });
+  }
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include CookieAssertions`; the merge is how `include()` types it
+interface CookieStoreTest extends Included<typeof CookieAssertions> {}
+include(CookieStoreTest, CookieAssertions);
+registerConstant("CookieStoreTest", CookieStoreTest);
 
 describe("CookieStoreTest", () => {
-  it("setting session value", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    const sid = store.generateSid();
-    const result = await store.writeSession(req, sid, { foo: "bar" });
-    expect(result.cookieValue["foo"]).toBe("bar");
-    expect(result.cookieValue["session_id"]).toBe(sid.publicId);
-  });
+  it("setting session value", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
 
-  it("getting session value", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    req.jar.store.set(store.key, { session_id: "sid", foo: "bar" });
-    const [, data] = await store.loadSession(req);
-    expect(data["foo"]).toBe("bar");
-  });
-
-  it("getting session id", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    req.jar.store.set(store.key, { session_id: "abc123" });
-    const sid = store.extractSessionId(req);
-    expect(sid!.publicId).toBe("abc123");
-  });
-
-  it("disregards tampered sessions", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    req.jar.store.set(store.key, null);
-    const [sid, data] = await store.loadSession(req);
-    expect(sid.publicId).toMatch(/^[0-9a-f]{32}$/);
-    expect(data["session_id"]).toBe(sid.publicId);
-  });
-
-  it("does not set secure cookies over http", async () => {
-    const opts: Record<string, unknown> = {};
-    makeStore(opts);
-    expect(opts.secure).toBeUndefined();
-  });
-
-  it("properly renew cookies", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    req.jar.store.set(store.key, { session_id: "old", counter: 1 });
-    const [sid1, data1] = await store.loadSession(req);
-    data1["counter"] = 2;
-    const result = await store.writeSession(req, sid1, data1);
-    expect(result.cookieValue["counter"]).toBe(2);
-    expect(result.publicId).toBe("old");
-  });
-
-  it("does set secure cookies over https", async () => {
-    const opts: Record<string, unknown> = { secure: true };
-    makeStore(opts);
-    expect(opts.secure).toBe(true);
-  });
-
-  it("deserializes unloaded classes on get id", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    req.jar.store.set(store.key, { session_id: "xyz" });
-    expect(store.extractSessionId(req)!.publicId).toBe("xyz");
-  });
-
-  it("deserializes unloaded classes on get value", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    req.jar.store.set(store.key, { session_id: "xyz", foo: "bar" });
-    const [, data] = await store.loadSession(req);
-    expect(data["foo"]).toBe("bar");
-  });
-
-  it("close raises when data overflows", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    const sid = store.generateSid();
-    const big = { foo: "x".repeat(5000) };
-    const result = await store.writeSession(req, sid, big);
-    expect(result.cookieValue["foo"]).toHaveLength(5000);
-  });
-
-  it("doesnt write session cookie if session is not accessed", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    expect(req.jar.store.has(store.key)).toBe(false);
-  });
-
-  it("doesnt write session cookie if session is unchanged", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    req.jar.store.set(store.key, { session_id: "same", foo: "bar" });
-    await store.loadSession(req);
-    expect(req.jar.store.get(store.key)).toEqual({ session_id: "same", foo: "bar" });
-  });
-
-  it("setting session value after session reset", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    const fresh = (await store.deleteSession(req, null, opts()))!;
-    const result = await store.writeSession(req, fresh, { foo: "bar" });
-    expect(result.cookieValue["foo"]).toBe("bar");
-    expect(result.publicId).toBe(fresh.publicId);
-  });
-
-  it("class type after session reset", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    const fresh = await store.deleteSession(req, null, opts());
-    expect(fresh).toBeInstanceOf(RackSessionId);
-  });
-
-  it("getting from nonexistent session", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    const [sid, data] = await store.loadSession(req);
-    expect(sid.publicId).toMatch(/^[0-9a-f]{32}$/);
-    expect(data["session_id"]).toBe(sid.publicId);
-  });
-
-  it("setting session value after session clear", async () => {
-    const store = makeStore();
-    const req = makeReq();
-    const fresh = (await store.deleteSession(req, null, opts()))!;
-    const result = await store.writeSession(req, fresh, { user: "new" });
-    expect(result.cookieValue["user"]).toBe("new");
-  });
-
-  it("persistent session id", async () => {
-    const store = makeStore();
-    const data = store.persistentSessionIdBang(null);
-    expect(typeof data["session_id"]).toBe("string");
-    expect((data["session_id"] as string).length).toBe(32);
-  });
-
-  it("setting session id to nil is respected", async () => {
-    const store = makeStore();
-    const data = store.persistentSessionIdBang({ session_id: null }, null);
-    expect(typeof data["session_id"]).toBe("string");
-  });
-
-  it("session store with expire after", async () => {
-    const opts: Record<string, unknown> = { expireAfter: 3600 };
-    makeStore(opts);
-    expect(opts.expireAfter).toBe(3600);
-  });
-
-  it("session store with expire after does not accept expired session", async () => {
-    const opts: Record<string, unknown> = { expireAfter: 1 };
-    makeStore(opts);
-    expect(opts.expireAfter).toBe(1);
-  });
-
-  it("session store with explicit domain", async () => {
-    const opts: Record<string, unknown> = { domain: "example.com" };
-    makeStore(opts);
-    expect(opts.domain).toBe("example.com");
-  });
-
-  it("session store without domain", async () => {
-    const opts: Record<string, unknown> = {};
-    makeStore(opts);
-    expect(opts.domain).toBeUndefined();
-  });
-
-  it("session store with nil domain", async () => {
-    const opts: Record<string, unknown> = { domain: null };
-    makeStore(opts);
-    expect(opts.domain).toBeNull();
-  });
-
-  it("session store with all domains", async () => {
-    const opts: Record<string, unknown> = { domain: "all" };
-    makeStore(opts);
-    expect(opts.domain).toBe("all");
-  });
-
-  it("default same_site derives SameSite from env", async () => {
-    const opts: Record<string, unknown> = {};
-    makeStore(opts);
-    expect(opts.sameSite).toBe(DEFAULT_SAME_SITE);
-    expect(DEFAULT_SAME_SITE({ cookiesSameSiteProtection: () => "Lax" })).toBe("Lax");
-  });
-
-  it("explicit same_site sets SameSite", async () => {
-    const opts: Record<string, unknown> = { sameSite: "Strict" };
-    makeStore(opts);
-    expect(opts.sameSite).toBe("Strict");
-  });
-
-  it("explicit nil same_site omits SameSite", async () => {
-    const opts: Record<string, unknown> = { sameSite: null };
-    makeStore(opts);
-    expect(opts.sameSite).toBeNull();
-  });
-});
-
-describe("CookieStore unit", () => {
-  describe("cookieJar", () => {
-    it("returns the request's signedOrEncrypted jar", async () => {
-      const store = makeStore();
-      const req = makeReq();
-      expect(store.cookieJar(req)).toBe(req.jar.signedOrEncrypted);
+      t.assertResponse("success");
+      t.assertSessionCookie("path=/; HttpOnly", { foo: "bar" });
     });
   });
 
-  describe("setCookie / getCookie", () => {
-    it("writes and reads through the signedOrEncrypted jar under store.key", async () => {
-      const store = makeStore();
-      const req = makeReq();
-      store.setCookie(req, null, { session_id: "abc", user: 1 });
-      expect(req.jar.store.get(store.key)).toEqual({ session_id: "abc", user: 1 });
-      expect(store.getCookie(req)).toEqual({ session_id: "abc", user: 1 });
+  it("getting session value", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      await t.get("/getSessionValue");
+
+      t.assertResponse("success");
+      assertEqual('foo: "bar"', t.response.body);
     });
   });
 
-  describe("unpackedCookieData", () => {
-    it("returns the cached header value when present", async () => {
-      const store = makeStore();
-      const req = makeReq({
-        "action_dispatch.request.unsigned_session_cookie": { session_id: "cached" },
+  it("getting session id", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      await t.get("/persistentSessionId");
+
+      t.assertResponse("success");
+      assertEqual(32, t.response.body.length);
+      const sessionId = t.response.body;
+
+      await t.get("/getSessionId");
+      t.assertResponse("success");
+      assertEqual(
+        `id: ${sessionId}`,
+        t.response.body,
+        "should be able to read session id without accessing the session hash",
+      );
+    });
+  });
+
+  it("disregards tampered sessions", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      const encryptor = new MessageEncryptor("A".repeat(32), {
+        cipher: "aes-256-gcm",
+        serializer: Marshal,
       });
-      expect(store.unpackedCookieData(req)).toEqual({ session_id: "cached" });
-    });
 
-    it("falls back to the cookie jar and memoizes onto the header", async () => {
-      const store = makeStore();
-      const req = makeReq();
-      req.jar.store.set(store.key, { session_id: "from-jar" });
-      expect(store.unpackedCookieData(req)).toEqual({ session_id: "from-jar" });
-      expect(req.headers["action_dispatch.request.unsigned_session_cookie"]).toEqual({
-        session_id: "from-jar",
+      t.cookies.set(SessionKey, encryptor.encryptAndSign({ foo: "bar", session_id: "abc" }));
+
+      await t.get("/getSessionValue");
+
+      t.assertResponse("success");
+      assertEqual("foo: nil", t.response.body);
+    });
+  });
+
+  it("does not set secure cookies over http", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    t.cookieOptions({ secure: true });
+
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      t.assertResponse("success");
+      assertNil(t.headers!.get("Set-Cookie"));
+    });
+  });
+
+  it("properly renew cookies", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      await t.get("/persistentSessionId");
+      const sessionId = t.response.body;
+      await t.get("/renewSessionId");
+      await t.get("/persistentSessionId");
+      assertNotEqual(t.response.body, sessionId);
+    });
+  });
+
+  it("does set secure cookies over https", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    t.cookieOptions({ secure: true });
+
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue", { headers: { HTTPS: "on" } });
+
+      t.assertResponse("success");
+      t.assertSessionCookie("path=/; secure; HttpOnly", { foo: "bar" });
+    });
+  });
+
+  // PERMANENT-SKIP: `with_autoload_path` pushes a Zeitwerk dir; CLAUDE.md, "Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)".
+  it.skip("deserializes unloaded classes on get id", () => {});
+
+  // PERMANENT-SKIP: `with_autoload_path` pushes a Zeitwerk dir; CLAUDE.md, "Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)".
+  it.skip("deserializes unloaded classes on get value", () => {});
+
+  it("close raises when data overflows", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      const error = await assertRaise([CookieOverflow], {}, async () => {
+        await t.get("/raiseDataOverflow");
+      });
+      assertEqual("_myapp_session cookie overflowed with size 5612 bytes", error.message);
+    });
+  });
+
+  it("doesnt write session cookie if session is not accessed", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/noSessionAccess");
+      t.assertResponse("success");
+      assertNil(t.headers!.get("Set-Cookie"));
+    });
+  });
+
+  it("doesnt write session cookie if session is unchanged", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      t.cookies.set(
+        SessionKey,
+        "BAh7BjoIZm9vIghiYXI%3D--" + "fef868465920f415f2c0652d6910d3af288a0367",
+      );
+      await t.get("/noSessionAccess");
+      t.assertResponse("success");
+      assertNil(t.headers!.get("Set-Cookie"));
+    });
+  });
+
+  it("setting session value after session reset", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      t.assertResponse("success");
+      const sessionPayload = t.response.body;
+      t.assertSessionCookie("path=/; HttpOnly", { foo: "bar" });
+
+      await t.get("/callResetSession");
+      t.assertResponse("success");
+      assertNotEqual([], t.headers!.get("Set-Cookie"));
+      assertNotNil(t.headers!.get("Set-Cookie"));
+      assertNotNil(sessionPayload);
+      assertNotEqual(sessionPayload, t.cookies.get(SessionKey));
+
+      await t.get("/getSessionValue");
+      t.assertResponse("success");
+      assertEqual("foo: nil", t.response.body);
+    });
+  });
+
+  it("class type after session reset", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      t.assertResponse("success");
+      t.assertSessionCookie("path=/; HttpOnly", { foo: "bar" });
+
+      await t.get("/getClassAfterResetSession");
+      t.assertResponse("success");
+      assertNotEqual([], t.headers!.get("Set-Cookie"));
+      assertEqual("class: ActionDispatch::Request::Session", t.response.body);
+    });
+  });
+
+  it("getting from nonexistent session", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/getSessionValue");
+      t.assertResponse("success");
+      assertEqual("foo: nil", t.response.body);
+      assertNil(t.headers!.get("Set-Cookie"), "should only create session on write, not read");
+    });
+  });
+
+  it("setting session value after session clear", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      t.assertResponse("success");
+      t.assertSessionCookie("path=/; HttpOnly", { foo: "bar" });
+
+      await t.get("/callSessionClear");
+      t.assertResponse("success");
+
+      await t.get("/getSessionValue");
+      t.assertResponse("success");
+      assertEqual("foo: nil", t.response.body);
+    });
+  });
+
+  it("persistent session id", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      await t.get("/persistentSessionId");
+      t.assertResponse("success");
+      assertEqual(32, t.response.body.length);
+      const sessionId = t.response.body;
+      await t.get("/persistentSessionId");
+      assertEqual(sessionId, t.response.body);
+      t.resetBang();
+      await t.get("/persistentSessionId");
+      assertNotEqual(sessionId, t.response.body);
+    });
+  });
+
+  it("setting session id to nil is respected", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      await t.get("/getSessionId");
+      const sid = t.response.body;
+      assertEqual(36, sid.length);
+
+      await t.get("/changeSessionId");
+      assertNotEqual(sid, t.response.body);
+    });
+  });
+
+  // BLOCKED: rack-session-commit-session-expiry-reads-time-now
+  it.skip("session store with expire after", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    t.cookieOptions({ expireAfter: Duration.hours(5) });
+
+    await t.withTestRouteSet(async () => {
+      let time = Time.local(2008, 4, 24);
+
+      await stub(Time, "now", time, [], async () => {
+        const expectedExpiry = time
+          .plusWithDuration(Duration.hours(5))
+          .utc()
+          .strftime("%a, %d %b %Y %H:%M:%S GMT");
+
+        await t.get("/setSessionValue");
+
+        t.assertResponse("success");
+        t.assertSessionCookie(`path=/; expires=${expectedExpiry}; HttpOnly`, { foo: "bar" });
+      });
+
+      time = time.plusWithDuration(Duration.hours(3));
+      await stub(Time, "now", time, [], async () => {
+        const expectedExpiry = time
+          .plusWithDuration(Duration.hours(5))
+          .utc()
+          .strftime("%a, %d %b %Y %H:%M:%S GMT");
+
+        await t.get("/noSessionAccess");
+
+        t.assertResponse("success");
+        t.assertSessionCookie(`path=/; expires=${expectedExpiry}; HttpOnly`, { foo: "bar" });
       });
     });
+  });
 
-    it("memoizes an empty object when no cookie is present", async () => {
-      const store = makeStore();
-      const req = makeReq();
-      expect(store.unpackedCookieData(req)).toEqual({});
-      expect(req.headers["action_dispatch.request.unsigned_session_cookie"]).toEqual({});
+  // BLOCKED: rack-session-commit-session-expiry-reads-time-now
+  it.skip("session store with expire after does not accept expired session", async ({
+    testCase,
+  }) => {
+    const t = testCase as CookieStoreTest;
+    t.cookieOptions({ expireAfter: Duration.hours(5) });
+
+    await t.withTestRouteSet(async () => {
+      let time = Time.local(2017, 11, 12);
+
+      await stub(Time, "now", time, [], async () => {
+        const expectedExpiry = time
+          .plusWithDuration(Duration.hours(5))
+          .utc()
+          .strftime("%a, %d %b %Y %H:%M:%S GMT");
+
+        await t.get("/setSessionValue");
+        await t.get("/getSessionValue");
+
+        t.assertResponse("success");
+        assertEqual('foo: "bar"', t.response.body);
+        t.assertSessionCookie(`path=/; expires=${expectedExpiry}; HttpOnly`, { foo: "bar" });
+      });
+
+      time = time.plusWithDuration(Duration.hours(5).plus(Duration.minutes(1)));
+
+      await stub(Time, "now", time, [], async () => {
+        await t.get("/getSessionValue");
+
+        t.assertResponse("success");
+        assertEqual("foo: nil", t.response.body);
+      });
     });
   });
 
-  describe("writeSession", () => {
-    it("returns a CookieStore::SessionId carrying the data", async () => {
-      const store = makeStore();
-      const req = makeReq();
-      const sid = new RackSessionId("a".repeat(32));
-      const data: Record<string, unknown> = { user: 1 };
-      const result = await store.writeSession(req, sid, data, opts());
-      expect(result).toBeInstanceOf(CookieSessionId);
-      expect(result.cookieValue).toBe(data);
-    });
+  it("session store with explicit domain", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    t.cookieOptions({ domain: "example.es" });
 
-    it("delegates the wrapped session id's surface without being one", async () => {
-      const store = makeStore();
-      const req = makeReq();
-      const sid = new RackSessionId("a".repeat(32));
-      const result = await store.writeSession(req, sid, {}, opts());
-      expect(result).not.toBeInstanceOf(RackSessionId);
-      expect(result.publicId).toBe(sid.publicId);
-      expect(result.privateId).toBe(sid.privateId);
-      expect(String(result)).toBe(sid.publicId);
-      expect(result.isEmpty()).toBe(false);
-      expect(result.inspect()).toBe(sid.inspect());
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      assertMatch(/domain=example\.es/, t.headers!.get("Set-Cookie") as string);
+      t.headers!.get("Set-Cookie");
     });
   });
 
-  describe("deleteSession", () => {
-    it("returns null and clears the header when options.drop is true", async () => {
-      const store = makeStore();
-      const req = makeReq();
-      const result = await store.deleteSession(req, null, opts({ drop: true }));
-      expect(result).toBeNull();
-      expect(req.headers["action_dispatch.request.unsigned_session_cookie"]).toEqual({});
+  it("session store without domain", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      assertNoMatch(/domain=/, t.headers!.get("Set-Cookie") as string);
+    });
+  });
+
+  it("session store with nil domain", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    t.cookieOptions({ domain: null });
+
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      assertNoMatch(/domain=/, t.headers!.get("Set-Cookie") as string);
+    });
+  });
+
+  it("session store with all domains", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    t.cookieOptions({ domain: ":all" });
+
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      assertMatch(/domain=example\.com/, t.headers!.get("Set-Cookie") as string);
+    });
+  });
+
+  it("default same_site derives SameSite from env", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      t.assertSetCookieAttributes("_myapp_session", "SameSite=Lax");
+    });
+  });
+
+  it("explicit same_site sets SameSite", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    t.cookieOptions({ sameSite: ":strict" });
+
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      t.assertSetCookieAttributes("_myapp_session", "SameSite=Strict");
+    });
+  });
+
+  it("explicit nil same_site omits SameSite", async ({ testCase }) => {
+    const t = testCase as CookieStoreTest;
+    t.cookieOptions({ sameSite: null });
+
+    await t.withTestRouteSet(async () => {
+      await t.get("/setSessionValue");
+      t.assertNotSetCookieAttributes("_myapp_session", "SameSite");
     });
   });
 });
