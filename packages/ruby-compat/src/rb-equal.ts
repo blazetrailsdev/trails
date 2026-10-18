@@ -114,11 +114,7 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   const tag = temporalTag(a);
   if (tag !== null) {
     if (temporalTag(b) === null) {
-      if (
-        (rbObjClass(a) === rbCDate || rbObjClass(a).prototype instanceof rbCDate) &&
-        (rbObjClass(b) === rbCDate || rbObjClass(b).prototype instanceof rbCDate)
-      )
-        return (b as { cmp(other: unknown): number | null }).cmp(a) === 0;
+      if (kDateP(a) && kDateP(b)) return (b as { cmp(other: unknown): number | null }).cmp(a) === 0;
       return false;
     }
     const x = widenPlainDate(a);
@@ -238,4 +234,17 @@ export function rbEqq(pattern: unknown, target: unknown): boolean {
     return rtest(pattern(target));
   }
   return rbEqual(pattern, target);
+}
+
+/**
+ * `k_date_p` (`vendor/ruby/v3.3.11/ext/date/date_core.c:1992`), `f_kind_of_p(x, cDate)`.
+ * Read off `rbObjClass` rather than `rbObjIsKindOf`, whose module would close an
+ * import cycle through include.ts.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function kDateP(x: unknown): boolean {
+  const klass = rbObjClass(x);
+  return klass === rbCDate || klass.prototype instanceof rbCDate;
 }

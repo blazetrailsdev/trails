@@ -4427,7 +4427,10 @@ function cmpGen(self: Date, other: unknown): number | null {
   if (kNumericP(other)) return self.ajd.cmp(other);
   else if (other instanceof Date) return self.ajd.cmp(other.ajd);
   else if (other instanceof Temporal.PlainDate) return self.ajd.cmp(new Date(other).ajd);
-  else if (other instanceof Temporal.PlainDateTime || other instanceof Temporal.ZonedDateTime)
+  else if (
+    (other instanceof Temporal.PlainDateTime || other instanceof Temporal.ZonedDateTime) &&
+    rbObjIsKindOf(other, rbCDate)
+  )
     return self.ajd.cmp(new DateTime(other).ajd);
   return null;
 }

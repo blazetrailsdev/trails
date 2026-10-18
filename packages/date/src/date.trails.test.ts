@@ -2009,5 +2009,6 @@ describe("a Ruby date against its Temporal seat", () => {
     const dt = new RubyDateTime(2001, 2, 3, 4, 5, 6);
     const time = Temporal.ZonedDateTime.from("2001-02-03T04:05:06+00:00[UTC]");
     expect([rbEqual(time, dt), cmp(time, dt)]).toEqual([false, null]);
+    expect([rbEqual(dt, time), cmp(dt, time), dt.cmp(time)]).toEqual([false, null, null]);
   });
 });
