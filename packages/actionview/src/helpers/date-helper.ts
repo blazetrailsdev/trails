@@ -20,8 +20,11 @@ import {
   rbInspect,
   rbObjRespondTo,
   Range,
+  rbBlockGivenP,
   rbFSend,
   rbModDefineMethod,
+  rtest,
+  type Block,
   sprintf,
 } from "@blazetrails/ruby-compat";
 
@@ -231,12 +234,13 @@ export function selectYear(date: unknown, options: Opts = {}, htmlOptions: Opts 
 export function timeTag(
   this: { contentTag(...args: unknown[]): SafeBuffer },
   dateOrTime: { iso8601(): string },
-  ...args: unknown[]
+  ...args: Array<string | SafeBuffer | Record<string, unknown> | Block<unknown>>
 ): SafeBuffer {
-  const block = typeof args.at(-1) === "function" ? (args.pop() as () => unknown) : undefined;
+  const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as Block<unknown>) : undefined;
   const options = extractOptionsBang(args);
-  const format = hashDelete(options, "format") ?? ":long";
-  const content = args[0] ?? I18n.l(dateOrTime, { format });
+  const deleted = hashDelete(options, "format");
+  const format = rtest(deleted) ? deleted : ":long";
+  const content = rtest(args[0]) ? args[0] : I18n.l(dateOrTime, { format });
 
   return this.contentTag(
     "time",
@@ -853,6 +857,14 @@ export interface DateTimeSelector extends Omit<Included<typeof import("./tag-hel
 }
 
 include(DateTimeSelector, TagHelper);
+
+declare module "./form-helper.js" {
+  interface FormBuilder {
+    dateSelect(method: unknown, options?: Opts, htmlOptions?: Opts): unknown;
+    timeSelect(method: unknown, options?: Opts, htmlOptions?: Opts): unknown;
+    datetimeSelect(method: unknown, options?: Opts, htmlOptions?: Opts): unknown;
+  }
+}
 
 type FormBuilderSelf = {
   objectName: unknown;

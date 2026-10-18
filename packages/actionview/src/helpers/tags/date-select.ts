@@ -60,14 +60,17 @@ export class DateSelect extends Base {
     const datetime = fetch(
       options,
       "selected",
-      block(() => this.value() ?? this.defaultDatetime(options)),
+      block(() => {
+        const value = this.value();
+        return rtest(value) ? value : this.defaultDatetime(options);
+      }),
     );
     this._autoIndex ??= null;
 
     options = dup(options);
     options["fieldName"] = this._methodName;
     options["includePosition"] = true;
-    options["prefix"] ??= this._objectName;
+    if (!rtest(options["prefix"])) options["prefix"] = this._objectName;
     if (this._autoIndex != null && !Object.hasOwn(options, "index")) {
       options["index"] = this._autoIndex;
     }
@@ -87,13 +90,13 @@ export class DateSelect extends Base {
     } else {
       const default_ = dup(optionsDefault as Record<string, unknown>);
 
-      default_["min"] ??= default_["minute"];
-      default_["sec"] ??= default_["second"];
+      if (!rtest(default_["min"])) default_["min"] = default_["minute"];
+      if (!rtest(default_["sec"])) default_["sec"] = default_["second"];
 
       const time = Time.current();
 
       for (const key of ["year", "month", "day", "hour", "min", "sec"]) {
-        default_[key] ??= rbFPublicSend(time, key);
+        if (!rtest(default_[key])) default_[key] = rbFPublicSend(time, key);
       }
 
       return Time.utc(

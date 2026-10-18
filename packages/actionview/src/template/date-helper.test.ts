@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "../test-helpers/abstract-unit.js";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Struct, sprintf } from "@blazetrails/ruby-compat";
+import { Struct, block, sprintf } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import {
   distanceOfTimeInWords,
@@ -21,22 +21,12 @@ import { assertDomEqual } from "../testing/dom-assertions.js";
 
 const Post = Struct.new("id", "written_on", "updated_at");
 const MONTHS =
-  "January February March April May June July August September October November December".split(
-    " ",
-  );
+  "January February March April May June July August September October November December";
 
-function options(
-  range: number[],
-  selected: number,
-  label: (i: number) => string,
-  value = label,
-): string {
-  return range
-    .map(
-      (i) =>
-        `<option value="${value(i)}"${i === selected ? ' selected="selected"' : ""}>${label(i)}</option>\n`,
-    )
-    .join("");
+function options(range: number[], sel: number, label: (i: number) => string, value = label) {
+  const opt = (i: number) =>
+    `<option value="${value(i)}"${i === sel ? ' selected="selected"' : ""}>`;
+  return range.map((i) => `${opt(i)}${label(i)}</option>\n`).join("");
 }
 
 function upto(from: number, to: number): number[] {
@@ -46,7 +36,7 @@ function upto(from: number, to: number): number[] {
 function dateSelects(attr: string, year: number, month: number, day: number): string {
   return (
     `<select id="post_${attr}_1i" name="post[${attr}(1i)]">\n${options(upto(year - 5, year + 5), year, String)}</select>\n` +
-    `<select id="post_${attr}_2i" name="post[${attr}(2i)]">\n${options(upto(1, 12), month, (i) => MONTHS[i - 1], String)}</select>\n` +
+    `<select id="post_${attr}_2i" name="post[${attr}(2i)]">\n${options(upto(1, 12), month, (i) => MONTHS.split(" ")[i - 1], String)}</select>\n` +
     `<select id="post_${attr}_3i" name="post[${attr}(3i)]">\n${options(upto(1, 31), day, String)}</select>\n`
   );
 }
@@ -289,6 +279,18 @@ describe("DateHelperTest", () => {
     assertDomEqual(expected, view.dateSelect("post", "written_on"));
   });
 
+  it("date select within fields for", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) =>
+      (view as any).concat(f.dateSelect("written_on")),
+    );
+    const expected = dateSelects("written_on", 2004, 6, 15);
+
+    assertDomEqual(expected, outputBuffer);
+  });
+
   it("time select", () => {
     view.post = new Post();
     view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
@@ -329,9 +331,14 @@ describe("DateHelperTest", () => {
   });
 
   it("time tag with given block", () => {
-    expect(String(view.timeTag(Time.now(), () => view.raw("<span>Right now</span>")))).toMatch(
-      /<time.*><span>Right now<\/span><\/time>/,
-    );
+    expect(
+      String(
+        view.timeTag(
+          Time.now(),
+          block(() => view.raw("<span>Right now</span>")),
+        ),
+      ),
+    ).toMatch(/<time.*><span>Right now<\/span><\/time>/);
   });
 
   it("time tag with different format", () => {
