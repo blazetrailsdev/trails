@@ -1,6 +1,14 @@
 import { Conversion, Naming } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
-import { extend, include, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  include,
+  rbInspect,
+  rbModConstSet,
+  registerConstant,
+  Struct,
+  toS,
+} from "@blazetrails/ruby-compat";
 
 export class Comment {
   static {
@@ -101,3 +109,41 @@ class Book {
 export const Cpk = { name: "Cpk" } as { name: string; Book: typeof Book };
 registerConstant("Cpk", Cpk);
 rbModConstSet(Cpk, "Book", Book);
+
+export class Customer extends Struct.new("name", "id") {
+  declare name: string;
+  declare id: number | null;
+
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  toXml(options: { builder?: { name(name: string): unknown } } = {}): unknown {
+    if (options.builder) {
+      return options.builder.name(this.name);
+    } else {
+      return `<name>${this.name}</name>`;
+    }
+  }
+
+  toJs(_options: Record<string, unknown> = {}): string {
+    return `name: ${rbInspect(this.name)}`;
+  }
+  toText = this.toJs;
+
+  errors(): unknown[] {
+    return [];
+  }
+
+  isPersisted(): boolean {
+    return isPresent(this.id);
+  }
+
+  cacheKey(): string {
+    return toS(this.name);
+  }
+}
+
+export class BadCustomer extends Customer {}
+export class GoodCustomer extends Customer {}

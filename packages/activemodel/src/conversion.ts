@@ -65,6 +65,7 @@ export function toPartialPath(this: object): string {
 }
 
 export function _toPartialPath(this: ConversionHost): string {
+  if (!Object.hasOwn(this, "_cachedToPartialPath")) this._cachedToPartialPath = undefined;
   return (this._cachedToPartialPath ||= (() => {
     if (rbObjRespondTo(this, "modelName")) {
       return `${this.modelName!.collection}/${this.modelName!.element}`;
