@@ -312,8 +312,7 @@ describe("RubyTrackerTests", () => {
     return new TSETracker(name, asTemplate(template), viewPaths);
   }
 
-  // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
-  it.skip("dependencies skip unknown options", () => {
+  it("dependencies skip unknown options", () => {
     const template = new FakeTemplate(
       `
       <%= render partial: "unknown_render_call", unknown_render_option: "yes" %>
@@ -325,8 +324,7 @@ describe("RubyTrackerTests", () => {
     expect(tracker.dependencies()).toEqual([]);
   });
 
-  // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
-  it.skip("dependencies finds spacer templates", () => {
+  it("dependencies finds spacer templates", () => {
     const template = new FakeTemplate(
       `
       <%= render partial: "messages/message", collection: books, spacer_template: "messages/message_spacer" %>
@@ -338,8 +336,7 @@ describe("RubyTrackerTests", () => {
     expect(tracker.dependencies()).toEqual(["messages/message_spacer", "messages/message"]);
   });
 
-  // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
-  it.skip("dependencies skip commented out renders", () => {
+  it("dependencies skip commented out renders", () => {
     const template = new FakeTemplate(
       `
       <%# render "messages/legacy_message" %>

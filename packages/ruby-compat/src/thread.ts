@@ -90,16 +90,17 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread.each_caller_location`.
    */
   static eachCallerLocation<V = never>(block: (location: Location) => void): V | null {
+    const V8Error = Error as {
+      stackTraceLimit?: number;
+      captureStackTrace?: (exc: object, fn: unknown) => void;
+    };
     const exc = new Error();
-    const stackTraceLimit = Error.stackTraceLimit;
-    Error.stackTraceLimit = Infinity;
+    const stackTraceLimit = V8Error.stackTraceLimit;
+    V8Error.stackTraceLimit = Infinity;
     try {
-      (Error as { captureStackTrace?: (exc: object, fn: unknown) => void }).captureStackTrace?.(
-        exc,
-        Thread.eachCallerLocation,
-      );
+      V8Error.captureStackTrace?.(exc, Thread.eachCallerLocation);
     } finally {
-      Error.stackTraceLimit = stackTraceLimit;
+      V8Error.stackTraceLimit = stackTraceLimit;
     }
     try {
       for (const location of (excBacktraceLocations(exc) ?? []).slice(1)) block(location);
