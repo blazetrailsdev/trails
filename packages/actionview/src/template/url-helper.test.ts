@@ -5,7 +5,12 @@ import { ActionController, Request, RouteSet } from "@blazetrails/actionpack";
 import { Conversion, Naming } from "@blazetrails/activemodel";
 import { assertPredicate, extend, isHtmlSafe, isPresent } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
-import { ArgumentError, include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  include,
+  rbObjSingletonClass,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
 import * as UrlHelper from "../helpers/url-helper.js";
@@ -1221,9 +1226,11 @@ describe("UrlHelperTest", () => {
   });
 });
 
+registerConstant("UrlHelperControllerTest", { name: "UrlHelperControllerTest" });
+
 class UrlHelperController extends ActionController.Base {
-  static override controllerPath(): string {
-    return "url_helper_controller_test/url_helper";
+  static {
+    Object.defineProperty(this, "name", { value: "UrlHelperControllerTest::UrlHelperController" });
   }
 
   static ROUTES = this.testRoutes(function () {
