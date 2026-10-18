@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { timeAgoInWords, distanceOfTimeInWords } from "@blazetrails/actionview";
+import type { Time } from "@blazetrails/date";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describe("DateHelperTest", () => {
@@ -8,7 +9,7 @@ describe("DateHelperTest", () => {
   it("takes an ActiveRecord datetime column with no conversion at the call site", async () => {
     const topic = await topics("first");
     const writtenOn = (
-      topic as unknown as { written_on: { toF: () => number; toTime: () => { toF: () => number } } }
+      topic as unknown as { written_on: { toF: () => number; toTime: () => Time } }
     ).written_on;
     expect(typeof writtenOn.toF()).toBe("number");
 

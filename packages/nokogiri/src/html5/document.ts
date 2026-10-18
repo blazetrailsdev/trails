@@ -1,4 +1,4 @@
-import { parse, type DefaultTreeAdapterMap } from "parse5";
+import { defaultTreeAdapter, parse, type DefaultTreeAdapterMap } from "parse5";
 import { ArgumentError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { readSource, type Readable } from "../readable.js";
@@ -17,12 +17,12 @@ export class Document {
   url: string | null = null;
   encoding: string | null = null;
 
-  private constructor(
+  constructor(
     /**
      * @internal
      * @noRailsEquivalent PERMANENT
      */
-    readonly _node: Parse5Document,
+    readonly _node: Parse5Document = defaultTreeAdapter.createDocument(),
   ) {}
 
   static parse(

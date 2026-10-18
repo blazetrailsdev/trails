@@ -1,5 +1,10 @@
+import { include, rbModConstSet } from "@blazetrails/ruby-compat";
+
+import { XML } from "../namespaces.js";
+
 import type { Node } from "../html5/node.js";
 import {
+  Searchable,
   cssRulesToXpath,
   extractParams,
   xpathInternal,
@@ -7,6 +12,8 @@ import {
 } from "./searchable.js";
 
 export class NodeSet implements Iterable<Node> {
+  declare atCss: (...args: unknown[]) => Node | undefined;
+
   static readonly IMPLIED_XPATH_CONTEXTS = [".//", "self::"] as const;
 
   private readonly _list: Node[] = [];
@@ -69,3 +76,6 @@ export class NodeSet implements Iterable<Node> {
     return this.map((node) => node.toString()).join("");
   }
 }
+
+include(NodeSet, Searchable);
+rbModConstSet(XML, "NodeSet", NodeSet);

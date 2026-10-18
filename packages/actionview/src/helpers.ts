@@ -1,5 +1,6 @@
 import { Benchmarkable, Concern, extend } from "@blazetrails/activesupport";
 import { Module } from "@blazetrails/ruby-compat";
+import { Tags } from "./namespaces.js";
 import { ActiveModelHelper } from "./helpers/active-model-helper.js";
 import { AssetTagHelper } from "./helpers/asset-tag-helper.js";
 import { AssetUrlHelper } from "./helpers/asset-url-helper.js";
@@ -62,3 +63,7 @@ export const Helpers = new Module((mod) => {
   mod.include(TranslationHelper);
   mod.include(UrlHelper);
 });
+
+export async function eagerLoadBang(): Promise<void> {
+  await Tags.eagerLoadBang();
+}

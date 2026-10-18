@@ -3,11 +3,13 @@ import {
   NotImplementedError,
   rbEqual,
   rbStrEnumerateLines,
+  rbModConstSet,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { ActionView } from "../../namespaces.js";
 import type { TemplateHandler } from "../handlers.js";
+import { Erubi } from "./tse/erubi.js";
 export class LocationParsingError extends Error {
   override name = "LocationParsingError";
 }
@@ -162,3 +164,5 @@ export class Tse implements TemplateHandler {
 }
 
 registerConstant("ActionView::Template::Handlers::TSE", Tse);
+
+rbModConstSet(Tse, "Erubi", Erubi);

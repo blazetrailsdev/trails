@@ -2,7 +2,9 @@ import { serializeOuter, type DefaultTreeAdapterMap } from "parse5";
 
 import type { Attr } from "../xml/attr.js";
 import type { NodeSet } from "../xml/node-set.js";
-import { include } from "@blazetrails/ruby-compat";
+import { include, rbModConstSet } from "@blazetrails/ruby-compat";
+import { HTML5 } from "../namespaces.js";
+import "../xml/node-set.js";
 import { Searchable } from "../xml/searchable.js";
 
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
@@ -15,6 +17,7 @@ export class Node {
   static readonly IMPLIED_XPATH_CONTEXTS = [".//"] as const;
   static readonly ELEMENT_NODE = 1;
   static readonly TEXT_NODE = 3;
+  static readonly CDATA_SECTION_NODE = 4;
   static readonly COMMENT_NODE = 8;
 
   constructor(
@@ -47,10 +50,23 @@ export class Node {
     return this.type === Node.TEXT_NODE;
   }
 
-  get text(): string {
+  isCdata(): boolean {
+    return this.type === Node.CDATA_SECTION_NODE;
+  }
+
+  isBlank(): boolean {
+    if (this.type !== Node.TEXT_NODE && this.type !== Node.CDATA_SECTION_NODE) return false;
+    return /^[ \t\n\r]*$/.test(this.content);
+  }
+
+  get content(): string {
     if (this._node.nodeName === "#text") return (this._node as { value: string }).value;
     if (this._node.nodeName === "#comment") return (this._node as { data: string }).data;
-    return this.children.map((child) => child.text).join("");
+    return this.children.map((child) => child.content).join("");
+  }
+
+  get text(): string {
+    return this.content;
   }
 
   private _children?: Node[];
@@ -75,6 +91,7 @@ export class Node {
 }
 
 include(Node, Searchable);
+rbModConstSet(HTML5, "Node", Node);
 
 /** @noRailsEquivalent PERMANENT */
 export function childNodes(parent: Parse5Parent, document: unknown = null): Node[] {

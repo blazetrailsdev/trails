@@ -1,10 +1,17 @@
 import { assert, assertEqual, assertOperator } from "@blazetrails/activesupport";
 import { ArgumentError, NotImplementedError, rbInspect } from "@blazetrails/ruby-compat";
-import { HTML5, XML, type Html5Node, type NodeSet } from "@blazetrails/nokogiri";
+import {
+  HTML5,
+  XML,
+  type Html5DocumentFragment,
+  type Html5Node,
+  type NodeSet,
+} from "@blazetrails/nokogiri";
+import { Testing } from "../testing.js";
 import { HTMLSelector, type EqualityTests } from "./selector-assertions/html-selector.js";
 
 export interface SelectorAssertionsHost {
-  _selected?: NodeSet | null;
+  _selected?: NodeSet | Html5DocumentFragment | null;
   documentRootElement(): unknown;
 }
 
@@ -37,6 +44,37 @@ export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): Nod
 }
 
 export const assertSelect = assertDom;
+
+export function assertDomEncoded(
+  this: SelectorAssertionsHost,
+  element: unknown = null,
+  { htmlVersion = null }: { htmlVersion?: string | null } = {},
+  block?: (selected: NodeSet | Html5DocumentFragment) => void,
+): void {
+  if (element == null && this._selected == null) {
+    throw new ArgumentError("Element is required when called from a nonnested assert_dom");
+  }
+
+  const content = nodeset(element ?? this._selected)
+    .map((elem) =>
+      elem.children
+        .filter((child) => child.isCdata() || (child.isText() && !child.isBlank()))
+        .map((child) => child.content)
+        .join(""),
+    )
+    .join("");
+
+  const selected = Testing.htmlDocumentFragment({ htmlVersion }).parse(content);
+  nestSelection.call(this, selected, () => {
+    if (content.length === 0) {
+      block!(selected);
+    } else {
+      assertDom.call(this, ":root", ...(block ? [block] : []));
+    }
+  });
+}
+
+export const assertSelectEncoded = assertDomEncoded;
 
 /** @internal */
 export function documentRootElement(): never {
@@ -83,13 +121,13 @@ function pluralizeElement(quantity: number): string {
 
 function nestSelection(
   this: SelectorAssertionsHost,
-  selection: NodeSet,
-  block: (selected: NodeSet) => void,
+  selection: NodeSet | Html5DocumentFragment,
+  block: (selected: never) => void,
 ): void {
   const oldSelected = this._selected;
   this._selected = selection;
   try {
-    block(this._selected);
+    block(this._selected as never);
   } finally {
     this._selected = oldSelected;
   }

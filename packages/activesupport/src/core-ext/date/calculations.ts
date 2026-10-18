@@ -231,7 +231,10 @@ export function compareWithoutCoercion(
 declare module "@blazetrails/date" {
   namespace Date {
     export function current(): Temporal.PlainDate;
+    export function beginningOfWeek(): string;
+    export function setBeginningOfWeek(weekStart: string): void;
+    export const DAYS_INTO_WEEK: Record<string, number>;
   }
 }
 
-Object.assign(RubyDate, { current });
+Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek, DAYS_INTO_WEEK });

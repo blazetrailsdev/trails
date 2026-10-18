@@ -1,8 +1,9 @@
 import type { DefaultTreeAdapterMap } from "parse5";
 import { Module } from "@blazetrails/ruby-compat";
 
-import { Node } from "../html5/node.js";
-import { NodeSet } from "./node-set.js";
+import type { Node } from "../html5/node.js";
+import type { NodeSet } from "./node-set.js";
+import { HTML5, XML } from "../namespaces.js";
 import { SyntaxError } from "../css/syntax-error.js";
 import { SyntaxError as XPathSyntaxError } from "./xpath/syntax-error.js";
 
@@ -99,13 +100,13 @@ export function xpathInternal(
   binds: Record<string, unknown> | null,
 ): NodeSet {
   const document = node.document;
-  if (document == null) return new NodeSet(document);
+  if (document == null) return new XML.NodeSet(document);
 
   if (paths.length === 1) return xpathImpl(node, paths[0], handler, ns, binds);
 
   return paths.reduce(
     (combined, path) => combined.plus(xpathImpl(node, path, handler, ns, binds)),
-    new NodeSet(document),
+    new XML.NodeSet(document),
   );
 }
 
@@ -128,9 +129,9 @@ function xpathImpl(
     }
   }
   const ordered = descendants(rootOf(node._node), true).filter((n) => found.has(n));
-  return new NodeSet(
+  return new XML.NodeSet(
     node.document,
-    ordered.map((n) => new Node(n as DefaultTreeAdapterMap["childNode"], node.document)),
+    ordered.map((n) => new HTML5.Node(n as DefaultTreeAdapterMap["childNode"], node.document)),
   );
 }
 
@@ -209,7 +210,7 @@ function matches(n: Parse5Node, c: Compound, handler: unknown): boolean {
     } else {
       const fn = (handler as Record<string, (...a: unknown[]) => unknown[]> | undefined)?.[name];
       if (typeof fn !== "function") throw new XPathSyntaxError(`Unregistered function: ${name}`);
-      if (fn.call(handler, [new Node(n, null)], ...splitArgs(args ?? "")).length === 0)
+      if (fn.call(handler, [new HTML5.Node(n, null)], ...splitArgs(args ?? "")).length === 0)
         return false;
     }
   }
