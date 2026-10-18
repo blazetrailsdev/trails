@@ -16,10 +16,11 @@ import {
   assertNotNil,
   assertRaise,
   assert,
+  assertNot,
   assertEmpty,
   assertNothingRaised,
 } from "@blazetrails/activesupport";
-import { ArgumentError, JSON, Marshal, hashDelete } from "@blazetrails/ruby-compat";
+import { ArgumentError, JSON, Marshal, block, hashDelete } from "@blazetrails/ruby-compat";
 import { escape } from "@blazetrails/rack";
 import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
 import { TestRequest } from "../testing/test-request.js";
@@ -69,8 +70,11 @@ function setCookieHeaders(jar: CookieJar): string[] {
 
 describe("CookieJarTest", () => {
   it("fetch", () => {
-    const jar = CookieJar.build(cookieRequest(), { foo: "bar" });
-    expect(jar.fetch("foo")).toBe("bar");
+    const request = TestRequest.create(cookieEnv());
+    const x = {};
+    assertNot(request.cookieJar().isKey("zzzzzz"));
+    assertEqual(x, request.cookieJar().fetch("zzzzzz", x));
+    assertNot(request.cookieJar().isKey("zzzzzz"));
   });
 
   it("fetch exists", () => {
@@ -79,8 +83,16 @@ describe("CookieJarTest", () => {
   });
 
   it("fetch block", () => {
-    const jar = CookieJar.build(cookieRequest(), {});
-    expect(jar.fetch("missing", "fallback")).toBe("fallback");
+    const request = TestRequest.create(cookieEnv());
+    const x = {};
+    assertNot(request.cookieJar().isKey("zzzzzz"));
+    assertEqual(
+      x,
+      request.cookieJar().fetch(
+        "zzzzzz",
+        block(() => x),
+      ),
+    );
   });
 
   it("key is to s", () => {
@@ -90,8 +102,10 @@ describe("CookieJarTest", () => {
   });
 
   it("to hash", () => {
-    const jar = CookieJar.build(cookieRequest(), { a: "1", b: "2" });
-    expect(jar.toHash()).toEqual({ a: "1", b: "2" });
+    const request = TestRequest.create(cookieEnv());
+    request.cookieJar().set("foo", "bar");
+    assertEqual({ foo: "bar" }, request.cookieJar().toHash());
+    assertEqual({ foo: "bar" }, request.cookieJar().toH());
   });
 
   it("fetch type error", () => {
@@ -119,31 +133,32 @@ describe("CookieJarTest", () => {
   });
 
   it("key methods", () => {
-    const jar = new CookieJar(cookieRequest());
-    expect(jar.isKey("foo")).toBe(false);
-    expect(jar.hasKey("foo")).toBe(false);
+    const request = TestRequest.create(cookieEnv());
+    assertNot(request.cookieJar().isKey("foo"));
+    assertNot(request.cookieJar().hasKey("foo"));
 
-    jar.set("foo", "bar");
-    expect(jar.isKey("foo")).toBe(true);
-    expect(jar.hasKey("foo")).toBe(true);
+    request.cookieJar().set("foo", "bar");
+    assert(request.cookieJar().isKey("foo"));
+    assert(request.cookieJar().hasKey("foo"));
   });
 
   it("write doesnt set a nil header", () => {
-    const jar = new CookieJar(cookieRequest());
-    const response = new Response();
-    jar.write(response);
-    expect(response.headers["set-cookie"]).toBeUndefined();
+    const headers: Record<string, unknown> = {};
+    TestRequest.create(cookieEnv())
+      .cookieJar()
+      .write(headers as unknown as Parameters<CookieJar["write"]>[0]);
+    assertNotIncludes(headers, "Set-Cookie");
   });
 });
 
 describe("CookiesMiddlewareTest", () => {
   it("sets expected cookie header", () => {
-    const jar = new CookieJar(cookieRequest());
-    jar.set("user_name", "david");
-    const headers = setCookieHeaders(jar);
-    expect(headers.length).toBe(1);
-    expect(headers[0]).toContain("user_name=david");
-    expect(headers[0]).toContain("path=/");
+    const env = cookieEnv();
+    delete env["action_dispatch.cookies_same_site_protection"];
+    const request = TestRequest.create(env);
+    request.cookieJar().set("foo", "bar");
+    const headers = setCookieHeaders(request.cookieJar());
+    assertEqual("foo=bar; path=/", headers[0]);
   });
 });
 

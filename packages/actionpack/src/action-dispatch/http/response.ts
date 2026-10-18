@@ -1,6 +1,7 @@
 import type { Time } from "@blazetrails/date";
 import { cattrAccessor, include, presence } from "@blazetrails/activesupport";
 import {
+  hashAset,
   File,
   IO,
   IOError,
@@ -286,7 +287,7 @@ export class Response {
     cattrAccessor.call(this, "defaultHeaders");
   }
 
-  private _status: number;
+  private _status!: number;
   private _headers: Headers;
   private _committed = false;
   private cv: Array<() => void> = [];
@@ -295,14 +296,21 @@ export class Response {
   stream: Buffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string };
   request: Request | null = null;
 
-  constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
-    this._status = status;
+  constructor(
+    status: number | string = 200,
+    headers: Record<string, string> = {},
+    body: string[] = [],
+    block?: (response: Response) => void,
+  ) {
     this._headers = new Headers();
     for (const [key, value] of Object.entries(headers)) {
       this._headers.set(key, value);
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject([...body]));
+    this.status = status;
     this.prepareCacheControlBang();
+
+    if (block) block(this);
   }
 
   get status(): number {
@@ -344,12 +352,12 @@ export class Response {
     return this._headers.get(key);
   }
 
-  setHeader(key: string, v: string): void {
-    this._headers.set(key, v);
+  setHeader(key: string, v: string | null): string | null {
+    return hashAset(this._headers, key, v);
   }
 
-  deleteHeader(key: string): void {
-    this._headers.delete(key);
+  deleteHeader(key: string): string | undefined {
+    return this._headers.delete(key);
   }
 
   get contentType(): string | null | undefined {

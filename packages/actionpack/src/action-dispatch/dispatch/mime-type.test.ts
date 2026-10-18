@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { EXTENSION_LOOKUP, Mime, MimeType } from "../http/mime-type.js";
+import { EXTENSION_LOOKUP, LOOKUP, Mime, MimeType } from "../http/mime-type.js";
 import {
+  assert,
+  assertNot,
   assertEqual,
   assertNil,
   assertNotEqual,
@@ -11,9 +13,11 @@ import { rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 
 describe("MimeTypeTest", () => {
   it("parse single", () => {
-    const types = MimeType.parse("text/html");
-    expect(types.length).toBe(1);
-    expect(types[0].string).toBe("text/html");
+    for (const mimeType of LOOKUP.keys()) {
+      if (mimeType !== "image/*") {
+        assertEqual([MimeType.lookup(mimeType)], MimeType.parse(mimeType));
+      }
+    }
   });
 
   it("unregister", () => {
@@ -34,35 +38,87 @@ describe("MimeTypeTest", () => {
   });
 
   it("parse text with trailing star at the beginning", () => {
-    const parsed = MimeType.parse("text/*, text/html, application/json, multipart/form-data").map(
-      (m) => m.string,
+    const accept = "text/*, text/html, application/json, multipart/form-data";
+    const expected = [
+      Mime.get(":html"),
+      Mime.get(":text"),
+      Mime.get(":js"),
+      Mime.get(":css"),
+      Mime.get(":ics"),
+      Mime.get(":csv"),
+      Mime.get(":vcf"),
+      Mime.get(":vtt"),
+      Mime.get(":xml"),
+      Mime.get(":yaml"),
+      Mime.get(":json"),
+      Mime.get(":multipart_form"),
+    ];
+    const parsed = MimeType.parse(accept);
+    assertEqual(
+      expected.map((m) => m!.toString()),
+      parsed.map((m) => m.toString()),
     );
-    expect(parsed).toContain("text/html");
-    expect(parsed).toContain("application/json");
-    expect(parsed.length).toBeGreaterThan(2);
-    expect(parsed).not.toContain("text/*");
   });
 
   it("parse text with trailing star in the end", () => {
-    const parsed = MimeType.parse("text/html, application/json, multipart/form-data, text/*").map(
-      (m) => m.string,
+    const accept = "text/html, application/json, multipart/form-data, text/*";
+    const expected = [
+      Mime.get(":html"),
+      Mime.get(":json"),
+      Mime.get(":multipart_form"),
+      Mime.get(":text"),
+      Mime.get(":js"),
+      Mime.get(":css"),
+      Mime.get(":ics"),
+      Mime.get(":csv"),
+      Mime.get(":vcf"),
+      Mime.get(":vtt"),
+      Mime.get(":xml"),
+      Mime.get(":yaml"),
+    ];
+    const parsed = MimeType.parse(accept);
+    assertEqual(
+      expected.map((m) => m!.toString()),
+      parsed.map((m) => m.toString()),
     );
-    expect(parsed).toContain("text/html");
-    expect(parsed).not.toContain("text/*");
   });
 
   it("parse text with trailing star", () => {
-    const parsed = MimeType.parse("text/*").map((m) => m.string);
-    expect(parsed).toContain("text/html");
-    expect(parsed).toContain("text/plain");
-    expect(parsed).not.toContain("text/*");
+    const accept = "text/*";
+    const expected = [
+      Mime.get(":html"),
+      Mime.get(":text"),
+      Mime.get(":js"),
+      Mime.get(":css"),
+      Mime.get(":ics"),
+      Mime.get(":csv"),
+      Mime.get(":vcf"),
+      Mime.get(":vtt"),
+      Mime.get(":xml"),
+      Mime.get(":yaml"),
+      Mime.get(":json"),
+    ];
+    const parsed = MimeType.parse(accept);
+    assertEqual(expected.map((m) => m!.toString()).sort(), parsed.map((m) => m.toString()).sort());
   });
 
   it("parse application with trailing star", () => {
-    const parsed = MimeType.parse("application/*").map((m) => m.string);
-    expect(parsed).toContain("application/json");
-    expect(parsed).toContain("application/xml");
-    expect(parsed).not.toContain("application/*");
+    const accept = "application/*";
+    const expected = [
+      Mime.get(":html"),
+      Mime.get(":js"),
+      Mime.get(":xml"),
+      Mime.get(":rss"),
+      Mime.get(":atom"),
+      Mime.get(":yaml"),
+      Mime.get(":url_encoded_form"),
+      Mime.get(":json"),
+      Mime.get(":pdf"),
+      Mime.get(":zip"),
+      Mime.get(":gzip"),
+    ];
+    const parsed = MimeType.parse(accept);
+    assertEqual(expected.map((m) => m!.toString()).sort(), parsed.map((m) => m.toString()).sort());
   });
 
   it("parse without q", () => {
@@ -71,9 +127,16 @@ describe("MimeTypeTest", () => {
   });
 
   it("parse with q", () => {
-    const types = MimeType.parse("text/html;q=0.9, application/json;q=1.0");
-    expect(types[0].string).toBe("application/json");
-    expect(types[1].string).toBe("text/html");
+    const accept =
+      "text/xml,application/xhtml+xml,text/yaml; q=0.3,application/xml,text/html; q=0.8,image/png,text/plain; q=0.5,application/pdf,*/*; q=0.2";
+    const expected = [
+      ...[":html", ":xml", ":png", ":pdf", ":text", ":yaml"].map((t) => Mime.get(t)!),
+      "*/*",
+    ];
+    assertEqual(
+      expected.map((m) => m.toString()),
+      MimeType.parse(accept).map((m) => m.toString()),
+    );
   });
 
   it("parse with q and media type parameters", () => {
@@ -112,8 +175,25 @@ describe("MimeTypeTest", () => {
   });
 
   it("parse other broken acceptlines", () => {
-    const types = MimeType.parse(",");
-    expect(types.length).toBeGreaterThanOrEqual(0);
+    const accept =
+      "image/gif, image/x-xbitmap, image/jpeg, image/pjpeg, application/x-shockwave-flash, application/vnd.ms-excel, application/vnd.ms-powerpoint, application/msword,  , pronto/1.00.00, sslvpn/1.00.00.00, */*";
+    const expected = [
+      "image/gif",
+      "image/x-xbitmap",
+      "image/jpeg",
+      "image/pjpeg",
+      "application/x-shockwave-flash",
+      "application/vnd.ms-excel",
+      "application/vnd.ms-powerpoint",
+      "application/msword",
+      "pronto/1.00.00",
+      "sslvpn/1.00.00.00",
+      "*/*",
+    ];
+    assertEqual(
+      expected,
+      MimeType.parse(accept).map((m) => m.toString()),
+    );
   });
 
   it("custom type", () => {
@@ -201,28 +281,37 @@ describe("MimeTypeTest", () => {
   });
 
   it("regexp matcher", () => {
-    expect(Mime.get(":js")!.isMatch("text/javascript")).toBe(true);
-    expect(Mime.get(":js")!.isMatch("application/javascript")).toBe(true);
-    expect(!Mime.get(":js")!.isMatch("text/html")).toBe(true);
-    expect(!Mime.get(":js")!.isMatch("text/javascript")).toBe(false);
-    expect(!Mime.get(":js")!.isMatch("application/javascript")).toBe(false);
-    expect(Mime.get(":html")!.isMatch("application/xhtml+xml")).toBe(true);
+    assert(Mime.get(":js")!.isMatch("text/javascript"));
+    assert(Mime.get(":js")!.isMatch("application/javascript"));
+    assert(!Mime.get(":js")!.isMatch("text/html"));
+    assertNot(!Mime.get(":js")!.isMatch("text/javascript"));
+    assertNot(!Mime.get(":js")!.isMatch("application/javascript"));
+    assert(Mime.get(":html")!.isMatch("application/xhtml+xml"));
   });
 
   it("match?", () => {
-    expect(Mime.get(":js")!.isMatch("text/javascript")).toBe(true);
-    expect(Mime.get(":js")!.isMatch("application/javascript")).toBe(true);
-    expect(Mime.get(":js")!.isMatch("text/html")).toBe(false);
+    assert(Mime.get(":js")!.isMatch("text/javascript"));
+    assert(Mime.get(":js")!.isMatch("application/javascript"));
+    assertNot(Mime.get(":js")!.isMatch("text/html"));
   });
 
   it("can be initialized with wildcards", () => {
-    const all = new MimeType("*/*", "all");
-    expect(all.string).toBe("*/*");
+    assertEqual("*/*", new MimeType("*/*").toString());
+    assertEqual("text/*", new MimeType("text/*").toString());
+    assertEqual("video/*", new MimeType("video/*").toString());
   });
 
   it("can be initialized with parameters", () => {
-    const type = new MimeType("text/html", "html");
-    expect(type.string).toBe("text/html");
+    assertEqual("text/html; parameter", new MimeType("text/html; parameter").toString());
+    assertEqual("text/html; parameter=abc", new MimeType("text/html; parameter=abc").toString());
+    assertEqual(
+      'text/html; parameter="abc"',
+      new MimeType('text/html; parameter="abc"').toString(),
+    );
+    assertEqual(
+      'text/html; parameter=abc; parameter2="xyz"',
+      new MimeType('text/html; parameter=abc; parameter2="xyz"').toString(),
+    );
   });
 
   it("can be initialized with parameters without having space after ;", () => {

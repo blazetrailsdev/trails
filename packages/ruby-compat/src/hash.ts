@@ -706,6 +706,29 @@ export function eachKey<T>(
 }
 
 /**
+ * Ruby `Hash#transform_values!` (`vendor/ruby/v3.3.11/hash.c:3398`
+ * `rb_hash_transform_values_bang`): each value replaced in place by the
+ * block's result, answering the receiver.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values!` (`vendor/ruby/v3.3.11/hash.c:3398`).
+ */
+export function transformValuesBang<H extends Record<string, unknown> | Map<unknown, unknown>>(
+  hash: H,
+  block: (value: unknown) => unknown,
+): H {
+  if (hash instanceof Map) {
+    const set = hash instanceof Hash ? Hash.prototype.set : Map.prototype.set;
+    for (const [key, value] of [...hash]) {
+      set.call(hash, key, block(value));
+    }
+    return hash;
+  }
+  for (const key of Object.keys(hash)) {
+    hash[key] = block(hash[key]);
+  }
+  return hash;
+}
+
+/**
  * Ruby `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`
  * `rb_hash_transform_values`) — a NEW hash with the same keys in the same
  * order and each value replaced by the block's result.
@@ -740,6 +763,10 @@ export function transformValues(
   const own = ownMethod(hash, "transformValues");
   if (own) return own.call(hash, block) as Record<string, unknown>;
   if (hash instanceof Map) {
+    const override = (hash as { transformValues?: unknown }).transformValues;
+    if (typeof override === "function") {
+      return override.call(hash, block) as Hash<unknown, unknown>;
+    }
     const result = new Hash<unknown, unknown>();
     for (const [key, value] of hash) {
       result.set(key, block(value));
@@ -1240,13 +1267,17 @@ export class Hash<K, V> extends Map<K, V> {
    * `rb_hash_to_h_block` (`hash.c:3528`): a new bare Hash of the pairs the block
    * returns, each checked by `rb_hash_set_pair` (`hash.c:3503`). With none, the receiver itself when it IS a Hash (`hash.c:3560`),
    * otherwise a `hash_dup` (`hash.c:3562`) into a bare Hash that carries the
-   * same entries and the same `default` / `default_proc`.
+   * same entries and the same `default` / `default_proc`. That bare Hash is a
+   * plain object when it needs no `Hash` feature (README, § "When a Ruby Hash
+   * is a `Hash` and when it is an object").
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#to_h` (`vendor/ruby/v3.3.11/hash.c:3555`).
    */
-  toH(): Hash<K, V>;
+  toH(): Hash<K, V> | Record<string, V>;
   toH<K2, V2>(block: (key: K, value: V) => [K2, V2]): Hash<K2, V2>;
-  toH(block?: (key: K, value: V) => [unknown, unknown]): Hash<unknown, unknown> {
+  toH(
+    block?: (key: K, value: V) => [unknown, unknown],
+  ): Hash<unknown, unknown> | Record<string, unknown> {
     if (block !== undefined) {
       const h = new Hash<unknown, unknown>();
       for (const [key, value] of this) {
@@ -1264,6 +1295,14 @@ export class Hash<K, V> extends Map<K, V> {
       return h;
     }
     if (this.constructor === Hash) return this;
+    if (
+      this.default() == null &&
+      !this.defaultProc() &&
+      !this.isCompareByIdentity() &&
+      [...this.keys()].every((key) => typeof key === "string")
+    ) {
+      return Object.fromEntries(this) as Record<string, V>;
+    }
     return hashDup(this, Hash<K, V>);
   }
 

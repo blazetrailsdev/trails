@@ -16,6 +16,7 @@ import {
   rbObjRespondTo,
   symbolToS,
   toEnum,
+  transformValuesBang,
   type Enumerator,
 } from "@blazetrails/ruby-compat";
 
@@ -561,16 +562,16 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.transformKeysBang((k) => (isSymbol(k) ? symbolToS(k) : String(k)));
   }
 
-  symbolizeKeys(): Hash<string, unknown> {
-    return symbolizeKeysBang(this.toHash());
+  symbolizeKeys(): Hash<string, unknown> | AnyObject {
+    return symbolizeKeysBang(this.toHash() as AnyObject);
   }
 
-  toOptions(): Hash<string, unknown> {
+  toOptions(): Hash<string, unknown> | AnyObject {
     return this.symbolizeKeys();
   }
 
-  deepSymbolizeKeys(): Hash<string, unknown> {
-    return deepSymbolizeKeysBang(this.toHash());
+  deepSymbolizeKeys(): Hash<string, unknown> | AnyObject {
+    return deepSymbolizeKeysBang(this.toHash() as AnyObject);
   }
 
   toOptionsBang(): this {
@@ -581,15 +582,11 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this;
   }
 
-  toHash(): Hash<string, unknown> {
-    const copy = new Hash<string, unknown>();
-    for (const [key, value] of this) {
-      copy.set(key, value);
-    }
-    for (const [key, v] of copy) {
-      copy.set(key, this.convertValueToHash(v as V));
-    }
-    this.setDefaults(copy);
+  /** @inventedArm if — PERMANENT */
+  toHash(): Hash<string, unknown> | AnyObject {
+    const copy = this.toH() as Hash<string, unknown> | AnyObject;
+    transformValuesBang(copy, (v) => this.convertValueToHash(v as V));
+    if (copy instanceof Hash) this.setDefaults(copy);
     return copy;
   }
 

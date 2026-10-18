@@ -78,11 +78,11 @@ export class ProtectedParams {
     return this.#self;
   }
 
-  toH(): Hash<string, unknown> {
+  toH(): Hash<string, unknown> | Record<string, unknown> {
     return this.#parameters.toH();
   }
 
-  toUnsafeH(): Hash<string, unknown> {
+  toUnsafeH(): Hash<string, unknown> | Record<string, unknown> {
     return this.toH();
   }
 

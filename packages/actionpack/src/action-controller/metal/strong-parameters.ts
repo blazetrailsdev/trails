@@ -527,7 +527,7 @@ export class Parameters {
     }
   }
 
-  toHash(): Hash<string, unknown> {
+  toHash(): Hash<string, unknown> | Record<string, unknown> {
     return this.toH().toHash();
   }
 

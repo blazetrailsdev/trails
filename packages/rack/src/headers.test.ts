@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Hash } from "@blazetrails/ruby-compat";
 import { Headers } from "./headers.js";
 
 describe("RackHeadersTest", () => {
@@ -381,12 +380,8 @@ describe("RackHeadersTest", () => {
   });
 
   it("to h", () => {
-    expect(h.toH()).toEqual(new Hash<string, string>());
-    const expected = new Hash<string, string>();
-    expected.set("3", "4");
-    expected.set("ab", "1");
-    expected.set("cd", "2");
-    expect(fh.toH()).toEqual(expected);
+    expect(h.toH()).toEqual({});
+    expect(fh.toH()).toEqual({ "3": "4", ab: "1", cd: "2" });
   });
 
   it("dig", () => {

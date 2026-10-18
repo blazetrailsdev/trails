@@ -11,9 +11,9 @@
       "value": 0
     },
     "actiondispatch": {
-      "assertionCount": 189,
-      "kind": 275,
-      "value": 46
+      "assertionCount": 166,
+      "kind": 245,
+      "value": 40
     },
     "actionview": {
       "assertionCount": 41,
@@ -76,7 +76,7 @@
       "value": 0
     },
     "rack": {
-      "assertionCount": 328,
+      "assertionCount": 327,
       "kind": 433,
       "value": 49
     },
