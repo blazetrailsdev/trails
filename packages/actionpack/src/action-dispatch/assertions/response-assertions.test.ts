@@ -24,6 +24,7 @@ function fakeResponse(
   const body = opts.body ?? "";
   return {
     status,
+    responseCode: status,
     isRedirection: status >= 300 && status <= 399,
     location,
     body,

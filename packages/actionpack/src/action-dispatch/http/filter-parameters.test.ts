@@ -37,7 +37,7 @@ function makeHost(overrides: Partial<FilterParametersHost> = {}): FilterParamete
     env,
     path: "/",
     queryString: "",
-    params: {},
+    parameters: {},
     ...overrides,
   };
 }
@@ -50,7 +50,7 @@ describe("ENV_MATCH", () => {
 
 describe("filteredParameters", () => {
   it("returns parameters filtered by the configured filter list", () => {
-    const host = makeHost({ params: { password: "secret", username: "alice" } });
+    const host = makeHost({ parameters: { password: "secret", username: "alice" } });
     host.setHeader("action_dispatch.parameter_filter", ["password"]);
     expect(filteredParameters.call(host)).toEqual({
       password: "[FILTERED]",
@@ -60,7 +60,7 @@ describe("filteredParameters", () => {
 
   it("returns an empty hash when reading params throws ParseError", () => {
     const host = makeHost();
-    Object.defineProperty(host, "params", {
+    Object.defineProperty(host, "parameters", {
       get() {
         throw new ParseError("bad");
       },
@@ -70,7 +70,7 @@ describe("filteredParameters", () => {
 
   it("rethrows non-ParseError exceptions", () => {
     const host = makeHost();
-    Object.defineProperty(host, "params", {
+    Object.defineProperty(host, "parameters", {
       get() {
         throw new TypeError("boom");
       },
@@ -81,7 +81,7 @@ describe("filteredParameters", () => {
   it("memoizes the filtered hash", () => {
     let calls = 0;
     const host = makeHost();
-    Object.defineProperty(host, "params", {
+    Object.defineProperty(host, "parameters", {
       get() {
         calls++;
         return {};

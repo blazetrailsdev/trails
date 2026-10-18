@@ -84,7 +84,7 @@ export class FixtureSet {
   static cachedFixtures(
     connectionPool: ConnectionPool,
     keysToFetch: readonly string[] | null = null,
-  ): (FixtureSet | undefined)[] {
+  ): (FixtureSet | null)[] {
     if (keysToFetch) {
       return valuesAt(this.cacheForConnectionPool(connectionPool), ...keysToFetch);
     } else {

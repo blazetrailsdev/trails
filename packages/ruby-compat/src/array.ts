@@ -635,8 +635,8 @@ export function aryPop<T>(ary: T[], n: number): T[] {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function first<T>(ary: Iterable<T>): T | undefined {
-  if (Array.isArray(ary)) return ary[0];
+export function first<T>(ary: Iterable<T>): T | null {
+  if (Array.isArray(ary)) return ary.length === 0 ? null : ary[0];
   if (typeof (ary as Partial<Iterable<T>> | null)?.[Symbol.iterator] !== "function") {
     throw new NoMethodError(
       ary == null
@@ -647,7 +647,7 @@ export function first<T>(ary: Iterable<T>): T | undefined {
   for (const i of ary) {
     return i;
   }
-  return undefined;
+  return null;
 }
 
 /**
@@ -658,13 +658,13 @@ export function first<T>(ary: Iterable<T>): T | undefined {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function last<T>(ary: readonly T[]): T | undefined;
+export function last<T>(ary: readonly T[]): T | null;
 /** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
 export function last<T>(ary: readonly T[], n: number): T[];
 /** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
-export function last<T>(ary: readonly T[], n?: number): T | undefined | T[] {
+export function last<T>(ary: readonly T[], n?: number): T | null | T[] {
   const len = ary.length;
-  if (n === undefined) return len === 0 ? undefined : ary[len - 1];
+  if (n === undefined) return len === 0 ? null : ary[len - 1];
   n = num2long(n);
   if (n > len) {
     n = len;
@@ -812,12 +812,12 @@ export function toH(ary: object): unknown {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function zip<T, U>(ary: readonly T[], ...argv: (readonly U[])[]): (T | U | undefined)[][] {
-  const result: (T | U | undefined)[][] = [];
+export function zip<T, U>(ary: readonly T[], ...argv: (readonly U[])[]): (T | U | null)[][] {
+  const result: (T | U | null)[][] = [];
   for (let i = 0; i < ary.length; i++) {
-    const tmp: (T | U | undefined)[] = [ary[i]];
+    const tmp: (T | U | null)[] = [ary[i]];
     for (let j = 0; j < argv.length; j++) {
-      tmp.push(argv[j][i]);
+      tmp.push(i < argv[j].length ? argv[j][i] : null);
     }
     result.push(tmp);
   }

@@ -81,6 +81,34 @@ describe("Object#inspect", () => {
     expect(inspect(["x", ":y", 2.5, true])).toBe('["x", :y, 2.5, true]');
   });
 
+  it("renders an instance with no inspect member by rb_obj_inspect, not toString", () => {
+    class Person {
+      id = "9";
+      toS(): string {
+        return "person";
+      }
+    }
+    expect(inspect(new Person())).toMatch(/^#<Person:0x[0-9a-f]{16} @id="9">$/);
+  });
+
+  it("renders a Set as Set#inspect does", () => {
+    expect(inspect(new RbSet([1, "a"]))).toBe('#<Set: {1, "a"}>');
+    const set = new RbSet<unknown>();
+    set.add(set);
+    expect(inspect(set)).toBe("#<Set: {#<Set: {...}>}>");
+  });
+
+  it("renders a Date seat by its to_s, not the ivar form", () => {
+    const date = new Date(0);
+    expect(inspect(date)).toBe(date.toString());
+  });
+
+  it("renders a Range as Range#inspect does", () => {
+    expect(inspect(new Range(1, 10))).toBe("1..10");
+    expect(inspect(new Range("a", null, true))).toBe('"a"...');
+    expect(inspect(new Range(null, 5))).toBe("..5");
+  });
+
   it("renders empty collections and nil", () => {
     expect(inspect([])).toBe("[]");
     expect(inspect({})).toBe("{}");

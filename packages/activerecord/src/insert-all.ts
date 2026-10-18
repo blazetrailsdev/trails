@@ -453,7 +453,7 @@ export class Builder implements InsertBuilder {
 
     const columnsKeys = Object.keys(columns);
     const unknownColumn = first(keys.filter((key) => !columnsKeys.includes(key)));
-    if (unknownColumn !== undefined) {
+    if (unknownColumn != null) {
       throw new UnknownAttributeError(new this.model(), unknownColumn);
     }
 

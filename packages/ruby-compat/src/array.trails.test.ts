@@ -285,8 +285,8 @@ describe("Array#zip", () => {
   it("is as long as the receiver, nil past an argument's end", () => {
     expect(zip([1, 2, 3], ["a"])).toEqual([
       [1, "a"],
-      [2, undefined],
-      [3, undefined],
+      [2, null],
+      [3, null],
     ]);
     expect(zip([1], ["a", "b"])).toEqual([[1, "a"]]);
   });
@@ -578,12 +578,12 @@ describe("aryDelete", () => {
 describe("first", () => {
   it("answers the first element, or nil for an empty array", () => {
     expect(first([1, 2, 3])).toBe(1);
-    expect(first([])).toBeUndefined();
+    expect(first([])).toBeNull();
   });
 
   it("reads only the first element of a Set", () => {
     expect(first(new Set(["a", "b"]))).toBe("a");
-    expect(first(new Set())).toBeUndefined();
+    expect(first(new Set())).toBeNull();
     let yielded = 0;
     function* each(): Generator<number> {
       for (const i of [1, 2, 3]) {
@@ -599,7 +599,7 @@ describe("first", () => {
 describe("last", () => {
   it("answers the last element, or nil for an empty array", () => {
     expect(last([1, 2, 3])).toBe(3);
-    expect(last([])).toBeUndefined();
+    expect(last([])).toBeNull();
   });
 
   it("answers the last n elements in order", () => {

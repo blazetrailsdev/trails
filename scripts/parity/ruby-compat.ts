@@ -61,6 +61,7 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Kernel#Float", "kernelFloat"],
   ["Kernel#Integer", "kernelInteger"],
   ["Kernel#catch", "kernelCatch"],
+  ["Kernel#dup", "rbObjDup"],
   ["Kernel#inspect", "rbInspect"],
   ["Kernel#object_id", "rbObjId"],
   ["Kernel#send", "rbFSend"],
@@ -70,6 +71,7 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Object#to_yaml", "toYaml"],
   ["Range#cover?", "cover"],
   ["Regexp.escape", "regexpEscape"],
+  ["Regexp.quote", "regexpEscape"],
   ["Regexp.union", "rbRegSUnion"],
   ["Regexp#match?", "rbRegMatchP"],
 ]);

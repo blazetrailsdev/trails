@@ -18,7 +18,7 @@ export interface FilterParametersHost extends ParametersHost {
   env: Record<string, unknown>;
   path: string;
   queryString: string;
-  params: Record<string, unknown>;
+  parameters: Record<string, unknown>;
 }
 
 export interface FilterParameters {
@@ -43,7 +43,7 @@ export function filteredParameters(this: FilterParametersHost): Record<string, u
   const host = this as FilterParametersHost & CachedState;
   if (host._filteredParameters != null) return host._filteredParameters;
   try {
-    host._filteredParameters = parameterFilter.call(this).filter(this.params);
+    host._filteredParameters = parameterFilter.call(this).filter(this.parameters);
   } catch (e) {
     if (e instanceof ParseError) {
       host._filteredParameters = {};

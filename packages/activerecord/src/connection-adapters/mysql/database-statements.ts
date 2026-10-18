@@ -103,7 +103,7 @@ export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLi
 export async function returningColumnValues(
   this: SupportsInsertReturningHost,
   result: Result,
-): Promise<unknown[] | undefined> {
+): Promise<unknown[] | null> {
   if (this.supportsInsertReturning()) {
     return first(result.rows);
   } else {

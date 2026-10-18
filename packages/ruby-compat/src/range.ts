@@ -13,6 +13,9 @@ import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
+import { rbInspect } from "./object.js";
+
+const inspectRecursing = new Set<object>();
 
 /** `INT_MAX`, the value `r_less` answers for a nil `<=>` (`vendor/ruby/v3.3.11/range.c:204`). */
 const INT_MAX = 2147483647;
@@ -151,6 +154,23 @@ export class Range<T = unknown> {
     const begin = this.begin !== null ? String(this.begin) : "";
     const end = this.end !== null ? String(this.end) : "";
     return `${begin}${this.excludeEnd ? "..." : ".."}${end}`;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — core Ruby `Range#inspect` (`vendor/ruby/v3.3.11/range.c:1841`
+   * `range_inspect`, over `inspect_range`, `:1796-1816`).
+   */
+  inspect(): string {
+    if (inspectRecursing.has(this)) return this.excludeEnd ? "(... ... ...)" : "(... .. ...)";
+    inspectRecursing.add(this);
+    try {
+      let str = this.begin !== null || this.end === null ? rbInspect(this.begin) : "";
+      str += this.excludeEnd ? "..." : "..";
+      if (this.begin === null || this.end !== null) str += rbInspect(this.end);
+      return str;
+    } finally {
+      inspectRecursing.delete(this);
+    }
   }
 
   /**

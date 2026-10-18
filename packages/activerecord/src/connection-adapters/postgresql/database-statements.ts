@@ -443,7 +443,7 @@ export async function lastInsertIdResult(
 }
 
 /** @internal */
-export function returningColumnValues(result: Result): unknown[] | undefined {
+export function returningColumnValues(result: Result): unknown[] | null {
   return first(result.rows);
 }
 

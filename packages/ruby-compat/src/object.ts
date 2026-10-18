@@ -1453,6 +1453,7 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (Array.isArray(value)) return inspectAry(value, recursing);
   if (isPlainHash(value) || value instanceof Map) return inspectHash(value, recursing);
   if (value instanceof RegExp) return regDesc(value);
+  if (value instanceof Set) return setInspect(value, recursing);
   const own = (value as { inspect?: unknown }).inspect;
   if (typeof own === "function") return String((own as () => unknown).call(value));
   if (value instanceof Error) return excInspect(value);
@@ -1463,11 +1464,23 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "function") return rbAnyToS(value);
-  if (typeof value === "object" && !(value instanceof Uint8Array)) {
+  if (value instanceof Date || temporalTag(value) !== null) {
     const str: unknown = rbObjAsString(value);
-    return typeof str === "string" ? str : rbObjInspect(value);
+    if (typeof str === "string") return str;
   }
+  if (typeof value === "object" && !(value instanceof Uint8Array)) return rbObjInspect(value);
   return String(value);
+}
+
+/** `Set#inspect` (`vendor/ruby/v3.3.11/lib/set.rb:811-823`). */
+function setInspect(set: Set<unknown>, recursing: Set<object>): string {
+  if (recursing.has(set)) return `#<${rbObjClassname(set)}: {...}>`;
+  recursing.add(set);
+  try {
+    return `#<${rbObjClassname(set)}: {${inspectAry([...set], recursing).slice(1, -1)}}>`;
+  } finally {
+    recursing.delete(set);
+  }
 }
 
 /** `exc_inspect` (`vendor/ruby/v3.3.11/error.c:1677-1703`), `Exception#inspect`. */

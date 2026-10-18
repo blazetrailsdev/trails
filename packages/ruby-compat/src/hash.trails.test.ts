@@ -896,8 +896,15 @@ describe("hashAref / hashAset", () => {
 describe("Array#values_at", () => {
   it("reads each index, counting a negative one from the end", () => {
     expect(valuesAt("a.b".split("."), -2, -1)).toEqual(["a", "b"]);
-    expect(valuesAt("b".split("."), -2, -1)).toEqual([undefined, "b"]);
-    expect(valuesAt([1, 2, 3], 0, 5, -4, -1)).toEqual([1, undefined, undefined, 3]);
+    expect(valuesAt("b".split("."), -2, -1)).toEqual([null, "b"]);
+    expect(valuesAt([1, 2, 3], 0, 5, -4, -1)).toEqual([1, null, null, 3]);
+  });
+});
+
+describe("Hash#values_at", () => {
+  it("answers nil for a key the hash does not hold", () => {
+    expect(valuesAt({ a: 1 }, "a", "b")).toEqual([1, null]);
+    expect(valuesAt(new Map([["a", 1]]), "a", "b")).toEqual([1, null]);
   });
 });
 

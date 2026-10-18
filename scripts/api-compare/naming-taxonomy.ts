@@ -192,6 +192,7 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   collect: ["map"],
   compact: ["filter"],
   detect: ["find"],
+  downcase: ["toLowerCase"],
   first: ["at"],
   gsub: ["replaceAll", "replace"],
   httpdate: ["toUTCString"],
@@ -208,7 +209,9 @@ export const NO_JS_EQUIVALENT: Record<string, string[]> = {
   to_f: ["parseFloat", "Number"],
   to_i: ["parseInt", "Number"],
   to_s: ["toString", "String"],
+  tr: ["replace"],
   unicode_normalize: ["normalize"],
+  upcase: ["toUpperCase"],
 };
 
 /**

@@ -17,6 +17,7 @@ export interface AssertionResponseHost {
 
 export interface AssertionResponseLike {
   status: number;
+  responseCode: number;
   body?: string;
   location?: string;
   isRedirection?: boolean;
@@ -40,7 +41,7 @@ export function assertResponse(
   if (Object.hasOwn(RESPONSE_PREDICATES, type)) {
     assert(RESPONSE_PREDICATES[type](this.response.status), message);
   } else {
-    assertEqual(new AssertionResponse(type).code, this.response.status, message);
+    assertEqual(new AssertionResponse(type).code, this.response.responseCode, message);
   }
 }
 
