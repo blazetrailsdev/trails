@@ -350,10 +350,16 @@ export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
   if (!(otherHash instanceof Map) && !isPlainObject(otherHash)) {
     return rbFSend(otherHash, "merge", obj) as T;
   }
-  return {
-    ...(otherHash instanceof Map ? Object.fromEntries(otherHash) : otherHash),
-    ...(obj instanceof Map ? Object.fromEntries(obj) : obj),
-  };
+  if (obj instanceof Map) {
+    const own: [unknown, unknown][] = [...obj];
+    const result = dup(obj) as Map<unknown, unknown>;
+    result.clear();
+    const other = otherHash instanceof Map ? otherHash : Object.entries(otherHash);
+    for (const [key, value] of other) result.set(key, value);
+    for (const [key, value] of own) result.set(key, value);
+    return result as T;
+  }
+  return { ...(otherHash instanceof Map ? Object.fromEntries(otherHash) : otherHash), ...obj };
 }
 
 export const withDefaults = reverseMerge;
@@ -372,7 +378,9 @@ export function reverseMergeBang<T extends object>(hash: T, otherHash: object): 
   for (const key of hash instanceof Map ? [...hash.keys()] : Object.keys(hash)) {
     hashDelete(hash, key);
   }
-  for (const [key, value] of Object.entries(merged)) hashAset(hash, key, value);
+  for (const [key, value] of merged instanceof Map ? merged : Object.entries(merged)) {
+    hashAset(hash, key, value);
+  }
   return hash;
 }
 

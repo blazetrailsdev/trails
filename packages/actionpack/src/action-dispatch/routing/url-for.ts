@@ -71,9 +71,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   }
   if (isPlainObject(options) || options instanceof Hash || options instanceof Parameters) {
     const routeName =
-      options instanceof Parameters
-        ? options.delete("useRoute")
-        : hashDelete(options as Record<string, unknown>, "useRoute");
+      options instanceof Parameters ? options.delete("useRoute") : hashDelete(options, "useRoute");
     const mergedUrlOptions = reverseMergeBang(
       dup(toH<Record<string, unknown> | Hash<string, unknown>>(options)),
       this.urlOptions(),

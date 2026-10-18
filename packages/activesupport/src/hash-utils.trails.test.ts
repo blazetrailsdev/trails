@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Hash } from "@blazetrails/ruby-compat";
-import { transformKeys } from "./hash-utils.js";
+import { reverseMerge, reverseMergeBang, transformKeys } from "./hash-utils.js";
 
 describe("transformKeys on a plain object", () => {
   it("answers a Hash keyed by the objects the block yields", () => {
@@ -21,5 +21,25 @@ describe("transformKeys on a plain object", () => {
 
   it("answers a plain object when the block yields strings", () => {
     expect(transformKeys({ x: 1 }, (k) => k.toUpperCase())).toEqual({ X: 1 });
+  });
+});
+
+describe("reverseMerge on a Hash receiver", () => {
+  it("answers a Hash of the receiver's class with the receiver's values winning", () => {
+    const hash = new Hash<unknown, unknown>().set("a", 1).set(1, "one");
+    const result = reverseMerge(hash, { a: 0, b: 2 });
+    expect(result).toBeInstanceOf(Hash);
+    expect([...result]).toEqual([
+      ["a", 1],
+      ["b", 2],
+      [1, "one"],
+    ]);
+  });
+
+  it("reverseMergeBang keeps the receiver's keys", () => {
+    const hash = new Hash<string, unknown>().set("onlyPath", true);
+    reverseMergeBang(hash, { onlyPath: false, controller: "d" });
+    expect(hash.get("onlyPath")).toBe(true);
+    expect(hash.get("controller")).toBe("d");
   });
 });
