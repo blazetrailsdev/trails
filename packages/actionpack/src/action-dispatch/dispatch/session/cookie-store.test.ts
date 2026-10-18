@@ -109,7 +109,7 @@ class TestController extends Base {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include CookieAssertions` (`cookie_store_test.rb:75`)
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class CookieStoreTest extends IntegrationTest {
   static TestController = TestController;
 
@@ -193,7 +193,7 @@ class CookieStoreTest extends IntegrationTest {
     });
   }
 }
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include CookieAssertions`; the merge is how `include()` types it
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 interface CookieStoreTest extends Included<typeof CookieAssertions> {}
 include(CookieStoreTest, CookieAssertions);
 registerConstant("CookieStoreTest", CookieStoreTest);

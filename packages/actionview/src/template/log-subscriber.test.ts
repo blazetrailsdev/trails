@@ -26,13 +26,13 @@ import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 import { Customer, GoodCustomer } from "../test-helpers/fake-models.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveSupport::LogSubscriber::TestHelper` (`log_subscriber_test.rb:9`); the class/interface merge is how a mixin surfaces on the type side.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 interface AVLogSubscriberTest extends Omit<
   Included<typeof TestHelper>,
   "setup" | "teardown" | "setLogger"
 > {}
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class AVLogSubscriberTest extends TestCase {
   declare logger: MockLogger;
   declare view: Base;
