@@ -41,7 +41,14 @@ export type CanonicalKind =
   | "queriesCount"
   | "noQueries"
   | "queriesMatch"
-  | "noQueriesMatch";
+  | "noQueriesMatch"
+  | "response"
+  | "redirectedTo"
+  | "generates"
+  | "recognizes"
+  | "routing"
+  | "select"
+  | "pattern";
 
 // Pairs a canonical kind with its logical negation, used to fold a trails
 // `not:` chain (`expect(x).not.toBeNull()`) onto the negated category so it
@@ -127,10 +134,26 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   // AsyncHelper#assert_async_equal (activerecord/test/support/async_helper.rb:5-14)
   // checks the result is a Promise, then asserts its value equals `expected`.
   assert_async_equal: "equal",
-  // Deliberately unmapped: the helpers ActiveRecord::TestCase mixes in
-  // (test_case.rb:22-29) and inherits from ActiveSupport::TestCase whose check
-  // is not one canonical kind — they count or compare calls, blocks and deltas.
-  // Both sides spell them by name, so they surface as unmapped, never divergent:
+  // ActionDispatch::Assertions, which ActionController::TestCase and
+  // ActionDispatch::IntegrationTest include. Each checks one thing of its own,
+  // so each is its own kind, matched by the trails helper of the same name:
+  //   assert_response / assert_redirected_to
+  //     (actionpack/lib/action_dispatch/testing/assertions/response.rb:33,60)
+  //   assert_recognizes / assert_generates / assert_routing
+  //     (actionpack/lib/action_dispatch/testing/assertions/routing.rb:168,208,252)
+  assert_response: "response",
+  assert_redirected_to: "redirectedTo",
+  assert_recognizes: "recognizes",
+  assert_generates: "generates",
+  assert_routing: "routing",
+  // Rails::Dom::Testing::Assertions::SelectorAssertions#assert_select.
+  assert_select: "select",
+  // Minitest::Assertions#assert_pattern (minitest/assertions.rb:355).
+  assert_pattern: "pattern",
+  // Deliberately unmapped: the helpers whose check is not one canonical kind —
+  // they count or compare calls, blocks and deltas, and their ports reach for
+  // vitest spies as often as for the helper — surface as unmapped, never
+  // divergent:
   //   assert_called / assert_called_with / assert_not_called /
   //   assert_called_on_instance_of / assert_not_called_on_instance_of
   //     (activesupport/lib/active_support/testing/method_call_assertions.rb:9-60)
@@ -141,7 +164,8 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   //   assert_error_reported / assert_no_error_reported
   //     (activesupport/lib/active_support/testing/error_reporter_assertions.rb:62-88)
   // Stream, TestFixtures, ValidationsRepairHelper, AdapterHelper and
-  // LoadSchemaHelper (test_case.rb:23-29) define no assertions.
+  // LoadSchemaHelper (activerecord/test/cases/test_case.rb:23-29) define no
+  // assertions.
 };
 
 const MSPEC_MAP: Record<string, CanonicalKind> = {
@@ -237,7 +261,7 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toBeCloseTo: "inDelta",
 };
 
-// Rails-side assertion helpers defined by the arel suite itself rather than by
+// Rails-side assertion helpers defined by the arel and actionpack suites rather than by
 // Minitest, resolved to the builtin they delegate to.
 const AREL_HELPER_ALIAS: Record<string, string> = {
   // `sql.must_be_like other` squeezes runs of whitespace and strips BOTH
@@ -247,6 +271,10 @@ const AREL_HELPER_ALIAS: Record<string, string> = {
   // `assert_edge(name, dot)` is `assert_match(/->.*label="name"/, dot)`
   // (vendor/rails/v8.0.2/activerecord/test/cases/arel/visitors/dot_test.rb:13-15).
   assert_edge: "assert_match",
+  // ActionDispatch's shared test helper `assert_headers` is `assert_equal value,
+  // actual[key]` over each expected header
+  // (vendor/rails/v8.0.2/actionpack/test/abstract_unit.rb:490-495).
+  assert_headers: "assert_equal",
 };
 
 /**

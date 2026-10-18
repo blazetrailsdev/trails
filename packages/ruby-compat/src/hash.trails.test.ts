@@ -828,6 +828,12 @@ describe("hashReplace", () => {
   it("raises FrozenError on a frozen receiver", () => {
     expect(() => hashReplace(Object.freeze({ foo: 0 }), {})).toThrow(/can't modify frozen Hash/);
   });
+
+  it("empties a Hash receiver and copies a plain object into it", () => {
+    const hash = new Hash<string, unknown>().set("foo", 0).set("bar", 1);
+    expect(hashReplace(hash, { baz: 2 })).toBe(hash);
+    expect([...hash]).toEqual([["baz", 2]]);
+  });
 });
 
 describe("hashDelete", () => {

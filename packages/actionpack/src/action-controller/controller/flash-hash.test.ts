@@ -1,68 +1,90 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { FlashHash } from "../../action-dispatch/middleware/flash.js";
-import { assertNil } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEmpty,
+  assertEqual,
+  assertNil,
+  assertNot,
+  assertNotEmpty,
+} from "@blazetrails/activesupport";
 import { rbObjDup, rbObjIvarSet } from "@blazetrails/ruby-compat";
 
 describe("FlashHashTest", () => {
+  let hash: FlashHash;
+
+  beforeEach(() => {
+    hash = new FlashHash();
+  });
+
   it("set get", () => {
-    const flash = new FlashHash();
-    flash.set("notice", "hello");
-    expect(flash.get("notice")).toBe("hello");
+    hash.set("foo", "zomg");
+    assertEqual("zomg", hash.get("foo"));
   });
 
   it("keys", () => {
-    const flash = new FlashHash({ a: "1", b: "2" });
-    expect(flash.keys).toEqual(["a", "b"]);
+    assertEqual([], hash.keys);
+
+    hash.set("foo", "zomg");
+    assertEqual(["foo"], hash.keys);
+
+    hash.set("bar", "zomg");
+    assertEqual(["foo", "bar"].sort(), hash.keys.sort());
   });
 
   it("update", () => {
-    const flash = new FlashHash();
-    flash.update({ notice: "hi", alert: "danger" });
-    expect(flash.get("notice")).toBe("hi");
-    expect(flash.get("alert")).toBe("danger");
+    hash.set("foo", "bar");
+    hash.update({ foo: "baz", hello: "world" });
+
+    assertEqual("baz", hash.get("foo"));
+    assertEqual("world", hash.get("hello"));
   });
 
   it("key", () => {
-    const flash = new FlashHash();
-    flash.set("foo", "bar");
+    hash.set("foo", "bar");
 
-    expect(flash.isKey("foo")).toBe(true);
-    expect(flash.isKey("bar")).toBe(false);
+    assert(hash.isKey("foo"));
+    assert(hash.isKey("foo"));
+    assertNot(hash.isKey("bar"));
+    assertNot(hash.isKey("bar"));
   });
 
   it("delete", () => {
-    const flash = new FlashHash();
-    flash.set("foo", "bar");
-    flash.delete("foo");
+    hash.set("foo", "bar");
+    hash.delete("foo");
 
-    expect(flash.isKey("foo")).toBe(false);
-    assertNil(flash.get("foo"));
+    assertNot(hash.isKey("foo"));
+    assertNil(hash.get("foo"));
   });
 
   it("to hash", () => {
-    const flash = new FlashHash({ a: "1", b: "2" });
-    expect(flash.toHash()).toEqual({ a: "1", b: "2" });
+    hash.set("foo", "bar");
+    assertEqual({ foo: "bar" }, hash.toHash());
+
+    hash.toHash()["zomg"] = "aaron";
+    assertNot(hash.isKey("zomg"));
+    assertEqual({ foo: "bar" }, hash.toHash());
   });
 
   it("to session value", () => {
-    const flash = new FlashHash({ foo: "bar" });
-    expect(flash.toSessionValue()).toEqual({ discard: [], flashes: { foo: "bar" } });
+    hash.set("foo", "bar");
+    assertEqual({ discard: [], flashes: { foo: "bar" } }, hash.toSessionValue());
 
-    flash.now.set("qux", 1);
-    expect(flash.toSessionValue()).toEqual({ flashes: { foo: "bar" }, discard: [] });
+    hash.now.set("qux", 1);
+    assertEqual({ flashes: { foo: "bar" }, discard: [] }, hash.toSessionValue());
 
-    flash.discard("foo");
-    assertNil(flash.toSessionValue());
+    hash.discard("foo");
+    assertNil(hash.toSessionValue());
 
-    flash.sweep();
-    assertNil(flash.toSessionValue());
+    hash.sweep();
+    assertNil(hash.toSessionValue());
   });
 
   it("from session value", () => {
     const legacy = new FlashHash({ greeting: "Hello", farewell: "Goodbye" });
     rbObjIvarSet(legacy, "@used", new Set(["farewell"]));
     const hash = FlashHash.fromSessionValue(legacy);
-    expect(hash.toHash()).toEqual({ greeting: "Hello" });
+    assertEqual({ greeting: "Hello" }, hash.toHash());
     assertNil(hash.toSessionValue());
   });
 
@@ -72,118 +94,138 @@ describe("FlashHashTest", () => {
     const session = JSON.parse(decryptedData);
     const hash = FlashHash.fromSessionValue(session["flash"]);
 
-    expect(hash.toHash()).toEqual({ greeting: "Hello" });
+    assertEqual({ greeting: "Hello" }, hash.toHash());
     assertNil(hash.toSessionValue());
-    expect(hash.get("greeting")).toBe("Hello");
-    expect(hash.get("greeting")).toBe("Hello");
+    assertEqual("Hello", hash.get("greeting"));
+    assertEqual("Hello", hash.get("greeting"));
   });
 
   it("empty?", () => {
-    expect(new FlashHash().isEmpty()).toBe(true);
-    expect(new FlashHash({ a: "1" }).isEmpty()).toBe(false);
+    assertEmpty(hash);
+    hash.set("zomg", "bears");
+    assertNotEmpty(hash);
+    hash.clear();
+    assertEmpty(hash);
   });
 
   it("each", () => {
-    const flash = new FlashHash({ a: "1", b: "2" });
-    const entries: [string, unknown][] = [];
-    flash.each(([k, v]) => entries.push([k, v]));
-    expect(entries).toEqual([
-      ["a", "1"],
-      ["b", "2"],
-    ]);
+    hash.set("hello", "world");
+    hash.set("foo", "bar");
+
+    const things: [string, unknown][] = [];
+    hash.each(([k, v]) => {
+      things.push([k, v]);
+    });
+
+    assertEqual(
+      [
+        ["hello", "world"],
+        ["foo", "bar"],
+      ].sort(),
+      things.sort(),
+    );
   });
 
   it("replace", () => {
-    const flash = new FlashHash({ old: "value" });
-    flash.replace({ new: "value" });
-    expect(flash.isKey("old")).toBe(false);
-    expect(flash.get("new")).toBe("value");
+    hash.set("hello", "world");
+    hash.replace({ omg: "aaron" });
+    assertEqual({ omg: "aaron" }, hash.toHash());
   });
 
   it("discard no args", () => {
-    const flash = new FlashHash({ a: "1", b: "2" });
-    flash.discard();
-    flash.sweep();
-    expect(flash.isEmpty()).toBe(true);
+    hash.set("hello", "world");
+    hash.discard();
+
+    hash.sweep();
+    assertEqual({}, hash.toHash());
   });
 
   it("discard one arg", () => {
-    const flash = new FlashHash({ a: "1", b: "2" });
-    flash.discard("a");
-    flash.sweep();
-    expect(flash.isKey("a")).toBe(false);
-    expect(flash.isKey("b")).toBe(true);
+    hash.set("hello", "world");
+    hash.set("omg", "world");
+    hash.discard("hello");
+
+    hash.sweep();
+    assertEqual({ omg: "world" }, hash.toHash());
   });
 
   it("keep sweep", () => {
-    const flash = new FlashHash({ a: "1" });
-    flash.keep("a");
-    flash.sweep();
-    expect(flash.get("a")).toBe("1");
-    flash.sweep();
-    expect(flash.isKey("a")).toBe(false);
+    hash.set("hello", "world");
+
+    hash.sweep();
+    assertEqual({ hello: "world" }, hash.toHash());
   });
 
   it("update sweep", () => {
-    const flash = new FlashHash();
-    flash.update({ a: "1" });
-    flash.sweep();
-    expect(flash.isKey("a")).toBe(true);
-    flash.sweep();
-    expect(flash.isKey("a")).toBe(false);
+    hash.set("hello", "world");
+    hash.update({ hi: "mom" });
+
+    hash.sweep();
+    assertEqual({ hello: "world", hi: "mom" }, hash.toHash());
   });
 
   it("update delete sweep", () => {
-    const flash = new FlashHash();
-    flash.update({ a: "1" });
-    flash.delete("a");
-    flash.sweep();
-    expect(flash.isKey("a")).toBe(false);
+    hash.set("hello", "world");
+    hash.delete("hello");
+    hash.update({ hello: "mom" });
+
+    hash.sweep();
+    assertEqual({ hello: "mom" }, hash.toHash());
   });
 
   it("delete sweep", () => {
-    const flash = new FlashHash({ a: "1" });
-    flash.delete("a");
-    flash.sweep();
-    expect(flash.isKey("a")).toBe(false);
+    hash.set("hello", "world");
+    hash.set("hi", "mom");
+    hash.delete("hi");
+
+    hash.sweep();
+    assertEqual({ hello: "world" }, hash.toHash());
   });
 
   it("clear sweep", () => {
-    const flash = new FlashHash({ a: "1", b: "2" });
-    flash.clear();
-    expect(flash.isEmpty()).toBe(true);
+    hash.set("hello", "world");
+    hash.clear();
+
+    hash.sweep();
+    assertEqual({}, hash.toHash());
   });
 
   it("replace sweep", () => {
-    const flash = new FlashHash({ old: "1" });
-    flash.replace({ new: "2" });
-    flash.sweep();
-    expect(flash.isKey("new")).toBe(true);
-    flash.sweep();
-    expect(flash.isKey("new")).toBe(false);
+    hash.set("hello", "world");
+    hash.replace({ hi: "mom" });
+
+    hash.sweep();
+    assertEqual({ hi: "mom" }, hash.toHash());
   });
 
   it("discard then add", () => {
-    const flash = new FlashHash({ a: "1" });
-    flash.discard("a");
-    flash.set("a", "2");
-    flash.sweep();
-    expect(flash.get("a")).toBe("2");
+    hash.set("hello", "world");
+    hash.set("omg", "world");
+    hash.discard("hello");
+    hash.set("hello", "world");
+
+    hash.sweep();
+    assertEqual({ omg: "world", hello: "world" }, hash.toHash());
   });
 
   it("keep all sweep", () => {
-    const flash = new FlashHash({ a: "1", b: "2" });
-    flash.keep();
-    flash.sweep();
-    expect(flash.get("a")).toBe("1");
-    expect(flash.get("b")).toBe("2");
+    hash.set("hello", "world");
+    hash.set("omg", "world");
+    hash.discard("hello");
+    hash.keep();
+
+    hash.sweep();
+    assertEqual({ omg: "world", hello: "world" }, hash.toHash());
   });
 
   it("double sweep", () => {
-    const flash = new FlashHash({ a: "1" });
-    flash.sweep();
-    flash.sweep();
-    expect(flash.isKey("a")).toBe(false);
+    hash.set("hello", "world");
+    hash.sweep();
+
+    assertEqual({ hello: "world" }, hash.toHash());
+
+    hash.sweep();
+    assertEqual({}, hash.toHash());
   });
 
   it("fromSessionValue loads Rails-shaped { flashes, discard } payload", () => {

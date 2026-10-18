@@ -1,7 +1,7 @@
 import { isBlank, mattrAccessor, presence, toParam, toQuery } from "@blazetrails/activesupport";
 import { escapeFragment } from "../journey/router/utils.js";
 import { Utils as RackUtils } from "@blazetrails/rack";
-import { fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
+import { ArgumentError, fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
 
 const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const HOST_REGEXP = /(^[^:]+:\/\/)?(\[[^\]]+\]|[^:]+)(?::(\d+$))?/;
@@ -184,7 +184,7 @@ export class URL {
   static fullUrlFor(options: UrlOptions): string {
     const { host, protocol, port } = options;
     if (!host) {
-      throw new Error(
+      throw new ArgumentError(
         "Missing host to link to! Please provide the :host parameter, set default_url_options[:host], or set :only_path to true",
       );
     }

@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   extend,
-  type Hash,
+  Hash,
   dup,
   hashDelete,
   include,
@@ -69,7 +69,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (options == null) {
     return this._routes!.urlFor({ ...this.urlOptions() });
   }
-  if (isPlainObject(options) || options instanceof Parameters) {
+  if (isPlainObject(options) || options instanceof Hash || options instanceof Parameters) {
     const routeName =
       options instanceof Parameters ? options.delete("useRoute") : hashDelete(options, "useRoute");
     const mergedUrlOptions = reverseMergeBang(
