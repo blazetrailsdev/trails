@@ -45,7 +45,7 @@ export class Start implements UtilsHost {
   /** @internal */
   railsRoot = railsRoot;
 
-  /** @missingRailsArgs debug — PERMANENT */
+  /** @missingRailsArgs debug — CONVERGEABLE call-args-block-padding-resolves-callee-by-receiver */
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
     if (!this.logger()) return;
     let qualifier: string | undefined;
@@ -110,7 +110,7 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     this.subscribeLogLevel("render_template", "debug");
   }
 
-  /** @missingRailsArgs debug — PERMANENT */
+  /** @missingRailsArgs debug — CONVERGEABLE call-args-block-padding-resolves-callee-by-receiver */
   renderPartial(event: Event): void {
     this.debug(undefined, () => {
       let message = `  Rendered ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
@@ -141,7 +141,7 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     this.subscribeLogLevel("render_layout", "info");
   }
 
-  /** @missingRailsArgs debug — PERMANENT */
+  /** @missingRailsArgs debug — CONVERGEABLE call-args-block-padding-resolves-callee-by-receiver */
   renderCollection(event: Event): void {
     const identifier =
       event.payload["identifier"] != null && event.payload["identifier"] !== false
