@@ -5,7 +5,8 @@
  *
  *   CODEGEN_GEM=activejob pnpm tsx scripts/codegen/src/cli.ts
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -74,36 +75,31 @@ export function handNamespaceAutoloads(): Set<string> {
 
 let coreExtMemo: Set<string> | undefined;
 /**
- * Methods activesupport seats on ruby-compat's primitive method tables
- * (`STRING_METHOD_TABLE.inTimeZone = …`, `Object.assign(TEMPORAL_METHOD_TABLE[seat],
- * { inTimeZone })`), which `rbFSend` dispatches on a string or Temporal receiver:
- * the trails spelling of a core_ext method on `String` / `Time` / `Date`.
+ * Methods seated on ruby-compat's primitive method tables (`STRING_METHOD_TABLE`,
+ * `TEMPORAL_METHOD_TABLE[seat]`, `ARRAY_METHOD_TABLE`), which `rbFSend`
+ * dispatches on a string, Temporal or array receiver: the trails spelling of a
+ * core_ext method on `String` / `Time` / `Date`. Read off the tables once
+ * activesupport (and through it `date`) has loaded, in a child process because
+ * the built packages are ESM.
  */
 export function coreExtSends(): Set<string> {
   if (coreExtMemo) return coreExtMemo;
-  coreExtMemo = new Set();
-  const dir = path.join(ROOT, "packages/activesupport/src");
-  const walk = (d: string): string[] =>
-    readdirSync(d, { withFileTypes: true }).flatMap((e) =>
-      e.isDirectory()
-        ? walk(path.join(d, e.name))
-        : /\.ts$/.test(e.name) && !/test/.test(e.name)
-          ? [path.join(d, e.name)]
-          : [],
-    );
-  for (const f of walk(dir)) {
-    const t = readFileSync(f, "utf8");
-    for (const m of t.matchAll(
-      /(?:STRING|TEMPORAL|ARRAY)_METHOD_TABLE(?:\[[^\]]+\])?(?: \?\?= \{\}\))?\.(\w+) =/g,
-    ))
-      coreExtMemo.add(m[1]);
-    for (const m of t.matchAll(
-      /Object\.assign\(\s*\(?(?:STRING|TEMPORAL|ARRAY)_METHOD_TABLE[^,]*,\s*\{([^}]*)\}/g,
-    ))
-      for (const k of m[1].split(",")) {
-        const name = k.split(":")[0].trim();
-        if (/^\w+$/.test(name)) coreExtMemo.add(name);
-      }
-  }
+  // Only what activesupport and `date` seat: ruby-compat's own bindings
+  // (`each`, `isEmpty`) have native lowerings of their own.
+  const script = `
+    const rc = await import("@blazetrails/ruby-compat");
+    const names = () => new Set([
+      ...Object.keys(rc.STRING_METHOD_TABLE),
+      ...Object.keys(rc.ARRAY_METHOD_TABLE),
+      ...Object.values(rc.TEMPORAL_METHOD_TABLE).flatMap((t) => Object.keys(t)),
+    ]);
+    const own = names();
+    await import("@blazetrails/activesupport");
+    process.stdout.write(JSON.stringify([...names()].filter((n) => !own.has(n))));`;
+  const out = execFileSync(process.execPath, ["--input-type=module", "-e", script], {
+    cwd: path.join(ROOT, "packages/activesupport"),
+    encoding: "utf8",
+  });
+  coreExtMemo = new Set(JSON.parse(out) as string[]);
   return coreExtMemo;
 }
