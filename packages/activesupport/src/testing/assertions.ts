@@ -743,9 +743,13 @@ export function assertNotSame(exp: unknown, act: unknown, msg?: string): void {
 export function assertOperator(
   o1: unknown,
   op: string,
-  o2: unknown,
+  o2?: unknown,
   msg: string | (() => string) | null = null,
 ): true {
+  if (o2 === undefined) {
+    assertPredicate(o1, (value) => rbFSend(value, op), (msg ?? undefined) as string | undefined);
+    return true;
+  }
   msg = message(msg, null, () => `Expected ${inspect(o1)} to be ${op} ${inspect(o2)}`);
   return assert(rbFSend(o1, op, o2), msg);
 }

@@ -2,6 +2,7 @@ import type { DefaultTreeAdapterMap } from "parse5";
 
 import { Node } from "../html5/node.js";
 import { NodeSet } from "./node-set.js";
+import { SyntaxError } from "../css/syntax-error.js";
 
 type Parse5Node = DefaultTreeAdapterMap["node"];
 type Parse5Element = DefaultTreeAdapterMap["element"];
@@ -194,7 +195,7 @@ class Parser {
         groups.push(steps);
         steps = [[" ", this.compound()]];
       } else if (comb || ws) steps.push([comb || " ", this.compound()]);
-      else throw new Error(`unexpected '${this.src[this.pos]}' in ${this.src}`);
+      else throw new SyntaxError(`unexpected '${this.src[this.pos]}' in ${this.src}`);
     }
     groups.push(steps);
     return groups;
@@ -214,9 +215,10 @@ class Parser {
       else if (sigil === ".") c.classes.push(this.eat(/[-\w]+/)!);
       else if (sigil === "[") {
         const m = this.eat(
-          /\s*[-\w:]+\s*(?:[~^$*|!]?=\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|[^\]\s]+)\s*)?\]/,
-        )!;
-        const [, name, op, value] = /^\s*([-\w:]+)\s*(?:([~^$*|!]?=)\s*(.*?))?\s*\]$/.exec(m)!;
+          /\s*[-\w:]+\s*(?:[~^$*|!]?=\s*(?:'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|[-\w]+)\s*)?\]/,
+        );
+        if (m === null) throw new SyntaxError(`unexpected '${this.src[this.pos]}' in ${this.src}`);
+        const [, name, op, value] = /^\s*([-\w:]+)\s*(?:([~^$*|!]?=)\s*(.*?))?\s*\]$/s.exec(m)!;
         c.attrs.push([name, op ?? null, unquote(value ?? "")]);
       } else if (sigil === ":") {
         const name = this.eat(/[-\w]+/)!;
