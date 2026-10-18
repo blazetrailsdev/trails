@@ -1,6 +1,8 @@
 import {
   I18n,
+  extractOptionsBang,
   htmlSafe,
+  reverseMerge,
   isPlainObject,
   withOptions,
   type SafeBuffer,
@@ -11,6 +13,7 @@ import {
   Module,
   StandardError,
   format,
+  hashDelete,
   include,
   type Included,
   rbFPublicSend,
@@ -18,10 +21,13 @@ import {
   rbObjRespondTo,
   Range,
   rbFSend,
+  rbModDefineMethod,
   sprintf,
 } from "@blazetrails/ruby-compat";
 
 import "../action-view.js";
+import { Tags } from "../namespaces.js";
+import { FormBuilder } from "./form-helper.js";
 import { TagHelper } from "./tag-helper.js";
 
 const MINUTES_IN_YEAR = 525600;
@@ -132,6 +138,36 @@ export const distanceOfTimeInWordsToNow = timeAgoInWords;
 
 type Opts = Record<string, unknown>;
 
+export function dateSelect(
+  this: unknown,
+  objectName: unknown,
+  method: unknown,
+  options: Opts = {},
+  htmlOptions: Opts = {},
+): unknown {
+  return new Tags.DateSelect(objectName, method, this, options, htmlOptions).render();
+}
+
+export function timeSelect(
+  this: unknown,
+  objectName: unknown,
+  method: unknown,
+  options: Opts = {},
+  htmlOptions: Opts = {},
+): unknown {
+  return new Tags.TimeSelect(objectName, method, this, options, htmlOptions).render();
+}
+
+export function datetimeSelect(
+  this: unknown,
+  objectName: unknown,
+  method: unknown,
+  options: Opts = {},
+  htmlOptions: Opts = {},
+): unknown {
+  return new Tags.DatetimeSelect(objectName, method, this, options, htmlOptions).render();
+}
+
 export function selectDatetime(
   datetime: unknown = Time.current(),
   options: Opts = {},
@@ -192,12 +228,34 @@ export function selectYear(date: unknown, options: Opts = {}, htmlOptions: Opts 
   return new DateTimeSelector(date, options, htmlOptions).selectYear();
 }
 
+export function timeTag(
+  this: { contentTag(...args: unknown[]): SafeBuffer },
+  dateOrTime: { iso8601(): string },
+  ...args: unknown[]
+): SafeBuffer {
+  const block = typeof args.at(-1) === "function" ? (args.pop() as () => unknown) : undefined;
+  const options = extractOptionsBang(args);
+  const format = hashDelete(options, "format") ?? ":long";
+  const content = args[0] ?? I18n.l(dateOrTime, { format });
+
+  return this.contentTag(
+    "time",
+    content,
+    reverseMerge(options, { datetime: dateOrTime.iso8601() }),
+    undefined,
+    block,
+  );
+}
+
 export const DateHelper = new Module((mod) => {
   mod.moduleEval((m) => {
     Object.assign(m, {
       distanceOfTimeInWords,
       distanceOfTimeInWordsToNow,
       timeAgoInWords,
+      dateSelect,
+      timeSelect,
+      datetimeSelect,
       selectDatetime,
       selectDate,
       selectTime,
@@ -207,6 +265,7 @@ export const DateHelper = new Module((mod) => {
       selectDay,
       selectMonth,
       selectYear,
+      timeTag,
     });
   });
 });
@@ -794,3 +853,48 @@ export interface DateTimeSelector extends Omit<Included<typeof import("./tag-hel
 }
 
 include(DateTimeSelector, TagHelper);
+
+type FormBuilderSelf = {
+  objectName: unknown;
+  _template: Record<string, (...args: unknown[]) => unknown>;
+  objectifyOptions(options: Opts): Opts;
+};
+
+rbModDefineMethod(
+  FormBuilder,
+  "dateSelect",
+  function (this: FormBuilderSelf, method: unknown, options: Opts = {}, htmlOptions: Opts = {}) {
+    return this._template.dateSelect(
+      this.objectName,
+      method,
+      this.objectifyOptions(options),
+      htmlOptions,
+    );
+  },
+);
+
+rbModDefineMethod(
+  FormBuilder,
+  "timeSelect",
+  function (this: FormBuilderSelf, method: unknown, options: Opts = {}, htmlOptions: Opts = {}) {
+    return this._template.timeSelect(
+      this.objectName,
+      method,
+      this.objectifyOptions(options),
+      htmlOptions,
+    );
+  },
+);
+
+rbModDefineMethod(
+  FormBuilder,
+  "datetimeSelect",
+  function (this: FormBuilderSelf, method: unknown, options: Opts = {}, htmlOptions: Opts = {}) {
+    return this._template.datetimeSelect(
+      this.objectName,
+      method,
+      this.objectifyOptions(options),
+      htmlOptions,
+    );
+  },
+);
