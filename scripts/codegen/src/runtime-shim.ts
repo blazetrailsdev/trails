@@ -19,7 +19,7 @@ export function rbRaise(...args: any[]): never {
   if (!args.length) throw new RbRaiseRuntimeError("unhandled exception");
   throw rbMakeException(...args);
 }`,
-  rbAsyncEnum: `import { TypeError as RbAsyncEnumTypeError, rbObjClassname as rbAsyncEnumClassname } from "@blazetrails/ruby-compat";
+  rbAsyncEnum: `import { TypeError as RbAsyncEnumTypeError, rbObjClassname as rbAsyncEnumClassname, transformValues as rbAsyncEnumTransformValues, eachKey as rbAsyncEnumEachKey, hashAref as rbAsyncEnumAref, hashAset as rbAsyncEnumAset } from "@blazetrails/ruby-compat";
 export async function rbAsyncEnum(recv: any, method: string, ...rest: any[]): Promise<any> {
   const fn = rest.pop();
   const items: any[] = recv instanceof Map ? [...recv.entries()] : Array.isArray(recv) ? recv : Object.entries(recv ?? {});
@@ -34,10 +34,12 @@ export async function rbAsyncEnum(recv: any, method: string, ...rest: any[]): Pr
     case "map": case "collect":
       for (const x of items) out.push(await fn(x));
       return out;
-    // Hash#transform_values (hash.c rb_hash_transform_values): a new plain hash.
+    // Hash#transform_values (hash.c rb_hash_transform_values): a new hash of the
+    // receiver's kind (a Map stays a Map, a __proto__ key stays an own key), its
+    // values awaited in order.
     case "transform_values": {
-      const h: any = {};
-      for (const [k, v] of Object.entries(recv ?? {})) h[k] = await fn(v);
+      const h: any = rbAsyncEnumTransformValues(recv, (v: any) => v);
+      for (const k of rbAsyncEnumEachKey(h)) rbAsyncEnumAset(h, k, await fn(rbAsyncEnumAref(h, k)));
       return h;
     }
     case "flat_map": case "collect_concat":

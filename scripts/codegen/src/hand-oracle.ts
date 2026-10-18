@@ -23,7 +23,7 @@ export type TypeRef =
   | { k: "prim"; name: "boolean" | "string" | "number" | "null"; nullable?: boolean }
   | { k: "array"; el: TypeRef | null; nullable?: boolean }
   | { k: "fn" }
-  | { k: "hash" }
+  | { k: "hash"; map?: boolean }
   | { k: "gemClass"; fqn: string }
   | null;
 
@@ -87,6 +87,14 @@ function main(): void {
     return `${fileKey(d.getSourceFile())}#${sym.getName()}`;
   };
 
+  const isMapType = (x: ts.Type): boolean => {
+    const n = (x.getSymbol() ?? x.aliasSymbol)?.getName();
+    return n === "Map" || n === "Hash";
+  };
+  const isRecordType = (x: ts.Type): boolean =>
+    !!(x.flags & ts.TypeFlags.Object) &&
+    !x.getCallSignatures().length &&
+    (checker.getIndexInfosOfType(x).length > 0 || x.aliasSymbol?.getName() === "Record");
   const refOf = (t: ts.Type, depth = 0): TypeRef => {
     if (depth > 3) return null;
     if (t.isUnion()) {
@@ -96,6 +104,15 @@ function main(): void {
       const nullable = parts.length < t.types.length ? { nullable: true as const } : {};
       if (parts.every((x) => x.flags & ts.TypeFlags.BooleanLike))
         return { k: "prim", name: "boolean", ...nullable };
+      // A hash the hand port types as `Record<…> | Map<…>` may be a Map, so a
+      // read or write on it keeps ruby-compat's `hashAref` / `hashAset`
+      // (CLAUDE.md "Hash calls on a plain object").
+      if (
+        parts.length > 1 &&
+        parts.some(isMapType) &&
+        parts.every((x) => isMapType(x) || isRecordType(x))
+      )
+        return { k: "hash", map: true, ...nullable };
       if (parts.length === 1) {
         const one = refOf(parts[0], depth + 1);
         return one && one.k !== "fn" && one.k !== "gemClass" && one.k !== "hash"

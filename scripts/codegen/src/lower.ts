@@ -1079,10 +1079,18 @@ export class Lowerer {
       // not v evaluated a second time.
       const asg = ok
         ? `${recv}.${ok} = ${args[args.length - 1]}`
-        : `${recv}[${args[0]}] = ${args[args.length - 1]}`;
+        : args.length === 2 && this.mayBeMap(n.recv, ctx)
+          ? `${this.rc(ctx, "hashAset")}(${recv}, ${args[0]}, ${args[1]})`
+          : `${recv}[${args[0]}] = ${args[args.length - 1]}`;
       return [tail ? `return (${asg});` : `${asg};`];
     }
     return null;
+  }
+
+  /** A Hash the hand twin types as possibly a `Map` (hand-oracle `{ k: "hash", map }`). */
+  mayBeMap(n: N, ctx: Ctx): boolean {
+    const t = this.typeOf(n, ctx);
+    return t?.k === "hash" && !!t.map;
   }
 
   entries(recv: string, ctx: Ctx): string {
@@ -3827,6 +3835,7 @@ export class Lowerer {
           !this.index.resolveConst(n.recv.path, ctx.nesting)
         )
           return `${r}.find(${a[0]})`;
+        if (a.length === 1 && this.mayBeMap(n.recv, ctx)) return `${rc("hashAref")}(${r}, ${a[0]})`;
         // A Range index is a slice, which JS `[]` cannot express.
         if (a.length === 1 && !a[0].startsWith("...") && n.args[0]?.k !== "range")
           return `${lhs}[${a[0]}]`;
