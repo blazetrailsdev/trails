@@ -65,16 +65,18 @@ export function toPartialPath(this: object): string {
 }
 
 export function _toPartialPath(this: ConversionHost): string {
-  if (!Object.hasOwn(this, "_cachedToPartialPath")) this._cachedToPartialPath = undefined;
-  return (this._cachedToPartialPath ||= (() => {
-    if (rbObjRespondTo(this, "modelName")) {
-      return `${this.modelName!.collection}/${this.modelName!.element}`;
-    } else {
-      const element = underscore(demodulize(this.name));
-      const collection = tableize(this.name);
-      return `${collection}/${element}`;
-    }
-  })());
+  return (
+    (Object.hasOwn(this, "_cachedToPartialPath") && this._cachedToPartialPath) ||
+    (this._cachedToPartialPath = (() => {
+      if (rbObjRespondTo(this, "modelName")) {
+        return `${this.modelName!.collection}/${this.modelName!.element}`;
+      } else {
+        const element = underscore(demodulize(this.name));
+        const collection = tableize(this.name);
+        return `${collection}/${element}`;
+      }
+    })())
+  );
 }
 
 export const ClassMethods = { _toPartialPath };

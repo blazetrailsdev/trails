@@ -113,6 +113,7 @@ rbModConstSet(Cpk, "Book", Book);
 export class Customer extends Struct.new("name", "id") {
   declare name: string;
   declare id: number | null;
+  declare toText: Customer["toJs"];
 
   static {
     extend(this, Naming);
@@ -130,7 +131,10 @@ export class Customer extends Struct.new("name", "id") {
   toJs(_options: Record<string, unknown> = {}): string {
     return `name: ${rbInspect(this.name)}`;
   }
-  toText = this.toJs;
+
+  static {
+    this.prototype.toText = this.prototype.toJs;
+  }
 
   errors(): unknown[] {
     return [];

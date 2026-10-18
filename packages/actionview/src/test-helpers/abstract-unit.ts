@@ -46,7 +46,6 @@ ActionController.TestCase.withRoutes = function (
 
 RoutingUrlFor.include(UrlFor);
 
-export const FIXTURE_LOAD_PATH = File.expandPath(
-  "fixtures",
-  new URL(".", import.meta.url).pathname,
-);
+const __dir__ = decodeURIComponent(new URL(".", import.meta.url).pathname);
+
+export const FIXTURE_LOAD_PATH = File.expandPath("fixtures", __dir__);
