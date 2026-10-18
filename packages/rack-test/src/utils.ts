@@ -27,7 +27,7 @@ function buildMultipart(
   params: unknown,
   _first: boolean = true,
   multipart: boolean = false,
-): string | null {
+): Uint8Array | null {
   if (!isPlainObject(params)) throw new ArgumentError("value must be a Hash");
 
   if (!multipart) {
@@ -48,7 +48,7 @@ function buildMultipart(
 
   const buffer = new StringIO();
   buildParts(buffer, params as Record<string, unknown>);
-  return buffer.string();
+  return Uint8Array.from(buffer.string(), (byte) => byte.charCodeAt(0));
 }
 
 function normalizeMultipartParams(

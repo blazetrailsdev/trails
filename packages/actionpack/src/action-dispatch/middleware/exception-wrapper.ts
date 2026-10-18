@@ -1,9 +1,10 @@
 import {
+  DelegateClass,
   excBacktraceLocations,
   File,
+  Location,
   Pathname,
   rbObjRespondTo,
-  type Location,
 } from "@blazetrails/ruby-compat";
 
 import {
@@ -20,36 +21,19 @@ import { RoutingError } from "../../action-controller/metal/exceptions.js";
 export type BacktraceLine = Location | SourceMapLocation;
 
 /** @internal */
-export class SourceMapLocation {
-  private location: Location;
+export class SourceMapLocation extends DelegateClass(Location) {
   private template: Template;
 
   constructor(location: Location, template: Template) {
-    this.location = location;
+    super(location);
     this.template = template;
   }
 
-  get path(): string {
-    return this.location.path;
-  }
-
-  get lineno(): number {
-    return this.location.lineno;
-  }
-
-  get label(): string | null {
-    return this.location.label;
-  }
-
-  toString(): string {
-    return this.location.toString();
-  }
-
   spot(exc: Error): Spot | null {
-    const location = this.template.spot(this.location);
+    const location = this.template.spot(this.__getobj__());
 
     if (location) {
-      return this.template.translateLocation(this.location, location);
+      return this.template.translateLocation(this.__getobj__(), location);
     }
     return null;
   }
@@ -416,11 +400,11 @@ export class ExceptionWrapper {
 
   /** @internal */
   extractSourceFragmentLines(
-    sourceLines: string[],
+    sourceLines: Iterable<string>,
     line: number,
   ): Record<number, string | [string, string, string]> {
     const start = Math.max(line - 3, 0);
-    const slice = sourceLines.slice(start, start + 6);
+    const slice = [...sourceLines].slice(start, start + 6);
     const out: Record<number, string> = {};
     for (let i = 0; i < slice.length; i++) out[start + 1 + i] = slice[i];
     return out;
@@ -435,7 +419,7 @@ export class ExceptionWrapper {
     const fullPath = new Pathname(TopLevel.Trails!.root()!).join(path).toString();
     if (File.isExist(fullPath)) {
       return File.open(fullPath, "r", (file) =>
-        this.extractSourceFragmentLines(file.read().split(/(?<=\n)/), line),
+        this.extractSourceFragmentLines(file.eachLine(), line),
       );
     }
     return null;

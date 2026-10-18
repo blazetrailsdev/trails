@@ -10,7 +10,7 @@ function multipartFile(name: string): string {
   return File.join(File.dirname(new URL(import.meta.url).pathname), "fixtures", name);
 }
 
-function parseData(data: string) {
+function parseData(data: Uint8Array) {
   const options = {
     CONTENT_TYPE: `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`,
     CONTENT_LENGTH: String(data.length),
@@ -108,8 +108,8 @@ describe("Rack::Test::Utils.build_multipart", () => {
     const params = parseData(data);
     expect(params["submit-name"]).toBe("Larry");
     expect(params["files"]).toBeUndefined();
-    expect(data).toContain('content-disposition: form-data; name="files"; filename=""');
-    expect(data).toContain("content-length: 0");
+    expect(b(data)).toContain('content-disposition: form-data; name="files"; filename=""');
+    expect(b(data)).toContain("content-length: 0");
   });
 
   it("builds multipart bodies from array of files", () => {

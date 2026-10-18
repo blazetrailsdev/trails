@@ -26,8 +26,10 @@ export class StringIO {
   /** `ptr->enc` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1823`). */
   private enc: Encoding | null = null;
 
-  constructor(string = "") {
-    this._string = string;
+  constructor(string: string | Uint8Array = "") {
+    this._string = "";
+    this.write(string);
+    this._pos = 0;
   }
 
   string(): string {

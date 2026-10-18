@@ -161,7 +161,7 @@ export class MockRequest {
     }
 
     let rackInput = opts[":input"];
-    if (typeof rackInput === "string") {
+    if (typeof rackInput === "string" || rackInput instanceof Uint8Array) {
       rackInput = new StringIO(rackInput);
     }
 

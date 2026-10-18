@@ -295,7 +295,7 @@ export class Session {
       }
 
       if (isPlainObject(params)) {
-        let data: string | null;
+        let data: Uint8Array | null;
         if (
           Object.keys(params).length !== 0 &&
           (data = this.buildMultipart(params, false, multipart as boolean)) != null

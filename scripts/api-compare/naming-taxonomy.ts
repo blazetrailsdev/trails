@@ -30,6 +30,7 @@ export type NamingClass =
   | "block-idiom"
   | "ivar-reflection"
   | "implicit-to-s"
+  | "encoding-tag"
   | "burndown";
 
 export interface NamingClassInfo {
@@ -121,6 +122,14 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
       "the rendering are the same, only Ruby's is invisible. The mirror image counts too: " +
       "Ruby coercing an already-`string` TS value (`force_change(attr_name.to_s)`, " +
       "dirty.rb:410, against a `attrName: string` parameter) has nothing to spell.",
+  },
+  {
+    name: "encoding-tag",
+    permanent: true,
+    reason:
+      "Ruby `String#b` re-tags a String ASCII-8BIT — `File.join(@root, path.b)` (static.rb:145). " +
+      "A JS string carries no encoding tag (CLAUDE.md, A String has no encoding tag either), so " +
+      "where the TS passes the receiver itself the value is the same and only Ruby's tag is gone.",
   },
   {
     name: "module-mixin-receiver",
@@ -389,6 +398,7 @@ export function classifyPair(
   if (chainExport !== undefined && recordedExport(chainExport) === tsRef) {
     return "no-js-equivalent";
   }
+  if (rubyRef === "b" && tsRef !== "b") return "encoding-tag";
   if (tsRef === "toS" || tsRef === "toString" || rubyRef === "toS" || rubyRef === "to_s") {
     return "implicit-to-s";
   }
