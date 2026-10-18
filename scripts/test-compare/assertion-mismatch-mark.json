@@ -1,14 +1,14 @@
 {
   "packages": {
     "abstractcontroller": {
-      "assertionCount": 5,
-      "kind": 18,
+      "assertionCount": 0,
+      "kind": 0,
       "value": 0
     },
     "actioncontroller": {
-      "assertionCount": 91,
-      "kind": 158,
-      "value": 25
+      "assertionCount": 43,
+      "kind": 70,
+      "value": 21
     },
     "actiondispatch": {
       "assertionCount": 312,

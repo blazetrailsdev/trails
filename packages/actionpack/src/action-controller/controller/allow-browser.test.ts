@@ -2,7 +2,12 @@ import { afterEach, describe, it, expect } from "vitest";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
-import { Notifications } from "@blazetrails/activesupport";
+import {
+  assertEmpty,
+  assertEqual,
+  assertNotEmpty,
+  Notifications,
+} from "@blazetrails/activesupport";
 import type { BrowserVersions } from "../metal/allow-browser.js";
 
 afterEach(() => {
@@ -196,10 +201,10 @@ describe("AllowBrowserTest", () => {
     const request = makeRequest(CHROME_118);
     await c.dispatch("modern", request, makeResponse());
 
-    expect(events.length).toBe(1);
-    expect(events[0].name).toBe("browser_block.action_controller");
-    expect(events[0].payload.versions).toBe("modern");
-    expect(events[0].payload.request).toBe(request);
-    expect(c.status).toBe(426);
+    const [event, ...rest] = events;
+
+    assertEqual(request, event.payload.request);
+    assertNotEmpty(event.payload.versions);
+    assertEmpty(rest);
   });
 });

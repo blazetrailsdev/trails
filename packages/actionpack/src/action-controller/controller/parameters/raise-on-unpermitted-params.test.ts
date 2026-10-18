@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Parameters, UnpermittedParameters } from "../../metal/strong-parameters.js";
+import { assertNothingRaised } from "@blazetrails/activesupport";
 
 describe("RaiseOnUnpermittedParamsTest", () => {
   afterEach(() => {
@@ -19,11 +20,18 @@ describe("RaiseOnUnpermittedParamsTest", () => {
     expect(() => params.permit({ post: ["title"] })).toThrow(UnpermittedParameters);
   });
 
-  it("expect never raises on unexpected params", () => {
+  it("expect never raises on unexpected params", async () => {
     Parameters.actionOnUnpermittedParameters = "raise";
-    const inner = new Parameters({ title: "Hi", admin: true });
-    const params = new Parameters({ post: inner });
-    expect(() => params.expect({ post: ["title"] })).not.toThrow(UnpermittedParameters);
+    const params = new Parameters({
+      id: 1,
+      book: { pages: 65, title: "Green Cats and where to find them." },
+    });
+
+    await assertNothingRaised(() => {
+      params.expect({ book: ["pages"] });
+      params.expect({ book: ["pages", "title"] });
+      params.expect("id");
+    });
   });
 
   it("expect! never raises on unexpected params", () => {

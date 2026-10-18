@@ -1,5 +1,6 @@
 import { Module, NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
+import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 import { Collector } from "./collector.js";
 
@@ -18,22 +19,22 @@ include(MyCollector, Collector);
 describe("TestCollector", () => {
   it("responds to default mime types", () => {
     const collector = new MyCollector();
-    expect("html" in collector).toBe(true);
-    expect("text" in collector).toBe(true);
+    assertRespondTo(collector, "html");
+    assertRespondTo(collector, "text");
   });
 
   it("does not respond to unknown mime types", () => {
     const collector = new MyCollector();
-    expect("unknown" in collector).toBe(false);
+    assertNotRespondTo(collector, "unknown");
   });
 
   it("register mime types on method missing", () => {
     Collector.removeMethod("js");
     try {
       const collector = new MyCollector() as MyCollector & { js: (...a: unknown[]) => unknown };
-      expect("js" in collector).toBe(false);
+      assertNotRespondTo(collector, "js");
       collector.js();
-      expect("js" in collector).toBe(true);
+      assertRespondTo(collector, "js");
     } finally {
       if (!Collector.isMethodDefined("js")) {
         Collector.generateMethodForMime(":js");

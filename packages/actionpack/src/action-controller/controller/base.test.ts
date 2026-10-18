@@ -6,12 +6,20 @@ import {
   assert,
   assertEqual,
   assertIncludes,
+  assertNot,
   assertNotDeprecated,
   assertNotIncludes,
+  assertRaise,
 } from "@blazetrails/activesupport";
+import { ActionNotFound } from "../../abstract-controller/base.js";
 import { ModelName } from "@blazetrails/activemodel";
 import { domClass, domId } from "@blazetrails/actionview";
-import { include, publicInstanceMethods, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  include,
+  publicInstanceMethods,
+  rbModConstSet,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { deprecator } from "../deprecator.js";
 import { TestCase } from "../test-case.js";
@@ -46,6 +54,13 @@ class Comment {
     this.id = 1;
   }
 }
+
+registerConstant("Submodule", { name: "Submodule" });
+class ContainedEmptyController extends Base {}
+Object.defineProperty(ContainedEmptyController, "name", {
+  value: "Submodule::ContainedEmptyController",
+});
+const Submodule = { ContainedEmptyController };
 
 class EmptyController extends Base {}
 
@@ -117,20 +132,18 @@ controllerConstants.set("default_url_options", DefaultUrlOptionsController);
 
 describe("ControllerClassTests", () => {
   it("controller path", () => {
-    expect(EmptyController.controllerPath()).toBe("empty");
-    expect(new EmptyController().controllerPath()).toBe("empty");
-
-    class SuperAdminController extends Base {}
-    expect(SuperAdminController.controllerPath()).toBe("super_admin");
+    assertEqual("empty", EmptyController.controllerPath());
+    assertEqual(EmptyController.controllerPath(), new EmptyController().controllerPath());
+    assertEqual("submodule/contained_empty", Submodule.ContainedEmptyController.controllerPath());
+    assertEqual(
+      Submodule.ContainedEmptyController.controllerPath(),
+      new Submodule.ContainedEmptyController().controllerPath(),
+    );
   });
 
   it("controller name", () => {
-    expect(EmptyController.controllerName()).toBe("empty");
-    expect(new EmptyController().controllerName()).toBe("empty");
-
-    class SuperAdminController extends Base {}
-    expect(SuperAdminController.controllerName()).toBe("super_admin");
-    expect(new SuperAdminController().controllerName()).toBe("super_admin");
+    assertEqual("empty", EmptyController.controllerName());
+    assertEqual("contained_empty", Submodule.ContainedEmptyController.controllerName());
   });
 
   it("no deprecation when action view record identifier is included", () => {
@@ -158,9 +171,9 @@ describe("ControllerInstanceTests", () => {
     const empty = new EmptyController();
     empty.setRequestBang(Request.empty());
     empty.setResponseBang(EmptyController.makeResponseBang(empty.request));
-    expect(empty.performed).toBe(false);
+    assertNot(empty.performed);
     empty.responseBody = ["sweet"];
-    expect(empty.performed).toBe(true);
+    assert(empty.performed);
   });
 
   it("empty controller action methods", () => {
@@ -223,8 +236,12 @@ describe("ControllerInstanceTests", () => {
 describe("PerformActionTest", () => {
   it("process should be precise", async () => {
     const c = new EmptyController();
-    await expect(c.dispatch("non_existent", makeRequest(), makeResponse())).rejects.toThrow(
-      /could not be found for EmptyController/,
+    const exception = await assertRaise([ActionNotFound], {}, () =>
+      c.dispatch("non_existent", makeRequest(), makeResponse()),
+    );
+    assertEqual(
+      "The action 'non_existent' could not be found for EmptyController",
+      exception.message,
     );
   });
 

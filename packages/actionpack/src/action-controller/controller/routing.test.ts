@@ -3,7 +3,13 @@
    merge is how `include()` surfaces those members on the type side. */
 import { describe, it, expect, beforeEach } from "vitest";
 
-import { ActiveSupportJSON, include, isPresent, type Included } from "@blazetrails/activesupport";
+import {
+  ActiveSupportJSON,
+  assertNot,
+  include,
+  type Included,
+  isPresent,
+} from "@blazetrails/activesupport";
 import { Utils, bodyFromString } from "@blazetrails/rack";
 import {
   RFC2396_PARSER,
@@ -1713,14 +1719,14 @@ describe("RouteSetTest", () => {
   });
 
   it("routing traversal does not load extra classes", async () => {
-    expect(rbModConstDefined(Object, "Profiler__"), "Profiler should not be loaded").toBe(false);
+    assertNot(rbModConstDefined(Object, "Profiler__"), "Profiler should not be loaded");
     set.draw(function () {
       this.get({ "/profile": "profile#index" });
     });
 
     await tc.requestPathParams("/profile").catch(() => null);
 
-    expect(rbModConstDefined(Object, "Profiler__"), "Profiler should not be loaded").toBe(false);
+    assertNot(rbModConstDefined(Object, "Profiler__"), "Profiler should not be loaded");
   });
 
   it("recognize with conditions and format", async () => {
