@@ -31,6 +31,15 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actionview:template/template_test.rb › TestERBTemplate › no magic comment word with utf 8": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'template/template_test.rb:150 `render.encoding` is Encoding::UTF_8 — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+    },
+  ],
   "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a browser":
     [
       {

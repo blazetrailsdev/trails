@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@blazetrails/actionpack";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { ArgumentError, Marshal } from "@blazetrails/ruby-compat";
 import { SafeBuffer } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
@@ -22,15 +22,15 @@ describe("TestTSETemplate", () => {
       this.virtualPath = null;
     }
 
-    hello(): string {
+    get hello(): string {
       return "Hello";
     }
 
-    apostrophe(): string {
+    get apostrophe(): string {
       return "l'apostrophe";
     }
 
-    partial(): Template {
+    get partial(): Template {
       return new Template("<%= virtualPath %>", "partial", TSEHandler, {
         virtualPath: "partial",
         format: "html",
@@ -47,7 +47,7 @@ describe("TestTSETemplate", () => {
   let context: Context;
 
   const newTemplate = (
-    body = "<%= hello() %>",
+    body = "<%= hello %>",
     details: Partial<{
       format: string;
       locals: string[];
@@ -99,24 +99,24 @@ describe("TestTSETemplate", () => {
   });
 
   it("basic template does html escape", async () => {
-    template = newTemplate("<%= apostrophe() %>");
+    template = newTemplate("<%= apostrophe %>");
     expect(await render()).toBe("l&#39;apostrophe");
   });
 
   it("text template does not html escape", async () => {
-    template = newTemplate("<%= apostrophe() %> <%== apostrophe() %>", { format: "text" });
+    template = newTemplate("<%= apostrophe %> <%== apostrophe %>", { format: "text" });
     expect(await render()).toBe("l'apostrophe l'apostrophe");
   });
 
   it("raw template", async () => {
-    template = newTemplate("<%= hello() %>", { handler: new Raw() });
-    expect(await render()).toBe("<%= hello() %>");
+    template = newTemplate("<%= hello %>", { handler: new Raw() });
+    expect(await render()).toBe("<%= hello %>");
   });
 
   it("template does not lose its source after rendering", async () => {
     template = newTemplate();
     await render();
-    expect(template.source).toBe("<%= hello() %>");
+    expect(template.source).toBe("<%= hello %>");
   });
 
   it("template does not lose its source after rendering if it does not have a virtual path", async () => {
@@ -138,7 +138,7 @@ describe("TestTSETemplate", () => {
 
   it("virtual path", async () => {
     template = newTemplate(
-      "<%= virtualPath %>" + "<%= await partial().render(this, {}) %>" + "<%= virtualPath %>",
+      "<%= virtualPath %>" + "<%= await partial.render(this, {}) %>" + "<%= virtualPath %>",
     );
     expect(await render()).toBe("hellopartialhello");
   });
@@ -174,17 +174,19 @@ describe("TestTSETemplate", () => {
   it.skip("encoding can be specified with magic comment", () => {});
 
   it("locals can be disabled", async () => {
-    template = newTemplate("<%# locals: () -%>");
-    const error = await render({ foo: "bar" }).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(Template.Error);
-    expect((error as Error).message).toMatch(/no locals accepted for hello template/);
+    const error = await assertRaises([Template.Error], {}, async () => {
+      template = newTemplate("<%# locals: () -%>");
+      await render({ foo: "bar" });
+    });
+    expect(error.message).toMatch(/no locals accepted for hello template/);
   });
 
   it("locals can not be specified with positional arguments", async () => {
-    template = newTemplate("<%# locals: (foo) -%>");
-    const error = await render({ foo: "bar" }).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(Template.Error);
-    expect((error as Error).message).toMatch(/`foo` set as non-keyword argument/);
+    const error = await assertRaises([Template.Error], {}, async () => {
+      template = newTemplate("<%# locals: (foo) -%>");
+      await render({ foo: "bar" });
+    });
+    expect(error.message).toMatch(/`foo` set as non-keyword argument/);
   });
 
   it("locals can be specified with splat arguments", async () => {
@@ -224,29 +226,32 @@ describe("TestTSETemplate", () => {
   });
 
   it("required locals must be specified", async () => {
-    template = newTemplate("<%# locals: (message:) -%>");
-    const error = await render().catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(Template.Error);
-    expect((error as Error).message).toMatch(/missing local: :message for hello template/);
-    expect((error as Error).cause).toBeInstanceOf(StrictLocalsError);
+    const error = await assertRaises([Template.Error], {}, async () => {
+      template = newTemplate("<%# locals: (message:) -%>");
+      await render();
+    });
+    expect(error.message).toMatch(/missing local: :message for hello template/);
+    expect(error.cause).toBeInstanceOf(StrictLocalsError);
   });
 
   it("extra locals raises strict locals error", async () => {
-    template = newTemplate("<%# locals: (message:) -%>");
-    const error = await render({ message: "Hi", foo: "bar" }).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(Template.Error);
-    expect((error as Error).message).toMatch(/unknown local: :foo for hello template/);
-    expect((error as Error).cause).toBeInstanceOf(StrictLocalsError);
+    const error = await assertRaises([Template.Error], {}, async () => {
+      template = newTemplate("<%# locals: (message:) -%>");
+      await render({ message: "Hi", foo: "bar" });
+    });
+    expect(error.message).toMatch(/unknown local: :foo for hello template/);
+    expect(error.cause).toBeInstanceOf(StrictLocalsError);
   });
 
   it("argument error in the template is not hijacked by strict locals checking", async () => {
-    template = newTemplate(
-      '<%# locals: () -%>\n<%= (() => { throw new ArgumentError("wrong number of arguments (given 1, expected 0)"); })() %>',
-    );
-    const error = await render().catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(Template.Error);
-    expect((error as Error).cause).toBeInstanceOf(ArgumentError);
-    expect((error as Error).cause).not.toBeInstanceOf(StrictLocalsError);
+    const error = await assertRaises([Template.Error], {}, async () => {
+      template = newTemplate(
+        '<%# locals: () -%>\n<%= (function hello() { throw new ArgumentError("wrong number of arguments (given 1, expected 0)"); })("invalid_argument") %>',
+      );
+      await render();
+    });
+    expect((error.cause as Error).stack!.split("\n")[1]).toMatch(/at (?:\S+\.)?hello\b/);
+    expect(error.cause).toBeInstanceOf(ArgumentError);
   });
 
   it("rails injected locals does not raise error if not passed", async () => {
