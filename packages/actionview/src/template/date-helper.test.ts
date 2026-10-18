@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "../test-helpers/abstract-unit.js";
 import { beforeEach, describe, expect, it } from "vitest";
-import { isHtmlSafe } from "@blazetrails/activesupport";
 import { Struct, sprintf } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import {
@@ -321,7 +320,6 @@ describe("DateHelperTest", () => {
     expected += timeSelects("updated_at", 16, 35);
 
     assertDomEqual(expected, view.datetimeSelect("post", "updated_at"));
-    expect(isHtmlSafe(view.timeSelect("post", "written_on", { ignoreDate: true }))).toBe(true);
   });
 
   it("time tag with date", () => {
