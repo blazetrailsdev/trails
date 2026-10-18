@@ -6,6 +6,9 @@ import {
   assertErrorReported,
   assertNoErrorReported,
   assertRaises,
+  assert,
+  assertNot,
+  assertRespondTo,
 } from "@blazetrails/activesupport";
 import { Executor } from "../middleware/executor.js";
 import { ExceptionWrapper } from "../middleware/exception-wrapper.js";
@@ -41,16 +44,16 @@ describe("ExecutorTest", () => {
 
   it("returned body object always responds to close", async () => {
     const body = await callAndReturnBody();
-    expect(typeof body.close).toBe("function");
+    assertRespondTo(body, "close");
   });
 
   it("returned body object always responds to close even if called twice", async () => {
     let body = await callAndReturnBody();
-    expect(typeof body.close).toBe("function");
+    assertRespondTo(body, "close");
     await body.close();
 
     body = await callAndReturnBody();
-    expect(typeof body.close).toBe("function");
+    assertRespondTo(body, "close");
     await body.close();
   });
 
@@ -63,7 +66,7 @@ describe("ExecutorTest", () => {
       return [200, { "content-type": "text/html" }, b] as unknown as RackResponse;
     });
     await body.close();
-    expect(closeCalled).toBe(true);
+    assert(closeCalled);
   });
 
   it("run callbacks are called before close", async () => {
@@ -73,11 +76,11 @@ describe("ExecutorTest", () => {
     });
 
     const body = await callAndReturnBody();
-    expect(running).toBe(true);
+    assert(running);
 
     running = false;
     await body.close();
-    expect(running).toBe(false);
+    assertNot(running);
   });
 
   it("complete callbacks are called on close", async () => {
@@ -87,10 +90,10 @@ describe("ExecutorTest", () => {
     });
 
     const body = await callAndReturnBody();
-    expect(completed).toBe(false);
+    assertNot(completed);
 
     await body.close();
-    expect(completed).toBe(true);
+    assert(completed);
   });
 
   it("complete callbacks are called on exceptions", async () => {
@@ -103,7 +106,7 @@ describe("ExecutorTest", () => {
       throw new Error("error");
     }).catch(() => null);
 
-    expect(completed).toBe(true);
+    assert(completed);
   });
 
   it("callbacks execute in shared context", async () => {
@@ -116,8 +119,8 @@ describe("ExecutorTest", () => {
     });
 
     await (await callAndReturnBody()).close();
-    expect(result).toBe(true);
-    expect("inSharedContext" in globalThis).toBe(false);
+    assert(result);
+    assertNot("inSharedContext" in globalThis);
   });
 
   it("body abandoned", async () => {

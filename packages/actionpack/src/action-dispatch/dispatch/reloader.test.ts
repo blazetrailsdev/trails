@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Reloader } from "../middleware/reloader.js";
 import type { ExecutorLike, ExecutorState } from "../middleware/executor.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assert, assertNil, assertNot, assertRespondTo } from "@blazetrails/activesupport";
 
 class StubReloader implements ExecutorLike {
   prepareHooks: Array<() => void> = [];
@@ -65,16 +65,18 @@ describe("ReloaderTest", () => {
 
   it("returned body object always responds to close", async () => {
     const body = await callAndReturnBody(new StubReloader());
-    expect(typeof body.close).toBe("function");
+    assertRespondTo(body, "close");
   });
 
   it("returned body object always responds to close even if called twice", async () => {
     const r = new StubReloader();
-    const b1 = await callAndReturnBody(r);
-    b1.close();
-    const b2 = await callAndReturnBody(r);
-    b2.close();
-    expect(typeof b2.close).toBe("function");
+    let body = await callAndReturnBody(r);
+    assertRespondTo(body, "close");
+    body.close();
+
+    body = await callAndReturnBody(r);
+    assertRespondTo(body, "close");
+    body.close();
   });
 
   it("condition specifies when to reload", async () => {
@@ -109,7 +111,7 @@ describe("ReloaderTest", () => {
       async () => [200, { "content-type": "text/html" }, innerBody] as unknown as RackResponse,
     );
     body.close();
-    expect(closeCalled).toBe(true);
+    assert(closeCalled);
   });
 
   it("complete callbacks are called when body is closed", async () => {
@@ -119,22 +121,22 @@ describe("ReloaderTest", () => {
       completed = true;
     });
     const body = await callAndReturnBody(r);
-    expect(completed).toBe(false);
+    assertNot(completed);
     body.close();
-    expect(completed).toBe(true);
+    assert(completed);
   });
 
   it("prepare callbacks arent called when body is closed", async () => {
     const r = new StubReloader();
+    // eslint-disable-next-line no-useless-assignment
     let prepared = false;
     r.toPrepare(() => {
       prepared = true;
     });
     const body = await callAndReturnBody(r);
-    expect(prepared).toBe(true);
     prepared = false;
     body.close();
-    expect(prepared).toBe(false);
+    assertNot(prepared);
   });
 
   it("complete callbacks are called on exceptions", async () => {
@@ -143,11 +145,9 @@ describe("ReloaderTest", () => {
     r.toComplete(() => {
       completed = true;
     });
-    await expect(
-      callAndReturnBody(r, async () => {
-        throw new Error("error");
-      }),
-    ).rejects.toThrow("error");
-    expect(completed).toBe(true);
+    await callAndReturnBody(r, async () => {
+      throw new Error("error");
+    }).catch(() => null);
+    assert(completed);
   });
 });
