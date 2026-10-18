@@ -192,11 +192,12 @@ export class Directory {
     pathInfo: string,
     scriptName: string,
   ): Promise<[number, Record<string, any>, any]> {
-    const s = this.stat(path);
-    if (s) {
-      if (s.isFile()) return this.app.call(env);
-      if (s.isDirectory()) return this.listDirectory(pathInfo, path, scriptName);
+    let stat: FsStatResult | null;
+    if ((stat = this.stat(path)) && File.isReadable(path)) {
+      if (stat.isFile()) return this.app.call(env);
+      if (stat.isDirectory()) return this.listDirectory(pathInfo, path, scriptName);
     }
+
     return this.entityNotFound(pathInfo);
   }
 
