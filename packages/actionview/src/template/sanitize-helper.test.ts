@@ -214,14 +214,14 @@ function sanitizeHelperVendorTests(
   });
 
   it("sanitized allowed tags returns a string collection", () => {
-    const result = subjectClass.sanitizedAllowedTags();
+    const result = (subjectClass as any).sanitizedAllowedTags() as Iterable<string>;
 
     expect(typeof result[Symbol.iterator]).toBe("function");
     expect(typeof Array.from(result)[0]).toBe("string");
   });
 
   it("sanitized allowed attributes returns a string collection", () => {
-    const result = subjectClass.sanitizedAllowedAttributes();
+    const result = (subjectClass as any).sanitizedAllowedAttributes() as Iterable<string>;
 
     expect(typeof result[Symbol.iterator]).toBe("function");
     expect(typeof Array.from(result)[0]).toBe("string");
