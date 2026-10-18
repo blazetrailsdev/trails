@@ -120,16 +120,20 @@ describe("ScreenshotHelperTest", () => {
 
   it("take_screenshot saves HTML and shows link to it when using html: kwarg", () => {
     const msgs: string[] = [];
+    let calledSaveHtml = false;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
     const page = {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
-      content: vi.fn().mockResolvedValue("<html></html>"),
+      content: vi.fn(async () => {
+        calledSaveHtml = true;
+        return "<html></html>";
+      }),
     };
     host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host, { html: true }).then(() => {
       const out = msgs.join("\n");
+      assert(calledSaveHtml);
       expect(out).toMatch(/\[Screenshot HTML\]/);
-      expect(page.content).toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
   });

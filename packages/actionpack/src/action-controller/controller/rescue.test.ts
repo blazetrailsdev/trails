@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { assertCalledWith } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
@@ -285,16 +286,14 @@ describe("RescueControllerTest", () => {
       async action() {
         throw new RecordInvalid("invalid record");
       }
+
+      showErrors(_exception: Error): void {}
     }
-    let caughtError: Error | null = null;
-    C.rescueFrom(RecordInvalid, {
-      with: (err: Error) => {
-        caughtError = err;
-      },
-    });
+    C.rescueFrom(RecordInvalid, { with: "showErrors" });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(caughtError).toBeInstanceOf(RecordInvalid);
+    await assertCalledWith(c, "showErrors", [Error], {}, async () => {
+      await c.dispatch("action", makeRequest(), makeResponse());
+    });
   });
 
   it("rescue handler with argument as string", async () => {
@@ -303,16 +302,14 @@ describe("RescueControllerTest", () => {
       async action() {
         throw new RecordInvalidStr("invalid");
       }
+
+      showErrors(_exception: Error): void {}
     }
-    let caughtError: Error | null = null;
-    C.rescueFrom(RecordInvalidStr, {
-      with: (err: Error) => {
-        caughtError = err;
-      },
-    });
+    C.rescueFrom(RecordInvalidStr, { with: "showErrors" });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(caughtError).toBeInstanceOf(RecordInvalidStr);
+    await assertCalledWith(c, "showErrors", [Error], {}, async () => {
+      await c.dispatch("action", makeRequest(), makeResponse());
+    });
   });
 
   it("proc rescue handler", async () => {
