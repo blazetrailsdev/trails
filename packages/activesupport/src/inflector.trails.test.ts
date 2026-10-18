@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
+import { StopIteration } from "@blazetrails/ruby-compat/stop-iteration";
 import { constantize, safeConstantize } from "./inflector.js";
 import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 
@@ -8,6 +9,7 @@ describe("constantize resolves core exception classes", () => {
   it("answers ruby-compat's NotImplementedError", () => {
     expect(constantize("NotImplementedError")).toBe(NotImplementedError);
     expect(constantize("::NameError")).toBe(NameError);
+    expect(constantize("StopIteration")).toBe(StopIteration);
   });
 });
 

@@ -1,4 +1,11 @@
-import { RuntimeError, deleteAt, insert, rbBlockGivenP, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  RuntimeError,
+  deleteAt,
+  rbInspect,
+  insert,
+  rbBlockGivenP,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import { Notifications } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
@@ -155,7 +162,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
   deleteBang(target: MiddlewareFactory): Middleware[] {
     const rejected = this.delete(target);
     if (rejected === null) {
-      throw new RuntimeError(`No such middleware to remove: ${target.name}`);
+      throw new RuntimeError(`No such middleware to remove: ${rbInspect(target)}`);
     }
     return rejected;
   }
@@ -222,9 +229,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
   assertIndex(index: number | MiddlewareFactory, where: "before" | "after"): number {
     const i = typeof index === "number" ? index : this.indexOf(index);
     if (i === -1) {
-      throw new RuntimeError(
-        `No such middleware to insert ${where}: ${typeof index === "number" ? index : index.name}`,
-      );
+      throw new RuntimeError(`No such middleware to insert ${where}: ${rbInspect(index)}`);
     }
     return i;
   }
