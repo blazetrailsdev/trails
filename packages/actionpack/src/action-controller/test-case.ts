@@ -633,6 +633,7 @@ export class TestRequest extends AbstractTestRequest {
     this.setHeader("CONTENT_TYPE", type);
   }
 
+  /** @missingRailsName b — PERMANENT */
   assignParameters(
     _routes: unknown,
     controllerPath: string,
@@ -687,9 +688,10 @@ export class TestRequest extends AbstractTestRequest {
             this._customParamParsers[contentMimeType!.symbol!] = () => nonPathParameters;
             data = toQuery(nonPathParameters);
         }
+        data = b(data);
       }
 
-      const dataStream = new StringIO(b(data));
+      const dataStream = new StringIO(data);
       this.setHeader("CONTENT_LENGTH", String(dataStream.size()));
       this.setHeader("rack.input", dataStream);
     }
