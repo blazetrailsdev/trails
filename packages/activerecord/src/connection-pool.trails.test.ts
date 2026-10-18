@@ -184,6 +184,56 @@ it("withConnection overlapping on an empty lease checks out one connection", asy
   expect(pool.isActiveConnection()).toBeNull();
 });
 
+it("withConnection joining after the checkout resolved releases once both settle", async () => {
+  const pool = makePool(2);
+  const checkout = vi.spyOn(pool, "checkout");
+  const events: string[] = [];
+  vi.spyOn(pool, "releaseConnection").mockImplementation(function (this: ConnectionPool) {
+    events.push("release");
+    return ConnectionPool.prototype.releaseConnection.call(this);
+  });
+  let finishFirst!: () => void;
+  const first = pool.withConnection(async () => {
+    events.push("first");
+    await new Promise<void>((resolve) => (finishFirst = resolve));
+    events.push("first done");
+  });
+  await vi.waitFor(() => expect(events).toContain("first"));
+  const second = pool.withConnection(async (conn) => {
+    expect(conn).toBe(pool.isActiveConnection());
+    events.push("second done");
+  });
+  await second;
+  finishFirst();
+  await first;
+  expect(checkout).toHaveBeenCalledTimes(1);
+  expect(events).toEqual(["first", "second done", "first done", "release"]);
+});
+
+it("withConnection overlapping calls with different preventPermanentCheckout release the lease", async () => {
+  const pool = makePool(2);
+  await Promise.all([
+    pool.withConnection(() => undefined, { preventPermanentCheckout: true }),
+    pool.withConnection(() => undefined),
+  ]);
+  expect(pool.isActiveConnection()).toBeNull();
+  expect(pool.isPermanentLease()).toBe(true);
+  expect(pool.stat().busy).toBe(0);
+});
+
+it("withConnection retries the checkout after an overlapping checkout rejects", async () => {
+  const pool = makePool(2);
+  const checkout = vi.spyOn(pool, "checkout").mockRejectedValueOnce(new Error("boom"));
+  const results = await Promise.allSettled([
+    pool.withConnection(() => undefined),
+    pool.withConnection(() => undefined),
+  ]);
+  expect(results.map((r) => r.status)).toEqual(["rejected", "rejected"]);
+  await pool.withConnection(() => undefined);
+  expect(checkout).toHaveBeenCalledTimes(2);
+  expect(pool.isActiveConnection()).toBeNull();
+});
+
 it("withConnection waits for a released connection when pool is saturated", async () => {
   const pool = makePool(1);
   const held = await pool.checkout();

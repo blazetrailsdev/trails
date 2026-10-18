@@ -404,6 +404,7 @@ export class ConnectionPool implements ReapablePool {
     return false;
   }
 
+  /** @inventedArm if — CONVERGEABLE with-connection-pending-checkout-join-needs-ruling */
   async withConnection<T>(
     fn: (conn: DatabaseAdapter) => T | Promise<T>,
     options: { preventPermanentCheckout?: boolean } = {},
@@ -422,14 +423,19 @@ export class ConnectionPool implements ReapablePool {
       }
     } else {
       const checkout = pending ?? { connection: this.checkout(), holders: 0 };
-      if (!pending) pendingCheckouts.set(lease, checkout);
+      if (!pending) {
+        pendingCheckouts.set(lease, checkout);
+        checkout.connection.catch(() => {
+          if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
+        });
+      }
       checkout.holders++;
       try {
         return await fn((lease.connection = await checkout.connection));
       } finally {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
         if (--checkout.holders === 0) {
-          pendingCheckouts.delete(lease);
+          if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
           if (!lease.sticky) this.releaseConnection(lease);
         }
       }
