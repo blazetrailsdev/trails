@@ -1,3 +1,4 @@
+import { classpaths } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
@@ -235,14 +236,7 @@ export function rbClassSuperclass<T extends object>(klass: T): T | null {
   return superclass === Function.prototype ? null : (superclass as T | null);
 }
 
-/**
- * The `classpath` seat `RCLASS_SET_CLASSPATH`
- * (`vendor/ruby/v3.3.11/internal/class.h:258`) writes: the path `const_set`
- * gave a class or module, and whether it is permanent.
- *
- * @noRailsEquivalent PERMANENT
- */
-export const classpaths = new WeakMap<object, { path: string; permanent: boolean }>();
+export { classpaths };
 
 /** `rb_define_class` (`vendor/ruby/v3.3.11/class.c:972`) for a core class no JS constructor seats. */
 function rbDefineClass(name: string, superclass: Klass = Object): new () => object {

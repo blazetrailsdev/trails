@@ -404,9 +404,10 @@ export class Request {
 
   get serverSoftware(): string | null {
     const m =
-      this.getHeader("SERVER_SOFTWARE") != null &&
-      /^([a-zA-Z]+)/.exec(this.getHeader("SERVER_SOFTWARE") as string);
-    return m ? m[1].toLowerCase() : null;
+      this.getHeader("SERVER_SOFTWARE") != null
+        ? /^([a-zA-Z]+)/.exec(this.getHeader("SERVER_SOFTWARE") as string)
+        : null;
+    return m != null ? m[1].toLowerCase() : null;
   }
 
   getHeader(name: string): any {
