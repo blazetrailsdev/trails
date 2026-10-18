@@ -61,6 +61,16 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           'dispatch/system_testing/driver_test.rb:45 `@browser.options` is a Playwright `LaunchOptions` plain object with no browser-specific options class, so its `args` are asserted (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
       },
     ],
+  "actiondispatch:dispatch/uploaded_file_test.rb › UploadedFileTest › filename is different object":
+    [
+      {
+        kind: "assert_not_equal",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'dispatch/uploaded_file_test.rb:23 `assert_not_equal file_str.object_id, uf.original_filename.object_id` — a JS string has no identity, so the port asserts the copied value (CLAUDE.md, "Ruby Strings are JS string primitives")',
+      },
+    ],
   "actiondispatch:dispatch/request/multipart_params_parsing_test.rb › MultipartParamsParsingTest › parses utf8 filename with percent character":
     [
       {

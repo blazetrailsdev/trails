@@ -1,8 +1,8 @@
-import { StringIO, Tempfile } from "@blazetrails/ruby-compat";
+import { rbObjEncoding, StringIO, Tempfile } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { UploadedFile } from "../http/upload.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertEqual, assertNil, assertNot, assertPredicate } from "@blazetrails/activesupport";
 
 describe("UploadedFileTest", () => {
   it("constructor with argument error", () => {
@@ -22,12 +22,12 @@ describe("UploadedFileTest", () => {
 
   it("filename should be in utf 8", () => {
     const uf = new UploadedFile({ filename: "foo", tempfile: Tempfile.new() });
-    expect(uf.originalFilename).toBe("foo");
+    assertEqual("UTF-8", rbObjEncoding(uf.originalFilename!).toString());
   });
 
   it("filename should always be in utf 8", () => {
     const uf = new UploadedFile({ filename: "日本語", tempfile: Tempfile.new() });
-    expect(uf.originalFilename).toBe("日本語");
+    assertEqual("UTF-8", rbObjEncoding(uf.originalFilename!).toString());
   });
 
   it("content type", () => {
@@ -42,12 +42,12 @@ describe("UploadedFileTest", () => {
 
   it("headers should be in utf 8", () => {
     const uf = new UploadedFile({ filename: "foo", head: "foo", tempfile: Tempfile.new() });
-    expect(uf.headers).toBe("foo");
+    assertEqual("UTF-8", rbObjEncoding(uf.headers!).toString());
   });
 
   it("headers should always be in utf 8", () => {
     const uf = new UploadedFile({ filename: "foo", head: "café", tempfile: Tempfile.new() });
-    expect(uf.headers).toBe("café");
+    assertEqual("UTF-8", rbObjEncoding(uf.headers!).toString());
   });
 
   it("tempfile", () => {
@@ -72,22 +72,23 @@ describe("UploadedFileTest", () => {
     const tf = Tempfile.new();
     tf.close();
     const uf = new UploadedFile({ tempfile: tf });
-    expect(uf.open()).toBe(tf.toIo());
-    expect(tf.isClosed()).toBe(false);
+    const file = uf.open();
+    assertEqual(tf.toIo(), file);
+    assertNot(tf.isClosed());
   });
 
   it("delegates close to tempfile", () => {
     const tf = Tempfile.new();
     const uf = new UploadedFile({ tempfile: tf });
     uf.close();
-    expect(tf.isClosed()).toBe(true);
+    assertPredicate(tf, (tf) => tf.isClosed());
   });
 
   it("close accepts parameter", () => {
     const tf = Tempfile.new();
     const uf = new UploadedFile({ tempfile: tf });
     uf.close(true);
-    expect(tf.isClosed()).toBe(true);
+    assertPredicate(tf, (tf) => tf.isClosed());
     assertNil(tf.path());
   });
 

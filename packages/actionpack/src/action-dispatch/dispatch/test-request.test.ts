@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Lint } from "@blazetrails/rack";
 import { StringIO } from "@blazetrails/ruby-compat";
+import { assertEqual } from "@blazetrails/activesupport";
 import type { CookieJar } from "../middleware/cookies.js";
 import { TestRequest } from "../testing/test-request.js";
 
@@ -59,7 +60,7 @@ describe("TestRequestTest", () => {
 
   it("does not complain when there is no application config", () => {
     const req = TestRequest.create({});
-    expect(Object.keys(req.env).length).toBeGreaterThan(0);
+    assertEqual(false, Object.keys(req.env).length === 0);
   });
 
   it("default remote address is 0.0.0.0", () => {

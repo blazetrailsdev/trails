@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import type { ViteDevServer } from "vite";
+import { assert, assertNotEqual } from "@blazetrails/activesupport";
 import { Server, vite } from "../../system-testing/server.js";
 
 describe("ServerTest", () => {
@@ -18,7 +19,10 @@ describe("ServerTest", () => {
 
   it("port is always included", async () => {
     await new Server().run();
-    expect(vite.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/$/);
+    assert(
+      /^http:\/\/127\.0\.0\.1:\d+\/$/.test(vite.url!),
+      "expected vite.url to include the port",
+    );
   });
 
   it("server is changed from `default` to `puma`", async () => {
@@ -29,7 +33,7 @@ describe("ServerTest", () => {
     } finally {
       Server.silencePuma = false;
     }
-    expect(vite.server).not.toBeUndefined();
+    assertNotEqual(vite.server, undefined);
   });
 
   it("server is not changed to `puma` when is different than default", async () => {

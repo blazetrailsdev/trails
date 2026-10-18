@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, it } from "vitest";
+import { Assertion, assertMatch, assertRaises } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import {
   assertResponse,
   type AssertionResponseHost,
@@ -27,104 +29,126 @@ function fakeResponse(
   };
 }
 
-function captureThrow(fn: () => unknown): string {
-  try {
-    fn();
-  } catch (e) {
-    return (e as Error).message;
-  }
-  throw new Error("expected fn to throw");
-}
-
-function host(
-  response: FakeResponse,
-  request?: AssertionResponseHost["request"],
-): AssertionResponseHost {
-  return { response, request };
-}
-
 describe("ResponseAssertionsTest", () => {
-  it("assert response predicate methods", () => {
-    expect(() => assertResponse.call(host(fakeResponse(200)), "success")).not.toThrow();
-    expect(() => assertResponse.call(host(fakeResponse(200)), "unauthorized")).toThrow();
+  let self: AssertionResponseHost & { assertResponse: typeof assertResponse };
 
-    expect(() => assertResponse.call(host(fakeResponse(404)), "missing")).not.toThrow();
-    expect(() => assertResponse.call(host(fakeResponse(404)), "unauthorized")).toThrow();
-
-    expect(() => assertResponse.call(host(fakeResponse(302)), "redirect")).not.toThrow();
-    expect(() => assertResponse.call(host(fakeResponse(302)), "unauthorized")).toThrow();
-
-    expect(() => assertResponse.call(host(fakeResponse(500)), "error")).not.toThrow();
-    expect(() => assertResponse.call(host(fakeResponse(500)), "unauthorized")).toThrow();
+  beforeEach(() => {
+    self = { response: fakeResponse(200), request: undefined, assertResponse };
   });
 
-  it("assert response integer", () => {
-    const h = host(fakeResponse(400));
-    expect(() => assertResponse.call(h, 400)).not.toThrow();
-    expect(() => assertResponse.call(h, "unauthorized")).toThrow();
-    expect(() => assertResponse.call(h, 500)).toThrow();
+  it("assert response predicate methods", async () => {
+    for (const [sym, status] of [
+      ["success", 200],
+      ["missing", 404],
+      ["redirect", 302],
+      ["error", 500],
+    ] as const) {
+      self.response = fakeResponse(status);
+      self.assertResponse(sym);
+
+      await assertRaises([Assertion], {}, () => {
+        self.assertResponse("unauthorized");
+      });
+    }
   });
 
-  it("assert response sym status", () => {
-    const h = host(fakeResponse(401));
-    expect(() => assertResponse.call(h, "unauthorized")).not.toThrow();
-    expect(() => assertResponse.call(h, "ok")).toThrow();
-    expect(() => assertResponse.call(h, "success")).toThrow();
+  it("assert response integer", async () => {
+    self.response = fakeResponse(400);
+    self.assertResponse(400);
+
+    await assertRaises([Assertion], {}, () => {
+      self.assertResponse("unauthorized");
+    });
+
+    await assertRaises([Assertion], {}, () => {
+      self.assertResponse(500);
+    });
   });
 
-  it("assert response sym typo", () => {
-    const h = host(fakeResponse(200));
-    expect(() => assertResponse.call(h, "succezz")).toThrow(/Invalid response name/);
+  it("assert response sym status", async () => {
+    self.response = fakeResponse(401);
+    self.assertResponse("unauthorized");
+
+    await assertRaises([Assertion], {}, () => {
+      self.assertResponse("ok");
+    });
+
+    await assertRaises([Assertion], {}, () => {
+      self.assertResponse("success");
+    });
   });
 
-  it("error message shows 404 when 404 asserted for success", () => {
-    const h = host(fakeResponse(404));
-    expect(() => assertResponse.call(h, "success")).toThrow(
-      "Expected response to be a <2XX: success>, but was a <404: Not Found>",
-    );
+  it("assert response sym typo", async () => {
+    self.response = fakeResponse(200);
+
+    await assertRaises([ArgumentError], {}, () => {
+      self.assertResponse("succezz");
+    });
   });
 
-  it("error message shows 404 when asserted for 200", () => {
-    const h = host(fakeResponse(404));
-    expect(() => assertResponse.call(h, 200)).toThrow(
-      "Expected response to be a <200: OK>, but was a <404: Not Found>",
-    );
+  it("error message shows 404 when 404 asserted for success", async () => {
+    self.response = fakeResponse(404);
+
+    const error = await assertRaises([Assertion], {}, () => self.assertResponse("success"));
+    const expected = "Expected response to be a <2XX: success>, but was a <404: Not Found>";
+    assertMatch(expected, error.message);
   });
 
-  it("error message shows 302 redirect when 302 asserted for success", () => {
-    const h = host(fakeResponse(302, { location: "http://test.host/posts/redirect/1" }));
-    expect(() => assertResponse.call(h, "success")).toThrow(
-      "Expected response to be a <2XX: success>, but was a <302: Found> redirect to <http://test.host/posts/redirect/1>",
-    );
+  it("error message shows 404 when asserted for 200", async () => {
+    self.response = fakeResponse(404);
+
+    const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
+    const expected = "Expected response to be a <200: OK>, but was a <404: Not Found>";
+    assertMatch(expected, error.message);
   });
 
-  it("error message shows 302 redirect when 302 asserted for 301", () => {
-    const h = host(fakeResponse(302, { location: "http://test.host/posts/redirect/2" }));
-    expect(() => assertResponse.call(h, 301)).toThrow(
-      "Expected response to be a <301: Moved Permanently>, but was a <302: Found> redirect to <http://test.host/posts/redirect/2>",
-    );
+  it("error message shows 302 redirect when 302 asserted for success", async () => {
+    self.response = fakeResponse(302, { location: "http://test.host/posts/redirect/1" });
+
+    const error = await assertRaises([Assertion], {}, () => self.assertResponse("success"));
+    const expected =
+      "Expected response to be a <2XX: success>, but was a <302: Found>" +
+      " redirect to <http://test.host/posts/redirect/1>";
+    assertMatch(expected, error.message);
   });
 
-  it("error message shows short response body", () => {
-    const h = host(fakeResponse(400, { body: "not too long" }));
-    expect(() => assertResponse.call(h, 200)).toThrow(
-      "Expected response to be a <200: OK>, but was a <400: Bad Request>\nResponse body: not too long",
-    );
+  it("error message shows 302 redirect when 302 asserted for 301", async () => {
+    self.response = fakeResponse(302, { location: "http://test.host/posts/redirect/2" });
+
+    const error = await assertRaises([Assertion], {}, () => self.assertResponse(301));
+    const expected =
+      "Expected response to be a <301: Moved Permanently>, but was a <302: Found>" +
+      " redirect to <http://test.host/posts/redirect/2>";
+    assertMatch(expected, error.message);
   });
 
-  it("error message does not show long response body", () => {
-    const h = host(fakeResponse(400, { body: "not too long".repeat(50) }));
-    const msg = captureThrow(() => assertResponse.call(h, 200));
-    expect(msg).toContain("Expected response to be a <200: OK>, but was a <400: Bad Request>");
-    expect(msg).not.toContain("Response body:");
+  it("error message shows short response body", async () => {
+    self.response = fakeResponse(400, { body: "not too long" });
+    const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
+    const expected =
+      "Expected response to be a <200: OK>, but was a <400: Bad Request>" +
+      "\nResponse body: not too long";
+    assertMatch(expected, error.message);
   });
 
-  it("error message shows rescued exception", () => {
+  it("error message does not show long response body", async () => {
+    self.response = fakeResponse(400, { body: "not too long".repeat(50) });
+    const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
+    const expected = "Expected response to be a <200: OK>, but was a <400: Bad Request>";
+    assertMatch(expected, error.message);
+  });
+
+  it("error message shows rescued exception", async () => {
+    self.response = fakeResponse(500);
+
     const ex = new Error("example error");
     ex.name = "RuntimeError";
-    const h = host(fakeResponse(500), { env: { "action_dispatch.exception": ex } });
-    expect(() => assertResponse.call(h, 200)).toThrow(
-      "Expected response to be a <200: OK>, but was a <500: Internal Server Error>\n\nException while processing request: RuntimeError: example error\n",
-    );
+    self.request = { env: { "action_dispatch.exception": ex } };
+
+    const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
+    const expected =
+      "Expected response to be a <200: OK>, but was a <500: Internal Server Error>\n\n" +
+      "Exception while processing request: RuntimeError: example error\n";
+    assertMatch(expected, error.message);
   });
 });

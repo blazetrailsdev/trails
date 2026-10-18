@@ -164,18 +164,6 @@ describe("Controller routing integration", () => {
     expect(() => routes.recognizePath("/posts/abc")).toThrow(RoutingError);
   });
 
-  it("multiple draw calls append routes", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/a", { to: "posts#index" });
-    });
-    routes.draw(function () {
-      this.get("/b", { to: "pages#home" });
-    });
-    expect(() => routes.recognizePath("/a")).not.toThrow();
-    expect(() => routes.recognizePath("/b")).not.toThrow();
-  });
-
   it("clear removes all routes", () => {
     const routes = new RouteSet();
     routes.draw(function () {

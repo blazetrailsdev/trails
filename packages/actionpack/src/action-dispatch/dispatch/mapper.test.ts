@@ -6,6 +6,7 @@ import { Dispatcher, RouteSet } from "../routing/route-set.js";
 import { Request } from "../http/request.js";
 import type { Pattern } from "../journey/path/pattern.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertEqual, assertRaises } from "@blazetrails/activesupport";
 
 class FakeSet extends RouteSet {
   override resourcesPathNames: Record<string, string> = {};
@@ -208,17 +209,14 @@ describe("MapperTest", () => {
     );
   });
 
-  it("raising error when invalid on option is given", () => {
+  it("raising error when invalid on option is given", async () => {
     const fakeset = new FakeSet();
-    const m = new Mapper(fakeset);
-    let error: Error | undefined;
-    try {
-      m.get("/foo", { on: "invalid_option" });
-    } catch (e) {
-      error = e as Error;
-    }
-    expect(error).toBeDefined();
-    expect(error!.message).toBe("Unknown scope :invalid_option given to :on");
+    const mapper = new Mapper(fakeset);
+    const error = await assertRaises([ArgumentError], {}, () => {
+      mapper.get("/foo", { on: "invalid_option" });
+    });
+
+    assertEqual("Unknown scope :invalid_option given to :on", error.message);
   });
 
   it("scope does not destructively mutate default options", () => {

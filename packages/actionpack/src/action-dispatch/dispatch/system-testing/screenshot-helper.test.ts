@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { assert, assertNot } from "@blazetrails/activesupport";
 import {
   takeScreenshot,
   takeFailedScreenshot,
@@ -221,13 +222,13 @@ describe("ScreenshotHelperTest", () => {
 describe("RackTestScreenshotsTest", () => {
   it("rack_test driver does not support screenshot", () => {
     const test = new DrivenByRackTest("rack_test driver does not support screenshot");
-    expect(supportsScreenshot.call(test)).toBe(false);
+    assertNot(supportsScreenshot.call(test));
   });
 });
 
 describe("SeleniumScreenshotsTest", () => {
   it("selenium driver supports screenshot", () => {
     const test = new DrivenBySeleniumWithChrome("selenium driver supports screenshot");
-    expect(supportsScreenshot.call(test)).toBe(true);
+    assert(supportsScreenshot.call(test));
   });
 });

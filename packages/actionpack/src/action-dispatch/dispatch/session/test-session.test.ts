@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SessionId } from "@blazetrails/rack-session";
+import { assertEqual, assertInstanceOf } from "@blazetrails/activesupport";
+import { rbCString } from "@blazetrails/ruby-compat";
 import { TestSession } from "../../../action-controller/test-case.js";
 
 describe("ActionController::TestSessionTest", () => {
@@ -70,8 +72,8 @@ describe("ActionController::TestSessionTest", () => {
 
   it("session id", () => {
     const session = new TestSession();
-    expect(typeof (session.id() as SessionId).publicId).toBe("string");
-    expect((session.id() as SessionId).publicId).toBe(session.get("session_id"));
+    assertInstanceOf(rbCString, (session.id() as SessionId).publicId);
+    assertEqual((session.id() as SessionId).publicId, session.get("session_id"));
   });
 
   it("merge!", () => {

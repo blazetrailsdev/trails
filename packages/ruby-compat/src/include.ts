@@ -22,6 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import type { abort } from "./process-adapter.js";
+import type { kernelRand } from "./kernel-rand.js";
 import { NameError } from "./name-error.js";
 import { isRegisteredConstant, registeredConstant } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
@@ -2009,7 +2010,9 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
  * `rb_obj_freeze`), defined at vendor/ruby/v3.3.11/object.c:4382,4385. A gem that reopens
  * `Object` defines its method here, as ActiveSupport does for `as_json`.
  * `abort` is the module function `Kernel.abort` (`rb_f_abort`,
- * vendor/ruby/v3.3.11/process.c:4536), seated by `index.ts`, which loads both modules.
+ * vendor/ruby/v3.3.11/process.c:4536), and `rand` the module function `Kernel.rand`
+ * (`rb_f_rand`, vendor/ruby/v3.3.11/random.c:1684, defined at :1840), both seated by
+ * `index.ts`, which loads every module involved.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -2034,7 +2037,7 @@ export const Kernel = new Module((mod) => {
   mod.defineMethod("freeze", function (this: object): object {
     return Object.freeze(this);
   });
-}) as Module & { abort: typeof abort };
+}) as Module & { abort: typeof abort; rand: typeof kernelRand };
 
 classpaths.set(Kernel, { path: "Kernel", permanent: true });
 classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
