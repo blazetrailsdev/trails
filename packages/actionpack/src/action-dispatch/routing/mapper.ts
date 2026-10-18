@@ -1249,7 +1249,7 @@ export class Mapper {
     const options: ScopeOptions = dup(extractOptionsBang(args)) as ScopeOptions;
     const scope: ScopeFrameHash = {};
 
-    if (args.length > 0) options.path = (args as Array<string | string[]>).flat().join("/");
+    if (args.length > 0) options.path = (args as Array<string | string[]>).flat(Infinity).join("/");
     options.constraints ??= {};
 
     if (!this.isNestedScope()) {

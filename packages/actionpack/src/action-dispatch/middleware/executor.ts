@@ -29,7 +29,7 @@ export class Executor {
 
   async call(env: RackEnv): Promise<RackResponse> {
     const state = await this.executor.runBang({ reset: true });
-    let returned = false;
+    let returned: RackResponse | null = null;
     try {
       const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
 
@@ -43,8 +43,8 @@ export class Executor {
 
       const parts = response as unknown[];
       parts.push(new BodyProxy(parts.pop() as RackResponse[2], () => state.completeBang()));
-      returned = true;
-      return response;
+      returned = response;
+      return returned;
     } catch (error) {
       const request = new Request(env);
       const backtraceCleaner = request.getHeader("action_dispatch.backtrace_cleaner") as
