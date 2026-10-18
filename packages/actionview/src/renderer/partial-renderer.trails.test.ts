@@ -75,7 +75,7 @@ describe("PartialRenderer render blocks", () => {
   it("finds a record's partial in the kebab-case directory of its partial path", async () => {
     const item = (name: string) => ({ name, toPartialPath: () => "admin/line_items/line_item" });
     expect(String(await renderer.renderPartial(view, { partial: item("one") }))).toBe("item one;");
-    const items = { toAry: () => [item("one"), item("two")] };
+    const items = [item("one"), item("two")];
     const body = await renderer.renderPartial(view, { partial: items });
     expect(String(body)).toBe("item one;item two;");
   });
