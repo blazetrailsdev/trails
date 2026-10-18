@@ -85,9 +85,10 @@ export class Thread<R = unknown> {
    * `Thread.each_caller_location` (`vendor/ruby/v3.3.11/vm_backtrace.c:1273-1278`):
    * yields each frame above the method calling it, as `caller_locations` would
    * answer them, and answers nil. A block that calls `rbIterBreakValue(val)`
-   * stops the walk, and the call answers `val`.
+   * stops the walk, and the call answers `val`. The break is a thrown value, so a
+   * block that catches every thrown value swallows it.
    *
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread.each_caller_location`.
+   * @noRailsEquivalent PERMANENT
    */
   static eachCallerLocation<V = never>(block: (location: Location) => void): V | null {
     const V8Error = Error as {

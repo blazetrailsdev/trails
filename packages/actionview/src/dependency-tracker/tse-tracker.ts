@@ -4,6 +4,21 @@ import type { PathSet } from "../path-set.js";
 import type { Template } from "../template.js";
 import { WildcardResolver } from "./wildcard-resolver.js";
 
+const ALL_KNOWN_KEYS = [
+  "partial",
+  "template",
+  "layout",
+  "formats",
+  "locals",
+  "object",
+  "collection",
+  "as",
+  "status",
+  "content_type",
+  "location",
+  "spacer_template",
+];
+
 /** @internal */
 export class TSETracker {
   static EXPLICIT_DEPENDENCY = /# Template Dependency: (\S+)/g;
@@ -30,23 +45,6 @@ export class TSETracker {
     `^(?:\\s*\\(?\\s*)(?:.*?${this.LAYOUT_HASH_KEY.source})(?:${this.STRING.source}|${this.VARIABLE_OR_METHOD_CHAIN.source})`,
     "su",
   );
-
-  static ALL_KNOWN_KEYS = [
-    "partial",
-    "template",
-    "layout",
-    "formats",
-    "locals",
-    "object",
-    "collection",
-    "as",
-    "status",
-    "content_type",
-    "location",
-    "spacer_template",
-  ];
-
-  static SPACER_TEMPLATE = new RegExp(`\\bspacer_template:\\s*${this.STRING.source}`, "su");
 
   static supportsViewPaths(): boolean {
     return true;
@@ -104,9 +102,11 @@ export class TSETracker {
       const call = args.split("%>")[0];
       if (/^\s*\(?\s*\w+:/u.test(call)) {
         const keys = [...call.replace(/\{[^{}]*\}/gu, "").matchAll(/\b(\w+):/gu)].map((m) => m[1]);
-        if (keys.some((key) => !TSETracker.ALL_KNOWN_KEYS.includes(key))) continue;
+        if (keys.some((key) => !ALL_KNOWN_KEYS.includes(key))) continue;
       }
-      const spacer = TSETracker.SPACER_TEMPLATE.exec(call);
+      const spacer = new RegExp(`\\bspacer_template:\\s*${TSETracker.STRING.source}`, "su").exec(
+        call,
+      );
       if (spacer) {
         this.addStaticDependency(dependencies, spacer.groups?.static, spacer.groups?.quote);
       }

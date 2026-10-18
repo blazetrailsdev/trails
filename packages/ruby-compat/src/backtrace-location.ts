@@ -1,4 +1,5 @@
 import { TypeError } from "./type-error.js";
+
 /**
  * Ruby's `Thread::Backtrace::Location` (`vendor/ruby/v3.3.11/vm_backtrace.c:1345`),
  * one frame of `Exception#backtrace_locations`.

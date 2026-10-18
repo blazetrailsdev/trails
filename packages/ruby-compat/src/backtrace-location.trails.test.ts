@@ -94,9 +94,7 @@ describe("Exception#set_backtrace", () => {
     expect(excBacktrace(exc)).toEqual(["proxied"]);
     expect(excBacktraceLocations(exc)).toBe(locations);
   });
-});
 
-describe("Exception#set_backtrace", () => {
   it("stores nil, wraps a String and keeps an Array of Strings", () => {
     const exc = new Error("x");
     expect(excSetBacktrace(exc, null)).toBeNull();

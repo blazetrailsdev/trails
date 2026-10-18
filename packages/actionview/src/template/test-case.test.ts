@@ -1,9 +1,12 @@
 import { describe, it } from "vitest";
 
-describe("GeneralViewTest", () => {
+describe("TestCase", () => {
   it.skip("helpers defined on ActionView::TestCase are available", () => {
     // BLOCKED: port-actionview-test-case
   });
+});
+
+describe("GeneralViewTest", () => {
   it.skip("memoizes the view", () => {
     // BLOCKED: port-actionview-test-case
   });
@@ -46,9 +49,6 @@ describe("GeneralViewTest", () => {
 });
 
 describe("ClassMethodsTest", () => {
-  it.skip("helpers defined on ActionView::TestCase are available", () => {
-    // BLOCKED: port-actionview-test-case
-  });
   it.skip("tests the specified helper module", () => {
     // BLOCKED: port-actionview-test-case
   });
@@ -67,11 +67,10 @@ describe("ControllerHelperMethod", () => {
   it.skip("can call a helper method defined on the current controller from a helper", () => {
     // BLOCKED: port-actionview-test-case
   });
-});
-
-describe("AnotherTestClass", () => {
-  it.skip("doesn't use controller helpers from other tests", () => {
-    // BLOCKED: port-actionview-test-case
+  describe("AnotherTestClass", () => {
+    it.skip("doesn't use controller helpers from other tests", () => {
+      // BLOCKED: port-actionview-test-case
+    });
   });
 });
 
@@ -97,9 +96,6 @@ describe("IgnoreProtectAgainstForgeryTest", () => {
 });
 
 describe("ATestHelperTest", () => {
-  it.skip("helpers defined on ActionView::TestCase are available", () => {
-    // BLOCKED: port-actionview-test-case
-  });
   it.skip("inflects the name of the helper module to test from the test case class", () => {
     // BLOCKED: port-actionview-test-case
   });
