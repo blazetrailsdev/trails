@@ -215,6 +215,11 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
     context: ViewContext,
     block: unknown,
   ): RenderedCollection | EmptyCollection | Promise<RenderedCollection | EmptyCollection> {
+    if (isThenable(collection)) {
+      return Promise.resolve(collection).then((records) =>
+        this.renderCollectionDerivePartial(records, context, block),
+      );
+    }
     const paths = collection.map((o) => this.partialPath(o, context));
 
     if (paths.filter((path, i) => paths.indexOf(path) === i).length === 1) {

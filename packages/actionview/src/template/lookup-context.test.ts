@@ -5,7 +5,9 @@ import {
   assert,
   assertEqual,
   assertKindOf,
+  assertCalled,
   assertMatch,
+  assertNil,
   assertNot,
   assertNotEqual,
   assertPredicate,
@@ -18,6 +20,7 @@ import { DetailsKey, LookupContext } from "../lookup-context.js";
 import { PathSet } from "../path-set.js";
 import type { Template } from "../template.js";
 import { FixtureResolver } from "../testing/resolvers.js";
+import { ActionView } from "../namespaces.js";
 import { MissingTemplate } from "./error.js";
 import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
@@ -123,7 +126,27 @@ describe("LookupContextTest", () => {
   });
 
   // BLOCKED: port-action-view-i18n-proxy
-  it.skip("delegates changing the locale to the I18n configuration object if it contains a lookup_context object", () => {});
+  it.skip("delegates changing the locale to the I18n configuration object if it contains a lookup_context object", () => {
+    const { I18nProxy } = ActionView as unknown as {
+      I18nProxy: new (
+        config: ReturnType<typeof I18n.config>,
+        lookupContext: LookupContext,
+      ) => ReturnType<typeof I18n.config>;
+    };
+    try {
+      I18n.setConfig(new I18nProxy(I18n.config(), lookupContext));
+      lookupContext.locale = ":pt";
+      assertEqual("pt", I18n.locale());
+      assertEqual(":pt", lookupContext.locale);
+    } finally {
+      I18n.setConfig(
+        (I18n.config() as unknown as { originalConfig: ReturnType<typeof I18n.config> })
+          .originalConfig,
+      );
+    }
+
+    assertEqual("pt", I18n.locale());
+  });
 
   it("find templates using the given view paths and configured details", () => {
     let template = lookupContext.find("hello_world", ["test"]) as Template;
@@ -149,7 +172,14 @@ describe("LookupContextTest", () => {
   });
 
   // BLOCKED: template/handlers/builder.rb is unported (scripts/parity/unported-files/actionview.ts)
-  it.skip("found templates have nil format if one cannot be found from template or handler", () => {});
+  it.skip("found templates have nil format if one cannot be found from template or handler", async () => {
+    const { Builder } = TemplateHandlers as unknown as { Builder: { defaultFormat: unknown } };
+    await assertCalled(Builder, "defaultFormat", null, { returns: null }, () => {
+      lookupContext.formats = [":text"];
+      const template = lookupContext.find("hello", ["test"]) as Template;
+      assertNil(template.format);
+    });
+  });
 
   it("generates a new details key for each details hash", () => {
     const keys: unknown[] = [];

@@ -110,9 +110,7 @@ export class Renderer {
 
     if (collection !== undefined) {
       const renderer = new CollectionRenderer(this.lookupContext, options);
-      return isThenable(collection)
-        ? collection.then((c) => renderer.renderCollectionDerivePartial(c, context, block))
-        : renderer.renderCollectionDerivePartial(collection, context, block);
+      return renderer.renderCollectionDerivePartial(collection, context, block);
     }
 
     return new ObjectRenderer(this.lookupContext, options).renderObjectDerivePartial(
@@ -133,17 +131,8 @@ function collectionFromOptions(options: RenderOptions): readonly unknown[] | und
   return (options.collection as readonly unknown[] | null | undefined) ?? [];
 }
 
-/**
- * @internal
- * @inventedArm if — PERMANENT
- */
-function collectionFromObject(
-  object: unknown,
-): readonly unknown[] | Promise<readonly unknown[]> | undefined {
-  if (Array.isArray(object)) return object;
-  if (rbObjRespondTo(object, "toAry"))
-    return isThenable(object)
-      ? Promise.resolve(object as Promise<readonly unknown[]>)
-      : (object as { toAry(): readonly unknown[] }).toAry();
+/** @internal */
+function collectionFromObject(object: unknown): readonly unknown[] | undefined {
+  if (rbObjRespondTo(object, "toAry")) return object as readonly unknown[];
   return undefined;
 }

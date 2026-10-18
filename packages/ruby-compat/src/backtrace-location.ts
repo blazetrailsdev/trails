@@ -66,6 +66,8 @@ export class Location {
   }
 }
 
+const setBacktraces = new WeakMap<Error, string[]>();
+
 /**
  * `Exception#backtrace_locations` (`vendor/ruby/v3.3.11/error.c:1789`): nil for an
  * exception that was never raised, else one `Location` per frame. Dispatches
@@ -84,8 +86,6 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
     .filter((line) => /^\s+at\s/.test(line))
     .map((line) => new Location(line));
 }
-
-const setBacktraces = new WeakMap<Error, string[]>();
 
 /**
  * `Exception#backtrace` (`vendor/ruby/v3.3.11/error.c:1741` `exc_backtrace`): nil for
