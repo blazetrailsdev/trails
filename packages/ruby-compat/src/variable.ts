@@ -331,7 +331,6 @@ registerConstant("Object", Object);
 registerConstant("Array", Array);
 registerConstant("Hash", Hash);
 registerConstant("Exception", Exception);
-// `Init_Exception` (`vendor/ruby/v3.3.11/error.c:3294-3380`) seats each core
 registerConstant("SignalException", SignalException);
 registerConstant("Interrupt", Interrupt);
 registerConstant("StandardError", StandardError);

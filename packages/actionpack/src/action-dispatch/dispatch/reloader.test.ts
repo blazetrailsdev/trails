@@ -128,8 +128,7 @@ describe("ReloaderTest", () => {
 
   it("prepare callbacks arent called when body is closed", async () => {
     const r = new StubReloader();
-    // eslint-disable-next-line no-useless-assignment
-    let prepared = false;
+    let prepared: boolean;
     r.toPrepare(() => {
       prepared = true;
     });
