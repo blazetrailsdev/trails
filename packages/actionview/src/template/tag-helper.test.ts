@@ -9,8 +9,9 @@ import {
   escapeOnce,
   TagBuilder,
 } from "../helpers/tag-helper.js";
-import { publicInstanceMethods } from "@blazetrails/ruby-compat";
-import { assertRespondTo, htmlSafe, SafeBuffer } from "@blazetrails/activesupport";
+import { CGI, publicInstanceMethods, rbObjMethod } from "@blazetrails/ruby-compat";
+import { assertRespondTo, htmlSafe, SafeBuffer, withOptions } from "@blazetrails/activesupport";
+import { FixtureResolver } from "../testing/resolvers.js";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
@@ -31,6 +32,24 @@ const renderTse = async (string: string): Promise<string> => {
   const view = Base.withEmptyTemplateCache();
   return String(await template.render(view.empty(), {})).trim();
 };
+
+const fixtureView = () =>
+  Base.withEmptyTemplateCache().withViewPaths(
+    [
+      new FixtureResolver({
+        "test/_content_tag_nested_in_content_tag.html.tse":
+          "<%= contentTag('p', null, null, true, () => { %>\n  <%= contentTag('b', 'Hello') %>\n<% }) %>\n",
+        "test/_builder_tag_nested_in_content_tag.html.tse":
+          "<%= tag().p(() => { %>\n  <%= tag().b('Hello') %>\n<% }) %>\n",
+        "test/_content_tag_nested_in_content_tag_with_data_attributes_out_of_erb.html.tse":
+          "<%= contentTag('div', { data: { controller: 'read-more', 'read-more-more-text-value': 'Read more', 'read-more-less-text-value': 'Read less' } }, null, true, () => { %>\n" +
+          "  <%= contentTag('p', 'Content text', { class: 'content-class', data: { 'test-name': 'content' } }) %>\n" +
+          "  <%= contentTag('button', 'Read more', { class: 'expand-button', data: { action: 'read-more#toggle' } }) %>\n" +
+          "<% }) %>\n",
+      }),
+    ],
+    {},
+  );
 
 const COMMON_DANGEROUS_CHARS = "&<>\"' %*+,/;=^|";
 const INVALID_TAG_CHARS = "> /";
@@ -513,6 +532,25 @@ describe("TagHelperTest", () => {
     expect(classNames("a value").htmlSafe).toBe(true);
   });
 
+  it("token list and class names only html escape once", () => {
+    for (const helperMethod of [tokenList, classNames]) {
+      const helper = (...args: unknown[]) =>
+        (helperMethod as (...a: unknown[]) => SafeBuffer)(...args);
+
+      const tokens = [
+        "click->controller#action1",
+        "click->controller#action2",
+        "click->controller#action3",
+        "click->controller#action4",
+      ];
+
+      const tokenList = (tokens as unknown[]).reduce((memo, token) => helper(memo, token));
+
+      expect((tokenList as SafeBuffer).htmlSafe).toBeTruthy();
+      expect(CGI.unescapeHTML(String(tokenList)).split(/\s+/)).toEqual(tokens);
+    }
+  });
+
   it("content tag with data attributes", () => {
     const result = contentTag("p", "limelight", {
       data: {
@@ -715,6 +753,10 @@ describe("TagHelperTest", () => {
     expect(div1.toString()).toBe(div2.toString());
   });
 
+  it("tag builder allow call via method object", () => {
+    expect(String(rbObjMethod(tag(), "foo").call())).toBe("<foo></foo>");
+  });
+
   it("tag builder dasherize names", () => {
     const t = tag() as any;
     expect(t.img_slider().toString()).toBe("<img-slider></img-slider>");
@@ -741,6 +783,14 @@ describe("TagHelperTest", () => {
     );
     expect(htmlSafeStr.toString()).toBe('"');
     expect(htmlSafeStr.htmlSafe).toBe(true);
+  });
+
+  it("tag builder with options builds p elements", () => {
+    const html = withOptions(tag() as TagBuilder, { id: "with-options" }, (t) =>
+      (t as unknown as { p(content: string): unknown }).p("content"),
+    );
+
+    assertDomEqual('<p id="with-options">content</p>', html);
   });
 
   it("tag options with array of numeric", () => {
@@ -879,6 +929,27 @@ describe("TagHelperTest", () => {
     expect(contentTag("p", contentTag("b", "Hello")).toString()).toBe("<p><b>Hello</b></p>");
     const t = tag() as any;
     expect(t.p(t.b("Hello")).toString()).toBe("<p><b>Hello</b></p>");
+  });
+
+  it("content tag nested in content tag in tse", async () => {
+    expect(String(await fixtureView().render("test/content_tag_nested_in_content_tag"))).toBe(
+      "<p>\n  <b>Hello</b>\n</p>",
+    );
+    expect(String(await fixtureView().render("test/builder_tag_nested_in_content_tag"))).toBe(
+      "<p>\n  <b>Hello</b>\n</p>",
+    );
+  });
+
+  it("content tag nested in content tag with data attributes out of tse", async () => {
+    expect(
+      String(
+        await fixtureView().render(
+          "test/content_tag_nested_in_content_tag_with_data_attributes_out_of_erb",
+        ),
+      ),
+    ).toBe(
+      '<div data-controller="read-more" data-read-more-more-text-value="Read more" data-read-more-less-text-value="Read less">\n  <p class="content-class" data-test-name="content">Content text</p>\n  <button class="expand-button" data-action="read-more#toggle">Read more</button>\n</div>',
+    );
   });
 
   it("respond to", () => {

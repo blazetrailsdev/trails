@@ -621,6 +621,8 @@ export {
   assertNoMatch,
   assertSame,
   assertNotSame,
+  assertOperator,
+  diff,
   assertRaises,
   assertRaise,
   assertNothingRaised,

@@ -1,16 +1,29 @@
 import { parse, type DefaultTreeAdapterMap } from "parse5";
-import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { readSource, type Readable } from "../readable.js";
 import { childNodes, type Node } from "./node.js";
+import type { NodeSet } from "../xml/node-set.js";
+import { Searchable } from "../xml/searchable.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 
 export class Document {
+  declare css: (...args: unknown[]) => NodeSet;
+  declare atCss: (...args: unknown[]) => Node | undefined;
+
+  static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
+
   url: string | null = null;
   encoding: string | null = null;
 
-  private constructor(private readonly _document: Parse5Document) {}
+  private constructor(
+    /**
+     * @internal
+     * @noRailsEquivalent PERMANENT
+     */
+    readonly _node: Parse5Document,
+  ) {}
 
   static parse(
     stringOrIo: string | Readable | null = null,
@@ -57,8 +70,14 @@ export class Document {
     return doc;
   }
 
+  get document(): Document {
+    return this;
+  }
+
   get root(): Node | null {
-    const root = childNodes(this._document).find((node) => node.isElement());
+    const root = childNodes(this._node, this).find((node) => node.isElement());
     return root ?? null;
   }
 }
+
+include(Document, Searchable);

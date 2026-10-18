@@ -740,7 +740,21 @@ export function assertNotSame(exp: unknown, act: unknown, msg?: string): void {
   );
 }
 
-function diff(exp: unknown, act: unknown): string {
+export function assertOperator(
+  o1: unknown,
+  op: string,
+  o2?: unknown,
+  msg: string | (() => string) | null = null,
+): true {
+  if (o2 === undefined) {
+    msg = message(msg, null, () => `Expected ${inspect(o1)} to be ${op}`);
+    return assert(rbFSend(o1, op), msg);
+  }
+  msg = message(msg, null, () => `Expected ${inspect(o1)} to be ${op} ${inspect(o2)}`);
+  return assert(rbFSend(o1, op, o2), msg);
+}
+
+export function diff(exp: unknown, act: unknown): string {
   let result = "";
 
   const [expect, butwas] = thingsToDiff(exp, act);

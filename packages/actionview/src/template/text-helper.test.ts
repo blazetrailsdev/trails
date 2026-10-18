@@ -13,11 +13,13 @@ import {
   simpleFormat as _simpleFormat,
   truncate,
   wordWrap,
+  TextHelper,
   type TextHelperHost,
 } from "../helpers/text-helper.js";
+import { include } from "@blazetrails/ruby-compat";
 import { raw } from "../helpers/output-safety-helper.js";
 import { Base } from "../base.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { I18n, assertNil, inflections } from "@blazetrails/activesupport";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const simpleFormat = _simpleFormat.bind(view);
@@ -32,6 +34,13 @@ const linkTo = (label: string, _href: string): SafeBuffer => raw(`<a href="#">${
 describe("TextHelperTest", () => {
   it("simple format should be html safe", () => {
     expect(simpleFormat("<b> test with HTML tags </b>").htmlSafe).toBeTruthy();
+  });
+
+  it("simple format included in isolation", () => {
+    const helperKlass = class {};
+    include(helperKlass, TextHelper);
+    const helper = new helperKlass() as { simpleFormat: OmitThisParameter<typeof _simpleFormat> };
+    expect(helper.simpleFormat("<b> test with HTML tags </b>").htmlSafe).toBeTruthy();
   });
 
   it("simple format", () => {
@@ -74,6 +83,22 @@ describe("TextHelperTest", () => {
         { sanitize: true },
       ).toString(),
     ).toBe("<p><b> test with unsafe string </b>code!</p>");
+  });
+
+  it("simple format should sanitize input when sanitize options is specified", () => {
+    expect(
+      simpleFormat(
+        '<a target="_blank" href="http://example.com">Continue</a>',
+        {},
+        { sanitizeOptions: { attributes: ["target", "href"] } },
+      ).toString(),
+    ).toBe('<p><a target="_blank" href="http://example.com">Continue</a></p>');
+  });
+
+  it("simple format should sanitize input when sanitize options is not specified", () => {
+    expect(
+      simpleFormat('<a target="_blank" href="http://example.com">Continue</a>').toString(),
+    ).toBe('<p><a href="http://example.com">Continue</a></p>');
   });
 
   it("simple format should not sanitize input when sanitize option is false", () => {
@@ -290,12 +315,33 @@ describe("TextHelperTest", () => {
     expect(pluralize("1.00", "count")).toBe("1.00 count");
     expect(pluralize(2, "count", "counters")).toBe("2 counters");
     expect(pluralize(null, "count", "counters")).toBe("0 counters");
-    expect(pluralize(2, "count", { plural: "counters" })).toBe("2 counters");
-    expect(pluralize(null, "count", { plural: "counters" })).toBe("0 counters");
+    expect(pluralize(2, "count", null, { plural: "counters" })).toBe("2 counters");
+    expect(pluralize(null, "count", null, { plural: "counters" })).toBe("0 counters");
     expect(pluralize(2, "person")).toBe("2 people");
     expect(pluralize(10, "buffalo")).toBe("10 buffaloes");
     expect(pluralize(1, "berry")).toBe("1 berry");
     expect(pluralize(12, "berry")).toBe("12 berries");
+  });
+
+  it("localized pluralization", () => {
+    const oldLocale = I18n.locale();
+    const enforceAvailableLocales = I18n.enforceAvailableLocales();
+    I18n.setEnforceAvailableLocales(false);
+
+    try {
+      I18n.setLocale("de");
+
+      inflections("de", (inflect) => {
+        inflect.irregular("region", "regionen");
+      });
+
+      expect(pluralize(1, "region")).toBe("1 region");
+      expect(pluralize(2, "region")).toBe("2 regionen");
+      expect(pluralize(2, "region", null, { locale: "en" })).toBe("2 regions");
+    } finally {
+      I18n.setLocale(oldLocale);
+      I18n.setEnforceAvailableLocales(enforceAvailableLocales);
+    }
   });
 
   it("highlight should be html safe", () => {
@@ -435,6 +481,16 @@ describe("TextHelperTest", () => {
     ).toBe("...judge Allen and...");
   });
 
+  it("excerpt should not be html safe", () => {
+    expect(
+      (
+        excerpt("This is a beautiful! morning", "beautiful", { radius: 5 }) as unknown as {
+          htmlSafe?: boolean;
+        }
+      ).htmlSafe,
+    ).toBeFalsy();
+  });
+
   it("excerpt in borderline cases", () => {
     expect(excerpt("", "", { radius: 0 })).toBe("");
     expect(excerpt("a", "a", { radius: 0 })).toBe("a");
@@ -452,6 +508,12 @@ describe("TextHelperTest", () => {
     expect(
       excerpt("This is a beautiful morning", "beautiful", { omission: "[...]", radius: 5 }),
     ).toBe("[...]is a beautiful morn[...]");
+  });
+
+  it("excerpt with utf8", () => {
+    expect(excerpt("That's why e\ufb03ciency could not be helped", "could", { radius: 8 })).toBe(
+      "...\ufb03ciency could not be...",
+    );
   });
 
   it("excerpt does not modify the options hash", () => {
@@ -615,5 +677,13 @@ describe("TextHelperTest", () => {
     expect(cycle.call(host, "red", "blue", { name: "colors" })).toBe("blue");
     expect(cycle.call(host, 1, 2, 3, { name: "numbers" })).toBe("2");
     expect(cycle.call(host, "red", "blue", { name: "colors" })).toBe("red");
+  });
+
+  it("cycle no instance variable clashes", () => {
+    const host = Object.assign(newHost(), { cycles: ["Specialized", "Fuji", "Giant"] });
+    expect(cycle.call(host, "red", "blue")).toBe("red");
+    expect(cycle.call(host, "red", "blue")).toBe("blue");
+    expect(cycle.call(host, "red", "blue")).toBe("red");
+    expect(host.cycles).toEqual(["Specialized", "Fuji", "Giant"]);
   });
 });

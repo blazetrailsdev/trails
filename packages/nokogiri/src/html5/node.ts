@@ -1,16 +1,30 @@
 import { serializeOuter, type DefaultTreeAdapterMap } from "parse5";
 
 import type { Attr } from "../xml/attr.js";
+import type { NodeSet } from "../xml/node-set.js";
+import { include } from "@blazetrails/ruby-compat";
+import { Searchable } from "../xml/searchable.js";
 
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 
 export class Node {
+  declare css: (...args: unknown[]) => NodeSet;
+  declare atCss: (...args: unknown[]) => Node | undefined;
+
+  static readonly IMPLIED_XPATH_CONTEXTS = [".//"] as const;
   static readonly ELEMENT_NODE = 1;
   static readonly TEXT_NODE = 3;
   static readonly COMMENT_NODE = 8;
 
-  constructor(private readonly _node: Parse5Node) {}
+  constructor(
+    /**
+     * @internal
+     * @noRailsEquivalent PERMANENT
+     */
+    readonly _node: Parse5Node,
+    readonly document: unknown = null,
+  ) {}
 
   get type(): number {
     if (this._node.nodeName === "#text") return Node.TEXT_NODE;
@@ -42,7 +56,12 @@ export class Node {
   private _children?: Node[];
 
   get children(): Node[] {
-    return (this._children ??= childNodes(this._node as Parse5Parent));
+    return (this._children ??= childNodes(this._node as Parse5Parent, this.document));
+  }
+
+  get(name: string): string | null {
+    const attrs = (this._node as { attrs?: Attr[] }).attrs ?? [];
+    return attrs.find((attr) => attr.name === name)?.value ?? null;
   }
 
   get attributeNodes(): Attr[] {
@@ -55,8 +74,10 @@ export class Node {
   }
 }
 
+include(Node, Searchable);
+
 /** @noRailsEquivalent PERMANENT */
-export function childNodes(parent: Parse5Parent): Node[] {
+export function childNodes(parent: Parse5Parent, document: unknown = null): Node[] {
   const nodes = (parent as { childNodes?: Parse5Node[] }).childNodes ?? [];
-  return nodes.map((node) => new Node(node));
+  return nodes.map((node) => new Node(node, document));
 }
