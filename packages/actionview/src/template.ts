@@ -12,6 +12,7 @@ import {
   forceEncoding,
   isValidEncoding,
   rbModConstSet,
+  rbInspect,
   rbModName,
   rbObjRespondTo,
   rbStrEnumerateLines,
@@ -323,10 +324,9 @@ export class Template {
   }
 
   inspect(): string {
-    const locals = this.locals;
-    const inspected =
-      locals == null ? "nil" : locals.length > 0 ? `[:${locals.join(", :")}]` : "[]";
-    return `#<${rbModName(this.constructor)} ${this.shortIdentifier} locals=${inspected}>`;
+    return `#<${rbModName(this.constructor)} ${this.shortIdentifier} locals=${rbInspect(
+      this.locals?.map((local) => `:${local}`) ?? null,
+    )}>`;
   }
 
   toString(): string {
