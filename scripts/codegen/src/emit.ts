@@ -170,6 +170,11 @@ export function collectUnits(file: IrFile): Unit[] {
   return units;
 }
 
+/** Constants whose every use is ruled out repo-wide, with the CLAUDE.md section that rules it. */
+const PERMANENT_CONSTS: Record<string, string> = {
+  Zeitwerk: 'CLAUDE.md "Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)"',
+};
+
 export class Emitter {
   lw: Lowerer;
   constructor(
@@ -371,6 +376,28 @@ export class Emitter {
     // has tests, which vitest requires of a collected file.
     const itCall = (guard: string | null): string =>
       guard ? `${vitest("it")}.skipIf(!(${guard}))` : vitest("it");
+    // A test whose body names a constant a ratified CLAUDE.md section rules out
+    // is parked as `it.skip` under a `PERMANENT-SKIP:` line, its body kept.
+    const permanentSkip = (stmts: N[]): string | null => {
+      let why: string | null = null;
+      walk(stmts, (n) => {
+        if (why) return false;
+        if (n.k === "const") {
+          const fqn = n.path.filter((x: string) => x).join("::");
+          if (PERMANENT_CONSTS[fqn]) why = PERMANENT_CONSTS[fqn];
+        }
+      });
+      return why;
+    };
+    const testHead = (stmts: N[], guard: string | null, nm: string): string[] => {
+      const why = permanentSkip(stmts);
+      return why
+        ? [
+            `// PERMANENT-SKIP: ${why}`,
+            `${vitest("it")}.skip(${nm}, async ({ testCase }: any) => {`,
+          ]
+        : [`${itCall(guard)}(${nm}, async ({ testCase }: any) => {`];
+    };
     const guarded = (guard: string | null, lines: string[]): string[] =>
       guard ? [`if (${guard}) {`, ...indent(lines), "}"] : lines;
     const emitBody = (stmts: N[], out: string[], guard: string | null = null): void => {
@@ -388,11 +415,7 @@ export class Emitter {
             s.args[0].k === "str"
               ? JSON.stringify(s.args[0].value)
               : this.lw.expr(s.args[0], nameCtx());
-          out.push(
-            `${itCall(guard)}(${nm}, async ({ testCase }: any) => {`,
-            ...indent(body(s.block.body)),
-            "});",
-          );
+          out.push(...testHead(s.block.body, guard, nm), ...indent(body(s.block.body)), "});");
         } else if (s.k === "if") {
           // A test defined under a condition (`if adapter_is?(:sucker_punch)`).
           const c = this.lw.cond(s.cond, nameCtx());
@@ -401,11 +424,7 @@ export class Emitter {
           emitBody(this.lw.seqBody(s.else), out, and(`!(${c})`));
         } else if (s.k === "def" && /^test_/.test(s.name)) {
           const nm = s.name.replace(/^test_/, "").replace(/_/g, " ");
-          out.push(
-            `${itCall(guard)}(${JSON.stringify(nm)}, async ({ testCase }: any) => {`,
-            ...indent(body(s.body)),
-            "});",
-          );
+          out.push(...testHead(s.body, guard, JSON.stringify(nm)), ...indent(body(s.body)), "});");
         } else if (
           s.k === "call" &&
           s.recv === null &&
