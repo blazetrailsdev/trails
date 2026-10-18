@@ -1,6 +1,6 @@
 import { encode, fetch, rtest, StandardError } from "@blazetrails/ruby-compat";
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+/** @noRailsEquivalent PERMANENT */
 export const DRIVER_ERRORS = new WeakSet<object>();
 
 export class Error extends StandardError {
@@ -52,7 +52,7 @@ export class Error extends StandardError {
     return new errorClass(msg, serverVersion, errorNumber, sqlState);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+  /** @noRailsEquivalent PERMANENT */
   static [Symbol.hasInstance](e: unknown): boolean {
     return (
       Function.prototype[Symbol.hasInstance].call(this, e) ||

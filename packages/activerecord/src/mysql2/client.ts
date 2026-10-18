@@ -56,7 +56,7 @@ function serverVersion(client: object | undefined): number {
   return major * 10000 + minor * 100 + patch;
 }
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+/** @noRailsEquivalent PERMANENT */
 export function driverError(e: unknown, client?: object): never {
   const { code, errno, fatal, sqlState } = (e ?? {}) as {
     code?: unknown;
@@ -94,7 +94,7 @@ export interface Mysql2Client extends Omit<mysql.Connection, "query" | "prepare"
   setServerOption(value: number): Promise<true>;
 }
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+/** @noRailsEquivalent PERMANENT */
 export function options(
   client: Mysql2Client,
   sql: string,
@@ -108,7 +108,7 @@ export function options(
     : { sql, rowsAsArray, typeCast };
 }
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+/** @noRailsEquivalent PERMANENT */
 export function storeResult(
   client: Mysql2Client,
   [rawResult, rawFields]: Native,
@@ -512,7 +512,7 @@ const NOT_DRIVER_OPTIONS =
 
 const CLIENT_ONLY_FLAGS = ["SSL_VERIFY_SERVER_CERT", "REMEMBER_OPTIONS"];
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+/** @noRailsEquivalent PERMANENT */
 async function connect(
   this: Wrapper,
   user: string | null,
@@ -547,7 +547,7 @@ async function connect(
   return client;
 }
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+/** @noRailsEquivalent PERMANENT */
 export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mysql2Client> {
   if (opts === null || typeof opts !== "object" || Array.isArray(opts)) {
     throw new Mysql2Error("Options parameter must be a Hash");

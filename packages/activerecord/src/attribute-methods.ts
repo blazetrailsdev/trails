@@ -239,7 +239,7 @@ const RESTRICTED_CLASS_METHODS = new Set([
 
 let _dangerousMethodsCache: Set<string> | null = null;
 
-/** @missingRailsCall map — CONVERGEABLE dangerous-attribute-methods-computed-not-curated */
+/** @missingRailsCall map — PERMANENT */
 export function dangerousAttributeMethods(): Set<string> {
   return (_dangerousMethodsCache ||= new Set([
     "save",

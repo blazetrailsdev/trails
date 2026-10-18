@@ -196,8 +196,8 @@ export function setPrimaryKeyAttr(this: PrimaryKeyHost, value: string | string[]
 }
 
 /**
- * @inventedArm isPrimaryKeyReflected — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
- * @inventedArm isArray — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
+ * @inventedArm isPrimaryKeyReflected — PERMANENT
+ * @inventedArm isArray — PERMANENT
  */
 export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
   if (!Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
