@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import {
   ContentSecurityPolicy,
   InvalidDirectiveError,
@@ -8,7 +8,6 @@ import { Request } from "../http/request.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
 import { Base } from "../../action-controller/base.js";
-import type { AbstractController } from "../../abstract-controller/base.js";
 import {
   Lint,
   bodyFromString,
@@ -21,8 +20,10 @@ import { Middleware } from "../http/content-security-policy.js";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { controllerConstants } from "../http/request.js";
 import {
+  assertEqual,
   assertMatch,
   assertNil,
+  assertNoMatch,
   assertNothingRaised,
   assertRaises,
 } from "@blazetrails/activesupport";
@@ -557,117 +558,6 @@ describe("ContentSecurityPolicyTest", () => {
   });
 });
 
-function resolvedCspHeader(app: IntegrationTest): string | null {
-  if (app.response.status === 304) return null;
-  const req = app.request;
-  const policy = req.contentSecurityPolicy;
-  if (!policy) return null;
-  const nonce = req.contentSecurityPolicyNonce ?? undefined;
-  const dirs = req.contentSecurityPolicyNonceDirectives ?? undefined;
-  const context = app.controller ?? app.request;
-  return policy.build(context, nonce, dirs);
-}
-
-function resolvedCspReportOnly(app: IntegrationTest): boolean {
-  return !!app.request.contentSecurityPolicyReportOnly;
-}
-
-const NONCE_GENERATOR = () => "iyhD0Yc0W+c=";
-const GLOBAL_CSP_POLICY = new ContentSecurityPolicy((p) => {
-  p.defaultSrc(":self");
-});
-
-class CspIntegrationController extends Base {
-  conditionTrue() {
-    return this.params.get("condition") === "true";
-  }
-  async index() {
-    this.head("ok");
-  }
-  async inline() {
-    this.head("ok");
-  }
-  async conditional() {
-    this.head("ok");
-  }
-  async reportOnly() {
-    this.head("ok");
-  }
-  async scriptSrc() {
-    this.head("ok");
-  }
-  async styleSrc() {
-    this.head("ok");
-  }
-  async noPolicy() {
-    this.head("ok");
-  }
-  async api() {
-    await this.render({ json: {} });
-  }
-  async notModified() {
-    this.head("not_modified");
-  }
-}
-CspIntegrationController.contentSecurityPolicy(undefined, { only: ["inline"] }, (p) => {
-  p.defaultSrc("https://example.com");
-});
-CspIntegrationController.contentSecurityPolicy(
-  undefined,
-  {
-    only: ["conditional"],
-    if: [(c: AbstractController) => (c as CspIntegrationController).conditionTrue()],
-  },
-  (p) => {
-    p.defaultSrc("https://true.example.com");
-  },
-);
-CspIntegrationController.contentSecurityPolicy(
-  undefined,
-  {
-    only: ["conditional"],
-    unless: [(c: AbstractController) => (c as CspIntegrationController).conditionTrue()],
-  },
-  (p) => {
-    p.defaultSrc("https://false.example.com");
-  },
-);
-CspIntegrationController.contentSecurityPolicy(undefined, { only: ["reportOnly"] }, (p) => {
-  p.reportUri("/violations");
-});
-CspIntegrationController.contentSecurityPolicyReportOnly(undefined, { only: ["reportOnly"] });
-CspIntegrationController.contentSecurityPolicy(undefined, { only: ["scriptSrc"] }, (p) => {
-  p.defaultSrc(false);
-  p.scriptSrc(":self");
-});
-CspIntegrationController.contentSecurityPolicy(undefined, { only: ["styleSrc"] }, (p) => {
-  p.defaultSrc(false);
-  p.styleSrc(":self");
-});
-CspIntegrationController.contentSecurityPolicy(false, { only: ["noPolicy"] });
-CspIntegrationController.contentSecurityPolicy(undefined, { only: ["api"] }, (p) => {
-  p.defaultSrc(":none");
-  p.frameAncestors(":none");
-});
-
-function buildCspApp() {
-  const app = new IntegrationTest(expect.getState().currentTestName!);
-  app.routes.draw(function () {
-    this.get("/", { to: "csp#index" });
-    this.get("/inline", { to: "csp#inline" });
-    this.get("/conditional", { to: "csp#conditional" });
-    this.get("/report-only", { to: "csp#reportOnly" });
-    this.get("/script-src", { to: "csp#scriptSrc" });
-    this.get("/style-src", { to: "csp#styleSrc" });
-    this.get("/no-policy", { to: "csp#noPolicy" });
-    this.get("/api", { to: "csp#api" });
-    this.get("/not-modified", { to: "csp#notModified" });
-  });
-  app.app = IntegrationTest.buildApp(app.routes);
-  controllerConstants.set("csp", CspIntegrationController);
-  return app;
-}
-
 describe("ContentSecurityPolicyMiddlewareTest", () => {
   function buildApp(app: RackApp): Lint {
     const inner = new Lint(app);
@@ -719,179 +609,414 @@ describe("ContentSecurityPolicyMiddlewareTest", () => {
   });
 });
 
-function cspEnv(policy: ContentSecurityPolicy | null, extra: Record<string, unknown> = {}) {
-  return {
-    "action_dispatch.content_security_policy": policy,
-    "action_dispatch.content_security_policy_nonce_generator": NONCE_GENERATOR,
-    "action_dispatch.content_security_policy_report_only": false,
-    ...extra,
-  };
-}
+describe("DefaultContentSecurityPolicyIntegrationTest", () => {
+  class PolicyController extends Base {
+    async index() {
+      this.head("ok");
+    }
+  }
 
-describe("ContentSecurityPolicyIntegrationTest", () => {
-  let app: IntegrationTest;
+  const ROUTES = new RouteSet();
+  ROUTES.draw(function () {
+    this.scope({ module: "default_content_security_policy_integration_test" }, () => {
+      this.get("/", { to: "policy#index" });
+      this.get("/redirect", { to: this.redirect("/") });
+    });
+  });
+  controllerConstants.set(
+    "default_content_security_policy_integration_test/policy",
+    PolicyController,
+  );
 
-  beforeAll(() => {
-    app = buildCspApp();
+  const POLICY = new ContentSecurityPolicy((p) => {
+    p.defaultSrc(() => ":self");
+    p.scriptSrc(() => ":https");
   });
 
-  beforeEach(() => app.resetBang());
+  class PolicyConfigMiddleware {
+    constructor(private app: { call(env: RackEnv): Promise<RackResponse> | RackResponse }) {}
+
+    call(env: RackEnv): Promise<RackResponse> | RackResponse {
+      env["action_dispatch.content_security_policy"] = POLICY;
+      env["action_dispatch.content_security_policy_nonce_generator"] = () => "iyhD0Yc0W+c=";
+      env["action_dispatch.content_security_policy_report_only"] = false;
+      env["action_dispatch.show_exceptions"] = ":none";
+
+      return this.app.call(env);
+    }
+  }
+
+  const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
+    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
+    middleware.use(Middleware as unknown as MiddlewareFactory);
+    middleware.use(Lint as unknown as MiddlewareFactory);
+  });
+
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  function assertPolicy(expected: string, { reportOnly = false } = {}): void {
+    let expectedHeader: string;
+    let unexpectedHeader: string;
+    if (reportOnly) {
+      expectedHeader = "Content-Security-Policy-Report-Only";
+      unexpectedHeader = "Content-Security-Policy";
+    } else {
+      expectedHeader = "Content-Security-Policy";
+      unexpectedHeader = "Content-Security-Policy-Report-Only";
+    }
+
+    assertNil(t.response.headers.get(unexpectedHeader));
+    assertEqual(expected, t.response.headers.get(expectedHeader));
+  }
+
+  it("adds nonce to script src content security policy only once", async () => {
+    await t.get("/");
+    await t.get("/");
+    t.assertResponse("success");
+    assertPolicy("default-src 'self'; script-src https: 'nonce-iyhD0Yc0W+c='");
+  });
+
+  it("redirect works with dynamic sources", async () => {
+    await t.get("/redirect");
+    t.assertResponse("redirect");
+    assertPolicy("default-src 'self'; script-src https: 'nonce-iyhD0Yc0W+c='");
+  });
+});
+
+describe("ContentSecurityPolicyIntegrationTest", () => {
+  class PolicyController extends Base {
+    static {
+      this.contentSecurityPolicy(undefined, { only: "inline" }, (p) => {
+        p.defaultSrc("https://example.com");
+      });
+
+      this.contentSecurityPolicy(undefined, { only: "conditional", if: ":isCondition" }, (p) => {
+        p.defaultSrc("https://true.example.com");
+      });
+
+      this.contentSecurityPolicy(
+        undefined,
+        { only: "conditional", unless: ":isCondition" },
+        (p) => {
+          p.defaultSrc("https://false.example.com");
+        },
+      );
+
+      this.contentSecurityPolicy(undefined, { only: "reportOnly" }, (p) => {
+        p.reportUri("/violations");
+      });
+
+      this.contentSecurityPolicy(undefined, { only: "scriptSrc" }, (p) => {
+        p.defaultSrc(false);
+        p.scriptSrc(":self");
+      });
+
+      this.contentSecurityPolicy(undefined, { only: "styleSrc" }, (p) => {
+        p.defaultSrc(false);
+        p.styleSrc(":self");
+      });
+
+      this.contentSecurityPolicy(false, { only: "noPolicy" });
+
+      this.contentSecurityPolicyReportOnly(undefined, { only: "reportOnly" });
+
+      this.contentSecurityPolicy(undefined, { only: "api" }, (p) => {
+        p.defaultSrc(":none");
+        p.frameAncestors(":none");
+      });
+    }
+
+    async index() {
+      this.head("ok");
+    }
+
+    async inline() {
+      this.head("ok");
+    }
+
+    async conditional() {
+      this.head("ok");
+    }
+
+    async reportOnly() {
+      this.head("ok");
+    }
+
+    async scriptSrc() {
+      this.head("ok");
+    }
+
+    async styleSrc() {
+      this.head("ok");
+    }
+
+    async noPolicy() {
+      this.head("ok");
+    }
+
+    async api() {
+      await this.render({ json: {} });
+    }
+
+    async notModified() {
+      this.head("not_modified");
+    }
+
+    /** @internal */
+    private isCondition() {
+      return this.params.get("condition") === "true";
+    }
+  }
+
+  const ROUTES = new RouteSet();
+  ROUTES.draw(function () {
+    this.scope({ module: "content_security_policy_integration_test" }, () => {
+      this.get("/", { to: "policy#index" });
+      this.get("/inline", { to: "policy#inline" });
+      this.get("/conditional", { to: "policy#conditional" });
+      this.get("/report-only", { to: "policy#reportOnly" });
+      this.get("/script-src", { to: "policy#scriptSrc" });
+      this.get("/style-src", { to: "policy#styleSrc" });
+      this.get("/no-policy", { to: "policy#noPolicy" });
+      this.get("/api", { to: "policy#api" });
+      this.get("/not-modified", { to: "policy#notModified" });
+    });
+  });
+  controllerConstants.set("content_security_policy_integration_test/policy", PolicyController);
+
+  const POLICY = new ContentSecurityPolicy((p) => {
+    p.defaultSrc(":self");
+  });
+
+  class PolicyConfigMiddleware {
+    constructor(private app: { call(env: RackEnv): Promise<RackResponse> | RackResponse }) {}
+
+    call(env: RackEnv): Promise<RackResponse> | RackResponse {
+      env["action_dispatch.content_security_policy"] = POLICY;
+      env["action_dispatch.content_security_policy_nonce_generator"] = () => "iyhD0Yc0W+c=";
+      env["action_dispatch.content_security_policy_report_only"] = false;
+      env["action_dispatch.show_exceptions"] = ":none";
+
+      return this.app.call(env);
+    }
+  }
+
+  const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
+    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
+    middleware.use(Middleware as unknown as MiddlewareFactory);
+    middleware.use(Lint as unknown as MiddlewareFactory);
+  });
+
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  function assertPolicy(expected: string, { reportOnly = false } = {}): void {
+    t.assertResponse("success");
+
+    let expectedHeader: string;
+    let unexpectedHeader: string;
+    if (reportOnly) {
+      expectedHeader = "Content-Security-Policy-Report-Only";
+      unexpectedHeader = "Content-Security-Policy";
+    } else {
+      expectedHeader = "Content-Security-Policy";
+      unexpectedHeader = "Content-Security-Policy-Report-Only";
+    }
+
+    assertNil(t.response.headers.get(unexpectedHeader));
+    assertEqual(expected, t.response.headers.get(expectedHeader));
+  }
 
   it("generates content security policy header", async () => {
-    await app.get("/", { env: cspEnv(GLOBAL_CSP_POLICY) });
-    expect(app.response.status).toBe(200);
-    const header = resolvedCspHeader(app);
-    expect(header).toBe("default-src 'self'");
-    expect(resolvedCspReportOnly(app)).toBe(false);
+    await t.get("/");
+    assertPolicy("default-src 'self'");
   });
 
   it("generates inline content security policy", async () => {
-    await app.get("/inline", { env: cspEnv(GLOBAL_CSP_POLICY) });
-    const header = resolvedCspHeader(app);
-    expect(header).toBe("default-src https://example.com");
+    await t.get("/inline");
+    assertPolicy("default-src https://example.com");
   });
 
   it("generates conditional content security policy", async () => {
-    await app.get("/conditional", {
-      env: cspEnv(GLOBAL_CSP_POLICY),
-      params: { condition: "true" },
-    });
-    expect(resolvedCspHeader(app)).toBe("default-src https://true.example.com");
+    await t.get("/conditional", { params: { condition: "true" } });
+    assertPolicy("default-src https://true.example.com");
 
-    await app.get("/conditional", {
-      env: cspEnv(GLOBAL_CSP_POLICY),
-      params: { condition: "false" },
-    });
-    expect(resolvedCspHeader(app)).toBe("default-src https://false.example.com");
+    await t.get("/conditional", { params: { condition: "false" } });
+    assertPolicy("default-src https://false.example.com");
   });
 
   it("generates report only content security policy", async () => {
-    await app.get("/report-only", { env: cspEnv(GLOBAL_CSP_POLICY) });
-    expect(resolvedCspHeader(app)).toBe("default-src 'self'; report-uri /violations");
-    expect(resolvedCspReportOnly(app)).toBe(true);
+    await t.get("/report-only");
+    assertPolicy("default-src 'self'; report-uri /violations", { reportOnly: true });
   });
 
   it("adds nonce to script src content security policy", async () => {
-    await app.get("/script-src", { env: cspEnv(GLOBAL_CSP_POLICY) });
-    expect(resolvedCspHeader(app)).toBe("script-src 'self' 'nonce-iyhD0Yc0W+c='");
+    await t.get("/script-src");
+    assertPolicy("script-src 'self' 'nonce-iyhD0Yc0W+c='");
   });
 
   it("adds nonce to style src content security policy", async () => {
-    await app.get("/style-src", { env: cspEnv(GLOBAL_CSP_POLICY) });
-    expect(resolvedCspHeader(app)).toBe("style-src 'self' 'nonce-iyhD0Yc0W+c='");
+    await t.get("/style-src");
+    assertPolicy("style-src 'self' 'nonce-iyhD0Yc0W+c='");
   });
 
   it("generates no content security policy", async () => {
-    await app.get("/no-policy", { env: cspEnv(GLOBAL_CSP_POLICY) });
-    assertNil(resolvedCspHeader(app));
+    await t.get("/no-policy");
+
+    assertNil(t.response.headers.get("Content-Security-Policy"));
+    assertNil(t.response.headers.get("Content-Security-Policy-Report-Only"));
   });
 
   it("generates api security policy", async () => {
-    await app.get("/api", { env: cspEnv(GLOBAL_CSP_POLICY) });
-    expect(resolvedCspHeader(app)).toBe("default-src 'none'; frame-ancestors 'none'");
+    await t.get("/api");
+    assertPolicy("default-src 'none'; frame-ancestors 'none'");
   });
 
   it("generates no content security policy for not modified", async () => {
-    await app.get("/not-modified", { env: cspEnv(GLOBAL_CSP_POLICY) });
-    expect(app.response.status).toBe(304);
-    assertNil(resolvedCspHeader(app));
+    await t.get("/not-modified");
+
+    assertNil(t.response.headers.get("Content-Security-Policy"));
+    assertNil(t.response.headers.get("Content-Security-Policy-Report-Only"));
   });
 });
 
 describe("DisabledContentSecurityPolicyIntegrationTest", () => {
-  let app: IntegrationTest;
+  class PolicyController extends Base {
+    static {
+      this.contentSecurityPolicy(undefined, { only: "inline" }, (p) => {
+        p.defaultSrc("https://example.com");
+      });
+    }
 
-  beforeAll(() => {
-    app = buildCspApp();
+    async index() {
+      this.head("ok");
+    }
+
+    async inline() {
+      this.head("ok");
+    }
+  }
+
+  const ROUTES = new RouteSet();
+  ROUTES.draw(function () {
+    this.scope({ module: "disabled_content_security_policy_integration_test" }, () => {
+      this.get("/", { to: "policy#index" });
+      this.get("/inline", { to: "policy#inline" });
+    });
+  });
+  controllerConstants.set(
+    "disabled_content_security_policy_integration_test/policy",
+    PolicyController,
+  );
+
+  class PolicyConfigMiddleware {
+    constructor(private app: { call(env: RackEnv): Promise<RackResponse> | RackResponse }) {}
+
+    call(env: RackEnv): Promise<RackResponse> | RackResponse {
+      env["action_dispatch.content_security_policy"] = null;
+      env["action_dispatch.content_security_policy_nonce_generator"] = null;
+      env["action_dispatch.content_security_policy_report_only"] = false;
+      env["action_dispatch.show_exceptions"] = ":none";
+
+      return this.app.call(env);
+    }
+  }
+
+  const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
+    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
+    middleware.use(Middleware as unknown as MiddlewareFactory);
+    middleware.use(Lint as unknown as MiddlewareFactory);
   });
 
-  beforeEach(() => app.resetBang());
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
 
   it("generates no content security policy by default", async () => {
-    await app.get("/", { env: cspEnv(null) });
-    assertNil(resolvedCspHeader(app));
+    await t.get("/");
+    assertNil(t.response.headers.get("Content-Security-Policy"));
   });
 
   it("generates content security policy header when globally disabled", async () => {
-    await app.get("/inline", { env: cspEnv(null) });
-    expect(resolvedCspHeader(app)).toBe("default-src https://example.com");
-  });
-});
-
-describe("DefaultContentSecurityPolicyIntegrationTest", () => {
-  it("adds nonce to script src content security policy only once", async () => {
-    const dynamicPolicy = new ContentSecurityPolicy((p) => {
-      p.defaultSrc(() => ":self");
-      p.scriptSrc(() => ":https");
-    });
-    const app = buildCspApp();
-    await app.get("/", { env: cspEnv(dynamicPolicy) });
-    await app.get("/", { env: cspEnv(dynamicPolicy) });
-    expect(app.response.status).toBe(200);
-    expect(resolvedCspHeader(app)).toBe(
-      "default-src 'self'; script-src https: 'nonce-iyhD0Yc0W+c='",
+    await t.get("/inline");
+    assertEqual(
+      "default-src https://example.com",
+      t.response.headers.get("Content-Security-Policy"),
     );
-  });
-
-  it("redirect works with dynamic sources", async ({ task }) => {
-    const dynamicPolicy = new ContentSecurityPolicy((p) => {
-      p.defaultSrc(() => ":self");
-      p.scriptSrc(() => ":https");
-    });
-    const app = new IntegrationTest(task.name);
-    app.routes.draw(function () {
-      this.get("/redirect", { to: "csp#redirect" });
-      this.get("/", { to: "csp#index" });
-    });
-    app.app = IntegrationTest.buildApp(app.routes);
-
-    class RedirectController extends Base {
-      async redirect() {
-        this.redirectTo("/");
-      }
-      async index() {
-        this.head("ok");
-      }
-    }
-    controllerConstants.set("csp", RedirectController);
-
-    await app.get("/redirect", { env: cspEnv(dynamicPolicy) });
-    expect(app.response.status).toBe(302);
-    const header = resolvedCspHeader(app);
-    expect(header).toContain("default-src 'self'");
-    expect(header).toContain("script-src https:");
   });
 });
 
 describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
-  it("generate nonce only specified in nonce directives", async ({ task }) => {
-    const policy = new ContentSecurityPolicy((p) => {
-      p.defaultSrc(() => ":self");
-      p.scriptSrc(() => ":https");
-      p.styleSrc(() => ":https");
-    });
-    const app = new IntegrationTest(task.name);
-    app.routes.draw(function () {
-      this.get("/", { to: "csp#index" });
-    });
-    app.app = IntegrationTest.buildApp(app.routes);
-
-    class NdController extends Base {
-      async index() {
-        this.head("ok");
-      }
+  class PolicyController extends Base {
+    async index() {
+      this.head("ok");
     }
-    controllerConstants.set("csp", NdController);
+  }
 
-    await app.get("/", {
-      env: cspEnv(policy, {
-        "action_dispatch.content_security_policy_nonce_directives": ["script-src"],
-      }),
+  const ROUTES = new RouteSet();
+  ROUTES.draw(function () {
+    this.scope({ module: "nonce_directive_content_security_policy_integration_test" }, () => {
+      this.get("/", { to: "policy#index" });
     });
+  });
+  controllerConstants.set(
+    "nonce_directive_content_security_policy_integration_test/policy",
+    PolicyController,
+  );
 
-    const header = resolvedCspHeader(app);
-    expect(header).toMatch(/script-src https: 'nonce-/);
-    expect(header).not.toMatch(/style-src https: 'nonce-/);
+  const POLICY = new ContentSecurityPolicy((p) => {
+    p.defaultSrc(() => ":self");
+    p.scriptSrc(() => ":https");
+    p.styleSrc(() => ":https");
+  });
+
+  class PolicyConfigMiddleware {
+    constructor(private app: { call(env: RackEnv): Promise<RackResponse> | RackResponse }) {}
+
+    call(env: RackEnv): Promise<RackResponse> | RackResponse {
+      env["action_dispatch.content_security_policy"] = POLICY;
+      env["action_dispatch.content_security_policy_nonce_generator"] = () => "iyhD0Yc0W+c=";
+      env["action_dispatch.content_security_policy_report_only"] = false;
+      env["action_dispatch.content_security_policy_nonce_directives"] = ["script-src"];
+      env["action_dispatch.show_exceptions"] = ":none";
+
+      return this.app.call(env);
+    }
+  }
+
+  const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
+    middleware.use(Lint as unknown as MiddlewareFactory);
+    middleware.use(PolicyConfigMiddleware as unknown as MiddlewareFactory);
+    middleware.use(Middleware as unknown as MiddlewareFactory);
+    middleware.use(Lint as unknown as MiddlewareFactory);
+  });
+
+  it("generate nonce only specified in nonce directives", async ({ task }) => {
+    const t = new IntegrationTest(task.name);
+    t.app = APP;
+    await t.get("/");
+
+    t.assertResponse("success");
+    assertMatch(
+      "script-src https: 'nonce-iyhD0Yc0W+c='",
+      t.response.headers.get("Content-Security-Policy")!,
+    );
+    assertNoMatch(
+      "style-src https: 'nonce-iyhD0Yc0W+c='",
+      t.response.headers.get("Content-Security-Policy")!,
+    );
   });
 });
 
