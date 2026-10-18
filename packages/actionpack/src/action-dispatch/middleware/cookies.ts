@@ -10,7 +10,7 @@
  *   `ActiveSupport::TimeWithZone` Rails stores.
  */
 
-import { include, isSymbol, KeyError, rbEqual, symbolToS, rbFSend } from "@blazetrails/ruby-compat";
+import { fetch, include, isSymbol, rbEqual, symbolToS, rbFSend } from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
   isPlainObject,
@@ -201,11 +201,8 @@ export class CookieJar implements Iterable<[string, string]> {
     return this._cookies.get(key);
   }
 
-  fetch(name: string, args?: string): string {
-    const val = this._cookies.get(name);
-    if (val !== undefined) return val;
-    if (args !== undefined) return args;
-    throw new KeyError(`key not found: "${name}"`, { receiver: this._cookies, key: name });
+  fetch(name: string, ...args: [] | [unknown]): unknown {
+    return fetch(this._cookies, String(name), ...args);
   }
 
   isKey(name: string): boolean {
@@ -214,13 +211,15 @@ export class CookieJar implements Iterable<[string, string]> {
 
   declare hasKey: CookieJar["isKey"];
 
-  toHash(): Record<string, string> {
+  toH(): Record<string, string> {
     const result: Record<string, string> = {};
     for (const [k, v] of this._cookies) {
       result[k] = v;
     }
     return result;
   }
+
+  declare toHash: CookieJar["toH"];
 
   update(otherHash: Record<string, string>): this {
     for (const [k, v] of Object.entries(otherHash)) this._cookies.set(k, v);
@@ -451,6 +450,7 @@ export class AbstractCookieJar {
 }
 
 CookieJar.prototype.hasKey = CookieJar.prototype.isKey;
+CookieJar.prototype.toHash = CookieJar.prototype.toH;
 
 include(CookieJar, ChainedCookieJars);
 include(AbstractCookieJar, ChainedCookieJars);

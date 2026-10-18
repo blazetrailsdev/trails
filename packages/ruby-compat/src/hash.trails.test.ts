@@ -689,6 +689,8 @@ describe("Hash#default", () => {
 
     expect(dup(hash)).toBeInstanceOf(Upcased);
     expect([...dup(hash)]).toEqual([["a", 1]]);
+    expect(hash.toH()).toEqual({ a: 1 });
+    hash.setDefault(0);
     expect(hash.toH().constructor).toBe(Hash);
   });
 

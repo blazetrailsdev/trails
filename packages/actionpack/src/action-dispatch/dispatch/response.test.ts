@@ -7,6 +7,7 @@ import {
   assertEqual,
   assertNil,
   assertNot,
+  assertEmpty,
   assertNotRespondTo,
   assertRaises,
 } from "@blazetrails/activesupport";
@@ -34,21 +35,33 @@ function newResponse(): Response {
 
 describe("ResponseTest", () => {
   it("simple output", () => {
-    const res = Response.create(200, { "content-type": "text/html" }, "Hello");
-    expect(res.status).toBe(200);
-    expect(res.body).toBe("Hello");
+    const response = newResponse();
+    response.body = "Hello, World!";
+
+    const [status, headers, body] = response.toA();
+    assertEqual(200, status);
+
+    self.assertHeaders({ "content-type": "text/html; charset=utf-8" }, headers);
+
+    const parts: unknown[] = [];
+    (body as RackBody).each((part: unknown) => parts.push(part));
+    assertEqual(["Hello, World!"], parts);
   });
 
   it("status handled properly in initialize", () => {
-    const res = new Response(404);
-    expect(res.status).toBe(404);
-    expect(res.message).toBe("Not Found");
+    assertEqual(200, new Response("200 OK").status);
   });
 
   it("response code", () => {
-    const res = new Response(200);
-    expect(res.code).toBe("200");
-    expect(res.status).toBe(200);
+    const response = newResponse();
+    response.status = "200 OK";
+    assertEqual(200, response.responseCode);
+
+    response.status = "200";
+    assertEqual(200, response.responseCode);
+
+    response.status = 200;
+    assertEqual(200, response.responseCode);
   });
 
   it("message", () => {
@@ -59,15 +72,19 @@ describe("ResponseTest", () => {
   });
 
   it("only set charset still defaults to text html", () => {
-    const res = new Response();
-    res.charset = "utf-8";
-    res.contentType = "text/html";
-    expect(res.charset).toBe("utf-8");
+    const response = new Response();
+    response.charset = "utf-16";
+    const [, headers] = response.toA();
+    assertEqual("text/html; charset=utf-16", headers["content-type"]);
   });
 
   it("utf8 output", () => {
-    const res = Response.create(200, {}, "héllo");
-    expect(res.body).toBe("héllo");
+    const response = newResponse();
+    response.body = String.fromCodePoint(1090, 1077, 1089, 1090);
+
+    const [status, headers] = response.toA();
+    assertEqual(200, status);
+    self.assertHeaders({ "content-type": "text/html; charset=utf-8" }, headers);
   });
 
   it("content length", () => {
@@ -84,15 +101,29 @@ describe("ResponseTest", () => {
   });
 
   it("does not contain a message-body", () => {
-    const res = new Response(204);
-    expect(res.status).toBe(204);
-    expect(res.message).toBe("No Content");
+    for (const c of [100, 101, 102, 103, 204, 304]) {
+      const response = new Response();
+      response.status = String(c);
+      response.body = "Body must not be included";
+      const [, , body] = response.toA();
+      assertEmpty(body, `${c} must not have a message-body but actually contains ${body}`);
+    }
   });
 
   it("content type", () => {
-    const res = new Response();
-    res.contentType = "application/json";
-    expect(res.contentType).toBe("application/json; charset=utf-8");
+    for (const c of [204, 304]) {
+      const response = new Response();
+      response.status = String(c);
+      const [, headers] = response.toA();
+      assertNot(Object.hasOwn(headers, "content-type"), `${c} should not have Content-Type header`);
+    }
+
+    for (const c of [200, 302, 404, 500]) {
+      const response = new Response();
+      response.status = String(c);
+      const [, headers] = response.toA();
+      assert(Object.hasOwn(headers, "content-type"), `${c} did not have Content-Type header`);
+    }
   });
 
   it("empty content type returns nil", () => {
@@ -101,15 +132,17 @@ describe("ResponseTest", () => {
   });
 
   it("setting content type header impacts content type method", () => {
-    const res = new Response();
-    res.setHeader("content-type", "application/xml");
-    expect(res.contentType).toBe("application/xml");
+    const response = newResponse();
+    response.headers.set("Content-Type", "application/aaron");
+    assertEqual("application/aaron", response.contentType);
   });
 
   it("response charset writer", () => {
-    const res = new Response();
-    res.charset = "iso-8859-1";
-    expect(res.charset).toBe("iso-8859-1");
+    const response = newResponse();
+    response.charset = "utf-16";
+    assertEqual("utf-16", response.charset);
+    response.charset = null;
+    assertEqual("utf-8", response.charset);
   });
 
   it("cookies", () => {
@@ -161,11 +194,16 @@ describe("ResponseTest", () => {
   });
 
   it("read charset and content type", () => {
-    const res = new Response();
-    res.setHeader("content-type", "text/html; charset=utf-8");
-    expect(res.contentType).toBe("text/html; charset=utf-8");
-    expect(res.mediaType).toBe("text/html");
-    expect(res.charset).toBe("utf-8");
+    const resp = new Response();
+    resp.charset = "utf-16";
+    resp.contentType = Mime.get(":xml")!;
+    resp.body = "Hello";
+    resp.toA();
+
+    assertEqual("utf-16", resp.charset);
+    assertEqual(Mime.get(":xml")!.toString(), resp.mediaType);
+    assertEqual("application/xml; charset=utf-16", resp.contentType);
+    assertEqual("application/xml; charset=utf-16", resp.headers.get("Content-Type"));
   });
 
   it("respect no-store cache-control", () => {
@@ -181,8 +219,10 @@ describe("ResponseTest", () => {
   });
 
   it("does not include Status header", () => {
-    const res = new Response(200);
-    expect(res.headers.get("Status")).toBeUndefined();
+    const response = newResponse();
+    response.status = "200 OK";
+    const [, headers] = response.toA();
+    assertNot(Object.hasOwn(headers, "status"));
   });
 
   it("can wait until commit", () => {
@@ -199,10 +239,11 @@ describe("ResponseTest", () => {
   });
 
   it("stream write", () => {
-    const res = new Response();
-    res.write("hello");
-    res.write(" world");
-    expect(res.body).toBe("hello world");
+    const response = newResponse();
+    const stream = response.stream as { write(s: string): void; close(): void };
+    stream.write("foo");
+    stream.close();
+    assertEqual("foo", response.body);
   });
 
   it("write after close", async () => {
@@ -229,12 +270,16 @@ describe("ResponseTest", () => {
   });
 
   it("set header after read body during action", () => {
-    const res = new Response();
-    void res.body;
-    res.setHeader("x-header", "Best of all possible worlds.");
-    const [status, headers] = res.toA();
-    expect(status).toBe(200);
-    expect(headers["x-header"]).toBe("Best of all possible worlds.");
+    const response = newResponse();
+    void response.body;
+
+    response.setHeader("x-header", "Best of all possible worlds.");
+
+    const [status, headers, body] = response.toA();
+    assertEqual(200, status);
+    assertEqual("", (body as RackBody).body);
+
+    assertEqual("Best of all possible worlds.", headers["x-header"]);
   });
 
   it("read body during action", () => {
@@ -360,10 +405,10 @@ describe("ResponseTest", () => {
 
 describe("ResponseHeadersTest", () => {
   it("has_header?", () => {
-    const res = Response.create();
-    res.setHeader("Foo", "1");
-    expect(res.hasHeader("Foo")).toBe(true);
-    expect(res.hasHeader("foo")).toBe(true);
+    const response = Response.create();
+    response.setHeader("Foo", "1");
+    assert(response.hasHeader("Foo"));
+    assert(response.hasHeader("foo"));
   });
 
   it("get_header", () => {
@@ -374,18 +419,22 @@ describe("ResponseHeadersTest", () => {
   });
 
   it("set_header", () => {
-    const res = Response.create();
-    res.setHeader("Foo", "1");
-    res.setHeader("Foo", "2");
-    expect(res.hasHeader("Foo")).toBe(true);
-    expect(res.getHeader("Foo")).toBe("2");
+    const response = Response.create();
+    response.setHeader("Foo", "1");
+    assertEqual("2", response.setHeader("Foo", "2"));
+    assert(response.hasHeader("Foo"));
+    assertEqual("2", response.getHeader("Foo"));
+
+    assertNil(response.setHeader("Foo", null));
+    assert(response.hasHeader("Foo"));
+    assertNil(response.getHeader("Foo"));
   });
 
   it("delete_header", () => {
-    const res = Response.create();
-    res.setHeader("Foo", "1");
-    res.deleteHeader("Foo");
-    expect(res.hasHeader("Foo")).toBe(false);
+    const response = Response.create();
+    response.setHeader("Foo", "1");
+    assertEqual("1", response.deleteHeader("Foo"));
+    assertNot(response.hasHeader("Foo"));
   });
 
   it("add_header", () => {

@@ -561,16 +561,16 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this.transformKeysBang((k) => (isSymbol(k) ? symbolToS(k) : String(k)));
   }
 
-  symbolizeKeys(): Hash<string, unknown> {
-    return symbolizeKeysBang(this.toHash());
+  symbolizeKeys(): Hash<string, unknown> | AnyObject {
+    return symbolizeKeysBang(this.toHash() as AnyObject);
   }
 
-  toOptions(): Hash<string, unknown> {
+  toOptions(): Hash<string, unknown> | AnyObject {
     return this.symbolizeKeys();
   }
 
-  deepSymbolizeKeys(): Hash<string, unknown> {
-    return deepSymbolizeKeysBang(this.toHash());
+  deepSymbolizeKeys(): Hash<string, unknown> | AnyObject {
+    return deepSymbolizeKeysBang(this.toHash() as AnyObject);
   }
 
   toOptionsBang(): this {
@@ -581,15 +581,18 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this;
   }
 
-  toHash(): Hash<string, unknown> {
-    const copy = new Hash<string, unknown>();
-    for (const [key, value] of this) {
-      copy.set(key, value);
+  toHash(): Hash<string, unknown> | AnyObject {
+    const copy = this.toH() as Hash<string, unknown> | AnyObject;
+    if (copy instanceof Hash) {
+      for (const [key, v] of [...copy]) {
+        copy.set(key, this.convertValueToHash(v as V));
+      }
+      this.setDefaults(copy);
+    } else {
+      for (const [key, v] of Object.entries(copy)) {
+        copy[key] = this.convertValueToHash(v as V);
+      }
     }
-    for (const [key, v] of copy) {
-      copy.set(key, this.convertValueToHash(v as V));
-    }
-    this.setDefaults(copy);
     return copy;
   }
 

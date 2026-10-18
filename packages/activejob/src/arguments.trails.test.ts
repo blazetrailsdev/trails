@@ -146,3 +146,13 @@ describe("ActiveJob::Arguments", () => {
     expect(constantize("ActiveJob::Serializers::ObjectSerializer")).toBe(ObjectSerializer);
   });
 });
+
+describe("Arguments.deserialize of a HashWithIndifferentAccess", () => {
+  it("answers a plain object for symbol keys, as argument_serialization_test.rb:189-192 expects", async () => {
+    const indifferentAccessSymbolKey = new HashWithIndifferentAccess({
+      a: 1,
+      _aj_symbol_keys: ["a"],
+    });
+    expect((await deserialize([indifferentAccessSymbolKey]))[0]).toStrictEqual({ ":a": 1 });
+  });
+});
