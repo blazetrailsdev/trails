@@ -43,6 +43,10 @@ function decodeWwwFormComponent(str: string): string {
 }
 
 export class FileStore extends Store implements CacheStore {
+  static toString(): string {
+    return "ActiveSupport::Cache::FileStore";
+  }
+
   get cachePath(): string {
     return this._cachePath;
   }

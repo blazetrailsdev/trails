@@ -7,6 +7,10 @@ import { delegateMissingTo } from "./module-ext.js";
 import { OrderedOptions } from "./ordered-options.js";
 
 export class InvalidContentError extends Error {
+  static toString(): string {
+    return "ActiveSupport::EncryptedConfiguration::InvalidContentError";
+  }
+
   constructor(contentPath: string, options: { cause?: unknown } = {}) {
     const message = `Invalid YAML in '${contentPath}'.`;
     const cause = options.cause;
@@ -19,6 +23,10 @@ export class InvalidContentError extends Error {
 }
 
 export class InvalidKeyError extends Error {
+  static toString(): string {
+    return "ActiveSupport::EncryptedConfiguration::InvalidKeyError";
+  }
+
   constructor(contentPath: string, key: unknown) {
     super(
       `Key '${String(key)}' is invalid, it must respond to '#to_sym' from configuration in '${contentPath}'.`,
@@ -34,6 +42,10 @@ export interface EncryptedConfiguration {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class EncryptedConfiguration extends EncryptedFile {
+  static toString(): string {
+    return "ActiveSupport::EncryptedConfiguration";
+  }
+
   static name = "ActiveSupport::EncryptedConfiguration";
 
   private _config: Record<string, unknown> | null = null;

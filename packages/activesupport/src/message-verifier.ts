@@ -13,6 +13,10 @@ import {
 import { ArgumentError, Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidSignature extends Error {
+  static toString(): string {
+    return "ActiveSupport::MessageVerifier::InvalidSignature";
+  }
+
   constructor(message = "Invalid signature") {
     super(message);
     this.name = "InvalidSignature";
@@ -33,6 +37,10 @@ type VerifyOptions = ExpectedMetadataOptions & RotatableOptions;
 const SEPARATOR = "--";
 
 export class MessageVerifier extends Codec {
+  static toString(): string {
+    return "ActiveSupport::MessageVerifier";
+  }
+
   static override defaultSerializer: Format | MessageSerializer = "json";
 
   /** @internal */

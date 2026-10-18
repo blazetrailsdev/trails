@@ -97,6 +97,10 @@ function mergeParts(
 }
 
 export class Duration {
+  static toString(): string {
+    return "ActiveSupport::Duration";
+  }
+
   static ISO8601Parser = ISO8601Parser;
 
   static readonly PARTS = PARTS;
@@ -689,6 +693,10 @@ function applyDuration(date: Date, parts: DurationParts, direction: 1 | -1): Dat
 }
 
 export class Scalar {
+  static toString(): string {
+    return "ActiveSupport::Duration::Scalar";
+  }
+
   readonly value: number;
 
   constructor(value: number) {

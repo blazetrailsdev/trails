@@ -601,6 +601,10 @@ export class Timezone {
 }
 
 export class TimeZone {
+  static toString(): string {
+    return "ActiveSupport::TimeZone";
+  }
+
   declare readonly name: string;
   declare readonly tzinfo: Timezone;
   declare private readonly _utcOffset: number | null;

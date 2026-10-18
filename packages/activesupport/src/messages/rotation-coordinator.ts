@@ -28,6 +28,10 @@ export interface FallsBack<C> {
 }
 
 export abstract class RotationCoordinator<C extends FallsBack<C>> {
+  static toString(): string {
+    return "ActiveSupport::Messages::RotationCoordinator";
+  }
+
   transitional: boolean | null = null;
 
   readonly #secretGenerator: SecretGenerator;

@@ -13,6 +13,10 @@ export interface HumanRule {
 }
 
 export class Uncountables extends Array<string> {
+  static toString(): string {
+    return "ActiveSupport::Inflector::Inflections::Uncountables";
+  }
+
   private _regexArray: RegExp[] = [];
 
   delete(entry: string): void {
@@ -41,6 +45,10 @@ export class Uncountables extends Array<string> {
 }
 
 export class Inflections {
+  static toString(): string {
+    return "ActiveSupport::Inflector::Inflections";
+  }
+
   plurals!: InflectionRule[];
   singulars!: InflectionRule[];
   uncountables!: Uncountables;

@@ -3,6 +3,10 @@ import { NameError } from "./core-ext/name-error.js";
 import { InheritableOptions } from "./ordered-options.js";
 
 export class Configuration extends InheritableOptions {
+  static toString(): string {
+    return "ActiveSupport::Configurable::Configuration";
+  }
+
   compileMethodsBang(): void {
     const klass = Object.getPrototypeOf(this).constructor as typeof Configuration;
     klass.compileMethodsBang(this.keys());

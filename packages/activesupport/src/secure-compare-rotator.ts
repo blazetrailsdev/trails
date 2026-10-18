@@ -8,6 +8,10 @@ export class InvalidMatch extends Error {
 }
 
 export class SecureCompareRotator {
+  static toString(): string {
+    return "ActiveSupport::SecureCompareRotator";
+  }
+
   private value: string;
   private rotateValues: string[];
   private onRotation: (() => void) | null;

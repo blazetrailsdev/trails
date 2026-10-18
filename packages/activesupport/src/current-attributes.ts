@@ -36,6 +36,10 @@ export interface CurrentAttributes extends Included<typeof Callbacks> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class CurrentAttributes {
+  static toString(): string {
+    return "ActiveSupport::CurrentAttributes";
+  }
+
   declare static defaults: Record<string, AttributeValue>;
   declare static isDefaults: boolean;
 

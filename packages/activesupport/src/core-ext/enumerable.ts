@@ -10,7 +10,11 @@ import {
 import { Range } from "@blazetrails/ruby-compat/range";
 import { exclude, sum as enumerableSum } from "../enumerable-utils.js";
 
-export class SoleItemExpectedError extends StandardError {}
+export class SoleItemExpectedError extends StandardError {
+  static toString(): string {
+    return "Enumerable::SoleItemExpectedError";
+  }
+}
 
 export function maximum(
   this: Iterable<unknown> | Record<string, unknown>,

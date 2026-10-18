@@ -24,6 +24,10 @@ export namespace NullSerializer {
 }
 
 export class InvalidMessage extends Error {
+  static toString(): string {
+    return "ActiveSupport::MessageEncryptor::InvalidMessage";
+  }
+
   constructor(message = "Invalid message") {
     super(message);
     this.name = "InvalidMessage";
@@ -42,6 +46,10 @@ const AUTH_TAG_LENGTH = 16;
 const SEPARATOR = "--";
 
 export class MessageEncryptor extends Codec {
+  static toString(): string {
+    return "ActiveSupport::MessageEncryptor";
+  }
+
   static override defaultSerializer: Format | MessageSerializer = "json";
 
   static useAuthenticatedMessageEncryption = false;

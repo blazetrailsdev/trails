@@ -2,6 +2,10 @@ import { Module, extend, extended, include } from "@blazetrails/ruby-compat";
 import { isModuleIncluded, prepend } from "@blazetrails/ruby-compat/include";
 
 export class MultipleIncludedBlocks extends Error {
+  static toString(): string {
+    return "ActiveSupport::Concern::MultipleIncludedBlocks";
+  }
+
   constructor() {
     super("Cannot define multiple 'included' blocks for a Concern");
     this.name = "MultipleIncludedBlocks";
@@ -9,6 +13,10 @@ export class MultipleIncludedBlocks extends Error {
 }
 
 export class MultiplePrependBlocks extends Error {
+  static toString(): string {
+    return "ActiveSupport::Concern::MultiplePrependBlocks";
+  }
+
   constructor() {
     super("Cannot define multiple 'prepended' blocks for a Concern");
     this.name = "MultiplePrependBlocks";

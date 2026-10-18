@@ -185,6 +185,7 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
   const klass = class extends superclass {};
   Object.defineProperty(klass, FL_SINGLETON, { value: obj });
   Object.defineProperty(klass.prototype, FL_SINGLETON, { value: klass });
+  Object.defineProperty(klass, "toString", { value: () => rbModToS(klass) });
   Object.defineProperty(klass.prototype, "constructor", {
     value: superclass,
     writable: true,
@@ -451,7 +452,11 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
 
     return s;
   }
-  return classpaths.get(klass)?.path ?? (klass.name || `#<Class:${objAddress(klass)}>`);
+  return (
+    classpaths.get(klass)?.path ??
+    (Object.hasOwn(klass, "toString") ? String(klass) : undefined) ??
+    (klass.name || `#<Class:${objAddress(klass)}>`)
+  );
 }
 
 /**
@@ -1350,7 +1355,10 @@ export function rbObjInspect(obj: object): string {
  * @noRailsEquivalent PERMANENT
  */
 export function rbAnyToS(obj: object): string {
-  const cname = typeof obj === "function" ? "Proc" : obj.constructor.name;
+  const cname =
+    typeof obj === "function"
+      ? "Proc"
+      : rbModToS(obj.constructor as abstract new (...args: never) => unknown);
   return `#<${cname}:${objAddress(obj)}>`;
 }
 

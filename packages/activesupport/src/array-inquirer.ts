@@ -1,4 +1,8 @@
 export class ArrayInquirer<T extends string | symbol> extends Array<T> {
+  static toString(): string {
+    return "ActiveSupport::ArrayInquirer";
+  }
+
   constructor(...items: T[]) {
     super(...items);
     return new Proxy(this, {

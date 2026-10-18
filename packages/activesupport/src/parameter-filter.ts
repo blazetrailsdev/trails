@@ -14,6 +14,10 @@ export interface ParameterFilterOptions {
 }
 
 export class ParameterFilter {
+  static toString(): string {
+    return "ActiveSupport::ParameterFilter";
+  }
+
   static readonly FILTERED = "[FILTERED]";
 
   static precompileFilters(filters: Filter[]): Array<FilterProc | RegExp> {

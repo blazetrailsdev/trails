@@ -8,6 +8,10 @@ import {
 import { ActiveJob, Serializers } from "../namespaces.js";
 
 export class ObjectSerializer {
+  static toString(): string {
+    return "ActiveJob::Serializers::ObjectSerializer";
+  }
+
   static instance<T extends ObjectSerializer>(this: new () => T): T {
     if (!Object.hasOwn(this, "_instance")) {
       Object.defineProperty(this, "_instance", { value: new this() });

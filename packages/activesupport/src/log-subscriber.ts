@@ -7,6 +7,10 @@ import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 
 export class LogSubscriber extends Subscriber {
+  static toString(): string {
+    return "ActiveSupport::LogSubscriber";
+  }
+
   static readonly MODES: Record<string, number> = {
     clear: 0,
     bold: 1,

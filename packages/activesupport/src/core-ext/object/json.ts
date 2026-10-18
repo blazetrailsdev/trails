@@ -85,18 +85,30 @@ export class Numeric {
 }
 
 export class Float {
+  static toString(): string {
+    return "Float";
+  }
+
   static asJson(value: number, options: EncodeOptions | null = null): number | null {
     return globalThis.Number.isFinite(globalThis.Number(value)) ? value : null;
   }
 }
 
 export class BigDecimal {
+  static toString(): string {
+    return "BigDecimal";
+  }
+
   static asJson(value: BigDecimalValue, options: EncodeOptions | null = null): string {
     return value.toString();
   }
 }
 
 export class Regexp {
+  static toString(): string {
+    return "Regexp";
+  }
+
   static asJson(value: RegExp, options: EncodeOptions | null = null): string {
     return globalThis.String(value);
   }
@@ -275,12 +287,20 @@ export class DateTime {
 }
 
 export class Generic {
+  static toString(): string {
+    return "URI::Generic";
+  }
+
   static asJson(value: URL, options: EncodeOptions | null = null): string {
     return value.toString();
   }
 }
 
 export class Exception {
+  static toString(): string {
+    return "Exception";
+  }
+
   static asJson(value: Error, options: EncodeOptions | null = null): string {
     return value.message;
   }

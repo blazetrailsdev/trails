@@ -82,6 +82,10 @@ export class Formatter {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerThreadSafeLevel` (`logger_silence.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
 export class Logger {
+  static toString(): string {
+    return "ActiveSupport::Logger";
+  }
+
   progname: string | null = null;
   /** @noRailsEquivalent PERMANENT */
   static Formatter = Formatter;
@@ -286,6 +290,10 @@ include(Logger, LoggerThreadSafeLevel);
 Logger.prototype.log = Logger.prototype.add;
 
 export class SimpleFormatter extends Formatter {
+  static toString(): string {
+    return "ActiveSupport::Logger::SimpleFormatter";
+  }
+
   override call(
     severity: string,
     timestamp: Temporal.Instant,

@@ -28,6 +28,10 @@ export function teardown(this: TestHelperHost): void {
 }
 
 export class MockLogger {
+  static toString(): string {
+    return "ActiveSupport::LogSubscriber::TestHelper::MockLogger";
+  }
+
   /** @noRailsEquivalent PERMANENT */
   declare static readonly DEBUG: number;
   /** @noRailsEquivalent PERMANENT */

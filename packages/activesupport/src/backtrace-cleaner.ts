@@ -6,6 +6,10 @@ type LineSilencer = (line: string) => boolean;
 export type CleanKind = "silent" | "noise" | "all";
 
 export class BacktraceCleaner {
+  static toString(): string {
+    return "ActiveSupport::BacktraceCleaner";
+  }
+
   protected _filters: LineFilter[] = [];
   protected _silencers: LineSilencer[] = [];
 

@@ -6,6 +6,10 @@ export type MethodSource = (mod: Record<string, unknown>) => void;
 type Owner = Module | { prototype: object };
 
 export class MethodSet {
+  static toString(): string {
+    return "ActiveSupport::CodeGenerator::MethodSet";
+  }
+
   static METHOD_CACHES = new Map<string, Module>();
 
   private cache: Module;
@@ -61,6 +65,10 @@ export class MethodSet {
 }
 
 export class CodeGenerator {
+  static toString(): string {
+    return "ActiveSupport::CodeGenerator";
+  }
+
   static batch<T>(
     owner: Owner | CodeGenerator,
     path: string,

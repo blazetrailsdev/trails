@@ -172,6 +172,10 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
 const TRAILS_GEM_ROOT = new URL(".", import.meta.url).pathname;
 
 export class Deprecation {
+  static toString(): string {
+    return "ActiveSupport::Deprecation";
+  }
+
   static _instance(): Deprecation {
     return (Deprecation.__instance ??= new Deprecation());
   }
