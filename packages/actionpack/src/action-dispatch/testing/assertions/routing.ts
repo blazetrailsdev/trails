@@ -183,7 +183,7 @@ export function assertRecognizes(
   expectedOptions: Options,
   path: string | PathWithMethod,
   extras: Options = {},
-  msg?: string,
+  msg?: string | (() => string),
 ): void {
   if (typeof path !== "string" && String(path.method ?? "") === "all") {
     for (const method of ["get", "post", "put", "delete"] as const) {
@@ -191,20 +191,18 @@ export function assertRecognizes(
     }
     return;
   }
-  const request = recognizedRequestFor.call(this, path, extras, msg);
+  const request = recognizedRequestFor.call(this, path, extras, msg as string | undefined);
 
   expectedOptions = { ...expectedOptions };
 
-  assertEqual(
-    expectedOptions,
-    request.pathParameters,
-    message(
-      msg ?? null,
-      "",
-      () =>
-        `The recognized options <${inspect(request.pathParameters)}> did not match <${inspect(expectedOptions)}>, difference:`,
-    ),
+  msg = message(
+    msg ?? null,
+    "",
+    () =>
+      `The recognized options <${inspect(request.pathParameters)}> did not match <${inspect(expectedOptions)}>, difference:`,
   );
+
+  assertEqual(expectedOptions, request.pathParameters, msg);
 }
 
 export function assertGenerates(
@@ -215,26 +213,25 @@ export function assertGenerates(
   extras: Options = {},
   message?: string,
 ): void {
-  let path: string;
   if (URL_FORM_RE.test(expectedPath)) {
-    path = failOn(InvalidURIError, message, () => {
+    expectedPath = failOn(InvalidURIError, message, () => {
       const uri = URI.parse(expectedPath);
       return String(uri.path ?? "") === "" ? "/" : uri.path!;
     });
   } else {
-    path = expectedPath.startsWith("/") ? expectedPath : `/${expectedPath}`;
+    expectedPath = expectedPath.startsWith("/") ? expectedPath : `/${expectedPath}`;
   }
   const routes = requireRoutes(this);
-  const opts = { ...options };
-  const [generatedPath, queryStringKeys] = routes.generateExtras(opts, defaults);
+  options = { ...options };
+  const [generatedPath, queryStringKeys] = routes.generateExtras(options, defaults);
   const foundExtras = Object.fromEntries(
-    Object.entries(opts).filter(([k]) => queryStringKeys.includes(k)),
+    Object.entries(options).filter(([k]) => queryStringKeys.includes(k)),
   );
   let msg = message ?? `found extras <${inspect(foundExtras)}>, not <${inspect(extras)}>`;
   assertEqual(extras, foundExtras, msg);
 
-  msg = message ?? `The generated path <${generatedPath}> did not match <${path}>`;
-  assertEqual(path, generatedPath, msg);
+  msg = message ?? `The generated path <${generatedPath}> did not match <${expectedPath}>`;
+  assertEqual(expectedPath, generatedPath, msg);
 }
 
 export function assertRouting(
@@ -312,28 +309,28 @@ export function recognizedRequestFor(
   msg?: string,
 ): TestRequest {
   const method = typeof path === "string" ? "get" : String(path.method ?? "get");
-  let pathStr = typeof path === "string" ? path : path.path;
+  path = typeof path === "string" ? path : path.path;
 
   const controller = this.controller;
   const request = ActionController.TestRequest.create(
     (controller as object | undefined)?.constructor ?? null,
   );
-  if (URL_FORM_RE.test(pathStr)) {
+  if (URL_FORM_RE.test(path)) {
     failOn(InvalidURIError, msg, () => {
-      const uri = URI.parse(pathStr);
+      const uri = URI.parse(path as string);
       request.env["rack.url_scheme"] = uri.scheme ?? "http";
       if (uri.host != null) request.host = uri.host;
       if (uri.port != null) request.port = uri.port;
       request.path = String(uri.path ?? "") === "" ? "/" : uri.path!;
     });
   } else {
-    if (!pathStr.startsWith("/")) pathStr = `/${pathStr}`;
-    request.path = pathStr;
+    if (!path.startsWith("/")) path = `/${path}`;
+    request.path = path;
   }
   request.env["REQUEST_METHOD"] = method.toUpperCase();
 
   const params = failOn(RoutingError, msg, () =>
-    requireRoutes(this).recognizePath(pathStr, { method, extras }),
+    requireRoutes(this).recognizePath(path, { method, extras }),
   );
   request.pathParameters = params;
   return request;

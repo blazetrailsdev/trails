@@ -45,6 +45,7 @@ export class Start implements UtilsHost {
   /** @internal */
   railsRoot = railsRoot;
 
+  /** @missingRailsArgs debug — CONVERGEABLE call-args-block-padding-resolves-callee-by-receiver */
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
     if (!this.logger()) return;
     let qualifier: string | undefined;
@@ -56,7 +57,7 @@ export class Start implements UtilsHost {
 
     if (qualifier === undefined) return;
 
-    this.logger()!.debug(() => {
+    this.logger()!.debug(undefined, () => {
       let message = `  Rendering ${qualifier}${this.fromRailsRoot(payload["identifier"] as string)}`;
       if (payload["layout"] != null && payload["layout"] !== false) {
         message += ` within ${this.fromRailsRoot(payload["layout"] as string)}`;
@@ -95,7 +96,7 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
   }
 
   renderTemplate(event: Event): void {
-    this._info(() => {
+    this.info(undefined, () => {
       let message = `  Rendered ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
       if (event.payload["layout"] != null && event.payload["layout"] !== false) {
         message += ` within ${this.fromRailsRoot(event.payload["layout"] as string)}`;
@@ -109,8 +110,9 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     this.subscribeLogLevel("render_template", "debug");
   }
 
+  /** @missingRailsArgs debug — CONVERGEABLE call-args-block-padding-resolves-callee-by-receiver */
   renderPartial(event: Event): void {
-    this._debug(() => {
+    this.debug(undefined, () => {
       let message = `  Rendered ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
       if (event.payload["layout"] != null && event.payload["layout"] !== false) {
         message += ` within ${this.fromRailsRoot(event.payload["layout"] as string)}`;
@@ -128,7 +130,7 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
   }
 
   renderLayout(event: Event): void {
-    this._info(() => {
+    this.info(undefined, () => {
       let message = `  Rendered layout ${this.fromRailsRoot(event.payload["identifier"] as string)}`;
       message += ` (Duration: ${round(event.duration, 1)}ms | GC: ${round(event.gcTime, 1)}ms)`;
       return message;
@@ -139,13 +141,14 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
     this.subscribeLogLevel("render_layout", "info");
   }
 
+  /** @missingRailsArgs debug — CONVERGEABLE call-args-block-padding-resolves-callee-by-receiver */
   renderCollection(event: Event): void {
     const identifier =
       event.payload["identifier"] != null && event.payload["identifier"] !== false
         ? (event.payload["identifier"] as string)
         : "templates";
 
-    this._debug(() => {
+    this.debug(undefined, () => {
       let message = `  Rendered collection of ${this.fromRailsRoot(identifier)}`;
       if (event.payload["layout"] != null && event.payload["layout"] !== false) {
         message += ` within ${this.fromRailsRoot(event.payload["layout"] as string)}`;

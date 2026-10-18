@@ -139,15 +139,15 @@ function buildHostUrl(
     if (!("port" in options)) port = match[3] ?? null;
   }
 
-  const protocolStr = normalizeProtocol(protocol);
+  protocol = normalizeProtocol(protocol);
   host = normalizeHost(host, options);
 
-  let result = protocolStr;
+  let result = protocol;
   if (options.user && options.password) {
     result += `${RackUtils.escape(options.user)}:${RackUtils.escape(options.password)}@`;
   }
   result += host;
-  normalizePort(port, protocolStr, (normalizedPort) => {
+  normalizePort(port, protocol, (normalizedPort) => {
     result += `:${normalizedPort}`;
   });
   result += path;

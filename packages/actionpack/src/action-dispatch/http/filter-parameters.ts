@@ -73,8 +73,9 @@ export function parameterFilter(this: FilterParametersHost): ParameterFilter {
   const host = this as FilterParametersHost & CachedState;
   if (host._parameterFilter != null) return host._parameterFilter;
   if (this.hasHeader("action_dispatch.parameter_filter")) {
-    const list = this.getHeader("action_dispatch.parameter_filter") as Array<string | RegExp>;
-    host._parameterFilter = parameterFilterFor(list);
+    host._parameterFilter = parameterFilterFor(
+      this.getHeader("action_dispatch.parameter_filter") as Array<string | RegExp>,
+    );
   } else {
     host._parameterFilter = NULL_PARAM_FILTER;
   }

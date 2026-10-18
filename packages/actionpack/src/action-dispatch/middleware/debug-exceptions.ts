@@ -103,26 +103,26 @@ export class DebugExceptions {
     if (logger == null) return;
     if (!rtest(this.isLogRescuedResponses(request)) && wrapper.rescueResponse()) return;
 
-    const lines: string[] = ["  "];
+    const message: string[] = ["  "];
     if (wrapper.hasCause()) {
-      lines.push(`${wrapper.exceptionClassName} (${wrapper.message})`);
+      message.push(`${wrapper.exceptionClassName} (${wrapper.message})`);
       for (const cause of wrapper.wrappedCauses) {
-        lines.push(`Caused by: ${cause.exceptionClassName} (${cause.message})`);
+        message.push(`Caused by: ${cause.exceptionClassName} (${cause.message})`);
       }
-      lines.push(`\nInformation for: ${wrapper.exceptionClassName} (${wrapper.message}):`);
+      message.push(`\nInformation for: ${wrapper.exceptionClassName} (${wrapper.message}):`);
     } else {
-      lines.push(`${wrapper.exceptionClassName} (${wrapper.message}):`);
+      message.push(`${wrapper.exceptionClassName} (${wrapper.message}):`);
     }
-    lines.push(...wrapper.annotatedSourceCode());
-    lines.push("  ");
-    lines.push(...wrapper.exceptionTrace().map(String));
+    message.push(...wrapper.annotatedSourceCode());
+    message.push("  ");
+    message.push(...wrapper.exceptionTrace().map(String));
     for (const cause of wrapper.hasCause() ? wrapper.wrappedCauses : []) {
-      lines.push(`\nInformation for cause: ${cause.exceptionClassName} (${cause.message}):`);
-      lines.push(...cause.annotatedSourceCode());
-      lines.push("  ");
-      lines.push(...cause.exceptionTrace().map(String));
+      message.push(`\nInformation for cause: ${cause.exceptionClassName} (${cause.message}):`);
+      message.push(...cause.annotatedSourceCode());
+      message.push("  ");
+      message.push(...cause.exceptionTrace().map(String));
     }
-    this.logArray(logger, lines, request);
+    this.logArray(logger, message, request);
   }
 
   /** @internal */

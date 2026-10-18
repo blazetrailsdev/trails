@@ -24,8 +24,7 @@ export class ContentDisposition {
   }
 
   asciiFilename(): string {
-    const translit = transliterate(this.filename ?? "");
-    return `filename="${percentEscape(translit, TRADITIONAL_ESCAPED_CHAR)}"`;
+    return `filename="${percentEscape(transliterate(this.filename ?? ""), TRADITIONAL_ESCAPED_CHAR)}"`;
   }
 
   utf8Filename(): string {

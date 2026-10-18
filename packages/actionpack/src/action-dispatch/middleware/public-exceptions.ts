@@ -73,17 +73,17 @@ export class PublicExceptions {
     const currentLocale = I18n.locale();
     const locale =
       typeof currentLocale === "string" && LOCALE_RE.test(currentLocale) ? currentLocale : null;
-    let file: string | null = locale
+    let path: string | null = locale
       ? File.join(this.publicPath, `${status}.${locale}.html`)
       : null;
-    let found = file != null && File.isExist(file);
+    let found = path != null && File.isExist(path);
     if (!found) {
-      file = File.join(this.publicPath, `${status}.html`);
-      found = File.isExist(file);
+      path = File.join(this.publicPath, `${status}.html`);
+      found = File.isExist(path);
     }
 
-    if (found && file != null) {
-      return this.renderFormat(status, "text/html", File.read(file));
+    if (found && path != null) {
+      return this.renderFormat(status, "text/html", File.read(path));
     }
     return [404, { [X_CASCADE]: "pass" }, emptyBody()];
   }

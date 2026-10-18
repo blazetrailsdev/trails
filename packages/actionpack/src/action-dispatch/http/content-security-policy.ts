@@ -2,7 +2,7 @@ import { ArgumentError, hashDelete, rbFSend, rbInspect } from "@blazetrails/ruby
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
-import { deepDup } from "@blazetrails/activesupport";
+import { deepDup, wrap } from "@blazetrails/activesupport";
 
 export const MAPPINGS = {
   self: "'self'",
@@ -295,8 +295,8 @@ export class ContentSecurityPolicy {
   }
 
   build(context?: unknown, nonce?: string, nonceDirectives?: readonly string[]): string {
-    const nonceDirs = nonceDirectives ?? DEFAULT_NONCE_DIRECTIVES;
-    return this.buildDirectives(context, nonce, nonceDirs)
+    nonceDirectives ??= DEFAULT_NONCE_DIRECTIVES;
+    return this.buildDirectives(context, nonce, nonceDirectives)
       .filter((p): p is string => p != null)
       .join("; ");
   }
@@ -364,9 +364,9 @@ export class ContentSecurityPolicy {
 
   /** @internal */
   private buildDirective(directive: string, sources: CSPSource[], context: unknown): string[] {
-    const resolved = sources.flatMap((source) => this.resolveSource(source, context));
-    this.validate(directive, resolved);
-    return resolved;
+    const resolvedSources = sources.flatMap((source) => this.resolveSource(source, context));
+    this.validate(directive, resolvedSources);
+    return resolvedSources;
   }
 
   /** @internal */
@@ -382,9 +382,8 @@ export class ContentSecurityPolicy {
           `Missing context for the dynamic content security policy source: ${String(source)}`,
         );
       }
-      const result = source(context);
-      const wrapped = Array.isArray(result) ? result : [result];
-      return this.applyMappings(wrapped).map((s) => {
+      const resolved = source(context);
+      return this.applyMappings(wrap(resolved)).map((s) => {
         if (typeof s !== "string") {
           throw new Error(`Unexpected content security policy source: ${String(s)}`);
         }
@@ -452,13 +451,12 @@ export class Request {
 
   get contentSecurityPolicyNonce(): string | undefined {
     if (!this.contentSecurityPolicyNonceGenerator) return undefined;
-    const existing = this.getHeader(NONCE);
-    if (existing !== null && existing !== undefined && existing !== false) {
-      return existing as string;
+    const nonce = this.getHeader(NONCE);
+    if (nonce !== null && nonce !== undefined && nonce !== false) {
+      return nonce as string;
+    } else {
+      return this.setHeader(NONCE, this.generateContentSecurityPolicyNonce()) as string;
     }
-    const generated = this.generateContentSecurityPolicyNonce();
-    this.setHeader(NONCE, generated);
-    return generated;
   }
 
   /** @internal */

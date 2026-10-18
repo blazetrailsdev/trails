@@ -18,13 +18,13 @@ class MockLogger extends Logger {
     return this._logged[level] ?? [];
   }
 
-  override debug(message?: string | (() => string)): boolean {
-    this._logged.debug.push(typeof message === "function" ? message() : (message ?? ""));
+  override debug(message: unknown = null, block?: () => unknown): boolean {
+    this._logged.debug.push(String(block ? block() : (message ?? "")));
     return true;
   }
 
-  override info(message?: string | (() => string)): boolean {
-    this._logged.info.push(typeof message === "function" ? message() : (message ?? ""));
+  override info(message: unknown = null, block?: () => unknown): boolean {
+    this._logged.info.push(String(block ? block() : (message ?? "")));
     return true;
   }
 }

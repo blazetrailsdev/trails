@@ -26,43 +26,43 @@ class MockLogger extends Logger {
     return this._logged[level] ?? [];
   }
 
-  override debug(message?: string | (() => string)): boolean {
+  override debug(message: string | null = null, block?: () => string): boolean {
     if (this.level > Logger.DEBUG) return true;
-    const msg = typeof message === "function" ? message() : (message ?? "");
+    const msg = block ? block() : (message ?? "");
     this._logged.debug.push(msg);
     return true;
   }
 
-  override info(message?: string | (() => string)): boolean {
+  override info(message: string | null = null, block?: () => string): boolean {
     if (this.level > Logger.INFO) return true;
-    const msg = typeof message === "function" ? message() : (message ?? "");
+    const msg = block ? block() : (message ?? "");
     this._logged.info.push(msg);
     return true;
   }
 
-  override warn(message?: string | (() => string)): boolean {
+  override warn(message: string | null = null, block?: () => string): boolean {
     if (this.level > Logger.WARN) return true;
-    const msg = typeof message === "function" ? message() : (message ?? "");
+    const msg = block ? block() : (message ?? "");
     this._logged.warn.push(msg);
     return true;
   }
 
-  override error(message?: string | (() => string)): boolean {
+  override error(message: string | null = null, block?: () => string): boolean {
     if (this.level > Logger.ERROR) return true;
-    const msg = typeof message === "function" ? message() : (message ?? "");
+    const msg = block ? block() : (message ?? "");
     this._logged.error.push(msg);
     return true;
   }
 
-  override fatal(message?: string | (() => string)): boolean {
+  override fatal(message: string | null = null, block?: () => string): boolean {
     if (this.level > Logger.FATAL) return true;
-    const msg = typeof message === "function" ? message() : (message ?? "");
+    const msg = block ? block() : (message ?? "");
     this._logged.fatal.push(msg);
     return true;
   }
 
-  override unknown(message?: string | (() => string)): boolean {
-    const msg = typeof message === "function" ? message() : (message ?? "");
+  override unknown(message: string | null = null, block?: () => string): boolean {
+    const msg = block ? block() : (message ?? "");
     this._logged.unknown.push(msg);
     return true;
   }
@@ -77,21 +77,21 @@ class MyLogSubscriber extends LogSubscriber {
 
   someEvent(event: Event): void {
     this.event = event;
-    this._info(event.name);
+    this.info(event.name);
   }
 
   foo(_event: Event | null): void {
-    this._debug("debug");
-    this._info(() => "info");
-    this._warn("warn");
+    this.debug("debug");
+    this.info(undefined, () => "info");
+    this.warn("warn");
   }
 
   bar(_event: Event | null): void {
-    this._info(`${this.color("cool", "red")}, ${this.color("isn't it?", "blue", { bold: true })}`);
+    this.info(`${this.color("cool", "red")}, ${this.color("isn't it?", "blue", { bold: true })}`);
   }
 
   baz(_event: Event | null): void {
-    this._info(
+    this.info(
       `${this.color("rad", "green", { bold: true, underline: true })}, ${this.color("isn't it?", "yellow", { italic: true })}`,
     );
   }
@@ -101,7 +101,7 @@ class MyLogSubscriber extends LogSubscriber {
   }
 
   debugOnly(_event: Event | null): void {
-    this._debug("debug logs are enabled");
+    this.debug("debug logs are enabled");
   }
 }
 

@@ -526,7 +526,7 @@ describe("ActionController::Live private helpers", () => {
       Base.logger = oldLogger;
     }
     expect(fatal).toHaveBeenCalledOnce();
-    const rendered = (fatal.mock.calls[0][0] as () => string)();
+    const rendered = (fatal.mock.calls[0][1] as () => string)();
     expect(rendered).toMatch(/^\nClientDisconnected \(oops\):\nsource\n {2}at .*\n {2}at /);
     expect(rendered.endsWith("\n\n")).toBe(true);
   });

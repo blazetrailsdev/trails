@@ -80,8 +80,8 @@ export class TestRequest extends Request {
     return (this.env["HTTP_USER_AGENT"] as string) || "";
   }
 
-  set userAgent(ua: string) {
-    this.setHeader("HTTP_USER_AGENT", ua);
+  set userAgent(userAgent: string) {
+    this.setHeader("HTTP_USER_AGENT", userAgent);
   }
 
   get accept(): string | undefined {

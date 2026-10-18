@@ -334,8 +334,8 @@ export class MimeType {
   static lookup(string: string): MimeType {
     if (LOOKUP.has(string)) return LOOKUP.get(string)!;
 
-    const str = string === "" ? null : string.split(";", 2)[0].trimEnd();
-    return LOOKUP.get(str as string) ?? new MimeType(str);
+    string = (string === "" ? null : string.split(";", 2)[0].trimEnd()) as string;
+    return LOOKUP.get(string) ?? new MimeType(string);
   }
 
   static lookupByExtension(extension: string | null): MimeType | undefined {
@@ -368,11 +368,11 @@ export class MimeType {
 
     if (!acceptHeader.includes(",")) {
       const sepMatch = acceptHeader.match(PARAMETER_SEPARATOR_REGEXP);
-      const header = sepMatch ? acceptHeader.slice(0, sepMatch.index).trim() : acceptHeader.trim();
-      if (header === "") return [];
-      const trailing = MimeType.parseTrailingStar(header);
+      acceptHeader = sepMatch ? acceptHeader.slice(0, sepMatch.index).trim() : acceptHeader.trim();
+      if (acceptHeader === "") return [];
+      const trailing = MimeType.parseTrailingStar(acceptHeader);
       if (trailing) return trailing;
-      return [MimeType.lookup(header)];
+      return [MimeType.lookup(acceptHeader)];
     }
 
     const list: AcceptItem[] = [];
