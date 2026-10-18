@@ -15,6 +15,7 @@
  */
 import { rubyMethodToTsIgnoringSkip } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES } from "./constant-renames.js";
+import { TS_CLASS_RENAMES } from "../../parity/conventions.js";
 import type { IrFile, N, Param } from "./ir.js";
 import { walk } from "./ir.js";
 import { GemIndex, lexicalChain, qualify, type ScopeInfo } from "./gem-index.js";
@@ -176,6 +177,8 @@ const PERMANENT_CONSTS: Record<string, string> = {
 };
 
 export class Emitter {
+  /** Nested constants with no seat on their parent (see `emitFile`). */
+  unseated: string[] = [];
   lw: Lowerer;
   constructor(
     readonly index: GemIndex,
@@ -196,7 +199,9 @@ export class Emitter {
         continue;
       if (!this.emits(u, file.file)) continue;
       const short = u.fqn.split("::").pop()!;
-      let name = TS_CONSTANT_RENAMES[u.fqn] ?? short;
+      // The conventions' class renames (`Railtie` → `Trailtie`) name the
+      // declaration, as parity:api matches it; the Ruby name still seats it.
+      let name = TS_CONSTANT_RENAMES[u.fqn] ?? TS_CLASS_RENAMES[short] ?? short;
       if (taken.has(name)) name = u.fqn.split("::").slice(-2).join("");
       taken.add(name);
       this.resolver.exportNames.set(u.fqn, { tsFile, name });
@@ -572,21 +577,34 @@ export class Emitter {
     // `setup` / `teardown` run inside them.
     const hctx = this.baseCtx(u, f, {});
     this.lw.resolver.wanted.set("TestHost", (this.lw.resolver.wanted.get("TestHost") ?? 0) + 1);
-    const host = this.lw.imp(hctx, "@root/codegen-runtime.js", "TestHost");
     this.lw.imp(hctx, "@blazetrails/activesupport/testing/autorun", "", "");
-    const register = this.lw.rc(hctx, "registerConstant");
+    // The test class is a top-level constant, as Ruby's `class ExceptionsTest <
+    // ActiveJob::TestCase` is: declared at module level, beside the `describe`
+    // autorun resolves to it by name, so a class nested in it is seated on it.
+    // A test class with no members and nothing included is the one autorun
+    // builds from the registered spec type (test/helper.rb): no declaration.
+    const bare =
+      !hostMembers.length &&
+      !classLines.length &&
+      f.rubyFile.startsWith("test/cases/") &&
+      ![...this.index.scopes.keys()].some((k) => k.startsWith(`${u.fqn}::`));
+    const host = bare ? "" : this.lw.imp(hctx, "@root/codegen-runtime.js", "TestHost");
     return [
+      ...(bare
+        ? []
+        : [
+            hostMembers.length
+              ? [
+                  `class ${short} extends ${host} {`,
+                  ...indent(hostMembers.join("\n\n").split("\n")),
+                  "}",
+                ].join("\n")
+              : `class ${short} extends ${host} {}`,
+            `${this.lw.rc(hctx, "registerConstant")}(${JSON.stringify(short)}, ${short});`,
+          ]),
+      ...classLines,
       `${desc}(${JSON.stringify(short)}, () => {`,
       ...indent([
-        hostMembers.length
-          ? [
-              `class ${short} extends ${host} {`,
-              ...indent(hostMembers.join("\n\n").split("\n")),
-              "}",
-            ].join("\n")
-          : `class ${short} extends ${host} {}`,
-        `${register}(${JSON.stringify(short)}, ${short});`,
-        ...classLines,
         `${vitest("beforeEach")}(async ({ testCase }: any) => {`,
         "  await testCase.setup();",
         "});",
@@ -728,7 +746,7 @@ export class Emitter {
       defs += r.defs;
       chunks.push(r.text);
       // A test's module is named for `Module#name` the way its classes are.
-      if (u.kind === "module" && file.file.startsWith("test/"))
+      if (u.kind === "module" && file.file.startsWith("test/") && !u.fqn.includes("::"))
         chunks.push(
           `${this.lw.rc(this.baseCtx(u, f, {}), "registerConstant")}(${JSON.stringify(u.fqn)}, ${name});`,
         );
@@ -787,6 +805,20 @@ export class Emitter {
           '  test: () => import("./adapters/test.js"),',
           '} as Record<string, () => Promise<unknown>>)[process.env["AJ_ADAPTER"]!]();',
         );
+      // The suite's test class is `ActiveSupport::TestCase` (the test host) unless
+      // a test file names another: Minitest::Spec's `register_spec_type`
+      // (minitest/spec.rb), which autorun builds a `describe`'s class from, so a
+      // test class with nothing of its own needs no declaration.
+      if (file.file === "test/helper.rb") {
+        this.lw.resolver.wanted.set("TestHost", (this.lw.resolver.wanted.get("TestHost") ?? 0) + 1);
+        const reg = this.lw.imp(
+          tctx,
+          "@blazetrails/activesupport/testing/autorun",
+          "registerSpecType",
+        );
+        const host = this.lw.imp(tctx, "@root/codegen-runtime.js", "TestHost");
+        chunks.push(`${reg}(/(?:)/, ${host});`);
+      }
       for (const s of top) chunks.push(...this.lw.stmt(s, tctx, false));
       // A top-level `def` (helper.rb's `adapter_is?`) is a method on Ruby's main
       // object, which every test can call bare: an exported function here.
@@ -816,19 +848,36 @@ export class Emitter {
     // Each constant is seated on its parent module, `rbModConstSet(ActiveJob,
     // "Base", Base)` (activejob base.ts), which is what `const_get` and an
     // `autoload` read, and what names it (`rbModName`). A parent the hand port
-    // seats in `namespaces.ts` is read from there.
-    if (handNamespaceFqns().size) {
+    // seats in `namespaces.ts` is read from there; a parent in this file, or in
+    // a file this one already imports (`relation.ts` seats `WhereClause`), is
+    // read directly. Seating on a parent this file does not import would add an
+    // edge that closes a cycle whenever that file imports its children
+    // (`serializers.rb` names every serializer), so such a constant stays
+    // unseated and is listed in the report.
+    {
       const bctx = this.baseCtx(units[0] ?? ({} as Unit), f, {});
       for (const u of units) {
         const i = u.fqn.lastIndexOf("::");
         if (i < 0) continue;
         const parent = u.fqn.slice(0, i);
-        // Only a parent seated in the zero-import `namespaces.ts`: seating on a
-        // parent read from its own file closes a cycle whenever that file
-        // imports its children (`serializers.rb` names every serializer).
         const seat = handNamespaceFqns().get(parent);
-        if (!seat) continue;
-        const ref = this.lw.imp(bctx, "@root/namespaces.js", seat, `${seat}Seat`);
+        const parentExp = this.resolver.exportNames.get(parent);
+        const parentSpec = parentExp && `@root/${parentExp.tsFile.replace(/\.ts$/, ".js")}`;
+        const ref = seat
+          ? this.lw.imp(bctx, "@root/namespaces.js", seat, `${seat}Seat`)
+          : names.has(parent)
+            ? names.get(parent)!
+            : parentSpec && f.imports.get(parentSpec)?.has(parentExp.name)
+              ? f.imports.get(parentSpec)!.get(parentExp.name)!
+              : null;
+        // A reopened constant of another gem (`ActiveSupport::TestCase`) is
+        // already seated where that gem defines it.
+        if (!ref && !this.index.scopes.has(parent) && !handNamespaceFqns().has(parent)) continue;
+        if (!ref) {
+          f.stats["unseated-constant"] = (f.stats["unseated-constant"] ?? 0) + 1;
+          this.unseated.push(u.fqn);
+          continue;
+        }
         chunks.push(
           `${this.lw.rc(bctx, "rbModConstSet")}(${ref}, ${JSON.stringify(u.fqn.slice(i + 2))}, ${names.get(u.fqn)});`,
         );
@@ -1514,10 +1563,13 @@ export class Emitter {
         staticStmts.push(s);
       }
     }
-    // The hand port seats each class for `constantize` (registerConstant).
-    after.unshift(
-      `${this.lw.rc(ctxStatic, "registerConstant")}(${JSON.stringify(u.fqn)}, ${name});`,
-    );
+    // A top-level class is a constant of `Object` (`rb_const_set` on `rb_cObject`,
+    // ruby-compat's `registerConstant`), which `constantize` reads. A nested one
+    // is seated on its parent instead (`emitFile`), as the hand port does.
+    if (!u.fqn.includes("::"))
+      after.unshift(
+        `${this.lw.rc(ctxStatic, "registerConstant")}(${JSON.stringify(u.fqn)}, ${name});`,
+      );
     // Executable class-body statements (macros, run_load_hooks) run after the
     // declaration and its include/extend lines, with `self` the class.
     if (staticStmts.length) {

@@ -341,6 +341,7 @@ writeFileSync(path.join(outDir, "codegen-declined.ts"), DECLINED_SHIM);
 // parameter or member takes `!` (nonnull-pass.ts). `--no-nonnull` skips it.
 if (!process.argv.includes("--no-nonnull"))
   report.nonNullAssertions = nonNullPass(outDir, path.join(PKG_DIR, "tsconfig.json"));
+report.unseatedConstants = emitter.unseated;
 report.wanted = Object.fromEntries([...resolver.wanted].sort((a, b) => b[1] - a[1]));
 report.unresolvedConsts = Object.fromEntries(
   [...resolver.unresolvedConsts].sort((a, b) => b[1] - a[1]),
