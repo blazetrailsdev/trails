@@ -133,7 +133,10 @@ function collectionFromOptions(options: RenderOptions): readonly unknown[] | und
   return (options.collection as readonly unknown[] | null | undefined) ?? [];
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 function collectionFromObject(
   object: unknown,
 ): readonly unknown[] | Promise<readonly unknown[]> | undefined {
