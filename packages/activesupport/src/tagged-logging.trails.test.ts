@@ -27,4 +27,18 @@ describe("TaggedLogging#tagged with an async block", () => {
     logger.info("after");
     expect(lines).toEqual(["[BCX] Funky time\n", "after\n"]);
   });
+
+  it("pops the tags when the block rejects", async () => {
+    const lines: string[] = [];
+    const logger = TaggedLogging.new(new Logger({ write: (s: string) => lines.push(s) }));
+    const error = new Error("boom");
+    await expect(
+      logger.tagged("BCX", async () => {
+        await Promise.resolve();
+        throw error;
+      }),
+    ).rejects.toBe(error);
+    logger.info("after");
+    expect(lines).toEqual(["after\n"]);
+  });
 });

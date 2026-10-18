@@ -12,6 +12,10 @@ import {
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { isBlank } from "./core-ext/object/blank.js";
 
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return typeof (value as { then?: unknown } | null)?.then === "function";
+}
+
 type Tag = string | number | boolean | null | undefined | readonly Tag[];
 
 export interface TaggedFormatter {
@@ -59,13 +63,14 @@ export const Formatter = {
     );
   },
 
+  /** @inventedArm if — PERMANENT */
   tagged<T>(this: TaggedFormatter, ...tags: (Tag | ((formatter: TaggedFormatter) => T))[]): T {
     const block = tags.pop() as (formatter: TaggedFormatter) => T;
     const pushedCount = this.tagStack.pushTags(tags).length;
     let deferred = false;
     try {
       const result = block(this);
-      if (typeof (result as { then?: unknown } | null)?.then === "function") {
+      if (isThenable(result)) {
         deferred = true;
         return Promise.resolve(result).finally(() => this.popTags(pushedCount)) as T;
       }

@@ -1017,7 +1017,7 @@ describe("TestRoutingMapper", () => {
     draw(function () {
       this.namespace("api", () => {
         this.scope(":version", { version: /.+/ }, () => {
-          this.resources("users", { id: /.+?/, format: /json|xml/ as unknown as boolean });
+          this.resources("users", { id: /.+?/, format: /json|xml/ });
         });
       });
     });

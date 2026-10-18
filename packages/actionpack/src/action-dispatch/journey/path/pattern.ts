@@ -42,6 +42,14 @@ function combinedFlagsFor(
   return out.join("");
 }
 
+function combinedFlagsUsed(matchers: Matchers, node: Node): string {
+  const values: Array<Requirement | Requirement[]> = [];
+  for (const n of node) {
+    if (n.isSymbol() && Object.hasOwn(matchers, n.toSym())) values.push(matchers[n.toSym()]);
+  }
+  return combinedFlagsFor(values);
+}
+
 export class AnchoredRegexp extends Visitor {
   protected readonly _separator: string;
   protected readonly _matchers: Matchers;
@@ -55,7 +63,7 @@ export class AnchoredRegexp extends Visitor {
   }
 
   override accept(node: Node): RegExp {
-    return new RegExp(`^${this.visit(node)}$`, combinedFlagsFor(Object.values(this._matchers)));
+    return new RegExp(`^${this.visit(node)}$`, combinedFlagsUsed(this._matchers, node));
   }
 
   protected override visitCAT(node: Node): string {
@@ -101,7 +109,7 @@ export class AnchoredRegexp extends Visitor {
 export class UnanchoredRegexp extends AnchoredRegexp {
   override accept(node: Node): RegExp {
     const path = this.visit(node) as string;
-    const flags = combinedFlagsFor(Object.values(this._matchers));
+    const flags = combinedFlagsUsed(this._matchers, node);
     if (path === "/") return new RegExp(`^/`, flags);
     return new RegExp(`^${path}(?:\\b|$|/)`, flags);
   }
