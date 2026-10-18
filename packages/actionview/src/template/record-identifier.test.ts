@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
-import { domClass, domId } from "./record-identifier.js";
+import { domClass, domId } from "../record-identifier.js";
 
 class Comment {
   static readonly modelName = { paramKey: "comment" };
@@ -38,38 +38,47 @@ describe("RecordIdentifierTest", () => {
     record = new Comment();
   });
 
-  it("test_dom_id_with_class", () => {
+  it("dom id with class", () => {
     expect(domId(Comment)).toBe(`new_${singular}`);
   });
 
-  it("test_dom_id_with_new_record", () => {
+  it("dom id with new record", () => {
     expect(domId(record)).toBe(`new_${singular}`);
   });
 
-  it("test_dom_id_with_new_record_and_prefix", () => {
+  it("dom id with new record and prefix", () => {
     expect(domId(record, "custom_prefix")).toBe(`custom_prefix_${singular}`);
   });
 
-  it("test_dom_id_with_saved_record", () => {
+  it("dom id with saved record", () => {
     record.save();
     expect(domId(record)).toBe(`${singular}_1`);
   });
 
-  it("test_dom_id_with_composite_primary_key_record", () => {
+  it("dom id with composite primary key record", () => {
     expect(domId(new CpkBook([1, 123]))).toBe("cpk_book_1_123");
   });
 
-  it("test_dom_id_with_prefix", () => {
+  it("dom id with prefix", () => {
     record.save();
     expect(domId(record, "edit")).toBe(`edit_${singular}_1`);
   });
 
-  it("test_dom_class", () => {
+  it("dom class", () => {
     expect(domClass(record)).toBe(singular);
   });
 
-  it("test_dom_class_with_prefix", () => {
+  it("dom class with prefix", () => {
     expect(domClass(record, "custom_prefix")).toBe(`custom_prefix_${singular}`);
+  });
+
+  it("dom id as singleton method", () => {
+    record.save();
+    expect(domId(record)).toBe(`${singular}_1`);
+  });
+
+  it("dom class as singleton method", () => {
+    expect(domClass(record)).toBe(singular);
   });
 });
 
@@ -96,46 +105,46 @@ describe("RecordIdentifierWithoutActiveModelTest", () => {
     record = new Plane();
   });
 
-  it("test_dom_id_with_new_class", () => {
+  it("dom id with new class", () => {
     expect(domId(Plane)).toBe("new_airplane");
   });
 
-  it("test_dom_id_with_new_record", () => {
+  it("dom id with new record", () => {
     expect(domId(record)).toBe("new_airplane");
   });
 
-  it("test_dom_id_with_new_record_and_prefix", () => {
+  it("dom id with new record and prefix", () => {
     expect(domId(record, "custom_prefix")).toBe("custom_prefix_airplane");
   });
 
-  it("test_dom_id_with_saved_record", () => {
+  it("dom id with saved record", () => {
     record.save();
     expect(domId(record)).toBe("airplane_1");
   });
 
-  it("test_dom_id_with_prefix", () => {
+  it("dom id with prefix", () => {
     record.save();
     expect(domId(record, "edit")).toBe("edit_airplane_1");
   });
 
-  it("test_dom_id_raises_useful_error_when_passed_nil", () => {
+  it("dom id raises useful error when passed nil", () => {
     expect(() => domId(null)).toThrow(ArgumentError);
   });
 
-  it("test_dom_class", () => {
+  it("dom class", () => {
     expect(domClass(record)).toBe("airplane");
   });
 
-  it("test_dom_class_with_prefix", () => {
+  it("dom class with prefix", () => {
     expect(domClass(record, "custom_prefix")).toBe("custom_prefix_airplane");
   });
 
-  it("test_dom_id_as_singleton_method", () => {
+  it("dom id as singleton method", () => {
     record.save();
     expect(domId(record)).toBe("airplane_1");
   });
 
-  it("test_dom_class_as_singleton_method", () => {
+  it("dom class as singleton method", () => {
     expect(domClass(record)).toBe("airplane");
   });
 });
