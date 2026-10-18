@@ -366,9 +366,15 @@ export function hashReplace<H extends object>(hash: H, hash2: object): H {
     throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
   }
   if (hash === hash2) return hash;
-  for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
-  if (hash2 instanceof Map) {
-    for (const [key, value] of hash2) hashAset(hash, key, value);
+  if (hash instanceof Map) {
+    hash.clear();
+  } else {
+    for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
+  }
+  if (hash2 instanceof Map || hash instanceof Map) {
+    for (const [key, value] of hash2 instanceof Map ? hash2 : Object.entries(hash2)) {
+      hashAset(hash, key, value);
+    }
   } else {
     Object.assign(hash, hash2);
   }
