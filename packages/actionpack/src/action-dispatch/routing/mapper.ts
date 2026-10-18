@@ -1079,6 +1079,7 @@ export class Mapper {
   _drawPaths: string[];
   /** @internal */
   _scope: Scope;
+
   constructor(set: RouteSetLike) {
     this._set = set;
     this._drawPaths = set.drawPaths;
