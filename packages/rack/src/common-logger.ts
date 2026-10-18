@@ -1,5 +1,5 @@
 import { SERVER_PROTOCOL, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
-import { Process, sprintf, rbFSend } from "@blazetrails/ruby-compat";
+import { Process, sprintf, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
 import { BodyProxy } from "./body-proxy.js";
@@ -85,10 +85,10 @@ export class CommonLogger {
 
     const logger = this.logger || request.getHeader(RACK_ERRORS);
 
-    if (logger && typeof logger.write === "function") {
+    if (rbObjRespondTo(logger, "write")) {
       logger.write(msg);
-    } else if (logger && typeof logger.info === "function") {
-      logger.info(msg.trimEnd());
+    } else {
+      logger.append(msg);
     }
   }
 
