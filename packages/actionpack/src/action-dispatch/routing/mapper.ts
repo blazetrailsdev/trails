@@ -130,7 +130,7 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 
 /** @internal */
 export class Resource {
-  static defaultActions(apiOnly: boolean): ResourceAction[] {
+  static defaultActions(apiOnly: boolean | null): ResourceAction[] {
     if (apiOnly) {
       return ["index", "create", "show", "update", "destroy"];
     } else {
@@ -145,13 +145,18 @@ export class Resource {
   protected _as: string | null | false | undefined;
   protected _options: RouteOptions;
   protected _shallow: boolean;
-  protected _apiOnly: boolean;
+  protected _apiOnly: boolean | null;
   protected _only: ResourceAction | ResourceAction[] | null;
   protected _except: ResourceAction | ResourceAction[] | null;
   protected _plural: string | undefined;
   protected _singular: string | undefined;
 
-  constructor(entities: string, apiOnly: boolean, shallow: boolean, options: RouteOptions = {}) {
+  constructor(
+    entities: string,
+    apiOnly: boolean | null,
+    shallow: boolean,
+    options: RouteOptions = {},
+  ) {
     if (String(options.param ?? "").includes(":")) {
       throw new ArgumentError(":param option can't contain colons");
     }
@@ -265,7 +270,7 @@ export class Resource {
 
 /** @internal */
 export class SingletonResource extends Resource {
-  static override defaultActions(apiOnly: boolean): ResourceAction[] {
+  static override defaultActions(apiOnly: boolean | null): ResourceAction[] {
     if (apiOnly) {
       return ["show", "create", "update", "destroy"];
     } else {
@@ -273,7 +278,7 @@ export class SingletonResource extends Resource {
     }
   }
 
-  constructor(entities: string, apiOnly: boolean, shallow: boolean, options: RouteOptions) {
+  constructor(entities: string, apiOnly: boolean | null, shallow: boolean, options: RouteOptions) {
     super(entities, apiOnly, shallow, options);
     this._as = null;
     this.controller = String(rtest(options.controller) ? options.controller : this.plural());
@@ -324,6 +329,7 @@ interface RouteSetLike {
   requestClass(): { prototype: object };
   addUrlHelper: RouteSet["addUrlHelper"];
   addPolymorphicMapping: RouteSet["addPolymorphicMapping"];
+  isApiOnly(): boolean | null;
 }
 
 /** @internal */
@@ -1073,9 +1079,6 @@ export class Mapper {
   _drawPaths: string[];
   /** @internal */
   _scope: Scope;
-  /** @internal */
-  _apiOnly = false;
-
   constructor(set: RouteSetLike) {
     this._set = set;
     this._drawPaths = set.drawPaths;
@@ -2189,8 +2192,8 @@ export class Mapper {
   }
 
   /** @internal */
-  isApiOnly(): boolean {
-    return this._apiOnly;
+  isApiOnly(): boolean | null {
+    return this._set.isApiOnly();
   }
 
   /** @internal */

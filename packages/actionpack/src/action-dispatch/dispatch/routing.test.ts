@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { RouteSet, type DrawCallback, type NamedRouteHelper } from "../routing/route-set.js";
+import {
+  Config,
+  RouteSet,
+  type DrawCallback,
+  type NamedRouteHelper,
+} from "../routing/route-set.js";
 import { bodyFromString, bodyToString, MockRequest } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import { controllerConstants, Request } from "../http/request.js";
@@ -244,23 +249,38 @@ describe("TestRoutingMapper", () => {
     expect(t.loginUrl()).toBe("http://rubyonrails.org/login");
   });
 
-  it("session singleton resource", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resource("session");
+  it("session singleton resource", async () => {
+    draw(function () {
+      this.resource("session", () => {
+        this.get(":create");
+        this.post(":reset");
+      });
     });
 
-    expect(routes.recognizePath("/session").action).toBe("show");
-    expect(routes.recognizePath("/session", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/session", { method: "put" }).action).toBe("update");
-    expect(routes.recognizePath("/session", { method: "patch" }).action).toBe("update");
-    expect(routes.recognizePath("/session", { method: "delete" }).action).toBe("destroy");
-    expect(routes.recognizePath("/session/new").action).toBe("new");
-    expect(routes.recognizePath("/session/edit").action).toBe("edit");
+    await t.get("/session");
+    expect(t.response.body).toBe("sessions#create");
+    expect(t.sessionPath()).toBe("/session");
 
-    expect(routes.pathFor({}, "session")).toBe("/session");
-    expect(routes.pathFor({}, "new_session")).toBe("/session/new");
-    expect(routes.pathFor({}, "edit_session")).toBe("/session/edit");
+    await t.post("/session");
+    expect(t.response.body).toBe("sessions#create");
+
+    await t.put("/session");
+    expect(t.response.body).toBe("sessions#update");
+
+    await t.delete("/session");
+    expect(t.response.body).toBe("sessions#destroy");
+
+    await t.get("/session/new");
+    expect(t.response.body).toBe("sessions#new");
+    expect(t.newSessionPath()).toBe("/session/new");
+
+    await t.get("/session/edit");
+    expect(t.response.body).toBe("sessions#edit");
+    expect(t.editSessionPath()).toBe("/session/edit");
+
+    await t.post("/session/reset");
+    expect(t.response.body).toBe("sessions#reset");
+    expect(t.resetSessionPath()).toBe("/session/reset");
   });
 
   it("projects (resources)", () => {
@@ -428,16 +448,42 @@ describe("TestRoutingMapper", () => {
     expect(params.id).toBe("3");
   });
 
-  it("session singleton resource for api app", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resource("session", { except: ["new", "edit"] });
+  it("session singleton resource for api app", async () => {
+    const config = new Config();
+    config.apiOnly = true;
+
+    IntegrationTest.stubControllers(config, (routes) => {
+      routes.draw(function () {
+        this.resource("session", () => {
+          this.get(":create");
+          this.post(":reset");
+        });
+      });
+      t.app = new RoutedRackApp(routes);
     });
-    expect(routes.recognizePath("/session").action).toBe("show");
-    expect(routes.recognizePath("/session", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/session", { method: "delete" }).action).toBe("destroy");
-    expect(() => routes.recognizePath("/session/new")).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/session/edit")).toThrow(RoutingError);
+
+    await t.get("/session");
+    expect(t.response.body).toBe("sessions#create");
+    expect(t.sessionPath()).toBe("/session");
+
+    await t.post("/session");
+    expect(t.response.body).toBe("sessions#create");
+
+    await t.put("/session");
+    expect(t.response.body).toBe("sessions#update");
+
+    await t.delete("/session");
+    expect(t.response.body).toBe("sessions#destroy");
+
+    await t.post("/session/reset");
+    expect(t.response.body).toBe("sessions#reset");
+    expect(t.resetSessionPath()).toBe("/session/reset");
+
+    await t.get("/session/new");
+    expect(t.response.body).toBe("Not Found");
+
+    await t.get("/session/edit");
+    expect(t.response.body).toBe("Not Found");
   });
 
   it("resource routes with only and except", () => {
@@ -507,13 +553,16 @@ describe("TestRoutingMapper", () => {
     expect(t.projectAttachmentsPath({ project_id: "1" })).toBe("/projects/1/attachments");
   });
 
-  it("openid", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.match("openid/login", { to: "openid#login", via: ["GET", "POST"] });
+  it("openid", async () => {
+    draw(function () {
+      this.match("openid/login", { via: ["get", "post"], to: "openid#login" });
     });
-    expect(routes.recognizePath("/openid/login").controller).toBe("openid");
-    expect(routes.recognizePath("/openid/login", { method: "post" }).controller).toBe("openid");
+
+    await t.get("/openid/login");
+    expect(t.response.body).toBe("openid#login");
+
+    await t.post("/openid/login");
+    expect(t.response.body).toBe("openid#login");
   });
 
   it("namespace with options", () => {
@@ -687,21 +736,18 @@ describe("TestRoutingMapper", () => {
     expect(t.sessionInfoPath()).toBe("/session/info");
   });
 
-  it("member on resource", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("replies", () => {
+  it("member on resource", async () => {
+    draw(function () {
+      this.resource("session", () => {
         this.member(() => {
-          this.put(":answer", { action: "mark_as_answer" });
-          this.delete(":answer", { action: "unmark_as_answer" });
+          this.get(":crush");
         });
       });
     });
-    const putM = routes.recognizePath("/replies/1/answer", { method: "put" });
-    expect(putM.action).toBe("mark_as_answer");
 
-    const delM = routes.recognizePath("/replies/1/answer", { method: "delete" });
-    expect(delM.action).toBe("unmark_as_answer");
+    await t.get("/session/crush");
+    expect(t.response.body).toBe("sessions#crush");
+    expect(t.crushSessionPath()).toBe("/session/crush");
   });
 
   it("replies", () => {
@@ -2213,18 +2259,24 @@ describe("TestRoutingMapper", () => {
     expect(m["controllers"]).toBe("foo");
   });
 
-  it("websocket", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("websocket", async () => {
+    draw(function () {
       this.connect("chat/live", { to: "chat#live" });
     });
-    expect(routes.recognizePath("/chat/live").action).toBe("live");
-    expect(routes.recognizePath("/chat/live", { method: "connect" }).action).toBe("live");
+
+    await t.get("/chat/live", {
+      headers: { REQUEST_METHOD: "GET", HTTP_CONNECTION: "Upgrade", HTTP_UPGRADE: "websocket" },
+    });
+    expect(t.response.body).toBe("chat#live");
+
+    await t.get("/chat/live", {
+      headers: { REQUEST_METHOD: "CONNECT", "rack.protocol": "websocket" },
+    });
+    expect(t.response.body).toBe("chat#live");
   });
 
-  it("bookmarks", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("bookmarks", async () => {
+    draw(function () {
       this.scope("bookmark", { controller: "bookmarks", as: "bookmark" }, () => {
         this.get(":new", { path: "build" });
         this.post(":create", { path: "create", as: "" });
@@ -2232,42 +2284,54 @@ describe("TestRoutingMapper", () => {
         this.get(":remove", { action: "destroy", as: "remove" });
       });
     });
-    expect(routes.recognizePath("/bookmark/build").controller).toBe("bookmarks");
-    expect(routes.recognizePath("/bookmark/build").action).toBe("new");
-    expect(routes.pathFor({}, "bookmark_new")).toBe("/bookmark/build");
-    expect(routes.recognizePath("/bookmark/create", { method: "post" }).controller).toBe(
-      "bookmarks",
-    );
-    expect(routes.recognizePath("/bookmark/create", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/bookmark/update", { method: "put" }).action).toBe("update");
-    expect(routes.pathFor({}, "bookmark_update")).toBe("/bookmark/update");
-    expect(routes.recognizePath("/bookmark/remove").action).toBe("destroy");
-    expect(routes.pathFor({}, "bookmark_remove")).toBe("/bookmark/remove");
+
+    await t.get("/bookmark/build");
+    expect(t.response.body).toBe("bookmarks#new");
+    expect(t.bookmarkNewPath()).toBe("/bookmark/build");
+
+    await t.post("/bookmark/create");
+    expect(t.response.body).toBe("bookmarks#create");
+    expect(t.bookmarkPath()).toBe("/bookmark/create");
+
+    await t.put("/bookmark/update");
+    expect(t.response.body).toBe("bookmarks#update");
+    expect(t.bookmarkUpdatePath()).toBe("/bookmark/update");
+
+    await t.get("/bookmark/remove");
+    expect(t.response.body).toBe("bookmarks#destroy");
+    expect(t.bookmarkRemovePath()).toBe("/bookmark/remove");
   });
 
-  it("pagemarks", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope("pagemark", { module: "pagemarks", as: "pagemark" }, () => {
+  it("pagemarks", async () => {
+    draw(function () {
+      this.scope("pagemark", { controller: "pagemarks", as: "pagemark" }, () => {
         this.get("build", { action: "new", as: "new" });
-        this.post("create", { action: "create", as: "" });
-        this.put("update", { action: "update", as: "update" });
+        this.post("create", { as: "" });
+        this.put("update");
         this.get("remove", { action: "destroy", as: "remove" });
         this.get("", { action: "show", as: "show" });
       });
     });
-    expect(routes.recognizePath("/pagemark/build").controller).toBe("pagemarks");
-    expect(routes.recognizePath("/pagemark/build").action).toBe("new");
-    expect(routes.pathFor({}, "pagemark_new")).toBe("/pagemark/build");
-    expect(routes.recognizePath("/pagemark/create", { method: "post" }).controller).toBe(
-      "pagemarks",
-    );
-    expect(routes.recognizePath("/pagemark/create", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/pagemark/update", { method: "put" }).action).toBe("update");
-    expect(routes.recognizePath("/pagemark/remove").action).toBe("destroy");
-    expect(routes.pathFor({}, "pagemark_remove")).toBe("/pagemark/remove");
-    expect(routes.recognizePath("/pagemark").action).toBe("show");
-    expect(routes.pathFor({}, "pagemark_show")).toBe("/pagemark");
+
+    await t.get("/pagemark/build");
+    expect(t.response.body).toBe("pagemarks#new");
+    expect(t.pagemarkNewPath()).toBe("/pagemark/build");
+
+    await t.post("/pagemark/create");
+    expect(t.response.body).toBe("pagemarks#create");
+    expect(t.pagemarkPath()).toBe("/pagemark/create");
+
+    await t.put("/pagemark/update");
+    expect(t.response.body).toBe("pagemarks#update");
+    expect(t.pagemarkUpdatePath()).toBe("/pagemark/update");
+
+    await t.get("/pagemark/remove");
+    expect(t.response.body).toBe("pagemarks#destroy");
+    expect(t.pagemarkRemovePath()).toBe("/pagemark/remove");
+
+    await t.get("/pagemark");
+    expect(t.response.body).toBe("pagemarks#show");
+    expect(t.pagemarkShowPath()).toBe("/pagemark");
   });
 
   it("admin", async () => {
@@ -2302,65 +2366,90 @@ describe("TestRoutingMapper", () => {
     expect(t.response.headers.get("x-cascade")).toBe("pass");
   });
 
-  it("global", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope({ module: "global" }, () => {
-        this.get("global/hide_notice", { action: "hide_notice", as: "global_hide_notice" });
+  it("global", async () => {
+    draw(function () {
+      this.controller("global", () => {
+        this.get("global/hide_notice");
         this.get("global/export", { action: "export", as: "export_request" });
         this.get("/export/:id/:file", {
           action: "export",
           as: "export_download",
           constraints: { file: /.*/ },
         });
-      });
-    });
-    expect(routes.recognizePath("/global/export").controller).toBe("global");
-    expect(routes.recognizePath("/global/export").action).toBe("export");
-    expect(routes.recognizePath("/global/hide_notice").controller).toBe("global");
-    expect(routes.recognizePath("/global/hide_notice").action).toBe("hide_notice");
-    expect(routes.recognizePath("/export/123/foo.txt").action).toBe("export");
-    expect(routes.pathFor({}, "export_request")).toBe("/global/export");
-    expect(routes.pathFor({}, "global_hide_notice")).toBe("/global/hide_notice");
-    expect(routes.pathFor({ id: "123", file: "foo.txt" }, "export_download")).toBe(
-      "/export/123/foo.txt",
-    );
-  });
 
-  it("local", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/local/dashboard", { to: "local#dashboard" });
-    });
-    expect(routes.recognizePath("/local/dashboard").action).toBe("dashboard");
-  });
-
-  it("url for with no side effects", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/projects/status(.:format)", { to: "projects#status" });
-    });
-    expect(() => routes.recognizePath("/projects/status")).not.toThrow();
-  });
-
-  it("url for does not modify controller", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/projects/status(.:format)", { to: "projects#status" });
-    });
-    expect(() => routes.recognizePath("/projects/status")).not.toThrow();
-  });
-
-  it("named route with no side effects", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("customers", () => {
-        this.member(() => {
-          this.get("profile", { as: "profile" });
+        deprecator().silence(() => {
+          this.get("global/:action");
         });
       });
     });
-    expect(() => routes.recognizePath("/customers/1/profile")).not.toThrow();
+
+    await t.get("/global/dashboard");
+    expect(t.response.body).toBe("global#dashboard");
+
+    await t.get("/global/export");
+    expect(t.response.body).toBe("global#export");
+
+    await t.get("/global/hide_notice");
+    expect(t.response.body).toBe("global#hide_notice");
+
+    await t.get("/export/123/foo.txt");
+    expect(t.response.body).toBe("global#export");
+
+    expect(t.exportRequestPath()).toBe("/global/export");
+    expect(t.globalHideNoticePath()).toBe("/global/hide_notice");
+    expect(t.exportDownloadPath({ id: 123, file: "foo.txt" })).toBe("/export/123/foo.txt");
+  });
+
+  it("local", async () => {
+    draw(function () {
+      deprecator().silence(() => {
+        this.get("/local/:action", { controller: "local" });
+      });
+    });
+
+    await t.get("/local/dashboard");
+    expect(t.response.body).toBe("local#dashboard");
+  });
+
+  it("url for with no side effects", () => {
+    draw(function () {
+      this.get("/projects/status(.:format)");
+    });
+
+    const originalOptions = { controller: "projects", action: "status" };
+    const options = { ...originalOptions };
+
+    t.urlFor(options);
+
+    expect(options).toEqual(originalOptions);
+  });
+
+  it("url for does not modify controller", () => {
+    draw(function () {
+      this.get("/projects/status(.:format)");
+    });
+
+    const controller = "/projects";
+    const options = { controller: controller, action: "status", onlyPath: true };
+    const url = t.urlFor(options);
+
+    expect(url).toBe("/projects/status");
+    expect(controller).toBe("/projects");
+  });
+
+  it("named route with no side effects", () => {
+    draw(function () {
+      this.resources("customers", () => {
+        this.get("profile", { on: "member" });
+      });
+    });
+
+    const originalOptions = { host: "test.host" };
+    const options = { ...originalOptions };
+
+    t.profileCustomerUrl("customer_model", options);
+
+    expect(options).toEqual(originalOptions);
   });
 
   it("projects", async () => {
