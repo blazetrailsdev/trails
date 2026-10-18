@@ -234,6 +234,27 @@ it("withConnection retries the checkout after an overlapping checkout rejects", 
   expect(pool.isActiveConnection()).toBeNull();
 });
 
+it("withConnection after a rejected overlapping checkout keeps a retry's connection leased", async () => {
+  const pool = makePool(2);
+  vi.spyOn(pool, "checkout").mockRejectedValueOnce(new Error("boom"));
+  let open!: () => void;
+  let retry!: Promise<void>;
+  const first = pool
+    .withConnection(() => undefined)
+    .catch(() => {
+      retry = pool.withConnection(async () => {
+        await new Promise<void>((resolve) => (open = resolve));
+      });
+    });
+  const second = pool.withConnection(() => undefined).catch(() => undefined);
+  await Promise.all([first, second]);
+  await vi.waitFor(() => expect(open).toBeDefined());
+  expect(pool.isActiveConnection()).not.toBeNull();
+  open();
+  await retry;
+  expect(pool.isActiveConnection()).toBeNull();
+});
+
 it("withConnection waits for a released connection when pool is saturated", async () => {
   const pool = makePool(1);
   const held = await pool.checkout();
