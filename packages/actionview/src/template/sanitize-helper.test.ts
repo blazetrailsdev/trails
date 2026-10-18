@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { include, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
+import { assertEqual, assertKindOf, assertRespondTo } from "@blazetrails/activesupport";
 
 declare const Loofah: unknown;
 declare const Rails: unknown;
@@ -171,22 +172,22 @@ function sanitizeHelperVendorTests(vendor: SanitizerVendor): void {
   it("full sanitizer returns a sanitizer", () => {
     const sanitizer = subjectClass.fullSanitizer;
 
-    expect(sanitizer.constructor).toBe(vendor.fullSanitizer);
-    expect(typeof sanitizer.sanitize).toBe("function");
+    assertEqual(vendor.fullSanitizer, sanitizer.constructor);
+    assertRespondTo(sanitizer, "sanitize");
   });
 
   it("link sanitizer returns a sanitizer", () => {
     const sanitizer = subjectClass.linkSanitizer;
 
-    expect(sanitizer.constructor).toBe(vendor.linkSanitizer);
-    expect(typeof sanitizer.sanitize).toBe("function");
+    assertEqual(vendor.linkSanitizer, sanitizer.constructor);
+    assertRespondTo(sanitizer, "sanitize");
   });
 
   it("safe list sanitizer returns a sanitizer", () => {
     const sanitizer = subjectClass.safeListSanitizer;
 
-    expect(sanitizer.constructor).toBe(vendor.safeListSanitizer);
-    expect(typeof sanitizer.sanitize).toBe("function");
+    assertEqual(vendor.safeListSanitizer, sanitizer.constructor);
+    assertRespondTo(sanitizer, "sanitize");
   });
 
   it("full sanitizer is settable", () => {
@@ -211,21 +212,21 @@ function sanitizeHelperVendorTests(vendor: SanitizerVendor): void {
   });
 
   it("deprecated methods are supported", () => {
-    expect(rbObjRespondTo(vendor, "whiteListSanitizer")).toBe(true);
+    assertRespondTo(vendor, "whiteListSanitizer");
   });
 
   it("sanitized allowed tags returns a string collection", () => {
     const result = (subjectClass as any).sanitizedAllowedTags() as Iterable<string>;
 
-    expect(typeof result[Symbol.iterator]).toBe("function");
-    expect(typeof Array.from(result)[0]).toBe("string");
+    assertKindOf(Set, result);
+    assertKindOf(String, Array.from(result)[0]);
   });
 
   it("sanitized allowed attributes returns a string collection", () => {
     const result = (subjectClass as any).sanitizedAllowedAttributes() as Iterable<string>;
 
-    expect(typeof result[Symbol.iterator]).toBe("function");
-    expect(typeof Array.from(result)[0]).toBe("string");
+    assertKindOf(Set, result);
+    assertKindOf(String, Array.from(result)[0]);
   });
 
   // BLOCKED: sanitize-helper-sanitized-allowed-writers
