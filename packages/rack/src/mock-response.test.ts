@@ -96,7 +96,7 @@ it("parses cookie headers with equals sign at the end", async () => {
 
 it("returns nil if a non existent cookie is requested", async () => {
   const res = await new MockRequest(app).get("/");
-  expect(res.cookie("nonexistent")).toBeUndefined();
+  expect(res.cookie("nonexistent")).toBeNull();
 });
 
 it("handles an empty cookie", async () => {

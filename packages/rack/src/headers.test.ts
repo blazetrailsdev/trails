@@ -459,7 +459,7 @@ describe("RackHeadersTest", () => {
 
   it("transform keys!", () => {
     const map: Record<string, string> = { ab: "Xy", cd: "dC", "3": "5" };
-    fh.transformKeysInPlace((k) => map[k]);
+    fh.transformKeysBang((k) => map[k]);
     expect(fh.get("xY")).toBe("1");
     expect(fh.get("DC")).toBe("2");
     expect(fh.get("5")).toBe("4");

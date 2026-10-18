@@ -2,34 +2,6 @@
   {
     "package": "rack",
     "tsFile": "multipart/parser.ts",
-    "rubyName": "check_part_limits",
-    "call": "multipart_file_limit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "multipart/parser.ts",
-    "rubyName": "check_part_limits",
-    "call": "multipart_total_part_limit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "multipart/parser.ts",
-    "rubyName": "handle_mime_head",
-    "call": "find_encoding",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "multipart/parser.ts",
-    "rubyName": "handle_mime_head",
-    "call": "new",
-    "reason": "Rails accumulates the quoted parameter value into a `String.new` (multipart/parser.rb:334); the port extracts that loop into `parseDispositionParams` (parser.ts:366) and accumulates into a plain JS string — as for the `find_encoding` row beside it."
-  },
-  {
-    "package": "rack",
-    "tsFile": "multipart/parser.ts",
     "rubyName": "initialize",
     "call": "new",
     "kind": "args",
@@ -41,24 +13,10 @@
   {
     "package": "rack",
     "tsFile": "multipart/parser.ts",
-    "rubyName": "normalize_filename",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "multipart/parser.ts",
     "rubyName": "on_mime_head",
     "call": "new",
     "kind": "args",
     "rubyArgs": [],
     "reason": "rack multipart/parser.rb:161 seeds the buffer part's body with `String.new` (a mutable String buffer); JS strings are immutable and have no such constructor, so the port seeds it with the empty string literal — the 5-argument `klass.new` beside it (parser.rb:164) is ported as-is."
-  },
-  {
-    "package": "rack",
-    "tsFile": "multipart/parser.ts",
-    "rubyName": "result",
-    "call": "new",
-    "reason": "multipart/parser.rb:247 is `MultipartInfo.new params, tmp_files`; trails' MultipartInfo (parser.ts:45) is an interface, so the same two fields are returned as an object literal. Surfaced by find_encoding dropping its `new TextDecoder`, which had been standing in for this `new`."
   }
 ]

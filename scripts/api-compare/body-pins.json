@@ -65676,6 +65676,111 @@
     "ref": "v8.0.2"
   },
   {
+    "package": "bcrypt",
+    "rubyFile": "engine.rb",
+    "rubyName": "autodetect_cost",
+    "digest": "a06023393195a5ac",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "engine.rb",
+    "rubyName": "calibrate",
+    "digest": "acb8cecc38a9be05",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "engine.rb",
+    "rubyName": "cost",
+    "digest": "bc7e0db2a601b930",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "engine.rb",
+    "rubyName": "cost=",
+    "digest": "8c5f9ff6889c7edd",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "engine.rb",
+    "rubyName": "generate_salt",
+    "digest": "bff5150a58802959",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "engine.rb",
+    "rubyName": "hash_secret",
+    "digest": "1965c2ccd4689dd6",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "engine.rb",
+    "rubyName": "valid_salt?",
+    "digest": "c8f7bed3a7d1f7ed",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "engine.rb",
+    "rubyName": "valid_secret?",
+    "digest": "24af9b39b5f271fc",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "password.rb",
+    "rubyName": "create",
+    "digest": "92ba34e0cba82ead",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "password.rb",
+    "rubyName": "initialize",
+    "digest": "438ff4888c9051b9",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "password.rb",
+    "rubyName": "split_hash",
+    "digest": "7f63485ebcf8516c",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "bcrypt",
+    "rubyFile": "password.rb",
+    "rubyName": "valid_hash?",
+    "digest": "80d8126ee78c8fb9",
+    "ref": "v3.1.20"
+  },
+  {
+    "package": "did-you-mean",
+    "rubyFile": "did_you_mean.rb",
+    "rubyName": "formatter",
+    "digest": "2caa99ff485b2ae4",
+    "ref": "v1.6.3"
+  },
+  {
+    "package": "did-you-mean",
+    "rubyFile": "did_you_mean.rb",
+    "rubyName": "formatter=",
+    "digest": "1cafa7a2f82010d9",
+    "ref": "v1.6.3"
+  },
+  {
+    "package": "did-you-mean",
+    "rubyFile": "formatter.rb",
+    "rubyName": "message_for",
+    "digest": "00a5808a45178bbd",
+    "ref": "v1.6.3"
+  },
+  {
     "package": "did-you-mean",
     "rubyFile": "jaro_winkler.rb",
     "rubyName": "distance",

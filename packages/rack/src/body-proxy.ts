@@ -49,6 +49,13 @@ export class BodyProxy {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  *[Symbol.iterator](): Iterator<any> {
+    const items: any[] = [];
+    this.each((item) => items.push(item));
+    yield* items;
+  }
+
   each(callback: (item: any) => void): void {
     if (Array.isArray(this.body)) {
       for (const item of this.body) callback(item);

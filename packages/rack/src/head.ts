@@ -1,6 +1,7 @@
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { REQUEST_METHOD, HEAD as HEAD_METHOD } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { BodyProxy } from "./body-proxy.js";
 
 export class Head {
   private app: RackApp;
@@ -14,8 +15,9 @@ export class Head {
     const [, , body] = response;
 
     if (env[REQUEST_METHOD] === HEAD_METHOD) {
-      if (body && typeof body.close === "function") body.close();
-      response[2] = [];
+      response[2] = new BodyProxy([], () => {
+        if (body && typeof body.close === "function") body.close();
+      });
     }
 
     return response;

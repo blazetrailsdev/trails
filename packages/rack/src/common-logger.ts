@@ -1,14 +1,7 @@
-import {
-  REQUEST_METHOD,
-  SCRIPT_NAME,
-  PATH_INFO,
-  QUERY_STRING,
-  SERVER_PROTOCOL,
-  CONTENT_LENGTH,
-} from "./constants.js";
+import { SERVER_PROTOCOL, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
 import { Process, sprintf, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
-import { forwardedValues } from "./utils.js";
+import { Request } from "./request.js";
 import { BodyProxy } from "./body-proxy.js";
 
 function clockTime(): number {
@@ -44,16 +37,7 @@ export class CommonLogger {
     responseHeaders: Record<string, string | string[]>,
     beganAt: number,
   ): void {
-    let addr: string;
-    if (env["HTTP_X_FORWARDED_FOR"]) {
-      addr = env["HTTP_X_FORWARDED_FOR"].split(",")[0].trim();
-    } else if (env["HTTP_FORWARDED"]) {
-      const forwarded = forwardedValues(env["HTTP_FORWARDED"]);
-      addr = forwarded?.for?.[0] || "-";
-    } else {
-      addr = env["REMOTE_ADDR"] || "-";
-    }
-
+    const request = new Request(env);
     const length = this.extractContentLength(responseHeaders);
 
     // boundary: Common Log Format timestamp (`[10/Oct/2000:13:55:36 -0700]`)
@@ -81,14 +65,14 @@ export class CommonLogger {
 
     let msg = sprintf(
       CommonLogger.FORMAT,
-      addr,
-      env["REMOTE_USER"] || "-",
+      request.ip || "-",
+      request.getHeader("REMOTE_USER") || "-",
       timestamp,
-      env[REQUEST_METHOD],
-      env[SCRIPT_NAME] || "",
-      env[PATH_INFO] || "",
-      env[QUERY_STRING] && env[QUERY_STRING].length > 0 ? `?${env[QUERY_STRING]}` : "",
-      env[SERVER_PROTOCOL],
+      request.requestMethod,
+      request.scriptName,
+      request.pathInfo,
+      request.queryString.length === 0 ? "" : `?${request.queryString}`,
+      request.getHeader(SERVER_PROTOCOL),
       String(status).slice(0, 4),
       length,
       clockTime() - beganAt,
@@ -99,7 +83,7 @@ export class CommonLogger {
     );
     msg = msg.slice(0, -1) + "\n";
 
-    const logger = this.logger || env["rack.errors"];
+    const logger = this.logger || request.getHeader(RACK_ERRORS);
 
     if (logger && typeof logger.write === "function") {
       logger.write(msg);

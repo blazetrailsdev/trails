@@ -44,6 +44,9 @@ it("close the body when it is removed", async () => {
   const { promise, getClosed } = testResponse({ REQUEST_METHOD: "HEAD" });
   const resp = await promise;
   expect(resp[0]).toBe(200);
-  expect(resp[2]).toEqual([]);
+  expect(resp[1]).toEqual({ "content-type": "test/plain", "content-length": "3" });
+  expect([...resp[2]]).toEqual([]);
+  expect(getClosed()).toBe(false);
+  resp[2].close();
   expect(getClosed()).toBe(true);
 });

@@ -761,6 +761,39 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#check"]).toEqual(["ref:size"]);
   });
 
+  it("records Kernel#fail as raise in a file with no fail of its own", () => {
+    const c = rubyCalls({
+      "foo.rb": `
+        class Foo
+          def a; fail "missing" unless ok?; end
+        end
+      `,
+      "bar.rb": `
+        class Bar
+          def get; fail(405, "no"); end
+          def fail(status, body); [status, body]; end
+        end
+      `,
+    });
+    expect(c["Foo#a"]).toEqual(["ok?", "raise"]);
+    expect(c["Bar#get"]).toEqual(["fail"]);
+  });
+
+  it("leaves a literal-new out of the call sequence", () => {
+    const c = rubyCalls({
+      "foo.rb": `
+        class Foo
+          def a
+            h = Hash.new
+            h[:x] = build
+            Cookie.new(h)
+          end
+        end
+      `,
+    });
+    expect(c["Foo#a"]).toEqual(["build", "new"]);
+  });
+
   it("still reads a bare name as a call when the regexp is on the right of `=~`", () => {
     const c = rubyCalls({
       "foo.rb": `
@@ -3758,8 +3791,8 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
         end
       `,
     });
-    expect(c["Core#literal"]).toEqual({ new: ["literal-new"], tap: ["expr"] });
-    expect(c["Core#concurrent"]).toEqual({ new: ["literal-new"] });
+    expect(c["Core#literal"]).toEqual({ tap: ["expr"] });
+    expect(c["Core#concurrent"]).toBeNull();
     expect(c["Core#concurrent_map"]).toEqual({ new: ["const"] });
     expect(c["Core#concurrent_sized"]).toEqual({ new: ["const"] });
     expect(c["Core#defaulted"]).toEqual({ new: ["const"] });

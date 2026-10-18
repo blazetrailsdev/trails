@@ -34,6 +34,7 @@ export class BaseIterator {
     });
   }
 
+  /** @noRailsEquivalent PERMANENT */
   *[Symbol.iterator](): Generator<string | Uint8Array> {
     const chunks: (string | Uint8Array)[] = [];
     this.each((chunk) => chunks.push(chunk));

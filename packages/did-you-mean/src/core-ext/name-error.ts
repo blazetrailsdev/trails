@@ -1,5 +1,5 @@
 import { Exception, excToS, Module, StandardError } from "@blazetrails/ruby-compat";
-import { formatter } from "../index.js";
+import { formatter } from "../did-you-mean.js";
 
 interface CorrectableHost extends Error {
   readonly corrections: string[];
