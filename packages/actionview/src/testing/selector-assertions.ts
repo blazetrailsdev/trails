@@ -30,12 +30,7 @@ export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): Nod
   }
 
   const matches = selector.select();
-  assertSizeMatch(
-    matches.size,
-    selector.tests,
-    selector.cssSelector,
-    selector.message as string | null,
-  );
+  assertSizeMatch(matches.size, selector.tests, selector.cssSelector, selector.message);
 
   if (block && !matches.isEmpty()) nestSelection.call(this, matches, block);
   return matches;
@@ -56,16 +51,17 @@ function assertSizeMatch(
   size: number,
   equals: EqualityTests,
   cssSelector: string,
-  message: string | null = null,
+  message: unknown = null,
 ): void {
   const [min, max, count] = [equals.minimum, equals.maximum, equals.count];
 
-  message ||= `Expected ${countDescription(min, max, count)} matching ${rbInspect(cssSelector)}, found ${size}`;
+  if (message == null || message === false)
+    message = `Expected ${countDescription(min, max, count)} matching ${rbInspect(cssSelector)}, found ${size}`;
   if (count != null) {
-    assertEqual(count, size, message);
+    assertEqual(count, size, message as string);
   } else {
-    if (min != null) assertOperator(size, ">=", min, message);
-    if (max != null) assertOperator(size, "<=", max, message);
+    if (min != null) assertOperator(size, ">=", min, message as string);
+    if (max != null) assertOperator(size, "<=", max, message as string);
   }
 }
 

@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import "../../test-helpers/abstract-unit.js";
-import { renderContent } from "../../test-helpers/tse-block-test-case.js";
+import { BlockTestCase } from "../../test-helpers/tse-block-test-case.js";
 
 describe("TagHelperTest", () => {
+  const testCase = new BlockTestCase();
+  const renderContent = async (...args: Parameters<BlockTestCase["renderContent"]>) =>
+    String(await testCase.renderContent(...args));
+
   it("percent equals works for content_tag and does not require parenthesis on method call", async () => {
     expect(await renderContent('contentTag("div", null, null, true, ', "Hello world")).toBe(
       "<div>Hello world</div>",

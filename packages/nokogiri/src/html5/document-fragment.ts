@@ -15,7 +15,7 @@ export class DocumentFragment {
   private _children?: Node[];
 
   get children(): Node[] {
-    return (this._children ??= childNodes(this._fragment));
+    return (this._children ??= childNodes(this._fragment, this));
   }
 
   css(...args: unknown[]): NodeSet {

@@ -56,28 +56,21 @@ export function truncate(
 }
 
 export interface PluralizeOptions {
-  plural?: string;
+  plural?: string | null;
   locale?: string;
 }
 
 export function pluralize(
   count: number | string | null | undefined,
   singular: string,
-  pluralOrOptions?: string | PluralizeOptions,
+  pluralArg: string | null = null,
+  { plural = pluralArg, locale = String(I18n.locale()) }: PluralizeOptions = {},
 ): string {
-  let plural: string | undefined;
-  let locale = String(I18n.locale());
-  if (typeof pluralOrOptions === "string") {
-    plural = pluralOrOptions;
-  } else if (pluralOrOptions) {
-    if (pluralOrOptions.plural !== undefined) plural = pluralOrOptions.plural;
-    if (pluralOrOptions.locale !== undefined) locale = pluralOrOptions.locale;
-  }
+  const word =
+    count === 1 || /^1(\.0+)?$/.test(String(count ?? ""))
+      ? singular
+      : (plural ?? inflectorPluralize(singular, locale));
 
-  const isOne =
-    count === 1 || count === "1" || (typeof count === "string" && /^1(\.0+)?$/.test(count));
-
-  const word = isOne ? singular : (plural ?? inflectorPluralize(singular, locale));
   return `${count ?? 0} ${word}`;
 }
 

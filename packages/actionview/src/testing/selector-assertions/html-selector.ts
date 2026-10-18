@@ -1,5 +1,5 @@
 import { diff } from "@blazetrails/activesupport";
-import { ArgumentError, Range } from "@blazetrails/ruby-compat";
+import { ArgumentError, Range, strip } from "@blazetrails/ruby-compat";
 import { XML, type Html5Node, type NodeSet } from "@blazetrails/nokogiri";
 import { SubstitutionContext } from "./substitution-context.js";
 
@@ -14,9 +14,9 @@ export interface EqualityTests {
 }
 
 export class HTMLSelector {
-  static readonly context = new SubstitutionContext();
+  private static readonly context = new SubstitutionContext();
 
-  readonly cssSelector!: string;
+  cssSelector!: string;
   readonly tests: EqualityTests;
   message: unknown;
   private readonly _values: unknown[];
@@ -52,7 +52,6 @@ export class HTMLSelector {
     return this.filter(this._root.css(this._selector, HTMLSelector.context));
   }
 
-  /** @internal */
   private filter(matches: NodeSet): NodeSet {
     const matchWith = this.tests.text ?? this.tests.html;
     if (matches.isEmpty() || matchWith == null) return matches;
@@ -64,7 +63,7 @@ export class HTMLSelector {
     const remaining = [...matches].filter((match: Html5Node) => {
       let content = textMatches ? match.text : match.children.join("");
 
-      if (!NO_STRIP.includes(match.name)) content = content.trim();
+      if (!NO_STRIP.includes(match.name)) content = strip(content);
       if (textMatches && match.name === "textarea" && content.startsWith("\n")) {
         content = content.slice(1);
       }
@@ -74,11 +73,12 @@ export class HTMLSelector {
       return false;
     });
 
-    if (remaining.length === 0) this.message ??= contentMismatch;
+    if (remaining.length === 0 && (this.message == null || this.message === false)) {
+      this.message = contentMismatch;
+    }
     return new XML.NodeSet(matches.document, remaining);
   }
 
-  /** @internal */
   private extractRoot(previousSelection: unknown, rootFallback: () => unknown): unknown {
     const possibleRoot = this._values[0];
 
@@ -98,7 +98,6 @@ export class HTMLSelector {
     }
   }
 
-  /** @internal */
   private extractSelectors(): void {
     const selector = this._values.shift();
 
@@ -106,19 +105,16 @@ export class HTMLSelector {
       throw new ArgumentError("Expecting a selector as the first argument");
     }
 
-    (this as { cssSelector: string }).cssSelector = HTMLSelector.context.substituteBang(
-      selector,
-      [...this._values],
-      true,
-    );
+    this.cssSelector = HTMLSelector.context.substituteBang(selector, [...this._values], true);
     this._selector = HTMLSelector.context.substituteBang(selector, this._values);
   }
 
-  /** @internal */
   private extractEqualityTests(): EqualityTests {
     let comparisons: EqualityTests = {};
     const comparator = this._values.shift();
-    if (typeof comparator === "string" || comparator instanceof RegExp) {
+    if (comparator != null && Object.getPrototypeOf(comparator) === Object.prototype) {
+      comparisons = comparator as EqualityTests;
+    } else if (typeof comparator === "string" || comparator instanceof RegExp) {
       comparisons.text = comparator;
     } else if (typeof comparator === "number" && Number.isInteger(comparator)) {
       comparisons.count = comparator;
@@ -129,8 +125,6 @@ export class HTMLSelector {
       comparisons.count = 0;
     } else if (comparator == null || comparator === true) {
       comparisons.minimum = 1;
-    } else if (Object.getPrototypeOf(comparator) === Object.prototype) {
-      comparisons = comparator as EqualityTests;
     } else {
       throw new ArgumentError("I don't understand what you're trying to match");
     }

@@ -315,8 +315,8 @@ describe("TextHelperTest", () => {
     expect(pluralize("1.00", "count")).toBe("1.00 count");
     expect(pluralize(2, "count", "counters")).toBe("2 counters");
     expect(pluralize(null, "count", "counters")).toBe("0 counters");
-    expect(pluralize(2, "count", { plural: "counters" })).toBe("2 counters");
-    expect(pluralize(null, "count", { plural: "counters" })).toBe("0 counters");
+    expect(pluralize(2, "count", null, { plural: "counters" })).toBe("2 counters");
+    expect(pluralize(null, "count", null, { plural: "counters" })).toBe("0 counters");
     expect(pluralize(2, "person")).toBe("2 people");
     expect(pluralize(10, "buffalo")).toBe("10 buffaloes");
     expect(pluralize(1, "berry")).toBe("1 berry");
@@ -337,7 +337,7 @@ describe("TextHelperTest", () => {
 
       expect(pluralize(1, "region")).toBe("1 region");
       expect(pluralize(2, "region")).toBe("2 regionen");
-      expect(pluralize(2, "region", { locale: "en" })).toBe("2 regions");
+      expect(pluralize(2, "region", null, { locale: "en" })).toBe("2 regions");
     } finally {
       I18n.setLocale(oldLocale);
       I18n.setEnforceAvailableLocales(enforceAvailableLocales);

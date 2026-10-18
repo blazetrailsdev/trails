@@ -1,18 +1,21 @@
 import type { DefaultTreeAdapterMap } from "parse5";
+import { Module } from "@blazetrails/ruby-compat";
 
 import { Node } from "../html5/node.js";
 import { NodeSet } from "./node-set.js";
 import { SyntaxError } from "../css/syntax-error.js";
+import { SyntaxError as XPathSyntaxError } from "./xpath/syntax-error.js";
 
 type Parse5Node = DefaultTreeAdapterMap["node"];
 type Parse5Element = DefaultTreeAdapterMap["element"];
 
-export interface Searchable {
-  readonly document?: unknown;
+export interface SearchableHost {
+  readonly document: unknown;
   readonly _node: Parse5Node;
   css(...args: unknown[]): NodeSet;
 }
 
+/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
 interface Compound {
   tag: string | null;
   ids: string[];
@@ -20,61 +23,112 @@ interface Compound {
   attrs: [string, string | null, string][];
   pseudos: [string, string | null][];
 }
-type Path = { contexts: readonly string[]; groups: [string, Compound][][] };
 
-export function css(this: Searchable, ...args: unknown[]): NodeSet {
-  const [rules, handler] = extractParams(args);
+export function css(this: SearchableHost, ...args: unknown[]): NodeSet {
+  const [rules, handler, ns] = extractParams(args);
 
-  return cssInternal(this, rules, handler);
+  return cssInternal(this, rules, handler, ns);
 }
 
-export function atCss(this: Searchable, ...args: unknown[]): Node | undefined {
+export function atCss(this: SearchableHost, ...args: unknown[]): Node | undefined {
   return this.css(...args).first();
 }
 
+export const Searchable = new Module((mod) => {
+  mod.moduleEval((m) => Object.assign(m, { css, atCss }));
+});
+
 /** @internal */
-export function extractParams(params: unknown[]): [string[], unknown] {
+export function extractParams(
+  params: unknown[],
+): [string[], unknown, Record<string, string>, Record<string, unknown> | undefined] {
   const handler = params.find(
-    (param) => typeof param !== "string" && Object.getPrototypeOf(param) !== Object.prototype,
+    (param) => param != null && typeof param !== "string" && !isHash(param),
   );
   if (handler !== undefined) params = params.filter((param) => param !== handler);
 
-  return [params.filter((param): param is string => typeof param === "string"), handler];
+  const hashes: unknown[] = [];
+  while (isHash(params.at(-1)) || params.at(-1) == null) {
+    hashes.push(params.pop());
+    if (params.length === 0) break;
+  }
+  const [ns, binds] = hashes.reverse() as [
+    Record<string, string> | undefined,
+    Record<string, unknown> | undefined,
+  ];
+
+  return [params as string[], handler, ns ?? {}, binds];
 }
 
-function cssInternal(node: Searchable, rules: string[], handler: unknown): NodeSet {
-  return xpathInternal(node, cssRulesToXpath(node, rules), handler);
+function isHash(param: unknown): param is Record<string, unknown> {
+  return param != null && Object.getPrototypeOf(param) === Object.prototype;
+}
+
+function cssInternal(
+  node: SearchableHost,
+  rules: string[],
+  handler: unknown,
+  ns: Record<string, string>,
+): NodeSet {
+  return xpathInternal(node, cssRulesToXpath(node, rules, ns), handler, ns, null);
 }
 
 /** @internal */
-export function cssRulesToXpath(node: Searchable, rules: string[]): Path[] {
-  return rules.map((rule) => xpathQueryFromCssRule(node, rule));
+export function cssRulesToXpath(node: SearchableHost, rules: string[], ns: Record<string, string>) {
+  return rules.map((rule) => xpathQueryFromCssRule(node, rule, ns));
 }
 
-function xpathQueryFromCssRule(node: Searchable, rule: string): Path {
-  const contexts = (node.constructor as unknown as { IMPLIED_XPATH_CONTEXTS: readonly string[] })
-    .IMPLIED_XPATH_CONTEXTS;
-  return { contexts, groups: new Parser(rule).parse() };
+function xpathQueryFromCssRule(node: SearchableHost, rule: string, _ns: Record<string, string>) {
+  return (
+    node.constructor as unknown as { IMPLIED_XPATH_CONTEXTS: readonly string[] }
+  ).IMPLIED_XPATH_CONTEXTS.map((impliedXpathContext) => ({
+    prefix: impliedXpathContext,
+    groups: new Parser(rule).parse(),
+  }));
 }
+
+type Path = ReturnType<typeof xpathQueryFromCssRule>;
 
 /** @internal */
-export function xpathInternal(node: Searchable, paths: Path[], handler: unknown): NodeSet {
+export function xpathInternal(
+  node: SearchableHost,
+  paths: Path[],
+  handler: unknown,
+  ns: Record<string, string>,
+  binds: Record<string, unknown> | null,
+): NodeSet {
+  const document = node.document;
+  if (document == null) return new NodeSet(document);
+
+  if (paths.length === 1) return xpathImpl(node, paths[0], handler, ns, binds);
+
+  return paths.reduce(
+    (combined, path) => combined.plus(xpathImpl(node, path, handler, ns, binds)),
+    new NodeSet(document),
+  );
+}
+
+function xpathImpl(
+  node: SearchableHost,
+  path: Path,
+  handler: unknown,
+  _ns: Record<string, string>,
+  _binds: Record<string, unknown> | null,
+): NodeSet {
   const found = new Set<Parse5Node>();
-  for (const path of paths) {
-    for (const context of path.contexts) {
-      const start =
-        context === "self::"
-          ? [node._node]
-          : descendants(context === "//" ? rootOf(node._node) : node._node);
-      for (const steps of path.groups) {
-        for (const el of evaluate(start, steps, handler)) found.add(el);
-      }
+  for (const { prefix, groups } of path) {
+    const start =
+      prefix === "self::"
+        ? [node._node]
+        : descendants(prefix === "//" ? rootOf(node._node) : node._node);
+    for (const steps of groups) {
+      for (const el of evaluate(start, steps, handler)) found.add(el);
     }
   }
   const ordered = descendants(rootOf(node._node), true).filter((n) => found.has(n));
   return new NodeSet(
-    node.document ?? null,
-    ordered.map((n) => new Node(n as DefaultTreeAdapterMap["childNode"])),
+    node.document,
+    ordered.map((n) => new Node(n as DefaultTreeAdapterMap["childNode"], node.document)),
   );
 }
 
@@ -130,16 +184,29 @@ function matches(n: Parse5Node, c: Compound, handler: unknown): boolean {
     } else if (name === "only-child") {
       if (siblings.length !== 1) return false;
     } else if (name === "nth-child") {
-      const nth = args === "odd" ? index % 2 === 1 : args === "even" ? index % 2 === 0 : null;
-      if (nth === false || (nth === null && index !== Number(args))) return false;
+      const nth = /^\s*(?:([+-]?\d*)n\s*(?:([+-])\s*(\d+))?|([+-]?\d+))\s*$/.exec(
+        args === "odd" ? "2n+1" : args === "even" ? "2n" : (args ?? ""),
+      );
+      if (nth === null) throw new SyntaxError(`unexpected '${args}' in nth-child`);
+      const a =
+        nth[4] !== undefined
+          ? 0
+          : nth[1] === "" || nth[1] === "+"
+            ? 1
+            : nth[1] === "-"
+              ? -1
+              : Number(nth[1]);
+      const b = nth[4] !== undefined ? Number(nth[4]) : Number(`${nth[2] ?? "+"}${nth[3] ?? "0"}`);
+      if (a === 0 ? index !== b : (index - b) / a < 0 || (index - b) % a !== 0) return false;
     } else if (name === "empty") {
       if (n.childNodes.length > 0) return false;
     } else if (name === "not") {
       if (matches(n, new Parser(args!).compound(), handler)) return false;
     } else {
       const fn = (handler as Record<string, (...a: unknown[]) => unknown[]> | undefined)?.[name];
-      if (typeof fn !== "function") throw new Error(`Invalid pseudo-class: ${name}`);
-      if (fn.call(handler, [new Node(n)], ...splitArgs(args ?? "")).length === 0) return false;
+      if (typeof fn !== "function") throw new XPathSyntaxError(`Unregistered function: ${name}`);
+      if (fn.call(handler, [new Node(n, null)], ...splitArgs(args ?? "")).length === 0)
+        return false;
     }
   }
   return true;
@@ -190,7 +257,11 @@ class Parser {
       const ws = this.eat(/\s*/);
       const comb = this.eat(/[>+~,]/);
       this.eat(/\s*/);
-      if (this.pos >= this.src.length) break;
+      if (this.pos >= this.src.length) {
+        if (comb)
+          throw new SyntaxError(`unexpected end of selector after '${comb}' in ${this.src}`);
+        break;
+      }
       if (comb === ",") {
         groups.push(steps);
         steps = [[" ", this.compound()]];
@@ -223,6 +294,11 @@ class Parser {
       } else if (sigil === ":") {
         const name = this.eat(/[-\w]+/)!;
         c.pseudos.push([name, this.src[this.pos] === "(" ? this.balanced() : null]);
+      } else if (
+        c.tag === null &&
+        c.ids.length + c.classes.length + c.attrs.length + c.pseudos.length === 0
+      ) {
+        throw new SyntaxError(`unexpected '${this.src[this.pos] ?? "$"}' in ${this.src}`);
       } else return c;
     }
   }

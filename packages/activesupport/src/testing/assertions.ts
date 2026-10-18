@@ -747,8 +747,8 @@ export function assertOperator(
   msg: string | (() => string) | null = null,
 ): true {
   if (o2 === undefined) {
-    assertPredicate(o1, (value) => rbFSend(value, op), (msg ?? undefined) as string | undefined);
-    return true;
+    msg = message(msg, null, () => `Expected ${inspect(o1)} to be ${op}`);
+    return assert(rbFSend(o1, op), msg);
   }
   msg = message(msg, null, () => `Expected ${inspect(o1)} to be ${op} ${inspect(o2)}`);
   return assert(rbFSend(o1, op, o2), msg);

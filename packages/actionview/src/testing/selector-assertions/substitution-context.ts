@@ -1,4 +1,4 @@
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect, rbRegInitStr, rbRegToS } from "@blazetrails/ruby-compat";
 import type { Html5Node } from "@blazetrails/nokogiri";
 
 export class SubstitutionContext {
@@ -18,22 +18,20 @@ export class SubstitutionContext {
   match(matches: Html5Node[], attribute: string, matcher: string): Html5Node[] {
     return matches.filter((node) => {
       const value = node.get(attribute);
-      return value != null && new RegExp(matcher).test(value);
+      return value != null && rbRegInitStr(matcher).test(value);
     });
   }
 
-  /** @internal */
   private matcherFor(value: unknown, formatForPresentation: boolean): string {
     if (formatForPresentation) {
       return rbInspect(value);
     } else if (value instanceof RegExp) {
-      return `"${value.source}"`;
+      return `"${rbRegToS(value, "onig")}"`;
     } else {
       return rbInspect(String(value));
     }
   }
 
-  /** @internal */
   private isSubstitutable(value: unknown): boolean {
     return typeof value === "string" || typeof value === "number" || value instanceof RegExp;
   }

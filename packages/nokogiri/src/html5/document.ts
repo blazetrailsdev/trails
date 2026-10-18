@@ -1,10 +1,10 @@
 import { parse, type DefaultTreeAdapterMap } from "parse5";
-import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { readSource, type Readable } from "../readable.js";
 import { childNodes, type Node } from "./node.js";
 import type { NodeSet } from "../xml/node-set.js";
-import { atCss, css } from "../xml/searchable.js";
+import { Searchable } from "../xml/searchable.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 
@@ -22,7 +22,10 @@ export class Document {
   encoding: string | null = null;
 
   private constructor(
-    /** @internal */
+    /**
+     * @internal
+     * @noRailsEquivalent PERMANENT
+     */
     readonly _node: Parse5Document,
   ) {}
 
@@ -71,10 +74,14 @@ export class Document {
     return doc;
   }
 
+  get document(): Document {
+    return this;
+  }
+
   get root(): Node | null {
-    const root = childNodes(this._node).find((node) => node.isElement());
+    const root = childNodes(this._node, this).find((node) => node.isElement());
     return root ?? null;
   }
 }
 
-Object.assign(Document.prototype, { css, atCss });
+include(Document, Searchable);

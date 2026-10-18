@@ -1,5 +1,10 @@
 import type { Node } from "../html5/node.js";
-import { cssRulesToXpath, extractParams, xpathInternal, type Searchable } from "./searchable.js";
+import {
+  cssRulesToXpath,
+  extractParams,
+  xpathInternal,
+  type SearchableHost,
+} from "./searchable.js";
 
 export class NodeSet implements Iterable<Node> {
   static readonly IMPLIED_XPATH_CONTEXTS = [".//", "self::"] as const;
@@ -22,11 +27,12 @@ export class NodeSet implements Iterable<Node> {
   }
 
   css(...args: unknown[]): NodeSet {
-    const [rules, handler] = extractParams(args);
-    const paths = cssRulesToXpath(this as unknown as Searchable, rules);
+    const [rules, handler, ns] = extractParams(args);
+    const paths = cssRulesToXpath(this as unknown as SearchableHost, rules, ns);
 
     return this._list.reduce(
-      (set, node) => set.plus(xpathInternal(node as unknown as Searchable, paths, handler)),
+      (set, node) =>
+        set.plus(xpathInternal(node as unknown as SearchableHost, paths, handler, ns, null)),
       new NodeSet(this.document),
     );
   }

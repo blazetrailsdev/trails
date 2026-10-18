@@ -308,12 +308,46 @@ describe("TSETrackerTest", () => {
 });
 
 describe("RubyTrackerTests", () => {
-  // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
-  it.skip("dependencies skip unknown options", () => {});
+  function makeTracker(name: string, template: FakeTemplate, viewPaths: PathSet | null = null) {
+    return new TSETracker(name, asTemplate(template), viewPaths);
+  }
 
   // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
-  it.skip("dependencies finds spacer templates", () => {});
+  it.skip("dependencies skip unknown options", () => {
+    const template = new FakeTemplate(
+      `
+      <%= render partial: "unknown_render_call", unknown_render_option: "yes" %>
+    `,
+      "tse",
+    );
+    const tracker = makeTracker("interpolation/_string", template);
+
+    expect(tracker.dependencies()).toEqual([]);
+  });
 
   // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
-  it.skip("dependencies skip commented out renders", () => {});
+  it.skip("dependencies finds spacer templates", () => {
+    const template = new FakeTemplate(
+      `
+      <%= render partial: "messages/message", collection: books, spacer_template: "messages/message_spacer" %>
+    `,
+      "tse",
+    );
+    const tracker = makeTracker("messages/show", template);
+
+    expect(tracker.dependencies()).toEqual(["messages/message_spacer", "messages/message"]);
+  });
+
+  // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
+  it.skip("dependencies skip commented out renders", () => {
+    const template = new FakeTemplate(
+      `
+      <%# render "messages/legacy_message" %>
+    `,
+      "tse",
+    );
+    const tracker = makeTracker("messages/show", template);
+
+    expect(tracker.dependencies()).toEqual([]);
+  });
 });

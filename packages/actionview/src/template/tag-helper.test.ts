@@ -786,7 +786,9 @@ describe("TagHelperTest", () => {
   });
 
   it("tag builder with options builds p elements", () => {
-    const html = withOptions(tag() as any, { id: "with-options" }, (t: any) => t.p("content"));
+    const html = withOptions(tag() as TagBuilder, { id: "with-options" }, (t) =>
+      (t as unknown as { p(content: string): unknown }).p("content"),
+    );
 
     assertDomEqual('<p id="with-options">content</p>', html);
   });

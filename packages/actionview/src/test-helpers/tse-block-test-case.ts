@@ -6,29 +6,27 @@ import { Tse } from "../template/handlers/tse.js";
 
 class Context extends Base {}
 
-export async function renderContent(
-  start: string,
-  inside: string,
-  routes: RouteSet | null = null,
-): Promise<string> {
-  routes ??= (() => {
-    const rs = new RouteSet();
-    rs.draw(() => {});
-    return rs;
-  })();
+export class BlockTestCase {
+  static Context: typeof Context = Context;
 
-  const view = class extends Context {};
-  include(view, routes.urlHelpers());
+  async renderContent(start: string, inside: string, routes: RouteSet | null = null) {
+    routes ??= (() => {
+      const rs = new RouteSet();
+      rs.draw(() => {});
+      return rs;
+    })();
 
-  return String(
-    await new Template(blockHelper(start, inside), `test${Math.random()}`, new Tse(), {
+    const view = class extends BlockTestCase.Context {};
+    include(view, routes.urlHelpers());
+
+    return new Template(this.blockHelper(start, inside), `test${Math.random()}`, new Tse(), {
       virtualPath: "partial",
       format: ":html",
       locals: [],
-    }).render(view.withEmptyTemplateCache().empty(), {}),
-  );
-}
+    }).render(view.withEmptyTemplateCache().empty(), {});
+  }
 
-function blockHelper(str: string, rest: string): string {
-  return `<%= ${str}() => { %>${rest}<% }) %>`;
+  blockHelper(str: string, rest: string): string {
+    return `<%= ${str}() => { %>${rest}<% }) %>`;
+  }
 }
