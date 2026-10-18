@@ -1,5 +1,10 @@
 import { assert, assertEqual, assertOperator } from "@blazetrails/activesupport";
-import { ArgumentError, NotImplementedError, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  LocalJumpError,
+  NotImplementedError,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
 import {
   HTML5,
   XML,
@@ -39,7 +44,7 @@ export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): Nod
   const matches = selector.select();
   assertSizeMatch(matches.size, selector.tests, selector.cssSelector, selector.message);
 
-  if (block && !matches.isEmpty()) nestSelection.call(this, matches, block);
+  if (block && !matches.isEmpty()) (nestSelection<NodeSet>).call(this, matches, block);
   return matches;
 }
 
@@ -65,9 +70,10 @@ export function assertDomEncoded(
     .join("");
 
   const selected = Testing.htmlDocumentFragment({ htmlVersion }).parse(content);
-  nestSelection.call(this, selected, () => {
+  (nestSelection<Html5DocumentFragment>).call(this, selected, () => {
     if (content.length === 0) {
-      block!(selected);
+      if (!block) throw new LocalJumpError("no block given (yield)");
+      block(selected);
     } else {
       assertDom.call(this, ":root", ...(block ? [block] : []));
     }
@@ -119,15 +125,15 @@ function pluralizeElement(quantity: number): string {
   return quantity === 1 ? "element" : "elements";
 }
 
-function nestSelection(
+function nestSelection<T extends NodeSet | Html5DocumentFragment>(
   this: SelectorAssertionsHost,
-  selection: NodeSet | Html5DocumentFragment,
-  block: (selected: never) => void,
+  selection: T,
+  block: (selected: T) => void,
 ): void {
   const oldSelected = this._selected;
   this._selected = selection;
   try {
-    block(this._selected as never);
+    block(this._selected as T);
   } finally {
     this._selected = oldSelected;
   }

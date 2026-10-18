@@ -5,7 +5,7 @@ import {
   extend,
   type Extended,
 } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
+import { Module, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Tags } from "./namespaces.js";
 import { ActiveModelHelper } from "./helpers/active-model-helper.js";
 import { AssetTagHelper } from "./helpers/asset-tag-helper.js";
@@ -48,9 +48,8 @@ type HelpersModule = Module &
 export const Helpers: HelpersModule = new Module((mod) => {
   extend(mod, Autoload);
   const helpers = mod as HelpersModule;
-  helpers.loadPath = {};
   helpers.autoload("Tags");
-  helpers.Tags = Tags;
+  rbModConstSet(helpers, "Tags", Tags);
   Object.defineProperty(helpers, "eagerLoadBang", {
     value: async function eagerLoadBang(this: HelpersModule): Promise<void> {
       await Autoload.eagerLoadBang.call(this);

@@ -6,6 +6,7 @@ import {
   isPlainObject,
   withOptions,
   type SafeBuffer,
+  type TimeWithZone,
 } from "@blazetrails/activesupport";
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import {
@@ -37,7 +38,7 @@ const MINUTES_IN_YEAR = 525600;
 const MINUTES_IN_QUARTER_YEAR = 131400;
 const MINUTES_IN_THREE_QUARTERS_YEAR = 394200;
 
-export type DistanceOfTimeInput = Date | number | Temporal.Instant | { toTime: () => Time };
+export type DistanceOfTimeInput = Date | number | Temporal.Instant | Time | TimeWithZone;
 
 export interface DistanceOfTimeOptions {
   includeSeconds?: boolean;
@@ -54,11 +55,11 @@ export function distanceOfTimeInWords(
 
   fromTime = normalizeDistanceOfTimeArgumentToTime(fromTime);
   toTime = normalizeDistanceOfTimeArgumentToTime(toTime);
-  if ((fromTime as Time).compare(toTime)! > 0) {
+  if (fromTime.compare(toTime)! > 0) {
     [fromTime, toTime] = [toTime, fromTime];
   }
-  const distanceInMinutes = Math.round(((toTime as Time).minus(fromTime as Time) as number) / 60.0);
-  const distanceInSeconds = Math.round((toTime as Time).minus(fromTime as Time) as number);
+  const distanceInMinutes = Math.round((toTime.minus(fromTime) as number) / 60.0);
+  const distanceInSeconds = Math.round(toTime.minus(fromTime) as number);
 
   return withOptions(I18n, { locale: options.locale, scope: options.scope }, (locale) => {
     if (distanceInMinutes <= 1) {
@@ -86,10 +87,10 @@ export function distanceOfTimeInWords(
     if (distanceInMinutes < 525600)
       return locale.t("x_months", { count: Math.round(distanceInMinutes / 43200) });
 
-    let fromYear = (fromTime as Time).year;
-    if ((fromTime as Time).month >= 3) fromYear += 1;
-    let toYear = (toTime as Time).year;
-    if ((toTime as Time).month < 3) toYear -= 1;
+    let fromYear = fromTime.year;
+    if (fromTime.month >= 3) fromYear += 1;
+    let toYear = toTime.year;
+    if (toTime.month < 3) toYear -= 1;
     const leapYears =
       fromYear > toYear
         ? 0
