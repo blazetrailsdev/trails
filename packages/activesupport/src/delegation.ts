@@ -14,6 +14,10 @@ import { callerLocations, type CallerLocation } from "./deprecation.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 export class DelegationError extends Error {
+  static toString(): string {
+    return "ActiveSupport::DelegationError";
+  }
+
   constructor(message: string) {
     super(message);
     this.name = "DelegationError";

@@ -3,11 +3,19 @@ import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
 
-export class FormatError extends StandardError {}
+export class FormatError extends StandardError {
+  static toString(): string {
+    return "ActiveSupport::ConfigurationFile::FormatError";
+  }
+}
 
 FormatError.prototype.name = "ActiveSupport::ConfigurationFile::FormatError";
 
 export class ConfigurationFile {
+  static toString(): string {
+    return "ActiveSupport::ConfigurationFile";
+  }
+
   private content: string;
   private contentPath: string;
 

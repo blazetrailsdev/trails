@@ -4,6 +4,10 @@ import { ActiveJob, Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
 export class DurationSerializer extends ObjectSerializer {
+  static toString(): string {
+    return "ActiveJob::Serializers::DurationSerializer";
+  }
+
   serialize(duration: Duration): Record<string, unknown> {
     return super.serialize({
       value: duration.value,

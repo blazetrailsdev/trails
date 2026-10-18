@@ -7,6 +7,10 @@ import {
 } from "@blazetrails/ruby-compat";
 
 export class SyntaxErrorProxy extends DelegateClass(SyntaxError) {
+  static toString(): string {
+    return "ActiveSupport::SyntaxErrorProxy";
+  }
+
   backtrace(): string[] {
     return [...this.parseMessageForTrace(), ...(excBacktrace(this.__getobj__()) ?? [])];
   }
@@ -41,6 +45,10 @@ export class SyntaxErrorProxy extends DelegateClass(SyntaxError) {
 }
 
 class BacktraceLocation {
+  static toString(): string {
+    return "ActiveSupport::SyntaxErrorProxy::BacktraceLocation";
+  }
+
   #toS: string;
 
   constructor(
@@ -61,6 +69,10 @@ class BacktraceLocation {
 }
 
 class BacktraceLocationProxy extends DelegateClass(Location) {
+  static toString(): string {
+    return "ActiveSupport::SyntaxErrorProxy::BacktraceLocationProxy";
+  }
+
   declare ex: SyntaxErrorProxy;
 
   constructor(loc: Location, ex: SyntaxErrorProxy) {

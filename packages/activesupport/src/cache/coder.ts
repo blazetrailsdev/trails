@@ -144,6 +144,10 @@ const PACKED_VERSION_INDEX = pack([0], PACKED_VERSION_LENGTH_TEMPLATE).length;
 const MARSHAL_SIGNATURE = b("\x04\x08");
 
 class StringDeserializer implements CoderSerializer {
+  static toString(): string {
+    return "ActiveSupport::Cache::Coder::StringDeserializer";
+  }
+
   constructor(private encoding: string) {}
 
   dump(value: unknown): string {
@@ -207,6 +211,10 @@ function lazyEntryClass(): NonNullable<typeof lazyEntry> {
 
 /** @internal */
 export class Coder {
+  static toString(): string {
+    return "ActiveSupport::Cache::Coder";
+  }
+
   private legacySerializer: boolean;
 
   constructor(

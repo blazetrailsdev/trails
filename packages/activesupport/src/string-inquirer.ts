@@ -1,6 +1,10 @@
 import { NoMethodError } from "@blazetrails/ruby-compat";
 
 export class StringInquirer extends String {
+  static toString(): string {
+    return "ActiveSupport::StringInquirer";
+  }
+
   constructor(value: string) {
     super(value);
     return new Proxy(this, {

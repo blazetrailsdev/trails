@@ -10,6 +10,10 @@ YAML.addBuiltinType("omap", (_type, val) => {
 });
 
 export class OrderedHash<K, V> extends Hash<K, V> {
+  static toString(): string {
+    return "ActiveSupport::OrderedHash";
+  }
+
   constructor(entries?: Iterable<readonly [K, V]>) {
     super();
     if (entries) for (const [k, v] of entries) this.set(k, v);

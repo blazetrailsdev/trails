@@ -13,6 +13,10 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 }
 
 export class Reloader extends ExecutionWrapper {
+  static toString(): string {
+    return "ActiveSupport::Reloader";
+  }
+
   declare static executor: typeof ExecutionWrapper;
 
   declare static check: () => boolean;

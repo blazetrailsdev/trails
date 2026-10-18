@@ -2,6 +2,10 @@ import { KeyError, fetch } from "@blazetrails/ruby-compat";
 import { classAttribute } from "./class-attribute.js";
 
 export class NonActionable extends Error {
+  static toString(): string {
+    return "ActiveSupport::ActionableError::NonActionable";
+  }
+
   constructor(message: string) {
     super(message);
     this.name = "NonActionable";

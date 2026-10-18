@@ -10,6 +10,10 @@ function powerOfTen(precision: number): BigDecimal {
 }
 
 export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyOptions> {
+  static toString(): string {
+    return "ActiveSupport::NumberHelper::NumberToCurrencyConverter";
+  }
+
   static {
     this.namespace = "currency";
   }

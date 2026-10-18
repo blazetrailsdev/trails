@@ -75,7 +75,7 @@ function readManifest(manifestPath) {
 }
 
 let manifestCache = null;
-function loadManifest() {
+export function loadManifest() {
   if (!manifestCache) manifestCache = readManifest(MANIFEST_PATH);
   return manifestCache;
 }

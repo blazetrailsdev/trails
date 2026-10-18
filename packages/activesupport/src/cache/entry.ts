@@ -7,6 +7,10 @@ import type { Duration } from "../duration.js";
 
 /** @internal */
 export class Entry {
+  static toString(): string {
+    return "ActiveSupport::Cache::Entry";
+  }
+
   protected _value: unknown;
   readonly version: string | null;
   private _createdAt: number;

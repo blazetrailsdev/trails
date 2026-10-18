@@ -100,6 +100,10 @@ export const Formatter = {
 };
 
 export class TagStack {
+  static toString(): string {
+    return "ActiveSupport::TaggedLogging::TagStack";
+  }
+
   private _tags: unknown[] = [];
   private _tagsString: string | null = null;
 

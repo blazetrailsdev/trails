@@ -4,6 +4,10 @@ import { Store } from "./store.js";
 import { registerStoreClass } from "./store-registry.js";
 
 export class NullStore extends Store implements CacheStore {
+  static toString(): string {
+    return "ActiveSupport::Cache::NullStore";
+  }
+
   static supportsCacheVersioning(): boolean {
     return true;
   }

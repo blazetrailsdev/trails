@@ -3,6 +3,10 @@ import { Logger, type LogLevel } from "./logger.js";
 import { ActiveSupport } from "./namespaces.js";
 
 export class BroadcastLogger extends Logger {
+  static toString(): string {
+    return "ActiveSupport::BroadcastLogger";
+  }
+
   public broadcasts: Logger[] = [];
 
   static silencer: boolean = true;

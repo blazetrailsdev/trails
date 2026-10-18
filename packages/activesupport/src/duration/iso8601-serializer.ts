@@ -5,6 +5,10 @@ import { isEmpty } from "@blazetrails/ruby-compat";
 const DATE_COMPONENTS: (keyof DurationParts)[] = ["years", "months", "days"];
 
 export class ISO8601Serializer {
+  static toString(): string {
+    return "ActiveSupport::Duration::ISO8601Serializer";
+  }
+
   private duration: Duration;
   private precision: number | null;
 

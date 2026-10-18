@@ -30,6 +30,10 @@ class StringScanner {
 }
 
 export class ParsingError extends Error {
+  static toString(): string {
+    return "ActiveSupport::Duration::ISO8601Parser::ParsingError";
+  }
+
   override name = "ParsingError";
 }
 
@@ -59,6 +63,10 @@ const DATE_COMPONENTS: (keyof DurationParts)[] = ["years", "months", "days"];
 const TIME_COMPONENTS: (keyof DurationParts)[] = ["hours", "minutes", "seconds"];
 
 export class ISO8601Parser {
+  static toString(): string {
+    return "ActiveSupport::Duration::ISO8601Parser";
+  }
+
   static ParsingError = ParsingError;
 
   readonly parts: Partial<DurationParts> = {};

@@ -22,6 +22,10 @@ export interface ShareLockThreadInfo {
 }
 
 export class ShareLock {
+  static toString(): string {
+    return "ActiveSupport::Concurrency::ShareLock";
+  }
+
   /** @noRailsEquivalent PERMANENT */
   synchronize = monSynchronize;
   /** @noRailsEquivalent PERMANENT */
