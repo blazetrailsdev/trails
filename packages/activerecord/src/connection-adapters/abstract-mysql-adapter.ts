@@ -1385,7 +1385,7 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   /** @internal */
-  override returningColumnValues(result: Result): Promise<unknown[] | undefined> {
+  override returningColumnValues(result: Result): Promise<unknown[] | null> {
     return mysqlReturningColumnValues.call(this, result);
   }
 

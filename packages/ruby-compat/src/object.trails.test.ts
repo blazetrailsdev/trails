@@ -81,6 +81,16 @@ describe("Object#inspect", () => {
     expect(inspect(["x", ":y", 2.5, true])).toBe('["x", :y, 2.5, true]');
   });
 
+  it("renders an instance with no inspect member by rb_obj_inspect, not toString", () => {
+    class Person {
+      id = "9";
+      toS(): string {
+        return "person";
+      }
+    }
+    expect(inspect(new Person())).toMatch(/^#<Person:0x[0-9a-f]{16} @id="9">$/);
+  });
+
   it("renders empty collections and nil", () => {
     expect(inspect([])).toBe("[]");
     expect(inspect({})).toBe("{}");

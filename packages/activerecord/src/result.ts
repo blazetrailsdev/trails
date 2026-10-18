@@ -178,9 +178,9 @@ export class Result {
     return rows.slice(0, n);
   }
 
-  last(): Record<string, unknown> | undefined;
+  last(): Record<string, unknown> | null;
   last(n: number): Record<string, unknown>[];
-  last(n?: number): Record<string, unknown> | Record<string, unknown>[] | undefined {
+  last(n?: number): Record<string, unknown> | Record<string, unknown>[] | null {
     return n != null ? last(this.hashRows(), n) : last(this.hashRows());
   }
 

@@ -1463,10 +1463,7 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "function") return rbAnyToS(value);
-  if (typeof value === "object" && !(value instanceof Uint8Array)) {
-    const str: unknown = rbObjAsString(value);
-    return typeof str === "string" ? str : rbObjInspect(value);
-  }
+  if (typeof value === "object" && !(value instanceof Uint8Array)) return rbObjInspect(value);
   return String(value);
 }
 

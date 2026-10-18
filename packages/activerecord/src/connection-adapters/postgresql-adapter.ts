@@ -1519,7 +1519,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   /** @internal */
-  override returningColumnValues(result: Result): unknown[] | undefined {
+  override returningColumnValues(result: Result): unknown[] | null {
     return pgReturningColumnValues(result);
   }
 

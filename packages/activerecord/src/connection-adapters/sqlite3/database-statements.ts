@@ -263,7 +263,7 @@ export function buildTruncateStatement(this: QuoteTableNameHost | void, tableNam
 }
 
 /** @internal */
-export function returningColumnValues(result: Result): unknown[] | undefined {
+export function returningColumnValues(result: Result): unknown[] | null {
   return first(result.rows);
 }
 
