@@ -163,6 +163,27 @@ it("with connection prevent permanent checkout on fresh lease keeps the lease pe
   expect(pool.isPermanentLease()).toBe(true);
 });
 
+it("withConnection overlapping on an empty lease checks out one connection", async () => {
+  const pool = makePool(2);
+  const checkout = vi.spyOn(pool, "checkout");
+  const seen: DatabaseAdapter[] = [];
+  const release = vi.spyOn(pool, "releaseConnection");
+  await Promise.all([
+    pool.withConnection(async (conn) => {
+      seen.push(conn);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      expect(pool.isActiveConnection()).toBe(conn);
+    }),
+    pool.withConnection((conn) => {
+      seen.push(conn);
+    }),
+  ]);
+  expect(checkout).toHaveBeenCalledTimes(1);
+  expect(seen[0]).toBe(seen[1]);
+  expect(release).toHaveBeenCalledTimes(1);
+  expect(pool.isActiveConnection()).toBeNull();
+});
+
 it("withConnection waits for a released connection when pool is saturated", async () => {
   const pool = makePool(1);
   const held = await pool.checkout();

@@ -3,7 +3,7 @@ futurama:
   title: Isn't futurama awesome?
   subtitle: It really is, isn't it.
   content: I like futurama
-  created_at: <%= new globalThis.Date(globalThis.Date.now() - 86400000).toISOString().slice(0, 19).replace("T", " ") %>
+  created_at: <%= ActiveSupport.Duration.days(1).ago().toFs(":db") %>
   updated_at:
 
 harvey_birdman:
@@ -11,7 +11,7 @@ harvey_birdman:
   title: Harvey Birdman is the king of all men
   subtitle: yup
   content: It really is
-  created_at: <%= new globalThis.Date(globalThis.Date.now() - 2 * 3600000).toISOString().slice(0, 19).replace("T", " ") %>
+  created_at: <%= ActiveSupport.Duration.hours(2).ago().toFs(":db") %>
   updated_at:
 
 rails:
@@ -19,4 +19,4 @@ rails:
   title: Rails is nice
   subtitle: It makes me happy
   content: except when I have to hack internals to fix pagination. even then really.
-  created_at: <%= new globalThis.Date(globalThis.Date.now() - 20 * 60000).toISOString().slice(0, 19).replace("T", " ") %>
+  created_at: <%= ActiveSupport.Duration.minutes(20).ago().toFs(":db") %>
