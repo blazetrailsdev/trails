@@ -1,5 +1,6 @@
 import { Deprecation } from "@blazetrails/activesupport";
 import * as _cookies from "./middleware/cookies.js";
+import { ActionDispatch } from "../namespaces.js";
 
 export { Deprecation as Deprecator };
 
@@ -9,6 +10,8 @@ export function deprecator(): Deprecation {
   if (!_deprecator) _deprecator = new Deprecation();
   return _deprecator;
 }
+
+ActionDispatch.deprecator = deprecator;
 
 /** @internal */ export const cookieJar = _cookies.cookieJar;
 /** @internal */ export const isHaveCookieJar = _cookies.isHaveCookieJar;

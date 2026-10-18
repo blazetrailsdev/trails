@@ -1,11 +1,16 @@
 import "../test-helpers/abstract-unit.js";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActionController, Request, RouteSet } from "@blazetrails/actionpack";
+import { ActionController, ActionDispatch, Request, RouteSet } from "@blazetrails/actionpack";
 import { Conversion, Naming } from "@blazetrails/activemodel";
 import { assertPredicate, extend, isHtmlSafe, isPresent } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
-import { ArgumentError, include } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  include,
+  rbObjSingletonClass,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { setPrependContentExfiltrationPrevention } from "../helpers/content-exfiltration-prevention-helper.js";
 import * as UrlHelper from "../helpers/url-helper.js";
@@ -1218,5 +1223,392 @@ describe("UrlHelperTest", () => {
     const options = { class: "special" };
     view.phoneTo("1234567890", "ME!", options);
     expect(options).toEqual({ class: "special" });
+  });
+});
+
+registerConstant("UrlHelperControllerTest", { name: "UrlHelperControllerTest" });
+
+class UrlHelperController extends ActionController.Base {
+  static {
+    Object.defineProperty(this, "name", { value: "UrlHelperControllerTest::UrlHelperController" });
+  }
+
+  static ROUTES = this.testRoutes(function () {
+    this.get("url_helper_controller_test/url_helper/show/:id", {
+      to: "url_helper_controller_test/url_helper#show",
+      as: "show",
+    });
+
+    this.get("url_helper_controller_test/url_helper/profile/:name", {
+      to: "url_helper_controller_test/url_helper#show",
+      as: "profile",
+    });
+
+    this.get("url_helper_controller_test/url_helper/show_named_route", {
+      to: "url_helper_controller_test/url_helper#showNamedRoute",
+      as: "show_named_route",
+    });
+
+    ActionDispatch.deprecator().silence(() => {
+      this.get("/:controller(/:action(/:id))");
+    });
+
+    this.get("url_helper_controller_test/url_helper/normalize_recall_params", {
+      to: UrlHelperController.action("normalizeRecall"),
+      as: "normalize_recall_params",
+    });
+
+    this.get("/url_helper_controller_test/url_helper/override_url_helper/default", {
+      to: "url_helper_controller_test/url_helper#overrideUrlHelper",
+      as: "override_url_helper",
+    });
+  });
+
+  async show(): Promise<void> {
+    if (this.params.get("name") != null) {
+      await this.render({ inline: "ok" });
+    } else {
+      await this.redirectTo((this as any).profilePath(this.params.get("id")));
+    }
+  }
+
+  async showUrlFor(): Promise<void> {
+    await this.render({
+      inline:
+        "<%= urlFor({ controller: 'url_helper_controller_test/url_helper', action: 'showUrlFor' }) %>",
+    });
+  }
+
+  async showNamedRoute(): Promise<void> {
+    await this.render({
+      inline: `<%= showNamedRoute${this.params.get("kind") === "url" ? "Url" : "Path"}() %>`,
+    });
+  }
+
+  async nilUrlFor(): Promise<void> {
+    await this.render({ inline: "<%= urlFor(null) %>" });
+  }
+
+  async normalizeRecallParams(): Promise<void> {
+    await this.render({ inline: "<%= normalizeRecallParamsPath() %>" });
+  }
+
+  async recallParamsNotChanged(): Promise<void> {
+    await this.render({ inline: "<%= urlFor({ action: 'showUrlFor' }) %>" });
+  }
+
+  async overrideUrlHelper(): Promise<void> {
+    await this.render({ inline: "<%= overrideUrlHelperPath() %>" });
+  }
+
+  overrideUrlHelperPath(): string {
+    return "/url_helper_controller_test/url_helper/override_url_helper/override";
+  }
+
+  static {
+    this.helperMethod("overrideUrlHelperPath");
+  }
+}
+
+class UrlHelperControllerTest extends ActionController.TestCase {
+  static {
+    this.tests(UrlHelperController);
+  }
+
+  override setup(): void {
+    super.setup();
+    this.routes = UrlHelperController.ROUTES;
+  }
+}
+
+describe("UrlHelperControllerTest", () => {
+  let tc: UrlHelperControllerTest;
+
+  beforeEach(async ({ task }) => {
+    tc = new UrlHelperControllerTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
+  });
+
+  it("url for shows only path", async () => {
+    await tc.get("showUrlFor");
+    expect(tc.response.body).toBe("/url_helper_controller_test/url_helper/showUrlFor");
+  });
+
+  it("named route url shows host and path", async () => {
+    await tc.get("showNamedRoute", { params: { kind: "url" } });
+    expect(tc.response.body).toBe(
+      "http://test.host/url_helper_controller_test/url_helper/show_named_route",
+    );
+  });
+
+  it("named route path shows only path", async () => {
+    await tc.get("showNamedRoute", { params: { kind: "path" } });
+    expect(tc.response.body).toBe("/url_helper_controller_test/url_helper/show_named_route");
+  });
+
+  it("url for nil returns current path", async () => {
+    await tc.get("nilUrlFor");
+    expect(tc.response.body).toBe("/url_helper_controller_test/url_helper/nilUrlFor");
+  });
+
+  it("named route should show host and path using controller default url options", async () => {
+    Object.defineProperty(rbObjSingletonClass(tc.controller).prototype, "defaultUrlOptions", {
+      get() {
+        return { host: "testtwo.host" };
+      },
+    });
+
+    await tc.get("showNamedRoute", { params: { kind: "url" } });
+    expect(tc.response.body).toBe(
+      "http://testtwo.host/url_helper_controller_test/url_helper/show_named_route",
+    );
+  });
+
+  it("recall params should be normalized", async () => {
+    await tc.get("normalizeRecallParams");
+    expect(tc.response.body).toBe("/url_helper_controller_test/url_helper/normalize_recall_params");
+  });
+
+  it("recall params should not be changed", async () => {
+    await tc.get("recallParamsNotChanged");
+    expect(tc.response.body).toBe("/url_helper_controller_test/url_helper/showUrlFor");
+  });
+
+  it("recall params should normalize id", async () => {
+    await tc.get("show", { params: { id: "123" } });
+    expect(tc.response.status).toBe(302);
+    expect(tc.response.location).toBe(
+      "http://test.host/url_helper_controller_test/url_helper/profile/123",
+    );
+
+    await tc.get("show", { params: { name: "123" } });
+    expect(tc.response.body).toBe("ok");
+  });
+
+  it("url helper can be overridden", async () => {
+    await tc.get("overrideUrlHelper");
+    expect(tc.response.body).toBe(
+      "/url_helper_controller_test/url_helper/override_url_helper/override",
+    );
+  });
+});
+
+class TasksController extends ActionController.Base {
+  static ROUTES = this.testRoutes(function () {
+    this.resources("tasks");
+  });
+
+  async index(): Promise<void> {
+    await this.renderDefault();
+  }
+
+  async show(): Promise<void> {
+    await this.renderDefault();
+  }
+
+  private async renderDefault(): Promise<void> {
+    await this.render({
+      inline:
+        "<%= linkToUnlessCurrent('tasks', tasksPath()) %>\n" +
+        "<%= linkToUnlessCurrent('tasks', tasksUrl()) %>",
+    });
+  }
+}
+
+class LinkToUnlessCurrentWithControllerTest extends ActionController.TestCase {
+  static {
+    this.tests(TasksController);
+  }
+
+  override setup(): void {
+    super.setup();
+    this.routes = TasksController.ROUTES;
+  }
+}
+
+describe("LinkToUnlessCurrentWithControllerTest", () => {
+  let tc: LinkToUnlessCurrentWithControllerTest;
+
+  beforeEach(async ({ task }) => {
+    tc = new LinkToUnlessCurrentWithControllerTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
+  });
+
+  it("link to unless current to current", async () => {
+    await tc.get("index");
+    expect(tc.response.body).toBe("tasks\ntasks");
+  });
+
+  it("link to unless current shows link", async () => {
+    await tc.get("show", { params: { id: 1 } });
+    expect(tc.response.body).toBe(
+      `<a href="/tasks">tasks</a>\n` +
+        `<a href="${tc.request.protocol}${tc.request.hostWithPort()}/tasks">tasks</a>`,
+    );
+  });
+});
+
+class WorkshopsController extends ActionController.Base {
+  declare workshop: Workshop;
+
+  static ROUTES = this.testRoutes(function () {
+    this.resources("workshops", () => {
+      this.resources("sessions");
+    });
+  });
+
+  async index(): Promise<void> {
+    this.workshop = new Workshop(null);
+    await this.render({ inline: "<%= urlFor(workshop) %>\n<%= linkTo('Workshop', workshop) %>" });
+  }
+
+  async show(): Promise<void> {
+    this.workshop = new Workshop(this.params.get("id"));
+    await this.render({ inline: "<%= urlFor(workshop) %>\n<%= linkTo('Workshop', workshop) %>" });
+  }
+
+  async edit(): Promise<void> {
+    this.workshop = new Workshop(this.params.get("id"));
+    await this.render({ inline: "<%= isCurrentPage(workshop) %>" });
+  }
+}
+
+class SessionsController extends ActionController.Base {
+  declare workshop: Workshop;
+  declare url: unknown[];
+
+  static ROUTES = this.testRoutes(function () {
+    this.resources("workshops", () => {
+      this.resources("sessions");
+    });
+  });
+
+  async index(): Promise<void> {
+    this.workshop = new Workshop(this.params.get("workshop_id"));
+    Object.defineProperty(this, "session", {
+      value: new Session(null),
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+    await this.render({
+      inline: "<%= urlFor([workshop, session]) %>\n<%= linkTo('Session', [workshop, session]) %>",
+    });
+  }
+
+  async show(): Promise<void> {
+    this.workshop = new Workshop(this.params.get("workshop_id"));
+    Object.defineProperty(this, "session", {
+      value: new Session(this.params.get("id")),
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+    await this.render({
+      inline: "<%= urlFor([workshop, session]) %>\n<%= linkTo('Session', [workshop, session]) %>",
+    });
+  }
+
+  async edit(): Promise<void> {
+    this.workshop = new Workshop(this.params.get("workshop_id"));
+    Object.defineProperty(this, "session", {
+      value: new Session(this.params.get("id")),
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+    this.url = [this.workshop, (this as any).session, { format: this.params.get("format") }];
+    await this.render({ inline: "<%= urlFor(url) %>\n<%= linkTo('Session', url) %>" });
+  }
+}
+
+class PolymorphicControllerTest extends ActionController.TestCase {
+  override setup(): void {
+    super.setup();
+    this.routes = WorkshopsController.ROUTES;
+  }
+}
+
+describe("PolymorphicControllerTest", () => {
+  let tc: PolymorphicControllerTest;
+
+  beforeEach(async ({ task }) => {
+    tc = new PolymorphicControllerTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
+  });
+
+  it("index resource", async () => {
+    tc.controller = new WorkshopsController();
+
+    await tc.get("index");
+    expect(tc.response.body).toBe(`/workshops\n<a href="/workshops">Workshop</a>`);
+  });
+
+  it("existing resource", async () => {
+    tc.controller = new WorkshopsController();
+
+    await tc.get("show", { params: { id: 1 } });
+    expect(tc.response.body).toBe(`/workshops/1\n<a href="/workshops/1">Workshop</a>`);
+  });
+
+  it("existing cpk resource", async () => {
+    tc.controller = new WorkshopsController();
+
+    await tc.get("show", { params: { id: "1-27" } });
+    expect(tc.response.body).toBe(`/workshops/1-27\n<a href="/workshops/1-27">Workshop</a>`);
+  });
+
+  it("current page when options does not respond to to hash", async () => {
+    tc.controller = new WorkshopsController();
+
+    await tc.get("edit", { params: { id: 1 } });
+    expect(tc.response.body).toBe("false");
+  });
+});
+
+class PolymorphicSessionsControllerTest extends ActionController.TestCase {
+  override setup(): void {
+    super.setup();
+    this.routes = SessionsController.ROUTES;
+  }
+}
+
+describe("PolymorphicSessionsControllerTest", () => {
+  let tc: PolymorphicSessionsControllerTest;
+
+  beforeEach(async ({ task }) => {
+    tc = new PolymorphicSessionsControllerTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
+  });
+
+  it("new nested resource", async () => {
+    tc.controller = new SessionsController();
+
+    await tc.get("index", { params: { workshop_id: 1 } });
+    expect(tc.response.body).toBe(
+      `/workshops/1/sessions\n<a href="/workshops/1/sessions">Session</a>`,
+    );
+  });
+
+  it("existing nested resource", async () => {
+    tc.controller = new SessionsController();
+
+    await tc.get("show", { params: { workshop_id: 1, id: 1 } });
+    expect(tc.response.body).toBe(
+      `/workshops/1/sessions/1\n<a href="/workshops/1/sessions/1">Session</a>`,
+    );
+  });
+
+  it("existing nested resource with params", async () => {
+    tc.controller = new SessionsController();
+
+    await tc.get("edit", { params: { workshop_id: 1, id: 1, format: "json" } });
+    expect(tc.response.body).toBe(
+      `/workshops/1/sessions/1.json\n<a href="/workshops/1/sessions/1.json">Session</a>`,
+    );
   });
 });

@@ -11,8 +11,22 @@ declare module "@blazetrails/actionpack" {
     namespace TestCase {
       let withRoutes: (block: DrawCallback) => void;
     }
+    // eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby reopens `class ActionController::Base` (`actionview/test/abstract_unit.rb:107-114`) to add `self.test_routes`.
+    namespace Base {
+      let testRoutes: (block: DrawCallback) => RouteSet;
+    }
   }
 }
+
+ActionController.Base.testRoutes = function (
+  this: typeof ActionController.Base,
+  block: DrawCallback,
+): RouteSet {
+  const routes = new RouteSet();
+  routes.draw(block);
+  include(this, routes.urlHelpers());
+  return routes;
+};
 
 include(ActionController.TestCase, ActionDispatch.TestProcess);
 
