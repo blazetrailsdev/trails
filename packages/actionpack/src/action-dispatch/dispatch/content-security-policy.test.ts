@@ -28,6 +28,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  RuntimeError,
   rbObjDup,
   registerConstant,
   unregisterConstant,
@@ -361,9 +362,9 @@ describe("ContentSecurityPolicyTest", () => {
 
   it("missing context for dynamic source", async () => {
     const policy = new ContentSecurityPolicy();
-    policy.scriptSrc(() => "www.example.com");
+    policy.scriptSrc((controller) => (controller as { request: Request }).request.host);
 
-    const exception = await assertRaises([Error], {}, () => policy.build());
+    const exception = await assertRaises([RuntimeError], {}, () => policy.build());
 
     expect(exception.message).toMatch(
       /^Missing context for the dynamic content security policy source:/,
@@ -491,7 +492,7 @@ describe("ContentSecurityPolicyTest", () => {
     const policy = new ContentSecurityPolicy();
     policy.pluginTypes([":flash"] as unknown as string);
 
-    const exception = await assertRaises([Error], {}, () => policy.build());
+    const exception = await assertRaises([RuntimeError], {}, () => policy.build());
 
     expect(exception.message).toMatch(/^Unexpected content security policy source:/);
   });

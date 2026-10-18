@@ -1470,11 +1470,14 @@ function kwargValue(tsArg: string, rubyKey: string): string | undefined {
  *  called from actiondispatch, and without the fallback its skipped `payload`
  *  positional reads as a value (redirection.rb:22).
  *
- *  `ownerSigs` are the enclosing class's own declarations of the name, given
- *  when the call resolves through a receiver: they win when present. When the
- *  class does not declare it, the callee is an ancestor's, which may live in a
- *  dependency, so a same-package homonym on an unrelated class does not stand
- *  in for it alone. `LogSubscriber#renderPartial`'s `debug do … end`
+ *  `ownerSigs` is what the call site says about the receiver's class. For a
+ *  receiver-less (`this`) call it is the enclosing class's own declarations
+ *  of the name, which win when present. Empty means the callee is not proven
+ *  to be in this package: an ancestor's method on a self-call, or any method
+ *  on a receiver of unknown class (`this.logger()!.debug`). Then the
+ *  dependency signatures are considered beside the same-package ones, so a
+ *  homonym on an unrelated class does not stand in for the callee alone.
+ *  Omitted, the old in-package-first rule applies. `LogSubscriber#renderPartial`'s `debug do … end`
  *  (`actionview/lib/action_view/log_subscriber.rb`) reaches
  *  `ActiveSupport::LogSubscriber#debug(progname = nil, &block)`, not
  *  actionview's `DebugHelper#debug(object)`. */
