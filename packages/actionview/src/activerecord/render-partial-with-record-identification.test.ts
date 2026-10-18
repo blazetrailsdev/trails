@@ -28,16 +28,6 @@ declare module "../test-helpers/fixtures/topic.js" {
     replies: AssociationProxy<Reply>;
   }
 }
-declare module "../test-helpers/fixtures/project.js" {
-  interface Project {
-    name: string;
-  }
-}
-declare module "../test-helpers/fixtures/mascot.js" {
-  interface Mascot {
-    name: string;
-  }
-}
 declare module "../test-helpers/fixtures/company.js" {
   interface Company {
     mascot: Promise<Mascot>;
@@ -164,7 +154,10 @@ describe("RenderPartialWithRecordIdentificationTest", () => {
   test("rendering partial with has many and belongs to association", async (tc) => {
     await tc.get("renderWithHasManyAndBelongsToAssociation");
     const projects = await (await Developer.find(1)).projects.toArray();
-    assertEqual(projects.map((p) => p.name).join(""), tc.response.body);
+    assertEqual(
+      projects.map((p) => (p as unknown as { name: string }).name).join(""),
+      tc.response.body,
+    );
   });
 
   test("rendering partial with has many association", async (tc) => {
@@ -193,13 +186,16 @@ describe("RenderPartialWithRecordIdentificationTest", () => {
   test("render with record collection and spacer template", async (tc) => {
     await tc.get("renderWithRecordCollectionAndSpacerTemplate");
     const projects = await (await Developer.find(1)).projects.toArray();
-    assertEqual(projects.map((p) => p.name).join("only partial"), tc.response.body);
+    assertEqual(
+      projects.map((p) => (p as unknown as { name: string }).name).join("only partial"),
+      tc.response.body,
+    );
   });
 
   test("rendering partial with has one association", async (tc) => {
     const mascot = await (await Company.find(1)).mascot;
     await tc.get("renderWithHasOneAssociation");
-    assertEqual(mascot.name, tc.response.body);
+    assertEqual((mascot as unknown as { name: string }).name, tc.response.body);
   });
 });
 
