@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { _resetTrailsEnv } from "../rails.js";
-import { pinEnvironment, serverEnvironment, serverHost, serverPort } from "./boot.js";
+import { serverEnvironment, serverHost, serverPort } from "./boot.js";
 
 describe("server boot options (trails)", () => {
   let savedTrailsEnv: string | undefined;
@@ -45,26 +45,6 @@ describe("server boot options (trails)", () => {
     });
   });
 
-  describe("pinEnvironment", () => {
-    it("pins TRAILS_ENV for the rest of the process", () => {
-      expect(pinEnvironment({ environment: "production" })).toBe("production");
-      expect(env.TRAILS_ENV).toBe("production");
-    });
-
-    it("does not override an already-set TRAILS_ENV, which wins over the flag", () => {
-      setEnv("TRAILS_ENV", "test");
-
-      expect(pinEnvironment({ environment: "production" })).toBe("production");
-      expect(env.TRAILS_ENV).toBe("test");
-    });
-
-    it("leaves an explicitly-empty TRAILS_ENV alone", () => {
-      setEnv("TRAILS_ENV", "");
-      pinEnvironment({ environment: "production" });
-      expect(env.TRAILS_ENV).toBe("");
-    });
-  });
-
   describe("host", () => {
     it("is localhost in development and 0.0.0.0 elsewhere", () => {
       expect(serverHost()).toBe("localhost");
@@ -75,6 +55,19 @@ describe("server boot options (trails)", () => {
       setEnv("BINDING", "127.0.0.1");
       expect(serverHost()).toBe("127.0.0.1");
       expect(serverHost({ binding: "::1" })).toBe("::1");
+    });
+  });
+
+  describe("agrees with `trails server`'s defaults", () => {
+    it("binds the same host for the same environment", () => {
+      expect(serverHost({ environment: "development" })).toBe("localhost");
+      expect(serverHost({ environment: "production" })).toBe("0.0.0.0");
+      expect(serverHost({ environment: "test" })).toBe("0.0.0.0");
+    });
+
+    it("takes commander's string option default and the same 3000", () => {
+      expect(serverPort({ port: "3000" })).toBe(3000);
+      expect(serverPort()).toBe(3000);
     });
   });
 

@@ -72,9 +72,9 @@ describe("the production server entry point", () => {
     expect(generators).not.toContain("generators/app-generator.ts");
   });
 
-  it("is reached by the CLI's server command, so there is one implementation", () => {
+  it("is not reached by the CLI's server command, which stays the ported file", () => {
     const command = graph("commands/server.ts");
-    expect(rel(command.files)).toContain("server/boot.ts");
+    expect(rel(command.files)).not.toContain("server/boot.ts");
   });
 
   it("still exposes Trails, which the `.` entry point only offers through the CLI", async () => {

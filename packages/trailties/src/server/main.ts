@@ -61,7 +61,7 @@ export async function main(args: readonly string[]): Promise<void> {
   await serve(parseArgs(args));
 }
 
-/** @internal */
+/** @noRailsEquivalent PERMANENT */
 export function binArgs(): readonly string[] {
   return argv.slice(2);
 }

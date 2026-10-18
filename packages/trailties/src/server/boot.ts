@@ -24,19 +24,11 @@ export function serverEnvironment(options: ServeOptions = {}): string {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function pinEnvironment(options: ServeOptions = {}): string {
-  const environment = serverEnvironment(options);
-  if (getEnv("TRAILS_ENV") === undefined) setEnv("TRAILS_ENV", environment);
-
-  return environment;
-}
-
-/** @noRailsEquivalent PERMANENT */
 export function serverHost(options: ServeOptions = {}): string {
   if (options.binding) return options.binding;
-  const defaultHost = serverEnvironment(options) === "development" ? "localhost" : "0.0.0.0";
+  const fallback = serverEnvironment(options) === "development" ? "localhost" : "0.0.0.0";
 
-  return getEnv("BINDING", defaultHost);
+  return getEnv("BINDING", fallback);
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -48,7 +40,7 @@ export function serverPort(options: ServeOptions = {}): number {
 
 /** @noRailsEquivalent PERMANENT */
 export async function serve(options: ServeOptions = {}): Promise<HttpServer> {
-  pinEnvironment(options);
+  if (getEnv("TRAILS_ENV") === undefined) setEnv("TRAILS_ENV", serverEnvironment(options));
 
   await requireApplicationBang();
   const app = await Trails.initialize();
@@ -61,8 +53,8 @@ export async function serve(options: ServeOptions = {}): Promise<HttpServer> {
 
   if (options.banner !== false) {
     const address = server.address();
-    const boundPort = address && typeof address === "object" ? address.port : port;
-    console.log(`=> Trails application starting in ${Trails.env} on http://${host}:${boundPort}`);
+    const bound = address && typeof address === "object" ? address.port : port;
+    console.log(`=> Trails application starting in ${Trails.env} on http://${host}:${bound}`);
     console.log(`=> Ctrl+C to stop`);
     console.log("");
   }
