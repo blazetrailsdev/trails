@@ -24,15 +24,18 @@ export function stubConst<T>(
       delete mod[constant];
       mod[constant] = oldValue;
     };
-    let result: T | undefined;
+    let deferred = false;
     try {
       delete mod[constant];
       mod[constant] = newValue;
-      result = block();
-      if (isThenable(result)) return Promise.resolve(result).finally(ensure) as T;
+      const result = block();
+      if (isThenable(result)) {
+        deferred = true;
+        return Promise.resolve(result).finally(ensure) as T;
+      }
       return result;
     } finally {
-      if (!isThenable(result)) ensure();
+      if (!deferred) ensure();
     }
   } else {
     if (constant in mod) {
@@ -42,14 +45,17 @@ export function stubConst<T>(
     const ensure = () => {
       delete mod[constant];
     };
-    let result: T | undefined;
+    let deferred = false;
     try {
       mod[constant] = newValue;
-      result = block();
-      if (isThenable(result)) return Promise.resolve(result).finally(ensure) as T;
+      const result = block();
+      if (isThenable(result)) {
+        deferred = true;
+        return Promise.resolve(result).finally(ensure) as T;
+      }
       return result;
     } finally {
-      if (!isThenable(result)) ensure();
+      if (!deferred) ensure();
     }
   }
 }
