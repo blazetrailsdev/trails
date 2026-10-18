@@ -437,7 +437,7 @@ describe("ActionDispatch::IntegrationTest", () => {
 
     it("custom headers", async () => {
       await app.get("/posts", { headers: { Authorization: "Bearer token" } });
-      expect(app.request.getHeader("Authorization")).toBe("Bearer token");
+      expect(app.request.getHeader("HTTP_AUTHORIZATION")).toBe("Bearer token");
     });
 
     it("as option is alias for format", async () => {

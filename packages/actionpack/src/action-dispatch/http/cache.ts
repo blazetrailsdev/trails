@@ -3,8 +3,8 @@ import { Digest } from "@blazetrails/activesupport/digest";
 import { mattrAccessor } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 
-const HTTP_IF_MODIFIED_SINCE = "If-Modified-Since";
-const HTTP_IF_NONE_MATCH = "If-None-Match";
+const HTTP_IF_MODIFIED_SINCE = "HTTP_IF_MODIFIED_SINCE";
+const HTTP_IF_NONE_MATCH = "HTTP_IF_NONE_MATCH";
 const DATE = "Date";
 const LAST_MODIFIED = "Last-Modified";
 const ETAG = "ETag";

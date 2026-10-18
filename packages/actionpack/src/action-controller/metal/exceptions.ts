@@ -49,7 +49,7 @@ export class UrlGenerationError extends ActionControllerError {
     methodName: string | null = null,
   ) {
     super(message);
-    this.name = "UrlGenerationError";
+    this.name = "ActionController::UrlGenerationError";
     this.routes = routes;
     this.routeName = routeName;
     this.methodName = methodName;
