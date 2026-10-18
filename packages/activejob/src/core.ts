@@ -68,10 +68,10 @@ export const ClassMethods = {
     return job;
   },
 
-  set(this: CoreClass, options: SetOptions = {}): unknown {
+  set(this: unknown, options: SetOptions = {}): unknown {
     return new (
       ActiveJob as unknown as {
-        ConfiguredJob: new (jobClass: CoreClass, options: SetOptions) => unknown;
+        ConfiguredJob: new (jobClass: unknown, options: SetOptions) => unknown;
       }
     ).ConfiguredJob(this, options);
   },
