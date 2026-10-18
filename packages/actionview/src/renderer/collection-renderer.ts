@@ -210,7 +210,6 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
     return this.renderCollection(collectionIterator, context, partial, template, layout, block);
   }
 
-  /** @inventedArm if — PERMANENT */
   renderCollectionDerivePartial(
     collection: readonly unknown[] | PromiseLike<readonly unknown[]>,
     context: ViewContext,
