@@ -7,12 +7,12 @@
     },
     "actioncontroller": {
       "assertionCount": 9,
-      "kind": 31,
+      "kind": 29,
       "value": 0
     },
     "actiondispatch": {
       "assertionCount": 9,
-      "kind": 32,
+      "kind": 29,
       "value": 2
     },
     "actionview": {

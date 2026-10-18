@@ -370,8 +370,8 @@ export class Session {
       }
     }
 
-    if (isPresent(wrappedHeaders.env)) {
-      Headers.fromHash(requestEnv).mergeBang(wrappedHeaders.env);
+    if (isPresent(wrappedHeaders)) {
+      Headers.fromHash(requestEnv).mergeBang(wrappedHeaders);
     }
     if (isPresent(options.env)) {
       Headers.fromHash(requestEnv).mergeBang(options.env!);

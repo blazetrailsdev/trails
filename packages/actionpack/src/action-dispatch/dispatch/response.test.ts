@@ -23,9 +23,13 @@ import {
 import { RackBody } from "../http/response.js";
 import { Mime } from "../http/mime-type.js";
 import { IntegrationTest } from "../testing/integration.js";
-import { HeadersAssertions } from "../../test-helpers/abstract-unit.js";
+import { CookieAssertions, HeadersAssertions } from "../../test-helpers/abstract-unit.js";
 
-const self = { ...HeadersAssertions, response: { headers: {} } };
+const self = {
+  ...HeadersAssertions,
+  ...CookieAssertions,
+  response: { headers: new Map<string, string | string[]>() },
+};
 
 function newResponse(): Response {
   const response = Response.create();
@@ -153,7 +157,8 @@ describe("ResponseTest", () => {
   it("cookies", () => {
     const res = new Response();
     res.setCookie("user_name", { value: "david", path: "/" });
-    expect(res.headers.get("set-cookie")).toBe("user_name=david; path=/");
+    const [, headers] = res.toA();
+    self.assertSetCookieHeader("user_name=david; path=/", headers["set-cookie"]);
     expect(res.cookies).toEqual({ user_name: "david" });
   });
 
@@ -165,8 +170,10 @@ describe("ResponseTest", () => {
       path: "/",
       expires: new Date(Date.UTC(2005, 9, 10, 5)),
     });
-    expect(res.headers.get("set-cookie")).toBe(
+    const [, headers] = res.toA();
+    self.assertSetCookieHeader(
       "user_name=david; path=/\nlogin=foo%26bar; path=/; expires=Mon, 10 Oct 2005 05:00:00 GMT",
+      headers["set-cookie"],
     );
     expect(res.cookies).toEqual({ login: "foo&bar", user_name: "david" });
   });

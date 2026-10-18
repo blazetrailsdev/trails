@@ -86,16 +86,19 @@ export class Headers {
     this._req.eachHeader((key, value) => fn([key, value]));
   }
 
-  merge(headersOrEnv: Record<string, unknown>): Headers {
+  merge(headersOrEnv: Record<string, unknown> | Headers): Headers {
     const headers = this._req.dup().headers;
     headers.mergeBang(headersOrEnv);
     return headers;
   }
 
-  mergeBang(headersOrEnv: Record<string, unknown>): Record<string, unknown> {
-    for (const [key, value] of Object.entries(headersOrEnv)) {
+  /** @inventedArm if — CONVERGEABLE headers-merge-bang-single-each-dispatch */
+  mergeBang(headersOrEnv: Record<string, unknown> | Headers): Record<string, unknown> | Headers {
+    const block = ([key, value]: [string, unknown]): void => {
       this._req.setHeader(envName(String(key)), value);
-    }
+    };
+    if (headersOrEnv instanceof Headers) headersOrEnv.each(block);
+    else Object.entries(headersOrEnv).forEach(block);
     return headersOrEnv;
   }
 }

@@ -136,6 +136,12 @@ describe("classifyPair", () => {
     expect(classifyPair("inspect", "toString")).toBe("no-js-equivalent");
   });
 
+  // static.rb:145 `File.join(@root, path.b)` vs static.ts `File.join(this.root, path)`.
+  it("names String#b dropped for the receiver as an encoding tag", () => {
+    expect(classifyPair("b", "path")).toBe("encoding-tag");
+    expect(classifyPair("b", "data")).toBe("burndown");
+  });
+
   // Ruby builtins whose TS spelling is the free function or method doing the
   // same work: locator.rb:107 `compact`, base.rb:282 `File.read`,
   // flatten.rb:100 `gsub`, base.rb:269 `inspect`.
@@ -187,6 +193,7 @@ describe("the taxonomy itself", () => {
       "block-idiom",
       "ivar-reflection",
       "implicit-to-s",
+      "encoding-tag",
     ]);
   });
 

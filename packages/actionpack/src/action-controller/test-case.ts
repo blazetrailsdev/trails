@@ -633,7 +633,6 @@ export class TestRequest extends AbstractTestRequest {
     this.setHeader("CONTENT_TYPE", type);
   }
 
-  /** @missingRailsName b — PERMANENT */
   assignParameters(
     _routes: unknown,
     controllerPath: string,
@@ -662,7 +661,7 @@ export class TestRequest extends AbstractTestRequest {
         this.queryString = toQuery(nonPathParameters);
       }
     } else {
-      let data: string;
+      let data: string | Uint8Array;
       if (TestRequest.ENCODER.shouldMultipart(nonPathParameters)) {
         this.contentType = TestRequest.ENCODER.contentType;
         data = TestRequest.ENCODER.buildMultipart(nonPathParameters)!;
@@ -688,10 +687,9 @@ export class TestRequest extends AbstractTestRequest {
             this._customParamParsers[contentMimeType!.symbol!] = () => nonPathParameters;
             data = toQuery(nonPathParameters);
         }
-        data = b(data);
       }
 
-      const dataStream = new StringIO(data);
+      const dataStream = new StringIO(b(data));
       this.setHeader("CONTENT_LENGTH", String(dataStream.size()));
       this.setHeader("rack.input", dataStream);
     }
