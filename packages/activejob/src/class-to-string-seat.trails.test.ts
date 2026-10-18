@@ -27,7 +27,9 @@ describe("class-to-string-seat", () => {
   });
 
   it("agrees with rbModToS for every seated class", () => {
-    const seated = Object.values({ ...ActiveSupportExports, ...ActiveJobExports }).filter(
+    const seated = (
+      Object.values({ ...ActiveSupportExports, ...ActiveJobExports }) as unknown[]
+    ).filter(
       (v): v is abstract new (...args: never) => unknown =>
         typeof v === "function" && Object.hasOwn(v, "toString"),
     );
