@@ -2244,7 +2244,16 @@ export class Lowerer {
       case "refute":
         return n.args.length >= 1 ? `expect(${a(0)}).toBeFalsy()` : null;
       case "assert_equal":
-        return n.args.length >= 2 ? `expect(${a(1)}).toEqual(${a(0)})` : null;
+        if (n.args.length < 2) return null;
+        // A Hash literal is `==` to any Hash with the same pairs (hash.c
+        // rb_hash_equal), a Map-backed one included, which `toEqual` is not:
+        // the actual value passes as the literal when Ruby's `==` holds, and
+        // fails with its own diff when it does not.
+        if (n.args[0].k === "hash") {
+          const t = `__act`;
+          return `expect(((${t}: any) => (${this.rc(ctx, "rbEqual")}(${t}, ${a(0)}) ? ${a(0)} : ${t}))(${a(1)})).toEqual(${a(0)})`;
+        }
+        return `expect(${a(1)}).toEqual(${a(0)})`;
       // Ruby's `!=` (an object's `==`, identity by default): vitest's `toEqual`
       // ignores classes, so two empty instances of different classes compare equal.
       case "assert_not_equal":
@@ -4218,6 +4227,10 @@ export class Lowerer {
         if (n.args.length === 0) return `${rc("rbToA")}(${r})`;
         break;
       case "to_h":
+        // An Array of pairs is a plain-object Hash (CLAUDE.md "A Ruby Hash is a
+        // plain object"); `toH` answers a Map-backed Hash.
+        if (n.args.length === 0 && !blk && recvType?.k === "array")
+          return `Object.fromEntries(${r})`;
         if (n.args.length === 0 && !blk) return `${rc("rbToH")}(${r})`;
         break;
       case "start_with?":
