@@ -25,6 +25,7 @@ import { Resolver } from "./resolve.js";
 import { TypeOracle } from "./types.js";
 import { runtimeShim, DECLINED_SHIM } from "./runtime-shim.js";
 import { GEM, GEM_LIB, GEN_DIR, ORACLE_PATH, PKG_DIR, ROOT } from "./gem.js";
+import { nonNullPass } from "./nonnull-pass.js";
 
 const LIB = GEM_LIB;
 
@@ -336,6 +337,10 @@ writeFileSync(path.join(outDir, "codegen-declined.ts"), DECLINED_SHIM);
   if (existsSync(seats))
     writeFileSync(path.join(outDir, "namespaces.ts"), readFileSync(seats, "utf8"));
 }
+// The signature index: a nullable argument or receiver meeting a non-null
+// parameter or member takes `!` (nonnull-pass.ts). `--no-nonnull` skips it.
+if (!process.argv.includes("--no-nonnull"))
+  report.nonNullAssertions = nonNullPass(outDir, path.join(PKG_DIR, "tsconfig.json"));
 report.wanted = Object.fromEntries([...resolver.wanted].sort((a, b) => b[1] - a[1]));
 report.unresolvedConsts = Object.fromEntries(
   [...resolver.unresolvedConsts].sort((a, b) => b[1] - a[1]),
