@@ -12,9 +12,11 @@ import {
   forceEncoding,
   isValidEncoding,
   rbModConstSet,
+  rbModName,
   rbObjRespondTo,
   rbStrEnumerateLines,
 } from "@blazetrails/ruby-compat";
+import { ActionView } from "./namespaces.js";
 import * as RubyCompat from "@blazetrails/ruby-compat";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
@@ -321,8 +323,10 @@ export class Template {
   }
 
   inspect(): string {
-    const locals = this._locals.length > 0 ? `[:${this._locals.join(", :")}]` : "[]";
-    return `#<ActionView::Template ${this.shortIdentifier} locals=${locals}>`;
+    const locals = this.locals;
+    const inspected =
+      locals == null ? "nil" : locals.length > 0 ? `[:${locals.join(", :")}]` : "[]";
+    return `#<${rbModName(this.constructor)} ${this.shortIdentifier} locals=${inspected}>`;
   }
 
   toString(): string {

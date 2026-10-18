@@ -2586,7 +2586,7 @@ class TestExtractor
     when :string_concat
       left = traverse_for_string(node[1])
       right = traverse_for_string(node[2])
-      left && right ? left + right : left || right
+      left && right ? left + right : nil
     when :@tstring_content
       node[1]
     else
