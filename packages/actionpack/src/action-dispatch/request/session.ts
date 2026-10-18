@@ -102,10 +102,6 @@ function objectIdHex(object: object): string {
 }
 
 export class Session {
-  static toString(): string {
-    return "ActionDispatch::Request::Session";
-  }
-
   private by: SessionStore | null;
   private req: Req;
   protected delegate: Record<string, unknown>;
