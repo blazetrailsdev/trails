@@ -2,6 +2,8 @@ import { Base, type Relation, registerModel } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
 
 export class Project extends Base {
+  declare name: string;
+
   static {
     this.hasAndBelongsToMany("developers", function (this: { uniq(): Relation<Base> }) {
       return this.uniq();
@@ -9,7 +11,7 @@ export class Project extends Base {
   }
 
   static override async collectionCacheKey(
-    collection: Relation<Base> = this.all(),
+    collection: Relation<Project> = this.all(),
     _timestampColumn = "updated_at",
   ): Promise<string> {
     return `projects-${await collection.count()}`;

@@ -2,6 +2,8 @@ import { Base, registerModel } from "@blazetrails/activerecord";
 import { TopLevel } from "@blazetrails/activesupport";
 
 export class Mascot extends Base {
+  declare name: string;
+
   static {
     this.belongsTo("company");
   }
