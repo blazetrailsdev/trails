@@ -1764,9 +1764,9 @@ export class Mapper {
     action: string | undefined,
   ): T | string | undefined {
     if (to || action) return to;
-    const stripped = path.replace(/\(\.:format\)$/, "");
-    if (this.isUsingMatchShorthand(stripped)) {
-      return stripped
+    const pathWithoutFormat = path.replace(/\(\.:format\)$/, "");
+    if (this.isUsingMatchShorthand(pathWithoutFormat)) {
+      return pathWithoutFormat
         .replace(/^\//, "")
         .replace(/\/([^/]*)$/, "#$1")
         .replace(/-/g, "_");

@@ -5,6 +5,7 @@ function host(status: number, headers: Record<string, string> = {}): AssertionRe
   return {
     response: {
       status,
+      responseCode: status,
       body: "",
       location: headers["location"],
       getHeader: (k) => headers[k.toLowerCase()],

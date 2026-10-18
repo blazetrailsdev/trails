@@ -244,14 +244,14 @@ export class HelperMethodBuilder {
     let args: unknown[];
     let target: PolymorphicHost = recipient;
     if (Array.isArray(recordOrHashOrArray)) {
-      const compact = recordOrHashOrArray.filter((x) => x != null);
-      if (compact.length === 0) {
+      recordOrHashOrArray = recordOrHashOrArray.filter((x) => x != null);
+      if (recordOrHashOrArray.length === 0) {
         throw new ArgumentError("Nil location provided. Can't build URI.");
       }
-      if (compact[0] instanceof Routing.RoutesProxy) {
-        target = compact.shift() as unknown as PolymorphicHost;
+      if (recordOrHashOrArray[0] instanceof Routing.RoutesProxy) {
+        target = (recordOrHashOrArray as unknown[]).shift() as PolymorphicHost;
       }
-      [method, args] = builder.handleList(compact);
+      [method, args] = builder.handleList(recordOrHashOrArray);
     } else if (typeof recordOrHashOrArray === "string") {
       [method, args] = builder.handleString(recordOrHashOrArray);
     } else if (isModelClass(recordOrHashOrArray)) {
@@ -356,7 +356,8 @@ export class HelperMethodBuilder {
   }
 
   private getMethodForClass(klass: ModelClass): string {
-    return this.getMethodForString(this.keyStrategy(klass.modelName));
+    const name = this.keyStrategy(klass.modelName);
+    return this.getMethodForString(name);
   }
 
   private getMethodForString(str: string): string {

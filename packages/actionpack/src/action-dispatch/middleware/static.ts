@@ -1,6 +1,6 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Files, Mime, Request, Utils } from "@blazetrails/rack";
-import { File, rbFSend } from "@blazetrails/ruby-compat";
+import { chomp, File, rbFSend } from "@blazetrails/ruby-compat";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -64,7 +64,7 @@ export class FileHandler {
       compressibleContentTypes = /^(?:text\/|application\/javascript|image\/svg\+xml)/,
     }: FileHandlerOptions = {},
   ) {
-    this.root = root.replace(/\/$/, "");
+    this.root = chomp(root, "/");
     this.index = index;
 
     this.precompressed = [...new Set([...precompressed, "identity"])];
@@ -218,7 +218,7 @@ export class FileHandler {
   private cleanPath(pathInfo: string): string | null {
     let path: string;
     try {
-      path = Utils.unescapePath(pathInfo.replace(/\/$/, ""));
+      path = Utils.unescapePath(chomp(pathInfo, "/"));
     } catch {
       return null;
     }

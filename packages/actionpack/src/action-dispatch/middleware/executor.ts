@@ -41,10 +41,10 @@ export class Executor {
         });
       }
 
-      const [status, headers, body] = response;
-      const wrapped = new BodyProxy(body, () => state.completeBang());
+      const parts = response as unknown[];
+      parts.push(new BodyProxy(parts.pop() as RackResponse[2], () => state.completeBang()));
       returned = true;
-      return [status, headers, wrapped];
+      return response;
     } catch (error) {
       const request = new Request(env);
       const backtraceCleaner = request.getHeader("action_dispatch.backtrace_cleaner") as
