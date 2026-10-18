@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { excSetupMessage } from "./exception.js";
+import { Exception, excSetupMessage } from "./exception.js";
+import { StandardError, rbModConstSet } from "./index.js";
 
 describe("excSetupMessage", () => {
   it("gives a raised exception the rescued one as its cause", () => {
@@ -38,8 +39,7 @@ describe("excSetupMessage", () => {
 });
 
 describe("Exception#message", () => {
-  it("answers the class name for an exception raised with no message", async () => {
-    const { Exception, StandardError, rbModConstSet } = await import("./index.js");
+  it("answers the class name for an exception raised with no message", () => {
     class DefaultsError extends StandardError {}
     expect(new DefaultsError().message).toBe("DefaultsError");
     expect(new DefaultsError().toS()).toBe("DefaultsError");

@@ -4004,6 +4004,29 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
     expect(m.params).toEqual([{ name: "attribute", kind: "required", type: "string" }]);
   });
 
+  it("carries a @noRailsEquivalent receipt on a get/set defineProperty statement", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        export class Base {}
+        /**
+         * @noRailsEquivalent PERMANENT
+         */
+        Object.defineProperty(Base.prototype, "message", {
+          configurable: true,
+          get() {
+            return "";
+          },
+          set(value: unknown) {},
+        });
+      `,
+    });
+    const members = info.classes["base.ts:Base"].instanceMethods.filter(
+      (x) => x.name === "message",
+    );
+    expect(members.length).toBe(2);
+    for (const m of members) expect(m.noRailsEquivalent).toBe("PERMANENT");
+  });
+
   it("credits for-of loop over [name, fn][] array to host class (Pattern B)", () => {
     const info = extractFromFiles("/p", {
       "base.ts": `export class Base {}`,
