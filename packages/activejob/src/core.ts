@@ -1,4 +1,4 @@
-import { constantize, Duration, I18n, seconds, zone } from "@blazetrails/activesupport";
+import { constantize, I18n, seconds, zone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import {
   extend,
@@ -6,7 +6,7 @@ import {
   Module,
   rbModName,
   rbObjClass,
-  rbObjIsKindOf,
+  toF,
   toI,
 } from "@blazetrails/ruby-compat";
 import { Arguments } from "./arguments.js";
@@ -117,11 +117,7 @@ function deserialize(this: CoreHost, jobData: JobData): void {
 /** @internal */
 function set<T extends CoreHost>(this: T, options: SetOptions = {}): T {
   if (options.wait != null && options.wait !== false)
-    this.scheduledAt = seconds(
-      rbObjIsKindOf(options.wait, Duration)
-        ? (options.wait as Duration).value
-        : (options.wait as number),
-    ).fromNow() as UtcTime;
+    this.scheduledAt = seconds(toF(options.wait)).fromNow() as UtcTime;
   if (options.waitUntil != null && options.waitUntil !== false)
     this.scheduledAt = options.waitUntil as UtcTime;
   if (options.queue != null && options.queue !== false)
