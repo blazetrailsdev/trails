@@ -298,8 +298,8 @@ export class Request {
   declare readonly ifNoneMatch: string | undefined;
   declare readonly ifNoneMatchEtags: string[];
   declare notModified: (modifiedAt: Date | undefined) => boolean;
-  declare etagMatches: (etag: string | null | undefined) => boolean;
-  declare fresh: (response: CacheResponseLike) => boolean;
+  declare etagMatches: (etag: string | null | undefined) => boolean | null;
+  declare fresh: (response: CacheResponseLike) => boolean | null;
 
   declare readonly contentMimeType: MimeType | null;
   declare readonly accepts: MimeType[];

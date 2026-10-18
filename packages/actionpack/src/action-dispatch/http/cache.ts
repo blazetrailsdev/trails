@@ -56,13 +56,16 @@ export function notModified(this: RequestCacheHost, modifiedAt: Date | undefined
   return !!(since && modifiedAt && since.getTime() >= modifiedAt.getTime());
 }
 
-export function etagMatches(this: RequestCacheHost, etag: string | null | undefined): boolean {
-  if (etag == null) return false;
+export function etagMatches(
+  this: RequestCacheHost,
+  etag: string | null | undefined,
+): boolean | null {
+  if (etag == null) return null;
   const v = ifNoneMatchEtags.call(this);
   return v.includes(etag) || v.includes("*");
 }
 
-export function fresh(this: RequestCacheHost, response: CacheResponseLike): boolean {
+export function fresh(this: RequestCacheHost, response: CacheResponseLike): boolean | null {
   if (this.strictFreshness) {
     if (ifNoneMatch.call(this)) return etagMatches.call(this, response.etag);
     if (ifModifiedSince.call(this)) return notModified.call(this, response.lastModified);
@@ -71,7 +74,7 @@ export function fresh(this: RequestCacheHost, response: CacheResponseLike): bool
   const lm = ifModifiedSince.call(this);
   const et = ifNoneMatch.call(this);
   if (!lm && !et) return false;
-  let ok = true;
+  let ok: boolean | null = true;
   if (lm) ok &&= notModified.call(this, response.lastModified);
   if (et) ok &&= etagMatches.call(this, response.etag);
   return ok;
