@@ -139,6 +139,7 @@ describe("classifyPair", () => {
   // static.rb:145 `File.join(@root, path.b)` vs static.ts `File.join(this.root, path)`.
   it("names String#b dropped for the receiver as an encoding tag", () => {
     expect(classifyPair("b", "path")).toBe("encoding-tag");
+    expect(classifyPair("b", "data")).toBe("burndown");
   });
 
   // Ruby builtins whose TS spelling is the free function or method doing the

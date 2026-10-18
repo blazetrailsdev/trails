@@ -398,7 +398,7 @@ export function classifyPair(
   if (chainExport !== undefined && recordedExport(chainExport) === tsRef) {
     return "no-js-equivalent";
   }
-  if (rubyRef === "b" && tsRef !== "b") return "encoding-tag";
+  if (rubyRef === "b" && tsRef === "path") return "encoding-tag";
   if (tsRef === "toS" || tsRef === "toString" || rubyRef === "toS" || rubyRef === "to_s") {
     return "implicit-to-s";
   }
