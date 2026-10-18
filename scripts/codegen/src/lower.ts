@@ -22,7 +22,7 @@ import { RUBY_COMPAT_EXPORTS } from "../../parity/ruby-compat.js";
 import { operatorSpelling } from "../../api-compare/operator-order-spelling.js";
 import type { N, Param } from "./ir.js";
 import { walk } from "./ir.js";
-import { GemIndex, lexicalChain, qualify, type ScopeInfo } from "./gem-index.js";
+import { GemIndex, lexicalChain, qualify, rubyAncestors, type ScopeInfo } from "./gem-index.js";
 import { GEM, ROOT, coreExtSends, handNamespaceAutoloads, handNamespaceFqns } from "./gem.js";
 import type { Resolver } from "./resolve.js";
 import { isBool, isObjectLike, type TypeRef } from "./types.js";
@@ -2130,6 +2130,29 @@ export class Lowerer {
       return `${this.rc(ctx, "rbCallSuper")}(this, "initialize", ${JSON.stringify(ctx.owner)}${args ? ", " + args : ""})`;
     }
     if (ctx.isModule && ctx.owner) {
+      // A module's `super` is resolved here, as a constructor's `@inlinedFrom`
+      // chain is: across every class of the gem that includes the module, the
+      // next definition after it in Ruby's ancestors. When they agree, `super`
+      // is a direct call of that definition: the next module's function, or the
+      // class's prototype method.
+      const next = this.moduleSuperTarget(ctx.owner, ctx.defName ?? "");
+      if (next) {
+        this.stat(ctx, "module-super-static");
+        const fn = tsMethodName(ctx.defName ?? "", next.owner);
+        let callee: string;
+        if (next.kind === "module") {
+          callee = this.resolver.importFrom(this.resolver.tsFileOf(next.file), fn, ctx, this);
+        } else {
+          const exp = this.resolver.exportNames.get(next.owner)!;
+          callee = `${this.resolver.importFrom(exp.tsFile, exp.name, ctx, this)}.prototype.${fn}`;
+        }
+        const call = `${callee}.call(${["this", args].filter(Boolean).join(", ")})`;
+        if (ctx.defAsync && ctx.asyncBox) {
+          ctx.asyncBox.awaits = true;
+          return `(await ${call})`;
+        }
+        return call;
+      }
       // ruby-compat Module#superMethod: resume the lookup past this module's
       // link in the receiver's ancestry (vm_search_super_method).
       const exp = this.resolver.exportNames.get(ctx.owner);
@@ -2150,6 +2173,38 @@ export class Lowerer {
       return `${this.rc(ctx, "rbCallSuper")}(this, ${JSON.stringify(name)}, ${JSON.stringify(ctx.owner)}${args ? ", " + args : ""})`;
     }
     return `super.${this.defTsName(ctx)}(${args})`;
+  }
+
+  /**
+   * The definition `super` reaches from `mod#name`, when every gem class that
+   * includes `mod` reaches the same one; undefined when they differ, when none
+   * includes it, or when the next definition is outside the gem.
+   */
+  moduleSuperTarget(
+    mod: string,
+    name: string,
+  ): { owner: string; kind: "class" | "module"; file: string } | undefined {
+    const owners = new Map<string, { owner: string; kind: "class" | "module"; file: string }>();
+    let includers = 0;
+    for (const sc of this.index.scopes.values()) {
+      if (sc.kind !== "class") continue;
+      const anc = rubyAncestors(this.index, sc.fqn);
+      const at = anc.indexOf(mod);
+      if (at < 0) continue;
+      includers++;
+      const hit = anc.slice(at + 1).find((f) => {
+        const o = this.index.scopes.get(f)!;
+        return o.defs.get(name)?.singleton === false || o.attrs.has(name);
+      });
+      if (!hit) return undefined;
+      const o = this.index.scopes.get(hit)!;
+      const d = o.defs.get(name);
+      if (!d || d.singleton) return undefined;
+      if (o.kind === "class" && !this.resolver.exportNames.has(hit)) return undefined;
+      owners.set(hit, { owner: hit, kind: o.kind, file: d.file });
+    }
+    if (!includers || owners.size !== 1) return undefined;
+    return [...owners.values()][0];
   }
 
   defTsName(ctx: Ctx): string {

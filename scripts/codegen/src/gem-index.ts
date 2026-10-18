@@ -92,6 +92,8 @@ export class GemIndex {
   consts = new Map<string, ConstInfo>();
   /** Constant aliases of classes/modules, resolved in finish(). */
   aliasPaths = new Map<string, { path: string[]; nesting: string[] }>();
+  /** `Klass.include M` sent from anywhere (a railtie's `on_load`): M joins Klass's includes, last. */
+  sentIncludes: { recv: string[]; mod: string[]; nesting: string[] }[] = [];
   aliases = new Map<string, string>();
 
   /** Every method name defined anywhere in the gem → whether it is only an attr. */
@@ -136,6 +138,19 @@ export class GemIndex {
 
   add(file: IrFile): void {
     this.visit(file.body, [], file.file, false);
+    const walk = (x: any, nesting: string[]): void => {
+      if (Array.isArray(x)) return x.forEach((y) => walk(y, nesting));
+      if (!x || typeof x !== "object") return;
+      if ((x.k === "module" || x.k === "class") && x.path) {
+        const fqn = qualify(x.path, nesting[nesting.length - 1]);
+        return walk(x.body, [...nesting, fqn]);
+      }
+      if (x.k === "call" && x.name === "include" && x.recv?.k === "const")
+        for (const a of x.args ?? [])
+          if (a.k === "const") this.sentIncludes.push({ recv: x.recv.path, mod: a.path, nesting });
+      for (const v of Object.values(x)) walk(v, nesting);
+    };
+    walk(file.body, []);
   }
 
   private visit(node: N, nesting: string[], file: string, singleton: boolean): void {
@@ -316,6 +331,12 @@ export class GemIndex {
           lexicalChain(this, s.lexicalParent),
         )?.fqn;
     }
+    for (const inc of this.sentIncludes) {
+      const target = this.resolveConst(inc.recv, inc.nesting);
+      const mod = this.resolveConst(inc.mod, inc.nesting);
+      if (target?.kind === "scope" && mod?.kind === "scope")
+        this.scopes.get(target.fqn)!.includes.push(mod.fqn.split("::"));
+    }
     for (const [fqn, a] of this.aliasPaths) {
       const hit = this.resolveConst(a.path, a.nesting);
       if (hit?.kind === "scope") this.aliases.set(fqn, hit.fqn);
@@ -402,6 +423,31 @@ export class GemIndex {
     visit(fqn);
     return out;
   }
+}
+
+/**
+ * Ruby's method-resolution order for a class or module (`Module#ancestors`):
+ * its prepends (last first), itself, its includes (last first), each expanded
+ * the same way, then the superclass's. A module already reached through the
+ * superclass is not inserted again (`include_modules_at` skips it), so the
+ * deeper occurrence is the one kept.
+ */
+export function rubyAncestors(index: GemIndex, fqn: string, seen = new Set<string>()): string[] {
+  const s = index.scopes.get(fqn);
+  if (!s || seen.has(fqn)) return [];
+  const inner = new Set([...seen, fqn]);
+  const chain = [...lexicalChain(index, s.lexicalParent), fqn];
+  const mods = (paths: string[][]) =>
+    [...paths].reverse().flatMap((p) => {
+      const hit = index.resolveConst(p, chain);
+      return hit?.kind === "scope" ? rubyAncestors(index, hit.fqn, inner) : [];
+    });
+  const prepends = mods(s.prepends);
+  const prependKeys = new Set(s.prepends.map((p) => p.join("::")));
+  const includes = mods(s.includes.filter((p) => !prependKeys.has(p.join("::"))));
+  const sup = s.superclassFqn ? rubyAncestors(index, s.superclassFqn, inner) : [];
+  const all = [...prepends, fqn, ...includes, ...sup];
+  return all.filter((f, i) => all.lastIndexOf(f) === i);
 }
 
 export function lexicalChain(index: GemIndex, fqn: string | undefined): string[] {

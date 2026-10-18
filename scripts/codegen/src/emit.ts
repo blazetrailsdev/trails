@@ -2138,24 +2138,8 @@ export class Emitter {
           return j === u.fqn || u.fqn.endsWith(`::${j}`);
         }),
     );
-    // A method another module also defines may be reached from it by `super`
-    // (EnqueueAfterTransactionCommit#raw_enqueue over Enqueuing's), which needs
-    // this module's own layer in the includer's ancestors.
-    const own = this.index.scopes.get(u.fqn);
-    const overridden =
-      !!own &&
-      [...this.index.scopes.values()].some(
-        (s) =>
-          s !== own &&
-          s.kind === "module" &&
-          [...own.defs.values()].some((d) => {
-            const o = s.defs.get(d.name);
-            return !d.singleton && o?.singleton === false && callsSuper(o.node);
-          }),
-      );
     const plain =
       !f.rubyFile.startsWith("test/") &&
-      !(isConcern && overridden) &&
       !(isConcern && (includedByModule || !!u.late?.length)) &&
       // A Concern's `ClassMethods` stays a Module: extended as its own layer, a
       // subclass's override (TestHelper's per-job `queue_adapter`) sits above it.
@@ -2249,16 +2233,6 @@ export class Emitter {
 }
 
 void rubyMethodToTsIgnoringSkip;
-
-/** The IR node (a `def`) contains a `super` call; an unknown body counts as one. */
-function callsSuper(n: any): boolean {
-  if (!n) return true;
-  const walk = (x: any): boolean =>
-    Array.isArray(x)
-      ? x.some(walk)
-      : !!x && typeof x === "object" && (x.k === "super" || Object.values(x).some(walk));
-  return walk(n.body ?? n);
-}
 
 /**
  * An object-literal member (shorthand reference, inline method, getter) as a
