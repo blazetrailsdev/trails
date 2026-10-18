@@ -193,6 +193,7 @@ describe("vendor/sources.ts", () => {
       "activerecord",
       "activejob",
       "rack-test",
+      "did-you-mean",
       "msgpack",
       "mysql2",
       "pg",

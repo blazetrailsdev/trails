@@ -4294,6 +4294,7 @@ class ApiExtractor
       # Unqualified method call: foo() or foo
       name = ident_name(callee[1])
       name = nil if callee[0] == :vcall && capture_local?(name)
+      name = "raise" if name == "fail" && !@defines_fail
     when :call, :command_call
       # Qualified method call: obj.foo
       recv = callee[1]
@@ -4318,8 +4319,8 @@ class ApiExtractor
        !(name == "new" && recv && proc_new_receiver?(recv)) &&
        !(recv && native_promise_call?(name, recv)) &&
        !(name == "with_index" && has_block && indexed_iterator_receiver?(recv, args))
-      calls << name
       kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
+      calls << name unless kind == "literal-new"
       (@call_receivers[name] ||= Set.new) << kind
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
         formless = ((has_block || block_pass?(args)) && BLOCK_ARM_HASH_CALLS.include?(name)) ||

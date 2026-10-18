@@ -5,6 +5,7 @@
  *   from `Date.now()`.
  */
 
+import { fetch, rbFArray, rbStrSNew } from "@blazetrails/ruby-compat";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
 
@@ -60,7 +61,7 @@ export class MockResponse extends Response {
   override get body(): string {
     if (this._bufferedBody !== undefined) return this._bufferedBody;
 
-    let buffer = "";
+    let buffer = (this._bufferedBody = rbStrSNew());
 
     for (const chunk of this._body) {
       buffer +=
@@ -81,8 +82,8 @@ export class MockResponse extends Response {
     return [201, 204, 304].includes(this.status);
   }
 
-  cookie(name: string): MockCookie | undefined {
-    return this.cookies[name];
+  cookie(name: string): MockCookie | null {
+    return fetch(this.cookies, name, null);
   }
 
   match(other: RegExp): RegExpMatchArray | null {
@@ -92,25 +93,23 @@ export class MockResponse extends Response {
   /** @internal */
   private parseCookiesFromHeader(): Record<string, MockCookie> {
     const cookies: Record<string, MockCookie> = {};
-    const setCookie = this.headers[SET_COOKIE];
-    if (!setCookie) return cookies;
-    const cookieHeaders = Array.isArray(setCookie) ? setCookie : [setCookie];
-
-    for (const cookie of cookieHeaders) {
-      const eqIdx = cookie.indexOf("=");
-      if (eqIdx === -1) continue;
-      const name = cookie.substring(0, eqIdx);
-      const filling = cookie.substring(eqIdx + 1);
-      const attrs = this.identifyCookieAttributes(filling);
-
-      cookies[name.trim()] = new MockCookie({
-        name: name.trim(),
-        value: attrs.value,
-        path: attrs.path,
-        domain: attrs.domain,
-        expires: attrs.expires,
-        secure: attrs.secure || false,
-      });
+    const setCookieHeader = this.headers[SET_COOKIE];
+    if (setCookieHeader && setCookieHeader.length !== 0) {
+      for (const cookie of rbFArray(setCookieHeader) as string[]) {
+        const i = cookie.indexOf("=");
+        const [cookieName, cookieFilling] =
+          i === -1 ? [cookie, undefined] : [cookie.slice(0, i), cookie.slice(i + 1)];
+        const cookieAttributes = this.identifyCookieAttributes(cookieFilling!);
+        const parsedCookie = new MockCookie({
+          name: cookieName.trim(),
+          value: fetch(cookieAttributes, "value"),
+          path: fetch(cookieAttributes, "path", null),
+          domain: fetch(cookieAttributes, "domain", null),
+          expires: fetch(cookieAttributes, "expires", null),
+          secure: fetch(cookieAttributes, "secure", false),
+        });
+        cookies[cookieName] = parsedCookie;
+      }
     }
     return cookies;
   }

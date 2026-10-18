@@ -42,6 +42,7 @@ export class Params {
     return params as Params;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static [Symbol.hasInstance](value: unknown): boolean {
     return (
       typeof value === "object" &&

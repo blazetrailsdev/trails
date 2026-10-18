@@ -300,10 +300,6 @@ export class Response {
     this.headers[key] = value;
   }
 
-  [Symbol.for("[]")](key: string): any {
-    return this.headers[key];
-  }
-
   includes(key: string): boolean {
     return key in this.headers;
   }

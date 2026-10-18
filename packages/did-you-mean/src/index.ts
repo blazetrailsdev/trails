@@ -7,17 +7,4 @@ export type { SpellCheckerOptions } from "./spell-checker.js";
 export { Correctable } from "./core-ext/name-error.js";
 
 export { Formatter, PlainFormatter };
-
-interface FormatterLike {
-  messageFor(corrections: string[]): string;
-}
-
-let ractorFormatter: FormatterLike | null = null;
-
-export function formatter(): typeof Formatter | FormatterLike {
-  return ractorFormatter || Formatter;
-}
-
-export function setFormatter<T extends FormatterLike | null>(formatter: T): T {
-  return (ractorFormatter = formatter) as T;
-}
+export { formatter, setFormatter } from "./did-you-mean.js";

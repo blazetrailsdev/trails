@@ -1,8 +1,10 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
+import { Dir, File, sprintf } from "@blazetrails/ruby-compat";
 import type { FsStatResult } from "@blazetrails/ruby-compat";
-import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
+import { CONTENT_TYPE, CONTENT_LENGTH, PATH_INFO, SCRIPT_NAME } from "./constants.js";
+import { escapeHtml, escapePath, unescapePath, validPath } from "./utils.js";
 import { mimeType } from "./mime.js";
 import { Files } from "./files.js";
+import { Head } from "./head.js";
 
 const DIR_FILE =
   "<tr><td class='name'><a href='%s'>%s</a></td><td class='size'>%s</td><td class='type'>%s</td><td class='mtime'>%s</td></tr>\n";
@@ -18,28 +20,18 @@ const FILESIZE_FORMAT: [string, number][] = [
   ["%.1fK", 2 ** 10],
 ];
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function dirPageHeader(showPath: string): string {
-  return `<html><head>
-  <title>${showPath}</title>
+const DIR_PAGE_HEADER = `<html><head>
+  <title>%s</title>
   <meta http-equiv="content-type" content="text/html; charset=utf-8" />
   <style type='text/css'>
-table { width:100%; }
+table { width:100%%; }
 .name { text-align:left; }
 .size, .mtime { text-align:right; }
 .type { width:11em; }
 .mtime { width:15em; }
   </style>
 </head><body>
-<h1>${showPath}</h1>
+<h1>%s</h1>
 <hr />
 <table>
   <tr>
@@ -49,92 +41,77 @@ table { width:100%; }
     <th class='mtime'>Last Modified</th>
   </tr>
 `;
-}
-
-function formatDirRow(
-  url: string,
-  name: string,
-  size: string,
-  type: string,
-  mtime: string,
-): string {
-  return DIR_FILE.replace("%s", escapeHtml(url))
-    .replace("%s", escapeHtml(name))
-    .replace("%s", escapeHtml(size))
-    .replace("%s", escapeHtml(type))
-    .replace("%s", escapeHtml(mtime));
-}
 
 export class DirectoryBody {
   root: string;
   path: string;
   files: (basename: string) => [string, string, string, string, string] | null;
-  private showPath: string;
 
   constructor(
     root: string,
     path: string,
     files: (basename: string) => [string, string, string, string, string] | null,
-    showPath?: string,
   ) {
     this.root = root;
     this.path = path;
     this.files = files;
-    this.showPath = showPath ?? escapeHtml(path.replace(root, ""));
   }
 
   each(cb: (chunk: string) => void): void {
-    cb(dirPageHeader(this.showPath));
+    const showPath = escapeHtml(this.path.replace(new RegExp(`^${this.root}`), ""));
+    cb(sprintf(DIR_PAGE_HEADER, showPath, showPath));
 
     if (this.path.replace(/\/$/, "") !== this.root) {
-      const parent = this.files("..");
-      if (parent) cb(formatDirRow(...parent));
+      cb(sprintf(DIR_FILE, ...this.DIR_FILE_escape(this.files("..")!)));
     }
 
     Dir.foreach(this.path, (basename) => {
       if (basename.startsWith(".")) return;
       const f = this.files(basename);
       if (!f) return;
-      cb(formatDirRow(...f));
+      cb(sprintf(DIR_FILE, ...this.DIR_FILE_escape(f)));
     });
 
     cb(DIR_PAGE_FOOTER);
+  }
+
+  /** @internal */
+  private DIR_FILE_escape(htmls: string[]): string[] {
+    return htmls.map((e) => escapeHtml(e));
   }
 }
 
 export class Directory {
   root: string;
   private app: any;
+  private head: Head;
 
   constructor(root: string, app?: any) {
     this.root = File.expandPath(root);
     this.app = app || new Files(this.root);
+    this.head = new Head(this.get.bind(this));
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    const method = env["REQUEST_METHOD"];
-    const [status, headers, body] = await this.get(env);
-    return method === "HEAD" ? [status, headers, []] : [status, headers, body];
+    return this.head.call(env);
   }
 
   async get(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    const scriptName = env["SCRIPT_NAME"] || "";
-    let pathInfo: string;
-    try {
-      pathInfo = decodeURIComponent(env["PATH_INFO"] || "/");
-    } catch {
-      return this.checkBadRequest("\0")!;
+    const scriptName = env[SCRIPT_NAME];
+    const pathInfo = unescapePath(env[PATH_INFO]);
+
+    const clientErrorResponse = this.checkBadRequest(pathInfo) || this.checkForbidden(pathInfo);
+    if (clientErrorResponse) {
+      return clientErrorResponse;
+    } else {
+      const path = File.join(this.root, pathInfo);
+      return this.listPath(env, path, pathInfo, scriptName);
     }
-
-    const clientError = this.checkBadRequest(pathInfo) || this.checkForbidden(pathInfo);
-    if (clientError) return clientError;
-
-    const path = File.join(this.root, pathInfo);
-    return this.listPath(env, path, pathInfo, scriptName);
   }
 
   checkBadRequest(pathInfo: string): [number, Record<string, any>, any] | null {
-    if (!pathInfo.includes("\0")) return null;
+    if (validPath(pathInfo)) return null;
+
     const body = "Bad Request\n";
     return [
       400,
@@ -150,7 +127,17 @@ export class Directory {
   checkForbidden(pathInfo: string): [number, Record<string, any>, any] | null {
     if (!pathInfo.includes("..")) return null;
     if (File.expandPath(File.join(this.root, pathInfo)).startsWith(this.root)) return null;
-    return this.entityNotFound(pathInfo);
+
+    const body = "Forbidden\n";
+    return [
+      403,
+      {
+        [CONTENT_TYPE]: "text/plain",
+        [CONTENT_LENGTH]: String(Buffer.byteLength(body)),
+        "x-cascade": "pass",
+      },
+      [body],
+    ];
   }
 
   listDirectory(
@@ -158,30 +145,35 @@ export class Directory {
     path: string,
     scriptName: string,
   ): [number, Record<string, any>, any] {
-    const showPath = escapeHtml(scriptName + pathInfo);
-    const urlHead = [...scriptName.split("/"), ...pathInfo.split("/")].map((p) =>
-      encodeURIComponent(p),
+    const urlHead = [...scriptName.split("/"), ...pathInfo.split("/")].map((part) =>
+      escapePath(part),
     );
 
-    const filesCallback = (basename: string): [string, string, string, string, string] | null => {
-      const fullEntry = File.join(path, basename);
-      const s = this.stat(fullEntry);
-      if (!s) return null;
+    const body = new DirectoryBody(this.root, path, (basename) => {
+      const stat = this.stat(File.join(path, basename));
+      if (!stat) return null;
 
-      let url = [...urlHead, encodeURIComponent(basename)].join("/").replace(/\/+/g, "/");
-      const mtime = s.mtime.toUTCString();
-
-      if (s.isDirectory()) {
-        url = url.endsWith("/") ? url : url + "/";
-        const displayName = basename === ".." ? "Parent Directory" : basename + "/";
-        return [url, displayName, "-", "directory", mtime];
+      let url = File.join(...urlHead, escapePath(basename));
+      const mtime = stat.mtime.toUTCString();
+      let type: string;
+      let size: string;
+      if (stat.isDirectory()) {
+        type = "directory";
+        size = "-";
+        url += "/";
+        if (basename === "..") {
+          basename = "Parent Directory";
+        } else {
+          basename += "/";
+        }
+      } else {
+        type = mimeType(File.extname(basename))!;
+        size = this.filesizeFormat(stat.size);
       }
 
-      const type = mimeType(File.extname(basename), null) || "text/plain";
-      return [url, basename, this.filesizeFormat(s.size), type, mtime];
-    };
+      return [url, basename, size, type, mtime];
+    });
 
-    const body = new DirectoryBody(this.root, path, filesCallback, showPath);
     return [200, { [CONTENT_TYPE]: "text/html; charset=utf-8" }, body];
   }
 
@@ -201,11 +193,12 @@ export class Directory {
     pathInfo: string,
     scriptName: string,
   ): Promise<[number, Record<string, any>, any]> {
-    const s = this.stat(path);
-    if (s) {
-      if (s.isFile()) return this.app.call(env);
-      if (s.isDirectory()) return this.listDirectory(pathInfo, path, scriptName);
+    let stat: FsStatResult | null;
+    if ((stat = this.stat(path)) && File.isReadable(path)) {
+      if (stat.isFile()) return this.app.call(env);
+      if (stat.isDirectory()) return this.listDirectory(pathInfo, path, scriptName);
     }
+
     return this.entityNotFound(pathInfo);
   }
 

@@ -34,7 +34,7 @@ it("work with standard library logger", async () => {
     },
   };
   const log = {
-    info(msg: string) {
+    append(msg: string) {
       logdev.write(msg + "\n");
     },
   };
@@ -98,7 +98,7 @@ it("escapes non printable characters including newline", async () => {
     },
   };
   const log = {
-    info(msg: string) {
+    append(msg: string) {
       logdev.write(msg + "\n");
     },
   };
@@ -119,7 +119,7 @@ it("log path with PATH_INFO", async () => {
     },
   };
   const log = {
-    info(msg: string) {
+    append(msg: string) {
       logdev.write(msg + "\n");
     },
   };
@@ -135,7 +135,7 @@ it("log path with SCRIPT_NAME", async () => {
     },
   };
   const log = {
-    info(msg: string) {
+    append(msg: string) {
       logdev.write(msg + "\n");
     },
   };
@@ -153,7 +153,7 @@ it("log path with SERVER_PROTOCOL", async () => {
     },
   };
   const log = {
-    info(msg: string) {
+    append(msg: string) {
       logdev.write(msg + "\n");
     },
   };

@@ -7,33 +7,22 @@ export function type(contentType: string | null | undefined): string | null {
 }
 
 export function params(contentType: string | null | undefined): Record<string, string> {
-  if (!contentType || contentType.length === 0) return {};
-  const parts = contentType.split(SPLIT_PATTERN);
-  const result: Record<string, string> = {};
-  for (let i = 1; i < parts.length; i++) {
-    const s = parts[i].trim();
-    const eqIdx = s.indexOf("=");
-    let k: string, v: string;
-    if (eqIdx === -1) {
-      k = s;
-      v = "";
-    } else {
-      k = s.substring(0, eqIdx);
-      v = stripDoubleQuotes(s.substring(eqIdx + 1));
-    }
-    result[k.toLowerCase()] = v;
-  }
-  return result;
-}
+  if (contentType == null) return {};
 
-function stripDoubleQuotes(str: string | undefined): string {
-  if (str && str.startsWith('"') && str.endsWith('"')) {
-    return str.slice(1, -1);
+  const hsh: Record<string, string> = {};
+  for (let s of contentType.split(SPLIT_PATTERN).slice(1)) {
+    s = s.trim();
+    const i = s.indexOf("=");
+    const kv = i === -1 ? [s, undefined] : [s.slice(0, i), s.slice(i + 1)];
+    let k = kv[0]!;
+    const v = kv[1];
+    k = k.toLowerCase();
+    hsh[k] = stripDoublequotes(v);
   }
-  return str || "";
+  return hsh;
 }
 
 /** @internal */
 export function stripDoublequotes(str: string | undefined): string {
-  return stripDoubleQuotes(str);
+  return str && str.startsWith('"') && str.endsWith('"') ? str.slice(1, -1) : str || "";
 }

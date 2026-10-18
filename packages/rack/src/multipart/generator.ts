@@ -2,6 +2,7 @@ import { File } from "@blazetrails/ruby-compat";
 import { ArgumentError, escapePath } from "../utils.js";
 import { UploadedFile } from "./uploaded-file.js";
 import { MULTIPART_BOUNDARY } from "../multipart-boundary.js";
+import { buildMultipart } from "../multipart.js";
 
 type Params = Record<string, unknown>;
 
@@ -20,19 +21,22 @@ export class Generator {
     this._first = first;
   }
 
+  /** @missingRailsArgs join — PERMANENT */
   dump(): string | Params | null {
     if (this._first && !this.isMultipart()) return null;
     if (!this._first) return this.flattenedParams();
 
-    let out = "";
-    for (const [name, file] of Object.entries(this.flattenedParams())) {
-      if (file instanceof UploadedFile) {
-        out += this.contentForTempfile(file, file, name);
-      } else {
-        out += this.contentForOther(file, name);
-      }
-    }
-    return out + `--${MULTIPART_BOUNDARY}--\r`;
+    return (
+      Object.entries(this.flattenedParams())
+        .map(([name, file]) => {
+          if (file instanceof UploadedFile) {
+            return this.contentForTempfile(file, file, name);
+          } else {
+            return this.contentForOther(file, name);
+          }
+        })
+        .join("") + `--${MULTIPART_BOUNDARY}--\r`
+    );
   }
 
   /** @internal */
@@ -56,13 +60,13 @@ export class Generator {
       const k = this._first ? String(key) : `[${key}]`;
       if (Array.isArray(value)) {
         for (const v of value) {
-          const sub = new Generator(v as Params, false).dump() as Params;
+          const sub = buildMultipart(v, false) as Params;
           for (const [sk, sv] of Object.entries(sub)) {
             h[`${k}[]${sk}`] = sv;
           }
         }
       } else if (value !== null && typeof value === "object" && !(value instanceof UploadedFile)) {
-        const sub = new Generator(value as Params, false).dump() as Params;
+        const sub = buildMultipart(value, false) as Params;
         for (const [sk, sv] of Object.entries(sub)) {
           h[k + sk] = sv;
         }

@@ -288,25 +288,16 @@ export class Headers extends Hash<string, string> {
     return this;
   }
 
-  transformKeys(fn: (key: string) => string): Headers {
-    const result = new Headers();
-    for (const [k, v] of this) {
-      result.set(result._key(fn(k)), v);
-    }
-    return result;
+  transformKeys(block: (key: string) => string): Headers {
+    return this.dup().transformKeysBang(block);
   }
 
-  transformKeysInPlace(fn: (key: string) => string): Headers {
-    const entries = [...this];
-    this.clear();
-    for (const [k, v] of entries) {
-      this.set(this._key(fn(k)), v);
-    }
-    return this;
-  }
-
-  transformKeysBang(fn: (key: string) => string): Headers {
-    return this.transformKeysInPlace(fn);
+  transformKeysBang(block: (key: string) => string): Headers {
+    const hash = new (this.constructor as typeof Headers)();
+    this.each((k, v) => {
+      hash.set(block(k), v);
+    });
+    return this.replace(hash);
   }
 
   invert(): Headers {

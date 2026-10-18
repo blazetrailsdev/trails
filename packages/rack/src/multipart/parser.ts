@@ -5,11 +5,13 @@ import {
   File,
   forceEncoding,
   include,
+  NoMethodError,
+  rbStrSNew,
   Tempfile,
 } from "@blazetrails/ruby-compat";
 import { BadRequest } from "../bad-request.js";
 import { QueryParser } from "../query-parser.js";
-import { getMultipartFileLimit, getMultipartTotalPartLimit, unescapePath } from "../utils.js";
+import { multipartFileLimit, multipartTotalPartLimit, unescapePath } from "../utils.js";
 
 export class MultipartPartLimitError extends Error {
   constructor(message = "Maximum file multiparts in content reached") {
@@ -49,11 +51,16 @@ export const MULTIPART_CONTENT_DISPOSITION = new RegExp(
 );
 export const MULTIPART_CONTENT_ID = new RegExp(`Content-ID:\\s*([^${EOL}]*)`, "i");
 
-export interface MultipartInfo {
+export class MultipartInfo {
   params: Record<string, any> | null;
   tmpFiles: any[];
+
+  constructor(params: Record<string, any> | null, tmpFiles: any[]) {
+    this.params = params;
+    this.tmpFiles = tmpFiles;
+  }
 }
-const EMPTY: MultipartInfo = { params: null, tmpFiles: [] };
+const EMPTY = new MultipartInfo(null, []);
 Object.freeze(EMPTY.tmpFiles);
 Object.freeze(EMPTY);
 
@@ -245,17 +252,17 @@ export class Collector {
 
   /** @internal */
   private checkPartLimits() {
-    const fileLimit = getMultipartFileLimit();
-    const partLimit = getMultipartTotalPartLimit();
+    const fileLimit = multipartFileLimit();
+    const partLimit = multipartTotalPartLimit();
 
-    if (fileLimit > 0) {
+    if (fileLimit && fileLimit > 0) {
       if (this.openFiles >= fileLimit) {
         this.mimeParts.forEach((part) => part.close());
         throw new MultipartPartLimitError("Maximum file multiparts in content reached");
       }
     }
 
-    if (partLimit > 0) {
+    if (partLimit && partLimit > 0) {
       if (this.mimeParts.length >= partLimit) {
         this.mimeParts.forEach((part) => part.close());
         throw new MultipartTotalPartLimitError("Maximum total multiparts in content reached");
@@ -362,10 +369,10 @@ export class Parser {
         this.queryParser.normalizeParams(this.params, name, body);
       }),
     );
-    return {
-      params: this.params.toParamsHash(),
-      tmpFiles: this.collector.findAll((part) => part.isFile()).map((part) => part.body),
-    };
+    return new MultipartInfo(
+      this.params.toParamsHash(),
+      this.collector.findAll((part) => part.isFile()).map((part) => part.body),
+    );
   }
 
   /** @internal */
@@ -405,25 +412,103 @@ export class Parser {
   }
 
   /** @internal */ private handleMimeHead(): void | "want_read" {
-    if (!this.sbuf.scanUntil(this.headRegex)) return "want_read";
-    const head = this.sbuf.cap(1),
-      contentType = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
-    let name: string | undefined, filename: string | undefined, filenameStar: string | undefined;
-    const dispositionMatch = MULTIPART_CONTENT_DISPOSITION.exec(head);
-    if (dispositionMatch && dispositionMatch[1].length <= CONTENT_DISPOSITION_MAX_BYTES) {
-      const params = this.parseDispositionParams(dispositionMatch[1]);
-      name = params.name;
-      filename = params.filename;
-      filenameStar = params.filenameStar;
+    if (this.sbuf.scanUntil(this.headRegex)) {
+      const head = this.sbuf.cap(1);
+      const contentType = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
+      let name: string | undefined, filename: string | undefined, filenameStar: string | undefined;
+      let disposition = MULTIPART_CONTENT_DISPOSITION.exec(head)?.[1];
+      if (disposition != null && Buffer.byteLength(disposition) <= CONTENT_DISPOSITION_MAX_BYTES) {
+        let i = disposition.indexOf(";");
+        if (i === -1) throw new NoMethodError("undefined method `+' for nil");
+        disposition = disposition.slice(i + 1);
+        let param: string;
+        let numParams = 0;
+
+        while ((i = disposition.indexOf("=")) !== -1) {
+          numParams += 1;
+          if (numParams > CONTENT_DISPOSITION_MAX_PARAMS) break;
+
+          param = disposition.slice(0, i + 1);
+          disposition = disposition.slice(i + 1);
+
+          param = param.replace(/=$/, "").trimStart();
+
+          let value: string;
+          if (disposition[0] === '"') {
+            disposition = disposition.slice(1);
+            value = rbStrSNew();
+
+            let m: RegExpExecArray | null;
+            while ((m = /(["\\])/.exec(disposition))) {
+              const c = m[1];
+              i = m.index;
+
+              value += disposition.slice(0, i);
+              disposition = disposition.slice(i);
+
+              disposition = disposition.slice(1);
+
+              if (c === '"') break;
+
+              const escapedChar = disposition.slice(0, 1);
+              disposition = disposition.slice(1);
+              if (param === "filename" && escapedChar !== '"') {
+                value += c + escapedChar;
+              } else {
+                value += escapedChar;
+              }
+            }
+          } else {
+            if ((i = disposition.indexOf(";")) !== -1) {
+              value = disposition.slice(0, i);
+              disposition = disposition.slice(i);
+            } else {
+              disposition = disposition.trim();
+              value = disposition;
+              disposition = "";
+            }
+          }
+
+          switch (param) {
+            case "name":
+              name = value;
+              break;
+            case "filename":
+              filename = value;
+              break;
+            case "filename*":
+              filenameStar = value;
+              break;
+          }
+
+          if ((i = disposition.indexOf(";")) !== -1) {
+            disposition = disposition.slice(i + 1);
+          }
+        }
+      } else {
+        name = MULTIPART_CONTENT_ID.exec(head)?.[1];
+      }
+
+      if (filenameStar) {
+        const first = filenameStar.indexOf("'");
+        const second = first === -1 ? -1 : filenameStar.indexOf("'", first + 1);
+        const encoding = first === -1 ? filenameStar : filenameStar.slice(0, first);
+        filename = second === -1 ? undefined : filenameStar.slice(second + 1);
+        filename = this.normalizeFilename(filename || "");
+        filename = forceEncoding(filename, this.findEncoding(encoding));
+      } else if (filename != null) {
+        filename = this.normalizeFilename(filename);
+      }
+
+      if (name == null || name.length === 0) {
+        name = filename ?? `${contentType ?? Parser.TEXT_PLAIN}[]`;
+      }
+
+      this.collector.onMimeHead(this.mimeIndex, head, filename, contentType, name);
+      this.state = "MIME_BODY";
     } else {
-      const contentId = MULTIPART_CONTENT_ID.exec(head);
-      if (contentId) name = contentId[1];
+      return "want_read";
     }
-    if (filenameStar) filename = this.normalizeFilename(filenameStar.split("'", 3)[2] ?? "");
-    else if (filename != null) filename = this.normalizeFilename(filename);
-    if (!name) name = filename ?? `${contentType ?? Parser.TEXT_PLAIN}[]`;
-    this.collector.onMimeHead(this.mimeIndex, head, filename, contentType, name);
-    this.state = "MIME_BODY";
   }
 
   /** @internal */ private handleMimeBody(): void | "want_read" {
@@ -459,7 +544,7 @@ export class Parser {
         /** @empty */
       }
     }
-    return filename.split(/[/\\]/).at(-1) ?? "";
+    return filename.split(/[/\\]/).at(-1) ?? rbStrSNew();
   }
   /** @internal */
   private tagMultipartEncoding(
@@ -502,64 +587,5 @@ export class Parser {
   }
   /** @internal */ private handleEmptyContentBang(content: string | null | undefined) {
     if (!content) throw new EmptyContentError();
-  }
-
-  private parseDispositionParams(raw: string): {
-    name?: string;
-    filename?: string;
-    filenameStar?: string;
-  } {
-    const si = raw.indexOf(";");
-    if (si < 0) return {};
-    let pos = si + 1,
-      name: string | undefined,
-      filename: string | undefined,
-      filenameStar: string | undefined,
-      np = 0;
-    while (pos < raw.length) {
-      const ei = raw.indexOf("=", pos);
-      if (ei < 0 || ++np > CONTENT_DISPOSITION_MAX_PARAMS) break;
-      const pn = raw.slice(pos, ei).trim().toLowerCase();
-      pos = ei + 1;
-      let v = "";
-      if (raw[pos] === '"') {
-        pos++;
-        while (pos < raw.length) {
-          const qi = raw.indexOf('"', pos),
-            bi = raw.indexOf("\\", pos);
-          if (bi >= 0 && (qi < 0 || bi < qi)) {
-            v += raw.slice(pos, bi);
-            pos = bi + 1;
-            const e = raw[pos] ?? "";
-            pos++;
-            v += pn === "filename" && e !== '"' ? "\\" + e : e;
-          } else if (qi >= 0) {
-            v += raw.slice(pos, qi);
-            pos = qi + 1;
-            break;
-          } else {
-            v += raw.slice(pos);
-            pos = raw.length;
-            break;
-          }
-        }
-      } else {
-        const nsi = raw.indexOf(";", pos);
-        if (nsi >= 0) {
-          v = raw.slice(pos, nsi);
-          pos = nsi;
-        } else {
-          v = raw.slice(pos).trim();
-          pos = raw.length;
-        }
-      }
-      if (pn === "name") name = v;
-      else if (pn === "filename") filename = v;
-      else if (pn === "filename*") filenameStar = v;
-      const ns = raw.indexOf(";", pos);
-      if (ns >= 0) pos = ns + 1;
-      else break;
-    }
-    return { name, filename, filenameStar };
   }
 }

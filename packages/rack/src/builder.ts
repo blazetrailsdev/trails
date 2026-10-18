@@ -1,8 +1,10 @@
-import { ArgumentError, File, rbBlockGivenP, rbFSend } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, rbBlockGivenP, rbFBinding, rbFSend } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
 
 type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, any>) => any);
 type MiddlewareFactory = new (app: RackApp, ...args: any[]) => RackApp;
+
+export const BUILDER_TOPLEVEL_BINDING = (builder: Builder): Builder => rbFBinding(builder);
 
 export class Builder {
   private _use: Array<(app: RackApp) => RackApp> = [];
@@ -54,6 +56,7 @@ export class Builder {
     options: Record<string, unknown> = {},
   ): RackApp {
     const builder = new this(null, options);
+    const binding = rbFSend(BUILDER_TOPLEVEL_BINDING, "call", builder) as Builder;
     const source =
       `"use strict";\n${builderScript}` +
       `\n//# sourceURL=${path.replace(/\\/g, "/").replace(/[\r\n\u2028\u2029]/g, "")}`;
@@ -66,7 +69,7 @@ export class Builder {
       });
     }
     try {
-      configFn(builder);
+      configFn(binding);
     } catch (err) {
       throw new Error(`Error evaluating config from ${path}: ${(err as Error).message}`, {
         cause: err,

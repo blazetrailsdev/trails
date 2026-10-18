@@ -1,6 +1,7 @@
 import { it, expect, beforeAll, afterAll } from "vitest";
 import { Directory } from "./directory.js";
 import { MockRequest } from "./mock-request.js";
+import { Lint } from "./lint.js";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -61,9 +62,16 @@ it("serve directory indices with bad symlinks", async () => {
 });
 
 it("return 404 for unreadable directories", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/../../../etc/shadow");
-  expect(res.status).toBe(404);
+  try {
+    fs.writeFileSync(path.join(tmpDir, "unreadable"), "");
+    fs.chmodSync(path.join(tmpDir, "unreadable"), 0);
+    const app = makeApp();
+    const res = await new MockRequest(new Lint((env: any) => app.call(env))).get("/unreadable");
+
+    expect(res.status).toBe(404);
+  } finally {
+    fs.rmSync(path.join(tmpDir, "unreadable"));
+  }
 });
 
 it("pass to app if file found", async () => {
@@ -95,13 +103,13 @@ it("allow directory traversal inside root directory", async () => {
 it("not allow directory traversal", async () => {
   const app = makeApp();
   const res = await new MockRequest((env) => app.call(env)).get("/../../../etc/passwd");
-  expect(res.status).toBe(404);
+  expect(res.status).toBe(403);
 });
 
 it("not allow directory traversal via root prefix bypass", async () => {
   const app = makeApp();
   const res = await new MockRequest((env) => app.call(env)).get("/%2E%2E/%2E%2E/etc/passwd");
-  expect(res.status).toBe(404);
+  expect(res.status).toBe(403);
 });
 
 it("not allow dir globs", async () => {
@@ -127,7 +135,7 @@ it("correctly escape script name with spaces", async () => {
   const app = makeApp();
   const res = await new MockRequest((env) => app.call(env)).get("/", { SCRIPT_NAME: "/my app" });
   expect(res.status).toBe(200);
-  expect(res.body).toContain("my app");
+  expect(res.body).toContain("/my%20app/");
 });
 
 it("correctly escape script name with '", async () => {
@@ -144,7 +152,7 @@ it("correctly escape script name", async () => {
   });
   expect(res.status).toBe(200);
   expect(res.body).not.toContain("<script>");
-  expect(res.body).toContain("&lt;script&gt;");
+  expect(res.body).toContain("/test%3Cscript%3E/");
 });
 
 it("return error when file not found for head request", async () => {
