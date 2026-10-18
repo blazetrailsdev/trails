@@ -322,7 +322,7 @@ export class Template {
 
   inspect(): string {
     const locals = this._locals.length > 0 ? `[:${this._locals.join(", :")}]` : "[]";
-    return `#<Template ${this.shortIdentifier} locals=${locals}>`;
+    return `#<ActionView::Template ${this.shortIdentifier} locals=${locals}>`;
   }
 
   toString(): string {
