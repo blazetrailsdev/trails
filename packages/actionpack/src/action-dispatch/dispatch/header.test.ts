@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Headers } from "../http/headers.js";
 import { Request } from "../http/request.js";
+import { assert, assertIncludes } from "@blazetrails/activesupport";
 
 function makeHeaders(hash: Record<string, unknown>): Headers {
   return new Headers(new Request(hash));
@@ -83,10 +84,10 @@ describe("HeaderTest", () => {
 
   it("key?", () => {
     const headers = setup();
-    expect(headers.isKey("CONTENT_TYPE")).toBe(true);
-    expect(headers.isInclude("CONTENT_TYPE")).toBe(true);
-    expect(headers.isKey("Content-Type")).toBe(true);
-    expect(headers.isInclude("Content-Type")).toBe(true);
+    assert(headers.isKey("CONTENT_TYPE"));
+    assertIncludes(headers, "CONTENT_TYPE");
+    assert(headers.isKey("Content-Type"));
+    assertIncludes(headers, "Content-Type");
   });
 
   it("fetch with block", () => {

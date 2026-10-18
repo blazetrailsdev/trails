@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ActionableError, NonActionable } from "@blazetrails/activesupport";
+import {
+  ActionableError,
+  assertEmpty,
+  assertRaises,
+  NonActionable,
+} from "@blazetrails/activesupport";
 import { StringIO } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ActionableExceptions } from "../middleware/actionable-exceptions.js";
@@ -54,7 +59,8 @@ describe("ActionableExceptionsTest", () => {
         { "action_dispatch.show_detailed_exceptions": false },
       ),
     );
-    expect(Actions).toEqual([]);
+
+    assertEmpty(Actions);
   });
 
   it("dispatched action can fail", async () => {
@@ -71,26 +77,26 @@ describe("ActionableExceptionsTest", () => {
 
   it("cannot dispatch non-actionable errors", async () => {
     const mw = new ActionableExceptions(noop);
-    await expect(
+    await assertRaises([NonActionable], {}, () =>
       mw.call(
         postEnv(
           { error: "RuntimeError", action: "Inexistent action", location: "/" },
           { "action_dispatch.show_detailed_exceptions": true },
         ),
       ),
-    ).rejects.toBeInstanceOf(NonActionable);
+    );
   });
 
   it("cannot dispatch Inexistent errors", async () => {
     const mw = new ActionableExceptions(noop);
-    await expect(
+    await assertRaises([NonActionable], {}, () =>
       mw.call(
         postEnv(
           { error: "", action: "Inexistent action", location: "/" },
           { "action_dispatch.show_detailed_exceptions": true },
         ),
       ),
-    ).rejects.toBeInstanceOf(NonActionable);
+    );
   });
 
   it("catches invalid redirections", async () => {

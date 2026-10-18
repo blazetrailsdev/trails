@@ -155,6 +155,16 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["on tc"]).toBe(2);
   });
 
+  it("counts an assert helper called on the suite's t instance", () => {
+    const src = `
+      it("on t", async () => {
+        await t.get("/parse");
+        t.assertResponse(":ok");
+      });
+    `;
+    expect(tsAssertionCounts(src)["on t"]).toBe(1);
+  });
+
   it("counts trails expect* assertion helpers (twins of Rails assert_* helpers)", () => {
     const src = `
       it("mixed", () => {

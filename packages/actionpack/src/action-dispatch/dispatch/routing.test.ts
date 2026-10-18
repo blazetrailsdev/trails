@@ -9,6 +9,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   pluralize,
   assertDeprecated,
+  assertEqual,
   assertNothingRaised,
   assertRaises,
   stub,
@@ -352,18 +353,6 @@ describe("TestRoutingMapper", () => {
     expect(() => routes.recognizePath("/search")).not.toThrow();
     expect(() => routes.recognizePath("/search", { method: "post" })).not.toThrow();
     expect(() => routes.recognizePath("/search", { method: "delete" })).toThrow(RoutingError);
-  });
-
-  it("multiple draw calls append routes", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/a", { to: "a#index" });
-    });
-    routes.draw(function () {
-      this.get("/b", { to: "b#index" });
-    });
-    expect(() => routes.recognizePath("/a")).not.toThrow();
-    expect(() => routes.recognizePath("/b")).not.toThrow();
   });
 
   it("constraints on dynamic segments", () => {
@@ -938,19 +927,6 @@ describe("TestRoutingMapper", () => {
     });
     expect(routes.recognizePath("/articles/42").action).toBe("show");
     expect(() => routes.recognizePath("/articles/abc")).toThrow(RoutingError);
-  });
-
-  it("appending routes", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/hello", { to: "hello#index" });
-    });
-    routes.draw(function () {
-      this.get("/goodbye", { to: "goodbye#index" });
-    });
-    expect(() => routes.recognizePath("/hello")).not.toThrow();
-    expect(() => routes.recognizePath("/goodbye")).not.toThrow();
-    expect(() => routes.recognizePath("/random")).toThrow(RoutingError);
   });
 
   it("controller option with nesting and leading slash", () => {
@@ -3626,34 +3602,41 @@ describe("ActionController::Routing", () => {
 });
 
 describe("TestAppendingRoutes", () => {
-  it("goodbye should be available", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/goodbye", { to: "goodbye#index" });
-    });
-    routes.draw(function () {
-      this.get("/hello", { to: "hello#index" });
-    });
-    expect(() => routes.recognizePath("/goodbye")).not.toThrow();
+  class TestAppendingRoutes extends IntegrationTest {}
+  registerConstant("TestAppendingRoutes", TestAppendingRoutes);
+
+  const simpleApp = (resp: string) => ({
+    call: (_e: unknown) => [200, { "Content-Type": "text/plain" }, [resp]],
   });
 
-  it("hello should not be overwritten", () => {
+  let t: TestAppendingRoutes;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestAppendingRoutes;
     const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/hello", { to: "hello#first" });
+    routes.append(function () {
+      this.get({ "/hello": simpleApp("fail") });
+      this.get({ "/goodbye": simpleApp("goodbye") });
     });
+
     routes.draw(function () {
-      this.get("/hello", { to: "hello#second" });
+      this.get({ "/hello": simpleApp("hello") });
     });
-    expect(routes.recognizePath("/hello").action).toBe("first");
+    t.app = IntegrationTest.buildApp(routes);
   });
 
-  it("missing routes are still missing", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/hello", { to: "hello#index" });
-    });
-    expect(() => routes.recognizePath("/random")).toThrow(RoutingError);
+  it("goodbye should be available", async () => {
+    await t.get("/goodbye");
+    assertEqual("goodbye", t.response.body);
+  });
+
+  it("hello should not be overwritten", async () => {
+    await t.get("/hello");
+    assertEqual("hello", t.response.body);
+  });
+
+  it("missing routes are still missing", async () => {
+    await t.get("/random");
+    assertEqual(404, t.response.status);
   });
 });
 

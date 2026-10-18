@@ -1,9 +1,9 @@
-import { describe, it, beforeEach, expect } from "vitest";
+import { describe, it, beforeEach } from "vitest";
 import { readFile, stat, unlink, writeFile } from "fs/promises";
 import { Lint, MockRequest, Mime, CONTENT_TYPE } from "@blazetrails/rack";
 import type { MockResponse, RackApp, RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Gzip } from "@blazetrails/activesupport/gzip";
-import { assertEqual, assertNil, assertNotEqual } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertNil, assertNotEqual } from "@blazetrails/activesupport";
 import { Static } from "../middleware/static.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 
@@ -296,7 +296,7 @@ for (const [testCase, publicPath] of [
 
     it("custom handler called when file is outside root", async () => {
       const filename = "shared.html.tse";
-      expect((await stat(`${root}/../${filename}`)).isFile()).toBe(true);
+      assert((await stat(`${root}/../${filename}`)).isFile());
       const env = MockRequest.envFor("", {
         REQUEST_METHOD: "GET",
         REQUEST_PATH: `/..%2F${filename}`,

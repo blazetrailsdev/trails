@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { Kernel } from "./index.js";
 import { kernelRand } from "./kernel-rand.js";
 
 describe("Kernel.rand", () => {
@@ -37,5 +38,30 @@ describe("Kernel.rand", () => {
       expect(value).toBeGreaterThanOrEqual(0n);
       expect(value).toBeLessThan(limit);
     }
+  });
+});
+
+describe("Kernel module rand", () => {
+  it("Kernel.rand is rb_f_rand", () => {
+    const value = Kernel.rand(10) as number;
+    expect(Number.isInteger(value)).toBe(true);
+    expect(value).toBeGreaterThanOrEqual(0);
+    expect(value).toBeLessThan(10);
+    expect(Kernel.rand()).toBeLessThan(1);
+  });
+
+  it("a stub of Kernel.rand replaces it for its callers", () => {
+    const original = Object.getOwnPropertyDescriptor(Kernel, "rand")!;
+    Object.defineProperty(Kernel, "rand", {
+      configurable: true,
+      writable: true,
+      value: () => 0.25,
+    });
+    try {
+      expect(Kernel.rand()).toBe(0.25);
+    } finally {
+      Object.defineProperty(Kernel, "rand", original);
+    }
+    expect(Kernel.rand()).not.toBe(0.25);
   });
 });

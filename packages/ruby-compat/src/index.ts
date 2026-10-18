@@ -479,4 +479,6 @@ export {
 
 import { Kernel } from "./include.js";
 import { abort } from "./process-adapter.js";
+import { kernelRand } from "./kernel-rand.js";
 Kernel.abort = abort;
+Kernel.rand = kernelRand;

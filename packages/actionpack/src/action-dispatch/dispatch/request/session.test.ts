@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Options, Session, type SessionStore } from "../../request/session.js";
-import { assertEqual, assertNil, MemoryStore } from "@blazetrails/activesupport";
+import { assertEmpty, assertEqual, assertNil, MemoryStore } from "@blazetrails/activesupport";
 import {
   bodyFromString,
   Lint,
@@ -77,7 +77,7 @@ describe("Request", () => {
       const s = await Session.create(makeStore(), req, {});
       s.set("rails", "ftw");
       await s.destroy();
-      expect(s.isEmpty()).toBe(true);
+      await assertEmpty(s);
     });
 
     it("store", async () => {
@@ -121,7 +121,7 @@ describe("Request", () => {
       s.set("rails", "ftw");
       s.set("adequate", "awesome");
       s.clear();
-      expect(s.values).toEqual([]);
+      assertEmpty(s.values);
     });
 
     it("update", async () => {
@@ -138,7 +138,7 @@ describe("Request", () => {
       const s = await Session.create(makeStore(), req, {});
       s.set("rails", "ftw");
       s.delete("rails");
-      expect(s.keys).toEqual([]);
+      assertEmpty(s.keys);
     });
 
     it("fetch", async () => {
@@ -156,9 +156,11 @@ describe("Request", () => {
       const req = makeReq();
       const s = await Session.create(makeStore(), req, {});
       s.set("one", { two: "3" });
-      expect(s.dig("one", "two")).toBe("3");
-      expect(s.dig("three", "two")).toBeUndefined();
-      expect(s.dig("one", "three")).toBeUndefined();
+      assertEqual("3", s.dig("one", "two"));
+      assertEqual("3", s.dig("one", "two"));
+
+      assertNil(s.dig("three", "two"));
+      assertNil(s.dig("one", "three"));
     });
 
     it("id was for new session that does not exist", async () => {

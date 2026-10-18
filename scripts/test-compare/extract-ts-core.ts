@@ -123,13 +123,17 @@ function isReceiverExpect(call: ts.CallExpression): boolean {
  * The test-case instance a Rails test helper is called on: Rails calls its
  * private helpers bare (`assert_recognizes`, `actionpack/test/controller/resources_test.rb:1178-1470`),
  * and trails calls the ported `TestCase` methods on `self()`, the `testCase`
- * fixture, or the suite's `tc` instance (`tc = new ResourcesTest(task.name)`).
+ * fixture, or the suite's `tc` / `t` instance (`tc = new ResourcesTest(task.name)`,
+ * `t = testCase as TestRoutingMapper`).
  */
 function isTestObject(owner: ts.Expression): boolean {
   if (ts.isCallExpression(owner)) owner = owner.arguments.length === 0 ? owner.expression : owner;
   return (
     ts.isIdentifier(owner) &&
-    (owner.text === "self" || owner.text === "testCase" || owner.text === "tc")
+    (owner.text === "self" ||
+      owner.text === "testCase" ||
+      owner.text === "tc" ||
+      owner.text === "t")
   );
 }
 

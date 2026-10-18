@@ -1,6 +1,11 @@
 import { afterAll, beforeEach, describe, it, expect } from "vitest";
-import { Module, assertEqual } from "@blazetrails/activesupport";
-import { registerConstant, unregisterConstant, rbFSend } from "@blazetrails/ruby-compat";
+import { Module, assertEqual, assertRaises } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  registerConstant,
+  unregisterConstant,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import {
   CONTENT_TYPE,
   Lint,
@@ -50,11 +55,13 @@ describe("PermissionsPolicyTest", () => {
     );
   });
 
-  it("invalid directive source", () => {
+  it("invalid directive source", async () => {
     const policy = new PermissionsPolicy();
-    expect(() => policy.geolocation([":non_existent"] as unknown as string)).toThrow(
-      "Invalid HTTP permissions policy source: [:non_existent]",
-    );
+    const exception = await assertRaises([ArgumentError], {}, () => {
+      policy.geolocation([":non_existent"] as unknown as string);
+    });
+
+    assertEqual("Invalid HTTP permissions policy source: [:non_existent]", exception.message);
   });
 });
 
