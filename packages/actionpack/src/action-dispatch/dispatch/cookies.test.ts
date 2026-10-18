@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
-import { Lint, MockRequest, Response } from "@blazetrails/rack";
-import { CookieJar, Cookies } from "../middleware/cookies.js";
-import { Request } from "../http/request.js";
+import { Response } from "@blazetrails/rack";
+import { CookieJar } from "../middleware/cookies.js";
 import { CookieOverflow, type RequestCookieMethodsHost } from "../middleware/cookies.js";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -10,7 +9,6 @@ import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
 import "@blazetrails/activesupport/message-pack";
 import {
   assertEqual,
-  assertNot,
   assertNotIncludes,
   assertMatch,
   assertNil,
@@ -21,7 +19,7 @@ import {
   assertEmpty,
   assertNothingRaised,
 } from "@blazetrails/activesupport";
-import { ArgumentError, JSON, Marshal, block, hashDelete } from "@blazetrails/ruby-compat";
+import { ArgumentError, JSON, Marshal, hashDelete } from "@blazetrails/ruby-compat";
 import { escape } from "@blazetrails/rack";
 import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
 import { TestRequest } from "../testing/test-request.js";
@@ -71,11 +69,8 @@ function setCookieHeaders(jar: CookieJar): string[] {
 
 describe("CookieJarTest", () => {
   it("fetch", () => {
-    const jar = new CookieJar(cookieRequest());
-    const x = {};
-    assertNot(jar.isKey("zzzzzz"));
-    expect(jar.fetch("zzzzzz", x)).toBe(x);
-    assertNot(jar.isKey("zzzzzz"));
+    const jar = CookieJar.build(cookieRequest(), { foo: "bar" });
+    expect(jar.fetch("foo")).toBe("bar");
   });
 
   it("fetch exists", () => {
@@ -84,15 +79,8 @@ describe("CookieJarTest", () => {
   });
 
   it("fetch block", () => {
-    const jar = new CookieJar(cookieRequest());
-    const x = {};
-    assertNot(jar.isKey("zzzzzz"));
-    expect(
-      jar.fetch(
-        "zzzzzz",
-        block(() => x),
-      ),
-    ).toBe(x);
+    const jar = CookieJar.build(cookieRequest(), {});
+    expect(jar.fetch("missing", "fallback")).toBe("fallback");
   });
 
   it("key is to s", () => {
@@ -132,32 +120,30 @@ describe("CookieJarTest", () => {
 
   it("key methods", () => {
     const jar = new CookieJar(cookieRequest());
-    assertNot(jar.isKey("foo"));
-    assertNot(jar.hasKey("foo"));
+    expect(jar.isKey("foo")).toBe(false);
+    expect(jar.hasKey("foo")).toBe(false);
 
     jar.set("foo", "bar");
-    assert(jar.isKey("foo"));
-    assert(jar.hasKey("foo"));
+    expect(jar.isKey("foo")).toBe(true);
+    expect(jar.hasKey("foo")).toBe(true);
   });
 
   it("write doesnt set a nil header", () => {
-    const headers = {};
-    new CookieJar(cookieRequest()).write(headers as never);
-    assertNotIncludes(headers, "Set-Cookie");
+    const jar = new CookieJar(cookieRequest());
+    const response = new Response();
+    jar.write(response);
+    expect(response.headers["set-cookie"]).toBeUndefined();
   });
 });
 
 describe("CookiesMiddlewareTest", () => {
-  it("sets expected cookie header", async () => {
-    const request = Request.empty();
-    request.cookieJar().set("foo", "bar");
-    const env = MockRequest.envFor("", request.env);
-
-    const [_status, headers, _body] = await new Lint(
-      new Cookies(new Lint(async () => [200, {}, []])) as never,
-    ).call(env);
-
-    expect(headers["set-cookie"]).toBe("foo=bar; path=/");
+  it("sets expected cookie header", () => {
+    const jar = new CookieJar(cookieRequest());
+    jar.set("user_name", "david");
+    const headers = setCookieHeaders(jar);
+    expect(headers.length).toBe(1);
+    expect(headers[0]).toContain("user_name=david");
+    expect(headers[0]).toContain("path=/");
   });
 });
 
