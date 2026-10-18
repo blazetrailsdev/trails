@@ -12,6 +12,8 @@ import {
   forceEncoding,
   isValidEncoding,
   rbModConstSet,
+  rbInspect,
+  rbModName,
   rbObjRespondTo,
   rbStrEnumerateLines,
 } from "@blazetrails/ruby-compat";
@@ -321,8 +323,9 @@ export class Template {
   }
 
   inspect(): string {
-    const locals = this._locals.length > 0 ? `[:${this._locals.join(", :")}]` : "[]";
-    return `#<Template ${this.shortIdentifier} locals=${locals}>`;
+    return `#<${rbModName(this.constructor)} ${this.shortIdentifier} locals=${rbInspect(
+      this.locals?.map((local) => `:${local}`) ?? null,
+    )}>`;
   }
 
   toString(): string {

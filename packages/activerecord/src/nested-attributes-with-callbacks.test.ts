@@ -127,13 +127,13 @@ describe("NestedAttributesWithCallbacksTest", () => {
     await assertAssignmentAffectsRecordsInTarget("birdsWithAdd");
   });
 
-  it("Assignment updates records in target when not loaded", async () => {
+  it("Assignment updates records in target when not loaded and callback loads target", async () => {
     expect(pirate.birdsWithAddLoad.loaded).toBeFalsy();
     await pirate.setBirdsWithAddLoadAttributes(updateNewAndDestroyBirdAttributes());
     await assertAssignmentAffectsRecordsInTarget("birdsWithAddLoad");
   });
 
-  it("Assignment updates records in target when loaded", async () => {
+  it("Assignment updates records in target when loaded and callback loads target", async () => {
     await pirate.birdsWithAddLoad.load();
     await pirate.setBirdsWithAddLoadAttributes(updateNewAndDestroyBirdAttributes());
     await assertAssignmentAffectsRecordsInTarget("birdsWithAddLoad");
