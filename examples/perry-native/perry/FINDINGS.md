@@ -50,6 +50,7 @@ rows are that build's behaviour; each wall's own section says what changed.
 | `04-activesupport` — one named import from the barrel             | ok   | **MEM**     | 429 modules                                    |
 | `05-model` — an `ActiveRecord` model class, no connection         | ok   | **MEM**     | killed at 12GB after 261s                      |
 | `06-sqlite` — `better-sqlite3`                                    | ok   | **ok\***    | 8s, 30MB — shimmed, see below                  |
+| `06b-crud` — one model, real connection, full CRUD                | ok   | **MEM**     | 891 modules; killed in codegen at 61/891       |
 | `07-boot` — full framework boot                                   | ok   | **MEM**     | killed at 12GB after 689s                      |
 
 Every rung runs correctly under Node, so no failure here is a broken program.
@@ -386,6 +387,50 @@ five substitutions are load-bearing for trails:
 A native build replaces **all three database adapters**, the CLI's parser and
 the date library with partial drop-ins, silently. A green compile says nothing
 about whether any of them behaves as ActiveRecord expects.
+
+## CRUD never ran natively, and the reason is not the adapter
+
+Asked 2026-10-18. `06-sqlite` passing is not evidence that ActiveRecord works
+over Perry's SQLite drop-in: that rung drives `better-sqlite3` directly, in a
+one-module binary, with no framework in it. `06b-crud` asks the real question —
+`create`, `find`, `update`, `destroy` on a model, over a connection the adapter
+opened — and the answer is that it cannot be compiled.
+
+| Attempt            | Collected | Codegen reached | Outcome                 |
+| ------------------ | --------- | --------------- | ----------------------- |
+| `MemoryMax=12G`    | 891       | 44/891 (5%)     | killed after 157s       |
+| `MemoryMax=28G`    | 891       | 61/891 (7%)     | killed after 243s       |
+
+Three things that result does establish:
+
+- **Collection is not this rung's wall.** All 891 modules collect, with the
+  `node_modules` symlink cycle fully intact. The cycle stops the *whole app* in
+  resolution; a single-model rung never reaches it. Two different walls, and
+  both print plausible-looking progress before dying.
+- **2.3x the memory cap bought 17 more modules.** That is item 5 above
+  confirmed rather than re-opened, so the knobs were not pursued further.
+- **Adapter parity remains untested, and is still the open question.** Perry
+  reports serving *both* `better-sqlite3` and `mysql2` from bundled partial
+  drop-ins for this rung. If the rung ever links, the CRUD it performs runs
+  against `perry-ext-better-sqlite3`, which is exactly the comparison wanted —
+  prepared-statement semantics, type coercion, `lastInsertRowid`, transactions.
+  Nothing here has compared them yet.
+
+Two incidental findings from the same logs, neither chased:
+
+- ActiveRecord trips a Perry type-constraint check: `Constraint violation in
+  function 'inQueryConnection': TypeMismatch { type_param: "F", ... }`. It is a
+  warning, not a failure, and the compile continued past it.
+- The 891 modules include `libxml2-wasm`, `libsql`, `mysql2`, `pg` and the
+  Temporal polyfill, reached through the `activerecord` barrel — so the rung
+  pays for four database drivers to use one. That is the same barrel-breadth
+  problem RFC 0192 measures on the Node side, showing up as codegen cost.
+
+The caps are also not reproducible against a fixed compiler: npm
+`@perryts/perry` is still 0.5.1520 (2026-09-11), which predates both the 3a
+prototype fix and the merged 3c namespace fix, so these numbers come from a
+build with two known bugs in it. They bound the memory question, not the
+correctness one.
 
 ## `perry check` is not evidence
 
