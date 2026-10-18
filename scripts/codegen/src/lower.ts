@@ -1107,6 +1107,17 @@ export class Lowerer {
     return t?.k === "hash" && !!t.map;
   }
 
+  /**
+   * `h.key?(k)`: `Object.hasOwn(h, k)` on a plain object (CLAUDE.md, "Hash calls
+   * on a plain object"), which a caller-supplied key cannot fool the way `in`'s
+   * prototype walk can; ruby-compat's `hasKey` only where the hand twin types the
+   * Hash as possibly a `Map`, which the helper dispatches to.
+   */
+  hasKeyForm(recvNode: N, r: string, key: string, ctx: Ctx): string {
+    if (this.mayBeMap(recvNode, ctx)) return `${this.rc(ctx, "hasKey")}(${r}, ${key})`;
+    return `Object.hasOwn(${r}, ${key})`;
+  }
+
   entries(recv: string, ctx: Ctx): string {
     return `${this.rc(ctx, "rbEntries")}(${recv})`;
   }
@@ -4360,12 +4371,12 @@ export class Lowerer {
       case "include?":
       case "member?":
         if (n.args.length === 1 && !blk && hashNamed(recvNode))
-          return `${rc("hasKey")}(${r}, ${args()[0]})`;
+          return this.hasKeyForm(recvNode, r, args()[0], ctx);
         if (n.args.length === 1 && !blk) return `${E}${nav}includes(${args()[0]})`;
         break;
       case "key?":
       case "has_key?":
-        if (n.args.length === 1) return `${rc("hasKey")}(${r}, ${args()[0]})`;
+        if (n.args.length === 1) return this.hasKeyForm(recvNode, r, args()[0], ctx);
         break;
       case "size":
       case "length":
