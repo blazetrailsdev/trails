@@ -3994,12 +3994,15 @@ export class Lowerer {
       !["push", "unshift", "concat", "join", "split", "first", "last"].includes(name)
     )
       return null;
-    // A Ruby Enumerable that is not an Array (a `Set`, a `Hash` as a `Map`) has
-    // none of the Array methods these forms use: a Set / Map is spread, and
-    // anything else passes through (an Array, a Relation answering its own).
+    // A Ruby Enumerable that is not an Array (a `Set`, a `Hash` as a `Map` or a
+    // plain object) has none of the Array methods these forms use: a Set / Map is
+    // spread, a plain object is its `[key, value]` pairs (`Hash#each` yields
+    // them), and anything else passes through (an Array, a Relation answering
+    // its own).
     const recvType = this.typeOf(recvNode, ctx);
     const enumOf = (x: string) =>
-      `${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map ? [...${x}] : ${x}`;
+      `${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map ? [...${x}] : ` +
+      `${x}?.constructor === Object ? Object.entries(${x}) : ${x}`;
     const E =
       recvType?.k === "array"
         ? R
