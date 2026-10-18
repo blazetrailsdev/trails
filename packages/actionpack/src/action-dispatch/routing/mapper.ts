@@ -46,6 +46,8 @@ import {
   rbObjRespondTo,
   rtest,
   stringSplit,
+  Thread,
+  rbIterBreakValue,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -896,15 +898,14 @@ export class Mapping {
   private routeSourceLocation(): string | null | undefined {
     if (Mapper.routeSourceLocations) {
       const actionDispatchDir = File.dirname(File.dirname(callerLocations(0, 1)[0].path));
-      for (const location of callerLocations(1)) {
-        if (location.path.startsWith(actionDispatchDir)) continue;
+      return Thread.eachCallerLocation<string>((location) => {
+        if (location.path.startsWith(actionDispatchDir)) return;
 
         const cleanedPath = Mapper.backtraceCleaner.cleanFrame(location.path);
-        if (cleanedPath == null) continue;
+        if (cleanedPath == null) return;
 
-        return `${cleanedPath}:${location.lineno}`;
-      }
-      return null;
+        rbIterBreakValue(`${cleanedPath}:${location.lineno}`);
+      });
     }
   }
 }

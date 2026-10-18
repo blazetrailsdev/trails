@@ -4,6 +4,21 @@ import type { PathSet } from "../path-set.js";
 import type { Template } from "../template.js";
 import { WildcardResolver } from "./wildcard-resolver.js";
 
+const ALL_KNOWN_KEYS = [
+  "partial",
+  "template",
+  "layout",
+  "formats",
+  "locals",
+  "object",
+  "collection",
+  "as",
+  "status",
+  "content_type",
+  "location",
+  "spacer_template",
+];
+
 /** @internal */
 export class TSETracker {
   static EXPLICIT_DEPENDENCY = /# Template Dependency: (\S+)/g;
@@ -72,11 +87,29 @@ export class TSETracker {
     return this.name.split("/").slice(0, -1).join("/");
   }
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm replace — PERMANENT
+   */
   private renderDependencies(): string[] {
     const dependencies: string[] = [];
-    const renderCalls = this.source.split(/\brender\b/).slice(1);
+    const renderCalls = this.source
+      .replace(/<%#.*?%>/gsu, "")
+      .split(/\brender\b/)
+      .slice(1);
 
     for (const args of renderCalls) {
+      const call = args.split("%>")[0];
+      if (/^\s*\(?\s*\w+:/u.test(call)) {
+        const keys = [...call.replace(/\{[^{}]*\}/gu, "").matchAll(/\b(\w+):/gu)].map((m) => m[1]);
+        if (keys.some((key) => !ALL_KNOWN_KEYS.includes(key))) continue;
+      }
+      const spacer = new RegExp(`\\bspacer_template:\\s*${TSETracker.STRING.source}`, "su").exec(
+        call,
+      );
+      if (spacer) {
+        this.addStaticDependency(dependencies, spacer.groups?.static, spacer.groups?.quote);
+      }
       this.addDependencies(dependencies, args, TSETracker.LAYOUT_DEPENDENCY);
       this.addDependencies(dependencies, args, TSETracker.RENDER_ARGUMENTS);
     }

@@ -433,7 +433,7 @@ export { coreHashMergeKwd, keywordSplat, rbGetKwargs, rbScanArgs } from "./keywo
 export { Queue, SizedQueue } from "./queue.js";
 export { Fiber } from "./fiber.js";
 export { FiberError } from "./fiber-error.js";
-export { Thread } from "./thread.js";
+export { Thread, rbIterBreakValue } from "./thread.js";
 export {
   Location,
   excBacktrace,
