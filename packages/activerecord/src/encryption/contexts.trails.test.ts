@@ -42,7 +42,7 @@ describe("ActiveRecord::Encryption::Contexts accessors", () => {
     });
 
     expect(Encryption.customContexts).toEqual([]);
-    expect(Encryption.currentCustomContext).toBeUndefined();
+    expect(Encryption.currentCustomContext).toBeNull();
   });
 
   it("a custom context is a dup of the default one, so the default keeps its properties", () => {

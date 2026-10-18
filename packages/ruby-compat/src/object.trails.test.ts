@@ -103,6 +103,12 @@ describe("Object#inspect", () => {
     expect(inspect(date)).toBe(date.toString());
   });
 
+  it("renders a Range as Range#inspect does", () => {
+    expect(inspect(new Range(1, 10))).toBe("1..10");
+    expect(inspect(new Range("a", null, true))).toBe('"a"...');
+    expect(inspect(new Range(null, 5))).toBe("..5");
+  });
+
   it("renders empty collections and nil", () => {
     expect(inspect([])).toBe("[]");
     expect(inspect({})).toBe("{}");
