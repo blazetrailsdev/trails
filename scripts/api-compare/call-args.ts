@@ -1468,12 +1468,27 @@ function kwargValue(tsArg: string, rubyKey: string): string | undefined {
  *  declarations, else the ones a dependency package declares under that name.
  *  `ActiveSupport::Notifications.instrument` is declared in activesupport and
  *  called from actiondispatch, and without the fallback its skipped `payload`
- *  positional reads as a value (redirection.rb:22). */
+ *  positional reads as a value (redirection.rb:22).
+ *
+ *  `ownerSigs` is what the call site says about the receiver's class. For a
+ *  receiver-less (`this`) call it is the enclosing class's own declarations
+ *  of the name, which win when present. Empty means the callee is not proven
+ *  to be in this package: an ancestor's method on a self-call, or any method
+ *  on a receiver of unknown class (`this.logger()!.debug`). Then the
+ *  dependency signatures are considered beside the same-package ones, so a
+ *  homonym on an unrelated class does not stand in for the callee alone.
+ *  Omitted, the old in-package-first rule applies. `LogSubscriber#renderPartial`'s `debug do … end`
+ *  (`actionview/lib/action_view/log_subscriber.rb`) reaches
+ *  `ActiveSupport::LogSubscriber#debug(progname = nil, &block)`, not
+ *  actionview's `DebugHelper#debug(object)`. */
 export function resolveCalleeSigs(
   inPkg: ParamInfo[][],
   inDeps: ParamInfo[][] | undefined,
+  ownerSigs?: ParamInfo[][],
 ): ParamInfo[][] {
-  return inPkg.length > 0 ? inPkg : (inDeps ?? []);
+  if (ownerSigs !== undefined && ownerSigs.length > 0) return ownerSigs;
+  if (inPkg.length === 0) return inDeps ?? [];
+  return ownerSigs === undefined ? inPkg : [...inPkg, ...(inDeps ?? [])];
 }
 
 export function compareCallArgs(

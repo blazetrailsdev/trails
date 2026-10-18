@@ -1,4 +1,10 @@
-import { ArgumentError, hashDelete, rbFSend, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  RuntimeError,
+  hashDelete,
+  rbFSend,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
@@ -378,19 +384,19 @@ export class ContentSecurityPolicy {
     }
     if (typeof source === "function") {
       if (context === undefined) {
-        throw new Error(
+        throw new RuntimeError(
           `Missing context for the dynamic content security policy source: ${String(source)}`,
         );
       }
       const resolved = source(context);
       return this.applyMappings(wrap(resolved)).map((s) => {
         if (typeof s !== "string") {
-          throw new Error(`Unexpected content security policy source: ${String(s)}`);
+          throw new RuntimeError(`Unexpected content security policy source: ${String(s)}`);
         }
         return s;
       });
     }
-    throw new Error(`Unexpected content security policy source: ${String(source)}`);
+    throw new RuntimeError(`Unexpected content security policy source: ${String(source)}`);
   }
 
   /** @internal */

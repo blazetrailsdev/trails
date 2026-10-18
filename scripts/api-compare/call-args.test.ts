@@ -613,6 +613,30 @@ describe("compareCallArgs block-tail nil padding", () => {
     );
   });
 
+  it("keeps the in-package signatures when no owner information is given", () => {
+    const inPkg = [[required("object")]];
+    const inDeps = [[optional("progname")]];
+    expect(resolveCalleeSigs(inPkg, inDeps)).toBe(inPkg);
+  });
+
+  it("lets the enclosing class's own signatures win over the package and dependencies", () => {
+    const own = [[optional("progname")]];
+    expect(resolveCalleeSigs([[required("object")]], [[required("x")]], own)).toBe(own);
+  });
+
+  it("does not let a same-package homonym on another class block the strip", () => {
+    const ruby = site("debug", [], ["block"]);
+    const ts = site("debug", ["nil"], ["block"]);
+    const homonym = [[required("object")]];
+    const inDeps = [[optional("progname"), optional("block")]];
+    expect(
+      compareCallArgs(ruby, ts, undefined, resolveCalleeSigs(homonym, inDeps, [])).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(ruby, ts, undefined, resolveCalleeSigs(homonym, inDeps, homonym)).verdict,
+    ).toBe("mismatch");
+  });
+
   it("does not fire when neither side carries a block", () => {
     expect(
       compareCallArgs(
