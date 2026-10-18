@@ -8,7 +8,7 @@ export interface RequestedInit {
   locale: ReadonlyArray<DetailKey>;
   handlers: ReadonlyArray<DetailKey>;
   formats: ReadonlyArray<DetailKey>;
-  variants: ReadonlyArray<DetailKey> | "any";
+  variants: ReadonlyArray<DetailKey> | ":any";
 }
 
 const ANY = Symbol.for("ActionView::TemplateDetails::ANY");
@@ -17,12 +17,12 @@ export class Requested {
   readonly locale: ReadonlyArray<DetailKey>;
   readonly handlers: ReadonlyArray<DetailKey>;
   readonly formats: ReadonlyArray<DetailKey>;
-  readonly variants: ReadonlyArray<DetailKey> | "any";
+  readonly variants: ReadonlyArray<DetailKey> | ":any";
 
   readonly localeIdx: ReadonlyMap<DetailKey, number>;
   readonly handlersIdx: ReadonlyMap<DetailKey, number>;
   readonly formatsIdx: ReadonlyMap<DetailKey, number>;
-  readonly variantsIdx: ReadonlyMap<DetailKey, number> | "any";
+  readonly variantsIdx: ReadonlyMap<DetailKey, number> | ":any";
 
   constructor({ locale, handlers, formats, variants }: RequestedInit) {
     this.locale = locale;
@@ -33,7 +33,7 @@ export class Requested {
     this.localeIdx = this.buildIdxHash(locale);
     this.handlersIdx = this.buildIdxHash(handlers);
     this.formatsIdx = this.buildIdxHash(formats);
-    this.variantsIdx = variants === "any" ? "any" : this.buildIdxHash(variants);
+    this.variantsIdx = variants === ":any" ? ":any" : this.buildIdxHash(variants);
   }
 
   /** @internal */
@@ -48,8 +48,8 @@ export class Requested {
   }
 
   /** @internal */
-  private idxFor(map: ReadonlyMap<DetailKey, number> | "any", key: DetailKey): number | undefined {
-    if (map === "any") return key === null ? 0 : 1;
+  private idxFor(map: ReadonlyMap<DetailKey, number> | ":any", key: DetailKey): number | undefined {
+    if (map === ":any") return key === null ? 0 : 1;
     return map.get(key);
   }
 

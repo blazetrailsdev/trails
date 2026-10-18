@@ -42,28 +42,20 @@ function combinedFlagsFor(
   return out.join("");
 }
 
-function combinedFlagsUsed(matchers: Matchers, names: readonly string[]): string {
-  const values: Array<Requirement | Requirement[]> = [];
-  for (const n of names) if (Object.hasOwn(matchers, n)) values.push(matchers[n]);
-  return combinedFlagsFor(values);
-}
-
 export class AnchoredRegexp extends Visitor {
   protected readonly _separator: string;
   protected readonly _matchers: Matchers;
-  protected readonly _names: readonly string[];
   private readonly _separatorRe: string;
 
-  constructor(separator: string, matchers: Matchers, names: readonly string[] = []) {
+  constructor(separator: string, matchers: Matchers) {
     super();
     this._separator = separator;
     this._matchers = matchers;
-    this._names = names;
     this._separatorRe = `([^${escapeCharClass(separator)}]+)`;
   }
 
   override accept(node: Node): RegExp {
-    return new RegExp(`^${this.visit(node)}$`, combinedFlagsUsed(this._matchers, this._names));
+    return new RegExp(`^${this.visit(node)}$`, combinedFlagsFor(Object.values(this._matchers)));
   }
 
   protected override visitCAT(node: Node): string {
@@ -109,7 +101,7 @@ export class AnchoredRegexp extends Visitor {
 export class UnanchoredRegexp extends AnchoredRegexp {
   override accept(node: Node): RegExp {
     const path = this.visit(node) as string;
-    const flags = combinedFlagsUsed(this._matchers, this._names);
+    const flags = combinedFlagsFor(Object.values(this._matchers));
     if (path === "/") return new RegExp(`^/`, flags);
     return new RegExp(`^${path}(?:\\b|$|/)`, flags);
   }
@@ -249,8 +241,7 @@ export class Pattern {
 
   toRegexp(): RegExp {
     if (this._re) return this._re;
-    const Klass = this.anchored ? AnchoredRegexp : UnanchoredRegexp;
-    this._re = new Klass(this._separators, this.requirements, this.names).accept(this.spec);
+    this._re = new this.regexpVisitor(this._separators, this.requirements).accept(this.spec);
     return this._re;
   }
 

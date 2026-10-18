@@ -37,6 +37,7 @@ import {
   include,
   Module,
   RFC2396_PARSER,
+  rbFArray,
   rbInspect,
   RuntimeError,
   rbFPublicSend,
@@ -1687,9 +1688,9 @@ export class Mapper {
     let to = options.to;
     delete options.to;
     const via = Mapping.checkVia(
-      kernelArray(
+      rbFArray(
         "via" in options ? options.via : (this._scope.get("via") as string | string[] | undefined),
-      ),
+      ) as string[],
     );
     delete options.via;
     const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);

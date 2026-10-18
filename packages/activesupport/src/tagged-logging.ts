@@ -62,10 +62,16 @@ export const Formatter = {
   tagged<T>(this: TaggedFormatter, ...tags: (Tag | ((formatter: TaggedFormatter) => T))[]): T {
     const block = tags.pop() as (formatter: TaggedFormatter) => T;
     const pushedCount = this.tagStack.pushTags(tags).length;
+    let deferred = false;
     try {
-      return block(this);
+      const result = block(this);
+      if (typeof (result as { then?: unknown } | null)?.then === "function") {
+        deferred = true;
+        return Promise.resolve(result).finally(() => this.popTags(pushedCount)) as T;
+      }
+      return result;
     } finally {
-      this.popTags(pushedCount);
+      if (!deferred) this.popTags(pushedCount);
     }
   },
 

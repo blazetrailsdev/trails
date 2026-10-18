@@ -20,7 +20,7 @@ import { Requested } from "./template-details.js";
 
 type DetailValue = ReadonlyArray<string | symbol>;
 type DetailsMap = Record<string, DetailValue>;
-type DetailsHash = Record<string, DetailValue | "any">;
+type DetailsHash = Record<string, DetailValue | ":any">;
 type DefaultProc = () => DetailValue;
 
 const REGISTERED_DETAILS: string[] = [];
@@ -130,7 +130,7 @@ export class DetailsKey {
         const value = details[k] ?? [];
         return [
           k,
-          value === "any"
+          value === ":any"
             ? value
             : value.map((v) => (typeof v === "symbol" ? DetailsKey._tagSymbol(v) : v)),
         ];
@@ -370,7 +370,7 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
 
     for (const k of REGISTERED_DETAILS) {
       if (k === "variants") {
-        details[k] = "any";
+        details[k] = ":any";
       } else {
         details[k] = Accessors.DEFAULT_PROCS[k].call(undefined);
       }

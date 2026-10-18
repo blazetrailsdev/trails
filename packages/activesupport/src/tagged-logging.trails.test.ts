@@ -15,3 +15,16 @@ describe("TaggedLogging.new clone", () => {
     expect(tagged.foo()).toEqual("foo");
   });
 });
+
+describe("TaggedLogging#tagged with an async block", () => {
+  it("keeps the tags until the block settles", async () => {
+    const lines: string[] = [];
+    const logger = TaggedLogging.new(new Logger({ write: (s: string) => lines.push(s) }));
+    await logger.tagged("BCX", async (l) => {
+      await Promise.resolve();
+      l.info("Funky time");
+    });
+    logger.info("after");
+    expect(lines).toEqual(["[BCX] Funky time\n", "after\n"]);
+  });
+});
