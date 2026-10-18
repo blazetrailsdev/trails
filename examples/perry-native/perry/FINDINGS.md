@@ -17,15 +17,18 @@ Real trails framework code compiles and runs natively: a 54-module slice of
 fix a **362-module** activesupport subgraph — WebAssembly and all — compiles,
 links and **runs** as a 69MB executable.
 
-The application itself does not. Node loads 1,283 modules to boot it; Perry
-exhausts a 32GB cap after ~50 minutes while still _collecting_ those modules,
-before codegen begins.
+The application itself did not — and the reason first recorded here was wrong.
+Node loads 1,283 modules to boot it, and Perry does exhaust a 32GB cap after
+~50 minutes before codegen begins, but **not because of the module count**. The
+cap goes in package _resolution_, to a `node_modules` symlink cycle. Remove the
+cycle and the same app reaches `codegen: modules finished 1713/1713 (100%)`.
+See [the correction](#correction-the-32gb-wall-is-resolution-not-module-count).
 
 Status of each wall after re-verification:
 
 | Wall                               | Status                                                                                                                               |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 1 — codegen memory                 | **The live blocker at app scale.** 362 modules fit in 20GB, but the 1,283-module app exhausts 32GB while still _collecting_ modules. |
+| 1 — codegen memory                 | 362 modules fit in 20GB. The app's 32GB exhaustion was **misattributed to this wall**; it happens in resolution, before collection — see the correction. |
 | 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                                               |
 | 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                                      |
 | 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship.                      |
@@ -334,15 +337,31 @@ them:
 | stage reached  | **`Collecting modules…`** — codegen never started |
 | RSS trajectory | 11GB @ 20min → 16.6 @ 30 → 22.2 @ 39 → 27.8 @ 49  |
 
-So Wall 1 returns at application scale, and in a worse place than before: the
-earlier memory failures were inside codegen, where the parallelism knobs at
-least exist. This one exhausts 32GB in module _collection_, single-threaded,
-before any code is generated. Nothing measured here suggests a knob for it.
+At the time this was read as Wall 1 returning at application scale, in a worse
+place than before — 32GB spent in module _collection_, single-threaded, with
+none of the parallelism knobs codegen offers. **That reading was wrong, and the
+next section retracts it.**
 
-For scale, the largest graph that does work is the 362-module activesupport
-subgraph — a 69MB binary that runs correctly. The app is roughly 3.5x that in
-module count before Perry's eager collection of dynamic-import targets
-inflates it further.
+### Correction: the 32GB wall is resolution, not module count
+
+Retracted 2026-10-18, superseding the paragraph above and the two claims
+earlier in this file. Recorded in full in tasks RFC 0192.
+
+The cap is exhausted in package **resolution**, before the first module is
+collected. In a pnpm workspace each `node_modules/@blazetrails/<pkg>/node_modules/@blazetrails`
+is a symlink back to `node_modules/@blazetrails`, so the resolver walks the
+scope into itself without bound: 6.5M `openat` calls and paths up to ~1,800
+characters. `Collecting modules…` is simply the stage label on screen while
+that happens.
+
+Delete the 19 back-pointing scope symlinks and the same application collects
+**1,713 modules** and reaches `codegen: modules finished 1713/1713 (100%)`. So
+module count was never the blocker, and the 3.5x-the-362-module-subgraph
+framing below it was measuring the wrong thing.
+
+This is a Perry resolver bug and it affects any pnpm workspace, not just this
+one. It is not filed upstream yet; the reproducer is about ten lines of
+workspace setup.
 
 ## The SQLite result is weaker than it looks
 
@@ -394,18 +413,29 @@ Treat only `perry compile` — and then running the binary — as a result.
    `04d-ruby-compat-barrel` against a from-source `main`. Minimize it before
    filing, the way 3a was cut to six lines — a 137-module reproducer that needs
    a trails checkout is not something a compiler maintainer can act on.
-4. **Ask Perry for a `wasm-host`-enabled runtime in the npm package** (Wall 2),
-   or confirm whether eager collection of a const-folded dynamic `import()` is
-   intended. Until then any graph reaching `libxml2-wasm` is unlinkable.
+4. **Ask Perry for a `wasm-host`-enabled runtime in the npm package** (Wall 2).
+   Until then any graph reaching `libxml2-wasm` is unlinkable. The second half
+   of this item — whether eager collection of a const-folded dynamic `import()`
+   is intended — has since been **answered by measurement**: Perry collects a
+   constant `await import()` exactly as it collects a static import (4 modules
+   against 4), and only a runtime-computed specifier escapes collection (1).
+   Deferral is a runtime property; collection is static. So a lazy import table
+   defers for Node and changes nothing for Perry.
 5. **Do not spend more time on the memory knobs.** Serial is worse and a bigger
    cap is not better; both measured above.
 6. **Do not trust a green rung that imports a shimmed package** until
    `perry.compilePackages` has compiled the real one and that adapter's own
    tests have run against it.
 7. **ruby-compat's circular imports are worth a look on their own.** Six
-   circular groups, one of 28 modules, found while diagnosing Wall 3. They are
+   circular groups covering 40 module files, the largest a 29-module strongly
+   connected component (Tarjan over relative value imports; `src` and `dist`
+   agree). An earlier count of 28 here was superseded by that measurement. They are
    not the cause of any Perry failure here, but circular value imports in the
    foundation layer are a genuine code-quality question and they pair with the
    module graph measured in [runtime-graph.md](runtime-graph.md).
-8. **Nothing here asks trails to change for Perry's sake.** Every wall is
+8. **File the resolver symlink cycle — it is the best filing candidate left.**
+   See the correction above. It is not specific to trails: any pnpm workspace
+   hits it, the reproducer is about ten lines, and it currently reads to a user
+   as "my project is too big to compile".
+9. **Nothing here asks trails to change for Perry's sake.** Every wall is
    Perry's and no change in this repo moves them.
