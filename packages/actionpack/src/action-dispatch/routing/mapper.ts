@@ -89,7 +89,7 @@ export interface RouteOptions {
   except?: ResourceAction | ResourceAction[];
   ip?: string | RegExp;
   redirect?: string | RedirectOptions | RedirectFunction;
-  pathNames?: { new?: string; edit?: string };
+  pathNames?: Record<string, string>;
   anchor?: boolean;
   shallow?: boolean;
   internal?: boolean;
