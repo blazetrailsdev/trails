@@ -56,8 +56,8 @@ export function notModified(this: RequestCacheHost, modifiedAt: Date | undefined
   return !!(since && modifiedAt && since.getTime() >= modifiedAt.getTime());
 }
 
-export function etagMatches(this: RequestCacheHost, etag: string | undefined): boolean {
-  if (!etag) return false;
+export function etagMatches(this: RequestCacheHost, etag: string | null | undefined): boolean {
+  if (etag == null) return false;
   const v = ifNoneMatchEtags.call(this);
   return v.includes(etag) || v.includes("*");
 }

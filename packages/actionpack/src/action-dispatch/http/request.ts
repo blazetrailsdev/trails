@@ -205,6 +205,7 @@ export const ENV_METHODS: readonly string[] = Object.freeze([
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Request {
   declare static Utils: typeof Utils;
+  static HTTP_METHODS = HTTP_METHODS;
   static HTTP_METHOD_LOOKUP = HTTP_METHOD_LOOKUP;
   static ENV_METHODS = ENV_METHODS;
 
@@ -297,7 +298,7 @@ export class Request {
   declare readonly ifNoneMatch: string | undefined;
   declare readonly ifNoneMatchEtags: string[];
   declare notModified: (modifiedAt: Date | undefined) => boolean;
-  declare etagMatches: (etag: string | undefined) => boolean;
+  declare etagMatches: (etag: string | null | undefined) => boolean;
   declare fresh: (response: CacheResponseLike) => boolean;
 
   declare readonly contentMimeType: MimeType | null;
@@ -401,8 +402,11 @@ export class Request {
     return {};
   }
 
-  get serverSoftware(): string {
-    return ((this.getHeader("SERVER_SOFTWARE") as string) || "").split("/")[0] || "";
+  get serverSoftware(): string | null {
+    const m =
+      this.getHeader("SERVER_SOFTWARE") != null &&
+      /^([a-zA-Z]+)/.exec(this.getHeader("SERVER_SOFTWARE") as string);
+    return m ? m[1].toLowerCase() : null;
   }
 
   getHeader(name: string): any {

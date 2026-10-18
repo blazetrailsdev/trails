@@ -36,3 +36,18 @@ describe("excSetupMessage", () => {
     expect(mesg.cause).toBeUndefined();
   });
 });
+
+describe("Exception#message", () => {
+  it("answers the class name for an exception raised with no message", async () => {
+    const { Exception, StandardError, rbModConstSet } = await import("./index.js");
+    class DefaultsError extends StandardError {}
+    expect(new DefaultsError().message).toBe("DefaultsError");
+    expect(new DefaultsError().toS()).toBe("DefaultsError");
+    expect(new DefaultsError("given").message).toBe("given");
+    expect(new Exception().message).toBe("Exception");
+    class Outer {}
+    class Inner extends StandardError {}
+    rbModConstSet(Outer, "Inner", Inner);
+    expect(new Inner().message).toBe("Outer::Inner");
+  });
+});

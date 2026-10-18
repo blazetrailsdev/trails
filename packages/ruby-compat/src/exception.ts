@@ -16,6 +16,8 @@ export class Exception extends Error {}
 export interface Exception {
   /** @noRailsEquivalent PERMANENT */
   detailedMessage(opt?: { highlight?: boolean | null } | null): string;
+  /** @noRailsEquivalent PERMANENT */
+  toS(): string;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
