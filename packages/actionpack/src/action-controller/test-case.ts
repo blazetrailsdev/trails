@@ -243,6 +243,11 @@ async function head(
   return this.process(action, { method: "HEAD", ...options });
 }
 
+/**
+ * @missingRailsName scrub_env! — PERMANENT
+ * @missingRailsName class — PERMANENT
+ * @missingRailsName responseKlass — PERMANENT
+ */
 async function process(
   this: Behavior,
   action: string,
@@ -312,6 +317,7 @@ function queryParameterNames(this: Behavior, generatedExtras: [string, string[]]
   return [...generatedExtras[1], "controller", "action"];
 }
 
+/** @missingRailsName responseKlass — PERMANENT */
 function setupControllerRequestAndResponse(this: Behavior): void {
   if (this.controller === undefined) this.controller = null!;
 
@@ -729,7 +735,10 @@ export class TestRequest extends AbstractTestRequest {
     }
   })();
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName customParamParsers — PERMANENT
+   */
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
     return merge<unknown>(base, this._customParamParsers) as ParameterParsers;

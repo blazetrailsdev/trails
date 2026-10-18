@@ -78,6 +78,10 @@ export class Renderer {
     });
   }
 
+  /**
+   * @missingRailsName defaults — PERMANENT
+   * @missingRailsName env — PERMANENT
+   */
   constructor(controller: RendererController, env: Env | null | undefined, defaults: Env) {
     this.controller = controller;
     this._defaults = defaults;
@@ -89,6 +93,7 @@ export class Renderer {
     }
   }
 
+  /** @missingRailsName defaults — PERMANENT */
   get defaults(): Env {
     if (Object.isFrozen(this._defaults)) this._defaults = dup(this._defaults);
     return this._defaults;
@@ -120,6 +125,7 @@ export class Renderer {
     return (this.constructor as typeof Renderer).normalizeEnv(env);
   }
 
+  /** @missingRailsName env — PERMANENT */
   private envForRequest(): Env {
     if ("HTTP_HOST" in this._env || this.controller._routes == null) {
       return dup(this._env);

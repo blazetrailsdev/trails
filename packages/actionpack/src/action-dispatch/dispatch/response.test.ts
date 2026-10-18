@@ -65,10 +65,15 @@ describe("ResponseTest", () => {
   });
 
   it("message", () => {
-    expect(new Response(200).message).toBe("OK");
-    expect(new Response(404).message).toBe("Not Found");
-    expect(new Response(500).message).toBe("Internal Server Error");
-    expect(new Response(301).message).toBe("Moved Permanently");
+    const response = newResponse();
+    response.status = "200 OK";
+    assertEqual("OK", response.message);
+
+    response.status = "200";
+    assertEqual("OK", response.message);
+
+    response.status = 200;
+    assertEqual("OK", response.message);
   });
 
   it("only set charset still defaults to text html", () => {
@@ -179,18 +184,33 @@ describe("ResponseTest", () => {
   });
 
   it("read ETag and Cache-Control", () => {
-    const res = new Response();
-    res.weakEtag("abc123");
-    res._cacheControl = "public, max-age=3600";
-    expect(res.etag?.startsWith('W/"')).toBe(true);
-    expect(res._cacheControl).toBe("public, max-age=3600");
+    const resp = new Response();
+    resp.cacheControl.public = true;
+    resp.etag = "123";
+    resp.body = "Hello";
+    resp.toA();
+
+    assert(resp.isEtag);
+    assert(resp.isWeakEtag());
+    assertNot(resp.isStrongEtag());
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', resp.etag);
+    assertEqual({ public: true }, resp.cacheControl);
+
+    assertEqual("public", resp.headers.get("Cache-Control"));
+    assertEqual('W/"202cb962ac59075b964b07152d234b70"', resp.headers.get("ETag"));
   });
 
   it("read strong ETag", () => {
-    const res = new Response();
-    res.strongEtag("strong-etag");
-    expect(res.isStrongEtag()).toBe(true);
-    expect(res.isWeakEtag()).toBe(false);
+    const resp = new Response();
+    resp.cacheControl.public = true;
+    resp.strongEtag("123");
+    resp.body = "Hello";
+    resp.toA();
+
+    assert(resp.isEtag);
+    assertNot(resp.isWeakEtag());
+    assert(resp.isStrongEtag());
+    assertEqual('"202cb962ac59075b964b07152d234b70"', resp.etag);
   });
 
   it("read charset and content type", () => {
@@ -225,17 +245,21 @@ describe("ResponseTest", () => {
     assertNot(Object.hasOwn(headers, "status"));
   });
 
-  it("can wait until commit", () => {
-    const res = new Response();
-    expect(res.committed).toBe(false);
-    res.close();
-    expect(res.committed).toBe(true);
+  it("can wait until commit", async () => {
+    const response = newResponse();
+    const t = response.awaitCommit();
+    response.commitBang();
+    assert(response.committed);
+    assert(
+      await Promise.race([t.then(() => true), new Promise((r) => setTimeout(() => r(false), 500))]),
+    );
   });
 
   it("stream close", () => {
-    const res = new Response();
-    res.close();
-    expect(res.committed).toBe(true);
+    const response = newResponse();
+    const stream = response.stream as { close(): void; isClosed: boolean };
+    stream.close();
+    assert(stream.isClosed);
   });
 
   it("stream write", () => {
@@ -257,9 +281,27 @@ describe("ResponseTest", () => {
   });
 
   it("each isnt called if str body is written", () => {
-    const res = new Response();
-    res.body = "direct body";
-    expect(res.body).toBe("direct body");
+    const response = newResponse();
+    let eachCounter = 0;
+    response.body = {
+      *[Symbol.iterator]() {
+        eachCounter += 1;
+        yield "foo";
+      },
+    } as unknown as string;
+    response.setHeader("X-Foo", response.body);
+
+    assertEqual(1, eachCounter, "#each was not called once");
+
+    const [status, headers, body] = response.toA();
+
+    assertEqual(200, status);
+    assertEqual("foo", headers["x-foo"]);
+    const chunks: string[] = [];
+    (body as { each(block: (chunk: string) => void): void }).each((c) => chunks.push(c));
+    assertEqual("foo", chunks.join(""));
+
+    assertEqual(1, eachCounter, "#each was not called once");
   });
 
   it("response body encoding", () => {
