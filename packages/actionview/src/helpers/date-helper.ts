@@ -6,6 +6,7 @@ import {
   isPlainObject,
   withOptions,
   type SafeBuffer,
+  type TimeWithZone,
 } from "@blazetrails/activesupport";
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import {
@@ -37,11 +38,7 @@ const MINUTES_IN_YEAR = 525600;
 const MINUTES_IN_QUARTER_YEAR = 131400;
 const MINUTES_IN_THREE_QUARTERS_YEAR = 394200;
 
-export type DistanceOfTimeInput =
-  | Date
-  | number
-  | Temporal.Instant
-  | { toTime: () => Date | { toF: () => number } };
+export type DistanceOfTimeInput = Date | number | Temporal.Instant | Time | TimeWithZone;
 
 export interface DistanceOfTimeOptions {
   includeSeconds?: boolean;
@@ -56,14 +53,13 @@ export function distanceOfTimeInWords(
 ): string {
   options = { scope: "datetime.distance_in_words", ...options };
 
-  let from = normalizeDistanceOfTimeArgumentToTime(fromTime);
-  let to = normalizeDistanceOfTimeArgumentToTime(toTime);
-  if (from.getTime() > to.getTime()) {
-    [from, to] = [to, from];
+  fromTime = normalizeDistanceOfTimeArgumentToTime(fromTime);
+  toTime = normalizeDistanceOfTimeArgumentToTime(toTime);
+  if (fromTime.compare(toTime)! > 0) {
+    [fromTime, toTime] = [toTime, fromTime];
   }
-
-  const distanceInMinutes = Math.round((to.getTime() - from.getTime()) / 1000 / 60.0);
-  const distanceInSeconds = Math.round((to.getTime() - from.getTime()) / 1000);
+  const distanceInMinutes = Math.round((toTime.minus(fromTime) as number) / 60.0);
+  const distanceInSeconds = Math.round(toTime.minus(fromTime) as number);
 
   return withOptions(I18n, { locale: options.locale, scope: options.scope }, (locale) => {
     if (distanceInMinutes <= 1) {
@@ -91,10 +87,10 @@ export function distanceOfTimeInWords(
     if (distanceInMinutes < 525600)
       return locale.t("x_months", { count: Math.round(distanceInMinutes / 43200) });
 
-    let fromYear = from.getUTCFullYear();
-    if (from.getUTCMonth() + 1 >= 3) fromYear += 1;
-    let toYear = to.getUTCFullYear();
-    if (to.getUTCMonth() + 1 < 3) toYear -= 1;
+    let fromYear = fromTime.year;
+    if (fromTime.month >= 3) fromYear += 1;
+    let toYear = toTime.year;
+    if (toTime.month < 3) toYear -= 1;
     const leapYears =
       fromYear > toYear
         ? 0
@@ -112,19 +108,12 @@ export function distanceOfTimeInWords(
 }
 
 /** @internal */
-function normalizeDistanceOfTimeArgumentToTime(value: DistanceOfTimeInput): Date {
+function normalizeDistanceOfTimeArgumentToTime(value: DistanceOfTimeInput): Time {
   if (typeof value === "number") {
-    // boundary: Ruby `Time.at(value)`, as the JS Date the arithmetic above is over.
-    return new Date(value * 1000);
+    return Time.at(value);
   } else if (rbObjRespondTo(value, "toTime")) {
-    const time = (value as { toTime: () => Date | { toF: () => number } }).toTime();
-    // boundary: a Ruby `::Time` from `to_time` is read back as a JS Date by its epoch seconds.
-    return time instanceof Date ? time : new Date(time.toF() * 1000);
+    return rbFSend(value, "toTime") as Time;
   } else {
-    // boundary: a JS Date has no `to_time`; it is already the value the arithmetic reads.
-    if (value instanceof Date) return value;
-    // boundary: ActiveRecord answers a datetime column as a Temporal.Instant, which has no `to_time`.
-    if (value instanceof Temporal.Instant) return new Date(value.epochMilliseconds);
     throw new ArgumentError(`${rbInspect(value)} can't be converted to a Time value`);
   }
 }

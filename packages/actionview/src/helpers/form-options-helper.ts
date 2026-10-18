@@ -1,6 +1,5 @@
+import { Date as RubyDate } from "@blazetrails/date";
 import {
-  DAYS_INTO_WEEK,
-  DateCalculations,
   I18n,
   TimeZone,
   extractOptionsBang,
@@ -275,7 +274,7 @@ export function weekdayOptionsForSelect(
   {
     indexAsValue = false,
     dayFormat = "day_names",
-    beginningOfWeek = DateCalculations.beginningOfWeek(),
+    beginningOfWeek = RubyDate.beginningOfWeek(),
   }: { indexAsValue?: unknown; dayFormat?: unknown; beginningOfWeek?: unknown } = {},
 ): SafeBuffer | string {
   let dayNames = I18n.translate(`date.${dayFormat}`) as unknown[];
@@ -283,7 +282,7 @@ export function weekdayOptionsForSelect(
   dayNames = rbFSend(
     dayNames,
     "rotate",
-    fetch(DAYS_INTO_WEEK, beginningOfWeek as string),
+    fetch(RubyDate.DAYS_INTO_WEEK, beginningOfWeek as string),
   ) as unknown[];
 
   return optionsForSelect.call(this, dayNames, selected);

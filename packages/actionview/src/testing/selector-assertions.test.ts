@@ -1,15 +1,22 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it } from "vitest";
 import { assertEqual, assertNot } from "@blazetrails/activesupport";
 import { ArgumentError, Range } from "@blazetrails/ruby-compat";
-import { CSS, type Html5Document, type NodeSet } from "@blazetrails/nokogiri";
+import { CSS, XML, type Html5Document, type NodeSet } from "@blazetrails/nokogiri";
 import { Testing } from "../testing.js";
-import { assertSelect as _assertSelect, cssSelect as _cssSelect } from "./selector-assertions.js";
+import {
+  assertSelect as _assertSelect,
+  assertSelectEncoded as _assertSelectEncoded,
+  cssSelect as _cssSelect,
+} from "./selector-assertions.js";
 
 describe("AssertSelectTest", () => {
   let htmlDocument: Html5Document;
   const host = { documentRootElement: () => htmlDocument.root };
   const assertSelect = _assertSelect.bind(host);
   const cssSelect = _cssSelect.bind(host);
+  const assertSelectEncoded = _assertSelectEncoded.bind(host);
+  const renderXml = (xml: string) => (htmlDocument = XML.Document.parse(xml) as never);
   const renderHtml = (html: string) => (htmlDocument = Testing.htmlDocument().parse(html));
   const assertFailure = (message: RegExp, block: () => void) => expect(block).toThrow(message);
 
@@ -231,6 +238,69 @@ describe("AssertSelectTest", () => {
   it("css select with invalid selector", () => {
     renderHtml('<a href="http://example.com">hello</a>');
     expect(() => cssSelect("[href=http://example.com]")).toThrow(CSS.SyntaxError);
+  });
+
+  // BLOCKED: nokogiri-xml-document-searchable
+  it.skip("feed item encoded", () => {
+    renderXml(`<rss version="2.0">
+  <channel>
+    <item>
+      <description>
+        <![CDATA[
+          <p>Test 1</p>
+        ]]>
+      </description>
+    </item>
+    <item>
+      <description>
+        &lt;p&gt;Test 2&lt;/p&gt;
+      </description>
+    </item>
+  </channel>
+</rss>
+`);
+
+    assertSelect("channel item description", () => {
+      assertSelectEncoded(null, {}, () => {
+        assertSelect("p", { count: 2, text: /Test/ });
+      });
+
+      assertSelect("description", (elements: NodeSet) => {
+        assertSelectEncoded([...elements][0], {}, () => {
+          assertSelect("p", "Test 1");
+        });
+        assertSelectEncoded([...elements][1], {}, () => {
+          assertSelect("p", "Test 2");
+        });
+      });
+    });
+
+    assertSelect("channel item", () => {
+      assertSelectEncoded(null, {}, () => {
+        assertSelect("p", 0);
+      });
+    });
+  });
+
+  // BLOCKED: nokogiri-xml-document-searchable
+  it.skip("feed item encoded with html version", () => {
+    const input = "&lt;p&gt;1&lt;b&gt;2&lt;i&gt;3&lt;/b&gt;4&lt;/i&gt;5&lt;/p&gt;";
+    const html5Result = "<p>1<b>2<i>3</i></b><i>4</i>5</p>";
+
+    renderXml(`<root>
+  <contents>${input}</contents>
+</root>
+`);
+
+    assertSelect("root contents", () => {
+      assertSelectEncoded(null, {}, (contents: any) => {
+        assertEqual(html5Result, contents.toString());
+      });
+
+      assertSelectEncoded(null, { htmlVersion: ":html5" }, (contents: any) => {
+        assertEqual(html5Result, contents.toString());
+      });
+    });
   });
 
   it("nested assert select with match failure shows nice regex", () => {

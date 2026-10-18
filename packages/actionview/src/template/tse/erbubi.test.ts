@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compileJs } from "@blazetrails/tse-compiler";
 
 describe("ErubiTest", () => {
-  // BLOCKED: port-erb-erubi-bufvar
-  it.skip("can configure bufvar", () => {
+  it("can configure bufvar", () => {
     const template = `foo
 
 <%= "foo".toUpperCase() %>
@@ -12,8 +11,8 @@ describe("ErubiTest", () => {
 `;
 
     const baseline = compileJs(template);
-    const erubi = compileJs(template, { bufvar: "boofer" } as never);
+    const erubi = compileJs(template, { bufvar: "boofer" });
 
-    expect(erubi.code).toBe(baseline.code.replaceAll("outputBuffer", "boofer"));
+    expect(erubi.code).toBe(baseline.code.replaceAll("context.outputBuffer", "boofer"));
   });
 });

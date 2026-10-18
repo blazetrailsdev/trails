@@ -1,4 +1,5 @@
-import { DateCalculations, type SafeBuffer } from "@blazetrails/activesupport";
+import type { SafeBuffer } from "@blazetrails/activesupport";
+import { Date as RubyDate } from "@blazetrails/date";
 import { fetch, include, rbModConstSet, rtest } from "@blazetrails/ruby-compat";
 
 import { Tags } from "../../namespaces.js";
@@ -28,11 +29,7 @@ export class WeekdaySelect extends Base {
       this.weekdayOptionsForSelect(rtest(value) ? value : this._options["selected"], {
         indexAsValue: fetch(this._options, "indexAsValue", false),
         dayFormat: fetch(this._options, "dayFormat", "day_names"),
-        beginningOfWeek: fetch(
-          this._options,
-          "beginningOfWeek",
-          DateCalculations.beginningOfWeek(),
-        ),
+        beginningOfWeek: fetch(this._options, "beginningOfWeek", RubyDate.beginningOfWeek()),
       }),
       this._options,
       this._htmlOptions,

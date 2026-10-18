@@ -1,14 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "../test-helpers/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  DateCalculations,
-  TimeZone,
-  assertMatch,
-  assertRaises,
-  isHtmlSafe,
-} from "@blazetrails/activesupport";
+import { TimeZone, assertMatch, assertRaises, isHtmlSafe } from "@blazetrails/activesupport";
 import { ArgumentError, Range, Struct } from "@blazetrails/ruby-compat";
+import { Date as RubyDate } from "@blazetrails/date";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
@@ -374,12 +369,12 @@ describe("FormOptionsHelperTest", () => {
   });
 
   it("weekday options for select with beginning of week set elsewhere", () => {
-    DateCalculations.setBeginningOfWeek(":sunday");
+    RubyDate.setBeginningOfWeek(":sunday");
     assertDomEqual(
       '<option value="Sunday">Sunday</option>\n<option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>',
       view.weekdayOptionsForSelect(),
     );
-    DateCalculations.setBeginningOfWeek(":monday");
+    RubyDate.setBeginningOfWeek(":monday");
   });
 
   it("weekday options for select with selected value", () => {

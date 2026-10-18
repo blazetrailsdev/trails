@@ -23,8 +23,7 @@ describe("FormOptionsHelperI18nTests", () => {
     I18n.reloadBang();
   });
 
-  // BLOCKED: i18n-namespace-is-not-stubbable
-  it.skip("select with prompt true translates prompt message", () => {
+  it("select with prompt true translates prompt message", () => {
     assertCalledWith(
       I18n,
       "translate",
