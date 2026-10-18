@@ -383,6 +383,30 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           "safe_buffer_test.rb:195 `assert_kind_of NilClass` — JS `null` is not an instance of any class, and nil is NilClass's only instance, so the check is `assert_nil`",
       },
     ],
+  "actiondispatch:dispatch/routing_test.rb › TestUrlGenerationErrors › URL helpers raise message with mixed parameters when generation fails":
+    [
+      {
+        kind: "assert_raises",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/routing_test.rb:4966-4977 `{ id: nil, "id" => "url-tested" }`, in the call and in the expected message — a Ruby Symbol is a JS string, so a JS object cannot hold both `:id` and `"id"` (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`"; packages/actionpack/CLAUDE.md, "A `null` positional keeps its url-helper slot")',
+      },
+      {
+        kind: "assert_match",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/routing_test.rb:4966-4977 `{ id: nil, "id" => "url-tested" }`, in the call and in the expected message — a Ruby Symbol is a JS string, so a JS object cannot hold both `:id` and `"id"` (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`"; packages/actionpack/CLAUDE.md, "A `null` positional keeps its url-helper slot")',
+      },
+      {
+        kind: "assert_match",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/routing_test.rb:4966-4977 `{ id: nil, "id" => "url-tested" }`, in the call and in the expected message — a Ruby Symbol is a JS string, so a JS object cannot hold both `:id` and `"id"` (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`"; packages/actionpack/CLAUDE.md, "A `null` positional keeps its url-helper slot")',
+      },
+    ],
   "actioncontroller:controller/routing_test.rb › LegacyRouteSetTests › id encoding": [
     {
       kind: "assert_equal",

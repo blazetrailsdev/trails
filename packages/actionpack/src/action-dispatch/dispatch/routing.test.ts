@@ -85,7 +85,6 @@ beforeEach(() => {
     "home",
     "images",
     "infos",
-    "internal",
     "invoices",
     "involvements",
     "journey",
@@ -1174,21 +1173,37 @@ describe("TestRoutingMapper", () => {
     expect(routes.recognizePath("/content").controller).toBe("content");
   });
 
-  it("resources are not pluralized", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("resources are not pluralized", async () => {
+    draw(function () {
       this.namespace("transport", () => {
         this.resources("taxis");
       });
     });
-    expect(routes.recognizePath("/transport/taxis").action).toBe("index");
-    expect(routes.pathFor({}, "transport_taxis")).toBe("/transport/taxis");
-    expect(routes.recognizePath("/transport/taxis/1").action).toBe("show");
-    expect(routes.pathFor({ id: 1 }, "transport_taxi")).toBe("/transport/taxis/1");
-    expect(routes.recognizePath("/transport/taxis/new").action).toBe("new");
-    expect(routes.pathFor({}, "new_transport_taxi")).toBe("/transport/taxis/new");
-    expect(routes.recognizePath("/transport/taxis/1/edit").action).toBe("edit");
-    expect(routes.pathFor({ id: 1 }, "edit_transport_taxi")).toBe("/transport/taxis/1/edit");
+
+    await t.get("/transport/taxis");
+    expect(t.response.body).toBe("transport/taxis#index");
+    expect(t.transportTaxisPath()).toBe("/transport/taxis");
+
+    await t.get("/transport/taxis/new");
+    expect(t.response.body).toBe("transport/taxis#new");
+    expect(t.newTransportTaxiPath()).toBe("/transport/taxis/new");
+
+    await t.post("/transport/taxis");
+    expect(t.response.body).toBe("transport/taxis#create");
+
+    await t.get("/transport/taxis/1");
+    expect(t.response.body).toBe("transport/taxis#show");
+    expect(t.transportTaxiPath({ id: "1" })).toBe("/transport/taxis/1");
+
+    await t.get("/transport/taxis/1/edit");
+    expect(t.response.body).toBe("transport/taxis#edit");
+    expect(t.editTransportTaxiPath({ id: "1" })).toBe("/transport/taxis/1/edit");
+
+    await t.put("/transport/taxis/1");
+    expect(t.response.body).toBe("transport/taxis#update");
+
+    await t.delete("/transport/taxis/1");
+    expect(t.response.body).toBe("transport/taxis#destroy");
   });
 
   it("singleton resources are not singularized", () => {
@@ -1298,13 +1313,49 @@ describe("TestRoutingMapper", () => {
     expect(() => routes.recognizePath("/projects/1/edit")).toThrow(RoutingError);
   });
 
-  it("constraints are merged from scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("movies", { constraints: { id: /\d{4}/ } });
+  it("constraints are merged from scope", async () => {
+    draw(function () {
+      this.scope({ constraints: { id: /\d{4}/ } }, () => {
+        this.resources("movies", () => {
+          this.resources("reviews");
+          this.resource("trailer");
+        });
+      });
     });
-    expect(routes.recognizePath("/movies/0001").action).toBe("show");
-    expect(() => routes.recognizePath("/movies/00001")).toThrow(RoutingError);
+
+    await t.get("/movies/0001");
+    expect(t.response.body).toBe("movies#show");
+    expect(t.moviePath({ id: "0001" })).toBe("/movies/0001");
+
+    await t.get("/movies/00001");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([UrlGenerationError], {}, () => t.moviePath({ id: "00001" }));
+
+    await t.get("/movies/0001/reviews");
+    expect(t.response.body).toBe("reviews#index");
+    expect(t.movieReviewsPath({ movie_id: "0001" })).toBe("/movies/0001/reviews");
+
+    await t.get("/movies/00001/reviews");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([UrlGenerationError], {}, () => t.movieReviewsPath({ movie_id: "00001" }));
+
+    await t.get("/movies/0001/reviews/0001");
+    expect(t.response.body).toBe("reviews#show");
+    expect(t.movieReviewPath({ movie_id: "0001", id: "0001" })).toBe("/movies/0001/reviews/0001");
+
+    await t.get("/movies/00001/reviews/0001");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([UrlGenerationError], {}, () =>
+      t.moviePath({ movie_id: "00001", id: "00001" }),
+    );
+
+    await t.get("/movies/0001/trailer");
+    expect(t.response.body).toBe("trailers#show");
+    expect(t.movieTrailerPath({ movie_id: "0001" })).toBe("/movies/0001/trailer");
+
+    await t.get("/movies/00001/trailer");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([UrlGenerationError], {}, () => t.movieTrailerPath({ movie_id: "00001" }));
   });
 
   it("nested resource constraints", () => {
@@ -1547,18 +1598,128 @@ describe("TestRoutingMapper", () => {
     expect(routes.recognizePath("/projects/1/tasks/nueva").action).toBe("new");
   });
 
-  it("shallow nested resources", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", () => {
-        this.resources("comments", { shallow: true });
+  it("shallow nested resources", async () => {
+    draw(function () {
+      this.shallow(() => {
+        this.namespace("api", () => {
+          this.resources("teams", () => {
+            this.resources("players");
+            this.resource("captain");
+          });
+        });
+      });
+
+      this.resources("threads", { shallow: true }, () => {
+        this.resource("owner");
+        this.resources("messages", () => {
+          this.resources("comments", () => {
+            this.member(() => {
+              this.post("preview");
+            });
+          });
+        });
       });
     });
-    expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
-    expect(() => routes.recognizePath("/posts/1/comments", { method: "post" })).not.toThrow();
-    expect(() => routes.recognizePath("/comments/1")).not.toThrow();
-    expect(routes.recognizePath("/comments/1").action).toBe("show");
-    expect(() => routes.recognizePath("/comments/1", { method: "delete" })).not.toThrow();
+
+    await t.get("/api/teams");
+    expect(t.response.body).toBe("api/teams#index");
+    expect(t.apiTeamsPath()).toBe("/api/teams");
+
+    await t.get("/api/teams/new");
+    expect(t.response.body).toBe("api/teams#new");
+    expect(t.newApiTeamPath()).toBe("/api/teams/new");
+
+    await t.get("/api/teams/1");
+    expect(t.response.body).toBe("api/teams#show");
+    expect(t.apiTeamPath({ id: "1" })).toBe("/api/teams/1");
+
+    await t.get("/api/teams/1/edit");
+    expect(t.response.body).toBe("api/teams#edit");
+    expect(t.editApiTeamPath({ id: "1" })).toBe("/api/teams/1/edit");
+
+    await t.get("/api/teams/1/players");
+    expect(t.response.body).toBe("api/players#index");
+    expect(t.apiTeamPlayersPath({ team_id: "1" })).toBe("/api/teams/1/players");
+
+    await t.get("/api/teams/1/players/new");
+    expect(t.response.body).toBe("api/players#new");
+    expect(t.newApiTeamPlayerPath({ team_id: "1" })).toBe("/api/teams/1/players/new");
+
+    await t.get("/api/players/2");
+    expect(t.response.body).toBe("api/players#show");
+    expect(t.apiPlayerPath({ id: "2" })).toBe("/api/players/2");
+
+    await t.get("/api/players/2/edit");
+    expect(t.response.body).toBe("api/players#edit");
+    expect(t.editApiPlayerPath({ id: "2" })).toBe("/api/players/2/edit");
+
+    await t.get("/api/teams/1/captain");
+    expect(t.response.body).toBe("api/captains#show");
+    expect(t.apiTeamCaptainPath({ team_id: "1" })).toBe("/api/teams/1/captain");
+
+    await t.get("/api/teams/1/captain/new");
+    expect(t.response.body).toBe("api/captains#new");
+    expect(t.newApiTeamCaptainPath({ team_id: "1" })).toBe("/api/teams/1/captain/new");
+
+    await t.get("/api/teams/1/captain/edit");
+    expect(t.response.body).toBe("api/captains#edit");
+    expect(t.editApiTeamCaptainPath({ team_id: "1" })).toBe("/api/teams/1/captain/edit");
+
+    await t.get("/threads");
+    expect(t.response.body).toBe("threads#index");
+    expect(t.threadsPath()).toBe("/threads");
+
+    await t.get("/threads/new");
+    expect(t.response.body).toBe("threads#new");
+    expect(t.newThreadPath()).toBe("/threads/new");
+
+    await t.get("/threads/1");
+    expect(t.response.body).toBe("threads#show");
+    expect(t.threadPath({ id: "1" })).toBe("/threads/1");
+
+    await t.get("/threads/1/edit");
+    expect(t.response.body).toBe("threads#edit");
+    expect(t.editThreadPath({ id: "1" })).toBe("/threads/1/edit");
+
+    await t.get("/threads/1/owner");
+    expect(t.response.body).toBe("owners#show");
+    expect(t.threadOwnerPath({ thread_id: "1" })).toBe("/threads/1/owner");
+
+    await t.get("/threads/1/messages");
+    expect(t.response.body).toBe("messages#index");
+    expect(t.threadMessagesPath({ thread_id: "1" })).toBe("/threads/1/messages");
+
+    await t.get("/threads/1/messages/new");
+    expect(t.response.body).toBe("messages#new");
+    expect(t.newThreadMessagePath({ thread_id: "1" })).toBe("/threads/1/messages/new");
+
+    await t.get("/messages/2");
+    expect(t.response.body).toBe("messages#show");
+    expect(t.messagePath({ id: "2" })).toBe("/messages/2");
+
+    await t.get("/messages/2/edit");
+    expect(t.response.body).toBe("messages#edit");
+    expect(t.editMessagePath({ id: "2" })).toBe("/messages/2/edit");
+
+    await t.get("/messages/2/comments");
+    expect(t.response.body).toBe("comments#index");
+    expect(t.messageCommentsPath({ message_id: "2" })).toBe("/messages/2/comments");
+
+    await t.get("/messages/2/comments/new");
+    expect(t.response.body).toBe("comments#new");
+    expect(t.newMessageCommentPath({ message_id: "2" })).toBe("/messages/2/comments/new");
+
+    await t.get("/comments/3");
+    expect(t.response.body).toBe("comments#show");
+    expect(t.commentPath({ id: "3" })).toBe("/comments/3");
+
+    await t.get("/comments/3/edit");
+    expect(t.response.body).toBe("comments#edit");
+    expect(t.editCommentPath({ id: "3" })).toBe("/comments/3/edit");
+
+    await t.post("/comments/3/preview");
+    expect(t.response.body).toBe("comments#preview");
+    expect(t.previewCommentPath({ id: "3" })).toBe("/comments/3/preview");
   });
 
   it("shallow nested resources inside resource", () => {
@@ -1573,15 +1734,66 @@ describe("TestRoutingMapper", () => {
     expect(routes.recognizePath("/posts/1").action).toBe("show");
   });
 
-  it("custom resource routes are scoped", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", () => {
-        this.get("preview", { to: "posts#preview", as: "preview" });
+  it("custom resource routes are scoped", async () => {
+    draw(function () {
+      this.resources("customers", () => {
+        this.get("recent", { on: "collection" });
+        this.get("profile", { on: "member" });
+        this.get({ "secret/profile": "customers#secret", on: "member" });
+        this.post({ preview: "customers#preview", as: "another_preview", on: "new" });
+        this.resource("avatar", () => {
+          this.get({ thumbnail: "avatars#thumbnail", as: "thumbnail", on: "member" });
+        });
+        this.resources("invoices", () => {
+          this.get({ outstanding: "invoices#outstanding", on: "collection" });
+          this.get("overdue", { action: "overdue", on: "collection" });
+          this.get({ print: "invoices#print", as: "print", on: "member" });
+          this.post({ preview: "invoices#preview", as: "preview", on: "new" });
+        });
+        this.resources("notes", { shallow: true }, () => {
+          this.get({ preview: "notes#preview", as: "preview", on: "new" });
+          this.get({ print: "notes#print", as: "print", on: "member" });
+        });
+      });
+
+      this.namespace("api", () => {
+        this.resources("customers", () => {
+          this.get({ recent: "customers#recent", as: "recent", on: "collection" });
+          this.get({ profile: "customers#profile", as: "profile", on: "member" });
+          this.post({ preview: "customers#preview", as: "preview", on: "new" });
+        });
       });
     });
-    const m = routes.recognizePath("/posts/1/preview");
-    expect(m.action).toBe("preview");
+
+    expect(t.recentCustomersPath()).toBe("/customers/recent");
+    expect(t.profileCustomerPath({ id: "1" })).toBe("/customers/1/profile");
+    expect(t.secretProfileCustomerPath({ id: "1" })).toBe("/customers/1/secret/profile");
+    expect(t.anotherPreviewNewCustomerPath()).toBe("/customers/new/preview");
+    expect(t.thumbnailCustomerAvatarPath({ customer_id: "1", format: "jpg" })).toBe(
+      "/customers/1/avatar/thumbnail.jpg",
+    );
+    expect(t.outstandingCustomerInvoicesPath({ customer_id: "1" })).toBe(
+      "/customers/1/invoices/outstanding",
+    );
+    expect(t.printCustomerInvoicePath({ customer_id: "1", id: "2" })).toBe(
+      "/customers/1/invoices/2/print",
+    );
+    expect(t.previewNewCustomerInvoicePath({ customer_id: "1" })).toBe(
+      "/customers/1/invoices/new/preview",
+    );
+    expect(t.previewNewCustomerNotePath({ customer_id: "1" })).toBe(
+      "/customers/1/notes/new/preview",
+    );
+    expect(t.printNotePath({ id: "1" })).toBe("/notes/1/print");
+    expect(t.recentApiCustomersPath()).toBe("/api/customers/recent");
+    expect(t.profileApiCustomerPath({ id: "1" })).toBe("/api/customers/1/profile");
+    expect(t.previewNewApiCustomerPath()).toBe("/api/customers/new/preview");
+
+    await t.get("/customers/1/invoices/overdue");
+    expect(t.response.body).toBe("invoices#overdue");
+
+    await t.get("/customers/1/secret/profile");
+    expect(t.response.body).toBe("customers#secret");
   });
 
   it("glob parameter accepts regexp", () => {
@@ -3957,12 +4169,27 @@ describe("TestUnicodePaths", () => {
 });
 
 describe("TestUrlGenerationErrors", () => {
-  it("URL helpers raise message with mixed parameters when generation fails", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts/:id/comments/:comment_id", { to: "comments#show", as: "post_comment" });
-    });
-    expect(() => routes.pathFor({ id: 1 }, "post_comment")).toThrow(/comment_id/);
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.get({ "/products/:id": "products#show", as: "product" });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  class TestUrlGenerationErrors extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  include(TestUrlGenerationErrors, Routes.urlHelpers());
+  registerConstant("TestUrlGenerationErrors", TestUrlGenerationErrors);
+
+  let t: TestUrlGenerationErrors & Record<string, (...args: unknown[]) => string>;
+  beforeEach(({ testCase }) => {
+    t = testCase as typeof t;
+  });
+
+  it("URL helpers raise message with mixed parameters when generation fails", async () => {
+    await assertRaises([UrlGenerationError], {}, () => t.productPath(null, { id: "url-tested" }));
   });
 
   it("correct for empty UrlGenerationError", () => {
@@ -3970,51 +4197,25 @@ describe("TestUrlGenerationErrors", () => {
     expect(() => routes.pathFor({}, "nonexistent")).toThrow(/No route matches/);
   });
 
-  it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
+  it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", async () => {
     const message =
       'No route matches {:action=>"show", :controller=>"products", :id=>nil}, missing required keys: [:id]';
 
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
-    expect(() => urlHelpers.productPath(null)).toThrow(UrlGenerationError);
-    expect(() => urlHelpers.productPath(null)).toThrow(message);
+    const error = await assertRaises([UrlGenerationError], {}, () => t.productPath(null));
+    expect(error.message).toBe(message);
   });
 
   it("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", async () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
     const message =
       'No route matches {:action=>"show", :controller=>"products", :id=>nil}, possible unmatched constraints: [:id]';
 
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
-    const error = await assertRaises([UrlGenerationError], {}, () =>
-      urlHelpers.productPath({ id: null }),
-    );
+    const error = await assertRaises([UrlGenerationError], {}, () => t.productPath({ id: null }));
     expect(error.message).toMatch(message);
   });
 
   it("exceptions have suggestions for fix", async () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
     const error = await assertRaises([UrlGenerationError], {}, () =>
-      urlHelpers.productPath(null, { id: "url-tested" }),
+      t.productPath(null, { id: "url-tested" }),
     );
     expect((error as UrlGenerationError & { detailedMessage(): string }).detailedMessage()).toMatch(
       "Did you mean?",
@@ -4938,24 +5139,74 @@ describe("TestErrorsInController", () => {
 });
 
 describe("TestPartialDynamicPathSegments", () => {
-  it("paths with partial dynamic segments are recognised", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/songs/song-:song", { to: "songs#show" });
-      this.get("/songs/:song-song", { to: "songs#show2" });
-      this.get("/:artist/song-:song", { to: "songs#artist_show" });
-      this.get("/:artist/:song-song", { to: "songs#artist_show2" });
-    });
-    let m = routes.recognizePath("/songs/song-changes");
-    expect(m.song).toBe("changes");
-    m = routes.recognizePath("/songs/changes-song");
-    expect(m.song).toBe("changes");
-    m = routes.recognizePath("/david-bowie/song-changes");
-    expect(m.artist).toBe("david-bowie");
-    expect(m.song).toBe("changes");
-    m = routes.recognizePath("/david-bowie/changes-song");
-    expect(m.artist).toBe("david-bowie");
-    expect(m.song).toBe("changes");
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    const ok = (_env: Record<string, unknown>) => [
+      200,
+      { "Content-Type": "text/plain" },
+      bodyFromString(""),
+    ];
+
+    this.get("/songs/song-:song", { to: ok });
+    this.get("/songs/:song-song", { to: ok });
+    this.get("/:artist/song-:song", { to: ok });
+    this.get("/:artist/:song-song", { to: ok });
+
+    this.get("/optional/songs(/song-:song)", { to: ok });
+    this.get("/optional/songs(/:song-song)", { to: ok });
+    this.get("/optional/:artist(/song-:song)", { to: ok });
+    this.get("/optional/:artist(/:song-song)", { to: ok });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  class TestPartialDynamicPathSegments extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestPartialDynamicPathSegments", TestPartialDynamicPathSegments);
+
+  let t: TestPartialDynamicPathSegments;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestPartialDynamicPathSegments;
+  });
+
+  function assertParams(params: Record<string, string>): void {
+    expect(t.request.pathParameters).toEqual(params);
+  }
+
+  it("paths with partial dynamic segments are recognised", async () => {
+    await t.get("/david-bowie/changes-song");
+    expect(t.response.status).toBe(200);
+    assertParams({ artist: "david-bowie", song: "changes" });
+
+    await t.get("/david-bowie/song-changes");
+    expect(t.response.status).toBe(200);
+    assertParams({ artist: "david-bowie", song: "changes" });
+
+    await t.get("/songs/song-changes");
+    expect(t.response.status).toBe(200);
+    assertParams({ song: "changes" });
+
+    await t.get("/songs/changes-song");
+    expect(t.response.status).toBe(200);
+    assertParams({ song: "changes" });
+
+    await t.get("/optional/songs/song-changes");
+    expect(t.response.status).toBe(200);
+    assertParams({ song: "changes" });
+
+    await t.get("/optional/songs/changes-song");
+    expect(t.response.status).toBe(200);
+    assertParams({ song: "changes" });
+
+    await t.get("/optional/david-bowie/changes-song");
+    expect(t.response.status).toBe(200);
+    assertParams({ artist: "david-bowie", song: "changes" });
+
+    await t.get("/optional/david-bowie/song-changes");
+    expect(t.response.status).toBe(200);
+    assertParams({ artist: "david-bowie", song: "changes" });
   });
 });
 
@@ -5063,15 +5314,40 @@ describe("TestPathParameters", () => {
 });
 
 describe("TestInternalRoutingParams", () => {
-  it("paths with partial dynamic segments are recognised", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/test_internal/:internal", { to: "internal#internal" });
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.get({ "/test_internal/:internal": "internal#internal" });
+  });
+
+  class InternalController extends Base {
+    internal(): void {
+      this.head("ok");
+    }
+  }
+  controllerConstants.set("internal", InternalController);
+
+  const APP = IntegrationTest.buildApp(Routes);
+  class TestInternalRoutingParams extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestInternalRoutingParams", TestInternalRoutingParams);
+
+  let t: TestInternalRoutingParams;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestInternalRoutingParams;
+  });
+
+  it("paths with partial dynamic segments are recognised", async () => {
+    await t.get("/test_internal/123");
+    expect(t.response.status).toBe(200);
+
+    expect(t.request.pathParameters).toEqual({
+      controller: "internal",
+      action: "internal",
+      internal: "123",
     });
-    const m = routes.recognizePath("/test_internal/123");
-    expect(m.internal).toBe("123");
-    expect(m.controller).toBe("internal");
-    expect(m.action).toBe("internal");
   });
 });
 
