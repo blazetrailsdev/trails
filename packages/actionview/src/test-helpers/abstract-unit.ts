@@ -1,6 +1,6 @@
 import { ActionController, ActionDispatch, RouteSet, UrlFor } from "@blazetrails/actionpack";
 import { RoutingUrlFor } from "../routing-url-for.js";
-import { include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { File, include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 
 type DrawCallback = Parameters<RouteSet["draw"]>[0];
 
@@ -45,3 +45,7 @@ ActionController.TestCase.withRoutes = function (
 };
 
 RoutingUrlFor.include(UrlFor);
+
+const __dir__ = decodeURIComponent(new URL(".", import.meta.url).pathname);
+
+export const FIXTURE_LOAD_PATH = File.expandPath("fixtures", __dir__);

@@ -947,8 +947,9 @@ Request.prototype.formatFromPathExtension = function (this: Request) {
 Request.prototype.setFormat = _setFormat;
 Request.prototype.isParamsReadable = _isParamsReadable;
 
-ActionDispatch.Request = Request;
+rbModConstSet(ActionDispatch, "Request", Request);
 rbModConstSet(Request, "Utils", Utils);
+rbModConstSet(Request, "Session", Session);
 rbModConstSet(ActionDispatch, "MissingController", MissingController);
 
 runLoadHooks("action_dispatch_request", Request);
