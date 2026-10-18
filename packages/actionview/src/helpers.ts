@@ -1,4 +1,10 @@
-import { Autoload, Benchmarkable, Concern, extend } from "@blazetrails/activesupport";
+import {
+  Autoload,
+  Benchmarkable,
+  Concern,
+  extend,
+  type Extended,
+} from "@blazetrails/activesupport";
 import { Module } from "@blazetrails/ruby-compat";
 import { Tags } from "./namespaces.js";
 import { ActiveModelHelper } from "./helpers/active-model-helper.js";
@@ -35,8 +41,25 @@ import { TextHelper } from "./helpers/text-helper.js";
 import { TranslationHelper } from "./helpers/translation-helper.js";
 import { UrlHelper } from "./helpers/url-helper.js";
 
-export const Helpers = new Module((mod) => {
+type HelpersModule = Module &
+  Autoload.Autoload &
+  Extended<typeof Autoload> & { Tags: typeof Tags; eagerLoadBang(): Promise<void> };
+
+export const Helpers: HelpersModule = new Module((mod) => {
   extend(mod, Autoload);
+  const helpers = mod as HelpersModule;
+  helpers.loadPath = {};
+  helpers.autoload("Tags");
+  helpers.Tags = Tags;
+  Object.defineProperty(helpers, "eagerLoadBang", {
+    value: async function eagerLoadBang(this: HelpersModule): Promise<void> {
+      await Autoload.eagerLoadBang.call(this);
+      await this.Tags.eagerLoadBang();
+    },
+    writable: true,
+    configurable: true,
+  });
+
   extend(mod, Concern);
 
   mod.include(Benchmarkable);
@@ -63,9 +86,4 @@ export const Helpers = new Module((mod) => {
   mod.include(TextHelper);
   mod.include(TranslationHelper);
   mod.include(UrlHelper);
-});
-
-export async function eagerLoadBang(): Promise<void> {
-  await Autoload.eagerLoadBang.call(Helpers as never);
-  await Tags.eagerLoadBang();
-}
+}) as HelpersModule;

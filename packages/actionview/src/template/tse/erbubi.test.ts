@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Erubi } from "../handlers/tse/erubi.js";
+import { compileJs } from "@blazetrails/tse-compiler";
 
 describe("ErubiTest", () => {
   it("can configure bufvar", () => {
@@ -10,9 +10,9 @@ describe("ErubiTest", () => {
 <%== "foo".length %>
 `;
 
-    const baseline = new Erubi(template);
-    const erubi = new Erubi(template, { bufvar: "boofer" });
+    const baseline = compileJs(template);
+    const erubi = compileJs(template, { bufvar: "boofer" });
 
-    expect(erubi.src).toBe(baseline.src.replaceAll(baseline.bufvar, "boofer"));
+    expect(erubi.code).toBe(baseline.code.replaceAll("context.outputBuffer", "boofer"));
   });
 });

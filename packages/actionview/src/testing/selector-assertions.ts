@@ -59,9 +59,9 @@ export function assertDomEncoded(
     .map((elem) =>
       elem.children
         .filter((child) => child.isCdata() || (child.isText() && !child.isBlank()))
-        .map((child) => child.content)
-        .join(""),
+        .map((child) => child.content),
     )
+    .flat()
     .join("");
 
   const selected = Testing.htmlDocumentFragment({ htmlVersion }).parse(content);
