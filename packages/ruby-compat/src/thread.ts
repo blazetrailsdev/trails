@@ -1,9 +1,25 @@
+import { excBacktraceLocations, type Location } from "./backtrace-location.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import {
   getAsyncContext,
   type AsyncContext,
   type AsyncContextAdapter,
 } from "./async-context-adapter.js";
+
+class IterBreak {
+  constructor(readonly value: unknown) {}
+}
+
+/**
+ * `rb_iter_break_value` (`vendor/ruby/v3.3.11/vm.c:2058`), Ruby's `break val`
+ * in a block: the walk the block was yielded from stops, and the method that
+ * yielded answers `val`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbIterBreakValue(val: unknown): never {
+  throw new IterBreak(val);
+}
 
 let _current: AsyncContext<Thread> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
@@ -63,6 +79,35 @@ export class Thread<R = unknown> {
    */
   static pass(): Promise<null> {
     return new Promise((resolve) => setTimeout(() => resolve(null), 0));
+  }
+
+  /**
+   * `Thread.each_caller_location` (`vendor/ruby/v3.3.11/vm_backtrace.c:1273-1278`):
+   * yields each frame above the method calling it, as `caller_locations` would
+   * answer them, and answers nil. A block that calls `rbIterBreakValue(val)`
+   * stops the walk, and the call answers `val`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.each_caller_location`.
+   */
+  static eachCallerLocation<V = never>(block: (location: Location) => void): V | null {
+    const exc = new Error();
+    const stackTraceLimit = Error.stackTraceLimit;
+    Error.stackTraceLimit = Infinity;
+    try {
+      (Error as { captureStackTrace?: (exc: object, fn: unknown) => void }).captureStackTrace?.(
+        exc,
+        Thread.eachCallerLocation,
+      );
+    } finally {
+      Error.stackTraceLimit = stackTraceLimit;
+    }
+    try {
+      for (const location of (excBacktraceLocations(exc) ?? []).slice(1)) block(location);
+    } catch (e) {
+      if (e instanceof IterBreak) return e.value as V;
+      throw e;
+    }
+    return null;
   }
 
   /**

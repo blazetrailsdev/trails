@@ -2,13 +2,19 @@ import { Attribute } from "@blazetrails/activemodel";
 import {
   any,
   BacktraceCleaner,
-  callerLocations,
   classAttribute,
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
-import { first, rbObjAsString, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
+import {
+  Thread,
+  first,
+  rbIterBreakValue,
+  rbObjAsString,
+  rbObjRespondTo,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import { verboseQueryLogs } from "./active-record.js";
 import { ActiveRecord } from "./namespaces.js";
 
@@ -128,11 +134,10 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   private querySourceLocation(): string | null {
-    for (const location of callerLocations()) {
+    return Thread.eachCallerLocation<string>((location) => {
       const frame = this.backtraceCleaner.cleanFrame(String(location));
-      if (frame) return frame;
-    }
-    return null;
+      if (frame) rbIterBreakValue(frame);
+    });
   }
 
   private typeCastedBinds(castedBinds: unknown): any[] {

@@ -47,7 +47,7 @@ export class DeserializationError extends StandardError {
       cause: errinfo,
     });
     this.name = "ActiveJob::DeserializationError";
-    excSetBacktrace(this, excBacktrace(errinfo as Error)!);
+    excSetBacktrace(this, excBacktrace(errinfo as Error));
   }
 }
 rbModConstSet(ActiveJob, "DeserializationError", DeserializationError);

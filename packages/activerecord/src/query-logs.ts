@@ -1,12 +1,11 @@
 import {
   ArgumentError,
-  callerLocations,
   ExecutionContext,
   isBlank,
   isPresent,
   threadMattrAccessor,
 } from "@blazetrails/activesupport";
-import { cmp } from "@blazetrails/ruby-compat";
+import { Thread, cmp, rbIterBreakValue } from "@blazetrails/ruby-compat";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
@@ -122,11 +121,10 @@ export class QueryLogs {
   }
 
   static querySourceLocation(): string | null {
-    for (const location of callerLocations()) {
+    return Thread.eachCallerLocation<string>((location) => {
       const frame = LogSubscriber.backtraceCleaner.cleanFrame(String(location));
-      if (frame) return frame;
-    }
-    return null;
+      if (frame) rbIterBreakValue(frame);
+    });
   }
 
   static {
