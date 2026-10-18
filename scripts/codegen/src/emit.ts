@@ -179,6 +179,10 @@ const PERMANENT_CONSTS: Record<string, string> = {
 export class Emitter {
   /** Nested constants with no seat on their parent (see `emitFile`). */
   unseated: string[] = [];
+  /** Concerns emitted as plain objects: their `ClassMethods` is extended from the `[included]` hook, not seated. */
+  plainConcerns = new Set<string>();
+  /** Modules emitted as plain objects: a nested constant is not seated on one (it has no constant table). */
+  plainModules = new Set<string>();
   lw: Lowerer;
   constructor(
     readonly index: GemIndex,
@@ -903,6 +907,7 @@ export class Emitter {
         const i = u.fqn.lastIndexOf("::");
         if (i < 0) continue;
         const parent = u.fqn.slice(0, i);
+        if (this.plainModules.has(parent)) continue;
         const seat = handNamespaceFqns().get(parent);
         const parentExp = this.resolver.exportNames.get(parent);
         const parentSpec = parentExp && `@root/${parentExp.tsFile.replace(/\.ts$/, ".js")}`;
@@ -928,6 +933,7 @@ export class Emitter {
     }
     for (const u of units) {
       if (u.kind !== "module" || !this.index.scopes.get(u.fqn)?.concern) continue;
+      if (this.plainConcerns.has(u.fqn)) continue;
       const cm = names.get(`${u.fqn}::ClassMethods`);
       if (cm) chunks.push(`${names.get(u.fqn)}.ClassMethods = ${cm};`);
     }
@@ -2030,12 +2036,14 @@ export class Emitter {
         ),
     );
     let incl = "";
+    let includedLines: string[] = [];
     if (includedBlock) {
       const ic = this.baseCtx(u, f, { selfKind: "static", selfExpr: "base" });
       const lines = this.lw.block(this.lw.seqBody(includedBlock.body), ic, false);
       const hoisted: Set<string> | undefined = ic.scope.hoisted;
       if (hoisted?.size)
         lines.unshift(`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
+      includedLines = lines;
       if (isConcern) {
         // `ActiveSupport::Concern#included` registers the block, and its
         // `append_features` runs it on the includer (the hand port's shape,
@@ -2064,9 +2072,10 @@ export class Emitter {
     const seatLine = seatNames.length ? `Object.assign(${name}, { ${seatNames.join(", ")} });` : "";
     // `extend ActiveSupport::Concern` first, so a concern this module includes
     // records a dependency instead of running against the module itself.
-    const concernLine = isConcern
-      ? `${this.lw.rc(this.baseCtx(u, f, {}), "extend")}(${name}, ${this.lw.as(this.baseCtx(u, f, {}), "Concern")});`
-      : "";
+    const concernLine = (): string =>
+      isConcern
+        ? `${this.lw.rc(this.baseCtx(u, f, {}), "extend")}(${name}, ${this.lw.as(this.baseCtx(u, f, {}), "Concern")});`
+        : "";
     // The module is a ruby-compat `Module` (the hand port's `new Module((mod) =>
     // mod.defineMethod(...))` shape), so `superMethod` can resolve a module `super`.
     // A zero-argument reader whose writer another gem scope declares (`def priority`
@@ -2111,14 +2120,52 @@ export class Emitter {
     const usesSuper = [...fns, ...members].some((t) => t.includes(`${name}.superMethod(`));
     // A namespace other constants are seated on, and a Concern's `ClassMethods`
     // (which `append_features` extends the includer with), keep the Module.
-    const parentFqn = u.fqn.slice(0, Math.max(0, u.fqn.lastIndexOf("::")));
     // A module a test file defines is used as a value (an adapter module whose
     // name is read), so it keeps the Module that carries its identity and name.
+    // A Concern is a plain object too (activerecord's `Integration`): its
+    // `[included]` hook does `append_features`' work on the includer, extending
+    // it with `ClassMethods` and then running the `included do` block. It keeps
+    // the Module when another module includes it, since Concern's
+    // `append_features` then records it as a dependency of that module rather
+    // than running against it, and when it includes others (`mixes`), whose
+    // methods must sit beneath its own.
+    const cmFqn = `${u.fqn}::ClassMethods`;
+    const includedByModule = [...this.index.scopes.values()].some(
+      (s) =>
+        s.kind === "module" &&
+        [...s.includes, ...s.prepends].some((p) => {
+          const j = p.join("::");
+          return j === u.fqn || u.fqn.endsWith(`::${j}`);
+        }),
+    );
+    // A method another module also defines may be reached from it by `super`
+    // (EnqueueAfterTransactionCommit#raw_enqueue over Enqueuing's), which needs
+    // this module's own layer in the includer's ancestors.
+    const own = this.index.scopes.get(u.fqn);
+    const overridden =
+      !!own &&
+      [...this.index.scopes.values()].some(
+        (s) =>
+          s !== own &&
+          s.kind === "module" &&
+          [...own.defs.values()].some((d) => {
+            const o = s.defs.get(d.name);
+            return !d.singleton && o?.singleton === false && callsSuper(o.node);
+          }),
+      );
     const plain =
       !f.rubyFile.startsWith("test/") &&
-      !isConcern &&
-      ![...this.index.scopes.keys()].some((k) => k.startsWith(`${u.fqn}::`)) &&
-      !(u.fqn.endsWith("::ClassMethods") && this.index.scopes.get(parentFqn)?.concern) &&
+      !(isConcern && overridden) &&
+      !(isConcern && (includedByModule || !!u.late?.length)) &&
+      // A Concern's `ClassMethods` stays a Module: extended as its own layer, a
+      // subclass's override (TestHelper's per-job `queue_adapter`) sits above it.
+      !(
+        u.fqn.endsWith("::ClassMethods") &&
+        this.index.scopes.get(u.fqn.slice(0, -"::ClassMethods".length))?.concern
+      ) &&
+      ![...this.index.scopes.keys()].some(
+        (k) => k.startsWith(`${u.fqn}::`) && !(isConcern && k === cmFqn),
+      ) &&
       !modAttrs.length &&
       !mixes &&
       !usesSuper &&
@@ -2129,6 +2176,23 @@ export class Emitter {
     // A plain module's constants (`VERSION::STRING`) are its properties.
     const consts = u.body.filter((c: N) => c.k === "casgn" && c.path?.length === 1);
     // Its singleton functions are its own members too, rather than seated later.
+    if (plain) this.plainModules.add(u.fqn);
+    if (plain && isConcern) {
+      this.plainConcerns.add(u.fqn);
+      const hc = this.baseCtx(u, f, {});
+      const cmExp = this.resolver.exportNames.get(cmFqn);
+      const cm = this.index.scopes.has(cmFqn)
+        ? cmExp && cmExp.tsFile === f.tsFile
+          ? cmExp.name
+          : cmFqn.split("::").join("")
+        : "";
+      const hook = [...(cm ? [`${this.lw.rc(hc, "extend")}(base, ${cm});`] : []), ...includedLines];
+      if (hook.length)
+        members.push(
+          `[${this.lw.rc(hc, "included")}](base: any): void {\n${indent(hook).join("\n")}\n}`,
+        );
+      incl = "";
+    }
     const plainMembers = [
       ...consts.map((c: N) => c.path[0] as string),
       ...(plain ? seatNames : []),
@@ -2150,7 +2214,7 @@ export class Emitter {
       const seat = this.lw.imp(this.baseCtx(u, f, {}), "@root/namespaces.js", name, `${name}Seat`);
       out.push(`export const ${name}: any = ${seat};`);
       if (seatLine) out.push(seatLine);
-      if (concernLine) out.push(concernLine);
+      if (concernLine()) out.push(concernLine());
       if (incl) out.push(incl);
       if (tops.length) {
         const tc = this.baseCtx(u, f, { selfKind: "static", selfExpr: name });
@@ -2170,7 +2234,7 @@ export class Emitter {
       for (const c of cs) out.push(`${set}(${name}, ${JSON.stringify(c.path[0])}, ${c.path[0]});`);
     }
     if (seatLine && !plain) out.push(seatLine);
-    if (concernLine) out.push(concernLine);
+    if (isConcern && !plain) out.push(concernLine());
     if (incl) out.push(incl);
     if (tops.length) {
       const tc = this.baseCtx(u, f, { selfKind: "static", selfExpr: name });
@@ -2185,6 +2249,16 @@ export class Emitter {
 }
 
 void rubyMethodToTsIgnoringSkip;
+
+/** The IR node (a `def`) contains a `super` call; an unknown body counts as one. */
+function callsSuper(n: any): boolean {
+  if (!n) return true;
+  const walk = (x: any): boolean =>
+    Array.isArray(x)
+      ? x.some(walk)
+      : !!x && typeof x === "object" && (x.k === "super" || Object.values(x).some(walk));
+  return walk(n.body ?? n);
+}
 
 /**
  * An object-literal member (shorthand reference, inline method, getter) as a
