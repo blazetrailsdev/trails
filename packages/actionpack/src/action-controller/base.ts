@@ -246,7 +246,7 @@ export interface RenderOptions {
 }
 
 type RenderOptionsFor<P extends string> = Omit<RenderOptions, "partial" | "locals"> & {
-  partial?: P;
+  partial?: P | true | object;
 } & (P extends keyof TemplateRegistry
     ? // eslint-disable-next-line @typescript-eslint/no-empty-object-type
       {} extends TemplateLocals<TemplateRegistry[P]>

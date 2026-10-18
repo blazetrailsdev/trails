@@ -66,6 +66,8 @@ export class Location {
   }
 }
 
+const setBacktraces = new WeakMap<Error, string[]>();
+
 /**
  * `Exception#backtrace_locations` (`vendor/ruby/v3.3.11/error.c:1789`): nil for an
  * exception that was never raised, else one `Location` per frame. Dispatches
@@ -95,6 +97,8 @@ export function excBacktraceLocations(exc: Error): Location[] | null {
 export function excBacktrace(exc: Error): string[] | null {
   const override = (exc as Error & { backtrace?: () => string[] | null }).backtrace;
   if (typeof override === "function") return override.call(exc);
+  const bt = setBacktraces.get(exc);
+  if (bt !== undefined) return bt;
   const locations = excBacktraceLocations(exc);
   if (locations === null) return null;
   return locations.map((location) => location.toString());
@@ -108,6 +112,7 @@ export function excBacktrace(exc: Error): string[] | null {
  * @noRailsEquivalent PERMANENT
  */
 export function excSetBacktrace(exc: Error, bt: string[]): string[] {
+  setBacktraces.set(exc, bt);
   exc.stack = [`${exc.name}: ${exc.message}`, ...bt.map((frame) => `    ${frame}`)].join("\n");
   return bt;
 }

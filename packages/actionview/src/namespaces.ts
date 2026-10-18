@@ -1,6 +1,7 @@
 import { Autoload, extend, TopLevel, type Extended } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { FileSystemResolver } from "./template/resolver.js";
+import type { Template } from "./template.js";
 import type { Select } from "./helpers/tags/select.js";
 import type { CollectionCheckBoxes } from "./helpers/tags/collection-check-boxes.js";
 import type { CollectionRadioButtons } from "./helpers/tags/collection-radio-buttons.js";
@@ -21,6 +22,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 export const ActionView = { name: "ActionView", loadPath } as AutoloadModule & {
   Base: typeof Base;
   FileSystemResolver: typeof FileSystemResolver;
+  Template: typeof Template;
 };
 extend(ActionView, Autoload);
 ActionView.eagerAutoload(() => {
