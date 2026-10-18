@@ -230,8 +230,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         // derives that from the package name, so use the kebab form.
         name: "did-you-mean",
         libPath: "lib/did_you_mean",
-        // `DidYouMean.formatter` / `.formatter=` are defined here, not under
-        // `lib/did_you_mean/`.
         libEntryFile: "lib/did_you_mean.rb",
         testPath: "test",
       },
