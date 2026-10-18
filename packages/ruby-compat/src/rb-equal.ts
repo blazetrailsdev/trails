@@ -1,5 +1,4 @@
-import { rbCDate, rbCString, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
-import { rbObjIsKindOf } from "./include.js";
+import { rbCDate, rbCString, rbObjClass, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
 import { rbRegEqual } from "./regexp.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
@@ -115,7 +114,10 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   const tag = temporalTag(a);
   if (tag !== null) {
     if (temporalTag(b) === null) {
-      if (rbObjIsKindOf(a, rbCDate) && rbObjIsKindOf(b, rbCDate))
+      if (
+        (rbObjClass(a) === rbCDate || rbObjClass(a).prototype instanceof rbCDate) &&
+        (rbObjClass(b) === rbCDate || rbObjClass(b).prototype instanceof rbCDate)
+      )
         return (b as { cmp(other: unknown): number | null }).cmp(a) === 0;
       return false;
     }
