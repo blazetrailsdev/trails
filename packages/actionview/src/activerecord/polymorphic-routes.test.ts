@@ -8,6 +8,7 @@ import {
   assertNoDifference,
   assertRaise,
   assertRaises,
+  underscore,
 } from "@blazetrails/activesupport";
 import { ActionController, ActionDispatch, RouteSet } from "@blazetrails/actionpack";
 import {
@@ -16,6 +17,7 @@ import {
   include,
   NoMethodError,
   rbModConstSet,
+  rbObjSingletonClass,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Context } from "../context.js";
@@ -977,3 +979,81 @@ for (const [name, klass] of [
     });
   });
 }
+
+class Linkable {
+  readonly id: string;
+
+  constructor(id: string) {
+    this.id = id;
+  }
+
+  linkableType(): string {
+    return underscore(this.constructor.name);
+  }
+}
+
+class Category extends Linkable {}
+class Collection extends Linkable {}
+class Product extends Linkable {}
+
+class TestController extends ActionController.Base {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- url helpers are mixed in by `include`.
+interface DirectRoutesTest {
+  linkablePath(linkable: Linkable): string;
+  linkableUrl(linkable: Linkable): string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+class DirectRoutesTest extends ActionController.TestCase {
+  static Routes: RouteSet = new RouteSet();
+
+  declare category: Category;
+  declare collection: Collection;
+  declare product: Product;
+
+  static {
+    this.Routes.draw(function () {
+      this.resources("categories");
+      this.resources("collections");
+      this.resources("products");
+      this.direct("linkable", {}, (...[linkable]: unknown[]) => [
+        `:${(linkable as Linkable).linkableType()}`,
+        { id: (linkable as Linkable).id },
+      ]);
+    });
+
+    include(this, Context);
+    include(this, RoutingUrlFor);
+    include(this, this.Routes.urlHelpers());
+    this.tests(TestController);
+  }
+
+  override setup(): void {
+    super.setup();
+    this.category = new Category("1");
+    this.collection = new Collection("2");
+    this.product = new Product("3");
+    include(rbObjSingletonClass(this.controller), DirectRoutesTest.Routes.urlHelpers());
+  }
+}
+
+describe("DirectRoutesTest", () => {
+  let testCase: DirectRoutesTest;
+
+  beforeEach(async ({ task }) => {
+    testCase = new DirectRoutesTest(task.name);
+    await testCase.beforeSetup();
+    testCase.setup();
+  });
+
+  it("direct routes", () => {
+    assertEqual("/categories/1", testCase.linkablePath(testCase.category));
+    assertEqual("/collections/2", testCase.linkablePath(testCase.collection));
+    assertEqual("/products/3", testCase.linkablePath(testCase.product));
+
+    assertEqual("http://test.host/categories/1", testCase.linkableUrl(testCase.category));
+    assertEqual("http://test.host/collections/2", testCase.linkableUrl(testCase.collection));
+    assertEqual("http://test.host/products/3", testCase.linkableUrl(testCase.product));
+  });
+});

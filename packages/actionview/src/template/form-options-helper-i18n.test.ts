@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "../test-helpers/abstract-unit.js";
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { I18n } from "@blazetrails/activesupport";
+import { I18n, assertCalledWith } from "@blazetrails/activesupport";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
@@ -21,6 +21,19 @@ describe("FormOptionsHelperI18nTests", () => {
 
   afterEach(() => {
     I18n.reloadBang();
+  });
+
+  // BLOCKED: i18n-namespace-is-not-stubbable
+  it.skip("select with prompt true translates prompt message", () => {
+    assertCalledWith(
+      I18n,
+      "translate",
+      ["helpers.select.prompt", { default: "Please select" }],
+      {},
+      () => {
+        view.select("post", "category", [], { prompt: true });
+      },
+    );
   });
 
   it("select with translated prompt", () => {

@@ -1,4 +1,5 @@
 import {
+  I18n,
   SafeBuffer,
   htmlEscape,
   htmlSafe,
@@ -56,6 +57,7 @@ export function truncate(
 
 export interface PluralizeOptions {
   plural?: string;
+  locale?: string;
 }
 
 export function pluralize(
@@ -64,16 +66,18 @@ export function pluralize(
   pluralOrOptions?: string | PluralizeOptions,
 ): string {
   let plural: string | undefined;
+  let locale = String(I18n.locale());
   if (typeof pluralOrOptions === "string") {
     plural = pluralOrOptions;
-  } else if (pluralOrOptions && pluralOrOptions.plural !== undefined) {
-    plural = pluralOrOptions.plural;
+  } else if (pluralOrOptions) {
+    if (pluralOrOptions.plural !== undefined) plural = pluralOrOptions.plural;
+    if (pluralOrOptions.locale !== undefined) locale = pluralOrOptions.locale;
   }
 
   const isOne =
     count === 1 || count === "1" || (typeof count === "string" && /^1(\.0+)?$/.test(count));
 
-  const word = isOne ? singular : (plural ?? inflectorPluralize(singular));
+  const word = isOne ? singular : (plural ?? inflectorPluralize(singular, locale));
   return `${count ?? 0} ${word}`;
 }
 

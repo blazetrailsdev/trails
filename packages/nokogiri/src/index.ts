@@ -5,7 +5,7 @@ import { SyntaxError } from "./xml/syntax-error.js";
 import { SaxDocument } from "./sax/document.js";
 import { SaxParser } from "./sax/parser.js";
 
-export const XML = { Document: XmlDocument, Node: XmlNode, SyntaxError };
+export const XML = { Document: XmlDocument, Node: XmlNode, NodeSet, SyntaxError };
 export const SAX = { Document: SaxDocument, Parser: SaxParser };
 export { parseXml, SaxDocument, SaxParser };
 export type { XmlNode, XmlDocument };
@@ -15,5 +15,7 @@ export type { Readable } from "./readable.js";
 import { Document as Html5Document } from "./html5/document.js";
 import { DocumentFragment as Html5DocumentFragment } from "./html5/document-fragment.js";
 import type { Node as Html5Node } from "./html5/node.js";
+import { NodeSet } from "./xml/node-set.js";
 export const HTML5 = { Document: Html5Document, DocumentFragment: Html5DocumentFragment };
 export type { Html5Document, Html5DocumentFragment, Html5Node };
+export type { NodeSet };

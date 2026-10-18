@@ -9,6 +9,8 @@ import {
   javascriptCdataSection,
   javascriptTag,
 } from "../helpers/javascript-helper.js";
+import { Base } from "../base.js";
+import { assertDomEqual } from "../testing/dom-assertions.js";
 
 function host() {
   return {
@@ -61,6 +63,20 @@ describe("JavaScriptHelperTest", () => {
     const result = javascriptTag.call(ctx, "alert('hello')").toString();
     expect(result).toBe("<script>\n//<![CDATA[\nalert('hello')\n//]]>\n</script>");
     expect(ctx.outputBuffer.toString().toString()).toBe("foo");
+  });
+
+  it("javascript include tag", () => {
+    const view = new (Base.withEmptyTemplateCache())(null, {}, null) as Base &
+      Record<string, (...args: unknown[]) => unknown>;
+    assertDomEqual("<script src='/foo.js'></script>", view.javascriptIncludeTag("/foo"));
+    assertDomEqual(
+      "<script src='/foo'></script>",
+      view.javascriptIncludeTag("/foo", { extname: false }),
+    );
+    assertDomEqual(
+      "<script src='/foo.bar'></script>",
+      view.javascriptIncludeTag("/foo", { extname: ".bar" }),
+    );
   });
 
   it("javascript tag with options", () => {

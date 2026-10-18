@@ -42,6 +42,26 @@ describe("TseUtilTest", () => {
     }
   });
 
+  it("json escape u0026", () => {
+    expect(jsonEscape("&").toString()).toBe("\\u0026");
+  });
+
+  it("json escape u003e", () => {
+    expect(jsonEscape(">").toString()).toBe("\\u003e");
+  });
+
+  it("json escape u003c", () => {
+    expect(jsonEscape("<").toString()).toBe("\\u003c");
+  });
+
+  it("json escape u2028", () => {
+    expect(jsonEscape("\u2028").toString()).toBe("\\u2028");
+  });
+
+  it("json escape u2029", () => {
+    expect(jsonEscape("\u2029").toString()).toBe("\\u2029");
+  });
+
   it("json escape does not alter json string meaning", () => {
     for (const [raw] of JSON_ESCAPE_TEST_CASES) {
       const expected = JSON.parse(raw);

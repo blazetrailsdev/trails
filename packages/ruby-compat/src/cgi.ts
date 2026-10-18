@@ -64,4 +64,40 @@ export class CGI {
       ),
     );
   }
+
+  /**
+   * `CGI.unescapeHTML` (`vendor/ruby/v3.3.11/lib/cgi/util.rb:107-162`), its
+   * UTF-8 arm: a String has no encoding tag (CLAUDE.md, "A String has no
+   * encoding tag either"), so `charlimit` is `0x10ffff`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static unescapeHTML(string: string): string {
+    if (!string.includes("&")) return string;
+    const charlimit = 0x10ffff;
+    return string.replace(/&(apos|amp|quot|gt|lt|#[0-9]+|#[xX][0-9A-Fa-f]+);/g, (_m, match) => {
+      let m: RegExpMatchArray | null;
+      switch (match) {
+        case "apos":
+          return "'";
+        case "amp":
+          return "&";
+        case "quot":
+          return '"';
+        case "gt":
+          return ">";
+        case "lt":
+          return "<";
+      }
+      if ((m = /^#0*(\d+)$/.exec(match))) {
+        const n = parseInt(m[1], 10);
+        return n < charlimit ? String.fromCodePoint(n) : `&#${m[1]};`;
+      } else if ((m = /^#x([0-9a-f]+)$/i.exec(match))) {
+        const n = parseInt(m[1], 16);
+        return n < charlimit ? String.fromCodePoint(n) : `&#x${m[1]};`;
+      } else {
+        return `&${match};`;
+      }
+    });
+  }
 }

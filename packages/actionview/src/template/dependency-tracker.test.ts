@@ -291,4 +291,29 @@ describe("TSETrackerTest", () => {
 
     expect(tracker.dependencies()).toEqual(["*/comments"]);
   });
+  it("dependencies with interpolation expr", () => {
+    const viewPaths = digestorViewPaths();
+
+    const template = new FakeTemplate(
+      `
+      <%= render \`orders/\${variable || "default"}\` %>
+    `,
+      "tse",
+    );
+
+    const tracker = makeTracker("interpolation/_string", template, viewPaths);
+
+    expect(tracker.dependencies()).toEqual([]);
+  });
+});
+
+describe("RubyTrackerTests", () => {
+  // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
+  it.skip("dependencies skip unknown options", () => {});
+
+  // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
+  it.skip("dependencies finds spacer templates", () => {});
+
+  // BLOCKED: ruby-tracker-tests-need-a-tracker-or-a-ruling
+  it.skip("dependencies skip commented out renders", () => {});
 });

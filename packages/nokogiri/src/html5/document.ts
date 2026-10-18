@@ -3,14 +3,28 @@ import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { readSource, type Readable } from "../readable.js";
 import { childNodes, type Node } from "./node.js";
+import type { NodeSet } from "../xml/node-set.js";
+import { atCss, css } from "../xml/searchable.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `Searchable` is mixed in below.
+export interface Document {
+  css(...args: unknown[]): NodeSet;
+  atCss(...args: unknown[]): Node | undefined;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Document {
+  static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
+
   url: string | null = null;
   encoding: string | null = null;
 
-  private constructor(private readonly _document: Parse5Document) {}
+  private constructor(
+    /** @internal */
+    readonly _node: Parse5Document,
+  ) {}
 
   static parse(
     stringOrIo: string | Readable | null = null,
@@ -58,7 +72,9 @@ export class Document {
   }
 
   get root(): Node | null {
-    const root = childNodes(this._document).find((node) => node.isElement());
+    const root = childNodes(this._node).find((node) => node.isElement());
     return root ?? null;
   }
 }
+
+Object.assign(Document.prototype, { css, atCss });
