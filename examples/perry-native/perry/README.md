@@ -67,6 +67,7 @@ first one that fails, because that names the layer that blocks a native build.
 | `04d-ruby-compat-barrel` | the same function through `ruby-compat`'s barrel                             |
 | `05-model`               | an `ActiveRecord` model class definition, no connection                      |
 | `06-sqlite`              | `better-sqlite3`, a native N-API addon                                       |
+| `06b-crud`               | one model over a real SQLite connection: create, find, update, destroy       |
 | `07-boot`                | the full framework boot: initializers, autoloading, routes                   |
 
 Every rung is also run under Node, so a row distinguishes "Perry cannot do
