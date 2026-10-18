@@ -42,6 +42,7 @@ import {
 import { Mime } from "@blazetrails/actionpack";
 import { Template } from "../template.js";
 import {
+  applyStylesheetMediaDefault,
   autoDiscoveryLinkTag,
   faviconLinkTag,
   imageDecoding,
@@ -53,6 +54,7 @@ import {
   preloadLinksHeader,
   pictureTag,
   setImageDecoding,
+  setApplyStylesheetMediaDefault,
   setImageLoading,
   setPreloadLinksHeader,
   stylesheetLinkTag,
@@ -851,6 +853,93 @@ describe("AssetTagHelperTest", () => {
 
   it("stylesheet link tag", () => {
     StyleLinkToTag.forEach(([method, tag]) => assertDomEqual(tag, method()));
+  });
+
+  it("stylesheet link tag nonce", () => {
+    assertDomEqual(
+      '<link rel="stylesheet" href="/stylesheets/foo.css" nonce="iyhD0Yc0W+c="></link>',
+      stylesheetLinkTag.call(host, "foo.css", { nonce: true }),
+    );
+  });
+
+  it("stylesheet link tag with missing source", async () => {
+    await assertNothingRaised(() => {
+      stylesheetLinkTag.call(host, "missing_security_guard");
+    });
+
+    await assertNothingRaised(() => {
+      stylesheetLinkTag.call(host, "http://example.com/css/missing_security_guard");
+    });
+  });
+
+  it("stylesheet link tag without request", () => {
+    const withoutRequest = { ...host, request: null };
+    assertDomEqual(
+      '<link rel="stylesheet" href="/stylesheets/foo.css" />',
+      stylesheetLinkTag.call(withoutRequest, "foo.css"),
+    );
+  });
+
+  it("stylesheet link tag is html safe", () => {
+    assertPredicate(stylesheetLinkTag.call(host, "dir/file"), isHtmlSafe);
+    assertPredicate(stylesheetLinkTag.call(host, "dir/other/file", "dir/file2"), isHtmlSafe);
+  });
+
+  it("stylesheet link tag escapes options", () => {
+    assertDomEqual(
+      '<link href="/file.css" media="&lt;script&gt;" rel="stylesheet" />',
+      stylesheetLinkTag.call(host, "/file", { media: "<script>" }),
+    );
+  });
+
+  it("stylesheet link tag should not output the same asset twice", () => {
+    assertDomEqual(
+      '<link href="/stylesheets/wellington.css" rel="stylesheet" />\n<link href="/stylesheets/amsterdam.css" rel="stylesheet" />',
+      stylesheetLinkTag.call(host, "wellington", "wellington", "amsterdam"),
+    );
+  });
+
+  it("stylesheet link tag with relative protocol", () => {
+    const withAssetHost = { ...host, config: { assetHost: "assets.example.com" } };
+    assertDomEqual(
+      '<link href="//assets.example.com/stylesheets/wellington.css" rel="stylesheet" />',
+      stylesheetLinkTag.call(withAssetHost, "wellington", { protocol: ":relative" }),
+    );
+  });
+
+  it("stylesheet link tag with default protocol", () => {
+    const withAssetHost = {
+      ...host,
+      config: { assetHost: "assets.example.com", defaultAssetHostProtocol: ":relative" },
+    };
+    assertDomEqual(
+      '<link href="//assets.example.com/stylesheets/wellington.css" rel="stylesheet" />',
+      stylesheetLinkTag.call(withAssetHost, "wellington"),
+    );
+  });
+
+  it("stylesheet link tag with configured stylesheet media default", () => {
+    const originalDefaultMedia = applyStylesheetMediaDefault;
+    setApplyStylesheetMediaDefault(true);
+    try {
+      assertDomEqual(
+        '<link href="/file.css" media="screen" rel="stylesheet" />',
+        stylesheetLinkTag.call(host, "/file"),
+      );
+      assertDomEqual(
+        '<link href="/file.css" media="all" rel="stylesheet" />',
+        stylesheetLinkTag.call(host, "/file", { media: "all" }),
+      );
+    } finally {
+      setApplyStylesheetMediaDefault(originalDefaultMedia);
+    }
+  });
+
+  it("stylesheet link tag without default extension applied", () => {
+    assertDomEqual(
+      '<link href="/stylesheets/wellington.less" rel="stylesheet" />',
+      stylesheetLinkTag.call(host, "wellington.less", { extname: false }),
+    );
   });
 
   it("javascript include tag without default extension applied", () => {
