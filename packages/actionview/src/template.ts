@@ -17,7 +17,6 @@ import {
   rbObjRespondTo,
   rbStrEnumerateLines,
 } from "@blazetrails/ruby-compat";
-import { ActionView } from "./namespaces.js";
 import * as RubyCompat from "@blazetrails/ruby-compat";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
