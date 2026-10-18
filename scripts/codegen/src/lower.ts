@@ -157,6 +157,8 @@ interface Ctx {
   /** fqn of the class/module whose body we are in. */
   owner?: string;
   selfKind: "instance" | "static" | "module" | "top";
+  /** Inside a `function (this: any)` (an `instance_exec`ed block): `this` is not a type. */
+  thisAny?: boolean;
   selfExpr: string;
   scope: Scope;
   blockVar?: string;
@@ -277,6 +279,11 @@ export class Lowerer {
       "@blazetrails/ruby-compat": "RubyCompat",
       "@blazetrails/activesupport": "ActiveSupportExports",
     };
+    // `typedSplat` casts with TS's global `Parameters` / `ConstructorParameters`
+    // utility types, which a binding of that name would shadow (a ported
+    // `ActionController::Parameters` stub).
+    if (local === name && (name === "Parameters" || name === "ConstructorParameters"))
+      local = `${name}Class`;
     if (local === name && name !== "*" && NS[spec] && ctx.f.usedLocalNames.has(name)) {
       m.delete(name);
       if (m.size === 0) ctx.f.imports.delete(spec);
@@ -1379,6 +1386,7 @@ export class Lowerer {
       nested: false,
       selfKind: "instance",
       selfExpr: "this",
+      thisAny: true,
       asyncBox: { awaits: false },
     });
     inner.prologue = undefined;
@@ -3355,7 +3363,11 @@ export class Lowerer {
       nav !== "." || !/^[\w$]+$/.test(callee)
         ? null
         : recv === "this"
-          ? `this["${callee}"]`
+          ? // `this` is a type only in an instance member; a module function's
+            // `this: any` and a static's class need no cast.
+            ctx.selfKind === "instance" && !ctx.thisAny
+            ? `this["${callee}"]`
+            : null
           : /^[\w$]+(\.[\w$]+)*$/.test(recv)
             ? `typeof ${recv}.${callee}`
             : null;
