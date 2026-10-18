@@ -44,7 +44,7 @@ function splitInline(arg: string): [string, string?] {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export async function main(args: readonly string[]): Promise<void> {
+export async function serveFromArgs(args: readonly string[]): Promise<void> {
   const root = Dir.pwd();
   const fs = getFs();
   const p = getPath();
