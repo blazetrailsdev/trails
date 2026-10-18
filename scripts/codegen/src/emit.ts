@@ -2098,10 +2098,49 @@ export class Emitter {
         : line;
     });
     const out: string[] = [...fns.flatMap((x) => [x, ""])];
-    const ModuleRef = this.lw.rc(this.baseCtx(u, f, {}), "Module");
+    // CLAUDE.md "Module mixins": a module is a plain object of its `this`-typed
+    // functions, which `include()` copies onto the includer (activerecord's
+    // `Integration`). It is a ruby-compat `Module` only for what needs its
+    // method table: a `super` from one of its methods (`superMethod`),
+    // `attr_*` / an accessor half (`attrReader`, `moduleEval`), a module it
+    // includes or extends itself, or `ActiveSupport::Concern`'s machinery.
+    const mixes = tops.some(
+      (t: N) =>
+        t.k === "call" && t.recv === null && ["include", "extend", "prepend"].includes(t.name),
+    );
+    const usesSuper = [...fns, ...members].some((t) => t.includes(`${name}.superMethod(`));
+    // A namespace other constants are seated on, and a Concern's `ClassMethods`
+    // (which `append_features` extends the includer with), keep the Module.
+    const parentFqn = u.fqn.slice(0, Math.max(0, u.fqn.lastIndexOf("::")));
+    // A module a test file defines is used as a value (an adapter module whose
+    // name is read), so it keeps the Module that carries its identity and name.
+    const plain =
+      !f.rubyFile.startsWith("test/") &&
+      !isConcern &&
+      ![...this.index.scopes.keys()].some((k) => k.startsWith(`${u.fqn}::`)) &&
+      !(u.fqn.endsWith("::ClassMethods") && this.index.scopes.get(parentFqn)?.concern) &&
+      !modAttrs.length &&
+      !mixes &&
+      !usesSuper &&
+      !defs2.some((l) => l.includes("moduleEval("));
+    const ModuleRef = plain ? "" : this.lw.rc(this.baseCtx(u, f, {}), "Module");
     const modLines = [...modAttrs, ...defs2];
     const ctorBody = modLines.length ? `(mod: any) => {\n${indent(modLines).join("\n")}\n}` : "";
-    const modExpr = `new ${ModuleRef}(${ctorBody})`;
+    // A plain module's constants (`VERSION::STRING`) are its properties.
+    const consts = u.body.filter((c: N) => c.k === "casgn" && c.path?.length === 1);
+    // Its singleton functions are its own members too, rather than seated later.
+    const plainMembers = [
+      ...consts.map((c: N) => c.path[0] as string),
+      ...(plain ? seatNames : []),
+      ...dedupeMembers(members),
+    ];
+    // Module-level state the singleton functions keep on it (`JobBuffer.@values`).
+    const stateful = plain && fns.some((t) => new RegExp(`\\b${name}\\._\\w`).test(t));
+    const modExpr = plain
+      ? plainMembers.length
+        ? `{\n${indent(plainMembers.join(",\n").split("\n")).join("\n")},\n}`
+        : "{}"
+      : `new ${ModuleRef}(${ctorBody})`;
     // The gem's top namespace is seated by the hand port's `namespaces.ts`, a
     // plain object extended with `ActiveSupport::Autoload` (CLAUDE.md, "Call-time
     // constant resolution"); this file adds its module functions, not a second object.
@@ -2122,15 +2161,15 @@ export class Emitter {
     }
     // `X[included] = fn` at top level is the shape the extractor reads an
     // `included do` port from (includedHookOwner).
-    out.push(`export const ${name}: any = ${modExpr};`);
+    out.push(`export const ${name}${plain && !stateful ? "" : ": any"} = ${modExpr};`);
     // A constant in the module body (`VERSION::STRING`) lives in the module's
     // constant table, as well as the file's flat export.
     {
-      const cs = u.body.filter((s: N) => s.k === "casgn" && s.path?.length === 1);
+      const cs = plain ? [] : u.body.filter((s: N) => s.k === "casgn" && s.path?.length === 1);
       const set = cs.length ? this.lw.rc(this.baseCtx(u, f, {}), "rbModConstSet") : "";
       for (const c of cs) out.push(`${set}(${name}, ${JSON.stringify(c.path[0])}, ${c.path[0]});`);
     }
-    if (seatLine) out.push(seatLine);
+    if (seatLine && !plain) out.push(seatLine);
     if (concernLine) out.push(concernLine);
     if (incl) out.push(incl);
     if (tops.length) {
