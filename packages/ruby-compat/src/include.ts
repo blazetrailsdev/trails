@@ -228,15 +228,16 @@ export class Module<I extends object = Record<never, never>> {
 
   /**
    * Mirrors: Ruby's Module#module_eval — vendor/ruby/v3.3.11/vm_eval.c:2128
-   * `rb_mod_module_eval` — yields the module's method table.
+   * `rb_mod_module_eval` — yields the module's method table, with the module
+   * as `this` (the block's `self`), so a block can call `this.include(...)`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  moduleEval<T>(block: (mod: Partial<I> & Record<string, unknown>) => T): T {
+  moduleEval<T>(block: (this: Module, mod: Partial<I> & Record<string, unknown>) => T): T {
     const carrier = carrierOf(this) as Partial<I> & Record<string, unknown>;
     const before: Record<PropertyKey, PropertyDescriptor | undefined> =
       Object.getOwnPropertyDescriptors(carrier);
-    const result = block(carrier);
+    const result = block.call(this as Module, carrier);
     for (const [key, entry] of Object.entries(Object.getOwnPropertyDescriptors(carrier))) {
       if (entry.configurable && !("value" in entry) && (!entry.get || !entry.set)) {
         defineAccessorHalf(carrier, key, {});

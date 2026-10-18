@@ -1,6 +1,6 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError } from "./date.js";
+import { ArgumentError, Date as RbDate, DateTime } from "./date.js";
 import { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
 import { Rational, env, rbFSend, rbObjRespondTo, setEnv } from "@blazetrails/ruby-compat";
 
@@ -883,5 +883,31 @@ describe("Time through Marshal", () => {
     const local = Time.local(2004);
     const back = Marshal.load(Marshal.dump(local)) as Time;
     expect([back.eql(local), back.utcOffset]).toEqual([true, local.utcOffset]);
+  });
+});
+
+describe("Date#iso8601, DateTime#iso8601 and Time#xmlschema on a Temporal seat", () => {
+  afterEach(() => {
+    resetLocalTimeZoneId();
+  });
+
+  it("answers MRI's output for each seat", () => {
+    expect(rbFSend(Temporal.PlainDate.from("2024-03-05"), "iso8601")).toBe("2024-03-05");
+    const zoned = Temporal.ZonedDateTime.from("2024-03-05T06:07:08.123456789+05:30[+05:30]");
+    expect(rbFSend(zoned, "iso8601", 9)).toBe("2024-03-05T06:07:08.123456789+05:30");
+    expect(rbFSend(zoned, "xmlschema")).toBe("2024-03-05T06:07:08+05:30");
+    resetLocalTimeZoneId("Asia/Tokyo");
+    const instant = Temporal.Instant.fromEpochNanoseconds(1709618828123456789n);
+    expect(rbFSend(instant, "xmlschema", 9)).toBe("2024-03-05T15:07:08.123456789+09:00");
+    const date = new globalThis.Date(1709618828123);
+    expect(rbFSend(date, "iso8601", 3)).toBe("2024-03-05T15:07:08.123+09:00");
+  });
+
+  it("round-trips Date.today and DateTime.now through their parsers", () => {
+    const today = RbDate.today();
+    expect(RbDate.iso8601(rbFSend(today, "iso8601") as string).equals(today)).toBe(true);
+    const now = DateTime.now();
+    const parsed = DateTime.iso8601(rbFSend(now, "iso8601", 9) as string);
+    expect(String(parsed)).toBe(String(now));
   });
 });

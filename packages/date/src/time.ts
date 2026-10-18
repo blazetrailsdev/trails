@@ -1928,6 +1928,15 @@ for (const seat of ["Temporal.Instant", "Date"]) {
         : Temporal.Instant.fromEpochMilliseconds(self.getTime())
       ).toZonedDateTimeISO(nowTimeZoneId()),
   });
+  const table = TEMPORAL_METHOD_TABLE[seat];
+  table.xmlschema = (self: Temporal.Instant | globalThis.Date, fractionDigits = 0) => {
+    const ns =
+      self instanceof Temporal.Instant
+        ? self.epochNanoseconds
+        : BigInt(self.getTime()) * 1_000_000n;
+    return Time.at(new Rational(ns, 1_000_000_000n)).xmlschema(fractionDigits);
+  };
+  table.iso8601 = table.xmlschema;
 }
 
 registerConstant("Time", Time);
