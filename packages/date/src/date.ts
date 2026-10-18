@@ -17,6 +17,7 @@ import {
   Rational,
   rational,
   rbCDate,
+  rbObjIsKindOf,
   rbDbl2num,
   rbDefineAllocFunc,
   rubyClass,
@@ -5570,8 +5571,8 @@ export class Date extends rbCDate {
     return aNth === bNth && aJd === bJd;
   }
 
-  isEql(other: unknown): boolean {
-    if (!(other instanceof Date)) return false;
+  eql(other: unknown): boolean {
+    if (!rbObjIsKindOf(other, rbCDate)) return false;
     return this.cmp(other) === 0;
   }
 

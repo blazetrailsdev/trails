@@ -16,8 +16,9 @@
  *  JS `Date` carries no relational operators of its own.
  */
 
+import { rbObjIsKindOf } from "./include.js";
 import { ArgumentError } from "./argument-error.js";
-import { rbInspect, rbObjClassname, rbObjRespondTo } from "./object.js";
+import { rbCDate, rbInspect, rbObjClassname, rbObjRespondTo } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 import { rbStrCmp } from "./string/support.js";
@@ -103,8 +104,7 @@ export function cmp(a: unknown, b: unknown): number | null {
     return ajd < n ? -1 : ajd > n ? 1 : 0;
   }
   if (temporalTag(a) !== null && temporalTag(b) === null) {
-    const name = rbObjClassname(b);
-    if ((name === "Date" || name === "DateTime") && isCmpSpelling(b)) {
+    if (rbObjIsKindOf(a, rbCDate) && rbObjIsKindOf(b, rbCDate) && isCmpSpelling(b)) {
       const c = b.cmp(a);
       return c == null ? null : c === 0 ? 0 : -c;
     }
