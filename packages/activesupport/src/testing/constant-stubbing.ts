@@ -1,11 +1,7 @@
 import { NameError } from "../core-ext/name-error.js";
 
 function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return (
-    value != null &&
-    (typeof value === "object" || typeof value === "function") &&
-    typeof (value as { then?: unknown }).then === "function"
-  );
+  return typeof (value as { then?: unknown } | null)?.then === "function";
 }
 
 export function stubConst<T>(
