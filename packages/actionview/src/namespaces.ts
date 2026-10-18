@@ -6,6 +6,9 @@ import type { CollectionCheckBoxes } from "./helpers/tags/collection-check-boxes
 import type { CollectionRadioButtons } from "./helpers/tags/collection-radio-buttons.js";
 import type { CollectionSelect } from "./helpers/tags/collection-select.js";
 import type { GroupedCollectionSelect } from "./helpers/tags/grouped-collection-select.js";
+import type { DateSelect } from "./helpers/tags/date-select.js";
+import type { DatetimeSelect } from "./helpers/tags/datetime-select.js";
+import type { TimeSelect } from "./helpers/tags/time-select.js";
 import type { TimeZoneSelect } from "./helpers/tags/time-zone-select.js";
 import type { WeekdaySelect } from "./helpers/tags/weekday-select.js";
 
@@ -33,6 +36,9 @@ export const Tags = { name: "ActionView::Helpers::Tags" } as {
   CollectionRadioButtons: typeof CollectionRadioButtons;
   CollectionSelect: typeof CollectionSelect;
   GroupedCollectionSelect: typeof GroupedCollectionSelect;
+  DateSelect: typeof DateSelect;
+  DatetimeSelect: typeof DatetimeSelect;
+  TimeSelect: typeof TimeSelect;
   TimeZoneSelect: typeof TimeZoneSelect;
   WeekdaySelect: typeof WeekdaySelect;
 };

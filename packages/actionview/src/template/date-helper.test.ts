@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import "../test-helpers/abstract-unit.js";
+import { beforeEach, describe, expect, it } from "vitest";
+import { Struct, block, sprintf } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import {
   distanceOfTimeInWords,
@@ -12,7 +15,40 @@ import {
   selectYear,
   timeAgoInWords,
 } from "../helpers/date-helper.js";
+import { Base } from "../base.js";
+import { LookupContext } from "../lookup-context.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
+
+const Post = Struct.new("id", "written_on", "updated_at");
+const MONTHS =
+  "January February March April May June July August September October November December";
+
+function options(range: number[], sel: number, label: (i: number) => string, value = label) {
+  const opt = (i: number) =>
+    `<option value="${value(i)}"${i === sel ? ' selected="selected"' : ""}>`;
+  return range.map((i) => `${opt(i)}${label(i)}</option>\n`).join("");
+}
+
+function upto(from: number, to: number): number[] {
+  return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+}
+
+function dateSelects(attr: string, year: number, month: number, day: number): string {
+  return (
+    `<select id="post_${attr}_1i" name="post[${attr}(1i)]">\n${options(upto(year - 5, year + 5), year, String)}</select>\n` +
+    `<select id="post_${attr}_2i" name="post[${attr}(2i)]">\n${options(upto(1, 12), month, (i) => MONTHS.split(" ")[i - 1], String)}</select>\n` +
+    `<select id="post_${attr}_3i" name="post[${attr}(3i)]">\n${options(upto(1, 31), day, String)}</select>\n`
+  );
+}
+
+function timeSelects(attr: string, hour: number, minute: number): string {
+  const pad = (i: number) => sprintf("%02d", i);
+  return (
+    `<select id="post_${attr}_4i" name="post[${attr}(4i)]">\n${options(upto(0, 23), hour, pad)}</select>\n` +
+    " : " +
+    `<select id="post_${attr}_5i" name="post[${attr}(5i)]">\n${options(upto(0, 59), minute, pad)}</select>\n`
+  );
+}
 
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -225,5 +261,89 @@ describe("DateHelperTest", () => {
         withCssClasses: { hour: "my-hour", minute: "my-minute", second: "my-second" },
       }),
     );
+  });
+
+  let view: Base & Record<string, any>;
+
+  beforeEach(() => {
+    view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null) as Base &
+      Record<string, any>;
+  });
+
+  it("date select", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    const expected = dateSelects("written_on", 2004, 6, 15);
+
+    assertDomEqual(expected, view.dateSelect("post", "written_on"));
+  });
+
+  it("date select within fields for", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) =>
+      (view as any).concat(f.dateSelect("written_on")),
+    );
+    const expected = dateSelects("written_on", 2004, 6, 15);
+
+    assertDomEqual(expected, outputBuffer);
+  });
+
+  it("time select", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+    expected += timeSelects("written_on", 15, 16);
+
+    assertDomEqual(expected, view.timeSelect("post", "written_on"));
+  });
+
+  it("datetime select", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 16, 35);
+
+    let expected = dateSelects("updated_at", 2004, 6, 15);
+    expected += " &mdash; ";
+    expected += timeSelects("updated_at", 16, 35);
+
+    assertDomEqual(expected, view.datetimeSelect("post", "updated_at"));
+  });
+
+  it("time tag with date", () => {
+    const date = new RubyDate(2013, 2, 20);
+    const expected = '<time datetime="2013-02-20">February 20, 2013</time>';
+    expect(String(view.timeTag(date))).toBe(expected);
+  });
+
+  it("time tag with time", () => {
+    const time = Time.new(2013, 2, 20, 0, 0, 0, "+00:00");
+    const expected = '<time datetime="2013-02-20T00:00:00+00:00">February 20, 2013 00:00</time>';
+    expect(String(view.timeTag(time))).toBe(expected);
+  });
+
+  it("time tag with given text", () => {
+    expect(String(view.timeTag(Time.now(), "Right now"))).toMatch(/<time.*>Right now<\/time>/);
+  });
+
+  it("time tag with given block", () => {
+    expect(
+      String(
+        view.timeTag(
+          Time.now(),
+          block(() => view.raw("<span>Right now</span>")),
+        ),
+      ),
+    ).toMatch(/<time.*><span>Right now<\/span><\/time>/);
+  });
+
+  it("time tag with different format", () => {
+    const time = Time.new(2013, 2, 20, 0, 0, 0, "+00:00");
+    const expected = '<time datetime="2013-02-20T00:00:00+00:00">20 Feb 00:00</time>';
+    expect(String(view.timeTag(time, { format: ":short" }))).toBe(expected);
   });
 });
