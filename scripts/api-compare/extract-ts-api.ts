@@ -2372,6 +2372,7 @@ function pushGeneratedAccessor(
   name: string,
   line: number,
   writerParams: ParamInfo[] | null,
+  noRailsEquivalent?: string,
 ): void {
   if (!members.some((m) => m.name === name && m.writer !== true)) {
     members.push({
@@ -2380,6 +2381,7 @@ function pushGeneratedAccessor(
       params: [],
       line,
       file,
+      ...(noRailsEquivalent !== undefined && { noRailsEquivalent }),
     });
   }
   if (writerParams === null) return;
@@ -2391,6 +2393,7 @@ function pushGeneratedAccessor(
     line,
     file,
     writer: true,
+    ...(noRailsEquivalent !== undefined && { noRailsEquivalent }),
   });
 }
 
@@ -2568,9 +2571,12 @@ function extractDefinePropertyAccessorDirect(
   const set = definePropertyAccessors(call.descriptor).set;
   const writerParams = set === null ? null : setterParams(set);
   const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
+  const receipt = ts.isExpressionStatement(expr.parent)
+    ? noRailsEquivalentReason(expr.parent)
+    : undefined;
   for (const host of resolvePrototypeHosts(call.target, info, checker, srcDir, program)) {
     const { members, file } = generatedAccessorMembers(expr, host, info, srcDir);
-    pushGeneratedAccessor(members, file, call.nameExpr.text, line, writerParams);
+    pushGeneratedAccessor(members, file, call.nameExpr.text, line, writerParams, receipt);
   }
 }
 
