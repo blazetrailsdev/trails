@@ -1,13 +1,27 @@
-import { afterEach, describe, it, expect } from "vitest";
-import { toQuery } from "@blazetrails/activesupport";
-import { include, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import {
+  assertEqual,
+  assertMatch,
+  assertRaise,
+  assertRespondTo,
+  HashWithIndifferentAccess,
+  toQuery,
+} from "@blazetrails/activesupport";
+import { ArgumentError, include } from "@blazetrails/ruby-compat";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import { URL } from "../../action-dispatch/http/url.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import { UrlGenerationError } from "../metal/exceptions.js";
+import { Parameters, UnfilteredParameters } from "../metal/strong-parameters.js";
+import { UrlFor } from "../metal/url-for.js";
+import { TestCase } from "../test-case.js";
+import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
+
+type Helpers = Record<string, (...args: unknown[]) => string>;
 
 class W {
   static defaultUrlOptions: Record<string, unknown>;
-  declare urlFor: (options: Record<string, unknown>) => string;
+  declare urlFor: (options: unknown) => string;
 }
 include(
   W,
@@ -26,168 +40,282 @@ function addHost(app: { defaultUrlOptions: Record<string, unknown> } = W): void 
   app.defaultUrlOptions["host"] = "www.basecamphq.com";
 }
 
+function addPort(): void {
+  W.defaultUrlOptions["port"] = 3000;
+}
+
+function addNumericHost(): void {
+  W.defaultUrlOptions["host"] = "127.0.0.1";
+}
+
 function extractParams(url: string): string[] {
   return url.split("?", 2).at(-1)!.split("&").sort();
 }
 
+function helpersFor(set: RouteSet): {
+  new (): Helpers;
+  defaultUrlOptions: Record<string, unknown>;
+} {
+  const kls = class {};
+  include(kls, set.urlHelpers());
+  return kls as unknown as { new (): Helpers; defaultUrlOptions: Record<string, unknown> };
+}
+
 describe("UrlForTest", () => {
+  let tc: TestCase;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    await tc.beforeSetup();
+    tc.routes = SharedTestRoutes;
+  });
+
   afterEach(() => {
     for (const key of Object.keys(W.defaultUrlOptions)) delete W.defaultUrlOptions[key];
   });
 
-  it("exception is thrown without host", () => {
-    expect(() => URL.urlFor({ path: "/posts" })).toThrow(/Missing host/);
+  it("nested optional", () => {
+    const r = new RouteSet();
+    r.draw(function () {
+      this.get("/foo/(:bar/(:baz))/:zot", { as: "fun", controller: "articles", action: "index" });
+    });
+    const klass = helpersFor(r);
+    klass.defaultUrlOptions["host"] = "example.com";
+
+    const path = new klass().funPath({ controller: "articles", baz: "baz", zot: "zot" });
+    assertEqual("/foo/zot", path);
+  });
+
+  it("exception is thrown without host", async () => {
+    await assertRaise([ArgumentError], {}, () => {
+      new W().urlFor({ controller: "c", action: "a", id: "i" });
+    });
   });
 
   it("anchor", () => {
-    expect(URL.urlFor({ host: "example.com", path: "/posts", anchor: "comments" })).toBe(
-      "http://example.com/posts#comments",
+    assertEqual(
+      "/c/a#anchor",
+      new W().urlFor({ onlyPath: true, controller: "c", action: "a", anchor: "anchor" }),
     );
   });
 
   it("nil anchor", () => {
-    expect(URL.urlFor({ host: "example.com", path: "/posts", anchor: null })).toBe(
-      "http://example.com/posts",
+    assertEqual(
+      "/c/a",
+      new W().urlFor({ onlyPath: true, controller: "c", action: "a", anchor: null }),
     );
   });
 
   it("false anchor", () => {
-    expect(URL.urlFor({ host: "example.com", path: "/posts", anchor: false })).toBe(
-      "http://example.com/posts",
+    assertEqual(
+      "/c/a",
+      new W().urlFor({ onlyPath: true, controller: "c", action: "a", anchor: false }),
     );
   });
 
   it("anchor should call to param", () => {
-    const anchor = { toParam: () => "anchor" };
-    expect(URL.urlFor({ path: "/c/a/i", anchor, onlyPath: true })).toBe("/c/a/i#anchor");
+    assertEqual(
+      "/c/a/i#anchor",
+      new W().urlFor({
+        onlyPath: true,
+        controller: "c",
+        action: "a",
+        id: "i",
+        anchor: { toParam: () => "anchor" },
+      }),
+    );
   });
 
   it("anchor should escape unsafe pchar", () => {
-    expect(URL.urlFor({ host: "example.com", path: "/c/a", anchor: "#anchor" })).toBe(
-      "http://example.com/c/a#%23anchor",
+    assertEqual(
+      "/c/a#%23anchor",
+      new W().urlFor({
+        onlyPath: true,
+        controller: "c",
+        action: "a",
+        anchor: { toParam: () => "#anchor" },
+      }),
     );
   });
 
   it("anchor should not escape safe pchar", () => {
-    expect(
-      URL.urlFor({ path: "/c/a", onlyPath: true, anchor: "name=user&email=user@domain.com" }),
-    ).toBe("/c/a#name=user&email=user@domain.com");
+    assertEqual(
+      "/c/a#name=user&email=user@domain.com",
+      new W().urlFor({
+        onlyPath: true,
+        controller: "c",
+        action: "a",
+        anchor: { toParam: () => "name=user&email=user@domain.com" },
+      }),
+    );
   });
 
   it("default host", () => {
-    expect(URL.urlFor({ host: "example.com", path: "/" })).toBe("http://example.com/");
+    addHost();
+    assertEqual(
+      "http://www.basecamphq.com/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i" }),
+    );
   });
 
   it("host may be overridden", () => {
-    expect(URL.urlFor({ host: "other.com", path: "/" })).toBe("http://other.com/");
+    addHost();
+    assertEqual(
+      "http://37signals.basecamphq.com/c/a/i",
+      new W().urlFor({ host: "37signals.basecamphq.com", controller: "c", action: "a", id: "i" }),
+    );
   });
 
   it("subdomain may be changed", () => {
-    expect(URL.urlFor({ host: "www.basecamphq.com", subdomain: "api", path: "/c/a/i" })).toBe(
+    addHost();
+    assertEqual(
       "http://api.basecamphq.com/c/a/i",
+      new W().urlFor({ subdomain: "api", controller: "c", action: "a", id: "i" }),
     );
   });
 
   it("subdomain may be object", () => {
     const model = { toParam: () => "api" };
-    expect(URL.urlFor({ host: "www.basecamphq.com", subdomain: model, path: "/c/a/i" })).toBe(
+    addHost();
+    assertEqual(
       "http://api.basecamphq.com/c/a/i",
+      new W().urlFor({ subdomain: model, controller: "c", action: "a", id: "i" }),
     );
   });
 
   it("subdomain may be removed", () => {
-    expect(URL.urlFor({ host: "www.basecamphq.com", subdomain: false, path: "/c/a/i" })).toBe(
+    addHost();
+    assertEqual(
       "http://basecamphq.com/c/a/i",
+      new W().urlFor({ subdomain: false, controller: "c", action: "a", id: "i" }),
     );
   });
 
   it("subdomain may be removed with blank string", () => {
-    expect(URL.urlFor({ host: "api.basecamphq.com", subdomain: "", path: "/c/a/i" })).toBe(
+    W.defaultUrlOptions["host"] = "api.basecamphq.com";
+    assertEqual(
       "http://basecamphq.com/c/a/i",
+      new W().urlFor({ subdomain: "", controller: "c", action: "a", id: "i" }),
     );
   });
 
   it("multiple subdomains may be removed", () => {
-    expect(
-      URL.urlFor({ host: "mobile.www.api.basecamphq.com", subdomain: false, path: "/c/a/i" }),
-    ).toBe("http://basecamphq.com/c/a/i");
+    W.defaultUrlOptions["host"] = "mobile.www.api.basecamphq.com";
+    assertEqual(
+      "http://basecamphq.com/c/a/i",
+      new W().urlFor({ subdomain: false, controller: "c", action: "a", id: "i" }),
+    );
   });
 
   it("subdomain may be accepted with numeric host", () => {
-    expect(URL.urlFor({ host: "127.0.0.1", subdomain: "api", path: "/c/a/i" })).toBe(
+    addNumericHost();
+    assertEqual(
       "http://127.0.0.1/c/a/i",
+      new W().urlFor({ subdomain: "api", controller: "c", action: "a", id: "i" }),
     );
   });
 
   it("domain may be changed", () => {
-    expect(
-      URL.urlFor({ host: "www.basecamphq.com", domain: "37signals.com", path: "/c/a/i" }),
-    ).toBe("http://www.37signals.com/c/a/i");
+    addHost();
+    assertEqual(
+      "http://www.37signals.com/c/a/i",
+      new W().urlFor({ domain: "37signals.com", controller: "c", action: "a", id: "i" }),
+    );
   });
 
   it("tld length may be changed", () => {
-    expect(
-      URL.urlFor({ host: "www.basecamphq.com", subdomain: "mobile", tldLength: 2, path: "/c/a/i" }),
-    ).toBe("http://mobile.www.basecamphq.com/c/a/i");
+    addHost();
+    assertEqual(
+      "http://mobile.www.basecamphq.com/c/a/i",
+      new W().urlFor({ subdomain: "mobile", tldLength: 2, controller: "c", action: "a", id: "i" }),
+    );
   });
 
   it("port", () => {
-    expect(URL.urlFor({ host: "example.com", port: 8080, path: "/" })).toBe(
-      "http://example.com:8080/",
+    addHost();
+    assertEqual(
+      "http://www.basecamphq.com:3000/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i", port: 3000 }),
     );
   });
 
   it("default port", () => {
-    expect(URL.urlFor({ host: "example.com", port: 80, path: "/" })).toBe("http://example.com/");
+    addHost();
+    addPort();
+    assertEqual(
+      "http://www.basecamphq.com:3000/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i" }),
+    );
   });
 
   it("protocol with and without separators", () => {
-    expect(URL.urlFor({ host: "example.com", protocol: "https", path: "/" })).toBe(
-      "https://example.com/",
+    addHost();
+    assertEqual(
+      "https://www.basecamphq.com/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i", protocol: "https" }),
     );
-    expect(URL.urlFor({ host: "example.com", protocol: "https://", path: "/" })).toBe(
-      "https://example.com/",
+    assertEqual(
+      "https://www.basecamphq.com/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i", protocol: "https:" }),
     );
-    expect(URL.urlFor({ host: "example.com", protocol: "https:", path: "/" })).toBe(
-      "https://example.com/",
+    assertEqual(
+      "https://www.basecamphq.com/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i", protocol: "https://" }),
     );
   });
 
   it("without protocol", () => {
-    expect(URL.urlFor({ host: "example.com", protocol: "//", path: "/" })).toBe("//example.com/");
-    expect(URL.urlFor({ host: "example.com", protocol: false, path: "/" })).toBe("//example.com/");
+    addHost();
+    assertEqual(
+      "//www.basecamphq.com/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i", protocol: "//" }),
+    );
+    assertEqual(
+      "//www.basecamphq.com/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i", protocol: false }),
+    );
   });
 
   it("without protocol and with port", () => {
-    expect(URL.urlFor({ host: "example.com", protocol: "//", port: 3000, path: "/" })).toBe(
-      "//example.com:3000/",
+    addHost();
+    addPort();
+
+    assertEqual(
+      "//www.basecamphq.com:3000/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i", protocol: "//" }),
     );
-    expect(URL.urlFor({ host: "example.com", protocol: false, port: 3000, path: "/" })).toBe(
-      "//example.com:3000/",
+    assertEqual(
+      "//www.basecamphq.com:3000/c/a/i",
+      new W().urlFor({ controller: "c", action: "a", id: "i", protocol: false }),
     );
   });
 
   it("user name and password", () => {
-    expect(URL.urlFor({ host: "example.com", user: "admin", password: "secret", path: "/" })).toBe(
-      "http://admin:secret@example.com/",
+    addHost();
+    assertEqual(
+      "http://david:secret@www.basecamphq.com/c/a/i",
+      new W().urlFor({ user: "david", password: "secret", controller: "c", action: "a", id: "i" }),
     );
   });
 
   it("user name and password with escape codes", () => {
-    expect(
-      URL.urlFor({
-        host: "www.basecamphq.com",
+    addHost();
+    assertEqual(
+      "http://openid.aol.com%2Fnextangler:one+two%3F@www.basecamphq.com/c/a/i",
+      new W().urlFor({
         user: "openid.aol.com/nextangler",
         password: "one two?",
-        path: "/c/a/i",
+        controller: "c",
+        action: "a",
+        id: "i",
       }),
-    ).toBe("http://openid.aol.com%2Fnextangler:one+two%3F@www.basecamphq.com/c/a/i");
+    );
   });
 
   it("trailing slash", () => {
     addHost();
     const options = { controller: "foo", trailingSlash: true, action: "bar", id: "33" };
-    expect(new W().urlFor(options)).toBe("http://www.basecamphq.com/foo/bar/33/");
+    assertEqual("http://www.basecamphq.com/foo/bar/33/", new W().urlFor(options));
   });
 
   it("trailing slash with protocol", () => {
@@ -199,19 +327,21 @@ describe("UrlForTest", () => {
       action: "bar",
       id: "33",
     };
-    expect(new W().urlFor(options)).toBe("https://www.basecamphq.com/foo/bar/33/");
-    expect(new W().urlFor({ ...options, query: "string" })).toBe(
+    assertEqual("https://www.basecamphq.com/foo/bar/33/", new W().urlFor(options));
+    assertEqual(
       "https://www.basecamphq.com/foo/bar/33/?query=string",
+      new W().urlFor({ ...options, query: "string" }),
     );
   });
 
   it("trailing slash with only path", () => {
     const options: Record<string, unknown> = { controller: "foo", trailingSlash: true };
-    expect(new W().urlFor({ ...options, onlyPath: true })).toBe("/foo/");
+    assertEqual("/foo/", new W().urlFor({ ...options, onlyPath: true }));
     Object.assign(options, { action: "bar", id: "33" });
-    expect(new W().urlFor({ ...options, onlyPath: true })).toBe("/foo/bar/33/");
-    expect(new W().urlFor({ ...options, query: "string", onlyPath: true })).toBe(
+    assertEqual("/foo/bar/33/", new W().urlFor({ ...options, onlyPath: true }));
+    assertEqual(
       "/foo/bar/33/?query=string",
+      new W().urlFor({ ...options, query: "string", onlyPath: true }),
     );
   });
 
@@ -224,9 +354,10 @@ describe("UrlForTest", () => {
       onlyPath: true,
       anchor: "chapter7",
     };
-    expect(new W().urlFor(options)).toBe("/foo/bar/33/#chapter7");
-    expect(new W().urlFor({ ...options, query: "string" })).toBe(
+    assertEqual("/foo/bar/33/#chapter7", new W().urlFor(options));
+    assertEqual(
       "/foo/bar/33/?query=string#chapter7",
+      new W().urlFor({ ...options, query: "string" }),
     );
   });
 
@@ -240,24 +371,38 @@ describe("UrlForTest", () => {
       p2: "link",
     });
     const params = extractParams(url);
-    expect(params[0]).toBe(toQuery({ p1: "cafe" }));
-    expect(params[1]).toBe(toQuery({ p2: "link" }));
+    assertEqual(toQuery({ p1: "cafe" }), params[0]);
+    assertEqual(toQuery({ p2: "link" }), params[1]);
   });
 
   it("relative url root is respected", () => {
-    const url = URL.urlFor({ host: "example.com", path: "/posts", scriptName: "/app" });
-    expect(url).toBe("http://example.com/app/posts");
+    addHost();
+    assertEqual(
+      "https://www.basecamphq.com/subdir/c/a/i",
+      new W().urlFor({
+        controller: "c",
+        action: "a",
+        id: "i",
+        protocol: "https",
+        scriptName: "/subdir",
+      }),
+    );
   });
 
   it("relative url root is respected with environment variable", () => {
-    expect(
-      URL.urlFor({
-        host: "www.basecamphq.com",
-        protocol: "https",
-        path: "/c/a/i",
-        scriptName: "/subdir",
-      }),
-    ).toBe("https://www.basecamphq.com/subdir/c/a/i");
+    const config = new RouteSet.Config("/subdir");
+    const r = new RouteSet(config);
+    r.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller(/:action(/:id(.:format)))");
+      });
+    });
+    const w = helpersFor(r);
+    addHost(w);
+    assertEqual(
+      "https://www.basecamphq.com/subdir/c/a/i",
+      new w().urlFor({ controller: "c", action: "a", id: "i", protocol: "https" }),
+    );
   });
 
   it("named routes", () => {
@@ -267,23 +412,26 @@ describe("UrlForTest", () => {
       this.get("home/sweet/home/:user", { to: "home#index", as: "home" });
     });
 
-    const kls = class {};
-    include(kls, set.urlHelpers());
+    const kls = helpersFor(set);
 
-    const controller = new kls() as Record<string, (options: object) => string>;
-    expect(rbObjRespondTo(controller, "homeUrl")).toBe(true);
-    expect(controller.homeUrl({ host: "www.basecamphq.com", user: "again" })).toBe(
+    const controller = new kls();
+    assertRespondTo(controller, "homeUrl");
+    assertEqual(
       "http://www.basecamphq.com/home/sweet/home/again",
+      controller.homeUrl({ host: "www.basecamphq.com", user: "again" }),
     );
 
-    expect(controller.homePath({ user: "alabama", host: "unused" })).toBe(
+    assertEqual(
       "/home/sweet/home/alabama",
+      controller.homePath({ user: "alabama", host: "unused" }),
     );
-    expect(controller.homeUrl({ user: "alabama", host: "www.basecamphq.com" })).toBe(
+    assertEqual(
       "http://www.basecamphq.com/home/sweet/home/alabama",
+      controller.homeUrl({ user: "alabama", host: "www.basecamphq.com" }),
     );
-    expect(controller.noArgsUrl({ host: "www.basecamphq.com" })).toBe(
+    assertEqual(
       "http://www.basecamphq.com/this/is/verbose",
+      controller.noArgsUrl({ host: "www.basecamphq.com" }),
     );
   });
 
@@ -293,26 +441,75 @@ describe("UrlForTest", () => {
       this.get("/home/sweet/home/:user", { to: "home#index", as: "home" });
     });
 
-    const kls = class {};
-    include(kls, set.urlHelpers());
-    const controller = new kls() as Record<string, (options: object) => string>;
+    const kls = helpersFor(set);
+    const controller = new kls();
 
-    expect(
+    assertEqual(
+      "http://www.basecamphq.com/subdir/home/sweet/home/again",
       controller.homeUrl({ host: "www.basecamphq.com", user: "again", scriptName: "/subdir" }),
-    ).toBe("http://www.basecamphq.com/subdir/home/sweet/home/again");
+    );
   });
 
   it("path params with default url options", () => {
-    expect(true).toBe(true);
+    const set = new RouteSet();
+    set.draw(function () {
+      this.scope(":account_id", () => {
+        this.get({ dashboard: "pages#dashboard", as: "dashboard" });
+        this.get({ "search(/:term)": "search#search", as: "search" });
+      });
+      this.delete({ signout: "sessions#destroy", as: "signout" });
+    });
+
+    const kls = class {
+      get defaultUrlOptions(): Record<string, unknown> {
+        return { pathParams: { account_id: "foo" } };
+      }
+    };
+    include(kls, set.urlHelpers());
+
+    const controller = new kls() as unknown as Helpers;
+
+    assertEqual("/foo/dashboard", controller.dashboardPath());
+    assertEqual("/bar/dashboard", controller.dashboardPath({ account_id: "bar" }));
+    assertEqual("/signout", controller.signoutPath());
+    assertEqual("/signout?account_id=bar", controller.signoutPath({ account_id: "bar" }));
+    assertEqual(
+      "/signout?account_id=bar",
+      controller.signoutPath({ account_id: "bar", pathParams: { account_id: "baz" } }),
+    );
+    assertEqual("/foo/search/quin", controller.searchPath("quin"));
   });
 
-  it("path params without default url options", () => {
-    expect(true).toBe(true);
+  it("path params without default url options", async () => {
+    const set = new RouteSet();
+    set.draw(function () {
+      this.scope(":account_id", () => {
+        this.get({ dashboard: "pages#dashboard", as: "dashboard" });
+        this.get({ "search(/:term)": "search#search", as: "search" });
+      });
+      this.delete({ signout: "sessions#destroy", as: "signout" });
+    });
+
+    const kls = helpersFor(set);
+    const controller = new kls();
+
+    await assertRaise([UrlGenerationError], {}, () => {
+      controller.dashboardPath();
+    });
+
+    assertEqual("/bar/dashboard", controller.dashboardPath({ pathParams: { account_id: "bar" } }));
+    assertEqual("/signout", controller.signoutPath({ pathParams: { account_id: "bar" } }));
+    assertEqual(
+      "/signout?account_id=bar",
+      controller.signoutPath({ account_id: "bar", pathParams: { account_id: "baz" } }),
+    );
+    assertEqual("/foo/search/quin", controller.searchPath("foo", "quin"));
   });
 
   it("using nil script name properly concats with original script name", () => {
     addHost();
-    expect(
+    assertEqual(
+      "https://www.basecamphq.com/subdir/c/a/i",
       new W().urlFor({
         controller: "c",
         action: "a",
@@ -321,138 +518,286 @@ describe("UrlForTest", () => {
         scriptName: null,
         originalScriptName: "/subdir",
       }),
-    ).toBe("https://www.basecamphq.com/subdir/c/a/i");
+    );
   });
 
   it("only path", () => {
-    expect(URL.urlFor({ path: "/posts", onlyPath: true })).toBe("/posts");
+    const set = new RouteSet();
+    set.draw(function () {
+      this.get("home/sweet/home/:user", { to: "home#index", as: "home" });
+
+      deprecator().silence(() => {
+        this.get(":controller/:action/:id");
+      });
+    });
+
+    const kls = helpersFor(set);
+    const controller = new kls();
+    assertRespondTo(controller, "homeUrl");
+    assertEqual(
+      "/brave/new/world",
+      controller.urlFor({ controller: "brave", action: "new", id: "world", onlyPath: true }),
+    );
+
+    assertEqual(
+      "/home/sweet/home/alabama",
+      controller.homePath({ user: "alabama", host: "unused" }),
+    );
+    assertEqual("/home/sweet/home/alabama", controller.homePath("alabama"));
   });
 
   it("one parameter", () => {
-    expect(URL.urlFor({ host: "example.com", path: "/posts", params: { page: "2" } })).toBe(
-      "http://example.com/posts?page=2",
+    assertEqual(
+      "/c/a?param=val",
+      new W().urlFor({ onlyPath: true, controller: "c", action: "a", param: "val" }),
     );
   });
 
   it("two parameters", () => {
-    const url = URL.urlFor({
-      host: "example.com",
-      path: "/posts",
-      params: { page: "2", per: "10" },
+    const url = new W().urlFor({
+      onlyPath: true,
+      controller: "c",
+      action: "a",
+      p1: "X1",
+      p2: "Y2",
     });
-    expect(url).toContain("page=2");
-    expect(url).toContain("per=10");
-    expect(url).toContain("?");
-    expect(url).toContain("&");
+    const params = extractParams(url);
+    assertEqual(toQuery({ p1: "X1" }), params[0]);
+    assertEqual(toQuery({ p2: "Y2" }), params[1]);
   });
 
   it("params option", () => {
-    const url = URL.urlFor({ path: "/c/a", onlyPath: true, params: { domain: "foo", id: "1" } });
-    expect(url).toBe("/c/a?domain=foo&id=1");
+    const url = new W().urlFor({
+      onlyPath: true,
+      controller: "c",
+      action: "a",
+      params: { domain: "foo", id: "1" },
+    });
+    const params = extractParams(url);
+    assertEqual("/c/a?domain=foo&id=1", url);
+    assertEqual(toQuery({ domain: "foo" }), params[0]);
+    assertEqual(toQuery({ id: "1" }), params[1]);
   });
 
   it("params option strong parameters", () => {
-    expect(true).toBe(true);
+    const requestParams = new Parameters({ domain: "foo", id: "1", other: "BAD" });
+    const url = new W().urlFor({
+      onlyPath: true,
+      controller: "c",
+      action: "a",
+      params: requestParams.permit("domain", "id"),
+    });
+    const params = extractParams(url);
+    assertEqual("/c/a?domain=foo&id=1", url);
+    assertEqual(toQuery({ domain: "foo" }), params[0]);
+    assertEqual(toQuery({ id: "1" }), params[1]);
   });
 
   it("non hash params option", () => {
-    const url = URL.urlFor({ path: "/c/a", onlyPath: true, params: { params: "p" } });
-    expect(url).toBe("/c/a?params=p");
+    const url = new W().urlFor({ onlyPath: true, controller: "c", action: "a", params: "p" });
+    const params = extractParams(url);
+    assertEqual("/c/a?params=p", url);
+    assertEqual(toQuery({ params: "p" }), params[0]);
   });
 
   it("hash parameter", () => {
-    const url = URL.urlFor({
-      host: "example.com",
-      path: "/",
-      params: { filter: { name: "test" } },
+    const url = new W().urlFor({
+      onlyPath: true,
+      controller: "c",
+      action: "a",
+      query: { name: "Bob", category: "prof" },
     });
-    expect(url).toContain("filter%5Bname%5D=test");
+    const params = extractParams(url);
+    assertEqual(toQuery({ "query[category]": "prof" }), params[0]);
+    assertEqual(toQuery({ "query[name]": "Bob" }), params[1]);
   });
 
   it("array parameter", () => {
-    const url = URL.urlFor({ host: "example.com", path: "/", params: { ids: [1, 2, 3] } });
-    expect(url).toContain("ids%5B%5D=1");
-    expect(url).toContain("ids%5B%5D=2");
-    expect(url).toContain("ids%5B%5D=3");
+    const url = new W().urlFor({
+      onlyPath: true,
+      controller: "c",
+      action: "a",
+      query: ["Bob", "prof"],
+    });
+    const params = extractParams(url);
+    assertEqual(toQuery({ "query[]": "Bob" }), params[0]);
+    assertEqual(toQuery({ "query[]": "prof" }), params[1]);
   });
 
   it("hash recursive parameters", () => {
-    const url = URL.urlFor({
-      path: "/c/a",
+    const url = new W().urlFor({
       onlyPath: true,
-      params: { query: { person: { name: "Bob", position: "prof" }, hobby: "piercing" } },
+      controller: "c",
+      action: "a",
+      query: { person: { name: "Bob", position: "prof" }, hobby: "piercing" },
     });
-    const params = url.split("?")[1].split("&").sort();
-    expect(params).toContain("query%5Bhobby%5D=piercing");
-    expect(params).toContain("query%5Bperson%5D%5Bname%5D=Bob");
-    expect(params).toContain("query%5Bperson%5D%5Bposition%5D=prof");
+    const params = extractParams(url);
+    assertEqual(toQuery({ "query[hobby]": "piercing" }), params[0]);
+    assertEqual(toQuery({ "query[person][name]": "Bob" }), params[1]);
+    assertEqual(toQuery({ "query[person][position]": "prof" }), params[2]);
   });
 
   it("hash recursive and array parameters", () => {
-    const url = URL.urlFor({
-      path: "/c/a/101",
+    const url = new W().urlFor({
       onlyPath: true,
-      params: {
-        query: { person: { name: "Bob", position: ["prof", "artdirector"] }, hobby: "piercing" },
-      },
+      controller: "c",
+      action: "a",
+      id: 101,
+      query: { person: { name: "Bob", position: ["prof", "art director"] }, hobby: "piercing" },
     });
-    expect(url).toMatch(/^\/c\/a\/101/);
-    const params = url.split("?")[1].split("&").sort();
-    expect(params).toContain("query%5Bhobby%5D=piercing");
-    expect(params).toContain("query%5Bperson%5D%5Bname%5D=Bob");
-    expect(params).toContain("query%5Bperson%5D%5Bposition%5D%5B%5D=prof");
-    expect(params).toContain("query%5Bperson%5D%5Bposition%5D%5B%5D=artdirector");
+    assertMatch(/^\/c\/a\/101/, url);
+    const params = extractParams(url);
+    assertEqual(toQuery({ "query[hobby]": "piercing" }), params[0]);
+    assertEqual(toQuery({ "query[person][name]": "Bob" }), params[1]);
+    assertEqual(toQuery({ "query[person][position][]": "art director" }), params[2]);
+    assertEqual(toQuery({ "query[person][position][]": "prof" }), params[3]);
   });
 
-  it("url action controller parameters", () => {
-    expect(true).toBe(true);
+  it("url action controller parameters", async () => {
+    addHost();
+    await assertRaise([UnfilteredParameters], {}, () => {
+      new W().urlFor(
+        new Parameters({
+          controller: "c",
+          action: "a",
+          protocol: "javascript",
+          f: "%0Aeval(name)",
+        }),
+      );
+    });
   });
 
   it("path generation for symbol parameter keys", () => {
-    expect(true).toBe(true);
+    tc.assertGenerates("/image", { controller: "image" });
   });
 
   it("named routes with nil keys", () => {
-    expect(true).toBe(true);
+    const set = new RouteSet();
+    set.draw(function () {
+      this.get("posts.:format", { to: "posts#index", as: "posts" });
+      this.get("/", { to: "posts#index", as: "main" });
+    });
+
+    const kls = helpersFor(set);
+    kls.defaultUrlOptions["host"] = "www.basecamphq.com";
+
+    const controller = new kls();
+    const params: Record<string, unknown> = { action: "index", controller: "posts", format: "xml" };
+    assertEqual("http://www.basecamphq.com/posts.xml", controller.urlFor(params));
+    params["format"] = null;
+    assertEqual("http://www.basecamphq.com/", controller.urlFor(params));
   });
 
   it("multiple includes maintain distinct options", () => {
-    expect(true).toBe(true);
+    const firstClass = class {} as unknown as { defaultUrlOptions: Record<string, unknown> };
+    include(firstClass, UrlFor);
+    const secondClass = class {} as unknown as { defaultUrlOptions: Record<string, unknown> };
+    include(secondClass, UrlFor);
+
+    const [firstHost, secondHost] = ["firsthost.com", "secondhost.com"];
+
+    firstClass.defaultUrlOptions["host"] = firstHost;
+    secondClass.defaultUrlOptions["host"] = secondHost;
+
+    assertEqual(firstHost, firstClass.defaultUrlOptions["host"]);
+    assertEqual(secondHost, secondClass.defaultUrlOptions["host"]);
   });
 
   it("with stringified keys", () => {
-    expect(true).toBe(true);
+    assertEqual("/c", new W().urlFor({ controller: "c", onlyPath: true }));
+    assertEqual("/c/a", new W().urlFor({ controller: "c", action: "a", onlyPath: true }));
   });
 
   it("with hash with indifferent access", () => {
-    expect(true).toBe(true);
+    W.defaultUrlOptions["controller"] = "d";
+    W.defaultUrlOptions["onlyPath"] = false;
+    assertEqual(
+      "/c",
+      new W().urlFor(new HashWithIndifferentAccess({ controller: "c", onlyPath: true })),
+    );
+
+    W.defaultUrlOptions["action"] = "b";
+    assertEqual(
+      "/c/a",
+      new W().urlFor(
+        new HashWithIndifferentAccess({ controller: "c", action: "a", onlyPath: true }),
+      ),
+    );
   });
 
   it("url params with nil to param are not in url", () => {
-    const url = URL.urlFor({ host: "example.com", path: "/", params: { a: null, b: "2" } });
-    expect(url).not.toContain("a=");
-    expect(url).toContain("b=2");
+    assertEqual(
+      "/c/a",
+      new W().urlFor({
+        onlyPath: true,
+        controller: "c",
+        action: "a",
+        id: { toParam: () => null },
+      }),
+    );
   });
 
   it("false url params are included in query", () => {
-    const url = URL.urlFor({ host: "example.com", path: "/", params: { a: false } });
-    expect(url).toContain("a=false");
+    assertEqual(
+      "/c/a?show=false",
+      new W().urlFor({ onlyPath: true, controller: "c", action: "a", show: false }),
+    );
   });
 
   it("url generation with array and hash", () => {
-    expect(true).toBe(true);
+    const set = new RouteSet();
+    set.draw(function () {
+      this.namespace("admin", () => {
+        this.resources("posts");
+      });
+    });
+
+    const kls = helpersFor(set);
+    kls.defaultUrlOptions["host"] = "www.basecamphq.com";
+
+    const controller = new kls();
+    assertEqual(
+      "http://www.basecamphq.com/admin/posts/new?param=value",
+      controller.urlFor([":new", ":admin", ":post", { param: "value" }]),
+    );
   });
 
   it("url for with array is unmodified", () => {
-    expect(true).toBe(true);
+    const set = new RouteSet();
+    set.draw(function () {
+      this.namespace("admin", () => {
+        this.resources("posts");
+      });
+    });
+
+    const kls = helpersFor(set);
+    kls.defaultUrlOptions["host"] = "www.basecamphq.com";
+
+    const originalComponents = [":new", ":admin", ":post", { param: "value" }];
+    const components = [...originalComponents];
+
+    new kls().urlFor(components);
+
+    assertEqual(originalComponents, components);
   });
 
   it("default params first empty", () => {
-    expect(true).toBe(true);
-  });
+    const set = new RouteSet();
+    set.draw(function () {
+      this.get({
+        "(:param1)/test(/:param2)": "index#index",
+        defaults: { param1: 1, param2: 2 },
+        constraints: { param1: /\d*/, param2: /\d+/ },
+      });
+    });
 
-  it("nested optional", () => {
-    expect(URL.urlFor({ host: "example.com", path: "/posts" })).toBe("http://example.com/posts");
+    const kls = helpersFor(set);
+    kls.defaultUrlOptions["host"] = "www.basecamphq.com";
+
+    assertEqual(
+      "http://www.basecamphq.com/test",
+      new kls().urlFor({ controller: "index", param1: "1" }),
+    );
   });
 
   it("https default port", () => {

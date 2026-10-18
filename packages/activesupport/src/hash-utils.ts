@@ -350,7 +350,10 @@ export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
   if (!(otherHash instanceof Map) && !isPlainObject(otherHash)) {
     return rbFSend(otherHash, "merge", obj) as T;
   }
-  return { ...(otherHash instanceof Map ? Object.fromEntries(otherHash) : otherHash), ...obj };
+  return {
+    ...(otherHash instanceof Map ? Object.fromEntries(otherHash) : otherHash),
+    ...(obj instanceof Map ? Object.fromEntries(obj) : obj),
+  };
 }
 
 export const withDefaults = reverseMerge;
@@ -366,7 +369,9 @@ export function reverseMergeBang<T extends object>(hash: T, otherHash: object): 
   if (Object.isFrozen(hash)) {
     throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
   }
-  for (const key of Object.keys(hash)) hashDelete(hash, key);
+  for (const key of hash instanceof Map ? [...hash.keys()] : Object.keys(hash)) {
+    hashDelete(hash, key);
+  }
   for (const [key, value] of Object.entries(merged)) hashAset(hash, key, value);
   return hash;
 }

@@ -24,6 +24,7 @@ import {
   rbInspect,
   rbObjClone,
   rbObjRespondTo,
+  update,
   RFC2396_PARSER,
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
@@ -393,7 +394,7 @@ export class UrlHelper {
       if (args.length < pathParamsSize) {
         pathParams = pathParams.filter((k) => !Object.hasOwn(controllerOptions, k));
         const supplied = {
-          ...((result["path_params"] as Record<string, unknown> | undefined) ?? {}),
+          ...((result["pathParams"] as Record<string, unknown> | undefined) ?? {}),
           ...result,
         };
         pathParams = pathParams.filter((k) => !Object.hasOwn(supplied, k));
@@ -1152,8 +1153,8 @@ export class RouteSet {
 
     if (Object.hasOwn(options, "params")) {
       const optParams = options["params"];
-      if (isPlainObject(optParams)) {
-        Object.assign(params, optParams);
+      if (rbObjRespondTo(optParams, "toHash")) {
+        update(params, optParams as Record<string, unknown>);
       } else {
         params["params"] = optParams;
       }
