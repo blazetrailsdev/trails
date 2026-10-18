@@ -1,4 +1,4 @@
-import { Benchmarkable, Concern, extend } from "@blazetrails/activesupport";
+import { Autoload, Benchmarkable, Concern, extend } from "@blazetrails/activesupport";
 import { Module } from "@blazetrails/ruby-compat";
 import { Tags } from "./namespaces.js";
 import { ActiveModelHelper } from "./helpers/active-model-helper.js";
@@ -36,6 +36,7 @@ import { TranslationHelper } from "./helpers/translation-helper.js";
 import { UrlHelper } from "./helpers/url-helper.js";
 
 export const Helpers = new Module((mod) => {
+  extend(mod, Autoload);
   extend(mod, Concern);
 
   mod.include(Benchmarkable);
@@ -65,5 +66,6 @@ export const Helpers = new Module((mod) => {
 });
 
 export async function eagerLoadBang(): Promise<void> {
+  await Autoload.eagerLoadBang.call(Helpers as never);
   await Tags.eagerLoadBang();
 }
