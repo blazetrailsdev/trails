@@ -106,8 +106,6 @@ interface FileOrder {
   // Window, NamedWindow, Rows, Range, CurrentRow, Preceding, Following) can
   // otherwise get wrong while staying green.
   declarations: string[];
-  // TS class name → the Ruby constant path its class was declared under, read
-  // by `blazetrails/class-to-string-seat` to write each class's `Module#to_s`.
   classPaths?: Record<string, string>;
 }
 interface Manifest {

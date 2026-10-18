@@ -606,8 +606,6 @@ export default defineConfig(
             "blazetrails/rails-file-structure-method-order": "error",
           },
         },
-        // class-to-string-seat reads the same manifest. Its package list is
-        // ONLY-GROW (eslint/class-to-string-seat.mjs).
         {
           files: ["packages/activejob/src/**/*.ts", "packages/activesupport/src/**/*.ts"],
           ignores: ["**/*.test.ts", "**/test-helpers/**"],
