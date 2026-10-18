@@ -132,7 +132,10 @@ function collectionFromOptions(options: RenderOptions): readonly unknown[] | und
 }
 
 /** @internal */
-function collectionFromObject(object: unknown): readonly unknown[] | undefined {
-  if (rbObjRespondTo(object, "toAry")) return object as readonly unknown[];
+function collectionFromObject(
+  object: unknown,
+): readonly unknown[] | PromiseLike<readonly unknown[]> | undefined {
+  if (rbObjRespondTo(object, "toAry"))
+    return object as readonly unknown[] | PromiseLike<readonly unknown[]>;
   return undefined;
 }
