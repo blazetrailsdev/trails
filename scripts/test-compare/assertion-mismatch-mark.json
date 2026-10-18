@@ -6,9 +6,9 @@
       "value": 0
     },
     "actioncontroller": {
-      "assertionCount": 22,
-      "kind": 70,
-      "value": 4
+      "assertionCount": 10,
+      "kind": 32,
+      "value": 0
     },
     "actiondispatch": {
       "assertionCount": 239,
