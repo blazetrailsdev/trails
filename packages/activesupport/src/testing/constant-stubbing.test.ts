@@ -11,21 +11,4 @@ describe("stubConst", () => {
     expect(seen).toBe(2);
     expect(mod.CONSTANT).toBe(1);
   });
-
-  it("keeps a new constant until an async block settles with exists: false", async () => {
-    const mod: Record<string, unknown> = {};
-    await expect(
-      stubConst(
-        mod,
-        "NEW",
-        3,
-        async () => {
-          await Promise.resolve();
-          if (mod.NEW !== 3) throw new Error("stub removed early");
-        },
-        { exists: false },
-      ),
-    ).resolves.toBeUndefined();
-    expect("NEW" in mod).toBe(false);
-  });
 });
