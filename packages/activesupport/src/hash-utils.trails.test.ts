@@ -25,14 +25,15 @@ describe("transformKeys on a plain object", () => {
 });
 
 describe("reverseMerge on a Hash receiver", () => {
-  it("answers a Hash of the receiver's class with the receiver's values winning", () => {
-    const hash = new Hash<unknown, unknown>().set("a", 1).set(1, "one");
-    const result = reverseMerge(hash, { a: 0, b: 2 });
+  it("answers other_hash.merge(self), the receiver's values winning", () => {
+    const hash = new Hash<unknown, unknown>().set("a", 1).set("c", 3);
+    const other = new Hash<unknown, unknown>().set("a", 0).set("b", 2);
+    const result = reverseMerge(hash, other);
     expect(result).toBeInstanceOf(Hash);
     expect([...result]).toEqual([
       ["a", 1],
       ["b", 2],
-      [1, "one"],
+      ["c", 3],
     ]);
   });
 

@@ -6,6 +6,7 @@ import {
   hashAset,
   hashDelete,
   isSymbol,
+  merge,
   rbFSend,
   rbInspect,
   rbObjDup,
@@ -350,16 +351,7 @@ export function reverseMerge<T extends object>(obj: T, otherHash: object): T {
   if (!(otherHash instanceof Map) && !isPlainObject(otherHash)) {
     return rbFSend(otherHash, "merge", obj) as T;
   }
-  if (obj instanceof Map) {
-    const own: [unknown, unknown][] = [...obj];
-    const result = dup(obj) as Map<unknown, unknown>;
-    result.clear();
-    const other = otherHash instanceof Map ? otherHash : Object.entries(otherHash);
-    for (const [key, value] of other) result.set(key, value);
-    for (const [key, value] of own) result.set(key, value);
-    return result as T;
-  }
-  return { ...(otherHash instanceof Map ? Object.fromEntries(otherHash) : otherHash), ...obj };
+  return merge(otherHash as Record<string, unknown>, obj as Record<string, unknown>) as T;
 }
 
 export const withDefaults = reverseMerge;

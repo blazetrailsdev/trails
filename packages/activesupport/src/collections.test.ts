@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Hash } from "@blazetrails/ruby-compat";
 import { toXml as toXmlArray } from "./array-utils.js";
 import {
   deepMerge,
@@ -198,11 +199,13 @@ describe("reverseMerge", () => {
   });
 
   it("reads the defaults of a Hash", () => {
-    const defaults = new Map([
-      ["a", 99],
+    const defaults = new Hash<string, number>().set("a", 99).set("b", 2);
+    const result = reverseMerge({ a: 1 }, defaults);
+    expect(result).toBeInstanceOf(Hash);
+    expect([...(result as unknown as Hash<string, number>)]).toEqual([
+      ["a", 1],
       ["b", 2],
     ]);
-    expect(reverseMerge({ a: 1 }, defaults)).toEqual({ a: 1, b: 2 });
   });
 
   it("does not mutate the original", () => {
