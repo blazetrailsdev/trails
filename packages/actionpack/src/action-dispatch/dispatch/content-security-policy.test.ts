@@ -767,7 +767,6 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
       this.head("not_modified");
     }
 
-    /** @internal */
     private isCondition() {
       return this.params.get("condition") === "true";
     }
