@@ -1,6 +1,14 @@
 import { htmlSafe } from "@blazetrails/activesupport";
 import { Date as RubyDate, Time } from "@blazetrails/date";
-import { block, dup, fetch, include, rbFPublicSend, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  block,
+  dup,
+  fetch,
+  include,
+  rbFPublicSend,
+  rbModConstSet,
+  rtest,
+} from "@blazetrails/ruby-compat";
 
 import { Tags } from "../../namespaces.js";
 import { DateTimeSelector } from "../date-helper.js";
@@ -23,16 +31,13 @@ export class DateSelect extends Base {
   }
 
   override render(): unknown {
-    return this.errorWrapping(
-      htmlSafe(
-        String(
-          rbFPublicSend(
-            this.datetimeSelector(this._options, this._htmlOptions),
-            `select${this.selectType().charAt(0).toUpperCase()}${this.selectType().slice(1)}`,
-          ),
-        ),
-      ),
+    const selectType = this.selectType();
+    const selector = this.datetimeSelector(this._options, this._htmlOptions);
+    const html = rbFPublicSend(
+      selector,
+      `select${selectType[0].toUpperCase()}${selectType.slice(1)}`,
     );
+    return this.errorWrapping(htmlSafe(String(html)));
   }
 
   static selectType(): string {
@@ -72,12 +77,7 @@ export class DateSelect extends Base {
 
   /** @internal */
   private defaultDatetime(options: Record<string, unknown>): unknown {
-    if (
-      (options["includeBlank"] != null && options["includeBlank"] !== false) ||
-      (options["prompt"] != null && options["prompt"] !== false)
-    ) {
-      return;
-    }
+    if (rtest(options["includeBlank"]) || rtest(options["prompt"])) return;
 
     const optionsDefault = options["default"];
     if (optionsDefault == null) {

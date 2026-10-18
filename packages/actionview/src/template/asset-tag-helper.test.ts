@@ -1327,6 +1327,7 @@ describe("AssetTagHelperTest", () => {
 describe("AssetTagHelperNonVhostTest", () => {
   type Controller = AssetTagHelperHost & { config: Record<string, unknown> };
   let controller: Controller;
+  const gopher = "gopher://assets.example.com/collaboration/hieraki";
   const rss =
     '<link href="http://www.example.com/collaboration/hieraki" rel="alternate" title="RSS" type="application/rss+xml" />';
 
@@ -1406,69 +1407,33 @@ describe("AssetTagHelperNonVhostTest", () => {
   it("should compute proper path with asset host", () => {
     controller.config.assetHost = "assets.example.com";
     assertDomEqual(rss, autoDiscoveryLinkTag.call(controller));
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/javascripts/xmlhr.js",
-      javascriptPath.call(controller, "xmlhr"),
-    );
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/stylesheets/style.css",
-      stylesheetPath.call(controller, "style"),
-    );
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/images/xml.png",
-      imagePath.call(controller, "xml.png"),
-    );
+    assertDomEqual(`${gopher}/javascripts/xmlhr.js`, javascriptPath.call(controller, "xmlhr"));
+    assertDomEqual(`${gopher}/stylesheets/style.css`, stylesheetPath.call(controller, "style"));
+    assertDomEqual(`${gopher}/images/xml.png`, imagePath.call(controller, "xml.png"));
   });
 
   it("should compute proper path with asset host and default protocol", () => {
     controller.config.assetHost = "assets.example.com";
     controller.config.defaultAssetHostProtocol = ":request";
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/javascripts/xmlhr.js",
-      javascriptPath.call(controller, "xmlhr"),
-    );
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/stylesheets/style.css",
-      stylesheetPath.call(controller, "style"),
-    );
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/images/xml.png",
-      imagePath.call(controller, "xml.png"),
-    );
+    assertDomEqual(`${gopher}/javascripts/xmlhr.js`, javascriptPath.call(controller, "xmlhr"));
+    assertDomEqual(`${gopher}/stylesheets/style.css`, stylesheetPath.call(controller, "style"));
+    assertDomEqual(`${gopher}/images/xml.png`, imagePath.call(controller, "xml.png"));
   });
 
   it("should compute proper url with asset host", () => {
     controller.config.assetHost = "assets.example.com";
     assertDomEqual(rss, autoDiscoveryLinkTag.call(controller));
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/javascripts/xmlhr.js",
-      javascriptUrl.call(controller, "xmlhr"),
-    );
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/stylesheets/style.css",
-      stylesheetUrl.call(controller, "style"),
-    );
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/images/xml.png",
-      imageUrl.call(controller, "xml.png"),
-    );
+    assertDomEqual(`${gopher}/javascripts/xmlhr.js`, javascriptUrl.call(controller, "xmlhr"));
+    assertDomEqual(`${gopher}/stylesheets/style.css`, stylesheetUrl.call(controller, "style"));
+    assertDomEqual(`${gopher}/images/xml.png`, imageUrl.call(controller, "xml.png"));
   });
 
   it("should compute proper url with asset host and default protocol", () => {
     controller.config.assetHost = "assets.example.com";
     controller.config.defaultAssetHostProtocol = ":request";
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/javascripts/xmlhr.js",
-      javascriptUrl.call(controller, "xmlhr"),
-    );
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/stylesheets/style.css",
-      stylesheetUrl.call(controller, "style"),
-    );
-    assertDomEqual(
-      "gopher://assets.example.com/collaboration/hieraki/images/xml.png",
-      imageUrl.call(controller, "xml.png"),
-    );
+    assertDomEqual(`${gopher}/javascripts/xmlhr.js`, javascriptUrl.call(controller, "xmlhr"));
+    assertDomEqual(`${gopher}/stylesheets/style.css`, stylesheetUrl.call(controller, "style"));
+    assertDomEqual(`${gopher}/images/xml.png`, imageUrl.call(controller, "xml.png"));
   });
 
   it("should return asset host with protocol", () => {
