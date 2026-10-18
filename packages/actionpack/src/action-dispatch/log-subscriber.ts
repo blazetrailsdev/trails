@@ -10,9 +10,9 @@ export class LogSubscriber extends BaseLogSubscriber {
   redirect(event: Event): void {
     const payload = event.payload;
 
-    this.info(null, () => `Redirected to ${rbObjAsString(payload.location)}`);
+    this.info(undefined, () => `Redirected to ${rbObjAsString(payload.location)}`);
 
-    this.info(null, () => {
+    this.info(undefined, () => {
       const status = payload.status as number;
 
       let message = `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status])} in ${round(event.duration)}ms`;

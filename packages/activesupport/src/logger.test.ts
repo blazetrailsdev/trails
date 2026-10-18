@@ -71,7 +71,7 @@ describe("LoggerTest", () => {
 
   it("should add message passed as block when using shortcut", () => {
     logger.level = Logger.INFO;
-    logger.info(null, () => "A debug message");
+    logger.info(undefined, () => "A debug message");
     expect(output.string).toContain("A debug message");
   });
 
@@ -83,7 +83,7 @@ describe("LoggerTest", () => {
 
   it("should convert message to string when passed in block", () => {
     logger.level = Logger.INFO;
-    logger.info(null, () => String(12345));
+    logger.info(undefined, () => String(12345));
     expect(output.string).toContain("12345");
   });
 

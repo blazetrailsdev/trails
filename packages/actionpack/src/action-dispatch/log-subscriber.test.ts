@@ -4,8 +4,8 @@ import { LogSubscriber } from "./log-subscriber.js";
 
 class CaptureLogger {
   messages: string[] = [];
-  info(msg: string | (() => string)): void {
-    this.messages.push(typeof msg === "function" ? msg() : msg);
+  info(msg: string | null = null, block?: () => string): void {
+    this.messages.push(block ? block() : msg!);
   }
 }
 

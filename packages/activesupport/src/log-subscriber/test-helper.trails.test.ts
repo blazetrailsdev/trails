@@ -11,7 +11,7 @@ import { MockLogger, TestHelper } from "./test-helper.js";
 class MyLogSubscriber extends LogSubscriber {
   foo(_event: Event): void {
     this.debug("debug ");
-    this.info(null, () => " info");
+    this.info(undefined, () => " info");
     this.warn();
   }
 }

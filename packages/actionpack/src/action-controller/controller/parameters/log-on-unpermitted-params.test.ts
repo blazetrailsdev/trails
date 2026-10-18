@@ -19,8 +19,8 @@ describe("LogOnUnpermittedParamsTest", () => {
 
   function assertLogged(message: string, block: () => void): void {
     log = [];
-    const push = (msg?: string | (() => string)) => {
-      log.push(typeof msg === "function" ? msg() : (msg ?? ""));
+    const push = (msg: string | null = null, block?: () => string) => {
+      log.push(block ? block() : (msg ?? ""));
       return true;
     };
     const logger = { "debug?": true, debug: push, info: push, warn: push, error: push };

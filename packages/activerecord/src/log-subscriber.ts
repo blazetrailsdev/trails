@@ -53,17 +53,17 @@ export class LogSubscriber extends BaseLogSubscriber {
   declare backtraceCleaner: BacktraceCleaner;
 
   strictLoadingViolation(event: Event): void {
-    this.debug(null, () => {
+    this.debug(undefined, () => {
       const owner = event.payload.owner;
       const reflection = event.payload.reflection as any;
       return this.color(reflection.strictLoadingViolationMessage(owner), BaseLogSubscriber.RED);
     });
   }
 
-  sql(event: Event): boolean | null | undefined {
+  sql(event: Event): boolean | null {
     const payload = event.payload as Event["payload"] & { binds?: any[] | null };
 
-    if (LogSubscriber.IGNORE_PAYLOAD_NAMES.includes(payload.name as string)) return;
+    if (LogSubscriber.IGNORE_PAYLOAD_NAMES.includes(payload.name as string)) return null;
 
     let name: string;
     if (payload.async) {

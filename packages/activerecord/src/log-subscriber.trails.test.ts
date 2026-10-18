@@ -56,9 +56,9 @@ describe("LogSubscriber nil payload name (trails)", () => {
   });
 
   it("returns what debug returns, and nil for an ignored payload name", () => {
-    expect(subscriber.sql(makeEvent({ sql: "select 1", name: "Topic Load" }))).toBeUndefined();
+    expect(subscriber.sql(makeEvent({ sql: "select 1", name: "Topic Load" }))).toBeNull();
     expect(logger.messages.length).toBe(1);
-    expect(subscriber.sql(makeEvent({ sql: "select 1", name: "SCHEMA" }))).toBeUndefined();
+    expect(subscriber.sql(makeEvent({ sql: "select 1", name: "SCHEMA" }))).toBeNull();
   });
 
   it("colorizes a nil name the same as SQL", () => {

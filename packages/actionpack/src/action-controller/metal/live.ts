@@ -346,7 +346,7 @@ export function logError(this: LiveControllerHost, exception: Error): void {
   const logger = ActionController.Base.logger;
   if (logger == null) return;
 
-  logger.fatal(null, () => {
+  logger.fatal(undefined, () => {
     let message = `\n${rbObjClassname(exception)} (${exception.message}):\n`;
     if (rbObjRespondTo(exception, "annotatedSourceCode")) {
       message += toS(
