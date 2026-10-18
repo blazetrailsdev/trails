@@ -37,6 +37,8 @@ export interface ScopeInfo {
   /** `singleton_class.attr_accessor` names: module functions, written through `setX`. */
   sclassAttrs: Set<string>;
   includes: string[][];
+  /** `prepend`ed module paths: also in `includes` for method lookup, but ahead of the class in Ruby's ancestors. */
+  prepends: string[][];
   extends: string[][];
   consts: Set<string>;
   concern: boolean;
@@ -112,6 +114,7 @@ export class GemIndex {
         sattrs: new Set(),
         sclassAttrs: new Set(),
         includes: [],
+        prepends: [],
         extends: [],
         consts: new Set(),
         concern: false,
@@ -272,6 +275,8 @@ export class GemIndex {
         }
       } else if (name === "include" || name === "prepend") {
         for (const a of node.args) if (a.k === "const") s.includes.push(a.path);
+        if (name === "prepend")
+          for (const a of node.args) if (a.k === "const") s.prepends.push(a.path);
       } else if (name === "extend") {
         for (const a of node.args) {
           if (a.k !== "const") continue;

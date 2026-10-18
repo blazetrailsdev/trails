@@ -258,7 +258,10 @@ export class Emitter {
     const seen = new Set<string>();
     const visit = (scope: ScopeInfo) => {
       const chain = lexicalChain(this.index, scope.lexicalParent);
+      // A prepended module sits ahead of the class (`prependChain`), not here.
+      const prepended = new Set(scope.prepends.map((p) => p.join("::")));
       for (const inc of [...scope.includes].reverse()) {
+        if (prepended.has(inc.join("::"))) continue;
         const m = this.index.resolveConst(inc, [...chain, scope.fqn]);
         const ms = m ? this.index.scopes.get(m.fqn) : undefined;
         if (!ms) {
@@ -287,6 +290,46 @@ export class Emitter {
     };
     visit(cls);
     return out;
+  }
+
+  /**
+   * The `initialize` of each module a class prepends, in Ruby's ancestor order
+   * (the last `prepend` first): they run before the class's own `initialize`,
+   * which their `super` enters (`moduleAncestors`' `prepended`, the
+   * `@inlinedFrom` gate's chain order).
+   */
+  prependChain(fqn: string): InlineHook[] {
+    const cls = this.index.scopes.get(fqn);
+    if (!cls || cls.kind !== "class") return [];
+    const chain = lexicalChain(this.index, cls.lexicalParent);
+    const out: InlineHook[] = [];
+    for (const p of [...cls.prepends].reverse()) {
+      const m = this.index.resolveConst(p, [...chain, cls.fqn]);
+      const ms = m ? this.index.scopes.get(m.fqn) : undefined;
+      const d = ms?.kind === "module" ? ms.defs.get("initialize") : undefined;
+      if (ms && d?.node && d.lineEnd)
+        out.push({
+          module: ms.fqn,
+          def: d.node,
+          file: d.file,
+          cite: `${CITE_PREFIX}/${d.file}:${d.line}-${d.lineEnd}`,
+        });
+    }
+    return out;
+  }
+
+  /**
+   * A prepended `initialize(...)` / `initialize(*)` forwards exactly the
+   * caller's arguments, so it is written with the parameters of the body its
+   * `super` enters: the constructor keeps that signature.
+   */
+  private headWithParams(head: InlineHook, params: Param[]): InlineHook {
+    const anon = head.def.params.every(
+      (p: Param) =>
+        p.kind === "fwd" ||
+        ((p.kind === "rest" || p.kind === "keyrest" || p.kind === "block") && !p.name),
+    );
+    return anon ? { ...head, def: { ...head.def, params: [...params] } } : head;
   }
 
   /**
@@ -1392,7 +1435,7 @@ export class Emitter {
     // No `initialize` of its own, but an included module has one: Ruby's
     // `Class#new` runs that body, so it is this class's constructor.
     if (!u.struct && !body.some((s) => s.k === "def" && s.name === "initialize" && !s.singleton)) {
-      const [head, ...restChain] = this.initializeChain(u.fqn);
+      const [head, ...restChain] = [...this.prependChain(u.fqn), ...this.initializeChain(u.fqn)];
       if (head) {
         defs++;
         members.push(
@@ -1414,9 +1457,26 @@ export class Emitter {
         .filter((s: N) => s.k === "call" && s.recv === null && s.name === "attr_writer")
         .flatMap((s: N) => s.args.filter((a: N) => a.k === "sym").map((a: N) => a.value)),
     );
+    const prepends = this.prependChain(u.fqn);
     for (const s of body) {
       if (s.k === "def") {
         defs++;
+        // A prepended `initialize` runs first; its `super` is this class's own
+        // `initialize`, whose `super` continues down the included chain.
+        if (s.name === "initialize" && !s.singleton && prepends.length) {
+          const [head, ...rest] = prepends;
+          const own: InlineHook = { module: u.fqn, def: s, file: f.rubyFile, cite: "" };
+          members.push(
+            this.emitMethod(this.headWithParams(head, s.params).def, u, f, {
+              static: false,
+              module: false,
+              vis: vis.get(s) ?? "public",
+              inlineChain: [...rest, own, ...this.initializeChain(u.fqn)],
+              inlinedHead: head,
+            }),
+          );
+          continue;
+        }
         let text = this.emitMethod(s, u, f, {
           static: s.singleton,
           module: false,
