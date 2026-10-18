@@ -16,10 +16,9 @@ import { Post, PostThatLoadsCommentsInAnAfterSaveHook } from "../test-helpers/mo
 import { Rating } from "../test-helpers/models/rating.js";
 import { Computer } from "../test-helpers/models/computer.js";
 import { Project } from "../test-helpers/models/project.js";
-import { Categorization } from "../test-helpers/models/categorization.js";
+import "../test-helpers/models/categorization.js";
 
 registerModel([
-  Categorization,
   Author,
   Developer,
   Comment,

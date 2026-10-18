@@ -24,7 +24,7 @@ import {
   SelectedMembership,
   TenantMembership,
 } from "../test-helpers/models/membership.js";
-import { Contract } from "../test-helpers/models/contract.js";
+import "../test-helpers/models/contract.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 
@@ -38,7 +38,6 @@ registerModel(CurrentMembership);
 registerModel(SuperMembership);
 registerModel(SelectedMembership);
 registerModel(TenantMembership);
-registerModel(Contract);
 registerModel(Company);
 registerModel(Firm);
 registerModel(DependentFirm);
