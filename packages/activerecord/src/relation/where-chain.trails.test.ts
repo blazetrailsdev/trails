@@ -7,11 +7,10 @@ import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Customer } from "../test-helpers/models/customer.js";
 import { Company } from "../test-helpers/models/company.js";
-import { Categorization } from "../test-helpers/models/categorization.js";
+import "../test-helpers/models/categorization.js";
 import { Range } from "@blazetrails/ruby-compat";
 
 registerModel(Post);
-registerModel(Categorization);
 registerModel(Author);
 registerModel(Comment);
 
