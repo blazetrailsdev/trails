@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as ActiveSupportExports from "@blazetrails/activesupport";
 import { Delegator, ExecutionWrapper, Executor } from "@blazetrails/activesupport";
-import { rbModToS } from "@blazetrails/ruby-compat";
+import { rbModToS, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import * as ActiveJobExports from "./index.js";
 import { Base } from "./base.js";
 
@@ -19,12 +19,20 @@ describe("class-to-string-seat", () => {
     expect(`${Executor}`).toBe("ActiveSupport::Executor");
   });
 
-  it("agrees with rbModToS for every seated class with a classpath", () => {
+  it("renders a singleton class as rb_mod_to_s's singleton arm, not the seat it inherits", () => {
+    const job = new Base();
+    const singleton = rbObjSingletonClass(job);
+    expect(`${singleton}`).toMatch(/^#<Class:#<ActiveJob::Base:0x[0-9a-f]+>>$/);
+    expect(String(singleton)).toBe(rbModToS(singleton));
+  });
+
+  it("agrees with rbModToS for every seated class", () => {
     const seated = Object.values({ ...ActiveSupportExports, ...ActiveJobExports }).filter(
       (v): v is abstract new (...args: never) => unknown =>
-        typeof v === "function" && Object.hasOwn(v, "toString") && rbModToS(v as never) !== v.name,
+        typeof v === "function" && Object.hasOwn(v, "toString"),
     );
     expect(seated).toContain(Base);
+    expect(seated).toContain(ActiveSupportExports.Duration);
     for (const klass of seated) expect(String(klass)).toBe(rbModToS(klass));
   });
 });
