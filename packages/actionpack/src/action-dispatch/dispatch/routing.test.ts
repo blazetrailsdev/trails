@@ -495,14 +495,16 @@ describe("TestRoutingMapper", () => {
     expect(m3.controller).toBe("attachments");
   });
 
-  it("projects attachments", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("projects", () => {
-        this.resources("attachments");
+  it("projects attachments", async () => {
+    draw(function () {
+      this.resources("projects", { controller: "project" }, () => {
+        this.resources("involvements", "attachments");
       });
     });
-    expect(routes.recognizePath("/projects/1/attachments").controller).toBe("attachments");
+
+    await t.get("/projects/1/attachments");
+    expect(t.response.body).toBe("attachments#index");
+    expect(t.projectAttachmentsPath({ project_id: "1" })).toBe("/projects/1/attachments");
   });
 
   it("openid", () => {
@@ -569,14 +571,17 @@ describe("TestRoutingMapper", () => {
     expect(options).toEqual({ only: ["index", "show"] });
   });
 
-  it("scoped root as name", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope("/api", { as: "api" }, () => {
-        this.root("api#index");
+  it("scoped root as name", async () => {
+    draw(function () {
+      this.scope("(:locale)", { locale: /en|pl/ }, () => {
+        this.root({ to: "projects#index", as: "projects" });
       });
     });
-    expect(routes.pathFor({}, "api_root")).toBe("/api");
+
+    expect(t.projectsPath({ locale: "en" })).toBe("/en");
+    expect(t.projectsPath()).toBe("/");
+    await t.get("/en");
+    expect(t.response.body).toBe("projects#index");
   });
 
   it("projects posts (nested resources)", () => {
@@ -613,15 +618,20 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({}, "token")).toBe("/token");
   });
 
-  it("path scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope("api", () => {
+  it("path scope", async () => {
+    draw(function () {
+      this.scope({ path: "api" }, () => {
         this.resource("me");
+        this.get({ "/": "mes#index" });
       });
     });
-    expect(routes.recognizePath("/api/me").action).toBe("show");
-    expect(routes.pathFor({}, "me")).toBe("/api/me");
+
+    await t.get("/api/me");
+    expect(t.response.body).toBe("mes#show");
+    expect(t.mePath()).toBe("/api/me");
+
+    await t.get("/api");
+    expect(t.response.body).toBe("mes#index");
   });
 
   it("dynamic controller segments are deprecated", async () => {
@@ -665,14 +675,16 @@ describe("TestRoutingMapper", () => {
     expect(m.action).toBe("description");
   });
 
-  it("session info nested singleton resource", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("session info nested singleton resource", async () => {
+    draw(function () {
       this.resource("session", () => {
         this.resource("info");
       });
     });
-    expect(routes.recognizePath("/session/info").action).toBe("show");
+
+    await t.get("/session/info");
+    expect(t.response.body).toBe("infos#show");
+    expect(t.sessionInfoPath()).toBe("/session/info");
   });
 
   it("member on resource", () => {
@@ -710,59 +722,149 @@ describe("TestRoutingMapper", () => {
     );
   });
 
-  it("projects participants", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("projects", () => {
-        this.resources("participants");
+  it("projects participants", async () => {
+    draw(function () {
+      this.resources("projects", { controller: "project" }, () => {
+        this.resources("participants", () => {
+          this.put("update_all", { on: "collection" });
+        });
       });
     });
-    expect(routes.recognizePath("/projects/1/participants").controller).toBe("participants");
-    expect(routes.recognizePath("/projects/1/participants/2").action).toBe("show");
+
+    await t.get("/projects/1/participants");
+    expect(t.response.body).toBe("participants#index");
+    expect(t.projectParticipantsPath({ project_id: "1" })).toBe("/projects/1/participants");
+
+    await t.put("/projects/1/participants/update_all");
+    expect(t.response.body).toBe("participants#update_all");
+    expect(t.updateAllProjectParticipantsPath({ project_id: "1" })).toBe(
+      "/projects/1/participants/update_all",
+    );
   });
 
-  it("projects companies", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("projects", () => {
-        this.resources("companies");
+  it("projects companies", async () => {
+    draw(function () {
+      this.resources("projects", { controller: "project" }, () => {
+        this.resources("companies", () => {
+          this.resources("people");
+          this.resource("avatar", { controller: "avatar" });
+        });
       });
     });
-    expect(routes.recognizePath("/projects/1/companies").controller).toBe("companies");
-    expect(routes.recognizePath("/projects/1/companies/2").action).toBe("show");
+
+    await t.get("/projects/1/companies");
+    expect(t.response.body).toBe("companies#index");
+    expect(t.projectCompaniesPath({ project_id: "1" })).toBe("/projects/1/companies");
+
+    await t.get("/projects/1/companies/1/people");
+    expect(t.response.body).toBe("people#index");
+    expect(t.projectCompanyPeoplePath({ project_id: "1", company_id: "1" })).toBe(
+      "/projects/1/companies/1/people",
+    );
+
+    await t.get("/projects/1/companies/1/avatar");
+    expect(t.response.body).toBe("avatar#show");
+    expect(t.projectCompanyAvatarPath({ project_id: "1", company_id: "1" })).toBe(
+      "/projects/1/companies/1/avatar",
+    );
   });
 
-  it("project manager", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("project manager", async () => {
+    draw(function () {
       this.resources("projects", () => {
-        this.resource("manager");
+        this.resource("manager", { as: "super_manager" }, () => {
+          this.post("fire");
+        });
       });
     });
-    expect(routes.recognizePath("/projects/1/manager").action).toBe("show");
+
+    await t.get("/projects/1/manager");
+    expect(t.response.body).toBe("managers#show");
+    expect(t.projectSuperManagerPath({ project_id: "1" })).toBe("/projects/1/manager");
+
+    await t.get("/projects/1/manager/new");
+    expect(t.response.body).toBe("managers#new");
+    expect(t.newProjectSuperManagerPath({ project_id: "1" })).toBe("/projects/1/manager/new");
+
+    await t.post("/projects/1/manager/fire");
+    expect(t.response.body).toBe("managers#fire");
+    expect(t.fireProjectSuperManagerPath({ project_id: "1" })).toBe("/projects/1/manager/fire");
   });
 
-  it("project images", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("project images", async () => {
+    draw(function () {
       this.resources("projects", () => {
-        this.resources("images");
+        this.resources("images", { as: "funny_images" }, () => {
+          this.post("revise", { on: "member" });
+        });
       });
     });
-    expect(routes.recognizePath("/projects/1/images").controller).toBe("images");
-    expect(routes.recognizePath("/projects/1/images/2").action).toBe("show");
-    expect(routes.recognizePath("/projects/1/images", { method: "post" }).action).toBe("create");
+
+    await t.get("/projects/1/images");
+    expect(t.response.body).toBe("images#index");
+    expect(t.projectFunnyImagesPath({ project_id: "1" })).toBe("/projects/1/images");
+
+    await t.get("/projects/1/images/new");
+    expect(t.response.body).toBe("images#new");
+    expect(t.newProjectFunnyImagePath({ project_id: "1" })).toBe("/projects/1/images/new");
+
+    await t.post("/projects/1/images/1/revise");
+    expect(t.response.body).toBe("images#revise");
+    expect(t.reviseProjectFunnyImagePath({ project_id: "1", id: "1" })).toBe(
+      "/projects/1/images/1/revise",
+    );
   });
 
-  it("projects people", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("projects people", async () => {
+    draw(function () {
       this.resources("projects", () => {
-        this.resources("people");
+        this.resources("people", () => {
+          this.nested(() => {
+            this.scope("/:access_token", () => {
+              this.resource("avatar");
+            });
+          });
+
+          this.member(() => {
+            this.put("accessible_projects");
+            this.post("resend");
+            this.post("generate_new_password");
+          });
+        });
       });
     });
-    expect(routes.recognizePath("/projects/1/people").controller).toBe("people");
-    expect(routes.recognizePath("/projects/1/people/2").action).toBe("show");
+
+    await t.get("/projects/1/people");
+    expect(t.response.body).toBe("people#index");
+    expect(t.projectPeoplePath({ project_id: "1" })).toBe("/projects/1/people");
+
+    await t.get("/projects/1/people/1");
+    expect(t.response.body).toBe("people#show");
+    expect(t.projectPersonPath({ project_id: "1", id: "1" })).toBe("/projects/1/people/1");
+
+    await t.get("/projects/1/people/1/7a2dec8/avatar");
+    expect(t.response.body).toBe("avatars#show");
+    expect(
+      t.projectPersonAvatarPath({ project_id: "1", person_id: "1", access_token: "7a2dec8" }),
+    ).toBe("/projects/1/people/1/7a2dec8/avatar");
+
+    await t.put("/projects/1/people/1/accessible_projects");
+    expect(t.response.body).toBe("people#accessible_projects");
+    expect(t.accessibleProjectsProjectPersonPath({ project_id: "1", id: "1" })).toBe(
+      "/projects/1/people/1/accessible_projects",
+    );
+
+    await t.post("/projects/1/people/1/resend");
+    expect(t.response.body).toBe("people#resend");
+    expect(t.resendProjectPersonPath({ project_id: "1", id: "1" })).toBe(
+      "/projects/1/people/1/resend",
+    );
+
+    await t.post("/projects/1/people/1/generate_new_password");
+    expect(t.response.body).toBe("people#generate_new_password");
+    expect(t.generateNewPasswordProjectPersonPath({ project_id: "1", id: "1" })).toBe(
+      "/projects/1/people/1/generate_new_password",
+    );
   });
 
   it("account namespace", () => {
@@ -853,32 +955,69 @@ describe("TestRoutingMapper", () => {
     expect(() => routes.recognizePath("/posts/1")).not.toThrow();
   });
 
-  it("default string params", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts", { to: "posts#index", defaults: { format: "json" } });
+  it("default string params", async () => {
+    draw(function () {
+      this.get("inline_pages/(:id)", { to: "pages#show", id: "home" });
+      this.get("default_pages/(:id)", { to: "pages#show", defaults: { id: "home" } });
+
+      this.defaults({ id: "home" }, () => {
+        this.get("scoped_pages/(:id)", { to: "pages#show" });
+      });
     });
-    expect(routes.recognizePath("/posts").format).toBe("json");
+
+    await t.get("/inline_pages");
+    expect(t.request.params["id"]).toBe("home");
+
+    await t.get("/default_pages");
+    expect(t.request.params["id"]).toBe("home");
+
+    await t.get("/scoped_pages");
+    expect(t.request.params["id"]).toBe("home");
   });
 
-  it("default integer params", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts", { to: "posts#index", defaults: { page: "1" } });
+  it("default integer params", async () => {
+    draw(function () {
+      this.get("inline_pages/(:page)", { to: "pages#show", page: 1 });
+      this.get("default_pages/(:page)", { to: "pages#show", defaults: { page: 1 } });
+
+      this.defaults({ page: 1 }, () => {
+        this.get("scoped_pages/(:page)", { to: "pages#show" });
+      });
     });
-    expect(routes.recognizePath("/posts").page).toBe("1");
+
+    await t.get("/inline_pages");
+    expect(t.request.params["page"]).toBe(1);
+
+    await t.get("/default_pages");
+    expect(t.request.params["page"]).toBe(1);
+
+    await t.get("/scoped_pages");
+    expect(t.request.params["page"]).toBe(1);
   });
 
-  it("symbol scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope("api", () => {
+  it("symbol scope", async () => {
+    draw(function () {
+      this.scope({ path: "api" }, () => {
         this.scope("v2", () => {
-          this.resource("me");
+          this.resource("me", { as: "v2_me" });
+          this.get({ "/": "mes#index" });
+        });
+
+        this.scope("v3", "admin", () => {
+          this.resource("me", { as: "v3_me" });
         });
       });
     });
-    expect(routes.recognizePath("/api/v2/me").action).toBe("show");
+
+    await t.get("/api/v2/me");
+    expect(t.response.body).toBe("mes#show");
+    expect(t.v2MePath()).toBe("/api/v2/me");
+
+    await t.get("/api/v2");
+    expect(t.response.body).toBe("mes#index");
+
+    await t.get("/api/v3/admin/me");
+    expect(t.response.body).toBe("mes#show");
   });
 
   it("update person route", () => {
@@ -890,34 +1029,68 @@ describe("TestRoutingMapper", () => {
     expect(routes.recognizePath("/people/1", { method: "patch" }).action).toBe("update");
   });
 
-  it("update project person", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("projects", () => {
-        this.resources("people");
+  it("update project person", async () => {
+    draw(function () {
+      this.get("/projects/:project_id/people/:id/update", {
+        to: "people#update",
+        as: "update_project_person",
       });
     });
-    expect(routes.recognizePath("/projects/1/people/2", { method: "put" }).action).toBe("update");
+
+    await t.get("/projects/1/people/2/update");
+    expect(t.response.body).toBe("people#update");
+
+    expect(t.updateProjectPersonPath({ project_id: 1, id: 2 })).toBe("/projects/1/people/2/update");
   });
 
-  it("forum products", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("forum products", async () => {
+    draw(function () {
       this.namespace("forum", () => {
-        this.resources("products");
+        this.resources("products", { path: "" }, () => {
+          this.resources("questions");
+        });
       });
     });
-    expect(routes.recognizePath("/forum/products").action).toBe("index");
-    expect(routes.pathFor({}, "forum_products")).toBe("/forum/products");
+
+    await t.get("/forum");
+    expect(t.response.body).toBe("forum/products#index");
+    expect(t.forumProductsPath()).toBe("/forum");
+
+    await t.get("/forum/basecamp");
+    expect(t.response.body).toBe("forum/products#show");
+    expect(t.forumProductPath({ id: "basecamp" })).toBe("/forum/basecamp");
+
+    await t.get("/forum/basecamp/questions");
+    expect(t.response.body).toBe("forum/questions#index");
+    expect(t.forumProductQuestionsPath({ product_id: "basecamp" })).toBe(
+      "/forum/basecamp/questions",
+    );
+
+    await t.get("/forum/basecamp/questions/1");
+    expect(t.response.body).toBe("forum/questions#show");
+    expect(t.forumProductQuestionPath({ product_id: "basecamp", id: 1 })).toBe(
+      "/forum/basecamp/questions/1",
+    );
   });
 
-  it("articles with id", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("articles");
+  it("articles with id", async () => {
+    draw(function () {
+      this.controller("articles", () => {
+        this.scope("/articles", { as: "article" }, () => {
+          this.scope({ path: "/:title", title: /[a-z]+/, as: "with_title" }, () => {
+            this.get("/:id", { action: "with_id", as: "" });
+          });
+        });
+      });
     });
-    expect(routes.recognizePath("/articles/1").action).toBe("show");
-    expect(routes.pathFor({ id: 1 }, "article")).toBe("/articles/1");
+
+    await t.get("/articles/rails/1");
+    expect(t.response.body).toBe("articles#with_id");
+
+    await t.get("/articles/123/1");
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+
+    expect(t.articleWithTitlePath({ title: "rails", id: 1 })).toBe("/articles/rails/1");
   });
 
   it("articles perma", () => {
@@ -965,21 +1138,33 @@ describe("TestRoutingMapper", () => {
   });
 
   it("projects status", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/projects/status", { to: "projects#status" });
+    draw(function () {
+      this.get("/projects/status(.:format)");
     });
-    expect(routes.recognizePath("/projects/status").action).toBe("status");
+
+    expect(t.urlFor({ controller: "projects", action: "status", onlyPath: true })).toBe(
+      "/projects/status",
+    );
+    expect(
+      t.urlFor({ controller: "projects", action: "status", format: "json", onlyPath: true }),
+    ).toBe("/projects/status.json");
   });
 
-  it("access token rooms", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("access_tokens", () => {
+  it("access token rooms", async () => {
+    draw(function () {
+      this.scope(":access_token", { constraints: { access_token: /\w{5,5}/ } }, () => {
         this.resources("rooms");
       });
     });
-    expect(routes.recognizePath("/access_tokens/1/rooms").controller).toBe("rooms");
+
+    await t.get("/12345/rooms");
+    expect(t.response.body).toBe("rooms#index");
+
+    await t.get("/12345/rooms/1");
+    expect(t.response.body).toBe("rooms#show");
+
+    await t.get("/12345/rooms/1/edit");
+    expect(t.response.body).toBe("rooms#edit");
   });
 
   it("resources controller name is not pluralized", () => {
@@ -1029,14 +1214,16 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({}, "tickets")).toBe("/tickets");
   });
 
-  it("route defined in resources scope level", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("route defined in resources scope level", async () => {
+    draw(function () {
       this.resources("customers", () => {
-        this.get("export", { to: "customers#export" });
+        this.get("export");
       });
     });
-    expect(routes.recognizePath("/customers/1/export").action).toBe("export");
+
+    await t.get("/customers/1/export");
+    expect(t.response.body).toBe("customers#export");
+    expect(t.customerExportPath({ customer_id: "1" })).toBe("/customers/1/export");
   });
 
   it("only should be read from scope", () => {

@@ -1244,32 +1244,12 @@ export class Mapper {
     });
   }
 
-  scope(
-    pathOrOptions: string | ScopeOptions,
-    callbackOrOptions?: MapperCallback | ScopeOptions,
-    callback?: MapperCallback,
-  ): void {
-    let path: string | undefined;
-    let options: ScopeOptions = {};
-    let cb: MapperCallback;
-
-    if (typeof pathOrOptions === "string") {
-      path = pathOrOptions;
-      if (typeof callbackOrOptions === "function") {
-        cb = callbackOrOptions;
-      } else {
-        options = callbackOrOptions ?? {};
-        cb = callback!;
-      }
-    } else {
-      options = pathOrOptions;
-      cb = callbackOrOptions as MapperCallback;
-    }
-
-    options = { ...options };
+  scope(...args: Array<string | string[] | ScopeOptions | MapperCallback>): void {
+    const cb = args.pop() as MapperCallback;
+    const options: ScopeOptions = dup(extractOptionsBang(args)) as ScopeOptions;
     const scope: ScopeFrameHash = {};
 
-    if (path !== undefined) options.path = path;
+    if (args.length > 0) options.path = (args as Array<string | string[]>).flat().join("/");
     options.constraints ??= {};
 
     if (!this.isNestedScope()) {
@@ -1543,7 +1523,7 @@ export class Mapper {
     }
   }
 
-  defaults(defaults: Record<string, string>, callback: MapperCallback): void {
+  defaults(defaults: Record<string, unknown>, callback: MapperCallback): void {
     const previous = this._scope;
     const merged = this.mergeDefaultsScope(
       this._scope.get("defaults") as Record<string, string> | undefined,
