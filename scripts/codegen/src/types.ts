@@ -78,6 +78,34 @@ export class TypeOracle {
     return this.propertyMemo.get(tsName) ?? false;
   }
 
+  private kindsMemo?: Map<string, MemberInfo[]>;
+  /** Every instance member named `tsName`, across the hand port and its dependencies. */
+  private membersNamed(tsName: string): MemberInfo[] {
+    if (!this.kindsMemo) {
+      this.kindsMemo = new Map();
+      for (const [k, c] of Object.entries(this.o.classes)) {
+        if (k.endsWith("#*")) continue;
+        for (const [n, info] of Object.entries(c.instance ?? {})) {
+          if (!this.kindsMemo.has(n)) this.kindsMemo.set(n, []);
+          this.kindsMemo.get(n)!.push(info);
+        }
+      }
+    }
+    return this.kindsMemo.get(tsName) ?? [];
+  }
+
+  /** The hand port declares instance member `tsName` only as a getter or property, at least once. */
+  onlyProperty(tsName: string): boolean {
+    const ms = this.membersNamed(tsName);
+    return ms.length > 0 && ms.every((m) => m.kind !== "method");
+  }
+
+  /** Every hand declaration of instance member `tsName` answers a Promise, at least once. */
+  alwaysAsync(tsName: string): boolean {
+    const ms = this.membersNamed(tsName);
+    return ms.length > 0 && ms.every((m) => m.async);
+  }
+
   cls(key: string): ClassInfo | undefined {
     return this.o.classes[key];
   }

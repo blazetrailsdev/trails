@@ -1785,14 +1785,73 @@ export class Lowerer {
     return `(${this.truthy(init, true)} ? ${t} : ${r})`;
   }
 
+  /**
+   * `x.is_a?(K)` / `kind_of?` / `instance_of?` / `K === x` on a local: the local
+   * and the instance type it is narrowed to on the true branch, as TypeScript
+   * narrows `x instanceof K`.
+   */
+  narrowing(c: N, ctx: Ctx): [string, TypeRef] | null {
+    if (c?.k === "and") return this.narrowing(c.left, ctx) ?? this.narrowing(c.right, ctx);
+    if (c?.k !== "call") return null;
+    let local: N | undefined, klass: N | undefined;
+    if (["is_a?", "kind_of?", "instance_of?"].includes(c.name) && c.args.length === 1)
+      [local, klass] = [c.recv, c.args[0]];
+    else if (c.name === "===" && c.recv?.k === "const" && c.args.length === 1)
+      [local, klass] = [c.args[0], c.recv];
+    if (local?.k !== "lvar" || !klass) return null;
+    let t: TypeRef = null;
+    if (klass.k === "const") {
+      const st = this.resolver.constType(klass.path, ctx.nesting);
+      if (st?.k === "class") t = { k: "class", key: st.key };
+      else {
+        const hit = this.index.resolveConst(klass.path, ctx.nesting);
+        if (hit?.kind === "scope") t = { k: "gemClass", fqn: hit.fqn };
+      }
+    } else if (klass.k === "call" && klass.name === "class" && klass.recv?.k === "self")
+      t = this.selfType(ctx);
+    return t ? [local.name, t] : null;
+  }
+
+  /** Lower `f()` with local `name` typed `t`, restoring its type afterwards. */
+  withNarrowed<T>(ctx: Ctx, nar: [string, TypeRef] | null, f: () => T): T {
+    if (!nar) return f();
+    let s: Scope | undefined = ctx.scope;
+    while (s && !s.locals.has(nar[0])) s = s.parent;
+    if (!s) return f();
+    s.types ??= new Map();
+    const had = s.types.has(nar[0]);
+    const prev = s.types.get(nar[0]);
+    s.types.set(nar[0], nar[1]);
+    try {
+      return f();
+    } finally {
+      if (had) s.types.set(nar[0], prev ?? null);
+      else s.types.delete(nar[0]);
+    }
+  }
+
   andExpr(n: N, ctx: Ctx): string {
     const l = this.expr(n.left, ctx);
-    const r = wrapArrow(this.expr(n.right, ctx));
+    const r = wrapArrow(
+      this.withNarrowed(ctx, this.narrowing(n.left, ctx), () => this.expr(n.right, ctx)),
+    );
     const lt = this.typeOf(n.left, ctx);
     if (this.isBoolean(n.left) || isBool(lt)) return `(${l} && ${r})`;
     const [t, init] = this.once(l, n.left, ctx);
     if (isObjectLike(lt)) return `(${init} != null ? ${r} : ${t})`;
     return `(${this.truthy(init, true)} ? ${r} : ${t})`;
+  }
+
+  /**
+   * `a == b` is JS `===` where Ruby's `==` is a primitive's: the receiver is
+   * typed a String, Number, Boolean or nil (`String#==`, `Integer#==`), or the
+   * argument is `nil` (`BasicObject#==` identity; a nil answers `==` only to nil).
+   */
+  primEq(n: N, rt: TypeRef, ctx: Ctx): boolean {
+    if (n.args.length !== 1) return false;
+    if (n.args[0].k === "nil") return true;
+    const at = this.typeOf(n.args[0], ctx);
+    return rt?.k === "prim" && (at?.k === "prim" || at === null);
   }
 
   /** Evaluate `e` once: a plain read is reused; anything else goes through a hoisted temp. */
@@ -1929,6 +1988,9 @@ export class Lowerer {
     // A reader `def x` whose writer a gem scope declares (`attr_writer :priority`)
     // is one accessor (the module getter half), read as a property.
     if (this.index.instanceWriters.has(name)) return true;
+    // The hand port reads the name as a property wherever it declares it
+    // (`SqlTypeMetadata#sql_type`, `Persistence#id_in_database`).
+    if (this.resolver.types.onlyProperty(propName(name))) return true;
     const m = this.index.methodNames.get(name);
     // A test helper's `def` is sent to a test only, never to another receiver.
     if (m) return m.attr > 0 && m.zeroArity - (otherRecv ? (m.testZero ?? 0) : 0) === 0;
@@ -2215,12 +2277,50 @@ export class Lowerer {
 
   call(n0: N, ctx: Ctx): string {
     let n = callbackFilterSymbols(n0);
+    // `errors.add(attr, :taken)`: the Symbol is a message key ActiveModel looks
+    // up, against a String used literally, so it keeps its colon (CLAUDE.md, "A
+    // Ruby Symbol is a JS string": `Errors#add`'s `type`).
+    if (
+      (n.name === "add" || n.name === "added?" || n.name === "of_kind?") &&
+      n.recv?.k === "call" &&
+      n.recv.name === "errors" &&
+      n.args[1]?.k === "sym"
+    )
+      n = {
+        ...n,
+        args: [n.args[0], { k: "str", value: `:${n.args[1].value}` }, ...n.args.slice(2)],
+      };
     // activesupport's `run_callbacks` answers a promise when any callback or the
     // block is async (callbacks.ts `runCallbacks`), and Ruby code after it needs
     // its result: await it, which makes the enclosing method async.
     if (n.name === "run_callbacks" && !ctx.testMode && ctx.asyncBox) {
       ctx.asyncBox.awaits = true;
       return `(await ${this.callInner(n, ctx)})`;
+    }
+    // `recv.instance_exec(*args, &blk)` runs the block with `self` the
+    // receiver: the JS spelling is `blk.call(recv, ...args)`.
+    if (
+      n.name === "instance_exec" &&
+      n.block?.k === "blockpass" &&
+      n.block.value &&
+      n.block.value.k !== "fwdblock" &&
+      !n.args.some((a: N) => a.k === "splat" || a.k === "kwargs")
+    ) {
+      const self = n.recv ? this.expr(n.recv, ctx) : ctx.selfExpr;
+      const blk = this.expr(n.block.value, ctx);
+      const args = n.args.map((x: N) => this.argExpr(x, ctx));
+      return `${needsParens(blk) ? `(${blk})` : blk}.call(${[self, ...args].join(", ")})`;
+    }
+    // `Proc#arity` of a block or lambda is the function's `length`.
+    if (
+      n.name === "arity" &&
+      n.recv &&
+      !n.args.length &&
+      !n.block &&
+      !this.index.methodNames.get("arity")?.def
+    ) {
+      const r = this.expr(n.recv, ctx);
+      return `${needsParens(r) ? `(${r})` : r}.length`;
     }
     // A top-level `def` of a test support file (helper.rb's `adapter_is?`) is
     // its exported function.
@@ -3436,8 +3536,12 @@ export class Lowerer {
     const anyAsync =
       !resolved &&
       !depConstRecv &&
-      [...this.resolver.asyncDefs].some((k) => k.endsWith(`#${name}`) || k.endsWith(`.${name}`)) &&
-      !this.resolver.types.handDefines(callee);
+      (([...this.resolver.asyncDefs].some(
+        (k) => k.endsWith(`#${name}`) || k.endsWith(`.${name}`),
+      ) &&
+        !this.resolver.types.handDefines(callee)) ||
+        // Every hand declaration of the name answers a Promise (`Relation#exists?`).
+        this.resolver.types.alwaysAsync(callee));
     // A gem method handed an async block (`enqueued_jobs_with(...) do |payload|
     // … perform_now end`) awaits its `yield`s, even inside an iteration block
     // (`jobs_with`'s `select { … yield job … }`), on the next pass.
@@ -3655,6 +3759,41 @@ export class Lowerer {
         return this.resolver.constType(n.path, ctx.nesting);
       case "call": {
         const name: string = n.name;
+        // `Array.wrap(x)` / `Array(x)` answer an Array; so do these Enumerable
+        // calls on one, and `Hash#keys` / `#values` / `String#split`.
+        if (
+          (name === "wrap" &&
+            n.recv?.k === "const" &&
+            n.recv.path.filter((x: string) => x).join("::") === "Array") ||
+          (name === "Array" && n.recv === null)
+        )
+          return { k: "array", el: null };
+        if (
+          n.recv &&
+          (((name === "keys" || name === "values") && !n.args.length) || name === "split") &&
+          this.typeOf(n.recv, ctx)?.k !== "gemClass" &&
+          this.typeOf(n.recv, ctx)?.k !== "class"
+        )
+          return { k: "array", el: null };
+        if (
+          [
+            "map",
+            "collect",
+            "flat_map",
+            "select",
+            "filter",
+            "reject",
+            "filter_map",
+            "compact",
+            "flatten",
+            "uniq",
+            "sort",
+            "sort_by",
+            "reverse",
+          ].includes(name) &&
+          this.typeOf(n.recv, ctx)?.k === "array"
+        )
+          return { k: "array", el: null };
         if (
           [
             "==",
@@ -3885,8 +4024,10 @@ export class Lowerer {
           RB_CORE_CLASSES[n.args[0].path.filter((x: string) => x).join("::")]
         )
           return `${rc("rbObjClass")}(${this.expr(n.recv.recv, ctx)}) === ${rc(RB_CORE_CLASSES[n.args[0].path.filter((x: string) => x).join("::")])}`;
+        if (this.primEq(n, rt, ctx)) return `${lhs} === ${a[0]}`;
         return `${rc("rbEqual")}(${r}, ${a[0]})`;
       case "!=":
+        if (this.primEq(n, rt, ctx)) return `${lhs} !== ${a[0]}`;
         return `!${rc("rbEqual")}(${r}, ${a[0]})`;
       case "!":
         return `!${this.truthy(r, true)}`;
@@ -4093,6 +4234,21 @@ export class Lowerer {
     // spread, a plain object is its `[key, value]` pairs (`Hash#each` yields
     // them), and anything else passes through (an Array, a Relation answering
     // its own).
+    // `options.except(:case_sensitive, :scope)` on an option hash: a plain
+    // object keyed by camelCase names (RFC 0149), so ruby-compat's
+    // `except(options, "caseSensitive", "scope")`, as the hand port writes it.
+    if (
+      (name === "except" || name === "slice") &&
+      n.args.length &&
+      n.args.every((a: N) => a.k === "sym") &&
+      recvNode &&
+      /options$/.test(
+        recvNode.k === "call" || recvNode.k === "lvar" || recvNode.k === "ivar"
+          ? String(recvNode.name).replace(/^@/, "")
+          : "",
+      )
+    )
+      return `${rc(name)}(${r}, ${n.args.map((a: N) => JSON.stringify(propName(a.value))).join(", ")})`;
     const recvType = this.typeOf(recvNode, ctx);
     const enumOf = (x: string) =>
       `${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map ? [...${x}] : ` +
