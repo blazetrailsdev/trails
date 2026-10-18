@@ -159,3 +159,10 @@ describe("ActionDispatch::Journey::Path::Pattern — leading-optional normalizat
     expect(p.toRegexp()).toBeInstanceOf(RegExp);
   });
 });
+
+describe("ActionDispatch::Journey::Path::Pattern — flags of unused requirements", () => {
+  it("does not take flags from a requirement the path does not name", () => {
+    const pattern = buildPath("/:id", { other: /x/u });
+    expect(pattern.toRegexp().flags).toBe("");
+  });
+});

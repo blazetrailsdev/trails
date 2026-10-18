@@ -18,7 +18,6 @@ import {
   isBlank,
   isPlainObject,
   isPresent,
-  kernelArray,
   pluralize,
   reverseMergeBang,
   singularize,
@@ -37,6 +36,7 @@ import {
   include,
   Module,
   RFC2396_PARSER,
+  rbFArray,
   rbInspect,
   RuntimeError,
   rbFPublicSend,
@@ -80,7 +80,7 @@ export interface RouteOptions {
   name?: string | null | false;
   constraints?: RouteConstraints | CallableConstraint;
   defaults?: Record<string, string | null>;
-  format?: boolean;
+  format?: boolean | string | RegExp;
   as?: string | null | false;
   to?: string | MountableApp | Redirect;
   controller?: string | RegExp;
@@ -183,7 +183,7 @@ export class Resource {
 
   actions(): ResourceAction[] {
     if (this._except != null) {
-      const except = kernelArray(this._except);
+      const except = rbFArray(this._except) as ResourceAction[];
       return this.availableActions().filter((a) => !except.includes(a));
     } else {
       return this.availableActions();
@@ -192,7 +192,7 @@ export class Resource {
 
   availableActions(): ResourceAction[] {
     if (this._only != null) {
-      return kernelArray(this._only);
+      return rbFArray(this._only) as ResourceAction[];
     } else {
       return this.defaultActions();
     }
@@ -450,7 +450,7 @@ export class Mapping {
   private readonly _blocks: readonly unknown[];
   private readonly _anchor: boolean;
   private readonly _via: readonly string[];
-  private readonly _formatted: boolean | undefined;
+  private readonly _formatted: boolean | string | RegExp | undefined;
   private readonly _internal: boolean | undefined;
   private readonly _conditions: Record<string, unknown>;
 
@@ -462,7 +462,7 @@ export class Mapping {
     defaultAction: string | undefined,
     to: unknown,
     via: readonly string[],
-    formatted: boolean | undefined,
+    formatted: boolean | string | RegExp | undefined,
     optionsConstraints: unknown,
     anchor: boolean,
     options: Record<string, unknown>,
@@ -503,7 +503,7 @@ export class Mapping {
     return via;
   }
 
-  static normalizePath(path: string, format: boolean | undefined): string {
+  static normalizePath(path: string, format: boolean | string | RegExp | undefined): string {
     path = Mapper.normalizePath(path);
 
     if (format === true) {
@@ -515,7 +515,7 @@ export class Mapping {
     }
   }
 
-  static optionalFormat(path: string, format: boolean | undefined): boolean {
+  static optionalFormat(path: string, format: boolean | string | RegExp | undefined): boolean {
     return format !== false && !Mapping.OPTIONAL_FORMAT_REGEX.test(path);
   }
 
@@ -537,7 +537,7 @@ export class Mapping {
     controller: string | RegExp | undefined;
     defaultAction: string | undefined;
     to: unknown;
-    formatted: boolean | undefined;
+    formatted: boolean | string | RegExp | undefined;
     via: readonly string[];
     optionsConstraints: unknown;
     anchor: boolean;
@@ -1655,7 +1655,7 @@ export class Mapper {
     options: RouteOptions & {
       via?: string | string[];
       on?: string;
-      format?: boolean;
+      format?: boolean | string | RegExp;
       anchor?: boolean;
       path?: string;
     },
@@ -1687,12 +1687,13 @@ export class Mapper {
     let to = options.to;
     delete options.to;
     const via = Mapping.checkVia(
-      kernelArray(
+      rbFArray(
         "via" in options ? options.via : (this._scope.get("via") as string | string[] | undefined),
-      ),
+      ) as string[],
     );
     delete options.via;
-    const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);
+    const formatted =
+      options.format ?? (this._scope.get("format") as boolean | string | RegExp | undefined);
     delete options.format;
     const anchor = options.anchor ?? true;
     delete options.anchor;
@@ -1767,7 +1768,7 @@ export class Mapper {
     _path: string | undefined,
     to: string | MountableApp | Redirect | undefined,
     via: string[],
-    formatted: boolean | undefined,
+    formatted: boolean | string | RegExp | undefined,
     anchor: boolean,
     optionsConstraints: RouteOptions["constraints"],
   ): void {
@@ -1850,7 +1851,7 @@ export class Mapper {
     _path: string | undefined,
     to: string | MountableApp | Redirect | undefined,
     via: string[],
-    formatted: boolean | undefined,
+    formatted: boolean | string | RegExp | undefined,
     anchor: boolean,
     optionsConstraints: RouteOptions["constraints"],
   ): void {
