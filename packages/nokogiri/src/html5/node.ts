@@ -8,24 +8,20 @@ import { Searchable } from "../xml/searchable.js";
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `Searchable` is mixed in below.
-export interface Node {
-  css(...args: unknown[]): NodeSet;
-  atCss(...args: unknown[]): Node | undefined;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Node {
+  declare css: (...args: unknown[]) => NodeSet;
+  declare atCss: (...args: unknown[]) => Node | undefined;
+
   static readonly IMPLIED_XPATH_CONTEXTS = [".//"] as const;
   static readonly ELEMENT_NODE = 1;
   static readonly TEXT_NODE = 3;
   static readonly COMMENT_NODE = 8;
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
   constructor(
+    /**
+     * @internal
+     * @noRailsEquivalent PERMANENT
+     */
     readonly _node: Parse5Node,
     readonly document: unknown = null,
   ) {}

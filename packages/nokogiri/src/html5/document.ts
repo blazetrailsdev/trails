@@ -8,14 +8,10 @@ import { Searchable } from "../xml/searchable.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `Searchable` is mixed in below.
-export interface Document {
-  css(...args: unknown[]): NodeSet;
-  atCss(...args: unknown[]): Node | undefined;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Document {
+  declare css: (...args: unknown[]) => NodeSet;
+  declare atCss: (...args: unknown[]) => Node | undefined;
+
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
 
   url: string | null = null;
