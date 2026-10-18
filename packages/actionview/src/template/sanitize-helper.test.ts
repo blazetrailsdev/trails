@@ -1,6 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include, rbObjRespondTo } from "@blazetrails/ruby-compat";
+
+declare const Loofah: unknown;
+declare const Rails: unknown;
 import { HTML4, HTML5, Html } from "@blazetrails/html-sanitizer";
 import { SanitizeHelper } from "../helpers/sanitize-helper.js";
 import type {
@@ -146,9 +149,7 @@ describe("SanitizeHelperTest", () => {
   });
 });
 
-function sanitizeHelperVendorTests(
-  vendor: SanitizerVendor & { whiteListSanitizer?: unknown },
-): void {
+function sanitizeHelperVendorTests(vendor: SanitizerVendor): void {
   let savedVendor: SanitizerVendor;
   let subjectClass: SanitizeHelperClass;
   let subject: Record<string, (...args: any[]) => any>;
@@ -210,7 +211,7 @@ function sanitizeHelperVendorTests(
   });
 
   it("deprecated methods are supported", () => {
-    expect(vendor.whiteListSanitizer).toBeDefined();
+    expect(rbObjRespondTo(vendor, "whiteListSanitizer")).toBe(true);
   });
 
   it("sanitized allowed tags returns a string collection", () => {
@@ -228,10 +229,30 @@ function sanitizeHelperVendorTests(
   });
 
   // BLOCKED: sanitize-helper-sanitized-allowed-writers
-  it.skip("sanitized allowed tags is settable", () => {});
+  it.skip("sanitized allowed tags is settable", () => {
+    const savedValue = (subjectClass as any).sanitizedAllowedTags();
+    try {
+      (subjectClass as any).sanitizedAllowedTags = ["a", "b"];
+      const result = (subjectClass as any).sanitizedAllowedTags();
+
+      expect(result).toEqual(["a", "b"]);
+    } finally {
+      (subjectClass as any).sanitizedAllowedTags = savedValue;
+    }
+  });
 
   // BLOCKED: sanitize-helper-sanitized-allowed-writers
-  it.skip("sanitized allowed attributes is settable", () => {});
+  it.skip("sanitized allowed attributes is settable", () => {
+    const savedValue = (subjectClass as any).sanitizedAllowedAttributes();
+    try {
+      (subjectClass as any).sanitizedAllowedAttributes = ["a", "b"];
+      const result = (subjectClass as any).sanitizedAllowedAttributes();
+
+      expect(result).toEqual(["a", "b"]);
+    } finally {
+      (subjectClass as any).sanitizedAllowedAttributes = savedValue;
+    }
+  });
 
   it("sanitize", () => {
     const input = `<div><script>alert(1);</script><a href="http://www.example.com/">Example</a> of a fragment</div>`;
@@ -261,13 +282,38 @@ function sanitizeHelperVendorTests(
   });
 
   // BLOCKED: html-sanitizer-port-scrubbers
-  it.skip("sanitize with loofah scrubber option", () => {});
+  it.skip("sanitize with loofah scrubber option", () => {
+    const input = `<div>hello</div>`;
+    const scrubber = new (Loofah as any).Scrubber((node: any) => {
+      node.content = "scrubbed";
+    });
+
+    expect(String(subject.sanitize(input, { scrubber }))).toBe(`<div>scrubbed</div>`);
+  });
 
   // BLOCKED: html-sanitizer-port-scrubbers
-  it.skip("sanitize with custom scrubber option", () => {});
+  it.skip("sanitize with custom scrubber option", () => {
+    const scrubber = new (class extends (Rails as any).HTML.PermitScrubber {
+      constructor() {
+        super();
+        this.tags = ["div"];
+      }
+    })();
+
+    const input = `<div>hello</div><p>world</p>`;
+
+    expect(String(subject.sanitize(input, { scrubber }))).toBe(`<div>hello</div>world`);
+  });
 
   // BLOCKED: html-sanitizer-safe-list-sanitize-css
-  it.skip("sanitize css", () => {});
+  it.skip("sanitize css", () => {
+    const input = `width: 100%; background-image:url("http://www.example.com/"); height: 100%;`;
+    const result = String(subject.sanitizeCss(input));
+
+    expect(result).not.toContain("background-image");
+    expect(result).toContain("width");
+    expect(result).toContain("height");
+  });
 
   it("strip tags", () => {
     const input = `<div><a href="http://www.example.com/">Example</a> of a fragment</div>`;
@@ -284,7 +330,17 @@ function sanitizeHelperVendorTests(
   });
 
   // BLOCKED: html-sanitizer-port-scrubbers
-  it.skip("we get the expected HTML parser", () => {});
+  it.skip("we get the expected HTML parser", () => {
+    const input = `<p>1<b>2<i>3</b>4</i>5</p>`;
+    const scrubber = new (Loofah as any).Scrubber(() => {});
+
+    const expected =
+      vendor === Html.Sanitizer || vendor === HTML4.Sanitizer
+        ? "<p>1<b>2<i>3</i></b>45</p>"
+        : "<p>1<b>2<i>3</i></b><i>4</i>5</p>";
+
+    expect(String(subject.sanitize(input, { scrubber }))).toBe(expected);
+  });
 }
 
 describe("SanitizeHelperVendorHtmlTest", () => {

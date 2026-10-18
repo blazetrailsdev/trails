@@ -1,4 +1,4 @@
-import { ArgumentError, Module, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, Module, extend, rbInspect } from "@blazetrails/ruby-compat";
 
 import { ModelNaming, convertToModel, modelNameFromRecordOrClass } from "./model-naming.js";
 
@@ -35,9 +35,12 @@ export function recordKeyForDomId(record: unknown): string | null {
 }
 
 export const RecordIdentifier = new Module((mod) => {
+  extend(mod, mod);
+  extend(mod, ModelNaming);
+
   mod.include(ModelNaming);
 
   mod.moduleEval((m) => {
     Object.assign(m, { domClass, domId, recordKeyForDomId });
   });
-});
+}) as Module & { domClass: typeof domClass; domId: typeof domId };

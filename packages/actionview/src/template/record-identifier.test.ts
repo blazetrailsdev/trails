@@ -2,33 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
-import { domClass, domId } from "../record-identifier.js";
-
-class Comment {
-  static readonly modelName = { paramKey: "comment" };
-
-  readonly modelName = Comment.modelName;
-
-  id: number | null = null;
-
-  save(): void {
-    this.id = 1;
-  }
-
-  toKey(): unknown[] | null {
-    return this.id == null ? null : [this.id];
-  }
-}
-
-class CpkBook {
-  readonly modelName = { paramKey: "cpk_book" };
-
-  constructor(private readonly id: unknown[]) {}
-
-  toKey(): unknown[] {
-    return this.id;
-  }
-}
+import { RecordIdentifier, domClass, domId } from "../record-identifier.js";
+import { Comment, Cpk, Plane } from "../test-helpers/fake-models.js";
 
 describe("RecordIdentifierTest", () => {
   const singular = "comment";
@@ -56,7 +31,7 @@ describe("RecordIdentifierTest", () => {
   });
 
   it("dom id with composite primary key record", () => {
-    expect(domId(new CpkBook([1, 123]))).toBe("cpk_book_1_123");
+    expect(domId(new Cpk.Book({ id: [1, 123] }))).toBe("cpk_book_1_123");
   });
 
   it("dom id with prefix", () => {
@@ -74,29 +49,13 @@ describe("RecordIdentifierTest", () => {
 
   it("dom id as singleton method", () => {
     record.save();
-    expect(domId(record)).toBe(`${singular}_1`);
+    expect(RecordIdentifier.domId(record)).toBe(`${singular}_1`);
   });
 
   it("dom class as singleton method", () => {
-    expect(domClass(record)).toBe(singular);
+    expect(RecordIdentifier.domClass(record)).toBe(singular);
   });
 });
-
-class Plane {
-  static readonly modelName = { paramKey: "airplane" };
-
-  readonly modelName = Plane.modelName;
-
-  private _toKey: unknown[] | null = null;
-
-  toKey(): unknown[] | null {
-    return this._toKey;
-  }
-
-  save(): void {
-    this._toKey = [1];
-  }
-}
 
 describe("RecordIdentifierWithoutActiveModelTest", () => {
   let record: Plane;
@@ -128,7 +87,7 @@ describe("RecordIdentifierWithoutActiveModelTest", () => {
   });
 
   it("dom id raises useful error when passed nil", () => {
-    expect(() => domId(null)).toThrow(ArgumentError);
+    expect(() => RecordIdentifier.domId(null)).toThrow(ArgumentError);
   });
 
   it("dom class", () => {
@@ -141,10 +100,10 @@ describe("RecordIdentifierWithoutActiveModelTest", () => {
 
   it("dom id as singleton method", () => {
     record.save();
-    expect(domId(record)).toBe("airplane_1");
+    expect(RecordIdentifier.domId(record)).toBe("airplane_1");
   });
 
   it("dom class as singleton method", () => {
-    expect(domClass(record)).toBe("airplane");
+    expect(RecordIdentifier.domClass(record)).toBe("airplane");
   });
 });

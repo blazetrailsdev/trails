@@ -1,7 +1,7 @@
 import "../test-helpers/abstract-unit.js";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActionController, Request, RouteSet } from "@blazetrails/actionpack";
+import { ActionController, ActionDispatch, Request, RouteSet } from "@blazetrails/actionpack";
 import { Conversion, Naming } from "@blazetrails/activemodel";
 import { assertPredicate, extend, isHtmlSafe, isPresent } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
@@ -1249,7 +1249,9 @@ class UrlHelperController extends ActionController.Base {
       as: "show_named_route",
     });
 
-    this.get("/:controller(/:action(/:id))");
+    ActionDispatch.deprecator().silence(() => {
+      this.get("/:controller(/:action(/:id))");
+    });
 
     this.get("url_helper_controller_test/url_helper/normalize_recall_params", {
       to: UrlHelperController.action("normalizeRecall"),

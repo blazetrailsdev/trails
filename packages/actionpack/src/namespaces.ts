@@ -4,6 +4,7 @@ import {
   camelize,
   extend,
   onLoad,
+  type Deprecation,
   type Extended,
 } from "@blazetrails/activesupport";
 import {
@@ -73,6 +74,7 @@ export const ActionDispatch = {
   Integration: { name: string; Session: typeof IntegrationSession };
   Session: typeof Session;
   testApp: unknown;
+  deprecator: () => Deprecation;
 };
 extend(ActionDispatch, Autoload);
 ActionDispatch.eagerAutoload(() => {
