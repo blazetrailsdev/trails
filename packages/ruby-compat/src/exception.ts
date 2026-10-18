@@ -28,7 +28,10 @@ Exception.prototype.name = "Exception";
 /**
  * `exc_to_s` (`vendor/ruby/v3.3.11/error.c:1463`): the message, or the class
  * name when there is none. Ruby's `mesg` ivar is the own `message` property
- * `Error`'s constructor seats only when given a message.
+ * `Error`'s constructor seats only when given a message. `rb_String` is
+ * `String`, not ruby-compat's `rbObjAsString`: `object.ts` reaches classes that
+ * extend `Exception`, so importing it here leaves `Exception` uninitialized
+ * when this module is loaded first.
  *
  * @noRailsEquivalent PERMANENT
  */
