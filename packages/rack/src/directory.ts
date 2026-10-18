@@ -4,6 +4,7 @@ import { CONTENT_TYPE, CONTENT_LENGTH, PATH_INFO, SCRIPT_NAME } from "./constant
 import { escapeHtml, escapePath, unescapePath, validPath } from "./utils.js";
 import { mimeType } from "./mime.js";
 import { Files } from "./files.js";
+import { Head } from "./head.js";
 
 const DIR_FILE =
   "<tr><td class='name'><a href='%s'>%s</a></td><td class='size'>%s</td><td class='type'>%s</td><td class='mtime'>%s</td></tr>\n";
@@ -83,16 +84,16 @@ export class DirectoryBody {
 export class Directory {
   root: string;
   private app: any;
+  private head: Head;
 
   constructor(root: string, app?: any) {
     this.root = File.expandPath(root);
     this.app = app || new Files(this.root);
+    this.head = new Head(this.get.bind(this));
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    const method = env["REQUEST_METHOD"];
-    const [status, headers, body] = await this.get(env);
-    return method === "HEAD" ? [status, headers, []] : [status, headers, body];
+    return this.head.call(env);
   }
 
   async get(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {

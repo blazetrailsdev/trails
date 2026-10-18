@@ -5,6 +5,7 @@ import {
   File,
   forceEncoding,
   include,
+  NoMethodError,
   rbStrSNew,
   Tempfile,
 } from "@blazetrails/ruby-compat";
@@ -416,8 +417,9 @@ export class Parser {
       const contentType = MULTIPART_CONTENT_TYPE.exec(head)?.[1] ?? null;
       let name: string | undefined, filename: string | undefined, filenameStar: string | undefined;
       let disposition = MULTIPART_CONTENT_DISPOSITION.exec(head)?.[1];
-      if (disposition != null && disposition.length <= CONTENT_DISPOSITION_MAX_BYTES) {
+      if (disposition != null && Buffer.byteLength(disposition) <= CONTENT_DISPOSITION_MAX_BYTES) {
         let i = disposition.indexOf(";");
+        if (i === -1) throw new NoMethodError("undefined method `+' for nil");
         disposition = disposition.slice(i + 1);
         let param: string;
         let numParams = 0;

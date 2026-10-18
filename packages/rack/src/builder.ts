@@ -56,7 +56,6 @@ export class Builder {
     options: Record<string, unknown> = {},
   ): RackApp {
     const builder = new this(null, options);
-
     const binding = rbFSend(BUILDER_TOPLEVEL_BINDING, "call", builder) as Builder;
     const source =
       `"use strict";\n${builderScript}` +
