@@ -102,6 +102,13 @@ export function cmp(a: unknown, b: unknown): number | null {
     if (Number.isNaN(n)) return null;
     return ajd < n ? -1 : ajd > n ? 1 : 0;
   }
+  if (temporalTag(a) !== null && temporalTag(b) === null) {
+    const name = rbObjClassname(b);
+    if ((name === "Date" || name === "DateTime") && isCmpSpelling(b)) {
+      const c = b.cmp(a);
+      return c == null ? null : c === 0 ? 0 : -c;
+    }
+  }
   if (temporalTag(a) !== null && temporalTag(b) !== null) {
     const x = widenPlainDate(a);
     const y = widenPlainDate(b);

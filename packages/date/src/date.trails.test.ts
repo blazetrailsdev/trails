@@ -21,6 +21,8 @@ import {
   rbModAncestors,
   rbObjClass,
   rbObjIsKindOf,
+  rbEqual,
+  cmp,
 } from "@blazetrails/ruby-compat";
 
 const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
@@ -1966,5 +1968,33 @@ describe("Marshal over Date", () => {
       expect(rbObjIsKindOf(seat, rbCTime)).toBe(false);
     }
     expect(Object.keys(zoned)).toEqual([]);
+  });
+});
+
+describe("a Ruby date against its Temporal seat", () => {
+  it("rbEqual and cmp match a Date against a Temporal.PlainDate, as MRI does", () => {
+    const d = new RubyDate(2001, 2, 3);
+    const same = RubyDate.iso8601("2001-02-03");
+    const next = RubyDate.iso8601("2001-02-04");
+    expect([rbEqual(d, same), rbEqual(same, d)]).toEqual([true, true]);
+    expect([rbEqual(d, next), rbEqual(next, d)]).toEqual([false, false]);
+    expect([cmp(d, same), cmp(same, d), cmp(d, next), cmp(next, d)]).toEqual([0, 0, -1, 1]);
+  });
+
+  it("rbEqual and cmp match a DateTime against a Temporal.ZonedDateTime / PlainDateTime", () => {
+    const dt = new RubyDateTime(2001, 2, 3, 4, 5, 6, "+03:00");
+    const zoned = RubyDateTime.iso8601("2001-02-03T04:05:06+03:00");
+    const later = RubyDateTime.iso8601("2001-02-03T04:05:07+03:00");
+    expect([rbEqual(dt, zoned), rbEqual(zoned, dt)]).toEqual([true, true]);
+    expect([rbEqual(dt, later), rbEqual(later, dt)]).toEqual([false, false]);
+    expect([cmp(dt, zoned), cmp(zoned, dt), cmp(dt, later), cmp(later, dt)]).toEqual([0, 0, -1, 1]);
+    const utc = new RubyDateTime(2001, 2, 3, 4, 5, 6);
+    const plain = Temporal.PlainDateTime.from("2001-02-03T04:05:06");
+    expect([rbEqual(utc, plain), rbEqual(plain, utc), cmp(utc, plain), cmp(plain, utc)]).toEqual([
+      true,
+      true,
+      0,
+      0,
+    ]);
   });
 });

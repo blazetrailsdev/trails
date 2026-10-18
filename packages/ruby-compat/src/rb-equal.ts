@@ -1,4 +1,4 @@
-import { rbCString, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
+import { rbCString, rbObjClassname, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
 import { rbRegEqual } from "./regexp.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
@@ -113,7 +113,15 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
      before the `equals` arm below, mirroring `cmp`'s Temporal arm. */
   const tag = temporalTag(a);
   if (tag !== null) {
-    if (temporalTag(b) === null) return false;
+    if (temporalTag(b) === null) {
+      const name = rbObjClassname(b);
+      if (
+        (name === "Date" || name === "DateTime") &&
+        typeof (b as { equals?: unknown }).equals === "function"
+      )
+        return (b as { equals(other: unknown): boolean }).equals(a);
+      return false;
+    }
     const x = widenPlainDate(a);
     const y = widenPlainDate(b);
     if (temporalTag(x) !== temporalTag(y)) return false;
