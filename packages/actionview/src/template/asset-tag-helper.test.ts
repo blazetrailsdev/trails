@@ -1,4 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
+import { assertMatch } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import {
   assertEqual,
@@ -11,6 +12,8 @@ import {
 } from "@blazetrails/activesupport";
 import {
   assetPath,
+  assetUrl,
+  computeAssetHost,
   computeAssetPath,
   imagePath,
   imageUrl,
@@ -1233,11 +1236,312 @@ describe("AssetTagHelperTest", () => {
     );
   });
 
+  it("compute asset public path", () => {
+    assertEqual("/robots.txt", computeAssetPath.call(host, "robots.txt"));
+    assertEqual("/robots.txt", computeAssetPath.call(host, "/robots.txt"));
+    assertEqual(
+      "/javascripts/foo.js",
+      computeAssetPath.call(host, "foo.js", { type: "javascript" }),
+    );
+    assertEqual(
+      "/javascripts/foo.js",
+      computeAssetPath.call(host, "/foo.js", { type: "javascript" }),
+    );
+    assertEqual(
+      "/stylesheets/foo.css",
+      computeAssetPath.call(host, "foo.css", { type: "stylesheet" }),
+    );
+  });
+
+  it("image path with blank placeholder", () => {
+    const placeholderImage = { isBlank: () => true, toString: () => "no-image-yet.png" };
+    assertEqual(
+      "/images/no-image-yet.png",
+      imagePath.call(host, placeholderImage as unknown as string),
+    );
+  });
+
+  it("image path with asset host proc returning nil", () => {
+    const controller = {
+      ...host,
+      config: {
+        assetHost: (source: string) => {
+          if (!source.endsWith("tiff")) {
+            return "cdn.example.com";
+          }
+        },
+      },
+    };
+
+    assertEqual("/images/file.tiff", imagePath.call(controller, "file.tiff"));
+    assertEqual("http://cdn.example.com/images/file.png", imagePath.call(controller, "file.png"));
+  });
+
+  it("image url with asset host proc returning nil", () => {
+    const controller = {
+      ...host,
+      config: { assetHost: () => null },
+      request: { baseUrl: "http://www.example.com", scriptName: null },
+    };
+
+    assertEqual("/images/rails.png", imagePath.call(controller, "rails.png"));
+    assertEqual("http://www.example.com/images/rails.png", imageUrl.call(controller, "rails.png"));
+  });
+
+  it("caching image path with caching and proc asset host using request", () => {
+    let ssl = false;
+    const controller = {
+      ...host,
+      request: { ...request, isSsl: () => ssl, hostWithPort: () => "localhost" },
+      config: {
+        assetHost: (
+          source: string,
+          request: { isSsl(): boolean; protocol: string; hostWithPort(): string },
+        ) => {
+          if (request.isSsl()) {
+            return `${request.protocol}${request.hostWithPort()}`;
+          } else {
+            return `${request.protocol}assets${source.length}.example.com`;
+          }
+        },
+      },
+    };
+
+    assertEqual(
+      "http://assets15.example.com/images/xml.png",
+      imagePath.call(controller, "xml.png"),
+    );
+
+    ssl = true;
+    assertEqual("http://localhost/images/xml.png", imagePath.call(controller, "xml.png"));
+  });
+
   it("should not modify source string", () => {
     const source = "/images/rails.png";
     const copy = source;
     imageTag.call(host, source);
     expect(source).toEqual(copy);
+  });
+});
+
+describe("AssetTagHelperNonVhostTest", () => {
+  type Controller = AssetTagHelperHost & { config: Record<string, unknown> };
+  let controller: Controller;
+  const rss =
+    '<link href="http://www.example.com/collaboration/hieraki" rel="alternate" title="RSS" type="application/rss+xml" />';
+
+  beforeEach(() => {
+    controller = {
+      computeAssetPath,
+      publicComputeAssetPath,
+      config: { relativeUrlRoot: "/collaboration/hieraki" },
+      request: {
+        protocol: "gopher://",
+        baseUrl: "gopher://www.example.com",
+        sendEarlyHints() {},
+      },
+      urlFor: (_options: unknown) => "http://www.example.com/collaboration/hieraki",
+    } as unknown as Controller;
+  });
+
+  it("should compute proper path", () => {
+    assertDomEqual(rss, autoDiscoveryLinkTag.call(controller));
+    assertDomEqual(
+      "/collaboration/hieraki/javascripts/xmlhr.js",
+      javascriptPath.call(controller, "xmlhr"),
+    );
+    assertDomEqual(
+      "/collaboration/hieraki/stylesheets/style.css",
+      stylesheetPath.call(controller, "style"),
+    );
+    assertDomEqual("/collaboration/hieraki/images/xml.png", imagePath.call(controller, "xml.png"));
+  });
+
+  it("should return nothing if asset host isnt configured", () => {
+    assertNil(computeAssetHost.call(controller, "foo"));
+  });
+
+  it("should current request host is always returned for request", () => {
+    assertEqual(
+      "gopher://www.example.com",
+      computeAssetHost.call(controller, "foo", { protocol: ":request" }),
+    );
+  });
+
+  it("should return custom host if passed in options", () => {
+    assertEqual(
+      "http://custom.example.com",
+      computeAssetHost.call(controller, "foo", { host: "http://custom.example.com" }),
+    );
+  });
+
+  it("should ignore relative root path on complete url", () => {
+    assertDomEqual(
+      "http://www.example.com/images/xml.png",
+      imagePath.call(controller, "http://www.example.com/images/xml.png"),
+    );
+  });
+
+  it("should return simple string asset host", () => {
+    controller.config.assetHost = "assets.example.com";
+    assertEqual("gopher://assets.example.com", computeAssetHost.call(controller, "foo"));
+  });
+
+  it("should return relative asset host", () => {
+    controller.config.assetHost = "assets.example.com";
+    assertEqual(
+      "//assets.example.com",
+      computeAssetHost.call(controller, "foo", { protocol: ":relative" }),
+    );
+  });
+
+  it("should return custom protocol asset host", () => {
+    controller.config.assetHost = "assets.example.com";
+    assertEqual(
+      "ftp://assets.example.com",
+      computeAssetHost.call(controller, "foo", { protocol: "ftp" }),
+    );
+  });
+
+  it("should compute proper path with asset host", () => {
+    controller.config.assetHost = "assets.example.com";
+    assertDomEqual(rss, autoDiscoveryLinkTag.call(controller));
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/javascripts/xmlhr.js",
+      javascriptPath.call(controller, "xmlhr"),
+    );
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/stylesheets/style.css",
+      stylesheetPath.call(controller, "style"),
+    );
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/images/xml.png",
+      imagePath.call(controller, "xml.png"),
+    );
+  });
+
+  it("should compute proper path with asset host and default protocol", () => {
+    controller.config.assetHost = "assets.example.com";
+    controller.config.defaultAssetHostProtocol = ":request";
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/javascripts/xmlhr.js",
+      javascriptPath.call(controller, "xmlhr"),
+    );
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/stylesheets/style.css",
+      stylesheetPath.call(controller, "style"),
+    );
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/images/xml.png",
+      imagePath.call(controller, "xml.png"),
+    );
+  });
+
+  it("should compute proper url with asset host", () => {
+    controller.config.assetHost = "assets.example.com";
+    assertDomEqual(rss, autoDiscoveryLinkTag.call(controller));
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/javascripts/xmlhr.js",
+      javascriptUrl.call(controller, "xmlhr"),
+    );
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/stylesheets/style.css",
+      stylesheetUrl.call(controller, "style"),
+    );
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/images/xml.png",
+      imageUrl.call(controller, "xml.png"),
+    );
+  });
+
+  it("should compute proper url with asset host and default protocol", () => {
+    controller.config.assetHost = "assets.example.com";
+    controller.config.defaultAssetHostProtocol = ":request";
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/javascripts/xmlhr.js",
+      javascriptUrl.call(controller, "xmlhr"),
+    );
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/stylesheets/style.css",
+      stylesheetUrl.call(controller, "style"),
+    );
+    assertDomEqual(
+      "gopher://assets.example.com/collaboration/hieraki/images/xml.png",
+      imageUrl.call(controller, "xml.png"),
+    );
+  });
+
+  it("should return asset host with protocol", () => {
+    controller.config.assetHost = "http://assets.example.com";
+    assertEqual("http://assets.example.com", computeAssetHost.call(controller, "foo"));
+  });
+
+  it("should ignore asset host on complete url", () => {
+    controller.config.assetHost = "http://assets.example.com";
+    assertDomEqual(
+      '<link href="http://bar.example.com/stylesheets/style.css" rel="stylesheet" />',
+      stylesheetLinkTag.call(controller, "http://bar.example.com/stylesheets/style.css"),
+    );
+  });
+
+  it("should ignore asset host on scheme relative url", () => {
+    controller.config.assetHost = "http://assets.example.com";
+    assertDomEqual(
+      '<link href="//bar.example.com/stylesheets/style.css" rel="stylesheet" />',
+      stylesheetLinkTag.call(controller, "//bar.example.com/stylesheets/style.css"),
+    );
+  });
+
+  it("should wildcard asset host", () => {
+    controller.config.assetHost = "http://a%d.example.com";
+    assertMatch(/http:\/\/a[0123]\.example\.com/, computeAssetHost.call(controller, "foo")!);
+  });
+
+  it("should wildcard asset host between zero and four", () => {
+    controller.config.assetHost = "http://a%d.example.com";
+    assertMatch(
+      /http:\/\/a[0123]\.example\.com\/collaboration\/hieraki\/images\/xml\.png/,
+      imagePath.call(controller, "xml.png"),
+    );
+    assertMatch(
+      /http:\/\/a[0123]\.example\.com\/collaboration\/hieraki\/images\/xml\.png/,
+      imageUrl.call(controller, "xml.png"),
+    );
+  });
+
+  it("asset host without protocol should be protocol relative", () => {
+    controller.config.assetHost = "a.example.com";
+    assertEqual(
+      "gopher://a.example.com/collaboration/hieraki/images/xml.png",
+      imagePath.call(controller, "xml.png"),
+    );
+    assertEqual(
+      "gopher://a.example.com/collaboration/hieraki/images/xml.png",
+      imageUrl.call(controller, "xml.png"),
+    );
+  });
+
+  it("asset host without protocol should be protocol relative even if path present", () => {
+    controller.config.assetHost = "a.example.com/files/go/here";
+    assertEqual(
+      "gopher://a.example.com/files/go/here/collaboration/hieraki/images/xml.png",
+      imagePath.call(controller, "xml.png"),
+    );
+    assertEqual(
+      "gopher://a.example.com/files/go/here/collaboration/hieraki/images/xml.png",
+      imageUrl.call(controller, "xml.png"),
+    );
+  });
+
+  it("assert css and js of the same name return correct extension", () => {
+    assertDomEqual(
+      "/collaboration/hieraki/javascripts/foo.js",
+      javascriptPath.call(controller, "foo"),
+    );
+    assertDomEqual(
+      "/collaboration/hieraki/stylesheets/foo.css",
+      stylesheetPath.call(controller, "foo"),
+    );
   });
 });
 
@@ -1278,5 +1582,68 @@ describe("AssetTagHelperWithStreamingRequest", () => {
         javascriptIncludeTag.call(streaming, "foo.js"),
       );
     });
+  });
+});
+
+describe("AssetUrlHelperControllerTest", () => {
+  const controller = {
+    computeAssetPath,
+    publicComputeAssetPath,
+    request: {
+      scriptName: null,
+      protocol: "http://",
+      isSsl: () => false,
+      hostWithPort: "www.example.com",
+      baseUrl: "http://www.example.com",
+    },
+  } as unknown as AssetUrlHelperHost;
+
+  it("asset path", () => {
+    assertEqual("/foo", assetPath.call(controller, "foo"));
+  });
+
+  it("asset url", () => {
+    assertEqual("http://www.example.com/foo", assetUrl.call(controller, "foo"));
+  });
+});
+
+describe("AssetUrlHelperEmptyModuleTest", () => {
+  let module: AssetUrlHelperHost & Record<string, unknown>;
+
+  beforeEach(() => {
+    module = { computeAssetPath, publicComputeAssetPath } as unknown as AssetUrlHelperHost &
+      Record<string, unknown>;
+  });
+
+  it("asset path", () => {
+    assertEqual("/foo", assetPath.call(module, "foo"));
+  });
+
+  it("asset url", () => {
+    assertEqual("/foo", assetUrl.call(module, "foo"));
+  });
+
+  it("asset url with request", () => {
+    module.request = { baseUrl: "http://www.example.com", scriptName: null };
+
+    expect(module.request).toBeTruthy();
+    assertEqual("http://www.example.com/foo", assetUrl.call(module, "foo"));
+  });
+
+  it("asset url with config asset host", () => {
+    module.config = { assetHost: "http://www.example.com" };
+
+    expect((module.config as { assetHost: string }).assetHost).toBeTruthy();
+    assertEqual("http://www.example.com/foo", assetUrl.call(module, "foo"));
+  });
+
+  it("asset url with custom asset host", () => {
+    module.config = { assetHost: "http://www.example.com" };
+
+    expect((module.config as { assetHost: string }).assetHost).toBeTruthy();
+    assertEqual(
+      "http://custom.example.com/foo",
+      assetUrl.call(module, "foo", { host: "http://custom.example.com" }),
+    );
   });
 });
