@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import "../../test-helpers/abstract-unit.js";
-import { File, getPath, registerConstant } from "@blazetrails/ruby-compat";
+import { File, getPath, rbModConstSet, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
 import { ActionController, ActionDispatch, type RouteSet } from "@blazetrails/actionpack";
 import { Base } from "../../base.js";
 import { DetailsKey } from "../../lookup-context.js";
@@ -39,19 +40,6 @@ class TestController extends ActionController.Base {
 }
 TestController.viewPaths([FIXTURE_LOAD_PATH]);
 
-class SubController extends ActionController.Base {
-  static {
-    Object.defineProperty(this, "name", { value: "ViewLoadPathsTest::Test::SubController" });
-    this.layout("test/sub");
-  }
-
-  async helloWorld(): Promise<void> {
-    await this.render({ template: "test/hello-world" });
-  }
-}
-const Test = { name: "ViewLoadPathsTest::Test", SubController };
-registerConstant("ViewLoadPathsTest", { name: "ViewLoadPathsTest", Test });
-
 class ViewLoadPathsTest extends ActionController.TestCase {
   declare paths: PathSet;
 
@@ -84,6 +72,20 @@ class ViewLoadPathsTest extends ActionController.TestCase {
         ? (paths.shift() as typeof ActionController.Base).viewPaths()
         : (this.controller as ActionController.Base).viewPaths;
     expect(viewPaths.toAry().map(String)).toEqual(expand(paths as string[]));
+  }
+}
+
+rbModConstSet(Object, "ViewLoadPathsTest", ViewLoadPathsTest);
+const Test = rbModConstSet(ViewLoadPathsTest, "Test", new Module());
+
+class SubController extends ActionController.Base {
+  static {
+    rbModConstSet(Test, "SubController", this);
+    this.layout("test/sub");
+  }
+
+  async helloWorld(): Promise<void> {
+    await this.render({ template: "test/hello-world" });
   }
 }
 
@@ -129,40 +131,40 @@ describe("ViewLoadPathsTest", () => {
   });
 
   test("template appends view path correctly", () => {
-    (controller as unknown as { template: Base }).template = Base.withViewPaths(
-      TestController.viewPaths(),
-      {},
+    rbObjIvarSet(
       controller,
+      "@template",
+      Base.withViewPaths(TestController.viewPaths(), {}, controller),
     );
-    const classViewPaths = TestController.viewPaths().toAry().map(String);
+    const classViewPaths = TestController.viewPaths();
 
     controller.appendViewPath("foo");
     tc.assertPaths(FIXTURE_LOAD_PATH, "foo");
 
     controller.appendViewPath(["bar", "baz"]);
     tc.assertPaths(FIXTURE_LOAD_PATH, "foo", "bar", "baz");
-    tc.assertPaths(TestController, ...classViewPaths);
+    tc.assertPaths(TestController, ...classViewPaths.toAry().map(String));
   });
 
   test("template prepends view path correctly", () => {
-    (controller as unknown as { template: Base }).template = Base.withViewPaths(
-      TestController.viewPaths(),
-      {},
+    rbObjIvarSet(
       controller,
+      "@template",
+      Base.withViewPaths(TestController.viewPaths(), {}, controller),
     );
-    const classViewPaths = TestController.viewPaths().toAry().map(String);
+    const classViewPaths = TestController.viewPaths();
 
     controller.prependViewPath("baz");
     tc.assertPaths("baz", FIXTURE_LOAD_PATH);
 
     controller.prependViewPath(["foo", "bar"]);
     tc.assertPaths("foo", "bar", "baz", FIXTURE_LOAD_PATH);
-    tc.assertPaths(TestController, ...classViewPaths);
+    tc.assertPaths(TestController, ...classViewPaths.toAry().map(String));
   });
 
   test("append view path does not bust template cache", () => {
     const templateInstances = Array.from({ length: 2 }, () => {
-      const controller = new Test.SubController();
+      const controller = new SubController();
       controller.appendViewPath(`${FIXTURE_LOAD_PATH}/override2`);
       return controller.lookupContext.findAll("layouts/test/sub");
     });
@@ -196,13 +198,13 @@ describe("ViewLoadPathsTest", () => {
   });
 
   test("view paths override for layouts in controllers with a module", async () => {
-    tc.controller = new Test.SubController();
+    tc.controller = new SubController();
     await tc.withRouting(async (routes: RouteSet) => {
       routes.draw(function () {
         this.get("helloWorld", { to: "view_load_paths_test/test/sub#helloWorld" });
       });
 
-      Test.SubController.viewPaths([
+      SubController.viewPaths([
         `${FIXTURE_LOAD_PATH}/override`,
         FIXTURE_LOAD_PATH,
         `${FIXTURE_LOAD_PATH}/override2`,

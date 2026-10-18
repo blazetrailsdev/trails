@@ -85,7 +85,6 @@ beforeEach(() => {
     "home",
     "images",
     "infos",
-    "internal",
     "invoices",
     "involvements",
     "journey",
@@ -4170,78 +4169,57 @@ describe("TestUnicodePaths", () => {
 });
 
 describe("TestUrlGenerationErrors", () => {
-  it("URL helpers raise message with mixed parameters when generation fails", async () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.get({ "/products/:id": "products#show", as: "product" });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  class TestUrlGenerationErrors extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  include(TestUrlGenerationErrors, Routes.urlHelpers());
+  registerConstant("TestUrlGenerationErrors", TestUrlGenerationErrors);
+
+  let t: TestUrlGenerationErrors & Record<string, (...args: unknown[]) => string>;
+  beforeEach(({ testCase }) => {
+    t = testCase as typeof t;
+  });
+
+  it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", async () => {
+    const message =
+      'No route matches {:action=>"show", :controller=>"products", :id=>nil}, missing required keys: [:id]';
+
+    const error = await assertRaises([UrlGenerationError], {}, () => t.productPath(null));
+    expect(error.message).toBe(message);
+  });
+
+  it("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", async () => {
     const message =
       'No route matches {:action=>"show", :controller=>"products", :id=>nil}, possible unmatched constraints: [:id]';
 
-    const error = await assertRaises([UrlGenerationError], {}, () =>
-      urlHelpers.productPath(null, { id: "url-tested" }),
-    );
+    const error = await assertRaises([UrlGenerationError], {}, () => t.productPath({ id: null }));
     expect(error.message).toMatch(message);
+  });
+
+  it("URL helpers raise message with mixed parameters when generation fails", async () => {
+    await assertRaises([UrlGenerationError], {}, () => t.productPath(null, { id: "url-tested" }));
+  });
+
+  it("exceptions have suggestions for fix", async () => {
+    const error = await assertRaises([UrlGenerationError], {}, () =>
+      t.productPath(null, { id: "url-tested" }),
+    );
+    expect((error as UrlGenerationError & { detailedMessage(): string }).detailedMessage()).toMatch(
+      "Did you mean?",
+    );
   });
 
   it("correct for empty UrlGenerationError", () => {
     const routes = new RouteSet();
     expect(() => routes.pathFor({}, "nonexistent")).toThrow(/No route matches/);
-  });
-
-  it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
-    const message =
-      'No route matches {:action=>"show", :controller=>"products", :id=>nil}, missing required keys: [:id]';
-
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
-    expect(() => urlHelpers.productPath(null)).toThrow(UrlGenerationError);
-    expect(() => urlHelpers.productPath(null)).toThrow(message);
-  });
-
-  it("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", async () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
-    const message =
-      'No route matches {:action=>"show", :controller=>"products", :id=>nil}, possible unmatched constraints: [:id]';
-
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
-    const error = await assertRaises([UrlGenerationError], {}, () =>
-      urlHelpers.productPath({ id: null }),
-    );
-    expect(error.message).toMatch(message);
-  });
-
-  it("exceptions have suggestions for fix", async () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
-    const error = await assertRaises([UrlGenerationError], {}, () =>
-      urlHelpers.productPath(null, { id: "url-tested" }),
-    );
-    expect((error as UrlGenerationError & { detailedMessage(): string }).detailedMessage()).toMatch(
-      "Did you mean?",
-    );
   });
 });
 
@@ -5346,6 +5324,7 @@ describe("TestInternalRoutingParams", () => {
       this.head("ok");
     }
   }
+  controllerConstants.set("internal", InternalController);
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestInternalRoutingParams extends IntegrationTest {
@@ -5357,7 +5336,6 @@ describe("TestInternalRoutingParams", () => {
 
   let t: TestInternalRoutingParams;
   beforeEach(({ testCase }) => {
-    controllerConstants.set("internal", InternalController);
     t = testCase as TestInternalRoutingParams;
   });
 
