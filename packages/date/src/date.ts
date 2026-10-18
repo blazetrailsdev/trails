@@ -6788,8 +6788,20 @@ rbDefineAllocFunc(
   (klass) => new klass(SEAT, 0n, 0, 0, new Rational(0, 1), 0, DEFAULT_SG),
 );
 
-TEMPORAL_METHOD_TABLE["Temporal.PlainDate"].marshalDump = (self: Temporal.PlainDate) =>
-  new Date(self).marshalDump();
+Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], {
+  marshalDump: (self: Temporal.PlainDate) => new Date(self).marshalDump(),
+  iso8601: (self: Temporal.PlainDate) => new Date(self).iso8601(),
+  xmlschema: (self: Temporal.PlainDate) => new Date(self).xmlschema(),
+});
+
+for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
+  Object.assign(TEMPORAL_METHOD_TABLE[seat], {
+    iso8601: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime, n = 0) =>
+      new DateTime(self).iso8601(n),
+    xmlschema: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime, n = 0) =>
+      new DateTime(self).xmlschema(n),
+  });
+}
 
 registerConstant("Date", Date);
 registerConstant("DateTime", DateTime);

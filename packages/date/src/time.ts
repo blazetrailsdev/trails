@@ -1927,7 +1927,19 @@ for (const seat of ["Temporal.Instant", "Date"]) {
         ? self
         : Temporal.Instant.fromEpochMilliseconds(self.getTime())
       ).toZonedDateTimeISO(nowTimeZoneId()),
+    xmlschema: (self: Temporal.Instant | globalThis.Date, fractionDigits = 0) =>
+      timeFromSeat(self).xmlschema(fractionDigits),
+    iso8601: (self: Temporal.Instant | globalThis.Date, fractionDigits = 0) =>
+      timeFromSeat(self).xmlschema(fractionDigits),
   });
+}
+
+function timeFromSeat(self: Temporal.Instant | globalThis.Date): Time {
+  const ns =
+    self instanceof Temporal.Instant ? self.epochNanoseconds : BigInt(self.getTime()) * 1_000_000n;
+  let sec = ns / 1_000_000_000n;
+  if (ns < 0n && ns % 1_000_000_000n !== 0n) sec -= 1n;
+  return Time.at(Number(sec), Number(ns - sec * 1_000_000_000n), "nanosecond");
 }
 
 registerConstant("Time", Time);

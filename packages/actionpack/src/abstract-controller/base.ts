@@ -200,8 +200,8 @@ export class AbstractController {
   }
 
   /** @internal */
-  async processAction(action: string, ...args: unknown[]): Promise<void> {
-    await this.sendAction(action, ...args);
+  async processAction(action: string, ...args: unknown[]): Promise<unknown> {
+    return this.sendAction(action, ...args);
   }
 
   /** @internal */
@@ -209,7 +209,7 @@ export class AbstractController {
     return rbFSend(this, method, ...args);
   }
 
-  async process(action: string, ...args: unknown[]): Promise<void> {
+  async process(action: string, ...args: unknown[]): Promise<unknown> {
     this._actionName = String(action);
 
     const actionName = this._findActionName(this._actionName);
@@ -223,7 +223,7 @@ export class AbstractController {
 
     this._responseBody = null;
 
-    await this.processAction(actionName, ...args);
+    return this.processAction(actionName, ...args);
   }
 
   controllerPath(): string {
