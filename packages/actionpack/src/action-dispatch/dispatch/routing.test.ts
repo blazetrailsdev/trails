@@ -4188,6 +4188,15 @@ describe("TestUrlGenerationErrors", () => {
     t = testCase as typeof t;
   });
 
+  it("URL helpers raise message with mixed parameters when generation fails", async () => {
+    await assertRaises([UrlGenerationError], {}, () => t.productPath(null, { id: "url-tested" }));
+  });
+
+  it("correct for empty UrlGenerationError", () => {
+    const routes = new RouteSet();
+    expect(() => routes.pathFor({}, "nonexistent")).toThrow(/No route matches/);
+  });
+
   it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", async () => {
     const message =
       'No route matches {:action=>"show", :controller=>"products", :id=>nil}, missing required keys: [:id]';
@@ -4204,10 +4213,6 @@ describe("TestUrlGenerationErrors", () => {
     expect(error.message).toMatch(message);
   });
 
-  it("URL helpers raise message with mixed parameters when generation fails", async () => {
-    await assertRaises([UrlGenerationError], {}, () => t.productPath(null, { id: "url-tested" }));
-  });
-
   it("exceptions have suggestions for fix", async () => {
     const error = await assertRaises([UrlGenerationError], {}, () =>
       t.productPath(null, { id: "url-tested" }),
@@ -4215,11 +4220,6 @@ describe("TestUrlGenerationErrors", () => {
     expect((error as UrlGenerationError & { detailedMessage(): string }).detailedMessage()).toMatch(
       "Did you mean?",
     );
-  });
-
-  it("correct for empty UrlGenerationError", () => {
-    const routes = new RouteSet();
-    expect(() => routes.pathFor({}, "nonexistent")).toThrow(/No route matches/);
   });
 });
 
