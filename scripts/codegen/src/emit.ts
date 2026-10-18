@@ -1302,14 +1302,15 @@ export class Emitter {
     ) {
       f.stats["getter-from-twin"] = (f.stats["getter-from-twin"] ?? 0) + 1;
       const mod = opts.objectMember ? "" : opts.static ? "static " : "";
-      return `${doc}${mod}get ${propKey(tsName)}(): any {\n${indent(body).join("\n")}\n}`;
+      const gt = twin?.info.ret ? `: ${this.lw.tsType(twin.info.ret, ctx)}` : "";
+      return `${doc}${mod}get ${propKey(tsName)}()${gt} {\n${indent(body).join("\n")}\n}`;
     }
     const inherited =
       !opts.module && !opts.objectMember && !opts.asFunction
         ? this.lw.inheritedDepGetter(u.fqn, d.name, opts.static)
         : undefined;
     if (inherited && !awaits && d.params.length === 0 && !/=$/.test(d.name))
-      return `${opts.static ? "static " : ""}get ${propKey(inherited.tsName)}(): any {\n${indent(body).join("\n")}\n}`;
+      return `${opts.static ? "static " : ""}get ${propKey(inherited.tsName)}() {\n${indent(body).join("\n")}\n}`;
     if (
       !opts.static &&
       !opts.module &&
@@ -1327,8 +1328,10 @@ export class Emitter {
         `set ${propKey(tsName)}(value: any) {\n  this._${tsName} = value;\n}`,
       ].join("\n\n");
     const thisParam = opts.module ? (ps ? "this: any, " : "this: any") : "";
-    const retType = this.lw.tsType(twin?.info.ret, ctx);
-    const ret = isCtor ? "" : asy ? `: Promise<${retType}>` : `: ${retType}`;
+    // The hand twin's declared return type where there is one; otherwise none,
+    // so TypeScript infers it from the body rather than reading `any`.
+    const retType = twin?.info.ret ? this.lw.tsType(twin.info.ret, ctx) : null;
+    const ret = isCtor || !retType ? "" : asy ? `: Promise<${retType}>` : `: ${retType}`;
     if (/^[a-z_]\w*=$/.test(d.name) && opts.asFunction) {
       const fnName = tsName.startsWith("set")
         ? tsName

@@ -132,6 +132,36 @@ function findEdits(
   return edits;
 }
 
+/**
+ * A method left unannotated so TypeScript infers its return type, but whose
+ * return reaches back into itself (TS7023 / TS7024: a recursive `format`),
+ * cannot be inferred: it alone is annotated, `any` (`Promise<any>` when async).
+ */
+function annotateRecursive(program: ts.Program, file: ts.SourceFile): number[] {
+  const at: number[] = [];
+  for (const d of program.getSemanticDiagnostics(file)) {
+    if ((d.code !== 7023 && d.code !== 7024) || d.start === undefined) continue;
+    // The innermost function-like node spanning the diagnostic.
+    let n: ts.Node | undefined;
+    const find = (node: ts.Node): void => {
+      if (d.start! < node.getStart(file) || d.start! >= node.getEnd()) return;
+      if (ts.isFunctionLike(node)) n = node;
+      ts.forEachChild(node, find);
+    };
+    find(file);
+    if (!n || !ts.isFunctionLike(n) || n.type) continue;
+    const params = n.parameters;
+    const close = file.text.indexOf(")", params.end);
+    if (close >= 0 && !at.includes(close + 1)) at.push(close + 1);
+  }
+  return at;
+}
+
+function isAsyncAt(text: string, closeParen: number): boolean {
+  const start = text.lastIndexOf("\n", closeParen);
+  return /\basync\b/.test(text.slice(start, closeParen));
+}
+
 export function nonNullPass(srcDir: string, tsconfig: string): number {
   const cfg = ts.readConfigFile(tsconfig, ts.sys.readFile);
   const parsed = ts.parseJsonConfigFileContent(cfg.config, ts.sys, path.dirname(tsconfig));
@@ -145,6 +175,19 @@ export function nonNullPass(srcDir: string, tsconfig: string): number {
   };
   const files = walkDir(srcDir);
   let total = 0;
+  {
+    const program = ts.createProgram(files, options);
+    for (const f of files) {
+      const sf = program.getSourceFile(f);
+      if (!sf) continue;
+      const at = annotateRecursive(program, sf);
+      if (!at.length) continue;
+      let text = readFileSync(f, "utf8");
+      for (const pos of at.sort((a, b) => b - a))
+        text = `${text.slice(0, pos)}: ${isAsyncAt(text, pos) ? "Promise<any>" : "any"}${text.slice(pos)}`;
+      writeFileSync(f, text);
+    }
+  }
   // A `!` can change the type an outer call sees, so the pass repeats until
   // nothing is added (two rounds in practice).
   for (let round = 0; round < 3; round++) {

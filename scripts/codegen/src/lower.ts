@@ -1285,6 +1285,8 @@ export class Lowerer {
       if (p.splat) return `...${this.expr(p.splat, ctx)}`;
       if (p.key.k === "sym")
         return `${propKey(jsIdent(p.key.value).replace(/_$/, ""))}: ${this.expr(p.value, ctx)}`;
+      // A String key (`super("value" => v)`) is a plain property key.
+      if (p.key.k === "str") return `${propKey(p.key.value)}: ${this.expr(p.value, ctx)}`;
       return `[${this.expr(p.key, ctx)}]: ${this.expr(p.value, ctx)}`;
     });
     return `{ ${parts.join(", ")} }`;
@@ -1306,7 +1308,7 @@ export class Lowerer {
         return symColonHere(ctx)
           ? `${JSON.stringify(":" + p.key.value)}: ${this.expr(p.value, ctx)}`
           : `${propKey(camelKeys && /^[a-z_][a-z0-9_]*$/.test(p.key.value) ? propName(p.key.value) : p.key.value)}: ${this.expr(p.value, ctx)}`;
-      if (p.key.k === "str") return `${JSON.stringify(p.key.value)}: ${this.expr(p.value, ctx)}`;
+      if (p.key.k === "str") return `${propKey(p.key.value)}: ${this.expr(p.value, ctx)}`;
       return `[${this.expr(p.key, ctx)}]: ${this.expr(p.value, ctx)}`;
     });
     return `{ ${parts.join(", ")} }`;
