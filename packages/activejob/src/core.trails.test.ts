@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { days, freezeTime, travelBack, useZone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { rbHashSRuby2KeywordsHashP, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  rbHashSRuby2KeywordsHashP,
+  rbModConstSet,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
+import { ActiveJob } from "./namespaces.js";
 import { Base } from "./base.js";
 
 class HelloJob extends Base {}
@@ -121,5 +126,52 @@ describe("ActiveJob::Core", () => {
   it("casts priority with to_i, including 0", () => {
     const job = new HelloJob().set({ priority: "0" });
     expect((job as unknown as { _priority: unknown })._priority).toBe(0);
+  });
+
+  it("ClassMethods.deserialize constantizes job_class, builds it and deserializes onto it", () => {
+    const job = HelloJob.deserialize<HelloJob>({
+      job_class: "HelloJob",
+      job_id: "abc",
+      arguments: [1],
+    });
+    expect(job).toBeInstanceOf(HelloJob);
+    expect(job.jobId).toBe("abc");
+    expect(job.serialize()["arguments"]).toEqual([1]);
+  });
+
+  it("ClassMethods.set builds a ConfiguredJob with the class and options", () => {
+    class ConfiguredJob {
+      constructor(
+        readonly jobClass: unknown,
+        readonly options: unknown,
+      ) {}
+    }
+    rbModConstSet(ActiveJob, "ConfiguredJob", ConfiguredJob);
+    const configured = HelloJob.set({ wait: 0 }) as ConfiguredJob;
+    expect(configured).toBeInstanceOf(ConfiguredJob);
+    expect(configured.jobClass).toBe(HelloJob);
+    expect(configured.options).toEqual({ wait: 0 });
+  });
+
+  it("serializes a null scheduled_at as null, and a set one as utc iso8601(9)", () => {
+    const job = new HelloJob();
+    expect(job.serialize()["scheduled_at"]).toBeNull();
+    job.scheduledAt = Time.iso8601("2026-01-02T03:04:05.123456789+02:00");
+    expect(job.serialize()["scheduled_at"]).toBe("2026-01-02T01:04:05.123456789Z");
+  });
+
+  it("deserializes enqueued_at and scheduled_at only when present", () => {
+    const job = new HelloJob();
+    job.deserialize({ enqueued_at: false, scheduled_at: null });
+    expect(job.enqueuedAt).toBeNull();
+    expect(job.scheduledAt).toBeNull();
+    job.deserialize({ scheduled_at: "2026-01-02T01:04:05.123456789Z" });
+    expect(job.scheduledAt).toBeInstanceOf(Time);
+    expect(job.serialize()["scheduled_at"]).toBe("2026-01-02T01:04:05.123456789Z");
+  });
+
+  it("set wait_until assigns the time as given", () => {
+    const at = Time.iso8601("2026-01-02T01:04:05Z");
+    expect(new HelloJob().set({ waitUntil: at }).scheduledAt).toBe(at);
   });
 });
