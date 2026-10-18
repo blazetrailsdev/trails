@@ -1,5 +1,10 @@
 import { describe, it, expect, afterAll, beforeAll, beforeEach } from "vitest";
-import { ContentSecurityPolicy, MAPPINGS } from "../http/content-security-policy.js";
+import {
+  ContentSecurityPolicy,
+  InvalidDirectiveError,
+  MAPPINGS,
+} from "../http/content-security-policy.js";
+import { Request } from "../http/request.js";
 import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
 import { Base } from "../../action-controller/base.js";
@@ -15,8 +20,18 @@ import {
 import { Middleware } from "../http/content-security-policy.js";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { controllerConstants } from "../http/request.js";
-import { assertMatch, assertNil } from "@blazetrails/activesupport";
-import { rbObjDup, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import {
+  assertMatch,
+  assertNil,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  rbObjDup,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import type { MiddlewareFactory } from "../middleware/stack.js";
 import { RouteSet } from "../routing/route-set.js";
@@ -24,77 +39,257 @@ import { RouteSet } from "../routing/route-set.js";
 describe("ContentSecurityPolicyTest", () => {
   it("build", () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'");
-    expect(policy.build()).toBe("default-src 'self'");
+    expect(policy.build()).toBe("");
+
+    policy.scriptSrc(":self");
+    expect(policy.build()).toBe("script-src 'self'");
   });
 
   it("dup", () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'");
-    const copy = rbObjDup(policy);
-    copy.scriptSrc("'unsafe-inline'");
-    expect(policy.build()).toBe("default-src 'self'");
-    expect(copy.build()).toContain("script-src");
+    policy.imgSrc(":self");
+    policy.blockAllMixedContent();
+    policy.upgradeInsecureRequests();
+    policy.sandbox();
+    const copied = rbObjDup(policy);
+    expect(policy.build()).toBe(copied.build());
   });
 
-  it("semicolon validation", () => {
+  it("semicolon validation", async () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'; script-src 'unsafe-inline'");
-    expect(() => policy.build()).toThrow(/semicolon/);
+    policy.baseUri("https://some.url; script-src https://other.url");
+
+    const error = await assertRaises([InvalidDirectiveError], {}, () => policy.build());
+    expect(error.message).toBe(
+      `Invalid Content Security Policy base-uri: "https://some.url; script-src https://other.url". ` +
+        "Directive values must not contain whitespace or semicolons. " +
+        "Please use multiple arguments or other directive methods instead.",
+    );
   });
 
   it("mappings", () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'");
-    policy.scriptSrc("'self'", "cdn.example.com");
-    const header = policy.build();
-    expect(header).toContain("default-src 'self'");
-    expect(header).toContain("script-src 'self' cdn.example.com");
+    policy.scriptSrc(":data");
+    expect(policy.build()).toBe("script-src data:");
+
+    policy.scriptSrc(":mediastream");
+    expect(policy.build()).toBe("script-src mediastream:");
+
+    policy.scriptSrc(":blob");
+    expect(policy.build()).toBe("script-src blob:");
+
+    policy.scriptSrc(":filesystem");
+    expect(policy.build()).toBe("script-src filesystem:");
+
+    policy.scriptSrc(":self");
+    expect(policy.build()).toBe("script-src 'self'");
+
+    policy.scriptSrc(":unsafe_inline");
+    expect(policy.build()).toBe("script-src 'unsafe-inline'");
+
+    policy.scriptSrc(":unsafe_eval");
+    expect(policy.build()).toBe("script-src 'unsafe-eval'");
+
+    policy.scriptSrc(":wasm_unsafe_eval");
+    expect(policy.build()).toBe("script-src 'wasm-unsafe-eval'");
+
+    policy.scriptSrc(":none");
+    expect(policy.build()).toBe("script-src 'none'");
+
+    policy.scriptSrc(":strict_dynamic");
+    expect(policy.build()).toBe("script-src 'strict-dynamic'");
+
+    policy.scriptSrc(":ws");
+    expect(policy.build()).toBe("script-src ws:");
+
+    policy.scriptSrc(":wss");
+    expect(policy.build()).toBe("script-src wss:");
+
+    policy.scriptSrc(":none", ":report_sample");
+    expect(policy.build()).toBe("script-src 'none' 'report-sample'");
+
+    policy.scriptSrc(":unsafe_hashes");
+    expect(policy.build()).toBe("script-src 'unsafe-hashes'");
   });
 
   it("fetch directives", () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'none'");
-    policy.imgSrc("*");
-    policy.fontSrc("https://fonts.example.com");
-    const header = policy.build();
-    expect(header).toContain("default-src 'none'");
-    expect(header).toContain("img-src *");
-    expect(header).toContain("font-src https://fonts.example.com");
+    policy.childSrc(":self");
+    expect(policy.build()).toMatch(/child-src 'self'/);
+
+    policy.childSrc(false);
+    expect(policy.build()).not.toMatch(/child-src/);
+
+    policy.connectSrc(":self");
+    expect(policy.build()).toMatch(/connect-src 'self'/);
+
+    policy.connectSrc(false);
+    expect(policy.build()).not.toMatch(/connect-src/);
+
+    policy.defaultSrc(":self");
+    expect(policy.build()).toMatch(/default-src 'self'/);
+
+    policy.defaultSrc(false);
+    expect(policy.build()).not.toMatch(/default-src/);
+
+    policy.fontSrc(":self");
+    expect(policy.build()).toMatch(/font-src 'self'/);
+
+    policy.fontSrc(false);
+    expect(policy.build()).not.toMatch(/font-src/);
+
+    policy.frameSrc(":self");
+    expect(policy.build()).toMatch(/frame-src 'self'/);
+
+    policy.frameSrc(false);
+    expect(policy.build()).not.toMatch(/frame-src/);
+
+    policy.imgSrc(":self");
+    expect(policy.build()).toMatch(/img-src 'self'/);
+
+    policy.imgSrc(false);
+    expect(policy.build()).not.toMatch(/img-src/);
+
+    policy.manifestSrc(":self");
+    expect(policy.build()).toMatch(/manifest-src 'self'/);
+
+    policy.manifestSrc(false);
+    expect(policy.build()).not.toMatch(/manifest-src/);
+
+    policy.mediaSrc(":self");
+    expect(policy.build()).toMatch(/media-src 'self'/);
+
+    policy.mediaSrc(false);
+    expect(policy.build()).not.toMatch(/media-src/);
+
+    policy.objectSrc(":self");
+    expect(policy.build()).toMatch(/object-src 'self'/);
+
+    policy.objectSrc(false);
+    expect(policy.build()).not.toMatch(/object-src/);
+
+    policy.prefetchSrc(":self");
+    expect(policy.build()).toMatch(/prefetch-src 'self'/);
+
+    policy.prefetchSrc(false);
+    expect(policy.build()).not.toMatch(/prefetch-src/);
+
+    policy.scriptSrc(":self");
+    expect(policy.build()).toMatch(/script-src 'self'/);
+
+    policy.scriptSrc(false);
+    expect(policy.build()).not.toMatch(/script-src/);
+
+    policy.scriptSrcAttr(":self");
+    expect(policy.build()).toMatch(/script-src-attr 'self'/);
+
+    policy.scriptSrcAttr(false);
+    expect(policy.build()).not.toMatch(/script-src-attr/);
+
+    policy.scriptSrcElem(":self");
+    expect(policy.build()).toMatch(/script-src-elem 'self'/);
+
+    policy.scriptSrcElem(false);
+    expect(policy.build()).not.toMatch(/script-src-elem/);
+
+    policy.styleSrc(":self");
+    expect(policy.build()).toMatch(/style-src 'self'/);
+
+    policy.styleSrc(false);
+    expect(policy.build()).not.toMatch(/style-src/);
+
+    policy.styleSrcAttr(":self");
+    expect(policy.build()).toMatch(/style-src-attr 'self'/);
+
+    policy.styleSrcAttr(false);
+    expect(policy.build()).not.toMatch(/style-src-attr/);
+
+    policy.styleSrcElem(":self");
+    expect(policy.build()).toMatch(/style-src-elem 'self'/);
+
+    policy.styleSrcElem(false);
+    expect(policy.build()).not.toMatch(/style-src-elem/);
+
+    policy.workerSrc(":self");
+    expect(policy.build()).toMatch(/worker-src 'self'/);
+
+    policy.workerSrc(false);
+    expect(policy.build()).not.toMatch(/worker-src/);
   });
 
   it("document directives", () => {
     const policy = new ContentSecurityPolicy();
-    policy.baseUri("'self'");
-    policy.sandbox("allow-scripts");
-    const header = policy.build();
-    expect(header).toContain("base-uri 'self'");
-    expect(header).toContain("sandbox allow-scripts");
+    policy.baseUri("https://example.com");
+    expect(policy.build()).toMatch(/base-uri https:\/\/example\.com/);
+
+    policy.pluginTypes("application/x-shockwave-flash");
+    expect(policy.build()).toMatch(/plugin-types application\/x-shockwave-flash/);
+
+    policy.sandbox();
+    expect(policy.build()).toMatch(/sandbox/);
+
+    policy.sandbox("allow-scripts", "allow-modals");
+    expect(policy.build()).toMatch(/sandbox allow-scripts allow-modals/);
+
+    policy.sandbox(false);
+    expect(policy.build()).not.toMatch(/sandbox/);
   });
 
   it("navigation directives", () => {
     const policy = new ContentSecurityPolicy();
-    policy.formAction("'self'");
-    policy.frameAncestors("'none'");
-    const header = policy.build();
-    expect(header).toContain("form-action 'self'");
-    expect(header).toContain("frame-ancestors 'none'");
+    policy.formAction(":self");
+    expect(policy.build()).toMatch(/form-action 'self'/);
+
+    policy.frameAncestors(":self");
+    expect(policy.build()).toMatch(/frame-ancestors 'self'/);
   });
 
   it("reporting directives", () => {
     const policy = new ContentSecurityPolicy();
-    policy.reportUri("/csp-report");
-    const header = policy.build();
-    expect(header).toContain("report-uri /csp-report");
+    policy.reportUri("/violations");
+    expect(policy.build()).toMatch(/report-uri \/violations/);
   });
 
   it("other directives", () => {
     const policy = new ContentSecurityPolicy();
     policy.blockAllMixedContent();
+    expect(policy.build()).toMatch(/block-all-mixed-content/);
+
+    policy.blockAllMixedContent(false);
+    expect(policy.build()).not.toMatch(/block-all-mixed-content/);
+
+    policy.requireSriFor(":script", ":style");
+    expect(policy.build()).toMatch(/require-sri-for script style/);
+
+    policy.requireSriFor("script", "style");
+    expect(policy.build()).toMatch(/require-sri-for script style/);
+
+    policy.requireSriFor();
+    expect(policy.build()).not.toMatch(/require-sri-for/);
+
+    policy.requireTrustedTypesFor(":script");
+    expect(policy.build()).toMatch(/require-trusted-types-for 'script'/);
+
+    policy.requireTrustedTypesFor();
+    expect(policy.build()).not.toMatch(/require-trusted-types-for/);
+
+    policy.trustedTypes(":none");
+    expect(policy.build()).toMatch(/trusted-types 'none'/);
+
+    policy.trustedTypes("foo", "bar");
+    expect(policy.build()).toMatch(/trusted-types foo bar/);
+
+    policy.trustedTypes("foo", "bar", ":allow_duplicates");
+    expect(policy.build()).toMatch(/trusted-types foo bar 'allow-duplicates'/);
+
+    policy.trustedTypes();
+    expect(policy.build()).not.toMatch(/trusted-types/);
+
     policy.upgradeInsecureRequests();
-    const header = policy.build();
-    expect(header).toContain("block-all-mixed-content");
-    expect(header).toContain("upgrade-insecure-requests");
+    expect(policy.build()).toMatch(/upgrade-insecure-requests/);
+
+    policy.upgradeInsecureRequests(false);
+    expect(policy.build()).not.toMatch(/upgrade-insecure-requests/);
   });
 
   it("block_all_mixed_content false removes the directive", () => {
@@ -127,49 +322,52 @@ describe("ContentSecurityPolicyTest", () => {
 
   it("multiple sources", () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'", "https://cdn.example.com", "https://api.example.com");
-    expect(policy.build()).toBe(
-      "default-src 'self' https://cdn.example.com https://api.example.com",
-    );
+    policy.scriptSrc(":self", ":https");
+    expect(policy.build()).toBe("script-src 'self' https:");
   });
 
   it("multiple directives", () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'");
-    policy.scriptSrc("cdn.example.com");
-    policy.styleSrc("'unsafe-inline'");
-    const header = policy.build();
-    expect(header).toContain("default-src 'self'");
-    expect(header).toContain("script-src cdn.example.com");
-    expect(header).toContain("style-src 'unsafe-inline'");
-    expect(header.split("; ").length).toBe(3);
+    policy.scriptSrc(":self", ":https");
+    policy.styleSrc(":self", ":https");
+    expect(policy.build()).toBe("script-src 'self' https:; style-src 'self' https:");
   });
 
   it("dynamic directives", () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc(() => "'self'");
-    expect(policy.build({})).toBe("default-src 'self'");
+    const request = new Request({ HTTP_HOST: "www.example.com" });
+    const controller = { request };
+
+    policy.scriptSrc(() => request.host);
+    expect(policy.build(controller)).toBe("script-src www.example.com");
   });
 
   it("multiple and dynamic directives", () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'");
-    policy.scriptSrc(() => "cdn.example.com");
-    const header = policy.build({});
-    expect(header).toContain("default-src 'self'");
-    expect(header).toContain("script-src cdn.example.com");
+    const request = new Request({ HTTP_HOST: "www.example.com" });
+    const controller = { request };
+
+    policy.frameAncestors(() => [":self", "https://example.com"]);
+    expect(policy.build(controller)).toBe("frame-ancestors 'self' https://example.com");
   });
 
   it("mixed static and dynamic directives", () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("'self'", () => "dynamic.example.com");
-    expect(policy.build({})).toBe("default-src 'self' dynamic.example.com");
+    policy.scriptSrc(":self", () => "foo.com", "bar.com");
+    const request = new Request({});
+    const controller = { request };
+    expect(policy.build(controller)).toBe("script-src 'self' foo.com bar.com");
   });
 
-  it("missing context for dynamic source", () => {
+  it("missing context for dynamic source", async () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc(() => "'self'");
-    expect(() => policy.build()).toThrow(/Missing context/);
+    policy.scriptSrc(() => "www.example.com");
+
+    const exception = await assertRaises([Error], {}, () => policy.build());
+
+    expect(exception.message).toMatch(
+      /^Missing context for the dynamic content security policy source:/,
+    );
   });
 
   it("constructor with init function", () => {
@@ -280,17 +478,22 @@ describe("ContentSecurityPolicyTest", () => {
     expect(policy.build({})).toBe("default-src https://a.example https://b.example");
   });
 
-  it("invalid directive source", () => {
+  it("invalid directive source", async () => {
     const policy = new ContentSecurityPolicy();
-    expect(() => policy.scriptSrc([":self"] as unknown as string)).toThrow(
-      "Invalid content security policy source: [:self]",
+    const exception = await assertRaises([ArgumentError], {}, () =>
+      policy.scriptSrc([":self"] as unknown as string),
     );
+
+    expect(exception.message).toBe("Invalid content security policy source: [:self]");
   });
 
-  it("raises runtime error when unexpected source", () => {
+  it("raises runtime error when unexpected source", async () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc(() => 42 as unknown as string);
-    expect(() => policy.build({})).toThrow(/Unexpected|Invalid/);
+    policy.pluginTypes([":flash"] as unknown as string);
+
+    const exception = await assertRaises([Error], {}, () => policy.build());
+
+    expect(exception.message).toMatch(/^Unexpected content security policy source:/);
   });
 
   it("DSL with no args clears the directive", () => {
@@ -332,10 +535,16 @@ describe("ContentSecurityPolicyTest", () => {
     expect(policy.build()).toBe("sandbox");
   });
 
-  it("whitespace validation", () => {
+  it("whitespace validation", async () => {
     const policy = new ContentSecurityPolicy();
-    policy.defaultSrc("foo bar");
-    expect(() => policy.build()).toThrow(/whitespace or semicolons/);
+    policy.baseUri("https://some.url https://other.url");
+
+    const error = await assertRaises([InvalidDirectiveError], {}, () => policy.build());
+    expect(error.message).toBe(
+      `Invalid Content Security Policy base-uri: "https://some.url https://other.url". ` +
+        "Directive values must not contain whitespace or semicolons. " +
+        "Please use multiple arguments or other directive methods instead.",
+    );
   });
 
   it("dup preserves bare-directive sentinel", () => {
@@ -482,7 +691,7 @@ describe("ContentSecurityPolicyMiddlewareTest", () => {
   it("rack lint", async () => {
     const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
 
-    await expect(buildApp(app).call(env)).resolves.toBeDefined();
+    await assertNothingRaised(() => buildApp(app).call(env));
   });
 
   it("does not override app content security policy", async () => {

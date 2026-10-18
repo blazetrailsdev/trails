@@ -6000,6 +6000,9 @@ export function main() {
             resolveCalleeSigs(
               portedWithArgsSigs(tsFile, ts.name),
               tsParamsByNameInDeps.get(ts.name),
+              ts.recv === undefined && tsClass !== undefined
+                ? (tsParamsByFileOwnerNameInPkg.get(tsFile)?.get(`${tsClass}#${ts.name}`) ?? [])
+                : [],
             ),
             rubyParamsByName.get(ruby.name),
           );

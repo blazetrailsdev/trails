@@ -1468,12 +1468,24 @@ function kwargValue(tsArg: string, rubyKey: string): string | undefined {
  *  declarations, else the ones a dependency package declares under that name.
  *  `ActiveSupport::Notifications.instrument` is declared in activesupport and
  *  called from actiondispatch, and without the fallback its skipped `payload`
- *  positional reads as a value (redirection.rb:22). */
+ *  positional reads as a value (redirection.rb:22).
+ *
+ *  `ownerSigs` are the enclosing class's own declarations of the name, given
+ *  when the call resolves through a receiver: they win when present. When the
+ *  class does not declare it, the callee is an ancestor's, which may live in a
+ *  dependency, so a same-package homonym on an unrelated class does not stand
+ *  in for it alone. `LogSubscriber#renderPartial`'s `debug do … end`
+ *  (`actionview/lib/action_view/log_subscriber.rb`) reaches
+ *  `ActiveSupport::LogSubscriber#debug(progname = nil, &block)`, not
+ *  actionview's `DebugHelper#debug(object)`. */
 export function resolveCalleeSigs(
   inPkg: ParamInfo[][],
   inDeps: ParamInfo[][] | undefined,
+  ownerSigs?: ParamInfo[][],
 ): ParamInfo[][] {
-  return inPkg.length > 0 ? inPkg : (inDeps ?? []);
+  if (ownerSigs !== undefined && ownerSigs.length > 0) return ownerSigs;
+  if (inPkg.length === 0) return inDeps ?? [];
+  return ownerSigs === undefined ? inPkg : [...inPkg, ...(inDeps ?? [])];
 }
 
 export function compareCallArgs(

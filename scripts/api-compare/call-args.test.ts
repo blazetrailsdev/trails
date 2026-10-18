@@ -613,6 +613,19 @@ describe("compareCallArgs block-tail nil padding", () => {
     );
   });
 
+  it("does not let a same-package homonym on another class block the strip", () => {
+    const ruby = site("debug", [], ["block"]);
+    const ts = site("debug", ["nil"], ["block"]);
+    const homonym = [[required("object")]];
+    const inDeps = [[optional("progname"), optional("block")]];
+    expect(
+      compareCallArgs(ruby, ts, undefined, resolveCalleeSigs(homonym, inDeps, [])).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(ruby, ts, undefined, resolveCalleeSigs(homonym, inDeps, homonym)).verdict,
+    ).toBe("mismatch");
+  });
+
   it("does not fire when neither side carries a block", () => {
     expect(
       compareCallArgs(
