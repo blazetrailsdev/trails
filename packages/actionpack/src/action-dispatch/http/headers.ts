@@ -92,6 +92,7 @@ export class Headers {
     return headers;
   }
 
+  /** @inventedArm if — CONVERGEABLE headers-merge-bang-single-each-dispatch */
   mergeBang(headersOrEnv: Record<string, unknown> | Headers): Record<string, unknown> | Headers {
     const block = ([key, value]: [string, unknown]): void => {
       this._req.setHeader(envName(String(key)), value);
