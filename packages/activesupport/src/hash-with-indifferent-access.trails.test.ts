@@ -53,7 +53,7 @@ describe("HashWithIndifferentAccess", () => {
   it("to_h does not convert nested values the way to_hash does", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: { b: 1 } });
     h.setDefault(0);
-    const toH = h.toH();
+    const toH = h.toH() as Hash<string, unknown>;
     expect(toH).toBeInstanceOf(Hash);
     expect(toH).not.toBeInstanceOf(HashWithIndifferentAccess);
     expect(toH.get("a")).toBeInstanceOf(HashWithIndifferentAccess);

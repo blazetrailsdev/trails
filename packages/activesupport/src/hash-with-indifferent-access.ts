@@ -16,6 +16,7 @@ import {
   rbObjRespondTo,
   symbolToS,
   toEnum,
+  transformValuesBang,
   type Enumerator,
 } from "@blazetrails/ruby-compat";
 
@@ -581,18 +582,11 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this;
   }
 
+  /** @inventedArm if — PERMANENT */
   toHash(): Hash<string, unknown> | AnyObject {
     const copy = this.toH() as Hash<string, unknown> | AnyObject;
-    if (copy instanceof Hash) {
-      for (const [key, v] of [...copy]) {
-        copy.set(key, this.convertValueToHash(v as V));
-      }
-      this.setDefaults(copy);
-    } else {
-      for (const [key, v] of Object.entries(copy)) {
-        copy[key] = this.convertValueToHash(v as V);
-      }
-    }
+    transformValuesBang(copy, (v) => this.convertValueToHash(v as V));
+    if (copy instanceof Hash) this.setDefaults(copy);
     return copy;
   }
 

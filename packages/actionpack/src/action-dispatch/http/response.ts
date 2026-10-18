@@ -1,6 +1,7 @@
 import type { Time } from "@blazetrails/date";
 import { cattrAccessor, include, presence } from "@blazetrails/activesupport";
 import {
+  hashAset,
   File,
   IO,
   IOError,
@@ -299,6 +300,7 @@ export class Response {
     status: number | string = 200,
     headers: Record<string, string> = {},
     body: string[] = [],
+    block?: (response: Response) => void,
   ) {
     this._headers = new Headers();
     for (const [key, value] of Object.entries(headers)) {
@@ -307,6 +309,8 @@ export class Response {
     this.stream = this.buildBuffer(this, this.mungeBodyObject([...body]));
     this.status = status;
     this.prepareCacheControlBang();
+
+    if (block) block(this);
   }
 
   get status(): number {
@@ -349,8 +353,7 @@ export class Response {
   }
 
   setHeader(key: string, v: string | null): string | null {
-    this._headers.set(key, v as string);
-    return v;
+    return hashAset(this._headers, key, v);
   }
 
   deleteHeader(key: string): string | undefined {

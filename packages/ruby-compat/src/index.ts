@@ -118,6 +118,7 @@ export {
   size,
   slice,
   transformValues,
+  transformValuesBang,
   update,
   valuesAt,
 } from "./hash.js";

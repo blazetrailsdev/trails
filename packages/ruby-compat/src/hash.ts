@@ -706,6 +706,29 @@ export function eachKey<T>(
 }
 
 /**
+ * Ruby `Hash#transform_values!` (`vendor/ruby/v3.3.11/hash.c:3398`
+ * `rb_hash_transform_values_bang`): each value replaced in place by the
+ * block's result, answering the receiver.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values!` (`vendor/ruby/v3.3.11/hash.c:3398`).
+ */
+export function transformValuesBang<H extends Record<string, unknown> | Map<unknown, unknown>>(
+  hash: H,
+  block: (value: unknown) => unknown,
+): H {
+  if (hash instanceof Map) {
+    const set = hash instanceof Hash ? Hash.prototype.set : Map.prototype.set;
+    for (const [key, value] of [...hash]) {
+      set.call(hash, key, block(value));
+    }
+    return hash;
+  }
+  for (const key of Object.keys(hash)) {
+    hash[key] = block(hash[key]);
+  }
+  return hash;
+}
+
+/**
  * Ruby `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`
  * `rb_hash_transform_values`) — a NEW hash with the same keys in the same
  * order and each value replaced by the block's result.
@@ -1250,9 +1273,11 @@ export class Hash<K, V> extends Map<K, V> {
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#to_h` (`vendor/ruby/v3.3.11/hash.c:3555`).
    */
-  toH(): Hash<K, V>;
+  toH(): Hash<K, V> | Record<string, V>;
   toH<K2, V2>(block: (key: K, value: V) => [K2, V2]): Hash<K2, V2>;
-  toH(block?: (key: K, value: V) => [unknown, unknown]): Hash<unknown, unknown> {
+  toH(
+    block?: (key: K, value: V) => [unknown, unknown],
+  ): Hash<unknown, unknown> | Record<string, unknown> {
     if (block !== undefined) {
       const h = new Hash<unknown, unknown>();
       for (const [key, value] of this) {
@@ -1276,7 +1301,7 @@ export class Hash<K, V> extends Map<K, V> {
       !this.isCompareByIdentity() &&
       [...this.keys()].every((key) => typeof key === "string")
     ) {
-      return Object.fromEntries(this) as unknown as Hash<K, V>;
+      return Object.fromEntries(this) as Record<string, V>;
     }
     return hashDup(this, Hash<K, V>);
   }
