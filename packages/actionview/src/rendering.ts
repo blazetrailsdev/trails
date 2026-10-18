@@ -18,7 +18,7 @@ import { ViewPaths } from "./view-paths.js";
 
 export interface RenderOptions {
   template?: string;
-  partial?: string;
+  partial?: string | boolean | object;
   action?: string;
   layout?: string | false;
   formats?: string[];

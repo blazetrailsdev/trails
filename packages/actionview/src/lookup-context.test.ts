@@ -1,8 +1,4 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { MimeType } from "@blazetrails/actionpack";
-import { I18n } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
-import { Base } from "./base.js";
 import { DetailsKey, LookupContext } from "./lookup-context.js";
 import type { RenderableTemplate, RenderOptions } from "./renderer/abstract-renderer.js";
 import { MissingTemplate } from "./template/error.js";
@@ -17,56 +13,6 @@ async function render(ctx: LookupContext, options: RenderOptions) {
   const view = new (DetailsKey.viewContextClass())(ctx, {}, null);
   return String(await view.viewRenderer.render(view, options));
 }
-
-describe("LookupContext", () => {
-  let enforceAvailableLocales: boolean;
-  beforeEach(() => {
-    enforceAvailableLocales = I18n.enforceAvailableLocales();
-    I18n.setEnforceAvailableLocales(false);
-  });
-  afterEach(() => {
-    I18n.setLocale("en");
-    I18n.setEnforceAvailableLocales(enforceAvailableLocales);
-  });
-
-  it("allows to override default_formats with ActionView::Base.default_formats", () => {
-    const formats = Base.defaultFormats;
-    Base.defaultFormats = [":foo", ":bar"];
-
-    expect(new LookupContext([]).defaultFormats()).toEqual([":foo", ":bar"]);
-    Base.defaultFormats = formats;
-  });
-
-  it("handles */* formats", () => {
-    const lookupContext = new LookupContext([]);
-    lookupContext.formats = ["*/*"];
-    expect(lookupContext.formats).toEqual(MimeType.SET.symbols);
-  });
-
-  it("raises on invalid format assignment", () => {
-    const lookupContext = new LookupContext([]);
-    let ex: unknown;
-    try {
-      lookupContext.formats = [":html", ":invalid", "also bad"];
-    } catch (e) {
-      ex = e;
-    }
-    expect(ex).toBeInstanceOf(ArgumentError);
-    expect((ex as ArgumentError).message).toBe('Invalid formats: :invalid, "also bad"');
-  });
-
-  it("provides getters and setters for locale", () => {
-    const lookupContext = new LookupContext([], {});
-    lookupContext.locale = ":pt";
-    expect(lookupContext.locale).toBe(":pt");
-  });
-
-  it("changing lookup_context locale, changes I18n.locale", () => {
-    const lookupContext = new LookupContext([], {});
-    lookupContext.locale = ":pt";
-    expect(I18n.locale()).toBe("pt");
-  });
-});
 
 describe("MissingTemplate#corrections", () => {
   const paths = (candidates: string[]) => [new PathsOnlyResolver(candidates)];

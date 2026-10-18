@@ -11,6 +11,7 @@ import {
   Encoding,
   forceEncoding,
   isValidEncoding,
+  rbModConstSet,
   rbObjRespondTo,
   rbStrEnumerateLines,
 } from "@blazetrails/ruby-compat";
@@ -18,6 +19,7 @@ import * as RubyCompat from "@blazetrails/ruby-compat";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer, StreamingBuffer } from "./buffers.js";
+import { ActionView } from "./namespaces.js";
 import { SyntaxErrorInTemplate, TemplateError, WrongEncodingError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Html } from "./template/handlers/html.js";
@@ -486,6 +488,9 @@ export class Template {
     return { virtual_path: this.virtualPath, identifier: this.identifier };
   }
 }
+
+rbModConstSet(ActionView, "Template", Template);
+rbModConstSet(Template, "Error", TemplateError);
 
 type Parameter = [type: string, name?: string, defaultExpr?: string];
 
