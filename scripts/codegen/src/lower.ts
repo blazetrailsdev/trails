@@ -1087,6 +1087,13 @@ export class Lowerer {
     return null;
   }
 
+  /** A hash literal, or a value typed as a Hash that is never a `Map`. */
+  plainHash(n: N, ctx: Ctx): boolean {
+    if (n.k === "hash") return true;
+    const t = this.typeOf(n, ctx);
+    return t?.k === "hash" && !t.map;
+  }
+
   /** A Hash the hand twin types as possibly a `Map` (hand-oracle `{ k: "hash", map }`). */
   mayBeMap(n: N, ctx: Ctx): boolean {
     const t = this.typeOf(n, ctx);
@@ -4180,13 +4187,18 @@ export class Lowerer {
       case "values":
         if (n.args.length === 0) return `Object.values(${r})`;
         break;
+      // The native spread / `Object.assign` copies only a plain object's own
+      // keys, so an argument that may be a Map (a caller's Hash) keeps the helper.
       case "merge":
-        if (!blk && n.args.length === 1) return `{ ...${R}, ...${args()[0]} }`;
+        if (!blk && n.args.length === 1 && this.plainHash(n.args[0], ctx))
+          return `{ ...${R}, ...${args()[0]} }`;
+        if (!blk && n.args.length === 1) return `${rc("merge")}(${r}, ${args()[0]})`;
         break;
       case "merge!":
       case "update":
-        if (!blk && n.args.length === 1 && name === "merge!")
+        if (!blk && n.args.length === 1 && name === "merge!" && this.plainHash(n.args[0], ctx))
           return `Object.assign(${r}, ${args()[0]})`;
+        if (!blk && n.args.length === 1) return `${rc("update")}(${r}, ${args()[0]})`;
         break;
       case "to_sym":
       case "to_str":
