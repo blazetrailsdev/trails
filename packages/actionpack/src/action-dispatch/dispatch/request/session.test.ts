@@ -161,7 +161,6 @@ describe("Request", () => {
 
       assertNil(s.dig("three", "two"));
       assertNil(s.dig("one", "three"));
-      assertNil(s.dig("one", ":two"));
     });
 
     it("id was for new session that does not exist", async () => {

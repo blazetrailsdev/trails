@@ -6,6 +6,8 @@ import {
   type AssertionResponseHost,
   type AssertionResponseLike,
 } from "../testing/assertions/response.js";
+import { Request } from "../http/request.js";
+import { Response } from "../http/response.js";
 
 interface FakeResponse extends AssertionResponseLike {
   status: number;
@@ -30,7 +32,10 @@ function fakeResponse(
 }
 
 describe("ResponseAssertionsTest", () => {
-  let self: AssertionResponseHost & { assertResponse: typeof assertResponse };
+  let self: Omit<AssertionResponseHost, "response"> & {
+    response: AssertionResponseLike & Record<string, any>;
+    assertResponse: typeof assertResponse;
+  };
 
   beforeEach(() => {
     self = { response: fakeResponse(200), request: undefined, assertResponse };
@@ -87,7 +92,8 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows 404 when 404 asserted for success", async () => {
-    self.response = fakeResponse(404);
+    self.response = new Response();
+    self.response.status = 404;
 
     const error = await assertRaises([Assertion], {}, () => self.assertResponse("success"));
     const expected = "Expected response to be a <2XX: success>, but was a <404: Not Found>";
@@ -95,7 +101,8 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows 404 when asserted for 200", async () => {
-    self.response = fakeResponse(404);
+    self.response = new Response();
+    self.response.status = 404;
 
     const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
     const expected = "Expected response to be a <200: OK>, but was a <404: Not Found>";
@@ -103,7 +110,9 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows 302 redirect when 302 asserted for success", async () => {
-    self.response = fakeResponse(302, { location: "http://test.host/posts/redirect/1" });
+    self.response = new Response();
+    self.response.status = 302;
+    self.response.location = "http://test.host/posts/redirect/1";
 
     const error = await assertRaises([Assertion], {}, () => self.assertResponse("success"));
     const expected =
@@ -113,7 +122,9 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows 302 redirect when 302 asserted for 301", async () => {
-    self.response = fakeResponse(302, { location: "http://test.host/posts/redirect/2" });
+    self.response = new Response();
+    self.response.status = 302;
+    self.response.location = "http://test.host/posts/redirect/2";
 
     const error = await assertRaises([Assertion], {}, () => self.assertResponse(301));
     const expected =
@@ -123,7 +134,9 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows short response body", async () => {
-    self.response = fakeResponse(400, { body: "not too long" });
+    self.response = new Response();
+    self.response.status = 400;
+    self.response.body = "not too long";
     const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
     const expected =
       "Expected response to be a <200: OK>, but was a <400: Bad Request>" +
@@ -132,18 +145,21 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message does not show long response body", async () => {
-    self.response = fakeResponse(400, { body: "not too long".repeat(50) });
+    self.response = new Response();
+    self.response.status = 400;
+    self.response.body = "not too long".repeat(50);
     const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
     const expected = "Expected response to be a <200: OK>, but was a <400: Bad Request>";
     assertMatch(expected, error.message);
   });
 
   it("error message shows rescued exception", async () => {
-    self.response = fakeResponse(500);
+    self.response = new Response();
+    self.response.status = 500;
 
     const ex = new Error("example error");
     ex.name = "RuntimeError";
-    self.request = { env: { "action_dispatch.exception": ex } };
+    self.request = new Request({ "action_dispatch.exception": ex });
 
     const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
     const expected =

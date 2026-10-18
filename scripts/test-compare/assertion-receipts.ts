@@ -61,6 +61,15 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           'dispatch/system_testing/driver_test.rb:45 `@browser.options` is a Playwright `LaunchOptions` plain object with no browser-specific options class, so its `args` are asserted (packages/actionpack/CLAUDE.md, "System testing runs on Vitest")',
       },
     ],
+  "actiondispatch:dispatch/request/session_test.rb › Request › SessionTest › dig": [
+    {
+      kind: "assert_nil",
+      value: null,
+      as: null,
+      reason:
+        'dispatch/request/session_test.rb:135 `assert_nil session.dig("one", :two)` — misses because `:two` is a Symbol and the stored key a String; a Ruby Symbol is a JS string (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`")',
+    },
+  ],
   "actiondispatch:dispatch/uploaded_file_test.rb › UploadedFileTest › filename is different object":
     [
       {
