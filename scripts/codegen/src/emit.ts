@@ -366,7 +366,14 @@ export class Emitter {
       for (const l of loopLocals) c.scope.locals.add(l);
       return c;
     };
-    const emitBody = (stmts: N[], out: string[]): void => {
+    // A test under a class-body condition (`unless adapter_skips_scheduling?`) is
+    // registered skipped, not left out: a file whose every test Ruby skips still
+    // has tests, which vitest requires of a collected file.
+    const itCall = (guard: string | null): string =>
+      guard ? `${vitest("it")}.skipIf(!(${guard}))` : vitest("it");
+    const guarded = (guard: string | null, lines: string[]): string[] =>
+      guard ? [`if (${guard}) {`, ...indent(lines), "}"] : lines;
+    const emitBody = (stmts: N[], out: string[], guard: string | null = null): void => {
       for (const s of stmts) {
         if (
           s.k === "call" &&
@@ -382,24 +389,20 @@ export class Emitter {
               ? JSON.stringify(s.args[0].value)
               : this.lw.expr(s.args[0], nameCtx());
           out.push(
-            `${vitest("it")}(${nm}, async ({ testCase }: any) => {`,
+            `${itCall(guard)}(${nm}, async ({ testCase }: any) => {`,
             ...indent(body(s.block.body)),
             "});",
           );
         } else if (s.k === "if") {
           // A test defined under a condition (`if adapter_is?(:sucker_punch)`).
-          const ctx = nameCtx();
-          const thenOut: string[] = [];
-          const elseOut: string[] = [];
-          emitBody(this.lw.seqBody(s.then), thenOut);
-          emitBody(this.lw.seqBody(s.else), elseOut);
-          out.push(`if (${this.lw.cond(s.cond, ctx)}) {`, ...indent(thenOut));
-          if (elseOut.length) out.push("} else {", ...indent(elseOut));
-          out.push("}");
+          const c = this.lw.cond(s.cond, nameCtx());
+          const and = (x: string): string => (guard ? `(${guard}) && ${x}` : x);
+          emitBody(this.lw.seqBody(s.then), out, and(`(${c})`));
+          emitBody(this.lw.seqBody(s.else), out, and(`!(${c})`));
         } else if (s.k === "def" && /^test_/.test(s.name)) {
           const nm = s.name.replace(/^test_/, "").replace(/_/g, " ");
           out.push(
-            `${vitest("it")}(${JSON.stringify(nm)}, async ({ testCase }: any) => {`,
+            `${itCall(guard)}(${JSON.stringify(nm)}, async ({ testCase }: any) => {`,
             ...indent(body(s.body)),
             "});",
           );
@@ -410,7 +413,13 @@ export class Emitter {
           s.block?.k === "block"
         ) {
           const hook = vitest(s.name === "setup" ? "beforeEach" : "afterEach");
-          out.push(`${hook}(async ({ testCase }: any) => {`, ...indent(body(s.block.body)), "});");
+          out.push(
+            ...guarded(guard, [
+              `${hook}(async ({ testCase }: any) => {`,
+              ...indent(body(s.block.body)),
+              "});",
+            ]),
+          );
         } else if (s.k === "call" && s.recv === null && s.name === "include" && s.args.length) {
           // `include ActiveJob::TestHelper`: the module joins the test class's
           // ancestors, so its methods and `before_setup` / `after_teardown` reach
@@ -452,7 +461,7 @@ export class Emitter {
           const inner: string[] = [];
           const list = this.lw.expr(s.recv, nameCtx());
           loopLocals.push(p);
-          emitBody(this.lw.seqBody(s.block.body), inner);
+          emitBody(this.lw.seqBody(s.block.body), inner, guard);
           loopLocals.pop();
           out.push(`for (const ${jsIdent(p)} of ${list}) {`, ...indent(inner), "}");
         } else if (s.k === "class" || s.k === "module") {
@@ -493,7 +502,9 @@ export class Emitter {
         } else {
           const ctx = this.baseCtx(u, f, { selfKind: "static", selfExpr: "testCase" });
           out.push(
-            `${this.lw.decline(ctx, "unhandled-node", s, `test class body: ${s.k} ${s.name ?? ""}`)};`,
+            ...guarded(guard, [
+              `${this.lw.decline(ctx, "unhandled-node", s, `test class body: ${s.k} ${s.name ?? ""}`)};`,
+            ]),
           );
         }
       }
@@ -1498,6 +1509,11 @@ export class Emitter {
         lines.unshift(`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
       if (lines.length) after.push(`{\n${indent(lines).join("\n")}\n}`);
     }
+    // `"#{klass}"` is `Module#to_s`, the constant path; a JS class interpolates its
+    // source, so each class carries the seat the hand port's `class-to-string-seat`
+    // lint writes.
+    if (!members.some((m) => /^(?:override )?static (?:override )?toString\(/.test(m)))
+      members.unshift(`static toString(): string {\n  return ${JSON.stringify(u.fqn)};\n}`);
     const head = `export class ${name}${ext} {`;
     const sig = [
       "[key: string]: any;",
