@@ -297,15 +297,14 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({ id: 1 }, "admin_user")).toBe("/admin/users/1");
   });
 
-  it("root", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.root("pages#home");
+  it("root", async () => {
+    draw(function () {
+      this.root({ to: "projects#index" });
     });
-    const m = routes.recognizePath("/");
-    expect(m.controller).toBe("pages");
-    expect(m.action).toBe("home");
-    expect(routes.pathFor({}, "root")).toBe("/");
+
+    expect(t.rootPath()).toBe("/");
+    await t.get("/");
+    expect(t.response.body).toBe("projects#index");
   });
 
   it("scoped root", () => {
@@ -319,18 +318,18 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({}, "api_status")).toBe("/api/status");
   });
 
-  it("nested namespace", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.namespace("api", () => {
-        this.namespace("v1", () => {
-          this.resources("articles");
+  it("nested namespace", async () => {
+    draw(function () {
+      this.namespace("account", () => {
+        this.namespace("admin", () => {
+          this.resource("subscription");
         });
       });
     });
-    expect(routes.recognizePath("/api/v1/articles").action).toBe("index");
-    expect(routes.pathFor({}, "api_v1_articles")).toBe("/api/v1/articles");
-    expect(routes.pathFor({ id: 5 }, "api_v1_article")).toBe("/api/v1/articles/5");
+
+    await t.get("/account/admin/subscription");
+    expect(t.response.body).toBe("account/admin/subscriptions#show");
+    expect(t.accountAdminSubscriptionPath()).toBe("/account/admin/subscription");
   });
 
   it("nested resources", () => {
@@ -652,14 +651,14 @@ describe("TestRoutingMapper", () => {
     expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
   });
 
-  it("index", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/info", { to: "projects#info", as: "info" });
+  it("index", async () => {
+    draw(function () {
+      this.get({ "/info": "projects#info", as: "info" });
     });
-    expect(routes.pathFor({}, "info")).toBe("/info");
-    expect(routes.recognizePath("/info").controller).toBe("projects");
-    expect(routes.recognizePath("/info").action).toBe("info");
+
+    expect(t.infoPath()).toBe("/info");
+    await t.get("/info");
+    expect(t.response.body).toBe("projects#info");
   });
 
   it("normalize namespaced matches", () => {
@@ -1351,14 +1350,23 @@ describe("TestRoutingMapper", () => {
     );
   });
 
-  it("resources path can be a symbol", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/pages", { to: "wiki_pages#index", as: "wiki_pages" });
-      this.get("/pages/:id", { to: "wiki_pages#show", as: "wiki_page" });
+  it("resources path can be a symbol", async () => {
+    draw(function () {
+      this.resources("wiki_pages", { path: "pages" });
+      this.resource("wiki_account", { path: "my_account" });
     });
-    expect(routes.pathFor({}, "wiki_pages")).toBe("/pages");
-    expect(routes.pathFor({ id: "Ruby_on_Rails" }, "wiki_page")).toBe("/pages/Ruby_on_Rails");
+
+    await t.get("/pages");
+    expect(t.response.body).toBe("wiki_pages#index");
+    expect(t.wikiPagesPath()).toBe("/pages");
+
+    await t.get("/pages/Ruby_on_Rails");
+    expect(t.response.body).toBe("wiki_pages#show");
+    expect(t.wikiPagePath({ id: "Ruby_on_Rails" })).toBe("/pages/Ruby_on_Rails");
+
+    await t.get("/my_account");
+    expect(t.response.body).toBe("wiki_accounts#show");
+    expect(t.wikiAccountPath()).toBe("/my_account");
   });
 
   it("login redirect", async () => {
@@ -2401,17 +2409,16 @@ describe("TestRoutingMapper", () => {
     }
   });
 
-  it("optional scoped root", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope("(:locale)", () => {
-        this.root("projects#index");
+  it("optional scoped root", async () => {
+    draw(function () {
+      this.scope("(:locale)", { locale: /en|pl/ }, () => {
+        this.root({ to: "projects#index" });
       });
     });
-    expect(routes.pathFor({ locale: "en" }, "root")).toBe("/en");
-    const m = routes.recognizePath("/en");
-    expect(m.controller).toBe("projects");
-    expect(m.action).toBe("index");
+
+    expect(t.rootPath("en")).toBe("/en");
+    await t.get("/en");
+    expect(t.response.body).toBe("projects#index");
   });
 
   it("optional scoped path", async () => {
