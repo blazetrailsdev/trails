@@ -38,9 +38,7 @@ export function stubConst<T>(
       throw new NameError(`already defined constant ${constant} in ${String(mod.name ?? "")}`);
     }
 
-    const ensure = () => {
-      delete mod[constant];
-    };
+    const ensure = () => delete mod[constant];
     let deferred = false;
     try {
       mod[constant] = newValue;
