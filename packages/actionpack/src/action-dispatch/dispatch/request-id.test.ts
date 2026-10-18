@@ -8,7 +8,9 @@ async function stubRequest(env: RackEnv = {}, { header = "x-request-id" } = {}):
   const app = async (_env: RackEnv): Promise<RackResponse> => [200, {}, []];
   env = MockRequest.envFor("", env);
 
-  await new Lint((e) => new RequestId(new Lint(app), { header: header }).call(e)).call(env);
+  await new Lint((e) =>
+    new RequestId((e) => new Lint(app).call(e), { header: header }).call(e),
+  ).call(env);
 
   return new Request(env);
 }
@@ -58,7 +60,7 @@ describe("RequestIdResponseTest", () => {
   const index = async (_env: RackEnv): Promise<RackResponse> => [200, {}, []];
 
   function app(header: string) {
-    return new Lint((e) => new RequestId(new Lint(index), { header }).call(e));
+    return new Lint((e) => new RequestId((e) => new Lint(index).call(e), { header }).call(e));
   }
 
   it("request id is passed all the way to the response", async () => {

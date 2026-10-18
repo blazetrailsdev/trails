@@ -129,6 +129,8 @@ describe("MiddlewareStackTest", () => {
   it("use should push middleware as class onto the stack", async () => {
     await assertDifference(
       () => stack.size,
+      1,
+      null,
       () => {
         stack.use(BazMiddleware);
       },
@@ -139,6 +141,8 @@ describe("MiddlewareStackTest", () => {
   it("use should push middleware class with arguments onto the stack", async () => {
     await assertDifference(
       () => stack.size,
+      1,
+      null,
       () => {
         stack.use(BazMiddleware, true, { foo: "bar" });
       },
@@ -151,6 +155,8 @@ describe("MiddlewareStackTest", () => {
     const proc = block(() => {});
     await assertDifference(
       () => stack.size,
+      1,
+      null,
       () => {
         stack.use(BlockMiddleware, proc);
       },
@@ -288,7 +294,7 @@ describe("MiddlewareStackTest", () => {
   });
 
   it("includes a middleware", () => {
-    expect(stack.includes(new Middleware(BarMiddleware, null, null))).toBe(true);
+    expect(stack.includes(new Middleware(BarMiddleware, null as never, null as never))).toBe(true);
   });
 
   it("build creates a callable app", async () => {
