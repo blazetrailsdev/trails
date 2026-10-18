@@ -20,20 +20,10 @@ import { LookupContext } from "../lookup-context.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
 const Post = Struct.new("id", "written_on", "updated_at");
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+const MONTHS =
+  "January February March April May June July August September October November December".split(
+    " ",
+  );
 
 function options(
   range: number[],

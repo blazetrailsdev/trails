@@ -1271,7 +1271,7 @@ describe("AssetTagHelperTest", () => {
           }
         },
       },
-    };
+    } as unknown as AssetUrlHelperHost;
 
     assertEqual("/images/file.tiff", imagePath.call(controller, "file.tiff"));
     assertEqual("http://cdn.example.com/images/file.png", imagePath.call(controller, "file.png"));
@@ -1282,7 +1282,7 @@ describe("AssetTagHelperTest", () => {
       ...host,
       config: { assetHost: () => null },
       request: { baseUrl: "http://www.example.com", scriptName: null },
-    };
+    } as unknown as AssetUrlHelperHost;
 
     assertEqual("/images/rails.png", imagePath.call(controller, "rails.png"));
     assertEqual("http://www.example.com/images/rails.png", imageUrl.call(controller, "rails.png"));
@@ -1305,7 +1305,7 @@ describe("AssetTagHelperTest", () => {
           }
         },
       },
-    };
+    } as unknown as AssetUrlHelperHost;
 
     assertEqual(
       "http://assets15.example.com/images/xml.png",
@@ -1624,7 +1624,7 @@ describe("AssetUrlHelperEmptyModuleTest", () => {
   });
 
   it("asset url with request", () => {
-    module.request = { baseUrl: "http://www.example.com", scriptName: null };
+    module.request = { baseUrl: "http://www.example.com", scriptName: null } as never;
 
     expect(module.request).toBeTruthy();
     assertEqual("http://www.example.com/foo", assetUrl.call(module, "foo"));
