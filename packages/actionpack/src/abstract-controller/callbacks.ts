@@ -323,8 +323,8 @@ export const ClassMethods: Module = new Module((mod) => {
 export async function processAction(
   this: AbstractController & Included<typeof ASCallbacks>,
   ...args: unknown[]
-): Promise<void> {
-  await this.runCallbacks("process_action", () =>
+): Promise<unknown> {
+  return this.runCallbacks("process_action", () =>
     Callbacks.superMethod(this, "processAction")!(...args),
   );
 }

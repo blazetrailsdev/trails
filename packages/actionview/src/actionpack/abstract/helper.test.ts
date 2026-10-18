@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { include } from "@blazetrails/activesupport";
+import { assertRaises, include } from "@blazetrails/activesupport";
 import { Module, NameError } from "@blazetrails/ruby-compat";
 import { AbstractController } from "@blazetrails/actionpack";
 import { Rendering } from "../../rendering.js";
@@ -78,15 +78,11 @@ describe("TestHelpers", () => {
     expect(String(controller.responseBody)).toBe("I respond to bare_a: true");
   });
 
-  test("declare missing helper", () => {
-    let e: unknown;
-    try {
-      (AbstractHelpers as unknown as HelpersStatics).helper("missing");
-    } catch (error) {
-      e = error;
-    }
-    expect(e).toBeInstanceOf(NameError);
-    expect((e as Error).message).toContain("uninitialized constant MissingHelper");
+  test("declare missing helper", async () => {
+    const e = await assertRaises([NameError], {}, () =>
+      (AbstractHelpers as unknown as HelpersStatics).helper("missing"),
+    );
+    expect(e.message).toContain("uninitialized constant MissingHelper");
   });
 
   test("helpers with module through block", async () => {
@@ -115,14 +111,10 @@ describe("ClearHelpersTest", () => {
 });
 
 describe("InvalidHelpersTest", () => {
-  test("controller raise error about missing helper", () => {
-    let e: unknown;
-    try {
-      (AbstractHelpers as unknown as HelpersStatics).helper("missing");
-    } catch (error) {
-      e = error;
-    }
-    expect(e).toBeInstanceOf(NameError);
-    expect((e as Error).message).toContain("uninitialized constant MissingHelper");
+  test("controller raise error about missing helper", async () => {
+    const e = await assertRaises([NameError], {}, () =>
+      (AbstractHelpers as unknown as HelpersStatics).helper("missing"),
+    );
+    expect(e.message).toContain("uninitialized constant MissingHelper");
   });
 });
