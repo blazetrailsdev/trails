@@ -1,10 +1,10 @@
-import { getEnv, presence } from "@blazetrails/activesupport";
-import { getFs, getPath, setEnv } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import { Handler, type RackEnv } from "@blazetrails/rack";
+import { type RackEnv } from "@blazetrails/rack";
 import { requireApplicationBang } from "../command/actions.js";
 import { Trails } from "../rails.js";
+import { pinEnvironment, serve, serverHost } from "../server/boot.js";
 
 export function serverCommand(): Command {
   const cmd = new Command("server");
@@ -21,65 +21,27 @@ export function serverCommand(): Command {
       "The environment to run `server` in (e.g. test / development / production).",
     )
     .action(async (options) => {
-      options.environment = environment(options);
-      setEnvironment(options);
+      options.environment = pinEnvironment(options);
 
       const root = Dir.pwd();
-      await requireApplicationBang();
-      const app = await Trails.initialize();
-      const port = parseInt(options.port, 10);
-      const railsApp = (env: RackEnv) => app.call(env);
       if (options.environment !== "development" || !(await hasViteConfig(root))) {
-        const server = await Handler.Node.run(railsApp, { Port: port, Host: host(options) });
-        const address = server.address();
-        const boundPort = address && typeof address === "object" ? address.port : port;
-        console.log(
-          `=> Trails application starting in ${Trails.env} on http://${host(options)}:${boundPort}`,
-        );
-        console.log(`=> Ctrl+C to stop`);
-        console.log("");
+        await serve(options);
         return;
       }
+
+      await requireApplicationBang();
+      const app = await Trails.initialize();
       const { DevServer } = await import("../server/dev-server.js");
       const server = new DevServer({
-        port,
-        host: host(options),
+        port: parseInt(options.port, 10),
+        host: serverHost(options),
         cwd: root,
-        app: railsApp,
+        app: (env: RackEnv) => app.call(env),
       });
       await server.start();
     });
 
   return cmd;
-}
-
-interface ServerOptions {
-  binding?: string;
-  environment?: string;
-}
-
-function setEnvironment(options: ServerOptions): void {
-  if (getEnv("TRAILS_ENV") === undefined) setEnv("TRAILS_ENV", options.environment);
-}
-
-/** @internal */
-function host(options: ServerOptions): string {
-  if (options.binding) {
-    return options.binding;
-  } else {
-    const defaultHost = environment(options) === "development" ? "localhost" : "0.0.0.0";
-
-    return getEnv("BINDING", defaultHost);
-  }
-}
-
-/** @internal */
-function environment(options: ServerOptions): string {
-  return options.environment || commandEnvironment();
-}
-
-function commandEnvironment(): string {
-  return presence(getEnv("TRAILS_ENV")) || presence(getEnv("NODE_ENV")) || "development";
 }
 
 async function hasViteConfig(root: string): Promise<boolean> {

@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "trails": "./bin/trails.js"
+    "trails": "./bin/trails.js",
+    "trails-server": "./bin/trails-server.js"
   },
   "exports": {
     ".": "./dist/cli.js",
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
     "./all": "./dist/all.js",
     "./generators": "./dist/generators/index.js",
     "./engine": {
