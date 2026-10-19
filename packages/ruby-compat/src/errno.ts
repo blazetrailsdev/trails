@@ -217,10 +217,4 @@ class ESRCH extends SystemCallError {
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-<<<<<<< HEAD
-export const Errno = { EEXIST, EISDIR, ENOENT, ENOTTY, EPIPE, ESPIPE };
-||||||| parent of dd6b6a416b (feat(rack,ruby-compat): Headers inherits Hash surface, port Reloader, RewindableInput buffers into a Tempfile)
-export const Errno = { EEXIST, EISDIR, ENOENT, ENOTTY, EPIPE };
-=======
-export const Errno = { EEXIST, EISDIR, ENOENT, ENOTDIR, ENOTTY, EPIPE, ESRCH };
->>>>>>> dd6b6a416b (feat(rack,ruby-compat): Headers inherits Hash surface, port Reloader, RewindableInput buffers into a Tempfile)
+export const Errno = { EEXIST, EISDIR, ENOENT, ENOTDIR, ENOTTY, EPIPE, ESPIPE, ESRCH };
