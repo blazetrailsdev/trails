@@ -63,7 +63,10 @@ export function render(
   });
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsName name — PERMANENT
+ */
 export async function processAction(
   this: InstrumentationHost,
   ...args: unknown[]
