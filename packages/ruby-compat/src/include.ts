@@ -2073,10 +2073,8 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
         link && link !== Object.prototype;
         link = Object.getPrototypeOf(link) as object | null
       ) {
-        for (const key of Reflect.ownKeys(link)) {
-          if (key !== "constructor" && !Object.hasOwn(methods, key)) {
-            methods[key] = Object.getOwnPropertyDescriptor(link, key)!;
-          }
+        for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(link))) {
+          if (key !== "constructor" && !Object.hasOwn(methods, key)) methods[key] = descriptor;
         }
       }
       for (const descriptor of Object.values(methods)) descriptor.enumerable = true;
