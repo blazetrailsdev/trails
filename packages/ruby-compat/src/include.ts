@@ -679,7 +679,7 @@ export class Module<I extends object = Record<never, never>> {
             ? (descriptor.value as (...args: unknown[]) => unknown).bind(receiver)
             : undefined;
         }
-        const root = writer ? undefined : Kernel[key];
+        const root = writer || !Object.hasOwn(Kernel, key) ? undefined : Kernel[key];
         return typeof root === "function"
           ? (root as (...args: unknown[]) => unknown).bind(receiver)
           : undefined;
@@ -2001,6 +2001,17 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
+export interface KernelModule {
+  [name: string]: unknown;
+  dup(this: object): object;
+  initializeDup(this: object, orig: unknown): object;
+  initializeClone(this: object, orig: unknown): object;
+  freeze(this: object): object;
+  abort: typeof abort;
+  rand: typeof kernelRand;
+}
+
 /**
  * Ruby's `Kernel`, the module `Object` includes and so the last stop of every
  * method search. It holds the instance methods a module's `super` reaches when
@@ -2038,7 +2049,7 @@ export const Kernel = {
   freeze(this: object): object {
     return Object.freeze(this);
   },
-} as unknown as Record<string, unknown> & { abort: typeof abort; rand: typeof kernelRand };
+} as KernelModule;
 
 classpaths.set(Kernel, { path: "Kernel", permanent: true });
 classpaths.set(Enumerable, { path: "Enumerable", permanent: true });

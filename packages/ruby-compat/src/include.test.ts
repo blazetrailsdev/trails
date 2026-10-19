@@ -1439,6 +1439,15 @@ describe("Module#superMethod", () => {
     }
   });
 
+  it("answers undefined for a name only Object.prototype defines", () => {
+    class Plain {}
+    Object.setPrototypeOf(Plain.prototype, null);
+    const mod = new Module();
+    include(Plain, mod);
+    expect(mod.superMethod(new Plain(), "toString")).toBeUndefined();
+    expect(mod.superMethod(new Plain(), "constructor")).toBeUndefined();
+  });
+
   it("answers undefined for a receiver whose ancestry lacks the module", () => {
     class Outside {}
     const mod = new Module();
