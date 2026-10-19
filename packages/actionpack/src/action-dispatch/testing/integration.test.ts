@@ -581,7 +581,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       const doc = app.htmlDocument;
       expect(doc).toBeDefined();
       expect(doc.root).toBeDefined();
-      expect(doc.root.name).toBe("root");
+      expect(doc.root!.name).toBe("root");
     });
 
     it("html_document is lazily cached per request", async () => {
@@ -600,11 +600,6 @@ describe("ActionDispatch::IntegrationTest", () => {
       app.assertResponse("success");
       expect(app.htmlDocument).not.toBe(previousHtmlDocument);
     });
-
-    it("html_document throws for text/html responses (HTML parsing not yet implemented)", async () => {
-      await app.get("/posts/html");
-      expect(() => app.htmlDocument).toThrow("not yet implemented");
-    });
   });
 
   describe("document_root_element", () => {
@@ -616,7 +611,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       await app.get("/posts/xml");
       const root = app.documentRootElement;
       expect(root).toBeDefined();
-      expect(root.name).toBe("root");
+      expect(root!.name).toBe("root");
       expect(root).toBe(app.htmlDocument.root);
     });
   });

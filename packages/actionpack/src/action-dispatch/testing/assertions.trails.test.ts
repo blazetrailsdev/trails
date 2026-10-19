@@ -50,7 +50,7 @@ describe("ActionDispatch::Assertions", () => {
     const test = new HtmlDocumentTest("test") as HtmlDocumentTest & Assertions;
     Object.assign(test, { response: { mediaType: "application/xml", body: "<a><b/></a>" } });
 
-    expect(test.htmlDocument.root.name).toBe("a");
+    expect(test.htmlDocument.root!.name).toBe("a");
   });
 
   it("method_missing sends a named route to the controller, and supers otherwise", () => {

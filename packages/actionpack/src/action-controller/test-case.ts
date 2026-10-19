@@ -49,7 +49,8 @@ import {
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
 import { Assertions } from "../action-dispatch/testing/assertions.js";
-import type { XmlDocument } from "@blazetrails/nokogiri";
+import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/testing/assertions";
+import type { Html5Document, XmlDocument } from "@blazetrails/nokogiri";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
 import type { ParameterParsers } from "../action-dispatch/http/parameters.js";
 import type { CookieJar, CookieResponse } from "../action-dispatch/middleware/cookies.js";
@@ -162,8 +163,8 @@ export interface Behavior extends Included<typeof TestProcess> {
   /** @internal */
   _responseKlass: typeof TestResponse | typeof LiveTestResponse;
   /** @internal */
-  _htmlDocument?: XmlDocument | null;
-  readonly htmlDocument: XmlDocument;
+  _htmlDocument?: XmlDocument | Html5Document | null;
+  readonly htmlDocument: XmlDocument | Html5Document;
   get: OmitThisParameter<typeof get>;
   post: OmitThisParameter<typeof post>;
   patch: OmitThisParameter<typeof patch>;
@@ -188,7 +189,7 @@ export interface Behavior extends Included<typeof TestProcess> {
   /** @internal */
   scrubEnvBang: OmitThisParameter<typeof scrubEnvBang>;
   /** @internal */
-  readonly documentRootElement: ReturnType<typeof documentRootElement>;
+  documentRootElement: OmitThisParameter<typeof documentRootElement>;
   /** @internal */
   checkRequiredIvars: OmitThisParameter<typeof checkRequiredIvars>;
 }
@@ -496,6 +497,7 @@ export const Behavior = new Module((mod) => {
   extend(mod, Concern);
   mod.include(TestProcess);
   mod.include(ConstantLookup);
+  mod.include(DomTestingAssertions);
 
   mod.attrReader("response", "request");
 
@@ -535,10 +537,7 @@ export const Behavior = new Module((mod) => {
       processControllerResponse,
       scrubEnvBang,
       checkRequiredIvars,
-    });
-    Object.defineProperty(m, "documentRootElement", {
-      get: documentRootElement,
-      configurable: true,
+      documentRootElement,
     });
   });
 });
