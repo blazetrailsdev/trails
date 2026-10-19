@@ -13,6 +13,7 @@ import {
   rbObjAsString,
   pack,
   sliceBang,
+  strlen,
   unpack,
   type Cipher,
 } from "@blazetrails/ruby-compat";
@@ -188,7 +189,7 @@ export class Encryptor {
       return `${pack([0], "v")}${this.serializer === JSON ? b(serializedData) : serializedData}`;
 
     const padSize = this.options.padSize as number;
-    const paddingBytes = padSize - ((2 + serializedData.length) % padSize);
+    const paddingBytes = padSize - ((2 + strlen(serializedData)) % padSize);
     const paddingData = SecureRandom.randomBytes(paddingBytes).toString("latin1");
 
     return `${pack([paddingBytes], "v")}${paddingData}${this.serializer === JSON ? b(serializedData) : serializedData}`;
