@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- a racc value stack holds tokens, Nodes and arrays untyped, as Ruby's does. */
+import { rbObjAsString } from "@blazetrails/ruby-compat";
+
 import { Parser as RaccParser, ParseError } from "../racc/parser.js";
 import { Node } from "./node.js";
 import { SyntaxError } from "./syntax-error.js";
@@ -185,155 +187,157 @@ export class Parser extends RaccParser {
 
   override onError(_errorTokenId: number, errorValue: unknown, valueStack: unknown[]): never {
     const after = valueStack.filter((v) => v != null).at(-1);
-    throw new SyntaxError(`unexpected '${errorValue}' after '${after}'`);
+    throw new SyntaxError(
+      `unexpected '${rbObjAsString(errorValue)}' after '${rbObjAsString(after)}'`,
+    );
   }
 
-  _reduce1(val: any[]) {
+  _reduce1(val: any[], _values: unknown[], _result: unknown) {
     return [val[0], val[2]].flat(Infinity);
   }
 
-  _reduce2(val: any[]) {
+  _reduce2(val: any[], _values: unknown[], _result: unknown) {
     return val.flat(Infinity);
   }
 
-  _reduce3(val: any[]) {
+  _reduce3(val: any[], _values: unknown[], _result: unknown) {
     return [val[1]].flat(Infinity);
   }
 
-  _reduce4() {
+  _reduce4(_val: any[], _values: unknown[], _result: unknown) {
     return "DIRECT_ADJACENT_SELECTOR";
   }
 
-  _reduce5() {
+  _reduce5(_val: any[], _values: unknown[], _result: unknown) {
     return "CHILD_SELECTOR";
   }
 
-  _reduce6() {
+  _reduce6(_val: any[], _values: unknown[], _result: unknown) {
     return "FOLLOWING_SELECTOR";
   }
 
-  _reduce7() {
+  _reduce7(_val: any[], _values: unknown[], _result: unknown) {
     return "DESCENDANT_SELECTOR";
   }
 
-  _reduce8() {
+  _reduce8(_val: any[], _values: unknown[], _result: unknown) {
     return "CHILD_SELECTOR";
   }
 
-  _reduce9(val: any[]) {
+  _reduce9(val: any[], _values: unknown[], _result: unknown) {
     return val[1];
   }
 
-  _reduce10(val: any[]) {
+  _reduce10(val: any[], _values: unknown[], _result: unknown) {
     return new Node("ATTRIB_NAME", [val[0]]);
   }
 
-  _reduce11(val: any[]) {
+  _reduce11(val: any[], _values: unknown[], _result: unknown) {
     return val[1] == null ? val[0] : new Node("CONDITIONAL_SELECTOR", [val[0], val[1]]);
   }
 
-  _reduce13(val: any[]) {
+  _reduce13(val: any[], _values: unknown[], _result: unknown) {
     return new Node("CONDITIONAL_SELECTOR", val);
   }
 
-  _reduce14(val: any[]) {
+  _reduce14(val: any[], _values: unknown[], _result: unknown) {
     return new Node("CONDITIONAL_SELECTOR", val);
   }
 
-  _reduce15(val: any[]) {
+  _reduce15(val: any[], _values: unknown[], _result: unknown) {
     return new Node("CONDITIONAL_SELECTOR", [new Node("ELEMENT_NAME", ["*"]), val[0]]);
   }
 
-  _reduce17(val: any[]) {
+  _reduce17(val: any[], _values: unknown[], _result: unknown) {
     return new Node(val[0], [null, val[1]]);
   }
 
-  _reduce18(val: any[]) {
+  _reduce18(val: any[], _values: unknown[], _result: unknown) {
     return new Node(val[1], [val[0], val[2]]);
   }
 
-  _reduce19(val: any[]) {
+  _reduce19(val: any[], _values: unknown[], _result: unknown) {
     return new Node("DESCENDANT_SELECTOR", [val[0], val[2]]);
   }
 
-  _reduce21(val: any[]) {
+  _reduce21(val: any[], _values: unknown[], _result: unknown) {
     return new Node("CLASS_CONDITION", [this.unescapeCssIdentifier(val[1])]);
   }
 
-  _reduce23(val: any[]) {
+  _reduce23(val: any[], _values: unknown[], _result: unknown) {
     return new Node("ELEMENT_NAME", val);
   }
 
-  _reduce24(val: any[]) {
+  _reduce24(val: any[], _values: unknown[], _result: unknown) {
     return new Node("ELEMENT_NAME", [val[0], val[2]]);
   }
 
-  _reduce25(val: any[]) {
+  _reduce25(val: any[], _values: unknown[], _result: unknown) {
     const name = val[0];
     return new Node("ELEMENT_NAME", [name]);
   }
 
-  _reduce26(val: any[]) {
+  _reduce26(val: any[], _values: unknown[], _result: unknown) {
     return val[0];
   }
 
-  _reduce28(val: any[]) {
+  _reduce28(val: any[], _values: unknown[], _result: unknown) {
     return new Node("ATTRIBUTE_CONDITION", [val[1], ...(val[2] ?? [])]);
   }
 
-  _reduce29(val: any[]) {
+  _reduce29(val: any[], _values: unknown[], _result: unknown) {
     return new Node("ATTRIBUTE_CONDITION", [val[1], ...(val[2] ?? [])]);
   }
 
-  _reduce30(val: any[]) {
+  _reduce30(val: any[], _values: unknown[], _result: unknown) {
     return new Node("PSEUDO_CLASS", [new Node("FUNCTION", ["nth-child(", val[1]])]);
   }
 
-  _reduce31(val: any[]) {
+  _reduce31(val: any[], _values: unknown[], _result: unknown) {
     return new Node("ATTRIB_NAME", [[val[0], val[2]].filter((v) => v != null).join(":")]);
   }
 
-  _reduce32(val: any[]) {
+  _reduce32(val: any[], _values: unknown[], _result: unknown) {
     return new Node("ATTRIB_NAME", [val[0]]);
   }
 
-  _reduce34(val: any[]) {
+  _reduce34(val: any[], _values: unknown[], _result: unknown) {
     return new Node("FUNCTION", [val[0].trim()]);
   }
 
-  _reduce35(val: any[]) {
+  _reduce35(val: any[], _values: unknown[], _result: unknown) {
     return new Node("FUNCTION", [val[0].trim(), val[1]].flat(Infinity));
   }
 
-  _reduce36(val: any[]) {
+  _reduce36(val: any[], _values: unknown[], _result: unknown) {
     return new Node("FUNCTION", [val[0].trim(), val[1]].flat(Infinity));
   }
 
-  _reduce37(val: any[]) {
+  _reduce37(val: any[], _values: unknown[], _result: unknown) {
     return new Node("FUNCTION", [val[0].trim(), val[1]].flat(Infinity));
   }
 
-  _reduce38(val: any[]) {
+  _reduce38(val: any[], _values: unknown[], _result: unknown) {
     return new Node("FUNCTION", [val[0].trim(), val[1]].flat(Infinity));
   }
 
-  _reduce39(val: any[]) {
+  _reduce39(val: any[], _values: unknown[], _result: unknown) {
     return [val[0], val[2]];
   }
 
-  _reduce40(val: any[]) {
+  _reduce40(val: any[], _values: unknown[], _result: unknown) {
     return [val[0], val[2]];
   }
 
-  _reduce41(val: any[]) {
+  _reduce41(val: any[], _values: unknown[], _result: unknown) {
     return [val[0], val[2]];
   }
 
-  _reduce42(val: any[]) {
+  _reduce42(val: any[], _values: unknown[], _result: unknown) {
     return [val[0], val[2]];
   }
 
-  _reduce45(val: any[]) {
+  _reduce45(val: any[], _values: unknown[], _result: unknown) {
     switch (val[0]) {
       case "even":
         return new Node("NTH", ["2", "n", "+", "0"]);
@@ -346,7 +350,7 @@ export class Parser extends RaccParser {
     }
   }
 
-  _reduce47(val: any[]) {
+  _reduce47(val: any[], _values: unknown[], _result: unknown) {
     if (val[1] === "n") {
       return new Node("NTH", val);
     } else {
@@ -354,7 +358,7 @@ export class Parser extends RaccParser {
     }
   }
 
-  _reduce48(val: any[]) {
+  _reduce48(val: any[], _values: unknown[], _result: unknown) {
     if (val[0] === "n") {
       val.unshift("1");
       return new Node("NTH", val);
@@ -367,7 +371,7 @@ export class Parser extends RaccParser {
     }
   }
 
-  _reduce49(val: any[]) {
+  _reduce49(val: any[], _values: unknown[], _result: unknown) {
     const n = val[1];
     if (n.slice(0, 2) === "n-") {
       val[1] = "n";
@@ -383,83 +387,83 @@ export class Parser extends RaccParser {
     }
   }
 
-  _reduce50(val: any[]) {
+  _reduce50(val: any[], _values: unknown[], _result: unknown) {
     return new Node("PSEUDO_CLASS", [val[1]]);
   }
 
-  _reduce51(val: any[]) {
+  _reduce51(val: any[], _values: unknown[], _result: unknown) {
     return new Node("PSEUDO_CLASS", [val[1]]);
   }
 
-  _reduce54(val: any[]) {
+  _reduce54(val: any[], _values: unknown[], _result: unknown) {
     return new Node("COMBINATOR", val);
   }
 
-  _reduce55(val: any[]) {
+  _reduce55(val: any[], _values: unknown[], _result: unknown) {
     return new Node("COMBINATOR", val);
   }
 
-  _reduce56(val: any[]) {
+  _reduce56(val: any[], _values: unknown[], _result: unknown) {
     return new Node("COMBINATOR", val);
   }
 
-  _reduce57(val: any[]) {
+  _reduce57(val: any[], _values: unknown[], _result: unknown) {
     return new Node("COMBINATOR", val);
   }
 
-  _reduce58(val: any[]) {
+  _reduce58(val: any[], _values: unknown[], _result: unknown) {
     return new Node("COMBINATOR", val);
   }
 
-  _reduce64(val: any[]) {
+  _reduce64(val: any[], _values: unknown[], _result: unknown) {
     return new Node("ID", [this.unescapeCssIdentifier(val[0])]);
   }
 
-  _reduce65(val: any[]) {
+  _reduce65(val: any[], _values: unknown[], _result: unknown) {
     return [val[0], this.unescapeCssIdentifier(val[1])];
   }
 
-  _reduce66(val: any[]) {
+  _reduce66(val: any[], _values: unknown[], _result: unknown) {
     return [val[0], this.unescapeCssString(val[1])];
   }
 
-  _reduce67(val: any[]) {
+  _reduce67(val: any[], _values: unknown[], _result: unknown) {
     return [val[0], val[1]];
   }
 
-  _reduce69() {
+  _reduce69(_val: any[], _values: unknown[], _result: unknown) {
     return "equal";
   }
 
-  _reduce70() {
+  _reduce70(_val: any[], _values: unknown[], _result: unknown) {
     return "prefix_match";
   }
 
-  _reduce71() {
+  _reduce71(_val: any[], _values: unknown[], _result: unknown) {
     return "suffix_match";
   }
 
-  _reduce72() {
+  _reduce72(_val: any[], _values: unknown[], _result: unknown) {
     return "substring_match";
   }
 
-  _reduce73() {
+  _reduce73(_val: any[], _values: unknown[], _result: unknown) {
     return "not_equal";
   }
 
-  _reduce74() {
+  _reduce74(_val: any[], _values: unknown[], _result: unknown) {
     return "includes";
   }
 
-  _reduce75() {
+  _reduce75(_val: any[], _values: unknown[], _result: unknown) {
     return "dash_match";
   }
 
-  _reduce76(val: any[]) {
+  _reduce76(val: any[], _values: unknown[], _result: unknown) {
     return new Node("NOT", [val[1]]);
   }
 
-  _reduceNone(val: any[]) {
+  _reduceNone(val: any[], _values: unknown[], _result: unknown) {
     return val[0];
   }
 }

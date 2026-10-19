@@ -1,4 +1,4 @@
-import { kernelCatch, kernelThrow, rbInspect } from "@blazetrails/ruby-compat";
+import { kernelCatch, kernelThrow, NotImplementedError, rbInspect } from "@blazetrails/ruby-compat";
 
 export class ParseError extends Error {
   override name = "Racc::ParseError";
@@ -28,21 +28,21 @@ export abstract class Parser {
   };
 
   /** @internal */
-  _racc_state: number[] = [];
+  _raccState: number[] = [];
   /** @internal */
-  _racc_tstack: number[] = [];
+  _raccTstack: number[] = [];
   /** @internal */
-  _racc_vstack: unknown[] = [];
+  _raccVstack: unknown[] = [];
   /** @internal */
-  _racc_t: number | null = null;
+  _raccT: number | null = null;
   /** @internal */
-  _racc_val: unknown = null;
+  _raccVal: unknown = null;
   /** @internal */
-  _racc_read_next = true;
+  _raccReadNext = true;
   /** @internal */
-  _racc_user_yyerror = false;
+  _raccUserYyerror = false;
   /** @internal */
-  _racc_error_status = 0;
+  _raccErrorStatus = 0;
 
   /** @internal */
   _raccSetup(): RaccArg {
@@ -53,17 +53,17 @@ export abstract class Parser {
 
   /** @internal */
   _raccInitSysvars(): void {
-    this._racc_state = [0];
-    this._racc_tstack = [];
-    this._racc_vstack = [];
+    this._raccState = [0];
+    this._raccTstack = [];
+    this._raccVstack = [];
 
-    this._racc_t = null;
-    this._racc_val = null;
+    this._raccT = null;
+    this._raccVal = null;
 
-    this._racc_read_next = true;
+    this._raccReadNext = true;
 
-    this._racc_user_yyerror = false;
-    this._racc_error_status = 0;
+    this._raccUserYyerror = false;
+    this._raccErrorStatus = 0;
   }
 
   doParse(): unknown {
@@ -71,7 +71,7 @@ export abstract class Parser {
   }
 
   nextToken(): [string | false, unknown] | null | undefined {
-    throw new Error(`${this.constructor.name}#next_token is not defined`);
+    throw new NotImplementedError(`${this.constructor.name}#next_token is not defined`);
   }
 
   /** @internal */
@@ -85,30 +85,26 @@ export abstract class Parser {
 
     return kernelCatch(":racc_end_parse", () => {
       while (true) {
-        if ((i = actionPointer[this._racc_state.at(-1)!]) != null) {
-          if (this._racc_read_next) {
-            if (this._racc_t !== 0) {
-              [tok, this._racc_val] = this.nextToken() ?? [undefined, undefined];
+        if ((i = actionPointer[this._raccState.at(-1)!]) != null) {
+          if (this._raccReadNext) {
+            if (this._raccT !== 0) {
+              [tok, this._raccVal] = this.nextToken() ?? [undefined, undefined];
               if (tok == null || tok === false) {
-                this._racc_t = 0;
+                this._raccT = 0;
               } else {
-                this._racc_t = tokenTable[tok] ?? 1;
+                this._raccT = tokenTable[tok] ?? 1;
               }
-              this._racc_read_next = false;
+              this._raccReadNext = false;
             }
           }
-          i += this._racc_t!;
+          i += this._raccT!;
           if (
-            !(
-              i >= 0 &&
-              (act = actionTable[i]) != null &&
-              actionCheck[i] === this._racc_state.at(-1)
-            )
+            !(i >= 0 && (act = actionTable[i]) != null && actionCheck[i] === this._raccState.at(-1))
           ) {
-            act = actionDefault[this._racc_state.at(-1)!];
+            act = actionDefault[this._raccState.at(-1)!];
           }
         } else {
-          act = actionDefault[this._racc_state.at(-1)!];
+          act = actionDefault[this._raccState.at(-1)!];
         }
         while ((act = this._raccEvalact(act!, arg)) != null);
       }
@@ -119,21 +115,21 @@ export abstract class Parser {
   _raccEvalact(act: number, arg: RaccArg): number | null {
     const [actionTable, actionCheck, , actionPointer, , , , , , , , shiftN, reduceN] = arg;
     if (act > 0 && act < shiftN) {
-      if (this._racc_error_status > 0) {
-        if (!(this._racc_t! <= 1)) this._racc_error_status -= 1;
+      if (this._raccErrorStatus > 0) {
+        if (!(this._raccT! <= 1)) this._raccErrorStatus -= 1;
       }
-      this._racc_vstack.push(this._racc_val);
-      this._racc_state.push(act);
-      this._racc_read_next = true;
+      this._raccVstack.push(this._raccVal);
+      this._raccState.push(act);
+      this._raccReadNext = true;
     } else if (act < 0 && act > -reduceN) {
       const code = kernelCatch(":racc_jump", () => {
-        this._racc_state.push(this._raccDoReduce(arg, act));
+        this._raccState.push(this._raccDoReduce(arg, act));
         return false;
       });
       if (code !== false) {
         switch (code) {
           case 1:
-            this._racc_user_yyerror = true;
+            this._raccUserYyerror = true;
             return -reduceN;
           case 2:
             return shiftN;
@@ -142,35 +138,35 @@ export abstract class Parser {
         }
       }
     } else if (act === shiftN) {
-      kernelThrow(":racc_end_parse", this._racc_vstack[0]);
+      kernelThrow(":racc_end_parse", this._raccVstack[0]);
     } else if (act === -reduceN) {
-      switch (this._racc_error_status) {
+      switch (this._raccErrorStatus) {
         case 0:
           if (!(arg as unknown[])[21]) {
-            this.onError(this._racc_t!, this._racc_val, this._racc_vstack);
+            this.onError(this._raccT!, this._raccVal, this._raccVstack);
           }
           break;
         case 3:
-          if (this._racc_t === 0) kernelThrow(":racc_end_parse", null);
-          this._racc_read_next = true;
+          if (this._raccT === 0) kernelThrow(":racc_end_parse", null);
+          this._raccReadNext = true;
       }
-      this._racc_user_yyerror = false;
-      this._racc_error_status = 3;
+      this._raccUserYyerror = false;
+      this._raccErrorStatus = 3;
       let i: number | null;
       while (true) {
-        if ((i = actionPointer[this._racc_state.at(-1)!]) != null) {
+        if ((i = actionPointer[this._raccState.at(-1)!]) != null) {
           i += 1;
           if (
             i >= 0 &&
             (act = actionTable[i]!) != null &&
-            actionCheck[i] === this._racc_state.at(-1)
+            actionCheck[i] === this._raccState.at(-1)
           ) {
             break;
           }
         }
-        if (this._racc_state.length <= 1) kernelThrow(":racc_end_parse", null);
-        this._racc_state.pop();
-        this._racc_vstack.pop();
+        if (this._raccState.length <= 1) kernelThrow(":racc_end_parse", null);
+        this._raccState.pop();
+        this._raccVstack.pop();
       }
       return act;
     } else {
@@ -199,9 +195,9 @@ export abstract class Parser {
       useResult,
     ] = arg;
 
-    const state = this._racc_state;
-    const vstack = this._racc_vstack;
-    const tstack = this._racc_tstack;
+    const state = this._raccState;
+    const vstack = this._raccVstack;
+    const tstack = this._raccTstack;
 
     let i: number | null = act * -3;
     const len = reduceTable[i] as number;
@@ -243,7 +239,7 @@ export abstract class Parser {
   }
 
   yyerrok(): void {
-    this._racc_error_status = 0;
+    this._raccErrorStatus = 0;
   }
 
   tokenToStr(t: number): string | undefined {

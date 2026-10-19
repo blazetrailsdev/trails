@@ -1,5 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- a racc value stack holds tokens, Nodes and arrays untyped, as Ruby's does. */
+import { rbFSend } from "@blazetrails/ruby-compat";
+
 import type { XPathVisitor } from "./xpath-visitor.js";
+
+/** @internal */
+export function methodName(rubyName: string): string {
+  return rubyName.replace(/_([a-z\d])/g, (_m, c: string) => c.toUpperCase());
+}
 
 export class Node {
   static readonly ALLOW_COMBINATOR_ON_SELF = [
@@ -17,12 +24,7 @@ export class Node {
   }
 
   accept(visitor: XPathVisitor): string {
-    const msg = `visit${this.type
-      .toLowerCase()
-      .split("_")
-      .map((s) => s[0].toUpperCase() + s.slice(1))
-      .join("")}`;
-    return (visitor as unknown as Record<string, (node: Node) => string>)[msg](this);
+    return rbFSend(visitor, methodName(`visit_${this.type.toLowerCase()}`), this) as string;
   }
 
   toXpath(visitor: XPathVisitor): string {

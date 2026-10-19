@@ -1,5 +1,5 @@
 export function usesLibxml(): boolean {
-  return true;
+  return false;
 }
 
 export function libxml2Patches(): string[] {

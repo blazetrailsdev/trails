@@ -1,9 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- a racc value stack holds tokens, Nodes and arrays untyped, as Ruby's does. */
-import { ArgumentError, fixMod, rbInspect, toI } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  fixMod,
+  rbFSend,
+  rbInspect,
+  rbObjRespondTo,
+  toI,
+} from "@blazetrails/ruby-compat";
 
 import { libxml2Patches, usesLibxml } from "../version/info.js";
 import { GLOBAL_SEARCH_PREFIX } from "../xml/xpath.js";
-import { Node } from "./node.js";
+import { methodName, Node } from "./node.js";
 import { SyntaxError } from "./syntax-error.js";
 
 export const BuiltinsConfig = {
@@ -22,9 +28,6 @@ export const DoctypeConfig = {
 
 type Builtins = (typeof BuiltinsConfig.VALUES)[number];
 type Doctype = (typeof DoctypeConfig.VALUES)[number];
-
-const camelize = (name: string) =>
-  name.replace(/[-_]+([a-z0-9])/g, (_m, c: string) => c.toUpperCase());
 
 export class XPathVisitor {
   static readonly WILDCARD_NAMESPACES = libxml2Patches().includes(
@@ -77,54 +80,54 @@ export class XPathVisitor {
   }
 
   visitFunction(node: Node): string {
-    const msg = camelize(`visit_function_${node.value[0].replace(/[(]/g, "")}`);
-    if (typeof (this as any)[msg] === "function") return (this as any)[msg](node);
+    const msg = methodName(`visit_function_${node.value[0].replace(/[(]/g, "")}`);
+    if (rbObjRespondTo(this, msg)) return rbFSend(this, msg, node) as string;
 
     const fn: string = node.value[0];
-    if (/^text\(/.test(fn)) {
+    if (/^text\(/m.test(fn)) {
       return "child::text()";
-    } else if (/^self\(/.test(fn)) {
+    } else if (/^self\(/m.test(fn)) {
       return `self::${node.value[1]}`;
-    } else if (/^eq\(/.test(fn)) {
+    } else if (/^eq\(/m.test(fn)) {
       return `position()=${node.value[1]}`;
-    } else if (/^(nth|nth-of-type)\(/.test(fn)) {
+    } else if (/^(nth|nth-of-type)\(/m.test(fn)) {
       if (node.value[1] instanceof Node && node.value[1].type === "NTH") {
         return this.nth(node.value[1]);
       } else {
         return `position()=${node.value[1]}`;
       }
-    } else if (/^nth-child\(/.test(fn)) {
+    } else if (/^nth-child\(/m.test(fn)) {
       if (node.value[1] instanceof Node && node.value[1].type === "NTH") {
         return this.nth(node.value[1], { child: true });
       } else {
         return `count(preceding-sibling::*)=${Number(toI(node.value[1])) - 1}`;
       }
-    } else if (/^nth-last-of-type\(/.test(fn)) {
+    } else if (/^nth-last-of-type\(/m.test(fn)) {
       if (node.value[1] instanceof Node && node.value[1].type === "NTH") {
         return this.nth(node.value[1], { last: true });
       } else {
         const index = Number(toI(node.value[1])) - 1;
         return index === 0 ? "position()=last()" : `position()=last()-${index}`;
       }
-    } else if (/^nth-last-child\(/.test(fn)) {
+    } else if (/^nth-last-child\(/m.test(fn)) {
       if (node.value[1] instanceof Node && node.value[1].type === "NTH") {
         return this.nth(node.value[1], { last: true, child: true });
       } else {
         return `count(following-sibling::*)=${Number(toI(node.value[1])) - 1}`;
       }
-    } else if (/^(first|first-of-type)\(/.test(fn)) {
+    } else if (/^(first|first-of-type)\(/m.test(fn)) {
       return "position()=1";
-    } else if (/^(last|last-of-type)\(/.test(fn)) {
+    } else if (/^(last|last-of-type)\(/m.test(fn)) {
       return "position()=last()";
-    } else if (/^contains\(/.test(fn)) {
+    } else if (/^contains\(/m.test(fn)) {
       return `contains(.,${node.value[1]})`;
-    } else if (/^gt\(/.test(fn)) {
+    } else if (/^gt\(/m.test(fn)) {
       return `position()>${node.value[1]}`;
-    } else if (/^only-child\(/.test(fn)) {
+    } else if (/^only-child\(/m.test(fn)) {
       return "last()=1";
-    } else if (/^comment\(/.test(fn)) {
+    } else if (/^comment\(/m.test(fn)) {
       return "comment()";
-    } else if (/^has\(/.test(fn)) {
+    } else if (/^has\(/m.test(fn)) {
       const isDirect = node.value[1].value[0] == null;
       return `.${isDirect ? "" : "//"}${node.value[1].accept(this)}`;
     } else {
@@ -148,8 +151,8 @@ export class XPathVisitor {
   }
 
   visitId(node: Node): string {
-    const m = /^#(.*)$/.exec(node.value[0]);
-    return `@id='${m?.[1]}'`;
+    const m = /^#(.*)$/m.exec(node.value[0]);
+    return `@id='${m?.[1] ?? ""}'`;
   }
 
   visitAttributeCondition(node: Node): string {
@@ -157,7 +160,7 @@ export class XPathVisitor {
     if (node.value.length === 1) return attribute;
 
     let value: string = String(node.value.at(-1));
-    if (!/^['"]/.test(value)) value = `'${value}'`;
+    if (!/^['"]/m.test(value)) value = `'${value}'`;
 
     if (value[0] === value.at(-1) && `"'`.includes(value[0])) {
       const strValue = value.slice(1, -1);
@@ -191,8 +194,8 @@ export class XPathVisitor {
     if (node.value[0] instanceof Node && node.value[0].type === "FUNCTION") {
       return node.value[0].accept(this);
     } else {
-      const msg = camelize(`visit_pseudo_class_${node.value[0].replace(/[(]/g, "")}`);
-      if (typeof (this as any)[msg] === "function") return (this as any)[msg](node);
+      const msg = methodName(`visit_pseudo_class_${node.value[0].replace(/[(]/g, "")}`);
+      if (rbObjRespondTo(this, msg)) return rbFSend(this, msg, node) as string;
 
       switch (node.value[0]) {
         case "first":

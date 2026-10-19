@@ -20,14 +20,14 @@ export function xpathFor(
 
   if (selector.length === 0) throw new SyntaxError("empty CSS selector");
 
-  if (visitor) {
-    if (prefix) throw new ArgumentError("cannot provide both :prefix and :visitor");
-    if (ns) throw new ArgumentError("cannot provide both :ns and :visitor");
+  if (visitor != null) {
+    if (prefix != null) throw new ArgumentError("cannot provide both :prefix and :visitor");
+    if (ns != null) throw new ArgumentError("cannot provide both :ns and :visitor");
   }
 
   visitor ??= new XPathVisitor({
-    ...(prefix ? { prefix } : {}),
-    ...(ns ? { namespaces: ns } : {}),
+    ...(prefix != null ? { prefix } : {}),
+    ...(ns != null ? { namespaces: ns } : {}),
   });
 
   if (cache) {

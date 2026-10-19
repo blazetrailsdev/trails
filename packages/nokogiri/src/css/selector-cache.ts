@@ -21,6 +21,9 @@ export const SelectorCache = {
   },
 
   key({ selector, visitor }: { selector: string; visitor: XPathVisitor }): string {
-    return JSON.stringify([selector, visitor.config()]);
+    const config = visitor.config();
+    const namespaces =
+      config.namespaces && Object.fromEntries(Object.entries(config.namespaces).sort());
+    return JSON.stringify([selector, { ...config, namespaces }]);
   },
 };
