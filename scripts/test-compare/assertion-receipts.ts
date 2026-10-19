@@ -44,18 +44,18 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
     {
       kind: "assert_instance_of",
       value: null,
-      as: null,
+      as: "assert_nil",
       reason:
-        'dispatch/param_builder_test.rb:15 `result` is a HashWithIndifferentAccess, whose one feature is reading a Symbol and a String key as the same key — a JS object has one key type, so params are a null-prototype plain object and there is no class to assert (CLAUDE.md, "A Ruby Hash is a plain object unless it needs a Hash feature" and "`symbolize_keys` on an option hash")',
+        'dispatch/param_builder_test.rb:15 `result` is a HashWithIndifferentAccess; trails params are a null-prototype plain object, so the port asserts the prototype is null (packages/actionpack/CLAUDE.md, "Request params are a null-prototype plain object")',
     },
   ],
   "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › nested parameters": [
     {
       kind: "assert_instance_of",
       value: null,
-      as: null,
+      as: "assert_nil",
       reason:
-        'dispatch/param_builder_test.rb:21 `result[:foo]` is a HashWithIndifferentAccess, whose one feature is reading a Symbol and a String key as the same key — a JS object has one key type, so params are a null-prototype plain object and there is no class to assert (CLAUDE.md, "A Ruby Hash is a plain object unless it needs a Hash feature" and "`symbolize_keys` on an option hash")',
+        'dispatch/param_builder_test.rb:21 `result[:foo]` is a HashWithIndifferentAccess; trails params are a null-prototype plain object, so the port asserts the prototype is null (packages/actionpack/CLAUDE.md, "Request params are a null-prototype plain object")',
     },
   ],
   "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a browser":

@@ -26,6 +26,7 @@ describe("ParamBuilderTest", () => {
   test("simple query string", () => {
     const result = ParamBuilder.fromQueryString("foo=bar&baz=quux");
     expect({ ...result }).toEqual({ foo: "bar", baz: "quux" });
+    expect(Object.getPrototypeOf(result)).toBeNull();
   });
 
   test("nested parameters", () => {
@@ -33,6 +34,7 @@ describe("ParamBuilderTest", () => {
     expect({ ...result, foo: { ...(result.foo as object) } }).toEqual({
       foo: { bar: "baz" },
     });
+    expect(Object.getPrototypeOf(result.foo)).toBeNull();
   });
 
   test("(rack 3) defaults to retaining leading bracket", () => {
