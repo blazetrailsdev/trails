@@ -267,7 +267,7 @@ describe("TestCase#document_root_element", () => {
     await tc.beforeSetup();
     await tc.get("index");
     const first = tc.htmlDocument;
-    expect(tc["documentRootElement"].name).toBe("root");
+    expect(tc["documentRootElement"]()!.name).toBe("root");
     await tc.get("index");
     expect(tc.htmlDocument).not.toBe(first);
   });

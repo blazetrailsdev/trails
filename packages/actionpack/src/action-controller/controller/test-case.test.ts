@@ -1,4 +1,5 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
+import { htmlSafe } from "@blazetrails/activesupport";
 import {
   assert,
   Assertion,
@@ -155,6 +156,25 @@ class TestController extends Base {
     await this.render({ plain: "ok" });
   }
 
+  async testXmlOutput() {
+    this.response.contentType = this.params.get("response_as") as string;
+    await this.render({
+      plain: `<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <area><p>area is an empty tag in HTML, so it won't contain this content</p></area>
+</root>
+`,
+    });
+  }
+
+  async testWithoutBody() {
+    await this.render({ html: htmlSafe('<div class="foo"></div>') });
+  }
+
+  async testWithBody() {
+    await this.render({ html: htmlSafe('<body class="foo"></body>') });
+  }
+
   async renderJson() {
     await this.render({ json: this.request.rawPost });
   }
@@ -248,11 +268,18 @@ describe("TestCaseTest", () => {
     tc.setup();
   });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("assert select without body", () => {});
+  it("assert select without body", async () => {
+    await tc.get("testWithoutBody");
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("assert select with body", () => {});
+    tc.assertSelect("body", 0);
+    tc.assertSelect("div.foo");
+  });
+
+  it("assert select with body", async () => {
+    await tc.get("testWithBody");
+
+    tc.assertSelect("body.foo");
+  });
 
   it("url options reset", async () => {
     tc.controller = new DefaultUrlOptionsCachingController();
@@ -458,11 +485,23 @@ describe("TestCaseTest", () => {
     assertEqual("OK", tc.response.body);
   });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("should impose childless html tags in html", () => {});
+  it("should impose childless html tags in html", async () => {
+    await tc.process("testXmlOutput", { params: { response_as: "text/html" } });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("should not impose childless html tags in xml", () => {});
+    const JRUBY_VERSION: string | null = null;
+    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors test_case_test.rb:435
+    if (JRUBY_VERSION != null) {
+      tc.assertSelect("root > map > area + p");
+    } else {
+      tc.assertSelect("root > area + p");
+    }
+  });
+
+  it("should not impose childless html tags in xml", async () => {
+    await tc.process("testXmlOutput", { params: { response_as: "application/xml" } });
+
+    tc.assertSelect("root > area > p");
+  });
 
   it("assert generates", () => {
     tc.assertGenerates("controller/action/5", {
