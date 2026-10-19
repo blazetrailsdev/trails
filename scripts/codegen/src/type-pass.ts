@@ -309,6 +309,7 @@ export class TypePass {
     // Every assignment to a field declared `unknown` (an ivar, a class_attribute):
     // its value's type joins the field's.
     const fieldSeen = new Map<ts.Declaration, ts.Type[]>();
+    const emptyArrays = new Set<ts.Declaration>();
     const isUnknownNode = (t: ts.TypeNode | undefined) =>
       !!t && t.kind === ts.SyntaxKind.UnknownKeyword;
     const assigns = (node: ts.Node): void => {
@@ -328,7 +329,14 @@ export class TypePass {
           d.getSourceFile().fileName.startsWith(this.srcDir)
         ) {
           const t = checker.getTypeAtLocation(node.right);
-          if (!(t.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never))) {
+          // `@values = []`: an empty array says nothing of its elements (TS
+          // reads `never[]`); the field takes the other assignments' types, or
+          // `unknown[]` when there are none.
+          const emptyArray =
+            checker.isArrayType(t) &&
+            !!(checker.getTypeArguments(t as ts.TypeReference)[0]?.flags & ts.TypeFlags.Never);
+          if (emptyArray) emptyArrays.add(d);
+          else if (!(t.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never))) {
             const list = fieldSeen.get(d) ?? fieldSeen.set(d, []).get(d)!;
             for (const u of t.isUnion() ? t.types : [t])
               list.push(checker.getBaseTypeOfLiteralType(u));
@@ -382,6 +390,13 @@ export class TypePass {
       ts.forEachChild(node, (c) => decls(c, sf));
     };
     for (const sf of sourceFiles) decls(sf, sf);
+    for (const d of emptyArrays)
+      if (!fieldSeen.has(d)) {
+        const sf = d.getSourceFile();
+        const t = (d as ts.PropertyDeclaration).type!;
+        push(sf, { pos: t.getStart(sf), end: t.getEnd(), text: "unknown[]" });
+        n++;
+      }
     for (const [d, types] of fieldSeen) {
       const sf = d.getSourceFile();
       const texts = widest(types).map((x) => this.typeText(checker, x, d, sf.fileName));
