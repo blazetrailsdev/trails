@@ -1,4 +1,4 @@
-import { Hash, first } from "@blazetrails/ruby-compat";
+import { Hash, first, rbObjDup } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 
 YAML.addBuiltinType("omap", (_type, val) => {
@@ -53,16 +53,15 @@ export class OrderedHash<K, V> extends Hash<K, V> {
 
   select(...args: [(key: K, value: V) => boolean]): OrderedHash<K, V> {
     const block = args[args.length - 1];
-    const result = new OrderedHash<K, V>();
-    for (const [k, v] of this) {
-      if (block(k, v)) result.set(k, v);
-    }
-    return result;
+    const hash = rbObjDup(this);
+    hash.deleteIf((k, v) => !block(k, v));
+    return hash;
   }
 
   reject(...args: [(key: K, value: V) => boolean]): OrderedHash<K, V> {
-    const block = args[args.length - 1];
-    return this.select((k, v) => !block(k, v));
+    const hash = rbObjDup(this);
+    hash.rejectBang(...args);
+    return hash;
   }
 
   nestedUnderIndifferentAccess(): this {

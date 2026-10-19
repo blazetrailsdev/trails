@@ -1,5 +1,5 @@
 import { Time } from "@blazetrails/date";
-import { rbCNumeric, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import { rbCNumeric, rbObjDup, rbObjIsKindOf } from "@blazetrails/ruby-compat";
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { coder } from "./coder.js";
@@ -97,7 +97,9 @@ export class Entry {
       !this.isCompressed() &&
       !(rbObjIsKindOf(this._value, rbCNumeric) || typeof this._value === "boolean")
     ) {
-      if (typeof this._value !== "string") {
+      if (typeof this._value === "string") {
+        this._value = rbObjDup(this._value);
+      } else {
         this._value = coder.load(coder.dump(this._value));
       }
     }

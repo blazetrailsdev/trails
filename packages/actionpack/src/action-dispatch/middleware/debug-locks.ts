@@ -1,5 +1,5 @@
 import { Dependencies, type ShareLockThreadInfo } from "@blazetrails/activesupport";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend, rbInspect } from "@blazetrails/ruby-compat";
 import { bodyFromString, CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
@@ -60,13 +60,11 @@ export class DebugLocks {
 
       if (info.sleeper) {
         msg += `  Waiting in ${String(info.sleeper)}`;
-        if (info.purpose != null) msg += ` to ${JSON.stringify(String(info.purpose))}`;
+        if (info.purpose != null) msg += ` to ${rbInspect(String(info.purpose))}`;
         msg += "\n";
 
         if (info.compatible) {
-          const compat = info.compatible.map((c) =>
-            c === false ? "share" : JSON.stringify(String(c)),
-          );
+          const compat = info.compatible.map((c) => (c === false ? "share" : rbInspect(String(c))));
           msg += `  may be pre-empted for: ${compat.join(", ")}\n`;
         }
 

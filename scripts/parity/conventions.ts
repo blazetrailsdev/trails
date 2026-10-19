@@ -490,9 +490,10 @@ export const PROTOCOL_DEFINITION_NAMES = [
 export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Set<string>([
   "abstractcontroller",
   "actioncontroller",
-  "actiondispatch",
   "actionview",
   "activemodel",
+  "activerecord",
+  "activesupport",
   "activerecord",
   "activerecord-test-support",
   "activesupport",
@@ -521,9 +522,12 @@ export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Se
  * converged, and is never removed to turn a red run green.
  */
 export const PROTOCOL_CALL_ENROLLED_PACKAGES: ReadonlySet<string> = new Set<string>([
+  "actioncontroller",
   "abstractcontroller",
   "actionview",
   "activemodel",
+  "activerecord",
+  "activesupport",
   "activerecord-test-support",
   "arel",
   "bcrypt",
