@@ -113,7 +113,7 @@ function absoluteImagePath(this: ScreenshotHelperHost): string {
 }
 
 /** @internal */
-function relativeImagePath(this: ScreenshotHelperHost): string {
+export function relativeImagePath(this: ScreenshotHelperHost): string {
   return `${File.join(screenshotsDir(), imageName.call(this))}.png`;
 }
 
