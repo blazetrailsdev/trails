@@ -86,6 +86,13 @@
   {
     "package": "abstractcontroller",
     "rubyFile": "base.rb",
+    "rubyName": "inspect",
+    "digest": "8d7ea8f998c4cd70",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "abstractcontroller",
+    "rubyFile": "base.rb",
     "rubyName": "internal_methods",
     "digest": "c5b342b609a78d82",
     "ref": "v8.0.2"
@@ -282,6 +289,27 @@
   {
     "package": "abstractcontroller",
     "rubyFile": "callbacks.rb",
+    "rubyName": "prepend_after_action",
+    "digest": "fd54db92a8c1d290",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "abstractcontroller",
+    "rubyFile": "callbacks.rb",
+    "rubyName": "prepend_around_action",
+    "digest": "fd54db92a8c1d290",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "abstractcontroller",
+    "rubyFile": "callbacks.rb",
+    "rubyName": "prepend_before_action",
+    "digest": "fd54db92a8c1d290",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "abstractcontroller",
+    "rubyFile": "callbacks.rb",
     "rubyName": "process_action",
     "digest": "f1c310537693972f",
     "ref": "v8.0.2"
@@ -450,6 +478,27 @@
   {
     "package": "abstractcontroller",
     "rubyFile": "rendering.rb",
+    "rubyName": "_set_html_content_type",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "abstractcontroller",
+    "rubyFile": "rendering.rb",
+    "rubyName": "_set_rendered_content_type",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "abstractcontroller",
+    "rubyFile": "rendering.rb",
+    "rubyName": "_set_vary_header",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "abstractcontroller",
+    "rubyFile": "rendering.rb",
     "rubyName": "initialize",
     "digest": "136da0a19a32c140",
     "ref": "v8.0.2"
@@ -464,8 +513,22 @@
   {
     "package": "abstractcontroller",
     "rubyFile": "rendering.rb",
+    "rubyName": "render_to_body",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "abstractcontroller",
+    "rubyFile": "rendering.rb",
     "rubyName": "render_to_string",
     "digest": "41b4b68e0dc2c32a",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "abstractcontroller",
+    "rubyFile": "rendering.rb",
+    "rubyName": "rendered_format",
+    "digest": "39fd5c758a9c952b",
     "ref": "v8.0.2"
   },
   {
@@ -506,8 +569,190 @@
   {
     "package": "actioncontroller",
     "rubyFile": "api.rb",
+    "rubyName": "_allow_other_host",
+    "digest": "bdadc11e288edfbf",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_enforce_open_redirect_protection",
+    "digest": "06104a3be786d54b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_ensure_url_is_http_header_safe",
+    "digest": "dfab896e49bf08f3",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_extract_parameters",
+    "digest": "f6cbb84142172e4c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_extract_redirect_to_status",
+    "digest": "e4e0b76a09055fda",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_perform_parameter_wrapping",
+    "digest": "3d790037accee08b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_url_host_allowed?",
+    "digest": "6601294ca30a17d4",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_wrap_parameters",
+    "digest": "edbb636ca0c127b3",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_wrapper_enabled?",
+    "digest": "fb73f20ed0487d87",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_wrapper_formats",
+    "digest": "86c07edec3169630",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "_wrapper_key",
+    "digest": "f2cc5fbe54aeb8a1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "append_info_to_payload",
+    "digest": "c8b72182f62836b9",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "cleanup_view_runtime",
+    "digest": "0a252ca5c7e40056",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "halted_callback_hook",
+    "digest": "1ca1034e75f1a1c0",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "initialize",
+    "digest": "cab1e19689f2ddff",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "instrument_name",
+    "digest": "024b77880f43dc5a",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "instrument_payload",
+    "digest": "8d18e7fe976f896e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "params",
+    "digest": "e279a70b89f7368b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "params=",
+    "digest": "484c055dff166b3a",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "process_action",
+    "digest": "267e83f1a7f29b00",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "rate_limiting",
+    "digest": "895ca33f785077d2",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "render",
+    "digest": "115cc5659b81e077",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "render_to_body",
+    "digest": "04efee3599017c31",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
+    "rubyName": "show_detailed_exceptions?",
+    "digest": "9583c381d896cc8b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api.rb",
     "rubyName": "without_modules",
     "digest": "5b1c159b1bd351f0",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api/api_rendering.rb",
+    "rubyName": "process_action",
+    "digest": "267e83f1a7f29b00",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "api/api_rendering.rb",
+    "rubyName": "render",
+    "digest": "115cc5659b81e077",
     "ref": "v8.0.2"
   },
   {
@@ -555,6 +800,13 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
+    "rubyName": "_render_to_body_with_renderer",
+    "digest": "715ffcf169236577",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "base.rb",
     "rubyName": "_set_html_content_type",
     "digest": "49613a7137ff7b7f",
     "ref": "v8.0.2"
@@ -592,6 +844,13 @@
     "rubyFile": "base.rb",
     "rubyName": "cleanup_view_runtime",
     "digest": "0a252ca5c7e40056",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "base.rb",
+    "rubyName": "combine_etags",
+    "digest": "e8b818dd733d0aaf",
     "ref": "v8.0.2"
   },
   {
@@ -674,6 +933,20 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
+    "rubyName": "helpers",
+    "digest": "77d9db488b586773",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "base.rb",
+    "rubyName": "http_cache_forever",
+    "digest": "23cd21f1c59a1340",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "base.rb",
     "rubyName": "initialize",
     "digest": "cab1e19689f2ddff",
     "ref": "v8.0.2"
@@ -695,6 +968,20 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
+    "rubyName": "marked_for_same_origin_verification?",
+    "digest": "f683b3fa94b442c7",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "base.rb",
+    "rubyName": "no_store",
+    "digest": "c31900ba4149689c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "base.rb",
     "rubyName": "params",
     "digest": "e279a70b89f7368b",
     "ref": "v8.0.2"
@@ -704,6 +991,13 @@
     "rubyFile": "base.rb",
     "rubyName": "params=",
     "digest": "484c055dff166b3a",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "base.rb",
+    "rubyName": "render",
+    "digest": "115cc5659b81e077",
     "ref": "v8.0.2"
   },
   {
@@ -744,8 +1038,22 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
+    "rubyName": "show_detailed_exceptions?",
+    "digest": "9583c381d896cc8b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "base.rb",
     "rubyName": "stale?",
     "digest": "587420e9408226ca",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "base.rb",
+    "rubyName": "url_options",
+    "digest": "c92b788c503d5614",
     "ref": "v8.0.2"
   },
   {
@@ -984,6 +1292,13 @@
     "rubyFile": "metal.rb",
     "rubyName": "set_response!",
     "digest": "cebfeda773c1dbdf",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal.rb",
+    "rubyName": "to_a",
+    "digest": "5d3019d5facef858",
     "ref": "v8.0.2"
   },
   {
@@ -1500,6 +1815,20 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/helpers.rb",
+    "rubyName": "helper_attr",
+    "digest": "99d9c647148c023f",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/helpers.rb",
+    "rubyName": "helpers",
+    "digest": "77d9db488b586773",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/helpers.rb",
     "rubyName": "modules_for_helpers",
     "digest": "4292fb1298ee877e",
     "ref": "v8.0.2"
@@ -1542,6 +1871,13 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/http_authentication.rb",
+    "rubyName": "authenticate_or_request_with_http_token",
+    "digest": "25f63476a6fa3dca",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/http_authentication.rb",
     "rubyName": "authenticate_with_http_basic",
     "digest": "82b0e40a87935162",
     "ref": "v8.0.2"
@@ -1551,6 +1887,13 @@
     "rubyFile": "metal/http_authentication.rb",
     "rubyName": "authenticate_with_http_digest",
     "digest": "3cc492f405663a83",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/http_authentication.rb",
+    "rubyName": "authenticate_with_http_token",
+    "digest": "6d4c10628cf891c7",
     "ref": "v8.0.2"
   },
   {
@@ -1640,6 +1983,20 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/http_authentication.rb",
+    "rubyName": "params_array_from",
+    "digest": "58f5a981947092ab",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/http_authentication.rb",
+    "rubyName": "raw_params",
+    "digest": "b273455880786664",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/http_authentication.rb",
     "rubyName": "request_http_basic_authentication",
     "digest": "b90720cabaaccefd",
     "ref": "v8.0.2"
@@ -1654,8 +2011,36 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/http_authentication.rb",
+    "rubyName": "request_http_token_authentication",
+    "digest": "6e3e71ad787c772d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/http_authentication.rb",
+    "rubyName": "rewrite_param_values",
+    "digest": "20e0703cbcbd6a5c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/http_authentication.rb",
     "rubyName": "secret_token",
     "digest": "4d1257cd67aefa5b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/http_authentication.rb",
+    "rubyName": "token_and_options",
+    "digest": "b8299d4d8bd21219",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/http_authentication.rb",
+    "rubyName": "token_params_from",
+    "digest": "e1aa2a19f505f8ba",
     "ref": "v8.0.2"
   },
   {
@@ -1982,6 +2367,13 @@
   },
   {
     "package": "actioncontroller",
+    "rubyFile": "metal/mime_responds.rb",
+    "rubyName": "variant_key",
+    "digest": "37f6ada704b42418",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
     "rubyFile": "metal/parameter_encoding.rb",
     "rubyName": "action_encoding_template",
     "digest": "edb31482c55206fd",
@@ -2200,6 +2592,13 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/redirecting.rb",
+    "rubyName": "redirect_to",
+    "digest": "98623d493b254a34",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/redirecting.rb",
     "rubyName": "url_from",
     "digest": "9af8f3ef7468b286",
     "ref": "v8.0.2"
@@ -2235,6 +2634,13 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/renderers.rb",
+    "rubyName": "add_renderer",
+    "digest": "9d3ffc57d104c988",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/renderers.rb",
     "rubyName": "initialize",
     "digest": "0f1d5d9dd80e86a3",
     "ref": "v8.0.2"
@@ -2244,6 +2650,13 @@
     "rubyFile": "metal/renderers.rb",
     "rubyName": "remove",
     "digest": "e711099fc453785c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/renderers.rb",
+    "rubyName": "remove_renderer",
+    "digest": "44a841cfc243289f",
     "ref": "v8.0.2"
   },
   {
@@ -2697,6 +3110,20 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/strong_parameters.rb",
+    "rubyName": "[]",
+    "digest": "c119d566cac8015c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/strong_parameters.rb",
+    "rubyName": "[]=",
+    "digest": "cb2cdc0dbe505072",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/strong_parameters.rb",
     "rubyName": "_deep_transform_keys_in_object",
     "digest": "3b363d2778f51e31",
     "ref": "v8.0.2"
@@ -2851,6 +3278,20 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/strong_parameters.rb",
+    "rubyName": "encode_with",
+    "digest": "ce36ead39a4e789e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/strong_parameters.rb",
+    "rubyName": "eql?",
+    "digest": "ba822c238f2f33db",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/strong_parameters.rb",
     "rubyName": "except",
     "digest": "1ce5c1ac22fa05d5",
     "ref": "v8.0.2"
@@ -2900,6 +3341,13 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/strong_parameters.rb",
+    "rubyName": "hash",
+    "digest": "c0f4823e20ecdf0c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/strong_parameters.rb",
     "rubyName": "hash_filter",
     "digest": "5450970e54ea7ec8",
     "ref": "v8.0.2"
@@ -2914,8 +3362,22 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/strong_parameters.rb",
+    "rubyName": "init_with",
+    "digest": "acc907ac00988e86",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/strong_parameters.rb",
     "rubyName": "initialize",
     "digest": "3b79342ac210cc91",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "metal/strong_parameters.rb",
+    "rubyName": "initialize_copy",
+    "digest": "a33adb89770dbedb",
     "ref": "v8.0.2"
   },
   {
@@ -3334,6 +3796,20 @@
   {
     "package": "actioncontroller",
     "rubyFile": "test_case.rb",
+    "rubyName": "check_required_ivars",
+    "digest": "60a055a1c3d7d76f",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "test_case.rb",
+    "rubyName": "clean_up_thread_locals",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "test_case.rb",
     "rubyName": "content_type",
     "digest": "622da6e181d2a4b6",
     "ref": "v8.0.2"
@@ -3411,6 +3887,13 @@
   {
     "package": "actioncontroller",
     "rubyFile": "test_case.rb",
+    "rubyName": "document_root_element",
+    "digest": "f71cab439a283fd7",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "test_case.rb",
     "rubyName": "enabled?",
     "digest": "357b923f2251ef17",
     "ref": "v8.0.2"
@@ -3481,6 +3964,13 @@
   {
     "package": "actioncontroller",
     "rubyFile": "test_case.rb",
+    "rubyName": "new_controller_thread",
+    "digest": "0a252ca5c7e40056",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "test_case.rb",
     "rubyName": "new_session",
     "digest": "56d41fe1859a6bee",
     "ref": "v8.0.2"
@@ -3546,6 +4036,27 @@
     "rubyFile": "test_case.rb",
     "rubyName": "scrub_env!",
     "digest": "8bb1d4c301f76d3c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "test_case.rb",
+    "rubyName": "setup_controller_request_and_response",
+    "digest": "63078d0f6853fca3",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "test_case.rb",
+    "rubyName": "setup_request",
+    "digest": "48c6c37d7621a13d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncontroller",
+    "rubyFile": "test_case.rb",
+    "rubyName": "should_multipart?",
+    "digest": "dcc44f9ed3d553c3",
     "ref": "v8.0.2"
   },
   {
@@ -3992,6 +4503,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/content_security_policy.rb",
+    "rubyName": "initialize_copy",
+    "digest": "2691636790cd8ac1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/content_security_policy.rb",
     "rubyName": "manifest_src",
     "digest": "ad3f5da8081b9e64",
     "ref": "v8.0.2"
@@ -4230,6 +4748,20 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/headers.rb",
+    "rubyName": "[]",
+    "digest": "e2083fae7509a426",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/headers.rb",
+    "rubyName": "[]=",
+    "digest": "f3837de732e9afe2",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/headers.rb",
     "rubyName": "add",
     "digest": "6a74c9084a739c56",
     "ref": "v8.0.2"
@@ -4405,6 +4937,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/mime_type.rb",
+    "rubyName": "[]",
+    "digest": "7991ff87aba6d00e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/mime_type.rb",
     "rubyName": "all?",
     "digest": "9583c381d896cc8b",
     "ref": "v8.0.2"
@@ -4421,6 +4960,13 @@
     "rubyFile": "http/mime_type.rb",
     "rubyName": "each",
     "digest": "294a6d76debf1d1b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/mime_type.rb",
+    "rubyName": "eql?",
+    "digest": "c7b16d0cb4d3820f",
     "ref": "v8.0.2"
   },
   {
@@ -4714,6 +5260,20 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "accelerometer",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "ambient_light_sensor",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
     "rubyName": "apply_mapping",
     "digest": "f9a56a6dafec6281",
     "ref": "v8.0.2"
@@ -4723,6 +5283,13 @@
     "rubyFile": "http/permissions_policy.rb",
     "rubyName": "apply_mappings",
     "digest": "1dfa49e3043448da",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "autoplay",
+    "digest": "ad3f5da8081b9e64",
     "ref": "v8.0.2"
   },
   {
@@ -4756,8 +5323,106 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "camera",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "display_capture",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "encrypted_media",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "fullscreen",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "geolocation",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "gyroscope",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "hid",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "idle_detection",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
     "rubyName": "initialize",
     "digest": "7b283825ea7b075c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "initialize_copy",
+    "digest": "2691636790cd8ac1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "keyboard_map",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "magnetometer",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "microphone",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "midi",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "payment",
+    "digest": "ad3f5da8081b9e64",
     "ref": "v8.0.2"
   },
   {
@@ -4772,6 +5437,13 @@
     "rubyFile": "http/permissions_policy.rb",
     "rubyName": "permissions_policy=",
     "digest": "5231a87d815f3b4f",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "picture_in_picture",
+    "digest": "ad3f5da8081b9e64",
     "ref": "v8.0.2"
   },
   {
@@ -4793,6 +5465,41 @@
     "rubyFile": "http/permissions_policy.rb",
     "rubyName": "resolve_source",
     "digest": "696d2de6ab9ae190",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "screen_wake_lock",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "serial",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "sync_xhr",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "usb",
+    "digest": "ad3f5da8081b9e64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/permissions_policy.rb",
+    "rubyName": "web_share",
+    "digest": "ad3f5da8081b9e64",
     "ref": "v8.0.2"
   },
   {
@@ -5122,6 +5829,13 @@
     "rubyFile": "http/request.rb",
     "rubyName": "initialize",
     "digest": "0e3e2c864db980d1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/request.rb",
+    "rubyName": "inspect",
+    "digest": "8326baa6fa79eb7d",
     "ref": "v8.0.2"
   },
   {
@@ -5610,6 +6324,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/response.rb",
+    "rubyName": "call",
+    "digest": "01cf29ea3ef4086a",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/response.rb",
     "rubyName": "charset",
     "digest": "07dd303c19dab05c",
     "ref": "v8.0.2"
@@ -5703,6 +6424,13 @@
     "rubyFile": "http/response.rb",
     "rubyName": "each",
     "digest": "530cb03355067a12",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/response.rb",
+    "rubyName": "each_chunk",
+    "digest": "ba0c5f7804d99cd7",
     "ref": "v8.0.2"
   },
   {
@@ -5960,6 +6688,20 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/response.rb",
+    "rubyName": "to_a",
+    "digest": "ee8464ef9e59df3e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/response.rb",
+    "rubyName": "to_ary",
+    "digest": "1efe66c98079cd7c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/response.rb",
     "rubyName": "to_path",
     "digest": "7e91786a1c83e548",
     "ref": "v8.0.2"
@@ -6079,6 +6821,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/url.rb",
+    "rubyName": "domain",
+    "digest": "50ab2fe963bddae2",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/url.rb",
     "rubyName": "extract_domain",
     "digest": "ac6163b1c4fbcb64",
     "ref": "v8.0.2"
@@ -6116,6 +6865,13 @@
     "rubyFile": "http/url.rb",
     "rubyName": "full_url_for",
     "digest": "9de4caec6116aa57",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/url.rb",
+    "rubyName": "host",
+    "digest": "84ea977f40f925ba",
     "ref": "v8.0.2"
   },
   {
@@ -6177,8 +6933,22 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/url.rb",
+    "rubyName": "port",
+    "digest": "5fcbbfde4d5be60f",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/url.rb",
     "rubyName": "port_string",
     "digest": "2af0123e4cb5eb95",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/url.rb",
+    "rubyName": "protocol",
+    "digest": "fd629a72be181175",
     "ref": "v8.0.2"
   },
   {
@@ -6207,6 +6977,13 @@
     "rubyFile": "http/url.rb",
     "rubyName": "standard_port?",
     "digest": "249639c790d56d37",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "http/url.rb",
+    "rubyName": "subdomain",
+    "digest": "7e119244bb558d67",
     "ref": "v8.0.2"
   },
   {
@@ -6396,6 +7173,13 @@
     "rubyFile": "journey/gtg/simulator.rb",
     "rubyName": "memos",
     "digest": "9f07eb5945b7527b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "journey/gtg/transition_table.rb",
+    "rubyName": "[]=",
+    "digest": "117a79d2d40f77bf",
     "ref": "v8.0.2"
   },
   {
@@ -6704,6 +7488,13 @@
     "rubyFile": "journey/parser.rb",
     "rubyName": "parse_terminal",
     "digest": "f819c148e556b1e8",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "journey/path/pattern.rb",
+    "rubyName": "[]",
+    "digest": "96778b362be598dd",
     "ref": "v8.0.2"
   },
   {
@@ -7283,6 +8074,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "journey/scanner.rb",
+    "rubyName": "peek_byte",
+    "digest": "71cb7998d601d588",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "journey/scanner.rb",
     "rubyName": "scan",
     "digest": "db84706fc39b00d7",
     "ref": "v8.0.2"
@@ -7507,6 +8305,20 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/cookies.rb",
+    "rubyName": "[]",
+    "digest": "e2dce6c43e16b2c4",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/cookies.rb",
+    "rubyName": "[]=",
+    "digest": "290459d2572e5308",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/cookies.rb",
     "rubyName": "authenticated_encrypted_cookie_salt",
     "digest": "f1ee4e5412688e21",
     "ref": "v8.0.2"
@@ -7530,6 +8342,13 @@
     "rubyFile": "middleware/cookies.rb",
     "rubyName": "check_for_overflow!",
     "digest": "7d26334c1f912c88",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/cookies.rb",
+    "rubyName": "clear",
+    "digest": "786d6e1cd7442520",
     "ref": "v8.0.2"
   },
   {
@@ -7661,6 +8480,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/cookies.rb",
+    "rubyName": "escape",
+    "digest": "c76c41ded8bf6d3c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/cookies.rb",
     "rubyName": "expiry_options",
     "digest": "b72fd2ed276287a3",
     "ref": "v8.0.2"
@@ -7691,6 +8517,13 @@
     "rubyFile": "middleware/cookies.rb",
     "rubyName": "initialize",
     "digest": "906bc9f4b7510ad3",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/cookies.rb",
+    "rubyName": "key?",
+    "digest": "5b59574e31ded0c8",
     "ref": "v8.0.2"
   },
   {
@@ -7780,6 +8613,27 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/cookies.rb",
+    "rubyName": "to_header",
+    "digest": "3d3b739826cae57e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/cookies.rb",
+    "rubyName": "update",
+    "digest": "dabd6cd9745b0e71",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/cookies.rb",
+    "rubyName": "update_cookies_from_jar",
+    "digest": "65cf5edff24bc298",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/cookies.rb",
     "rubyName": "upgrade_legacy_hmac_aes_cbc_cookies?",
     "digest": "bccdea9aa028751e",
     "ref": "v8.0.2"
@@ -7824,6 +8678,13 @@
     "rubyFile": "middleware/debug_exceptions.rb",
     "rubyName": "call",
     "digest": "40083b329024986d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/debug_exceptions.rb",
+    "rubyName": "create_template",
+    "digest": "4214f483b2dd6233",
     "ref": "v8.0.2"
   },
   {
@@ -7894,6 +8755,13 @@
     "rubyFile": "middleware/debug_exceptions.rb",
     "rubyName": "render_for_api_request",
     "digest": "c13f1b44d61db137",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/debug_exceptions.rb",
+    "rubyName": "render_for_browser_request",
+    "digest": "233d945814ba0ef5",
     "ref": "v8.0.2"
   },
   {
@@ -7985,6 +8853,13 @@
     "rubyFile": "middleware/debug_view.rb",
     "rubyName": "protect_against_forgery?",
     "digest": "9583c381d896cc8b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/debug_view.rb",
+    "rubyName": "render",
+    "digest": "b4aad09ca43539c2",
     "ref": "v8.0.2"
   },
   {
@@ -8207,6 +9082,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/exception_wrapper.rb",
+    "rubyName": "spot",
+    "digest": "79760f554beeda7d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/exception_wrapper.rb",
     "rubyName": "status_code",
     "digest": "df85df7f1639034b",
     "ref": "v8.0.2"
@@ -8272,6 +9154,20 @@
     "rubyFile": "middleware/executor.rb",
     "rubyName": "initialize",
     "digest": "58a18d368ca7461e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/flash.rb",
+    "rubyName": "[]",
+    "digest": "4e424fcb2b79d89f",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/flash.rb",
+    "rubyName": "[]=",
+    "digest": "3d97b367e948dab3",
     "ref": "v8.0.2"
   },
   {
@@ -8368,6 +9264,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/flash.rb",
+    "rubyName": "initialize_copy",
+    "digest": "e31192a9057ef599",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/flash.rb",
     "rubyName": "keep",
     "digest": "9c4a662178318e7b",
     "ref": "v8.0.2"
@@ -8375,8 +9278,22 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/flash.rb",
+    "rubyName": "key?",
+    "digest": "e25ef6fcf058d3c4",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/flash.rb",
     "rubyName": "keys",
     "digest": "d59e201ac3077bf8",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/flash.rb",
+    "rubyName": "new",
+    "digest": "18f60c2b1d90cc27",
     "ref": "v8.0.2"
   },
   {
@@ -8403,6 +9320,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/flash.rb",
+    "rubyName": "now_is_loaded?",
+    "digest": "d5104690a7b9b307",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/flash.rb",
     "rubyName": "replace",
     "digest": "350739bd4a66a296",
     "ref": "v8.0.2"
@@ -8417,8 +9341,22 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/flash.rb",
+    "rubyName": "stringify_array",
+    "digest": "fae3eda36e1db5d6",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/flash.rb",
     "rubyName": "sweep",
     "digest": "1f82357730fb57df",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/flash.rb",
+    "rubyName": "to_hash",
+    "digest": "19b570061c2128c6",
     "ref": "v8.0.2"
   },
   {
@@ -8587,6 +9525,13 @@
     "rubyFile": "middleware/remote_ip.rb",
     "rubyName": "call",
     "digest": "5d3ad89e622a8c23",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/remote_ip.rb",
+    "rubyName": "filter_proxies",
+    "digest": "3d99db4712bf2833",
     "ref": "v8.0.2"
   },
   {
@@ -8878,6 +9823,13 @@
   },
   {
     "package": "actiondispatch",
+    "rubyFile": "middleware/session/mem_cache_store.rb",
+    "rubyName": "prepare_session",
+    "digest": "c50d15a0a47386f0",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
     "rubyFile": "middleware/show_exceptions.rb",
     "rubyName": "call",
     "digest": "6c504fcf3aba360b",
@@ -8991,6 +9943,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/stack.rb",
+    "rubyName": "[]",
+    "digest": "eec94fb73e38e16d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/stack.rb",
     "rubyName": "assert_index",
     "digest": "a9193c8dc0e6d297",
     "ref": "v8.0.2"
@@ -9005,8 +9964,22 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/stack.rb",
+    "rubyName": "build_instrumented",
+    "digest": "7a1fbe508ca94b1b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/stack.rb",
     "rubyName": "build_middleware",
     "digest": "14d697b2000971dc",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/stack.rb",
+    "rubyName": "call",
+    "digest": "e9dd8a9a790638be",
     "ref": "v8.0.2"
   },
   {
@@ -9047,6 +10020,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/stack.rb",
+    "rubyName": "initialize_copy",
+    "digest": "cdf6201a6d977666",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/stack.rb",
     "rubyName": "insert",
     "digest": "50a3e95585c0b1c5",
     "ref": "v8.0.2"
@@ -9056,6 +10036,13 @@
     "rubyFile": "middleware/stack.rb",
     "rubyName": "insert_after",
     "digest": "cc45d538c8331d5d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/stack.rb",
+    "rubyName": "inspect",
+    "digest": "b35e3edd850d45f3",
     "ref": "v8.0.2"
   },
   {
@@ -9313,6 +10300,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "request/session.rb",
+    "rubyName": "inspect",
+    "digest": "0889b89d1eb2cd59",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "request/session.rb",
     "rubyName": "keys",
     "digest": "c34254dffa2f1945",
     "ref": "v8.0.2"
@@ -9369,6 +10363,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "request/session.rb",
+    "rubyName": "to_hash",
+    "digest": "15fa7c69103be7d7",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "request/session.rb",
     "rubyName": "update",
     "digest": "44f6538f1fec3085",
     "ref": "v8.0.2"
@@ -9406,6 +10407,27 @@
     "rubyFile": "request/utils.rb",
     "rubyName": "each_param_value",
     "digest": "b8aa69bf0d7d8225",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "request/utils.rb",
+    "rubyName": "encode",
+    "digest": "530337677b7733d1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "request/utils.rb",
+    "rubyName": "encode_for_template",
+    "digest": "8b5c34ecccd9f786",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "request/utils.rb",
+    "rubyName": "handle_array",
+    "digest": "482b6f164027cf6d",
     "ref": "v8.0.2"
   },
   {
@@ -9656,6 +10678,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "action_name",
+    "digest": "dbdd682e3dd284c0",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "action_options?",
     "digest": "51a8a990d04b6dcd",
     "ref": "v8.0.2"
@@ -9665,6 +10694,20 @@
     "rubyFile": "routing/mapper.rb",
     "rubyName": "action_path",
     "digest": "4a93b0e79e831109",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "actions",
+    "digest": "41c18d06563f5bac",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "add_controller_module",
+    "digest": "c2f29fc4bc0e0302",
     "ref": "v8.0.2"
   },
   {
@@ -9705,6 +10748,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "application",
+    "digest": "b40db07099fd7ee5",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "apply_action_options",
     "digest": "62dae25d3921aad6",
     "ref": "v8.0.2"
@@ -9719,6 +10769,34 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "available_actions",
+    "digest": "65e9a69ce6228bc1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "blocks",
+    "digest": "ca0fba90d451c942",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "build",
+    "digest": "11155d3c1318c29c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "build_conditions",
+    "digest": "d0d30ae46b628302",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "canonical_action?",
     "digest": "722c305b5d3faf18",
     "ref": "v8.0.2"
@@ -9726,8 +10804,36 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "check_controller_and_action",
+    "digest": "61046389069cc0a6",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "check_part",
+    "digest": "5ad34d2c6ef9e44d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "check_via",
+    "digest": "65f360db7521fce4",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "collection",
     "digest": "52273ec247cec542",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "collection_name",
+    "digest": "7ca1e25bd366e34e",
     "ref": "v8.0.2"
   },
   {
@@ -9742,6 +10848,13 @@
     "rubyFile": "routing/mapper.rb",
     "rubyName": "concerns",
     "digest": "805e8345b07b2716",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "conditions",
+    "digest": "cbb61d2611886363",
     "ref": "v8.0.2"
   },
   {
@@ -9777,6 +10890,13 @@
     "rubyFile": "routing/mapper.rb",
     "rubyName": "decomposed_match",
     "digest": "413a4cbb39deaa85",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "default_actions",
+    "digest": "218aa4dc5bf1a234",
     "ref": "v8.0.2"
   },
   {
@@ -9838,6 +10958,20 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "each",
+    "digest": "5a877deeddef7ac8",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "frame",
+    "digest": "562772b61fed17d6",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "get",
     "digest": "d68ffc2272054c4e",
     "ref": "v8.0.2"
@@ -9861,6 +10995,27 @@
     "rubyFile": "routing/mapper.rb",
     "rubyName": "initialize",
     "digest": "f3fe3300061dd714",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "intern",
+    "digest": "d14bd46f8d58c3a6",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "invalid_only_except_options",
+    "digest": "8407409a1535500c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "make_route",
+    "digest": "834da8c8449686b9",
     "ref": "v8.0.2"
   },
   {
@@ -9903,6 +11058,13 @@
     "rubyFile": "routing/mapper.rb",
     "rubyName": "member",
     "digest": "ea8fa6dd340520c8",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "member_scope",
+    "digest": "715c1ca2077926f0",
     "ref": "v8.0.2"
   },
   {
@@ -10027,6 +11189,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "name",
+    "digest": "524c3347ff238f17",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "name_for_action",
     "digest": "d0dc4449c35ffbd6",
     "ref": "v8.0.2"
@@ -10062,8 +11231,50 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "nested_param",
+    "digest": "068a6402fc319d76",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "nested_scope",
+    "digest": "1057b3b2c79ddc4c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "nested_scope?",
     "digest": "c7a7961b9843b459",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "new_level",
+    "digest": "47f8d6c47fad1d9b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "new_scope",
+    "digest": "882a1347146a525a",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "normalize_defaults",
+    "digest": "d741893cc5742ae3",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "normalize_format",
+    "digest": "c5330d191ad77771",
     "ref": "v8.0.2"
   },
   {
@@ -10076,8 +11287,29 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "normalize_options!",
+    "digest": "5f22268217429f0e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "normalize_path",
     "digest": "c957f296762680b6",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "null?",
+    "digest": "e9fc6813295097ba",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "optional_format?",
+    "digest": "8e0135de3f9f7b7a",
     "ref": "v8.0.2"
   },
   {
@@ -10132,6 +11364,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "plural",
+    "digest": "496a7560704c799b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "post",
     "digest": "97b9df1520d26ccb",
     "ref": "v8.0.2"
@@ -10162,6 +11401,13 @@
     "rubyFile": "routing/mapper.rb",
     "rubyName": "redirect",
     "digest": "12a51ae140da4f0c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "request_method",
+    "digest": "00dada8cc0228ff8",
     "ref": "v8.0.2"
   },
   {
@@ -10237,6 +11483,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "route_source_location",
+    "digest": "20b187ef535f55b5",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "scope",
     "digest": "385dc2b5f4e686fc",
     "ref": "v8.0.2"
@@ -10293,8 +11546,43 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/mapper.rb",
+    "rubyName": "singleton?",
+    "digest": "9583c381d896cc8b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "singular",
+    "digest": "f212596563e3af2d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "split_constraints",
+    "digest": "c8f484df50ca26b9",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "translate_controller",
+    "digest": "59814f28087207fd",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
     "rubyName": "using_match_shorthand?",
     "digest": "7d2c4ffb551eb238",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/mapper.rb",
+    "rubyName": "verify_regexp_requirements",
+    "digest": "8563a6a1e34c7c3e",
     "ref": "v8.0.2"
   },
   {
@@ -10538,6 +11826,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/redirection.rb",
+    "rubyName": "inspect",
+    "digest": "e58500092e12a378",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/redirection.rb",
     "rubyName": "interpolation_required?",
     "digest": "4853ca8d4e0ba402",
     "ref": "v8.0.2"
@@ -10650,6 +11945,20 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/route_set.rb",
+    "rubyName": "create",
+    "digest": "84e8cc7435debeb9",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "current_controller",
+    "digest": "a1815e3f611d01f3",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
     "rubyName": "default_env",
     "digest": "8284a98213c9b796",
     "ref": "v8.0.2"
@@ -10692,6 +12001,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/route_set.rb",
+    "rubyName": "different_controller?",
+    "digest": "ae689f5e6ca46abd",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
     "rubyName": "dispatch",
     "digest": "0b3fcad356c42bb3",
     "ref": "v8.0.2"
@@ -10708,6 +12024,13 @@
     "rubyFile": "routing/route_set.rb",
     "rubyName": "draw",
     "digest": "db29716c9c2532fc",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "each",
+    "digest": "90b203c284afdf02",
     "ref": "v8.0.2"
   },
   {
@@ -10797,6 +12120,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/route_set.rb",
+    "rubyName": "handle_positional_args",
+    "digest": "6bf8b5715b744f93",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
     "rubyName": "helper_names",
     "digest": "86553385ffd68032",
     "ref": "v8.0.2"
@@ -10832,8 +12162,22 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/route_set.rb",
+    "rubyName": "merge_defaults",
+    "digest": "3992b5f7a854e170",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
     "rubyName": "mounted_helpers",
     "digest": "f42e590d06fab72b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "named_route_exists?",
+    "digest": "d030b1476af817fa",
     "ref": "v8.0.2"
   },
   {
@@ -10853,8 +12197,50 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/route_set.rb",
+    "rubyName": "normalize_controller!",
+    "digest": "bead88d234014e62",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "normalize_controller_action_id!",
+    "digest": "be8f6340cbd00176",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "normalize_options!",
+    "digest": "d0728ac3304c6dfb",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "optimize_helper?",
+    "digest": "30903cb29fc210c8",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
     "rubyName": "optimize_routes_generation?",
     "digest": "cfac877de69ea75c",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "optimized_helper",
+    "digest": "508be6308e49717b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "parameterize_args",
+    "digest": "3932c14f773cd7de",
     "ref": "v8.0.2"
   },
   {
@@ -10876,6 +12262,13 @@
     "rubyFile": "routing/route_set.rb",
     "rubyName": "prepend",
     "digest": "17a4afb09ebb3bc3",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "raise_generation_error",
+    "digest": "ecdf0e62ba02bff6",
     "ref": "v8.0.2"
   },
   {
@@ -10923,6 +12316,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "routing/route_set.rb",
+    "rubyName": "segment_keys",
+    "digest": "d86a619c97257943",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
     "rubyName": "serve",
     "digest": "20ecfbe920310b4f",
     "ref": "v8.0.2"
@@ -10946,6 +12346,20 @@
     "rubyFile": "routing/route_set.rb",
     "rubyName": "url_options",
     "digest": "d87a66fd99bca633",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "use_recall_for",
+    "digest": "140d3e42a477746d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "routing/route_set.rb",
+    "rubyName": "use_relative_controller!",
+    "digest": "972b80cffbe0577f",
     "ref": "v8.0.2"
   },
   {
@@ -11226,6 +12640,62 @@
     "rubyFile": "system_test_case.rb",
     "rubyName": "url_helpers",
     "digest": "27b51bbf442343df",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "system_testing/browser.rb",
+    "rubyName": "configure",
+    "digest": "0754ee8458628bad",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "system_testing/browser.rb",
+    "rubyName": "default_chrome_options",
+    "digest": "3ee81a8c87552b67",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "system_testing/browser.rb",
+    "rubyName": "default_firefox_options",
+    "digest": "b177c7cac1e91aec",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "system_testing/browser.rb",
+    "rubyName": "initialize",
+    "digest": "d79500a7799edb4f",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "system_testing/browser.rb",
+    "rubyName": "options",
+    "digest": "a7a5d1db09a22bfa",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "system_testing/browser.rb",
+    "rubyName": "preload",
+    "digest": "b2beae4566649b6a",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "system_testing/browser.rb",
+    "rubyName": "resolve_driver_path",
+    "digest": "7986352366a704af",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "system_testing/browser.rb",
+    "rubyName": "type",
+    "digest": "64b9499571559485",
     "ref": "v8.0.2"
   },
   {
@@ -11812,6 +13282,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
+    "rubyName": "assertions",
+    "digest": "c61da66dfc1a9c29",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "testing/integration.rb",
     "rubyName": "assertions=",
     "digest": "c7c8339a31264afb",
     "ref": "v8.0.2"
@@ -11938,6 +13415,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "testing/integration.rb",
+    "rubyName": "html_dump_default_path",
+    "digest": "89b132ca08ed6183",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "testing/integration.rb",
     "rubyName": "https!",
     "digest": "355d703c8fe91fc5",
     "ref": "v8.0.2"
@@ -11961,6 +13445,13 @@
     "rubyFile": "testing/integration.rb",
     "rubyName": "integration_session",
     "digest": "ef14f83d36c77468",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "testing/integration.rb",
+    "rubyName": "open_file",
+    "digest": "cc5a248e4599beee",
     "ref": "v8.0.2"
   },
   {
@@ -12080,6 +13571,20 @@
     "rubyFile": "testing/integration.rb",
     "rubyName": "route_for",
     "digest": "72a84c03ef364715",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "testing/integration.rb",
+    "rubyName": "save_and_open_page",
+    "digest": "ac2e588fa7caa5a5",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "testing/integration.rb",
+    "rubyName": "save_page",
+    "digest": "402a904cc035f541",
     "ref": "v8.0.2"
   },
   {
@@ -12346,6 +13851,13 @@
     "rubyFile": "gem_version.rb",
     "rubyName": "gem_version",
     "digest": "1575150db471364f",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actionpackversion",
+    "rubyFile": "version.rb",
+    "rubyName": "version",
+    "digest": "a928486f9957840f",
     "ref": "v8.0.2"
   },
   {

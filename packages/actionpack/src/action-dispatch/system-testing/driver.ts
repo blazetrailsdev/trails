@@ -2,7 +2,7 @@ import type { LaunchOptions } from "playwright";
 import { compact } from "@blazetrails/activesupport";
 import type { RackMiddleware } from "@blazetrails/rack";
 import { Session } from "@blazetrails/rack-test";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { hashDelete, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Browser } from "./browser.js";
 import { vite } from "./server.js";
 
@@ -57,10 +57,8 @@ export class Driver {
   ) {
     this.driverType = driverType;
     this.screenSize = options.screenSize;
-    this.options = { ...(options.options ?? {}) };
-    const name = this.options.name as string | undefined;
-    delete this.options.name;
-    this.name = name ?? driverType;
+    this.options = options.options ?? {};
+    this.name = (hashDelete(this.options, "name") as string | null) ?? driverType;
     this.capabilities = capabilities;
 
     if (driverType === "selenium") {

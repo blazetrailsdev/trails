@@ -16,6 +16,7 @@ export interface RackAppObject {
   call(env: RackEnv): Promise<RackResponse>;
 }
 export type MiddlewareBlock = (...args: any[]) => unknown;
+type MiddlewareArgs = unknown[] | [...unknown[], MiddlewareBlock];
 
 export type MiddlewareFactory = new (
   app: any,
@@ -96,10 +97,8 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.entries.length;
   }
 
-  dup(): this {
-    const copy = new (this.constructor as new () => this)();
-    copy.middlewares = [...this.entries];
-    return copy;
+  initializeCopy(other: MiddlewareStack): void {
+    this.middlewares = [...other.middlewares];
   }
 
   isAny(): boolean {
@@ -114,14 +113,18 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.entries[this.entries.length - 1];
   }
 
-  unshift(klass: MiddlewareFactory, ...args: unknown[]): void {
+  unshift(klass: MiddlewareFactory, ...args: MiddlewareArgs): void {
     const block = rbBlockGivenP(args[args.length - 1])
       ? (args.pop() as MiddlewareBlock)
       : undefined;
     this.middlewares.unshift(this.buildMiddleware(klass, args, block));
   }
 
-  insert(index: MiddlewareFactory | number, klass: MiddlewareFactory, ...args: unknown[]): void {
+  insert(
+    index: MiddlewareFactory | number,
+    klass: MiddlewareFactory,
+    ...args: MiddlewareArgs
+  ): void {
     const block = rbBlockGivenP(args[args.length - 1])
       ? (args.pop() as MiddlewareBlock)
       : undefined;
@@ -137,12 +140,12 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.insert(index, klass, ...args);
   }
 
-  insertAfter(index: MiddlewareFactory | number, ...args: unknown[]): void {
+  insertAfter(index: MiddlewareFactory | number, ...args: MiddlewareArgs): void {
     index = this.assertIndex(index, "after");
     this.insert(index + 1, ...(args as [MiddlewareFactory, ...unknown[]]));
   }
 
-  swap(target: MiddlewareFactory | number, ...args: unknown[]): void {
+  swap(target: MiddlewareFactory | number, ...args: MiddlewareArgs): void {
     const index = this.assertIndex(target, "before");
     this.insert(index, ...(args as [MiddlewareFactory, ...unknown[]]));
     this.middlewares.splice(index + 1, 1);
@@ -187,7 +190,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
     insert(this.middlewares, targetIndex + 1, sourceMiddleware);
   }
 
-  use(klass: MiddlewareFactory, ...args: unknown[]): void {
+  use(klass: MiddlewareFactory, ...args: MiddlewareArgs): void {
     const block = rbBlockGivenP(args[args.length - 1])
       ? (args.pop() as MiddlewareBlock)
       : undefined;

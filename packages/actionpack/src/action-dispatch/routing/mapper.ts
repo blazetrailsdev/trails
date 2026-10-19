@@ -48,6 +48,8 @@ import {
   stringSplit,
   Thread,
   rbIterBreakValue,
+  rbBlockGivenP,
+  type Block,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -118,7 +120,8 @@ type ConcernCallback = (mapper: Mapper, options: Record<string, unknown>) => voi
 type ConcernCallable =
   | ConcernCallback
   | { call(mapper: Mapper, options: Record<string, unknown>): void };
-type MapMethodArgs = (string | RouteOptions | Record<string, unknown>)[];
+type MapMethodArg = string | RouteOptions | Record<string, unknown>;
+type MapMethodArgs = MapMethodArg[] | [...MapMethodArg[], Block<unknown>];
 
 const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
   "as",
@@ -1457,8 +1460,11 @@ export class Mapper {
 
   match(
     path: string | Record<string, unknown>,
-    ...rest: (string | (RouteOptions & { via?: string | string[] }))[]
+    ...rest:
+      | (string | (RouteOptions & { via?: string | string[] }))[]
+      | [...(string | (RouteOptions & { via?: string | string[] }))[], Block<unknown>]
   ): void {
+    if (rest.length > 0 && (rest.at(-1) === undefined || rbBlockGivenP(rest.at(-1)))) rest.pop();
     let options: Record<string, unknown>;
     let paths: string[];
     if (rest.length === 0 && isPlainObject(path)) {
@@ -1511,10 +1517,16 @@ export class Mapper {
   }
 
   /** @internal */
-  mapMethod(method: string | string[], args: MapMethodArgs): this {
-    const options = extractOptionsBang(args);
+  mapMethod(
+    method: string | string[],
+    args: MapMethodArgs,
+    block: Block<unknown> | undefined = rbBlockGivenP(args.at(-1))
+      ? (args.pop() as Block<unknown>)
+      : undefined,
+  ): this {
+    const options = extractOptionsBang(args as MapMethodArg[]);
     options[args.length === 0 ? ":via" : "via"] = method;
-    this.match(...(args as [string]), options as RouteOptions);
+    this.match(...(args as [string]), options as RouteOptions, block!);
     return this;
   }
 
@@ -1833,7 +1845,9 @@ export class Mapper {
     this._set.addUrlHelper(name, options, block);
   }
 
-  resolve(...args: unknown[]): void {
+  resolve(
+    ...args: unknown[] | [...unknown[], Parameters<RouteSet["addPolymorphicMapping"]>[2]]
+  ): void {
     if (!this._scope.isRoot()) {
       throw new RuntimeError("The resolve method can't be used inside a routes scope block");
     }

@@ -4473,6 +4473,7 @@ export function extractClass(
         ...(internal ? { internal: true } : {}),
         ...tagged,
         ...(signatureReturnsVoid(member, checker) ? { returnsVoid: true } : {}),
+        ...(member.asteriskToken ? { generator: true } : {}),
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(optionKeys != null && optionReads !== undefined ? { optionReads } : {}),
         ...(calls !== undefined ? { calls } : {}),

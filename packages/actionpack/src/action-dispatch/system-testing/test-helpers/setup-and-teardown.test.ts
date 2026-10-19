@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { TopLevel } from "@blazetrails/activesupport";
+import { Dir } from "@blazetrails/ruby-compat";
 import { vite } from "../server.js";
 import { beforeTeardown, afterTeardown, type SetupAndTeardownHost } from "./setup-and-teardown.js";
 
 describe("ActionDispatch::SystemTesting::TestHelpers::SetupAndTeardown", () => {
+  const trails = TopLevel.Trails;
+
   afterEach(() => {
+    TopLevel.Trails = trails;
     vi.restoreAllMocks();
     vite.currentDriver = "rack_test";
   });
 
   it("before_teardown calls take_failed_screenshot", async () => {
+    TopLevel.Trails = { root: () => Dir.pwd() } as typeof TopLevel.Trails;
     vite.currentDriver = "selenium";
     vi.spyOn(console, "log").mockImplementation(() => {});
     const host: SetupAndTeardownHost = {

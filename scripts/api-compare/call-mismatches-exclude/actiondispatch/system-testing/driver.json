@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actiondispatch",
-    "tsFile": "system-testing/driver.ts",
-    "rubyName": "initialize",
-    "call": "delete",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails driver.rb:10-25 pops the name with `@options.delete(:name)`; trails driver.ts:47-55 uses the JS `delete opts.name` operator on a spread copy."
-  }
-]

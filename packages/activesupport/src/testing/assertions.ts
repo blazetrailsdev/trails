@@ -90,6 +90,17 @@ export class Test {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  assert(test: unknown, msg: string | (() => string) | null = null): true {
+    this.assertions += 1;
+    if (test == null || test === false) {
+      msg ||= `Expected ${inspect(test)} to be truthy.`;
+      if (typeof msg === "function") msg = msg();
+      throw new Assertion(msg);
+    }
+    return true;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   get metadata(): Record<string, unknown> {
     return (this._metadata ??= {});
   }

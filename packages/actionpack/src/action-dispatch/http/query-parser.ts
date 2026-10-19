@@ -1,5 +1,5 @@
 import { cattrAccessor } from "@blazetrails/activesupport";
-import { ArgumentError, bytes, strNew } from "@blazetrails/ruby-compat";
+import { ArgumentError, bytes, strNew, toEnum, type Enumerator } from "@blazetrails/ruby-compat";
 
 const DEFAULT_SEP = /& */;
 const COMMON_SEP: Record<string, RegExp> = Object.assign(Object.create(null), {
@@ -19,8 +19,20 @@ export class QueryParser {
     cattrAccessor.call(this, "strictQueryStringSeparator");
   }
 
-  static *eachPair(s: string | null | undefined, separator?: string | null): Generator<QueryPair> {
-    const str = s ?? "";
+  static eachPair(s: string | null | undefined, separator?: string | null): Enumerator<QueryPair>;
+  static eachPair(
+    s: string | null | undefined,
+    separator: string | null | undefined,
+    block: (k: string, v: string | null) => void,
+  ): null;
+  static eachPair(
+    s: string | null | undefined,
+    separator: string | null = null,
+    block?: (k: string, v: string | null) => void,
+  ): Enumerator<QueryPair> | null {
+    if (!block) return toEnum(this, "eachPair", s, separator);
+
+    s ??= "";
 
     let splitter: RegExp;
     if (separator) {
@@ -29,7 +41,7 @@ export class QueryParser {
       splitter = DEFAULT_SEP;
     }
 
-    for (const part of str.split(splitter)) {
+    for (const part of s.split(splitter)) {
       if (part === "") continue;
 
       const eq = part.indexOf("=");
@@ -46,8 +58,10 @@ export class QueryParser {
       k = decodeFormComponent(k);
       if (v !== null) v = decodeFormComponent(v);
 
-      yield [k, v];
+      block(k, v);
     }
+
+    return null;
   }
 }
 

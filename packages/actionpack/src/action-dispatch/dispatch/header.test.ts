@@ -92,7 +92,7 @@ describe("HeaderTest", () => {
 
   it("fetch with block", () => {
     const headers = setup();
-    expect(headers.fetch("notthere", () => "omg")).toBe("omg");
+    expect(headers.fetch("notthere", undefined, () => "omg")).toBe("omg");
   });
 
   it("accessing http header", () => {

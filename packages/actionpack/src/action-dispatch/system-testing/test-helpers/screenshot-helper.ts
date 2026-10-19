@@ -1,4 +1,4 @@
-import { Minitest, presence } from "@blazetrails/activesupport";
+import { Minitest, presence, TopLevel } from "@blazetrails/activesupport";
 import {
   Encoding,
   File,
@@ -36,10 +36,6 @@ export const ScreenshotHelper = Object.assign(new Module(), {
 
 function env(key: string): string | undefined {
   return (globalThis as any).process?.env?.[key] as string | undefined;
-}
-
-function projectRoot(): string {
-  return (globalThis as any).process?.cwd?.() ?? ".";
 }
 
 export function takeScreenshot(
@@ -103,8 +99,8 @@ export function screenshotsDir(): string {
 }
 
 /** @internal */
-function absolutePath(this: ScreenshotHelperHost): string {
-  return new Pathname(projectRoot()).join(screenshotsDir(), imageName.call(this)).toString();
+function absolutePath(this: ScreenshotHelperHost): Pathname {
+  return new Pathname(TopLevel.Trails!.root()!).join(screenshotsDir(), imageName.call(this));
 }
 
 /** @internal */
@@ -112,12 +108,9 @@ function absoluteImagePath(this: ScreenshotHelperHost): string {
   return `${absolutePath.call(this)}.png`;
 }
 
-/**
- * @internal
- * @missingRailsCall root — CONVERGEABLE screenshot-helper-relative-image-path-uses-relative-path-from
- */
+/** @internal */
 export function relativeImagePath(this: ScreenshotHelperHost): string {
-  return `${File.join(screenshotsDir(), imageName.call(this))}.png`;
+  return `${absolutePath.call(this).relativePathFrom(TopLevel.Trails!.root()!)}.png`;
 }
 
 /** @internal */
@@ -133,7 +126,7 @@ export async function saveHtml(this: ScreenshotHelperHost): Promise<void> {
   if (!this._page) return;
   const path = absoluteHtmlPath.call(this);
   const fs = getFs();
-  await fs.mkdir!(File.join(projectRoot(), screenshotsDir()), { recursive: true });
+  await fs.mkdir!(File.join(TopLevel.Trails!.root()!, screenshotsDir()), { recursive: true });
   const content = await this._page.content();
   await fs.writeFile!(path, content);
 }
@@ -143,7 +136,7 @@ export async function saveImage(this: ScreenshotHelperHost): Promise<Buffer | un
   if (!this._page) return;
   const path = absoluteImagePath.call(this);
   const fs = getFs();
-  await fs.mkdir!(File.join(projectRoot(), screenshotsDir()), { recursive: true });
+  await fs.mkdir!(File.join(TopLevel.Trails!.root()!, screenshotsDir()), { recursive: true });
   return this._page.screenshot({ path });
 }
 

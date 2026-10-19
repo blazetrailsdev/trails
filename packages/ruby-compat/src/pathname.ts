@@ -1,5 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { File } from "./file.js";
+import { rbInspect } from "./object.js";
 import { stringValue } from "./string/support.js";
 
 const SEPARATOR_PAT = /\//;
@@ -40,6 +41,101 @@ export class Pathname {
       return null;
     } else {
       return [path.slice(0, path.lastIndexOf(base)), base];
+    }
+  }
+
+  private prependPrefix(prefix: string, relpath: string): string {
+    if (relpath === "") {
+      return File.dirname(prefix);
+    } else if (SEPARATOR_PAT.test(prefix)) {
+      prefix = File.dirname(prefix);
+      if (File.basename(prefix + "a") !== "a") prefix = File.join(prefix, "");
+      return prefix + relpath;
+    } else {
+      return prefix + relpath;
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:94` */
+  cleanpath(considerSymlink = false): Pathname {
+    if (considerSymlink) {
+      return this.cleanpathConservative();
+    } else {
+      return this.cleanpathAggressive();
+    }
+  }
+
+  private cleanpathAggressive(): Pathname {
+    const path = this.path;
+    const names: string[] = [];
+    let pre = path;
+    let r: [string, string] | null;
+    while ((r = this.chopBasename(pre))) {
+      let base: string;
+      [pre, base] = r;
+      switch (base) {
+        case ".":
+          break;
+        case "..":
+          names.unshift(base);
+          break;
+        default:
+          if (names[0] === "..") {
+            names.shift();
+          } else {
+            names.unshift(base);
+          }
+      }
+    }
+    if (SEPARATOR_PAT.test(File.basename(pre))) {
+      while (names[0] === "..") names.shift();
+    }
+    return new Pathname(this.prependPrefix(pre, File.join(...names)));
+  }
+
+  private isHasTrailingSeparator(path: string): boolean {
+    const r = this.chopBasename(path);
+    if (r) {
+      const [pre, basename] = r;
+      return pre.length + basename.length < path.length;
+    } else {
+      return false;
+    }
+  }
+
+  private addTrailingSeparator(path: string): string {
+    if (File.basename(path + "a") === "a") {
+      return path;
+    } else {
+      return File.join(path, "");
+    }
+  }
+
+  private cleanpathConservative(): Pathname {
+    const path = this.path;
+    const names: string[] = [];
+    let pre = path;
+    let r: [string, string] | null;
+    while ((r = this.chopBasename(pre))) {
+      let base: string;
+      [pre, base] = r;
+      if (base !== ".") names.unshift(base);
+    }
+    if (SEPARATOR_PAT.test(File.basename(pre))) {
+      while (names[0] === "..") names.shift();
+    }
+    if (names.length === 0) {
+      return new Pathname(File.dirname(pre));
+    } else {
+      if (names.at(-1) !== ".." && File.basename(path) === ".") {
+        names.push(".");
+      }
+      const result = this.prependPrefix(pre, File.join(...names));
+      if (!/^(?:\.|\.\.)$/.test(names.at(-1)!) && this.isHasTrailingSeparator(path)) {
+        return new Pathname(this.addTrailingSeparator(result));
+      } else {
+        return new Pathname(result);
+      }
     }
   }
 
@@ -111,5 +207,46 @@ export class Pathname {
       if (result.isAbsolute()) return result;
     }
     return this.plusOp(result);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:517` */
+  relativePathFrom(baseDirectory: Pathname | string): Pathname {
+    if (!(baseDirectory instanceof Pathname)) baseDirectory = new Pathname(baseDirectory);
+    const destDirectory = this.cleanpath().toString();
+    baseDirectory = baseDirectory.cleanpath().toString();
+    let destPrefix = destDirectory;
+    const destNames: string[] = [];
+    let r: [string, string] | null;
+    while ((r = this.chopBasename(destPrefix))) {
+      let basename: string;
+      [destPrefix, basename] = r;
+      if (basename !== ".") destNames.unshift(basename);
+    }
+    let basePrefix = baseDirectory;
+    const baseNames: string[] = [];
+    while ((r = this.chopBasename(basePrefix))) {
+      let basename: string;
+      [basePrefix, basename] = r;
+      if (basename !== ".") baseNames.unshift(basename);
+    }
+    if (destPrefix !== basePrefix) {
+      throw new ArgumentError(
+        `different prefix: ${rbInspect(destPrefix)} and ${rbInspect(baseDirectory)}`,
+      );
+    }
+    while (destNames.length > 0 && baseNames.length > 0 && destNames[0] === baseNames[0]) {
+      destNames.shift();
+      baseNames.shift();
+    }
+    if (baseNames.includes("..")) {
+      throw new ArgumentError(`base_directory has ..: ${rbInspect(baseDirectory)}`);
+    }
+    baseNames.fill("..");
+    const relpathNames = [...baseNames, ...destNames];
+    if (relpathNames.length === 0) {
+      return new Pathname(".");
+    } else {
+      return new Pathname(File.join(...relpathNames));
+    }
   }
 }
