@@ -10,6 +10,7 @@ import { include, rbModConstSet } from "@blazetrails/ruby-compat";
 import { XML } from "../namespaces.js";
 
 import type { NodeSet } from "./node-set.js";
+import "./node-set.js";
 import { Searchable } from "./searchable.js";
 
 export interface AttrNode {
@@ -29,7 +30,7 @@ export class XmlNode {
      * @noRailsEquivalent PERMANENT
      */
     readonly _node: XmlTreeNode,
-    readonly document: unknown = null,
+    readonly document: unknown,
   ) {}
 
   get name(): string {

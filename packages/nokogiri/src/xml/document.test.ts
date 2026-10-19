@@ -61,3 +61,51 @@ describe("Nokogiri::XML::Document", () => {
     expect(() => d.dispose()).not.toThrow();
   });
 });
+
+describe("Nokogiri::XML::Searchable", () => {
+  const xml = `<root><a id="x" class="one two" lang="en-US">1</a><b href="http://e.com/p.xml">2</b><c>3</c><d><e/></d></root>`;
+
+  it("css on document searches from the root and on a node searches descendants", () => {
+    const doc = XmlDocument.parse(xml);
+    expect(doc.css("root").size).toBe(1);
+    expect(doc.root.css("root").size).toBe(0);
+    expect(doc.root.css("e").size).toBe(1);
+    expect(doc.atCss("c")?.content).toBe("3");
+  });
+
+  it("css combinators and groups", () => {
+    const doc = XmlDocument.parse(xml);
+    expect(doc.css("root > a").size).toBe(1);
+    expect(doc.css("root > e").size).toBe(0);
+    expect(doc.css("a + b").size).toBe(1);
+    expect(doc.css("a ~ c").size).toBe(1);
+    expect(doc.css("a, c, e").size).toBe(3);
+  });
+
+  it("css attribute operators", () => {
+    const doc = XmlDocument.parse(xml);
+    expect(doc.css("#x.two").size).toBe(1);
+    expect(doc.css("[href^=http]").size).toBe(1);
+    expect(doc.css("[href$='.xml']").size).toBe(1);
+    expect(doc.css("[href*='e.com']").size).toBe(1);
+    expect(doc.css("[class~=one]").size).toBe(1);
+    expect(doc.css("[lang|=en]").size).toBe(1);
+    expect(doc.css("root > [id!=x]").size).toBe(3);
+  });
+
+  it("css pseudo classes", () => {
+    const doc = XmlDocument.parse(xml);
+    expect(doc.css("root > :first-child").first()?.name).toBe("a");
+    expect(doc.css("root > :nth-child(2)").first()?.name).toBe("b");
+    expect(doc.css("root > :not(a)").size).toBe(3);
+    expect(doc.css("e:empty").size).toBe(1);
+  });
+
+  it("blank? answers true only for whitespace text", () => {
+    const doc = XmlDocument.parse("<root> <a/>x</root>");
+    const [space, a, text] = doc.root.children;
+    expect(space.isBlank()).toBe(true);
+    expect(a.isBlank()).toBe(false);
+    expect(text.isBlank()).toBe(false);
+  });
+});

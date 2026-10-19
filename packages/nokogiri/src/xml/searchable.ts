@@ -113,33 +113,30 @@ function xpathImpl(
   node: SearchableHost,
   path: Path,
   handler: unknown,
-  _ns: Record<string, string>,
+  ns: Record<string, string>,
   _binds: Record<string, unknown> | null,
 ): NodeSet {
-  if (node._node instanceof XmlTreeNode || node._node instanceof LibXmlDocument) {
+  const host = node._node;
+  if (host instanceof XmlTreeNode || host instanceof LibXmlDocument) {
     const xpath = path
       .flatMap(({ prefix, groups }) => groups.map((steps) => prefix + xpathFromSteps(steps)))
       .join(" | ");
     return new XML.NodeSet(
       node.document,
-      node._node
-        .find(xpath)
+      host
+        .find(xpath, ns)
         .map((n) => new XML.Node(n as XmlTreeNode, node.document) as unknown as Node),
     );
   }
+  if (host === null) return new XML.NodeSet(node.document);
   const found = new Set<Parse5Node>();
   for (const { prefix, groups } of path) {
-    const start =
-      prefix === "self::"
-        ? [node._node as Parse5Node]
-        : descendants(
-            prefix === "//" ? rootOf(node._node as Parse5Node) : (node._node as Parse5Node),
-          );
+    const start = prefix === "self::" ? [host] : descendants(prefix === "//" ? rootOf(host) : host);
     for (const steps of groups) {
       for (const el of evaluate(start, steps, handler)) found.add(el);
     }
   }
-  const ordered = descendants(rootOf(node._node as Parse5Node), true).filter((n) => found.has(n));
+  const ordered = descendants(rootOf(host), true).filter((n) => found.has(n));
   return new XML.NodeSet(
     node.document,
     ordered.map((n) => new HTML5.Node(n as DefaultTreeAdapterMap["childNode"], node.document)),
@@ -177,7 +174,7 @@ function xpathFromCompound(c: Compound): string {
       const v = literal(value);
       if (op === null) return `@${name}`;
       if (op === "=") return `@${name}=${v}`;
-      if (op === "!=") return `@${name}!=${v}`;
+      if (op === "!=") return `not(@${name}=${v})`;
       if (op === "~=")
         return `contains(concat(' ',normalize-space(@${name}),' '),${literal(` ${value} `)})`;
       if (op === "^=") return `starts-with(@${name},${v})`;
@@ -186,13 +183,21 @@ function xpathFromCompound(c: Compound): string {
       if (op === "*=") return `contains(@${name},${v})`;
       return `@${name}=${v} or starts-with(@${name},${literal(`${value}-`)})`;
     }),
-    ...c.pseudos.map(([name]) => {
+    ...c.pseudos.map(([name, args]) => {
       if (name === "root") return "not(parent::*)";
       if (name === "first-child") return "count(preceding-sibling::*)=0";
       if (name === "last-child") return "count(following-sibling::*)=0";
       if (name === "only-child")
         return "count(preceding-sibling::*)=0 and count(following-sibling::*)=0";
       if (name === "empty") return "not(node())";
+      if (name === "not") return `not(self::${xpathFromCompound(new Parser(args!).compound())})`;
+      if (name === "nth-child") {
+        const [a, b] = nthChild(args);
+        const index = "(count(preceding-sibling::*)+1)";
+        return a === 0
+          ? `${index}=${b}`
+          : `(${index}-${b}) mod ${a}=0 and (${index}-${b}) div ${a}>=0`;
+      }
       throw new XPathSyntaxError(`Unregistered function: ${name}`);
     }),
   ];
@@ -253,19 +258,7 @@ function matches(n: Parse5Node, c: Compound, handler: unknown): boolean {
     } else if (name === "only-child") {
       if (siblings.length !== 1) return false;
     } else if (name === "nth-child") {
-      const nth = /^\s*(?:([+-]?\d*)n\s*(?:([+-])\s*(\d+))?|([+-]?\d+))\s*$/.exec(
-        args === "odd" ? "2n+1" : args === "even" ? "2n" : (args ?? ""),
-      );
-      if (nth === null) throw new SyntaxError(`unexpected '${args}' in nth-child`);
-      const a =
-        nth[4] !== undefined
-          ? 0
-          : nth[1] === "" || nth[1] === "+"
-            ? 1
-            : nth[1] === "-"
-              ? -1
-              : Number(nth[1]);
-      const b = nth[4] !== undefined ? Number(nth[4]) : Number(`${nth[2] ?? "+"}${nth[3] ?? "0"}`);
+      const [a, b] = nthChild(args);
       if (a === 0 ? index !== b : (index - b) / a < 0 || (index - b) % a !== 0) return false;
     } else if (name === "empty") {
       if (n.childNodes.length > 0) return false;
@@ -279,6 +272,24 @@ function matches(n: Parse5Node, c: Compound, handler: unknown): boolean {
     }
   }
   return true;
+}
+
+/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+function nthChild(args: string | null): [number, number] {
+  const nth = /^\s*(?:([+-]?\d*)n\s*(?:([+-])\s*(\d+))?|([+-]?\d+))\s*$/.exec(
+    args === "odd" ? "2n+1" : args === "even" ? "2n" : (args ?? ""),
+  );
+  if (nth === null) throw new SyntaxError(`unexpected '${args}' in nth-child`);
+  const a =
+    nth[4] !== undefined
+      ? 0
+      : nth[1] === "" || nth[1] === "+"
+        ? 1
+        : nth[1] === "-"
+          ? -1
+          : Number(nth[1]);
+  const b = nth[4] !== undefined ? Number(nth[4]) : Number(`${nth[2] ?? "+"}${nth[3] ?? "0"}`);
+  return [a, b];
 }
 
 /** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
