@@ -332,7 +332,7 @@ export function isPlainObject(value: object): boolean {
   return proto === globalThis.Object.prototype || proto === null;
 }
 
-export function asJson(value: unknown, options: EncodeOptions | null = null): unknown {
+export function asJson(value: unknown, options?: EncodeOptions | null): unknown {
   if (value == null) return NilClass.asJson(value, options);
   if (typeof value === "boolean") return TrueClass.asJson(value, options);
   if (typeof value === "string") return String.asJson(value, options);
