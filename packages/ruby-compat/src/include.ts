@@ -776,12 +776,6 @@ function appendPlainFeatures(base: Module, mod: ModuleObject): void {
   relinkIncluders(base);
 }
 
-/**
- * A plain module that includes modules keeps its own place in an includer's
- * ancestry, as `include_modules_at` (vendor/ruby/v3.3.11/class.c:1253) skips a
- * module already there: flattened onto `base`'s carrier, its members would
- * shadow a method a module above it defines.
- */
 function recordPlainModule(base: Module, mod: ModuleObject): void {
   const carrier = carrierOf(base);
   const links = (includerCarriers.get(base) ?? []).filter(
