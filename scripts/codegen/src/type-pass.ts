@@ -366,10 +366,8 @@ export class TypePass {
         const got = texts.every((x) => x !== null) ? texts : [];
         if (got.length || lastRound) {
           let t = TypePass.union(got);
-          // Nothing reaches it, and its body only reads it by key (`options[:wait]`,
-          // `job_data["job_id"]`): a Ruby Hash, which is a plain object.
-          if (t === "unknown" && !isThis && this.readByKeyOnly(checker, node))
-            t = "Record<string, unknown>";
+          // Nothing reaches it: typed by how its body uses it (usageType).
+          if (t === "unknown" && !isThis) t = this.usageType(checker, node) ?? t;
           if (!isThis && node.initializer) {
             const it = this.typeText(
               checker,
@@ -414,43 +412,113 @@ export class TypePass {
   }
 
   /**
-   * Every use of the parameter in its function is a key read (`p["k"]`, `p.k`
-   * not called), a nil test, or a `??` fallback, and there is at least one key read.
+   * The type a value nothing types is used as, when every use agrees: called
+   * (a Ruby block or proc, `block.call(x)`) is a function; iterated or sent an
+   * Array method is an array; read by key (`options[:wait]`) is a Hash, a plain
+   * object. A nil test or a `??` fallback says nothing; any other use, or two
+   * kinds, answers null. `decl` is a parameter (uses in its function) or a
+   * field (uses as `x.field` anywhere in `scope`).
    */
-  readByKeyOnly(checker: ts.TypeChecker, p: ts.ParameterDeclaration): boolean {
-    if (!ts.isIdentifier(p.name)) return false;
-    const sym = checker.getSymbolAtLocation(p.name);
-    const fn = p.parent;
-    if (!sym || !("body" in fn) || !fn.body) return false;
-    let keyReads = 0;
+  usageType(checker: ts.TypeChecker, decl: ts.Declaration, scope?: ts.Node[]): string | null {
+    const name = (decl as ts.NamedDeclaration).name;
+    if (!name || !ts.isIdentifier(name)) return null;
+    const sym = checker.getSymbolAtLocation(name);
+    if (!sym) return null;
+    const fn = decl.parent as ts.Node & { body?: ts.Node };
+    const roots: ts.Node[] = scope ?? (fn.body ? [fn.body] : []);
+    const ARRAY = new Set([
+      "forEach",
+      "map",
+      "filter",
+      "length",
+      "push",
+      "some",
+      "every",
+      "find",
+      "includes",
+      "join",
+      "flat",
+      "slice",
+      "pop",
+      "shift",
+      "unshift",
+      "indexOf",
+      "reduce",
+      "flatMap",
+      "at",
+      "concat",
+    ]);
+    const NIL_TESTS = [
+      ts.SyntaxKind.EqualsEqualsToken,
+      ts.SyntaxKind.ExclamationEqualsToken,
+      ts.SyntaxKind.EqualsEqualsEqualsToken,
+      ts.SyntaxKind.ExclamationEqualsEqualsToken,
+      ts.SyntaxKind.QuestionQuestionToken,
+    ];
+    const kinds = new Set<string>();
     let other = false;
     const visit = (n: ts.Node): void => {
       if (other) return;
-      if (ts.isIdentifier(n) && n !== p.name && checker.getSymbolAtLocation(n) === sym) {
-        const parent = n.parent;
-        if (ts.isElementAccessExpression(parent) && parent.expression === n) keyReads++;
+      const isRef =
+        (ts.isIdentifier(n) && n !== name && checker.getSymbolAtLocation(n) === sym) ||
+        (ts.isPropertyAccessExpression(n) && checker.getSymbolAtLocation(n.name) === sym);
+      if (isRef) {
+        const ref = n as ts.Expression;
+        const parent = ref.parent;
+        const call = (x: ts.Node) => ts.isCallExpression(x.parent) && x.parent.expression === x;
+        if (ts.isCallExpression(parent) && parent.expression === ref) kinds.add("fn");
         else if (
           ts.isPropertyAccessExpression(parent) &&
-          parent.expression === n &&
-          !(ts.isCallExpression(parent.parent) && parent.parent.expression === parent)
+          parent.expression === ref &&
+          ["call", "apply"].includes(parent.name.text) &&
+          call(parent)
         )
-          keyReads++;
+          kinds.add("fn");
         else if (
+          (ts.isForOfStatement(parent) && parent.expression === ref) ||
+          ts.isSpreadElement(parent)
+        )
+          kinds.add("array");
+        else if (
+          ts.isPropertyAccessExpression(parent) &&
+          parent.expression === ref &&
+          ARRAY.has(parent.name.text)
+        )
+          kinds.add("array");
+        else if (ts.isElementAccessExpression(parent) && parent.expression === ref)
+          kinds.add("record");
+        else if (
+          ts.isPropertyAccessExpression(parent) &&
+          parent.expression === ref &&
+          !call(parent)
+        )
+          kinds.add("record");
+        else if (
+          (ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+          parent.arguments?.includes(ref)
+        ) {
+          // passed on: says nothing
+        } else if (ts.isBinaryExpression(parent) && NIL_TESTS.includes(parent.operatorToken.kind)) {
+          // says nothing
+        } else if (
           ts.isBinaryExpression(parent) &&
-          [
-            ts.SyntaxKind.EqualsEqualsToken,
-            ts.SyntaxKind.ExclamationEqualsToken,
-            ts.SyntaxKind.EqualsEqualsEqualsToken,
-            ts.SyntaxKind.ExclamationEqualsEqualsToken,
-            ts.SyntaxKind.QuestionQuestionToken,
-          ].includes(parent.operatorToken.kind)
-        );
-        else other = true;
+          parent.left === ref &&
+          parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        ) {
+          // an assignment to it
+        } else other = true;
+        if (ts.isPropertyAccessExpression(n)) return;
       }
       ts.forEachChild(n, visit);
     };
-    visit(fn.body as ts.Node);
-    return !other && keyReads > 0;
+    for (const r of roots) visit(r);
+    if (other || kinds.size !== 1) return null;
+    const k = [...kinds][0];
+    return k === "fn"
+      ? "(...args: unknown[]) => unknown"
+      : k === "array"
+        ? "unknown[]"
+        : "Record<string, unknown>";
   }
 
   /** `): any {` returns dropped, so TypeScript infers them. */
@@ -671,6 +739,31 @@ export class TypePass {
     return n;
   }
 
+  /** Fields still declared `unknown`: typed by how the tree uses them (`usageType`). */
+  typeFieldsByUse(): number {
+    const program = this.program();
+    const checker = program.getTypeChecker();
+    const sfs = this.files.map((f) => program.getSourceFile(f)).filter(Boolean) as ts.SourceFile[];
+    let n = 0;
+    for (const sf of sfs) {
+      const edits: Edit[] = [];
+      const visit = (node: ts.Node): void => {
+        if (
+          (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) &&
+          node.type?.kind === ts.SyntaxKind.UnknownKeyword
+        ) {
+          const t = this.usageType(checker, node, sfs);
+          if (t) edits.push({ pos: node.type.getStart(sf), end: node.type.getEnd(), text: t });
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sf);
+      applyEdits(sf.fileName, edits);
+      n += edits.length;
+    }
+    return n;
+  }
+
   run(): Record<string, number> {
     const stats: Record<string, number> = { returns: 0, locals: 0, params: 0, uninferable: 0 };
     stats.returns += this.dropAnyReturns();
@@ -686,6 +779,7 @@ export class TypePass {
       stats.uninferable += k;
       if (!k) break;
     }
+    stats.fieldsByUse = this.typeFieldsByUse();
     stats.swept = 0;
     for (let round = 0; round < 4; round++) {
       const k = this.sweepAny();

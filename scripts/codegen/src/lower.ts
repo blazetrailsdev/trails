@@ -1621,7 +1621,8 @@ export class Lowerer {
     if (kw.length) out.push(`{ ${kw.join(", ")} }: any = {}`);
     void kwRequired;
     const blk = params.find((p) => p.kind === "block");
-    if (blk) out.push(`${jsIdent(blk.name ?? "block")}?: any`);
+    // A Ruby `&block` is a Proc or nil: a function, optional.
+    if (blk) out.push(`${jsIdent(blk.name ?? "block")}?: (...args: unknown[]) => unknown`);
     return out.join(", ");
   }
 
