@@ -4688,7 +4688,6 @@ export function main() {
       Map<string, Map<string, Map<string, string>>>
     >();
     const tsInlinedFromByFileOwner = new Map<string, Map<string, InlinedFrom[]>>();
-    // (file → `Owner#tsName` → tags) for a method inlining module `super` (RFC 0197).
     const tsInlinedMethodTagsByFile = new Map<string, Map<string, InlinedFrom[]>>();
     const inlinedTagsCompared = new Set<string>();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
