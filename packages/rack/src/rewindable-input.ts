@@ -3,9 +3,9 @@ import {
   Encoding,
   RUBY_PLATFORM,
   RuntimeError,
+  byteslice,
   Tempfile,
   rbFSend,
-  rbStrByteslice,
 } from "@blazetrails/ruby-compat";
 
 export class RewindableInput {
@@ -71,10 +71,10 @@ export class RewindableInput {
     while ((buffer = this.io.read(1024 * 4)) != null) {
       let entireBufferWrittenOut = false;
       while (!entireBufferWrittenOut) {
-        const written = this.rewindableIo.write(buffer);
-        entireBufferWrittenOut = written === Buffer.byteLength(buffer);
+        const written = this.rewindableIo.write(Uint8Array.from(buffer, (c) => c.charCodeAt(0)));
+        entireBufferWrittenOut = written === buffer.length;
         if (!entireBufferWrittenOut) {
-          buffer = rbStrByteslice(buffer, written, Buffer.byteLength(buffer) - written)!;
+          buffer = byteslice(buffer, written, buffer.length - written)!;
         }
       }
     }

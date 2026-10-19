@@ -100,7 +100,7 @@ function rewindableTest(makeIo: () => any) {
     rio.isFilesystemHasPosixSemantics = () => {
       const io = rio.rewindableIo;
       const superWrite = io.write.bind(io);
-      io.write = (buffer: string) => superWrite(buffer.slice(0, 2));
+      io.write = (buffer: Uint8Array) => superWrite(buffer.slice(0, 2));
       return superPosix();
     };
     rio.read(1);
