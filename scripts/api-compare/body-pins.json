@@ -10020,6 +10020,13 @@
   {
     "package": "actiondispatch",
     "rubyFile": "middleware/stack.rb",
+    "rubyName": "initialize_copy",
+    "digest": "cdf6201a6d977666",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actiondispatch",
+    "rubyFile": "middleware/stack.rb",
     "rubyName": "insert",
     "digest": "50a3e95585c0b1c5",
     "ref": "v8.0.2"

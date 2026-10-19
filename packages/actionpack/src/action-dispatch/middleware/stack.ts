@@ -97,10 +97,8 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.entries.length;
   }
 
-  dup(): this {
-    const copy = new (this.constructor as new () => this)();
-    copy.middlewares = [...this.entries];
-    return copy;
+  initializeCopy(other: MiddlewareStack): void {
+    this.middlewares = [...other.middlewares];
   }
 
   isAny(): boolean {

@@ -3,7 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Dir, File, FileUtils, Pathname } from "@blazetrails/ruby-compat";
-import { assert, assertEqual, assertNot } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertNot, TopLevel } from "@blazetrails/activesupport";
 import {
   takeScreenshot,
   takeFailedScreenshot,
@@ -36,6 +36,7 @@ const { DrivenByRackTest, DrivenBySeleniumWithChrome } =
 const root = (path: string): string => new Pathname(Dir.pwd()).join(path).toString();
 
 describe("ScreenshotHelperTest", () => {
+  let trails: typeof TopLevel.Trails;
   let host: InstanceType<typeof DrivenBySeleniumWithChrome>;
 
   beforeEach(() => {
@@ -43,9 +44,12 @@ describe("ScreenshotHelperTest", () => {
     host._screenshotCounter = undefined;
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT", "");
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "");
+    trails = TopLevel.Trails;
+    TopLevel.Trails = { root: () => Dir.pwd() } as typeof TopLevel.Trails;
   });
 
   afterEach(() => {
+    TopLevel.Trails = trails;
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
