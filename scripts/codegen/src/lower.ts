@@ -2013,11 +2013,15 @@ export class Lowerer {
       case "prim":
         return t.name;
       case "array": {
-        const el = t.el ? this.tsType(t.el) : "any";
+        const el0 = t.el ? this.tsType(t.el, ctx) : "unknown";
+        const el = el0 === "any" ? "unknown" : el0;
         return /\s/.test(el) ? `(${el})[]` : `${el}[]`;
       }
       case "fn":
-        return "(...args: any[]) => any";
+        return "(...args: unknown[]) => unknown";
+      // A Ruby Hash is a plain object unless the hand twin says it may be a Map.
+      case "hash":
+        return t.map ? "Map<unknown, unknown>" : "Record<string, unknown>";
       default:
         return "any";
     }

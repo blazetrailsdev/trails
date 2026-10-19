@@ -214,6 +214,38 @@ export class TypePass {
       ts.forEachChild(node, (c) => visit(c, sf));
     };
     for (const sf of sourceFiles) visit(sf, sf);
+    // Every assignment to a field declared `unknown` (an ivar, a class_attribute):
+    // its value's type joins the field's.
+    const fieldSeen = new Map<ts.Declaration, ts.Type[]>();
+    const isUnknownNode = (t: ts.TypeNode | undefined) =>
+      !!t && t.kind === ts.SyntaxKind.UnknownKeyword;
+    const assigns = (node: ts.Node): void => {
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        (ts.isPropertyAccessExpression(node.left) || ts.isElementAccessExpression(node.left))
+      ) {
+        const sym = checker.getSymbolAtLocation(
+          ts.isPropertyAccessExpression(node.left) ? node.left.name : node.left.argumentExpression,
+        );
+        const d = sym?.declarations?.[0];
+        if (
+          d &&
+          (ts.isPropertyDeclaration(d) || ts.isPropertySignature(d)) &&
+          isUnknownNode(d.type) &&
+          d.getSourceFile().fileName.startsWith(this.srcDir)
+        ) {
+          const t = checker.getTypeAtLocation(node.right);
+          if (!(t.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Never))) {
+            const list = fieldSeen.get(d) ?? fieldSeen.set(d, []).get(d)!;
+            for (const u of t.isUnion() ? t.types : [t])
+              list.push(checker.getBaseTypeOfLiteralType(u));
+          }
+        }
+      }
+      ts.forEachChild(node, assigns);
+    };
+    for (const sf of sourceFiles) assigns(sf);
     // Every declaration still typed `any`: its union, or (on the last round, when
     // nothing more can arrive) `unknown`.
     const edits = new Map<string, Edit[]>();
@@ -234,6 +266,10 @@ export class TypePass {
         const got = texts.every((x) => x !== null) ? texts : [];
         if (got.length || lastRound) {
           let t = TypePass.union(got);
+          // Nothing reaches it, and its body only reads it by key (`options[:wait]`,
+          // `job_data["job_id"]`): a Ruby Hash, which is a plain object.
+          if (t === "unknown" && !isThis && this.readByKeyOnly(checker, node))
+            t = "Record<string, unknown>";
           if (!isThis && node.initializer) {
             const it = this.typeText(
               checker,
@@ -254,8 +290,56 @@ export class TypePass {
       ts.forEachChild(node, (c) => decls(c, sf));
     };
     for (const sf of sourceFiles) decls(sf, sf);
+    for (const [d, types] of fieldSeen) {
+      const sf = d.getSourceFile();
+      const texts = widest(types).map((x) => this.typeText(checker, x, d, sf.fileName));
+      if (!texts.length || texts.some((x) => x === null)) continue;
+      const t = (d as ts.PropertyDeclaration).type!;
+      push(sf, { pos: t.getStart(sf), end: t.getEnd(), text: TypePass.union(texts as string[]) });
+      n++;
+    }
     for (const [f, es] of edits) applyEdits(f, es);
     return n;
+  }
+
+  /**
+   * Every use of the parameter in its function is a key read (`p["k"]`, `p.k`
+   * not called), a nil test, or a `??` fallback, and there is at least one key read.
+   */
+  readByKeyOnly(checker: ts.TypeChecker, p: ts.ParameterDeclaration): boolean {
+    if (!ts.isIdentifier(p.name)) return false;
+    const sym = checker.getSymbolAtLocation(p.name);
+    const fn = p.parent;
+    if (!sym || !("body" in fn) || !fn.body) return false;
+    let keyReads = 0;
+    let other = false;
+    const visit = (n: ts.Node): void => {
+      if (other) return;
+      if (ts.isIdentifier(n) && n !== p.name && checker.getSymbolAtLocation(n) === sym) {
+        const parent = n.parent;
+        if (ts.isElementAccessExpression(parent) && parent.expression === n) keyReads++;
+        else if (
+          ts.isPropertyAccessExpression(parent) &&
+          parent.expression === n &&
+          !(ts.isCallExpression(parent.parent) && parent.parent.expression === parent)
+        )
+          keyReads++;
+        else if (
+          ts.isBinaryExpression(parent) &&
+          [
+            ts.SyntaxKind.EqualsEqualsToken,
+            ts.SyntaxKind.ExclamationEqualsToken,
+            ts.SyntaxKind.EqualsEqualsEqualsToken,
+            ts.SyntaxKind.ExclamationEqualsEqualsToken,
+            ts.SyntaxKind.QuestionQuestionToken,
+          ].includes(parent.operatorToken.kind)
+        );
+        else other = true;
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(fn.body as ts.Node);
+    return !other && keyReads > 0;
   }
 
   /** `): any {` returns dropped, so TypeScript infers them. */

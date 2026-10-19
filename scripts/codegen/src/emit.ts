@@ -1333,7 +1333,8 @@ export class Emitter {
         `${doc}get ${propKey(tsName)}(): any {\n${indent(body).join("\n")}\n}`,
         `set ${propKey(tsName)}(value: any) {\n  this._${tsName} = value;\n}`,
       ].join("\n\n");
-    const thisParam = opts.module ? (ps ? "this: any, " : "this: any") : "";
+    const host = opts.module ? this.hostThis(u, f) : "";
+    const thisParam = opts.module ? (ps ? `this: ${host}, ` : `this: ${host}`) : "";
     // The hand twin's declared return type where there is one; otherwise none,
     // so TypeScript infers it from the body rather than reading `any`.
     const retType = twin?.info.ret ? this.lw.tsType(twin.info.ret, ctx) : null;
@@ -1342,7 +1343,7 @@ export class Emitter {
       const fnName = tsName.startsWith("set")
         ? tsName
         : "set" + tsName[0].toUpperCase() + tsName.slice(1);
-      const tp = opts.module ? (ps ? "this: any, " : "this: any") : "";
+      const tp = thisParam;
       return `${doc}export ${asy}function ${fnName}(${tp}${ps})${ret} {\n${indent(body).join("\n")}\n}`;
     }
     if (
@@ -1668,6 +1669,45 @@ export class Emitter {
   }
 
   /**
+   * The `this` of a module's functions: the gem classes the module enters the
+   * Ruby ancestors of (`include M` on `Base`), as an `import()` type so the
+   * module file takes no runtime import of its includer; `typeof` them for a
+   * Concern's `ClassMethods`. `any` (for the type pass) where no lib class
+   * includes it, or more than a few do.
+   */
+  hostThis(u: Unit, f: FileCtx): string {
+    const isCm = u.fqn.endsWith("::ClassMethods");
+    const mod = isCm ? u.fqn.slice(0, -"::ClassMethods".length) : u.fqn;
+    const memo = (this.hostMemo ??= new Map<string, string[]>());
+    let hosts = memo.get(mod);
+    if (!hosts) {
+      hosts = [];
+      for (const s of this.index.scopes.values()) {
+        if (s.kind !== "class") continue;
+        if (!rubyAncestors(this.index, s.fqn).includes(mod)) continue;
+        if (s.superclassFqn && rubyAncestors(this.index, s.superclassFqn).includes(mod)) continue;
+        hosts.push(s.fqn);
+      }
+      memo.set(mod, hosts);
+    }
+    const lib = hosts.filter((h) => {
+      const e = this.resolver.exportNames.get(h);
+      return e && !/\.test\.ts$|(^|\/)test-helpers\//.test(e.tsFile);
+    });
+    if (!lib.length || lib.length > 3) return "any";
+    return lib
+      .map((h) => {
+        const e = this.resolver.exportNames.get(h)!;
+        let rel = path.relative(path.dirname(f.tsFile), e.tsFile).replace(/\.ts$/, ".js");
+        if (!rel.startsWith(".")) rel = `./${rel}`;
+        return `${isCm ? "typeof " : ""}import("${rel}").${e.name}`;
+      })
+      .join(" | ");
+  }
+
+  hostMemo?: Map<string, string[]>;
+
+  /**
    * The members a class gets from the modules that enter its Ruby ancestors at
    * this class (`include M`, and a Concern's `ClassMethods`, which its
    * `append_features` extends the class with), typed through ruby-compat's
@@ -1890,7 +1930,7 @@ export class Emitter {
       const pre =
         prefix?.k === "true" ? `${target}_` : prefix?.k === "sym" ? `${prefix.value}_` : "";
       const nm = tsMethodName(pre + m, u.fqn);
-      const thisP = module ? "this: any, " : "";
+      const thisP = module ? `this: ${this.hostThis(u, f)}, ` : "";
       // `delegate :x, :x=, to: :t` delegates an attribute: the reader reads the
       // target's property and the writer (`setX`) assigns it.
       const names = new Set(s.args.filter((x: N) => x.k === "sym").map((x: N) => x.value));
@@ -2079,7 +2119,7 @@ export class Emitter {
           members.push(
             (() => {
               const [ps, as] = this.aliasSignature(u.fqn, old, false);
-              return `${propKey(tsMethodName(nw, u.fqn))}(${["this: any", ps].filter(Boolean).join(", ")}): any {\n  return this.${tsMethodName(old, u.fqn)}(${as});\n}`;
+              return `${propKey(tsMethodName(nw, u.fqn))}(${[`this: ${this.hostThis(u, f)}`, ps].filter(Boolean).join(", ")}): any {\n  return this.${tsMethodName(old, u.fqn)}(${as});\n}`;
             })(),
           );
       } else {
