@@ -91,7 +91,7 @@ describe("DebugExceptions API body conversions", () => {
         HTTP_ACCEPT: "text/wibble",
       });
       expect(String(headers["content-type"])).toContain("text/wibble");
-      expect(Array.from(body as Iterable<string>).join("")).toBe("wibble:500");
+      expect([...(body as Iterable<string>)].join("")).toBe("wibble:500");
     } finally {
       delete HASH_CONVERSIONS.toWibble;
       MimeType.unregister(":wibble");

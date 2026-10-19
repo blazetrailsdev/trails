@@ -411,7 +411,7 @@ describe("TestRoutingMapper", () => {
       PATH_INFO: "/nope",
     });
     expect(status).toBe(404);
-    expect(Array.from(body as Iterable<string>).join("")).toContain("Not Found");
+    expect([...(body as Iterable<string>)].join("")).toContain("Not Found");
   });
 
   it("dispatches matched route", async () => {
@@ -428,7 +428,7 @@ describe("TestRoutingMapper", () => {
       PATH_INFO: "/posts/7",
     });
     expect(status).toBe(200);
-    const json = JSON.parse(Array.from(body as Iterable<string>).join(""));
+    const json = JSON.parse([...(body as Iterable<string>)].join(""));
     expect(json.controller).toBe("posts");
     expect(json.action).toBe("show");
     expect(json.params.id).toBe("7");
@@ -4605,7 +4605,7 @@ describe("TestDefaultScope", () => {
 
   it("default scope", async () => {
     const [, , body] = await DefaultScopeRoutes.call(MockRequest.envFor("/posts"));
-    expect(Array.from(body as Iterable<string>).join("")).toBe("blog/posts#index");
+    expect([...(body as Iterable<string>)].join("")).toBe("blog/posts#index");
   });
 });
 

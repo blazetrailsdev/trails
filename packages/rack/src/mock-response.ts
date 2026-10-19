@@ -9,9 +9,11 @@ import { CGI, fetch, rbFArray, rbStrSNew } from "@blazetrails/ruby-compat";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
 
+type Cookie = InstanceType<typeof CGI.Cookie>;
+
 export class MockResponse extends Response {
   originalHeaders: Record<string, any>;
-  cookies: Record<string, InstanceType<typeof CGI.Cookie>>;
+  cookies: Record<string, Cookie>;
   private _errors: any;
   private _bufferedBody: string | undefined;
 
@@ -60,7 +62,7 @@ export class MockResponse extends Response {
     return [201, 204, 304].includes(this.status);
   }
 
-  cookie(name: string): InstanceType<typeof CGI.Cookie> | null {
+  cookie(name: string): Cookie | null {
     return fetch(this.cookies, name, null);
   }
 
@@ -69,8 +71,8 @@ export class MockResponse extends Response {
   }
 
   /** @internal */
-  private parseCookiesFromHeader(): Record<string, InstanceType<typeof CGI.Cookie>> {
-    const cookies: Record<string, InstanceType<typeof CGI.Cookie>> = {};
+  private parseCookiesFromHeader(): Record<string, Cookie> {
+    const cookies: Record<string, Cookie> = {};
     const setCookieHeader = this.headers[SET_COOKIE];
     if (setCookieHeader && setCookieHeader.length !== 0) {
       for (const cookie of rbFArray(setCookieHeader) as string[]) {

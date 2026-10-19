@@ -385,7 +385,7 @@ describe("Trails.application integration (PR 2.6 hello-world fixture)", () => {
       PATH_INFO: "/hello",
     });
     expect(status).toBe(200);
-    expect(Array.from(body as Iterable<string>).join("")).toBe("hello world");
+    expect([...(body as Iterable<string>)].join("")).toBe("hello world");
   });
 });
 
@@ -409,7 +409,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       PATH_INFO: "/posts",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(Array.from(body as Iterable<string>).join(""))).toEqual({ posts: [] });
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ posts: [] });
     expect(app.routesReloader().loaded).toBe(true);
 
     const [nestedStatus, , nestedBody] = await (rbFSend(app.app(), "call", {
@@ -417,7 +417,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       PATH_INFO: "/admin/sessions",
     }) as Promise<RackResponse>);
     expect(nestedStatus).toBe(200);
-    expect(JSON.parse(Array.from(nestedBody as Iterable<string>).join(""))).toEqual({
+    expect(JSON.parse([...(nestedBody as Iterable<string>)].join(""))).toEqual({
       scope: "admin",
     });
   });
@@ -439,9 +439,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       HTTP_ACCEPT: "*/*",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(Array.from(body as Iterable<string>).join("")).toContain(
-      '<a href="/posts">All posts</a>',
-    );
+    expect([...(body as Iterable<string>)].join("")).toContain('<a href="/posts">All posts</a>');
   });
 
   it("calls a named route helper from a controller action with lazily drawn routes", async () => {
@@ -459,7 +457,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       PATH_INFO: "/posts/link",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(Array.from(body as Iterable<string>).join(""))).toEqual({ href: "/posts" });
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ href: "/posts" });
   });
 
   it("calls a named *_url helper from a controller action against the request host", async () => {
@@ -479,7 +477,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       "rack.url_scheme": "https",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(Array.from(body as Iterable<string>).join(""))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       href: "https://blog.example.com:8080/posts",
     });
   });
@@ -501,7 +499,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       "rack.url_scheme": "https",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(Array.from(body as Iterable<string>).join(""))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       href: "https://blog.example.com:8080/posts",
     });
     expect(

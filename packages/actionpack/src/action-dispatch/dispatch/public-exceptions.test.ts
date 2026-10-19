@@ -35,7 +35,7 @@ describe("PublicExceptions", () => {
     });
     expect(status).toBe(500);
     expect(headers["content-type"]).toBe("text/html; charset=utf-8");
-    expect(Array.from(body as Iterable<string>).join("")).toBe("<h1>500</h1>");
+    expect([...(body as Iterable<string>)].join("")).toBe("<h1>500</h1>");
   });
 
   it("prefers the localized html when present", async () => {
@@ -44,7 +44,7 @@ describe("PublicExceptions", () => {
       HTTP_ACCEPT: "text/html",
     });
     expect(status).toBe(404);
-    expect(Array.from(body as Iterable<string>).join("")).toBe("<h1>404 en</h1>");
+    expect([...(body as Iterable<string>)].join("")).toBe("<h1>404 en</h1>");
   });
 
   it("returns x-cascade pass when no template exists", async () => {
@@ -54,7 +54,7 @@ describe("PublicExceptions", () => {
     });
     expect(status).toBe(404);
     expect(headers[X_CASCADE]).toBe("pass");
-    expect(Array.from(body as Iterable<string>).join("")).toBe("");
+    expect([...(body as Iterable<string>)].join("")).toBe("");
   });
 
   it("renders json when requested", async () => {
@@ -64,7 +64,7 @@ describe("PublicExceptions", () => {
     });
     expect(status).toBe(500);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
-    expect(JSON.parse(Array.from(body as Iterable<string>).join(""))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       status: 500,
       error: "Internal Server Error",
     });
@@ -77,7 +77,7 @@ describe("PublicExceptions", () => {
     });
     expect(status).toBe(500);
     expect(headers["content-type"]).toBe("application/xml; charset=utf-8");
-    const xml = Array.from(body as Iterable<string>).join("");
+    const xml = [...(body as Iterable<string>)].join("");
     expect(xml).toContain('<status type="integer">500</status>');
     expect(xml).toContain("<error>Internal Server Error</error>");
   });

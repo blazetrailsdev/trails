@@ -1,14 +1,12 @@
 import { I18n, camelize } from "@blazetrails/activesupport";
 import { fetch, File, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
 import { Mime, MimeType } from "../http/mime-type.js";
 import { InvalidType } from "../http/mime-negotiation.js";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
-
-async function* emptyBody(): RackBody {}
 
 const LOCALE_RE = /^[A-Za-z0-9_-]+$/;
 
@@ -81,6 +79,6 @@ export class PublicExceptions {
     if (found && path != null) {
       return this.renderFormat(status, "text/html", File.read(path));
     }
-    return [404, { [X_CASCADE]: "pass" }, emptyBody()];
+    return [404, { [X_CASCADE]: "pass" }, []];
   }
 }

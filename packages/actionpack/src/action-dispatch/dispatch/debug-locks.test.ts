@@ -25,7 +25,7 @@ describe("DebugLocksTest", () => {
 
       testTerminated.countDown();
 
-      assertMatch(/Thread.*?Sharing/, Array.from(response[2] as Iterable<string>).join(""));
+      assertMatch(/Thread.*?Sharing/, [...(response[2] as Iterable<string>)].join(""));
     } finally {
       await thread.join();
     }

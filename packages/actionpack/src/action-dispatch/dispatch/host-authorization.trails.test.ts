@@ -29,7 +29,7 @@ describe("HostAuthorization (trails)", () => {
     });
     expect(status).toBe(403);
     expect(headers["content-type"]).toContain("text/html");
-    expect(Array.from(body as Iterable<string>).join("")).toBe("");
+    expect([...(body as Iterable<string>)].join("")).toBe("");
   });
 
   it("default response renders DebugView body when show_detailed_exceptions is set", async () => {
@@ -42,7 +42,7 @@ describe("HostAuthorization (trails)", () => {
     });
     expect(status).toBe(403);
     expect(headers["content-type"]).toContain("text/html");
-    const rendered = Array.from(body as Iterable<string>).join("");
+    const rendered = [...(body as Iterable<string>)].join("");
     expect(rendered).toContain("Blocked host");
     expect(rendered).toContain("evil.com");
   });
@@ -193,7 +193,7 @@ describe("HostAuthorization (trails)", () => {
       PATH_INFO: "/",
     });
     expect(status).toBe(503);
-    expect(Array.from(body as Iterable<string>).join("")).toBe("Service Unavailable");
+    expect([...(body as Iterable<string>)].join("")).toBe("Service Unavailable");
   });
 
   it("falls back to SERVER_NAME when HTTP_HOST is absent", async () => {

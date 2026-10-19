@@ -21,7 +21,7 @@ describe("createAppServer", () => {
     const server = createAppServer({ executeCode: async () => {} });
     const [status, _headers, body] = await server.call(makeEnv("GET", "/nothing"));
     expect(status).toBe(404);
-    const text = Array.from(body as Iterable<string>).join("");
+    const text = [...(body as Iterable<string>)].join("");
     expect(text).toContain("No route matches");
   });
 
@@ -44,7 +44,7 @@ describe("createAppServer", () => {
     const [status, headers, body] = await server.call(makeEnv("GET", "/posts"));
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("application/json");
-    const text = Array.from(body as Iterable<string>).join("");
+    const text = [...(body as Iterable<string>)].join("");
     expect(text).toBe('{"posts":[]}');
   });
 
@@ -75,7 +75,7 @@ describe("createAppServer", () => {
 
     const [status, _headers, body] = await server.call(makeEnv("GET", "/broken"));
     expect(status).toBe(500);
-    const text = Array.from(body as Iterable<string>).join("");
+    const text = [...(body as Iterable<string>)].join("");
     expect(text).toContain("kaboom");
   });
 });

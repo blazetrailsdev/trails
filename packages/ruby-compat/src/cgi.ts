@@ -109,54 +109,76 @@ export class CGI {
 
 /**
  * `CGI::Cookie` (`vendor/ruby/v3.3.11/lib/cgi/cookie.rb:40`), narrowed to the
- * options-hash arm of `initialize` that `Rack::MockResponse` calls. A Ruby
- * `Cookie < Array` is its own value, so `value` holds the Array here.
+ * options-hash arm of `initialize` (`cookie.rb:86-100`) that
+ * `Rack::MockResponse#parse_cookies_from_header` calls. A Ruby `Cookie < Array`
+ * is its own value, so `value` holds the Array. The default `path` is the arm
+ * Ruby takes when `ENV["SCRIPT_NAME"]` is unset, `""`: trails reads no process
+ * environment.
  *
  * @noRailsEquivalent PERMANENT
  */
 export class Cookie {
   /** @noRailsEquivalent PERMANENT */
-  name: string;
+  static readonly TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly PATH_VALUE_RE = /^[ -:<-~]*$/;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly DOMAIN_VALUE_RE = /^\.?(?!-)[-A-Za-z0-9]+(?<!-)(?:\.(?!-)[-A-Za-z0-9]+(?<!-))*$/;
+
+  /** @noRailsEquivalent PERMANENT */
+  name!: string | null;
   /** @noRailsEquivalent PERMANENT */
   value: string[];
   /** @noRailsEquivalent PERMANENT */
-  path: string | null;
+  path!: string | null;
   /** @noRailsEquivalent PERMANENT */
-  domain: string | null;
+  domain!: string | null;
   /** @noRailsEquivalent PERMANENT */
   expires: Date | null;
   /** @noRailsEquivalent PERMANENT */
   secure: boolean;
-  /** @noRailsEquivalent PERMANENT */
-  httponly: boolean;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(options: Record<string, unknown>) {
+    this.domain = null;
+    this.expires = null;
+
     if (!Object.hasOwn(options, "name")) {
       throw new ArgumentError("`name' required");
     }
 
-    this.name = options["name"] as string;
+    this.setName(options["name"] as string | null);
     const value = rbFArray(options["value"]) as string[];
-    this.path = (options["path"] as string | null | undefined) ?? "";
-    this.domain = (options["domain"] as string | null | undefined) ?? null;
+    this.setPath((options["path"] as string | null | undefined) || "");
+    this.setDomain((options["domain"] as string | null | undefined) ?? null);
     this.expires = (options["expires"] as Date | null | undefined) ?? null;
     this.secure = options["secure"] === true;
-    this.httponly = options["httponly"] === true;
 
     this.value = value;
   }
 
   /** @noRailsEquivalent PERMANENT */
-  toString(): string {
-    const val = this.value.map((v) => CGI.escape(v)).join("&");
-    let buf = `${this.name}=${val}`;
-    if (this.domain != null) buf += `; domain=${this.domain}`;
-    if (this.path != null) buf += `; path=${this.path}`;
-    if (this.expires != null) buf += `; expires=${this.expires.toUTCString()}`;
-    if (this.secure) buf += "; secure";
-    if (this.httponly) buf += "; HttpOnly";
-    return buf;
+  setName(str: string | null): void {
+    if (str && !Cookie.TOKEN_RE.test(str)) {
+      throw new ArgumentError(`invalid name: ${JSON.stringify(str)}`);
+    }
+    this.name = str;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  setPath(str: string | null): void {
+    if (str && !Cookie.PATH_VALUE_RE.test(str)) {
+      throw new ArgumentError(`invalid path: ${JSON.stringify(str)}`);
+    }
+    this.path = str;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  setDomain(str: string | null): void {
+    if (str && (bytes(str).length > 255 || !Cookie.DOMAIN_VALUE_RE.test(str))) {
+      throw new ArgumentError(`invalid domain: ${JSON.stringify(str)}`);
+    }
+    this.domain = str;
   }
 }
 

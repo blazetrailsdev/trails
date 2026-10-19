@@ -1,5 +1,5 @@
 import { StringIO } from "@blazetrails/ruby-compat";
-import { Request, ResponseRaw } from "@blazetrails/rack";
+import { Request, Raw } from "@blazetrails/rack";
 import { describe, expect, it } from "vitest";
 
 import type { PersistedRequest, PersistedSession } from "./index.js";
@@ -94,7 +94,7 @@ describe("Rack::Session::Pool", () => {
     } as unknown as Persisted;
     const session = (env["rack.session"] = new SecureSessionHash(store, req));
     session.set("foo", "bar");
-    await pool.commitSession(req, new ResponseRaw(200, {}));
+    await pool.commitSession(req, new Raw(200, {}));
     errors.rewind();
     expect(errors.read()).toBe(
       "Warning! Rack::Session::Pool failed to save session. Content dropped.\n",

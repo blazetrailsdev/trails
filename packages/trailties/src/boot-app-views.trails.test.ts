@@ -22,7 +22,7 @@ describe("a generated app renders its own views", () => {
       PATH_INFO: "/posts/show",
       HTTP_ACCEPT: "*/*",
     }) as Promise<RackResponse>);
-    const html = Array.from(body as Iterable<string>).join("");
+    const html = [...(body as Iterable<string>)].join("");
     expect(status).toBe(200);
     expect(headers["content-type"]).toMatch(/text\/html/);
     expect(html).toContain("<h1>Posts</h1>");

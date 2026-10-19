@@ -1,5 +1,5 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { RACK_SESSION, RACK_SESSION_OPTIONS, ResponseRaw } from "@blazetrails/rack";
+import { RACK_SESSION, RACK_SESSION_OPTIONS, Raw } from "@blazetrails/rack";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { Request } from "@blazetrails/rack";
 import { setVerbose } from "@blazetrails/ruby-compat";
@@ -200,7 +200,7 @@ describe("Rack::Session::Abstract::Persisted#call", () => {
     await store.prepareSession(req);
     req.setHeader(RACK_SESSION_OPTIONS, seat);
     (req.getHeader(RACK_SESSION) as unknown as SessionHash).set("counter", 2);
-    await store.commitSession(req, new ResponseRaw(200, {}));
+    await store.commitSession(req, new Raw(200, {}));
 
     expect(cookies[0]?.["path"]).toBe("/deep");
     expect(cookies[0]?.["id"]).toBe("stored");
@@ -230,7 +230,7 @@ describe("Rack::Session::Abstract::Persisted#call", () => {
       const session = (env["rack.session"] = new SessionHash(backing, req));
       session.set("foo", "bar");
       req.setHeader(RACK_SESSION_OPTIONS, { defer: true });
-      await store.commitSession(req, new ResponseRaw(200, {}));
+      await store.commitSession(req, new Raw(200, {}));
       errors.rewind();
       return errors;
     }

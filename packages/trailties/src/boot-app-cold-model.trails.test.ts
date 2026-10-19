@@ -52,6 +52,6 @@ describe("a booted app's models are warm before user code runs", () => {
         HTTP_ACCEPT: "application/json",
       }),
     ) as Promise<RackResponse>);
-    expect([status, Array.from(body as Iterable<string>).join("")]).toEqual([201, '{"title":"x"}']);
+    expect([status, [...(body as Iterable<string>)].join("")]).toEqual([201, '{"title":"x"}']);
   }, 15_000);
 });

@@ -143,7 +143,7 @@ describe("RouteSet#call through a Redirect endpoint", () => {
 
     expect(status).toBe(301);
     expect(headers["location"]).toBe("http://example.com/dashboard");
-    expect(Array.from(body as Iterable<string>).join("")).toBe("");
+    expect([...(body as Iterable<string>)].join("")).toBe("");
   });
 
   it("hands the redirect block the path parameters Journey matched", async () => {

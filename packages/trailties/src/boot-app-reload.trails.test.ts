@@ -41,7 +41,7 @@ describe("a generated app reloads its views in development", () => {
         PATH_INFO: "/posts/show",
         HTTP_ACCEPT: "*/*",
       }) as Promise<RackResponse>);
-      return Array.from(body as Iterable<string>).join("");
+      return [...(body as Iterable<string>)].join("");
     };
 
     expect(await show()).toContain("<h1>Before edit</h1>");

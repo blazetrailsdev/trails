@@ -23,7 +23,7 @@ describe("ShowExceptions#call", () => {
     const env: RackEnv = { REQUEST_METHOD: "GET", PATH_INFO: "/" };
     const [status, , body] = await new ShowExceptions(boom, exceptionsApp).call(env);
     expect(status).toBe(500);
-    expect(Array.from(body as Iterable<string>).join("")).toBe("/500 error fixture\n");
+    expect([...(body as Iterable<string>)].join("")).toBe("/500 error fixture\n");
     expect(env["action_dispatch.report_exception"]).toBe(true);
     expect((env["action_dispatch.exception"] as Error).message).toBe("puke!");
   });

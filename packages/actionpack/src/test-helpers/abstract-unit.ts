@@ -357,9 +357,7 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return Array.from((await this.sendRequest(uriOrHost, "GET", path))[2] as Iterable<string>).join(
-      "",
-    );
+    return [...((await this.sendRequest(uriOrHost, "GET", path))[2] as Iterable<string>)].join("");
   },
 
   async post(
@@ -367,9 +365,7 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return Array.from(
-      (await this.sendRequest(uriOrHost, "POST", path))[2] as Iterable<string>,
-    ).join("");
+    return [...((await this.sendRequest(uriOrHost, "POST", path))[2] as Iterable<string>)].join("");
   },
 
   async put(
@@ -377,9 +373,7 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return Array.from((await this.sendRequest(uriOrHost, "PUT", path))[2] as Iterable<string>).join(
-      "",
-    );
+    return [...((await this.sendRequest(uriOrHost, "PUT", path))[2] as Iterable<string>)].join("");
   },
 
   async delete(
@@ -387,9 +381,9 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return Array.from(
-      (await this.sendRequest(uriOrHost, "DELETE", path))[2] as Iterable<string>,
-    ).join("");
+    return [...((await this.sendRequest(uriOrHost, "DELETE", path))[2] as Iterable<string>)].join(
+      "",
+    );
   },
 
   async patch(
@@ -397,9 +391,9 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return Array.from(
-      (await this.sendRequest(uriOrHost, "PATCH", path))[2] as Iterable<string>,
-    ).join("");
+    return [...((await this.sendRequest(uriOrHost, "PATCH", path))[2] as Iterable<string>)].join(
+      "",
+    );
   },
 };
 

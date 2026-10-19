@@ -1044,7 +1044,7 @@ describe("DebugExceptions", () => {
     const [status, headers, raw] = await mw.call(env({ HTTP_ACCEPT: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
-    const text = Array.from(raw as Iterable<string>).join("");
+    const text = [...(raw as Iterable<string>)].join("");
     const json = JSON.parse(text);
     expect(json.exception).toBeDefined();
     expect(json.traces["Application Trace"]).toBeDefined();

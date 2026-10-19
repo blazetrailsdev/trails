@@ -11,7 +11,7 @@ async function requestUp(): Promise<[number, string]> {
     PATH_INFO: "/up",
     HTTP_ACCEPT: "*/*",
   }) as Promise<RackResponse>);
-  return [status, Array.from(body as Iterable<string>).join("")];
+  return [status, [...(body as Iterable<string>)].join("")];
 }
 
 describe("a generated app routes /up to Rails::HealthController", () => {

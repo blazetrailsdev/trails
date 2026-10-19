@@ -25,7 +25,7 @@ describe("Controller JSON rendering integration", () => {
 
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
-    expect(JSON.parse(Array.from(body as Iterable<string>).join(""))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       posts: [{ id: 1, title: "Hello" }],
     });
   });
@@ -124,7 +124,7 @@ describe("Controller JSON rendering integration", () => {
 
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
-    expect(JSON.parse(Array.from(body as Iterable<string>).join(""))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       id: "7",
       found: true,
     });
@@ -142,7 +142,7 @@ describe("Controller JSON rendering integration", () => {
     });
 
     expect(status).toBe(404);
-    expect(Array.from(body as Iterable<string>).join("")).toContain("Not Found");
+    expect([...(body as Iterable<string>)].join("")).toContain("Not Found");
   });
 
   it("API controller renders JSON", async () => {
