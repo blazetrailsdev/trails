@@ -1,10 +1,9 @@
 import { NameError } from "./core-ext/name-error.js";
 import { Module } from "@blazetrails/ruby-compat/include";
-import { rbModDefineMethod } from "@blazetrails/ruby-compat";
 
 export type MethodSource = (mod: Record<string, unknown>) => void;
 
-type Owner = Module | { prototype: object } | Record<string, unknown>;
+type Owner = Module | { prototype: object };
 
 export class MethodSet {
   static toString(): string {
@@ -58,7 +57,7 @@ export class MethodSet {
       }
       if (owner instanceof Module) {
         owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
-      } else rbModDefineMethod(owner, as, instanceMethod);
+      } else Object.defineProperty(owner.prototype, as, instanceMethod);
     }
   }
 }
@@ -123,14 +122,8 @@ export class CodeGenerator {
         this.owner.moduleEval((mod) => {
           for (const source of this.sources) source(mod);
         });
-      } else if ("prototype" in this.owner) {
-        for (const source of this.sources) source(this.owner.prototype as Record<string, unknown>);
       } else {
-        const mod: Record<string, unknown> = {};
-        for (const source of this.sources) source(mod);
-        for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(mod))) {
-          rbModDefineMethod(this.owner, name, descriptor);
-        }
+        for (const source of this.sources) source(this.owner.prototype as Record<string, unknown>);
       }
     }
   }

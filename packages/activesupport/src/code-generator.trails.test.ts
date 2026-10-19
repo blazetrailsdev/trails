@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { CodeGenerator } from "./code-generator.js";
-import { include } from "@blazetrails/ruby-compat/include";
+import { include, Module } from "@blazetrails/ruby-compat/include";
 
 describe("CodeGenerator (trails)", () => {
   it("applies the batched definitions to the owner when the batch ends", () => {
-    const owner: Record<string, unknown> = {};
+    const owner = new Module();
     class Person {}
     include(Person, owner);
 
@@ -24,7 +24,7 @@ describe("CodeGenerator (trails)", () => {
   });
 
   it("defines the method under `as` while caching it under the canonical name", () => {
-    const owner: Record<string, unknown> = {};
+    const owner = new Module();
     CodeGenerator.batch(owner, "code-generator.ts", 1, (codeGenerator) => {
       codeGenerator.defineCachedMethod(
         "canonical",
@@ -37,13 +37,13 @@ describe("CodeGenerator (trails)", () => {
       );
     });
 
-    expect(Object.hasOwn(owner, "publicName")).toBe(true);
-    expect(Object.hasOwn(owner, "canonical")).toBe(false);
+    expect(owner.isMethodDefined("publicName")).toBe(true);
+    expect(owner.isMethodDefined("canonical")).toBe(false);
   });
 
   it("builds a body once per canonical name and reuses the cached method", () => {
     let built = 0;
-    const define = (owner: Record<string, unknown>): void => {
+    const define = (owner: Module): void => {
       CodeGenerator.batch(owner, "code-generator.ts", 1, (codeGenerator) => {
         codeGenerator.defineCachedMethod("cached", { namespace: "test_cache" }, (sources) => {
           built += 1;
@@ -54,18 +54,18 @@ describe("CodeGenerator (trails)", () => {
       });
     };
 
-    const first: Record<string, unknown> = {};
-    const second: Record<string, unknown> = {};
+    const first = new Module();
+    const second = new Module();
     define(first);
     define(second);
 
     expect(built).toBe(1);
-    expect(Object.hasOwn(first, "cached")).toBe(true);
-    expect(Object.hasOwn(second, "cached")).toBe(true);
+    expect(first.isMethodDefined("cached")).toBe(true);
+    expect(second.isMethodDefined("cached")).toBe(true);
   });
 
   it("yields the enclosing generator to a nested batch instead of a new one", () => {
-    const owner: Record<string, unknown> = {};
+    const owner = new Module();
     CodeGenerator.batch(owner, "code-generator.ts", 1, (outer) => {
       CodeGenerator.batch(outer, "code-generator.ts", 1, (inner) => {
         expect(inner).toBe(outer);
@@ -75,9 +75,9 @@ describe("CodeGenerator (trails)", () => {
           });
         });
       });
-      expect(Object.hasOwn(owner, "fromNestedBatch")).toBe(false);
+      expect(owner.isMethodDefined("fromNestedBatch")).toBe(false);
     });
 
-    expect(Object.hasOwn(owner, "fromNestedBatch")).toBe(true);
+    expect(owner.isMethodDefined("fromNestedBatch")).toBe(true);
   });
 });

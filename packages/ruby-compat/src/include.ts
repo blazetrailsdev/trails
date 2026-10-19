@@ -1025,7 +1025,6 @@ const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
 const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
 const moduleIncludesKey = Symbol.for("@blazetrails/ruby-compat:moduleIncludes");
-const moduleSubclassesKey = Symbol.for("@blazetrails/ruby-compat:moduleSubclasses");
 const extendedOwners = new WeakMap<object, Map<string, object>>();
 
 const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
@@ -1458,10 +1457,7 @@ export function publicInstanceMethods(
   mod: ModuleObject | AnyClass | Module,
   includeSuper = true,
 ): string[] {
-  if (mod instanceof Module) {
-    const carrier = carrierOf(mod);
-    return Object.getOwnPropertyNames(carrier).filter((name) => !isUndefEntry(carrier, name));
-  }
+  if (mod instanceof Module) return Object.getOwnPropertyNames(carrierOf(mod));
   if (typeof mod === "function") {
     const names = new Set<string>();
     let proto: object | null = (mod as AnyClass).prototype as object;
@@ -1589,7 +1585,6 @@ export function rbModAppendFeatures(
     }
   }
   trackIncludedModule(klass.prototype, mod);
-  trackIncludedModule(mod, klass, moduleSubclassesKey);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
     if (
@@ -1657,35 +1652,6 @@ export function rbModAppendFeatures(
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
-}
-
-/**
- * Mirrors: Ruby's Module#undef_method — vendor/ruby/v3.3.11/vm_method.c:1973
- * `rb_mod_undef_method`, on a plain-object or class module: each name is
- * removed from the module and from every class that took it from the module.
- * A class has no undef entry of its own to hold, so a superclass's method of
- * that name answers again where Ruby's `rb_undef` entry would stop the search.
- *
- * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
- */
-export function rbModUndefMethod(mod: object, ...names: string[]): object {
-  if (mod instanceof Module) return mod.undefMethod(...names);
-  const table = (isClass(mod) ? mod.prototype : mod) as Record<string, unknown>;
-  for (const name of names) {
-    if (!Object.prototype.hasOwnProperty.call(table, name)) {
-      throw new NameError(`undefined method '${name}' for module '#<Module>'`, name);
-    }
-    delete table[name];
-    for (const klass of (Object.prototype.hasOwnProperty.call(mod, moduleSubclassesKey)
-      ? (mod as Record<symbol, Set<AnyClass>>)[moduleSubclassesKey]
-      : []) as Iterable<AnyClass>) {
-      const installed = trackedKeys(klass.prototype);
-      if (!installed.has(name)) continue;
-      installed.delete(name);
-      delete (klass.prototype as Record<string, unknown>)[name];
-    }
-  }
-  return mod;
 }
 
 export type Extended<M extends object> = CallableMethods<M>;

@@ -704,17 +704,12 @@ module's ancestry, so `mod`'s own methods outrank them and the class reports
 `other` as included. A `Concern` dependency still goes through
 `Concern#append_features`.
 
-**A method defined on a module after it is included** is
-`rbModDefineMethod(mod, name, body)`, `Module#define_method`. Ruby's includers
-share the module's method table, so the method is also written to every class
-that already includes `mod`, under any method that class's own body defines
-(a class-body setter `name` answers Ruby's `name=`). `rbModUndefMethod`
-removes the name from both. This is how `generated_attribute_methods` and
-`CodeGenerator`'s `define_method` reach the model class. Because the
-generated method sits on the class prototype itself rather than beneath it, a
-class body's own method of that name cannot reach it through JS `super`. A
-Rails test whose class body calls `super` into its own generated module is
-parked as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
+**A method defined on a module after it is included** has no carrier-free
+form: Ruby's includers share the module's method table (`rb_include_module`,
+`vendor/ruby/v3.3.11/class.c:1179`), and the repo owner has ruled out both a
+carrier and a list of a module's includers. Each such site is ported so that
+its definitions exist before the include, or is left on a `Module` until its
+own story settles it.
 
 ## A module's `initialize` is inlined into the constructor (`@inlinedFrom`)
 
@@ -788,7 +783,9 @@ constructor(attributes = null) { … }
 `parity:api` credits a tagged module hook to the constructor, both call gates
 compare the constructor against the tagged bodies in chain order, and
 `pnpm parity:api:inlined` reds on a stale or unfounded tag (see "Before you
-open the PR").
+open the PR"). `initialize_copy` / `initialize_dup` / `initialize_clone` are
+the `rbObjDup` / `rbObjClone` protocol and stay methods. This rule was set by
+the repo owner on 2026-10-08 (RFC 0188).
 
 **A module method's `super` is inlined the same way** (RFC 0197). A copied
 plain-module method has no link to resume a `super` search from, so a module
@@ -800,9 +797,7 @@ where the `super` stays a real `super.foo()`. `C#foo` carries one
 `@inlinedFrom <Module>#foo <citation>` per segment from another Ruby file, in
 ancestor order, with the citation shape above. A module that is a `super`
 target converts in the same PR as the module whose `super` reaches it, because
-a plain module's copied methods outrank every carrier link. `initialize_copy` / `initialize_dup` / `initialize_clone` are
-the `rbObjDup` / `rbObjClone` protocol and stay methods. This rule was set by
-the repo owner on 2026-10-08 (RFC 0188).
+a plain module's copied methods outrank every carrier link.
 
 ## Generated attribute readers are properties (`define_method_attribute`)
 

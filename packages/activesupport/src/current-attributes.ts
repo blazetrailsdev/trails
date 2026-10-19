@@ -3,7 +3,7 @@ import { Callbacks } from "./callbacks.js";
 import { classAttribute } from "./class-attribute.js";
 import { CodeGenerator } from "./code-generator.js";
 import { objectWith } from "./core-ext/object/with.js";
-import { include, type Extended, type Included } from "@blazetrails/ruby-compat/include";
+import { include, Module, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 const __FILE__ = import.meta.url;
@@ -219,14 +219,14 @@ const CURRENT_ATTRIBUTES_INSTANCES = "current_attributes_instances";
 
 type CurrentAttributesClass = typeof CurrentAttributes & {
   defaults: Record<string, AttributeValue>;
-  _generatedAttributeMethods?: Record<string, unknown>;
+  _generatedAttributeMethods?: Module;
   _currentInstancesKey?: string;
 };
 
 /** @internal */
-function generatedAttributeMethods(this: CurrentAttributesClass): Record<string, unknown> {
+function generatedAttributeMethods(this: CurrentAttributesClass): Module {
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    const mod = {};
+    const mod = new Module();
     include(this as unknown as new (...args: unknown[]) => unknown, mod);
     this._generatedAttributeMethods = mod;
   }

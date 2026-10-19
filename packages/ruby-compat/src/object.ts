@@ -18,9 +18,6 @@ import { NoMethodError } from "./no-method-error.js";
 import { Hash } from "./hash.js";
 import { toEnum } from "./enumerator.js";
 
-const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
-const moduleSubclassesKey = Symbol.for("@blazetrails/ruby-compat:moduleSubclasses");
-
 type Klass = abstract new (...args: never) => unknown;
 
 /**
@@ -765,23 +762,21 @@ function checkDefinitionVisibility(
  * A `Module` instance keeps its method table on a private carrier and answers
  * through its own `isMethodDefined`, for that table only whatever `inherit` is:
  * a ruby-compat `Module` copies an included module's methods into its includer
- * and records no ancestor to walk. A plain-object module's method table is its
- * own enumerable members.
+ * and records no ancestor to walk.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModMethodDefined(
-  mod: { prototype: object } | { isMethodDefined(mid: string): boolean } | object,
+  mod: { prototype: object } | { isMethodDefined(mid: string): boolean },
   mid: string,
   inherit = true,
 ): boolean {
-  if ("isMethodDefined" in mod) return mod.isMethodDefined(mid);
-  if (!("prototype" in mod)) return Object.prototype.propertyIsEnumerable.call(mod, mid);
+  if (!("prototype" in mod)) return mod.isMethodDefined(mid);
   return checkDefinitionVisibility(mod, mid, inherit);
 }
 
 /**
- * `Module#define_method` (`rb_mod_define_method`,
+ * `Module#define_method` on a class receiver (`rb_mod_define_method`,
  * `vendor/ruby/v3.3.11/proc.c:2325`): binds `body` as `mod`'s instance method
  * `mid`. `body` is the block, or the method `define_method(symbol, method)`
  * takes, whose JS carrier is a property descriptor (see
@@ -790,66 +785,21 @@ export function rbModMethodDefined(
  * statics (CLAUDE.md, "`singleton_class` is a per-object subclass"), so a
  * class's `singleton_class.define_method` passes `{ prototype: klass }`.
  *
- * On a plain-object or class module, Ruby's includers share the module's
- * method table, so the method also reaches every class that already includes
- * the module, through the includer list `include_modules_at` keeps
- * (`rb_module_add_to_subclasses_list`, vendor/ruby/v3.3.11/class.c:108,1343).
- * A class's own method of the same name still outranks it.
- *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModDefineMethod(
-  mod: { prototype: object } | object,
+  mod: { prototype: object },
   mid: string,
   body: ((...args: never[]) => unknown) | PropertyDescriptor,
 ): string {
-  const descriptor: PropertyDescriptor =
+  Object.defineProperty(
+    mod.prototype,
+    mid,
     typeof body === "function"
       ? { value: body, writable: true, configurable: true }
-      : { configurable: true, ...body };
-  const isPlainModule = !("prototype" in mod);
-  Object.defineProperty(
-    isPlainModule ? mod : mod.prototype,
-    mid,
-    isPlainModule ? { ...descriptor, enumerable: true } : descriptor,
+      : { configurable: true, ...body },
   );
-  for (const klass of includersOf(mod)) {
-    const installed = installedKeysOf(klass.prototype);
-    const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
-    const writer = writerSpelling(attr);
-    if (
-      [mid, attr, writer].some(
-        (key) =>
-          key !== undefined &&
-          Object.prototype.hasOwnProperty.call(klass.prototype, key) &&
-          !installed.has(key) &&
-          (key !== attr || Object.getOwnPropertyDescriptor(klass.prototype, key)!.set),
-      )
-    ) {
-      continue;
-    }
-    installed.add(mid);
-    Object.defineProperty(klass.prototype, mid, { ...descriptor, enumerable: false });
-  }
   return mid;
-}
-
-function includersOf(mod: object): Array<{ prototype: object }> {
-  return Object.prototype.hasOwnProperty.call(mod, moduleSubclassesKey)
-    ? [...(mod as Record<symbol, Set<{ prototype: object }>>)[moduleSubclassesKey]]
-    : [];
-}
-
-function installedKeysOf(proto: object): Set<string | symbol> {
-  if (!Object.prototype.hasOwnProperty.call(proto, includedKeys)) {
-    Object.defineProperty(proto, includedKeys, {
-      value: new Set<string | symbol>(),
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    });
-  }
-  return (proto as Record<symbol, Set<string | symbol>>)[includedKeys];
 }
 
 const ABSENT_HALVES = new WeakSet<object>();
