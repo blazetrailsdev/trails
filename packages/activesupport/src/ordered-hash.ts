@@ -52,9 +52,8 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   }
 
   select(...args: [(key: K, value: V) => boolean]): OrderedHash<K, V> {
-    const block = args[args.length - 1];
     const hash = rbObjDup(this);
-    hash.deleteIf((k, v) => !block(k, v));
+    hash.selectBang(...args);
     return hash;
   }
 
@@ -73,6 +72,20 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     const n = this.size;
     if (!n) return null;
     this.deleteIf(block);
+    if (n === this.size) return null;
+    return this;
+  }
+
+  /**
+   * Ruby core `Hash#select!` (`vendor/ruby/v3.3.11/hash.c:2813` `rb_hash_select_bang`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  selectBang(...args: [(key: K, value: V) => boolean]): this | null {
+    const block = args[args.length - 1];
+    const n = this.size;
+    if (!n) return null;
+    this.deleteIf((k, v) => !block(k, v));
     if (n === this.size) return null;
     return this;
   }
