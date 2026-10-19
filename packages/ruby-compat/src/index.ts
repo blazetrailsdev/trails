@@ -90,7 +90,6 @@ export {
   rtest,
   isNil,
   rbCBasicObject,
-  isPlainHash,
 } from "./object.js";
 export {
   Hash,
