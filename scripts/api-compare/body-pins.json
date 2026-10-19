@@ -25990,13 +25990,6 @@
   {
     "package": "activerecord",
     "rubyFile": "base.rb",
-    "rubyName": "primary_key_values_present?",
-    "digest": "9ff24e42579fee96",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
     "rubyName": "prohibit_shard_swapping",
     "digest": "71f71d84f06eeffe",
     "ref": "v8.0.2"

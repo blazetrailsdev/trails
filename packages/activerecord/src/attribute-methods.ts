@@ -72,7 +72,7 @@ export interface InstanceMethodHost {
     getAttribute?(name: string): { valueForDatabase?: unknown } | null;
     fetchValue?(name: string): unknown;
   };
-  _primaryKey?: string | string[];
+  _primaryKey?: string | string[] | null;
   id?: unknown;
   readAttribute(name: string, block?: (name: string) => unknown): unknown;
   writeAttribute(name: string, value: unknown): void;
@@ -514,7 +514,7 @@ function attributeMethod(this: InstanceMethodHost, attrName: string): boolean {
 /** @internal */
 export function attributesWithValues(
   this: InstanceMethodHost,
-  attributeNames: string[],
+  attributeNames: readonly string[],
 ): Record<string, unknown> {
   return indexWith(attributeNames, (name) => this._attributes!.getAttribute!(name));
 }
