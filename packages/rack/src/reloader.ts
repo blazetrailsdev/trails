@@ -4,6 +4,7 @@ import {
   LoadError,
   Mutex,
   Pathname,
+  Thread,
   extend,
   hashDelete,
   puts,
@@ -56,9 +57,9 @@ export const Stat = {
   ): [string | false, FsStatResult | false] {
     let found: string | null | false | undefined = this.cache[file];
     if (!found && new Pathname(file).isAbsolute()) found = file;
-    let stat: FsStatResult | undefined;
-    // eslint-disable-next-line prefer-const -- `found, stat = safe_stat(found)` reassigns found alongside it
-    [found, stat] = this.safeStat(found) || [];
+    const safe = this.safeStat(found) || [];
+    found = safe[0];
+    const stat = safe[1];
     if (found) return [found, stat!];
 
     for (const possiblePath of paths) {
@@ -119,7 +120,11 @@ export class Reloader {
       this.cooldown !== false &&
       Date.now() / 1000 > this.last + this.cooldown
     ) {
-      await this.reloadMutex.synchronize(() => this.reloadBang());
+      if (Thread.list().length > 1) {
+        await this.reloadMutex.synchronize(() => this.reloadBang());
+      } else {
+        await this.reloadBang();
+      }
 
       this.last = Date.now() / 1000;
     }

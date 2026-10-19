@@ -1,4 +1,4 @@
-import { ArgumentError, dup, Hash, KeyError } from "@blazetrails/ruby-compat";
+import { ArgumentError, dup, except, fetch, Hash } from "@blazetrails/ruby-compat";
 
 type PairBlock = (key: string, value: string) => unknown;
 
@@ -34,10 +34,10 @@ export class Headers extends Hash<string, string> {
     return this.set(key, value);
   }
 
-  assoc(key: string): [string, string] | undefined {
+  assoc(key: string): [string, string] | null {
     const k = this.downcaseKey(key);
     if (super.has(k)) return [k, super.get(k)!];
-    return undefined;
+    return null;
   }
 
   override compareByIdentity(): never {
@@ -57,13 +57,7 @@ export class Headers extends Hash<string, string> {
 
   fetch(key: string, ...defaultValue: any[]): string {
     key = this.downcaseKey(key);
-    if (defaultValue.length > 1) throw new ArgumentError("wrong number of arguments");
-    if (super.has(key)) return super.get(key)!;
-    if (defaultValue.length === 1) {
-      if (typeof defaultValue[0] === "function") return defaultValue[0](key);
-      return defaultValue[0];
-    }
-    throw new KeyError(`key not found: "${key}"`, { receiver: this, key });
+    return fetch(this as Map<string, string>, key, ...defaultValue) as string;
   }
 
   fetchValues(...a: string[]): string[] {
@@ -156,13 +150,8 @@ export class Headers extends Hash<string, string> {
     return this.replace(hash);
   }
 
-  except(...a: string[]): Headers {
-    const exclude = new Set(a.map((key) => this.downcaseKey(key)));
-    const result = new (this.constructor as typeof Headers)();
-    for (const [k, v] of this) {
-      if (!exclude.has(k)) result.set(k, v);
-    }
-    return result;
+  except(...a: string[]): Hash<string, string> {
+    return except(this as Map<string, string>, ...a.map((key) => this.downcaseKey(key)));
   }
 
   /** @internal */

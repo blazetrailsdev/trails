@@ -24,6 +24,7 @@ export function rbIterBreakValue(val: unknown): never {
 let _current: AsyncContext<Thread> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
+const _threads = new Set<Thread>();
 const _locations = new WeakMap<object, string>();
 const _locals = new WeakMap<object, Map<string, unknown>>();
 const _variables = new WeakMap<object, Map<string, unknown>>();
@@ -49,6 +50,21 @@ export class Thread<R = unknown> {
     status: "run",
     name: null,
   });
+
+  /**
+   * `Thread.list` (`vendor/ruby/v3.3.11/thread.c:2924` `thread_list`), the
+   * main thread and every thread still alive (`rb_thread_list`, `:2895`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.list` (`vendor/ruby/v3.3.11/thread.c:5388`).
+   */
+  static list(): Thread[] {
+    const list: Thread[] = [Thread.main];
+    for (const th of _threads) {
+      if (th.isAlive()) list.push(th);
+      else _threads.delete(th);
+    }
+    return list;
+  }
 
   /**
    * `rb_thread_s_handle_interrupt` (`vendor/ruby/v3.3.11/thread.c:2230`), which
@@ -151,6 +167,7 @@ export class Thread<R = unknown> {
     const block = argsAndBlock.pop() as (...args: unknown[]) => R;
     const args = argsAndBlock;
     this.id = ++_threadIdCounter;
+    _threads.add(this as Thread);
     this.status = "run";
     const frame = new Error().stack?.split("\n")[2] ?? "";
     const location = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);

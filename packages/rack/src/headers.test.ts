@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { dup, eachKey, eachValue, KeyError, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  block,
+  dup,
+  eachKey,
+  eachValue,
+  KeyError,
+  rbEqual,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
 import { Headers } from "./headers.js";
 
 describe("RackHeadersTest", () => {
@@ -160,7 +168,12 @@ describe("RackHeadersTest", () => {
     h.set("1", "8");
     expect(h.fetch("1")).toBe("8");
     expect(h.fetch("2", "3")).toBe("3");
-    expect(h.fetch("2", (k: string) => k.repeat(3))).toBe("222");
+    expect(
+      h.fetch(
+        "2",
+        block((k: string) => k.repeat(3)),
+      ),
+    ).toBe("222");
     expect(fh.fetch("Ab")).toBe("1");
     expect(fh.fetch("cD", "3")).toBe("2");
     expect(fh.fetch("3", "notused")).toBe("4");
@@ -312,10 +325,10 @@ describe("RackHeadersTest", () => {
   });
 
   it("assoc", () => {
-    expect(h.assoc("1")).toBeUndefined();
+    expect(h.assoc("1")).toBeNull();
     expect(fh.assoc("Ab")).toEqual(["ab", "1"]);
     expect(fh.assoc("CD")).toEqual(["cd", "2"]);
-    expect(fh.assoc("4")).toBeUndefined();
+    expect(fh.assoc("4")).toBeNull();
     expect(fh.assoc("3")).toEqual(["3", "4"]);
   });
 
@@ -473,14 +486,10 @@ describe("RackHeadersTest", () => {
   });
 
   it("except", () => {
-    expect(rbEqual(fh.except(), fh)).toBe(true);
-    const ex1 = fh.except("AB");
-    expect(ex1.size).toBe(2);
-    expect(ex1.hasKey("ab")).toBe(false);
-
-    const ex2 = fh.except("cD", "3");
-    expect(ex2.size).toBe(1);
-    expect(ex2.get("AB")).toBe("1");
+    fh = Headers.get({ AB: "1", Cd: "2", "3": "4" });
+    expect(rbEqual(fh, fh.except())).toBe(true);
+    expect(rbEqual(Headers.get({ cD: "2", "3": "4" }), fh.except("AB", "5"))).toBe(true);
+    expect(rbEqual(Headers.get({ AB: "1" }), fh.except("cD", "3"))).toBe(true);
   });
 
   it("dup and clone", () => {
@@ -506,11 +515,5 @@ describe("RackHeadersTest", () => {
   it("deconstruct keys", () => {
     expect(rbEqual(fh.deconstructKeys([]), fh.toHash())).toBe(true);
     expect(fh.deconstructKeys([]).constructor).toBe(Headers);
-  });
-
-  it("equals compares contents", () => {
-    const h1 = Headers.get({ a: "1", b: "2" });
-    const h2 = Headers.get({ A: "1", B: "2" });
-    expect(rbEqual(h1, h2)).toBe(true);
   });
 });
