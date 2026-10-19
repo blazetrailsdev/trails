@@ -757,8 +757,7 @@ describe("CollectionCacheTest", () => {
     assertEqual(1, controller.partialRenderedTimes);
   });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("preserves order when reading from cache plus rendering", async () => {
+  it("preserves order when reading from cache plus rendering", async () => {
     await tc.get("index", { params: { id: 2 } });
     assertEqual(1, controller.partialRenderedTimes);
     tc.assertSelect(":root", "david, 2");
@@ -768,8 +767,7 @@ describe("CollectionCacheTest", () => {
     tc.assertSelect(":root", "david, 1\n  david, 2\n  david, 3");
   });
 
-  // BLOCKED: action-controller-test-case-has-no-assert-select
-  it.skip("explicit render call with options", async () => {
+  it("explicit render call with options", async () => {
     await tc.get("indexExplicitRenderInController");
 
     tc.assertSelect(":root", "david, 1");

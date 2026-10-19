@@ -5,6 +5,7 @@ import {
   assert,
   assertIncludes,
   assertInstanceOf,
+  assertKindOf,
   assertNot,
   assertNotIncludes,
   include,
@@ -24,7 +25,7 @@ import {
   rbObjSingletonClass,
   stderr,
 } from "@blazetrails/ruby-compat";
-import { XML } from "@blazetrails/nokogiri";
+import { HTML5, XML } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { IntegrationTest, Session } from "../../action-dispatch/testing/integration.js";
@@ -406,7 +407,7 @@ describe("IntegrationProcessTest", () => {
     t = new IntegrationProcessTest(task.name);
   });
 
-  it.skip("get", async () => {
+  it("get", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/get");
       expect(t.status).toBe(200);
@@ -417,7 +418,7 @@ describe("IntegrationProcessTest", () => {
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("OK");
       expect(t.response.body).toBe("OK");
-      expect(t.htmlDocument).toBeInstanceOf(XML.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
     });
   });
@@ -440,7 +441,7 @@ describe("IntegrationProcessTest", () => {
     }
   });
 
-  it.skip("post", async () => {
+  it("post", async () => {
     await t.withTestRouteSet(async () => {
       await t.post("/post");
       expect(t.status).toBe(201);
@@ -451,7 +452,7 @@ describe("IntegrationProcessTest", () => {
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("Created");
       expect(t.response.body).toBe("Created");
-      expect(t.htmlDocument).toBeInstanceOf(XML.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
     });
   });
@@ -509,7 +510,7 @@ describe("IntegrationProcessTest", () => {
     });
   });
 
-  it.skip("redirect", async () => {
+  it("redirect", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/redirect");
       expect(t.status).toBe(302);
@@ -518,7 +519,7 @@ describe("IntegrationProcessTest", () => {
       assertResponse("redirect");
       assertResponse("found");
       expect(t.response.body).toBe("");
-      expect(t.htmlDocument).toBeInstanceOf(XML.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
 
       await t.followRedirectBang();
@@ -550,7 +551,7 @@ describe("IntegrationProcessTest", () => {
     });
   });
 
-  it.skip("redirect reset html document", async () => {
+  it("redirect reset html document", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/redirect");
       const previousHtmlDocument = t.htmlDocument;
