@@ -116,7 +116,7 @@ export class EmptyCollection {
 
 /** @internal */
 export interface ObjectRenderingHost {
-  contextPrefix: string;
+  contextPrefix: string | undefined;
   readonly options: RenderOptions;
 }
 
