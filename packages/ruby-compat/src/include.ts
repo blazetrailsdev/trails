@@ -321,7 +321,9 @@ export class Module<I extends object = Record<never, never>> {
    */
   isInclude(mod2: object): boolean {
     if (isModuleMethodTablePresent({ prototype: carrierOf(this) }, mod2)) return true;
-    return (nestedModules.get(this) ?? []).some((nested) => nested.isInclude(mod2));
+    return (nestedModules.get(this) ?? []).some((nested) =>
+      nested instanceof Module ? nested.isInclude(mod2) : rbModAncestors(nested).includes(mod2),
+    );
   }
 
   /**
@@ -369,7 +371,11 @@ export class Module<I extends object = Record<never, never>> {
       ? [...(carrier[includedModulesKey] as Set<object>)]
       : [];
     for (const mod of mods.reverse()) {
-      for (const m of mod instanceof Module ? mod.ancestors() : [mod]) {
+      for (const m of mod instanceof Module
+        ? mod.ancestors()
+        : isPlainHash(mod)
+          ? rbModAncestors(mod)
+          : [mod]) {
         if (!ary.includes(m)) ary.push(m);
       }
     }
@@ -491,7 +497,9 @@ export class Module<I extends object = Record<never, never>> {
       return;
     }
     for (const mod of nestedModules.get(this) ?? []) {
-      if (!isModuleMethodTablePresent(base, mod)) Module.prototype.appendFeatures.call(mod, base);
+      if (isModuleMethodTablePresent(base, mod)) continue;
+      if (mod instanceof Module) Module.prototype.appendFeatures.call(mod, base);
+      else splicePlainModule(prependOrigins.get(base.prototype as object) ?? base.prototype, mod);
     }
     trackIncludedModule(base.prototype, this);
     const instanceInitializer = (this as ModuleHooks)[initialize];
@@ -603,7 +611,10 @@ export class Module<I extends object = Record<never, never>> {
       if (isLinkOf(this, proto)) return;
       proto = Object.getPrototypeOf(proto) as object | null;
     }
-    for (const mod of nestedModules.get(this) ?? []) Module.prototype.extendObject.call(mod, obj);
+    for (const mod of nestedModules.get(this) ?? []) {
+      if (mod instanceof Module) Module.prototype.extendObject.call(mod, obj);
+      else extend(obj, mod);
+    }
     const holder: object = typeof obj === "function" ? obj : rbObjSingletonClass(obj).prototype;
     trackIncludedModule(holder, this);
     const parent = Object.getPrototypeOf(holder) as object | null;
@@ -737,11 +748,7 @@ export class Module<I extends object = Record<never, never>> {
 function appendPlainFeatures(base: Module, mod: ModuleObject): void {
   const carrier = carrierOf(base);
   if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
-    if (Object.hasOwn(mod, moduleIncludesKey)) {
-      for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
-        base.include(nested);
-      }
-    }
+    if (Object.hasOwn(mod, moduleIncludesKey)) return recordPlainModule(base, mod);
     trackIncludedModule(carrier, mod);
     const installed = trackedKeys(carrier);
     const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
@@ -770,11 +777,31 @@ function appendPlainFeatures(base: Module, mod: ModuleObject): void {
   }
 }
 
+function recordPlainModule(base: Module, mod: ModuleObject): void {
+  const carrier = carrierOf(base);
+  const links = (includerCarriers.get(base) ?? []).filter(
+    (link) =>
+      !isModuleMethodTablePresent({ prototype: Object.getPrototypeOf(link) as object }, mod),
+  );
+  trackIncludedModule(carrier, mod);
+  let nested = nestedModules.get(base);
+  if (!nested) nestedModules.set(base, (nested = []));
+  nested.push(mod);
+  for (const link of links) splicePlainModule(link, mod);
+}
+
+function splicePlainModule(proto: object, mod: ModuleObject): void {
+  function iclass() {}
+  iclass.prototype = Object.create(Object.getPrototypeOf(proto)) as object;
+  rbModAppendFeatures(iclass, mod);
+  Object.setPrototypeOf(proto, iclass.prototype);
+}
+
 const modToS = Module.prototype.toS;
 
 const carriers = new WeakMap<Module, Record<string, unknown>>();
 
-const nestedModules = new WeakMap<Module, Module[]>();
+const nestedModules = new WeakMap<Module, (Module | ModuleObject)[]>();
 
 function carrierOf(mod: Module): Record<string, unknown> {
   let carrier = carriers.get(mod);
