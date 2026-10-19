@@ -6,7 +6,6 @@ import {
   included,
   isSymbol,
   keywordSplat,
-  Module,
   rbRegMatchP,
   registerConstant,
   slice,
@@ -536,10 +535,10 @@ export type ColumnMethodsBase = {
   prototype: Record<string, unknown>;
 };
 
-export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
-  new Module();
-
-ColumnMethods.defineMethod("primaryKey", primaryKey);
+export const ColumnMethods: {
+  primaryKey: typeof primaryKey;
+  [included]?: (base: ColumnMethodsBase) => void;
+} = { primaryKey };
 
 ColumnMethods[included] = function (base: ColumnMethodsBase): void {
   base.defineColumnMethods(

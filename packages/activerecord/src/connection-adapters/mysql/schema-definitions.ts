@@ -14,7 +14,7 @@ import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js
 import { type VisitorHostAdapter } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
 import { deprecate } from "@blazetrails/activesupport";
-import { include, included, Module, rtest } from "@blazetrails/ruby-compat";
+import { include, included, rtest } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   blob(...names: string[]): unknown;
@@ -45,8 +45,7 @@ export interface ColumnMethods {
   unsignedDecimal(...args: [...names: string[], options: ColumnOptions]): unknown;
 }
 
-export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
-  new Module();
+export const ColumnMethods: { [included]?: (base: ColumnMethodsBase) => void } = {};
 
 ColumnMethods[included] = function (base: ColumnMethodsBase): void {
   base.defineColumnMethods(

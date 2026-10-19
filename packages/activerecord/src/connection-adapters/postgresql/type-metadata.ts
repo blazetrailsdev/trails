@@ -54,7 +54,7 @@ export class TypeMetadata extends DelegateClass(SqlTypeMetadata) {
   /** @internal */
   deduplicated(): this {
     this.__setobj__(this.__getobj__().deduplicate());
-    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
+    return Object.freeze(this);
   }
 }
 

@@ -141,17 +141,11 @@ export class GeneratedRelationMethods extends Module {
   }
 }
 
-export const ClassSpecificRelation = new Module() as Module<{
-  methodMissing(method: string, ...args: any[]): unknown;
-}> & { ClassMethods: typeof ClassMethods };
-extend(ClassSpecificRelation, Concern);
-
 export const ClassMethods = {
   get name(): string | null {
     return rbModName(rbClassSuperclass(this as object)!);
   },
 };
-ClassSpecificRelation.ClassMethods = ClassMethods;
 
 export function methodMissing(this: any, method: string, ...args: any[]): unknown {
   const model = this._model as typeof Base;
@@ -176,7 +170,12 @@ export function methodMissing(this: any, method: string, ...args: any[]): unknow
     );
   }
 }
-ClassSpecificRelation.defineMethod("methodMissing", methodMissing);
+
+export const ClassSpecificRelation = {
+  ClassMethods,
+  methodMissing,
+};
+extend(ClassSpecificRelation, Concern);
 
 export function create(this: FamilyCtor, model: typeof Base, ...args: any[]): any {
   return new (relationClassFor.call(this, model))(model, ...args);
