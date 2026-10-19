@@ -1,11 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
-import { bodyFromString } from "@blazetrails/rack";
 import type { RackApp } from "@blazetrails/actionpack";
 import { trailsPlugin } from "./vite-plugin.js";
 
-const okApp: RackApp = async () => [200, { "content-type": "text/plain" }, bodyFromString("ok")];
+const okApp: RackApp = async () => [200, { "content-type": "text/plain" }, ["ok"]];
 
 function createMockReq(options: {
   method?: string;

@@ -19,7 +19,7 @@ export class BodyProxy {
         ) {
           return Reflect.get(target, prop, receiver);
         }
-        return (...args: unknown[]) => target.delegate(prop, ...args);
+        return (...args: unknown[]) => target.methodMissing(prop, ...args);
       },
     });
   }
@@ -58,6 +58,7 @@ export class BodyProxy {
     yield* items;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   each(callback: (item: any) => void): void {
     if (Array.isArray(this.body)) {
       for (const item of this.body) callback(item);
@@ -68,6 +69,7 @@ export class BodyProxy {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT */
   toArray(): any[] {
     try {
       if (Array.isArray(this.body)) return this.body;
@@ -95,16 +97,16 @@ export class BodyProxy {
     return typeof this.body?.[methodName] === "function";
   }
 
-  delegate(method: string, ...args: unknown[]): any {
-    if (method === "toStr" || method === "to_str") {
+  methodMissing(methodName: string, ...args: unknown[]): any {
+    if (methodName === "toStr" || methodName === "to_str") {
       throw new Error("NoMethodError: undefined method 'to_str'");
     }
-    if (method === "toArray" || method === "to_ary") {
+    if (methodName === "toArray" || methodName === "to_ary") {
       return this.toArray();
     }
-    if (typeof this.body?.[method] === "function") {
-      return this.body[method](...args);
+    if (typeof this.body?.[methodName] === "function") {
+      return this.body[methodName](...args);
     }
-    throw new Error(`NoMethodError: undefined method '${method}'`);
+    throw new Error(`NoMethodError: undefined method '${methodName}'`);
   }
 }

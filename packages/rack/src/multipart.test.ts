@@ -13,9 +13,9 @@ import {
   UploadedFile,
 } from "./multipart.js";
 import {
-  getMultipartFileLimit,
+  multipartFileLimit,
   setMultipartFileLimit,
-  getMultipartTotalPartLimit,
+  multipartTotalPartLimit,
   setMultipartTotalPartLimit,
 } from "./utils.js";
 import { StringIO } from "@blazetrails/ruby-compat";
@@ -154,7 +154,7 @@ it("can parse fields that end at the end of the buffer", () => {
 });
 
 it("builds complete params with the chunk size of 16384 slicing exactly on boundary", () => {
-  const previousLimit = getMultipartFileLimit();
+  const previousLimit = multipartFileLimit();
   setMultipartFileLimit(256);
   try {
     const data = fs
@@ -177,7 +177,7 @@ it("builds complete params with the chunk size of 16384 slicing exactly on bound
 });
 
 it("does not reach a multi-part limit", () => {
-  const previousLimit = getMultipartFileLimit();
+  const previousLimit = multipartFileLimit();
   setMultipartFileLimit(4);
   try {
     const env = multipartFixture("three_files_three_fields");
@@ -191,7 +191,7 @@ it("does not reach a multi-part limit", () => {
 });
 
 it("treats a multipart limit of 0 as no limit", () => {
-  const previousLimit = getMultipartFileLimit();
+  const previousLimit = multipartFileLimit();
   setMultipartFileLimit(0);
   try {
     const env = multipartFixture("three_files_three_fields");
@@ -205,7 +205,7 @@ it("treats a multipart limit of 0 as no limit", () => {
 });
 
 it("reaches a multipart file limit", () => {
-  const previousLimit = getMultipartFileLimit();
+  const previousLimit = multipartFileLimit();
   setMultipartFileLimit(3);
   try {
     const env = multipartFixture("three_files_three_fields");
@@ -216,7 +216,7 @@ it("reaches a multipart file limit", () => {
 });
 
 it("reaches a multipart total limit", () => {
-  const previousLimit = getMultipartTotalPartLimit();
+  const previousLimit = multipartTotalPartLimit();
   setMultipartTotalPartLimit(5);
   try {
     const env = multipartFixture("three_files_three_fields");

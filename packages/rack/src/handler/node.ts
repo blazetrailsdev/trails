@@ -21,23 +21,31 @@ import { HTTP_STATUS_CODES } from "../utils.js";
 import { RELEASE } from "../version.js";
 import type { RackApp, RackEnv, RackMiddleware, RackResponse } from "../index.js";
 
+/** @noRailsEquivalent PERMANENT */
 export interface Options {
+  /** @noRailsEquivalent PERMANENT */
   Port?: number;
+  /** @noRailsEquivalent PERMANENT */
   Host?: string;
 }
 
 /** @noRailsEquivalent PERMANENT */
 const unhijacked = new Set<HttpSocket>();
 
+/** @noRailsEquivalent PERMANENT */
 export class Node {
+  /** @noRailsEquivalent PERMANENT */
   static server: HttpServer | null = null;
 
+  /** @noRailsEquivalent PERMANENT */
   readonly app: RackApp | RackMiddleware;
 
+  /** @noRailsEquivalent PERMANENT */
   constructor(app: RackApp | RackMiddleware) {
     this.app = app;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static async run(app: RackApp, options: Options = {}): Promise<HttpServer> {
     const handler = new Node(app);
     const http = await getHttpAsync();
@@ -53,6 +61,7 @@ export class Node {
     });
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static async shutdown(): Promise<void> {
     const server = Node.server;
     if (!server) return;
@@ -172,6 +181,7 @@ export class Node {
     return env;
   }
 
+  /** @noRailsEquivalent PERMANENT */
   async metaVars(req: HttpRequest): Promise<RackEnv> {
     const scheme = req.socket.encrypted === true ? "https" : "http";
     const url = parseUri(req.url ?? "/", scheme, header(req, "host") ?? "localhost");

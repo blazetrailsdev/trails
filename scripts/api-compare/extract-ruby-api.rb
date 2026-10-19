@@ -1093,7 +1093,7 @@ class ApiExtractor
       process_prepend(extract_const_args(args, keep_absolute: true))
     when "extend"
       process_extend(args)
-    when "attr_reader"
+    when "attr_reader", "attr"
       process_attr(args, :reader, force_class: on_singleton)
     when "attr_writer"
       process_attr(args, :writer, force_class: on_singleton)
@@ -3853,6 +3853,8 @@ class ApiExtractor
       if lhs.is_a?(Array) && lhs[0] == :var_field
         lhs[1]
       elsif lhs.is_a?(Array) && lhs[0] == :const_path_field && self_ref?(lhs[1])
+        lhs[2]
+      elsif lhs.is_a?(Array) && lhs[0] == :const_path_field
         lhs[2]
       end
     return unless const.is_a?(Array) && const[0] == :@const

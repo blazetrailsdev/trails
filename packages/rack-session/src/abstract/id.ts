@@ -12,13 +12,7 @@ import {
   KeyError,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import {
-  RACK_ERRORS,
-  RACK_SESSION,
-  RACK_SESSION_OPTIONS,
-  Request,
-  ResponseRaw,
-} from "@blazetrails/rack";
+import { RACK_ERRORS, RACK_SESSION, RACK_SESSION_OPTIONS, Request, Raw } from "@blazetrails/rack";
 
 export class SessionId {
   static ID_VERSION = 2;
@@ -387,7 +381,7 @@ export class Persisted {
     const req = this.makeRequest(env);
     await this.prepareSession(req);
     const [status, headers, body] = await (rbFSend(app, "call", req.env) as Promise<RackResponse>);
-    const res = new ResponseRaw(status, headers);
+    const res = new Raw(status, headers);
     await this.commitSession(req, res);
     return [status, headers, body];
   }
@@ -498,7 +492,7 @@ export class Persisted {
     return isTruthy(request.ssl) || this.assumeSsl === true;
   }
 
-  async commitSession(req: PersistedRequest, res: ResponseRaw): Promise<unknown> {
+  async commitSession(req: PersistedRequest, res: Raw): Promise<unknown> {
     const session = req.getHeader(RACK_SESSION);
     const options: Record<string, unknown> = session.options();
 
@@ -565,11 +559,7 @@ export class Persisted {
   }
 
   /** @internal */
-  setCookie(
-    request: PersistedRequest,
-    response: ResponseRaw,
-    cookie: Record<string, unknown>,
-  ): void {
+  setCookie(request: PersistedRequest, response: Raw, cookie: Record<string, unknown>): void {
     if (request.cookies[this.key] !== cookie["value"] || isTruthy(cookie["expires"])) {
       response.setCookie(this.key, cookie);
     }

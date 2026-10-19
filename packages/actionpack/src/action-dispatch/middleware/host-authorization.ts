@@ -1,5 +1,4 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
 import { isBlank, type Logger } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import { Request } from "../http/request.js";
@@ -195,7 +194,7 @@ export class DefaultResponseApp {
         "content-type": `${format}; charset=utf-8`,
         "content-length": String(bytes),
       },
-      bodyFromString(body),
+      [body],
     ];
   }
 

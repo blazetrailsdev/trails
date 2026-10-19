@@ -13,18 +13,6 @@ export interface RackMiddleware {
   call(env: RackEnv): Promise<RackResponse>;
 }
 
-export async function* bodyFromString(str: string): RackBody {
-  yield str;
-}
-
-export async function bodyToString(body: RackBody): Promise<string> {
-  const chunks: string[] = [];
-  for await (const chunk of body) {
-    chunks.push(typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk));
-  }
-  return chunks.join("");
-}
-
 export {
   parseNestedQuery,
   buildNestedQuery,
@@ -37,13 +25,13 @@ export {
   QueryLimitError,
   QueryParser,
   Params,
-  getDefaultQueryParser,
+  defaultQueryParser,
   setDefaultQueryParser,
-  getParamDepthLimit,
+  paramDepthLimit,
   setParamDepthLimit,
-  getMultipartFileLimit,
+  multipartFileLimit,
   setMultipartFileLimit,
-  getMultipartTotalPartLimit,
+  multipartTotalPartLimit,
   setMultipartTotalPartLimit,
   setCookieHeader,
   deleteSetCookieHeaderBang,
@@ -55,7 +43,7 @@ export { Builder } from "./builder.js";
 export { Headers } from "./headers.js";
 export { BodyProxy } from "./body-proxy.js";
 export { DEFAULT_PORTS, Request, Helpers as RequestHelpers } from "./request.js";
-export { Response, ResponseRaw, Helpers as ResponseHelpers } from "./response.js";
+export { Response, Raw, Helpers as ResponseHelpers } from "./response.js";
 export {
   CONTENT_TYPE,
   CONTENT_LENGTH,
@@ -82,4 +70,5 @@ export { MockRequest, FatalWarning } from "./mock-request.js";
 export { MockResponse } from "./mock-response.js";
 export * as Mime from "./mime.js";
 export * as Utils from "./utils.js";
+/** @noRailsEquivalent PERMANENT */
 export * as Handler from "./handler/index.js";

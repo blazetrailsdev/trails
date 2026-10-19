@@ -6,7 +6,6 @@
  */
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
 import { RouteSet, ActionController, controllerConstants } from "@blazetrails/actionpack";
 import type { DispatchableControllerClass, DrawCallback } from "@blazetrails/actionpack";
 
@@ -38,7 +37,7 @@ export function createAppServer(_deps: AppServerDeps): AppServer {
       try {
         return await routeSet.call(env);
       } catch (e: any) {
-        return [500, { "content-type": "text/plain" }, bodyFromString(String(e?.message ?? e))];
+        return [500, { "content-type": "text/plain" }, [String(e?.message ?? e)]];
       }
     },
 

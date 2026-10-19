@@ -159,10 +159,6 @@ export abstract class MimePart {
     public name: string,
   ) {}
 
-  abstract isFile(): boolean;
-
-  abstract close(): void;
-
   getData(cb: (data: any) => void): void {
     let data: any = this.body;
     if (this.filename === "") {
@@ -205,15 +201,15 @@ export class TempfilePart extends MimePart {
 
 /** @internal */
 export class Collector {
-  private mimeParts: MimePart[] = [];
+  private mimeParts: (BufferPart | TempfilePart)[] = [];
   private openFiles = 0;
   constructor(private tempfile: ((filename: string, contentType: string) => any) | null) {}
 
-  each(cb: (part: MimePart) => void) {
+  each(cb: (part: BufferPart | TempfilePart) => void) {
     this.mimeParts.forEach((part) => cb(part));
   }
 
-  findAll(predicate: (part: MimePart) => boolean): MimePart[] {
+  findAll(predicate: (part: BufferPart | TempfilePart) => boolean): (BufferPart | TempfilePart)[] {
     return this.mimeParts.filter((part) => predicate(part));
   }
 

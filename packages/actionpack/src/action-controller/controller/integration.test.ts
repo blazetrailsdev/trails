@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { bodyFromString, Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { assertEqual } from "@blazetrails/activesupport";
 import {
   assert,
@@ -53,7 +53,7 @@ describe("SessionTest", () => {
   const StubApp = (_env: RackEnv): RackResponse => [
     200,
     { "Content-Type": "text/html", "Content-Length": "13" },
-    bodyFromString("Hello, World!"),
+    ["Hello, World!"],
   ];
 
   let session: Session;
@@ -255,7 +255,7 @@ describe("RackLintIntegrationTest", () => {
     const t = new RackLintIntegrationTest(task.name);
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.get("/", { to: (_: RackEnv): RackResponse => [200, {}, bodyFromString("")] });
+        this.get("/", { to: (_: RackEnv): RackResponse => [200, {}, [""]] });
       });
 
       await t.get("/");
@@ -791,13 +791,9 @@ describe("IntegrationProcessTest", () => {
 const Poller = {
   async call(env: RackEnv): Promise<RackResponse> {
     if (/^\/success/.test(env["PATH_INFO"] as string)) {
-      return [
-        200,
-        { "Content-Type": "text/plain", "Content-Length": "12" },
-        bodyFromString("Hello World!"),
-      ];
+      return [200, { "Content-Type": "text/plain", "Content-Length": "12" }, ["Hello World!"]];
     } else {
-      return [404, { "Content-Type": "text/plain", "Content-Length": "0" }, bodyFromString("")];
+      return [404, { "Content-Type": "text/plain", "Content-Length": "0" }, [""]];
     }
   },
 };
@@ -934,11 +930,7 @@ describe("ApplicationIntegrationTest", () => {
 
         this.mount(MountedApp as unknown as MountableApp, { at: "/mounted", as: "mounted" });
         this.get("fooz", {
-          to: (_env: RackEnv): RackResponse => [
-            200,
-            { [X_CASCADE]: "pass" },
-            bodyFromString("omg"),
-          ],
+          to: (_env: RackEnv): RackResponse => [200, { [X_CASCADE]: "pass" }, ["omg"]],
           anchor: false,
         });
         this.get("fooz", { to: "application_integration_test/test#index" });

@@ -1,5 +1,5 @@
 import { StringIO } from "@blazetrails/ruby-compat";
-import { Request, ResponseRaw } from "@blazetrails/rack";
+import { Request, Raw } from "@blazetrails/rack";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 
@@ -48,7 +48,7 @@ describe("Rack::Session::Abstract::Persisted", () => {
     } as unknown as Persisted;
     const session = (env["rack.session"] = new SessionHash(store, req));
     session.set("foo", "bar");
-    await pers.commitSession(req, new ResponseRaw(200, {}));
+    await pers.commitSession(req, new Raw(200, {}));
     errors.rewind();
     expect(errors.read()).toBe(
       "Warning! Rack::Session::Abstract::Persisted failed to save session. Content dropped.\n",

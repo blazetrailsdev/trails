@@ -76,6 +76,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // rack/headers.rb:91 `def self.[](*items)` → headers.ts `static get`, :110
   // `def [](key)` → `get`, and :114 `def []=(key, value)` → `set`.
   "Rack::Headers": { "self.[]": ["get"], "[]": ["get"], "[]=": ["set"] },
+  "Rack::Response": { "self.[]": ["get"] },
+  "Rack::Multipart::ParamList": { "<<": ["push"] },
+  "Rack::NullLogger": { "<<": ["append"] },
   // action_dispatch/middleware/cookies.rb:345 `def [](name)` → middleware/cookies.ts
   // `CookieJar#get`, :379 `def []=(name, options)` → `set`; :513 / :525 on
   // `AbstractCookieJar` likewise.

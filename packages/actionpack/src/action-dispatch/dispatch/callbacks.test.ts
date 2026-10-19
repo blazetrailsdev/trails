@@ -1,13 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { bodyFromString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Callbacks } from "../middleware/callbacks.js";
 
-const dummyApp = async (_env: RackEnv): Promise<RackResponse> => [
-  200,
-  {},
-  bodyFromString("response"),
-];
+const dummyApp = async (_env: RackEnv): Promise<RackResponse> => [200, {}, ["response"]];
 
 const counts = { a: 0, b: 0 };
 

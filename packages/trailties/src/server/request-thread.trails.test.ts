@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Handler, bodyFromString } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rack";
 import type { RackApp } from "@blazetrails/rack";
 import { getHttpAsync } from "@blazetrails/ruby-compat";
 import type { HttpServer } from "@blazetrails/ruby-compat";
@@ -16,7 +16,7 @@ function gatedApp(leases: object[]): RackApp {
     leases.push(connectionLease());
     if (leases.length === 2) release();
     await gate;
-    return [200, {}, bodyFromString("")];
+    return [200, {}, [""]];
   };
 }
 

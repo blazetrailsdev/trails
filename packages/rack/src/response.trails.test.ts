@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { Response, ResponseRaw } from "./response.js";
+import { Response, Raw } from "./response.js";
 
 describe("Rack::Response::Raw", () => {
   it("answers the Helpers status predicates", () => {
-    const response = new ResponseRaw(204, {});
+    const response = new Raw(204, {});
     expect(response.isNoContent).toBe(true);
     expect(response.isSuccessful).toBe(true);
     expect(response.isRedirection).toBe(false);
@@ -13,7 +13,7 @@ describe("Rack::Response::Raw", () => {
   });
 
   it("answers the Helpers header accessors", () => {
-    const response = new ResponseRaw(200, {});
+    const response = new Raw(200, {});
     response.contentType = "text/plain;charset=utf-8";
     expect(response.mediaType).toBe("text/plain");
     expect(response.mediaTypeParams).toEqual({ charset: "utf-8" });
@@ -29,7 +29,7 @@ describe("Rack::Response::Raw", () => {
   });
 
   it("answers cache! and do_not_cache!", () => {
-    const response = new ResponseRaw(200, {});
+    const response = new Raw(200, {});
     response.doNotCacheBang();
     expect(response.cacheControl).toBe("no-cache, must-revalidate");
 

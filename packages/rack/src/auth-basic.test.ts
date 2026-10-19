@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { AuthBasic } from "./auth-basic.js";
+import { Basic } from "./auth/basic.js";
 import { MockRequest } from "./mock-request.js";
 
 const realm = "WallysWorld";
@@ -8,8 +8,7 @@ const unprotectedApp = async (env: Record<string, any>) =>
   [200, { "content-type": "text/plain" }, [`Hi ${env["REMOTE_USER"]}`]] as any;
 
 function protectedApp() {
-  const app = new AuthBasic(unprotectedApp, (username) => username === "Boss");
-  app.realm = realm;
+  const app = new Basic(unprotectedApp, realm, (username: string) => username === "Boss");
   return app;
 }
 
@@ -71,6 +70,6 @@ it("return 400 Bad Request for a authorization header with only username", async
 });
 
 it("takes realm as optional constructor arg", () => {
-  const app = new AuthBasic(unprotectedApp, realm, () => true);
+  const app = new Basic(unprotectedApp, realm, () => true);
   expect(app.realm).toBe(realm);
 });

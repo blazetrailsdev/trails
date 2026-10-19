@@ -141,7 +141,7 @@ export const TAGGED_ONLY_PACKAGES = [
  * therefore carry no mark row — see ROWLESS MODE in the module comment.
  * Only-grow, like {@link TAGGED_ONLY_PACKAGES}.
  */
-export const ROWLESS_PACKAGES = ["activemodel", "activerecord", "arel"] as const;
+export const ROWLESS_PACKAGES = ["activemodel", "activerecord", "arel", "rack"] as const;
 
 /**
  * The packages this gate covers, in either mode. Everything else is measured

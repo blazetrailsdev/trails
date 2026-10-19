@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { Response, ResponseRaw } from "./response.js";
+import { Response, Raw } from "./response.js";
 
 it("has standard constructor", () => {
   const headers = { header: "value" };
   const body = ["body"];
-  const response = Response.create(200, headers, body);
+  const response = Response.get(200, headers, body);
   expect(response.status).toBe(200);
   expect(response.headers["header"]).toBe("value");
   expect(response.body).toEqual(body);
@@ -717,19 +717,19 @@ describe("headers", () => {
 });
 
 it("has_header?", () => {
-  const response = new ResponseRaw(200, { foo: "1" });
+  const response = new Raw(200, { foo: "1" });
   expect(response.hasHeader("foo")).toBe(true);
   expect(response.hasHeader(null as any)).toBe(false);
 });
 
 it("get_header", () => {
-  const response = new ResponseRaw(200, { foo: "1" });
+  const response = new Raw(200, { foo: "1" });
   expect(response.getHeader("foo")).toBe("1");
   expect(response.getHeader(null as any)).toBeUndefined();
 });
 
 it("set_header", () => {
-  const response = new ResponseRaw(200, { foo: "1" });
+  const response = new Raw(200, { foo: "1" });
   expect(response.setHeader("foo", "2")).toBe("2");
   expect(response.getHeader("foo")).toBe("2");
 
@@ -741,7 +741,7 @@ it("set_header", () => {
 });
 
 it("delete_header", () => {
-  const response = new ResponseRaw(200, { foo: "1" });
+  const response = new Raw(200, { foo: "1" });
   expect(response.deleteHeader("foo")).toBe("1");
   expect(response.hasHeader("foo")).toBe(false);
 

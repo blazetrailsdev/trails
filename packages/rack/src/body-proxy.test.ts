@@ -72,7 +72,7 @@ it("allows #method to work with delegated methods", () => {
     },
   };
   const proxy = new BodyProxy(body, () => {});
-  expect(proxy.delegate("banana")).toBe("pear");
+  expect(proxy.methodMissing("banana")).toBe("pear");
 });
 
 it("allows calling delegated methods with keywords", () => {
@@ -82,7 +82,7 @@ it("allows calling delegated methods with keywords", () => {
     },
   };
   const proxy = new BodyProxy(body, () => {});
-  expect(proxy.delegate("banana", { foo: 1 })).toBe(1);
+  expect(proxy.methodMissing("banana", { foo: 1 })).toBe(1);
 });
 
 it("respond to :to_ary if body does responds to it, and have to_ary call close", () => {
@@ -104,19 +104,19 @@ it("not respond to :to_ary if body does not respond to it", () => {
   };
   const proxy = new BodyProxy(body, () => {});
   expect(proxy.respondToMissing("to_ary")).toBe(false);
-  expect(() => proxy.delegate("to_ary")).not.toThrow();
+  expect(() => proxy.methodMissing("to_ary")).not.toThrow();
 });
 
 it("not respond to :to_str", () => {
   const proxy = new BodyProxy("string body", () => {});
   expect(proxy.respondToMissing("to_str")).toBe(false);
-  expect(() => proxy.delegate("to_str")).toThrow();
+  expect(() => proxy.methodMissing("to_str")).toThrow();
 });
 
 it("not respond to :to_path if body does not respond to it", () => {
   const proxy = new BodyProxy("string body", () => {});
   expect(proxy.respondToMissing("to_path")).toBe(false);
-  expect(() => proxy.delegate("to_path")).toThrow();
+  expect(() => proxy.methodMissing("to_path")).toThrow();
 });
 
 it("not close more than one time", () => {

@@ -13,7 +13,6 @@ import {
 } from "@blazetrails/activesupport";
 import { flatten } from "@blazetrails/ruby-compat";
 import {
-  bodyFromString,
   ContentLength,
   MockRequest,
   type RackBody as RackBodyType,
@@ -521,10 +520,7 @@ describe("ResponseIntegrationTest", () => {
     };
   }
 
-  function rackishApp(
-    headers: Record<string, string>,
-    body: RackBodyType = bodyFromString("Hello"),
-  ) {
+  function rackishApp(headers: Record<string, string>, body: RackBodyType = ["Hello"]) {
     return (): RackResponse => [200, headers, body];
   }
 
