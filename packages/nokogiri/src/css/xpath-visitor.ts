@@ -2,6 +2,7 @@
 import { ArgumentError, fixMod, rbInspect, toI } from "@blazetrails/ruby-compat";
 
 import { libxml2Patches, usesLibxml } from "../version/info.js";
+import { GLOBAL_SEARCH_PREFIX } from "../xml/xpath.js";
 import { Node } from "./node.js";
 import { SyntaxError } from "./syntax-error.js";
 
