@@ -872,7 +872,10 @@ export function except(
  * the hash does not hold.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#values_at` (`vendor/ruby/v3.3.11/hash.c:2713`).
  */
-export function valuesAt<T>(hash: Record<string, T>, ...keys: string[]): (T | null)[];
+export function valuesAt<T>(
+  hash: Record<string, T> | Map<string, T>,
+  ...keys: string[]
+): (T | null)[];
 /**
  * The Map arm: `rb_hash_aref` is the same lookup whichever hash it is given.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#values_at` (`vendor/ruby/v3.3.11/hash.c:2713`).

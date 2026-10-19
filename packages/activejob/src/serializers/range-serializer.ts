@@ -18,11 +18,11 @@ export class RangeSerializer extends ObjectSerializer {
 
   async deserialize(hash: Record<string, unknown> | Map<string, unknown>): Promise<Range> {
     return new (this.klass())(
-      ...((await ActiveJob.Arguments.deserialize(
-        hash instanceof Map
-          ? valuesAt(hash, ...RangeSerializer.KEYS)
-          : valuesAt(hash, ...RangeSerializer.KEYS),
-      )) as [unknown, unknown, boolean]),
+      ...((await ActiveJob.Arguments.deserialize(valuesAt(hash, ...RangeSerializer.KEYS))) as [
+        unknown,
+        unknown,
+        boolean,
+      ]),
     );
   }
 
