@@ -320,8 +320,7 @@ export class Group {
       shell?: Basic | null;
     } = {},
   ) {
-    const actions = isModuleIncluded(new.target, Actions);
-    if (actions) {
+    if (isModuleIncluded(new.target, Actions)) {
       (this as unknown as Host).behavior = (() => {
         switch (toS(config.behavior)) {
           case "force":
@@ -405,7 +404,8 @@ export class Group {
     if (rbObjRespondTo((this as unknown as Host).shell, "base"))
       (this as unknown as Host).shell.base ||= this as never;
 
-    if (actions) (this as unknown as Host).destinationRoot = config.destinationRoot as string;
+    if (isModuleIncluded(new.target, Actions))
+      (this as unknown as Host).destinationRoot = config.destinationRoot as string;
   }
 
   /** @internal */

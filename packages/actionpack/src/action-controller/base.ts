@@ -490,8 +490,7 @@ export class Base extends Metal {
     this._urlOptions = null;
     this._markedForSameOriginVerification = null;
     this.viewRuntime = null;
-    const controllerRuntime = TopLevel.ActiveRecord?.Railties?.ControllerRuntime;
-    if (controllerRuntime != null && isModuleIncluded(new.target, controllerRuntime)) {
+    if (isModuleIncluded(new.target, TopLevel.ActiveRecord?.Railties.ControllerRuntime as never)) {
       (this as unknown as { dbRuntime: number | null }).dbRuntime = null;
     }
   }

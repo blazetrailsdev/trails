@@ -93,7 +93,7 @@ export const TopLevel: {
     };
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
-  ActiveRecord?: { Railties?: { ControllerRuntime?: object } };
+  ActiveRecord?: { Railties: { ControllerRuntime?: object } };
   ActionCable?: { Engine?: unknown };
   BCrypt?: {
     Engine: { readonly MIN_COST: number; readonly cost: number };
