@@ -57,4 +57,9 @@ describe("ForwardRequest", () => {
       [RACK_URL_SCHEME]: "https",
     });
   });
+
+  it("takes the scheme's default port and leaves a relative URL's other keys unset", () => {
+    expect(new ForwardRequest("http://example.org/x").env["HTTP_PORT"]).toBe(80);
+    expect(new ForwardRequest("/not-found").env).toEqual({ PATH_INFO: "/not-found" });
+  });
 });
