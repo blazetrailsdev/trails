@@ -26,3 +26,14 @@ export function dropsBlock(rubyTakesBlock: boolean, candidates: ParamInfo[][]): 
  *  `return` / `next` or an `await` (`Journey::Router#find_routes` under
  *  `serve`, `journey/router.rb:33-65`), which a JS callback cannot take. */
 export const GENERATOR_BLOCK: ParamInfo[] = [{ name: "yield", kind: "rest", admitsFunction: true }];
+
+/** Only a non-public generator stands in for the block: a public method answers
+ *  Rails' block with a block parameter (and `toEnum` where Rails' `enum_for`
+ *  answers a blockless call), so a public generator still drops it. */
+export function isInternalGenerator(m: {
+  generator?: boolean;
+  visibility: string;
+  internal?: boolean;
+}): boolean {
+  return m.generator === true && (m.visibility !== "public" || m.internal === true);
+}

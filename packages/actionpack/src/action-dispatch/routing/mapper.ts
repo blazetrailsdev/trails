@@ -48,6 +48,8 @@ import {
   stringSplit,
   Thread,
   rbIterBreakValue,
+  rbBlockGivenP,
+  type Block,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -119,7 +121,7 @@ type ConcernCallable =
   | ConcernCallback
   | { call(mapper: Mapper, options: Record<string, unknown>): void };
 type MapMethodArg = string | RouteOptions | Record<string, unknown>;
-type MapMethodArgs = MapMethodArg[] | [...MapMethodArg[], MapperCallback];
+type MapMethodArgs = MapMethodArg[] | [...MapMethodArg[], Block<unknown>];
 
 const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
   "as",
@@ -1097,28 +1099,23 @@ export class Mapper {
   }
 
   get(...args: MapMethodArgs): this {
-    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
-    return this.mapMethod("GET", args as MapMethodArg[], block);
+    return this.mapMethod("GET", args);
   }
 
   post(...args: MapMethodArgs): this {
-    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
-    return this.mapMethod("POST", args as MapMethodArg[], block);
+    return this.mapMethod("POST", args);
   }
 
   put(...args: MapMethodArgs): this {
-    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
-    return this.mapMethod("PUT", args as MapMethodArg[], block);
+    return this.mapMethod("PUT", args);
   }
 
   patch(...args: MapMethodArgs): this {
-    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
-    return this.mapMethod("PATCH", args as MapMethodArg[], block);
+    return this.mapMethod("PATCH", args);
   }
 
   delete(...args: MapMethodArgs): this {
-    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
-    return this.mapMethod("DELETE", args as MapMethodArg[], block);
+    return this.mapMethod("DELETE", args);
   }
 
   root(path: string | RouteOptions | null, options: RouteOptions = {}): void {
@@ -1465,9 +1462,9 @@ export class Mapper {
     path: string | Record<string, unknown>,
     ...rest:
       | (string | (RouteOptions & { via?: string | string[] }))[]
-      | [...(string | (RouteOptions & { via?: string | string[] }))[], MapperCallback]
+      | [...(string | (RouteOptions & { via?: string | string[] }))[], Block<unknown>]
   ): void {
-    if (typeof rest.at(-1) === "function") rest.pop();
+    if (rbBlockGivenP(rest.at(-1))) rest.pop();
     let options: Record<string, unknown>;
     let paths: string[];
     if (rest.length === 0 && isPlainObject(path)) {
@@ -1512,21 +1509,25 @@ export class Mapper {
   }
 
   options(...args: MapMethodArgs): this {
-    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
-    return this.mapMethod("OPTIONS", args as MapMethodArg[], block);
+    return this.mapMethod("OPTIONS", args);
   }
 
   connect(...args: MapMethodArgs): this {
-    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
-    return this.mapMethod(["GET", "CONNECT"], args as MapMethodArg[], block);
+    return this.mapMethod(["GET", "CONNECT"], args);
   }
 
   /** @internal */
-  mapMethod(method: string | string[], args: MapMethodArg[], block?: MapperCallback): this {
-    const options = extractOptionsBang(args);
+  mapMethod(
+    method: string | string[],
+    args: MapMethodArgs,
+    block: Block<unknown> | null = rbBlockGivenP(args.at(-1))
+      ? (args.pop() as Block<unknown>)
+      : null,
+  ): this {
+    const options = extractOptionsBang(args as MapMethodArg[]);
     options[args.length === 0 ? ":via" : "via"] = method;
-    if (block) this.match(...(args as [string]), options as RouteOptions, block);
-    else this.match(...(args as [string]), options as RouteOptions);
+    const [path, ...rest] = [...args, options, ...(block ? [block] : [])];
+    this.match(path as string, ...(rest as [RouteOptions]));
     return this;
   }
 

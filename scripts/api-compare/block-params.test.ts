@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ParamInfo } from "@blazetrails/parity/types";
-import { GENERATOR_BLOCK, dropsBlock } from "./block-params.js";
+import { GENERATOR_BLOCK, dropsBlock, isInternalGenerator } from "./block-params.js";
 import { measure, staleMarkFailure, staleMarks, type ParamNameMarks } from "./param-name-mark.js";
 
 const opts: ParamInfo = { name: "opts", kind: "optional" };
@@ -25,6 +25,17 @@ describe("dropsBlock", () => {
 
   it("has nothing to judge without a TS candidate", () => {
     expect(dropsBlock(true, [])).toBe(false);
+  });
+});
+
+describe("isInternalGenerator", () => {
+  it("credits a private or @internal generator, never a public one", () => {
+    expect(isInternalGenerator({ generator: true, visibility: "private" })).toBe(true);
+    expect(isInternalGenerator({ generator: true, visibility: "public", internal: true })).toBe(
+      true,
+    );
+    expect(isInternalGenerator({ generator: true, visibility: "public" })).toBe(false);
+    expect(isInternalGenerator({ visibility: "private" })).toBe(false);
   });
 });
 

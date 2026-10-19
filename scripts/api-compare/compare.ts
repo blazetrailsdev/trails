@@ -131,7 +131,7 @@ import {
   type ArityRange,
 } from "./arity.js";
 import { isNestedConstructorHomonym, matchParamNamesAgainst } from "./param-names.js";
-import { GENERATOR_BLOCK, dropsBlock } from "./block-params.js";
+import { GENERATOR_BLOCK, dropsBlock, isInternalGenerator } from "./block-params.js";
 import {
   ARITY_EXCLUDE_PATH,
   arityExcludeKeyOf,
@@ -4816,7 +4816,7 @@ export function main() {
         const blockSigs = byName.get(m.name) ?? [];
         blockSigs.push(m.params);
         if (m.aliasParams) blockSigs.push(m.aliasParams);
-        if (m.generator) blockSigs.push(GENERATOR_BLOCK);
+        if (isInternalGenerator(m)) blockSigs.push(GENERATOR_BLOCK);
         byName.set(m.name, blockSigs);
         tsBlockSigsByFileName.set(file, byName);
         const byOwner = tsBlockSigsByFileOwnerName.get(file) ?? new Map<string, ParamInfo[][]>();
@@ -4825,7 +4825,7 @@ export function main() {
           ...(byOwner.get(ownerKey) ?? []),
           m.params,
           ...(m.aliasParams ? [m.aliasParams] : []),
-          ...(m.generator ? [GENERATOR_BLOCK] : []),
+          ...(isInternalGenerator(m) ? [GENERATOR_BLOCK] : []),
         ]);
         tsBlockSigsByFileOwnerName.set(file, byOwner);
       }

@@ -1361,6 +1361,21 @@ Rules that apply across the table:
   re-send is unported, and test_help's integration `before_setup` awaits the
   reload — debt tracked by `lazy-route-set-method-missing-resends-in-line`.
 
+## A private generator may stand in for a block (`find_routes`, `match_route`)
+
+A Ruby block ports as a trailing block parameter, marked with ruby-compat's
+`block()` where it rides at the end of a `*args` splat and read back with
+`rbBlockGivenP`; a public method Rails lets run blockless answers `toEnum`
+there, as `enum_for` does. One case has no callback shape: a block whose body
+takes a non-local `return` or `next`, or an `await`
+(`Journey::Router#serve` over `find_routes`,
+`actionpack/lib/action_dispatch/journey/router.rb:33-65`). There the yielding
+method is a JS generator and the block body is the caller's `for…of` body.
+**Only a TS-`private` or `@internal` method may do this**, so a generator never
+reaches public API; `parity:api:blocks` credits a non-public generator's
+`yield` as its block and still flags a public one. Ruled by the repo owner on
+trails#9053.
+
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 
 § "Module mixins" says only `inherited` has no JS equivalent. JS has no hook
