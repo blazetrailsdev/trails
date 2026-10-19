@@ -4,6 +4,7 @@ import {
   isEmpty,
   kernelCatch,
   rbEqual,
+  rbFSend,
   rbObjRespondTo,
   rbDeclareIvar,
   Set,
@@ -221,6 +222,9 @@ export abstract class CollectionAssociation extends Association {
   protected abstract intersection(a: Base[], b: Base[]): Base[];
 
   /** @internal */
+  protected abstract countRecords(): Promise<number>;
+
+  /** @internal */
   async insertRecord(
     record: Base,
     validate = true,
@@ -371,11 +375,9 @@ export abstract class CollectionAssociation extends Association {
       return Promise.resolve(this.loadTarget()).then((target) => target.length);
     } else if (!this.associationScope().distinctValue && !isEmpty(this.target)) {
       const unsavedRecords = this.target.filter((record) => record.isNewRecord());
-      return (this as unknown as { countRecords(): Promise<number> })
-        .countRecords()
-        .then((count) => unsavedRecords.length + count);
+      return this.countRecords().then((count) => unsavedRecords.length + count);
     } else {
-      return (this as unknown as { countRecords(): Promise<number> }).countRecords();
+      return this.countRecords();
     }
   }
 
@@ -817,7 +819,7 @@ export function callback(this: CallbackHost, method: string, record: Base): void
 export function callbacksFor(this: CallbackHost, callbackName: string): unknown[] {
   const fullCallbackName = `${callbackName}For${this.reflection.name.charAt(0).toUpperCase()}${this.reflection.name.slice(1)}`;
   if (rbObjRespondTo(this.owner.constructor, fullCallbackName)) {
-    return (this.owner.constructor as any)[fullCallbackName];
+    return rbFSend(this.owner.constructor, fullCallbackName) as unknown[];
   } else {
     return [];
   }

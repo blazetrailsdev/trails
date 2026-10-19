@@ -498,9 +498,12 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   }
 
   protected enqueueDestroyAssociation(options: Record<string, unknown>): void {
-    const jobClass = (this.owner.constructor as any).destroyAssociationAsyncJob;
+    const jobClass = (this.owner.constructor as typeof Base).destroyAssociationAsyncJob;
     if (jobClass) {
-      (this.owner as any)._afterCommitJobs.push([jobClass, options]);
+      (this.owner as Base & { _afterCommitJobs: unknown[] })._afterCommitJobs.push([
+        jobClass,
+        options,
+      ]);
     }
   }
 }

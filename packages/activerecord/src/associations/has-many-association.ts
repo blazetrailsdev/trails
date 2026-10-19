@@ -6,6 +6,7 @@ import {
   isEmpty,
   kernelThrow,
   rbEqual,
+  rbFPublicSend,
   toI,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
@@ -92,11 +93,11 @@ export class HasManyAssociation extends CollectionAssociation {
           if (queryConstraintsList.call(associationClass)) {
             primaryKeyColumn = queryConstraintsList.call(associationClass)!;
             ids = this.target.map((assoc) =>
-              (primaryKeyColumn as string[]).map((col) => (assoc as any)[col]),
+              (primaryKeyColumn as string[]).map((col) => rbFPublicSend(assoc, col)),
             );
           } else {
             primaryKeyColumn = associationClass.primaryKey as string;
-            ids = this.target.map((assoc) => (assoc as any)[primaryKeyColumn as string]);
+            ids = this.target.map((assoc) => rbFPublicSend(assoc, primaryKeyColumn));
           }
 
           for (const idsBatch of eachSlice(
