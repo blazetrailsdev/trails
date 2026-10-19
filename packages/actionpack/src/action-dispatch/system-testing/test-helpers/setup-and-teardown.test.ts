@@ -5,13 +5,15 @@ import { vite } from "../server.js";
 import { beforeTeardown, afterTeardown, type SetupAndTeardownHost } from "./setup-and-teardown.js";
 
 describe("ActionDispatch::SystemTesting::TestHelpers::SetupAndTeardown", () => {
+  const trails = TopLevel.Trails;
+
   afterEach(() => {
+    TopLevel.Trails = trails;
     vi.restoreAllMocks();
     vite.currentDriver = "rack_test";
   });
 
   it("before_teardown calls take_failed_screenshot", async () => {
-    const trails = TopLevel.Trails;
     TopLevel.Trails = { root: () => Dir.pwd() } as typeof TopLevel.Trails;
     vite.currentDriver = "selenium";
     vi.spyOn(console, "log").mockImplementation(() => {});
@@ -27,7 +29,6 @@ describe("ActionDispatch::SystemTesting::TestHelpers::SetupAndTeardown", () => {
       },
     };
     await beforeTeardown.call(host);
-    TopLevel.Trails = trails;
     expect(host._screenshotCounter).toBe(1);
   });
 
