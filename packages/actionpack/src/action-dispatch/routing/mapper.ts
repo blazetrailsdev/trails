@@ -1464,7 +1464,7 @@ export class Mapper {
       | (string | (RouteOptions & { via?: string | string[] }))[]
       | [...(string | (RouteOptions & { via?: string | string[] }))[], Block<unknown>]
   ): void {
-    if (rbBlockGivenP(rest.at(-1))) rest.pop();
+    if (rest.length > 0 && (rest.at(-1) === undefined || rbBlockGivenP(rest.at(-1)))) rest.pop();
     let options: Record<string, unknown>;
     let paths: string[];
     if (rest.length === 0 && isPlainObject(path)) {
@@ -1520,14 +1520,13 @@ export class Mapper {
   mapMethod(
     method: string | string[],
     args: MapMethodArgs,
-    block: Block<unknown> | null = rbBlockGivenP(args.at(-1))
+    block: Block<unknown> | undefined = rbBlockGivenP(args.at(-1))
       ? (args.pop() as Block<unknown>)
-      : null,
+      : undefined,
   ): this {
     const options = extractOptionsBang(args as MapMethodArg[]);
     options[args.length === 0 ? ":via" : "via"] = method;
-    const [path, ...rest] = [...args, options, ...(block ? [block] : [])];
-    this.match(path as string, ...(rest as [RouteOptions]));
+    this.match(...(args as [string]), options as RouteOptions, block!);
     return this;
   }
 

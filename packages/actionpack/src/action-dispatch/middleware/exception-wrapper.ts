@@ -347,7 +347,7 @@ export class ExceptionWrapper {
   causesFor(exception: Error, block?: (cause: Error) => void): Enumerator<Error> | void {
     if (!block) return toEnum(this, "causesFor", exception);
 
-    while ((exception = exception.cause as Error) instanceof Error) block(exception);
+    while ((exception = exception.cause as Error) != null) block(exception);
   }
 
   /** @internal */

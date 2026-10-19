@@ -37,7 +37,7 @@ function envName(key: string): string {
 }
 
 export class Headers {
-  static DEFAULT: object = {};
+  static readonly DEFAULT: object = {};
 
   private _req: Request;
 

@@ -234,9 +234,7 @@ export class RackBody {
 
   /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
-    const stream = this._response.stream as Partial<AsyncIterable<unknown>> & {
-      each(): unknown;
-    };
+    const stream = this._response.stream as Partial<AsyncIterable<unknown>>;
     this._response.sendingBang();
     if (typeof stream[Symbol.asyncIterator] === "function") {
       for await (const chunk of stream as AsyncIterable<unknown>)

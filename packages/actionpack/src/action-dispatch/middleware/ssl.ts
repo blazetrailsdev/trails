@@ -118,12 +118,12 @@ export class SSL {
 
   /** @internal */
   private flagCookiesAsSecureBang(headers: Record<string, string | string[]>): void {
-    const cookies = headers[SET_COOKIE];
+    let cookies = headers[SET_COOKIE];
     if (cookies == null) return;
 
     if (new Gem.Version(RELEASE).compare(new Gem.Version("3"))! < 0) {
-      const lines = (cookies as string).split("\n");
-      headers[SET_COOKIE] = lines
+      cookies = (cookies as string).split("\n");
+      headers[SET_COOKIE] = cookies
         .map((cookie) => {
           if (!/;\s*secure\s*(;|$)/i.test(cookie)) {
             return `${cookie}; secure`;
