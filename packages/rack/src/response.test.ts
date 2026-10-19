@@ -577,7 +577,7 @@ it("provide access to the HTTP status", () => {
 it("provide access to the HTTP headers", () => {
   const res = new Response();
   res.headers["content-type"] = "text/yaml; charset=UTF-8";
-  expect(res.isInclude("content-type")).toBeTruthy();
+  expect(Object.keys(res.headers)).toContain("content-type");
   expect(res.headers["content-type"]).toBe("text/yaml; charset=UTF-8");
   expect(res.get("content-type")).toBe("text/yaml; charset=UTF-8");
   expect(res.contentType).toBe("text/yaml; charset=UTF-8");
@@ -688,7 +688,7 @@ it("should specify not to cache content", () => {
   response.doNotCacheBang();
   expect(response.headers["cache-control"]).toBe("no-cache, must-revalidate");
   const expires = new Date(response.headers["expires"] as string);
-  expect(expires.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+  expect(expires.getTime()).toBeLessThanOrEqual(Date.now());
 });
 
 it("should not cache content if calling cache! after do_not_cache!", () => {
@@ -713,19 +713,20 @@ it("should specify to cache content", () => {
 describe("headers", () => {
   it("has_header?", () => {
     const response = new Response([], 200, { foo: "1" } as any);
-    expect(() => response.hasHeader(null as any)).toThrow();
+    expect(() => response.hasHeader(null as any)).toThrow(ArgumentError);
     expect(response.hasHeader("foo")).toBe(true);
   });
 
   it("get_header", () => {
     const response = new Response([], 200, { foo: "1" } as any);
-    expect(() => response.getHeader(null as any)).toThrow();
+    expect(() => response.getHeader(null as any)).toThrow(ArgumentError);
     expect(response.getHeader("foo")).toBe("1");
   });
 
   it("set_header", () => {
     const response = new Response([], 200, { foo: "1" } as any);
-    expect(() => response.setHeader(null as any, "1")).toThrow();
+    expect(() => response.setHeader(null as any, "1")).toThrow(ArgumentError);
+
     expect(response.setHeader("foo", "2")).toBe("2");
     expect(response.hasHeader("foo")).toBe(true);
     expect(response.getHeader("foo")).toBe("2");
@@ -736,15 +737,17 @@ describe("headers", () => {
 
   it("add_header", () => {
     const response = new Response([], 200, { foo: "1" } as any);
-    expect(() => response.addHeader(null as any, "1")).toThrow();
+    expect(() => response.addHeader(null as any, "1")).toThrow(ArgumentError);
 
     expect(response.addHeader("foo", "2")).toEqual(["1", "2"]);
     expect(response.getHeader("foo")).toEqual(["1", "2"]);
 
     expect(response.addHeader("foo", null)).toEqual(["1", "2"]);
+    expect(response.getHeader("foo")).toEqual(["1", "2"]);
 
     expect(response.addHeader("bar", null)).toBeNull();
     expect(response.hasHeader("bar")).toBe(false);
+    expect(response.getHeader("bar")).toBeUndefined();
 
     expect(response.addHeader("bar", "1")).toBe("1");
     expect(response.hasHeader("bar")).toBe(true);
@@ -753,12 +756,13 @@ describe("headers", () => {
 
   it("delete_header", () => {
     const response = new Response([], 200, { foo: "1" } as any);
-    expect(() => response.deleteHeader(null as any)).toThrow();
+    expect(() => response.deleteHeader(null as any)).toThrow(ArgumentError);
 
     expect(response.deleteHeader("foo")).toBe("1");
     expect(response.hasHeader("foo")).toBe(false);
 
     expect(response.deleteHeader("foo")).toBeNull();
+    expect(response.hasHeader("foo")).toBe(false);
 
     response.setHeader("foo", 1);
     expect(response.deleteHeader("foo")).toBe(1);
@@ -781,6 +785,7 @@ it("get_header", () => {
 it("set_header", () => {
   const response = new ResponseRaw(200, { foo: "1" });
   expect(response.setHeader("foo", "2")).toBe("2");
+  expect(response.hasHeader("foo")).toBe(true);
   expect(response.getHeader("foo")).toBe("2");
 
   expect(response.setHeader(null as any, "1")).toBe("1");
@@ -796,6 +801,7 @@ it("delete_header", () => {
   expect(response.hasHeader("foo")).toBe(false);
 
   expect(response.deleteHeader("foo")).toBeNull();
+  expect(response.hasHeader("foo")).toBe(false);
 
   response.setHeader("foo", 1);
   expect(response.deleteHeader("foo")).toBe(1);

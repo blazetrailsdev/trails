@@ -109,7 +109,7 @@ export abstract class Helpers {
   }
 
   addHeader(key: string | null, value: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (typeof key !== "string") throw new ArgumentError();
     if (value === null || value === undefined) return this.getHeader(key) ?? null;
     const existing = this.getHeader(key);
     if (existing != null) {
@@ -373,15 +373,15 @@ export class Response {
   }
 
   hasHeader(key: string | null): boolean {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (typeof key !== "string") throw new ArgumentError();
     return Object.hasOwn(this.headers, downcaseKey(key));
   }
   getHeader(key: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (typeof key !== "string") throw new ArgumentError();
     return this.headers[downcaseKey(key)];
   }
   setHeader(key: string | null, value: any): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (typeof key !== "string") throw new ArgumentError();
     this.headers[downcaseKey(key)] = value;
     return value;
   }
