@@ -168,6 +168,7 @@ export class FlashHash {
     return this;
   }
 
+  /** @missingRailsName flashes — PERMANENT */
   get keys(): string[] {
     return Object.keys(this._flashes);
   }

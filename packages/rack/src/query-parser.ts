@@ -76,6 +76,8 @@ const BYTESIZE_LIMIT = 4194304;
 const PARAMS_LIMIT = 4096;
 
 export class QueryParser {
+  static readonly DEFAULT_SEP = DEFAULT_SEP;
+
   readonly paramDepthLimit: number;
   private readonly bytesizeLimit: number;
   private readonly paramsLimit: number;

@@ -104,6 +104,7 @@ const AR_CLOSURE_PATH = path.join(OUTPUT_DIR, "ar-closure.json");
  * never removed to turn a red run green.
  */
 export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
+  "abstractcontroller",
   "actioncontroller",
   "activemodel",
   "activesupport",

@@ -17,6 +17,7 @@ export class RouteWithParams {
     readonly params: Record<string, unknown>,
   ) {}
 
+  /** @missingRailsName parameterizedParts — PERMANENT */
   path(_?: string | null): string {
     return this._route.format(this._parameterizedParts);
   }

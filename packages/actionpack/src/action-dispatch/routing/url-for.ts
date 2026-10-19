@@ -84,9 +84,8 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (typeof options === "string" && !isSymbol(options)) {
     return options;
   }
-  const target = this as unknown as PolymorphicHost;
   if (isSymbol(options)) {
-    return HelperMethodBuilder.url().handleStringCall(target, options);
+    return HelperMethodBuilder.url().handleStringCall(this as unknown as PolymorphicHost, options);
   }
   if (Array.isArray(options)) {
     const components = [...options];
@@ -94,9 +93,12 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
     return this.polymorphicUrl!(components, opts);
   }
   if (isModelClass(options)) {
-    return HelperMethodBuilder.url().handleClassCall(target, options);
+    return HelperMethodBuilder.url().handleClassCall(this as unknown as PolymorphicHost, options);
   }
-  return HelperMethodBuilder.url().handleModelCall(target, options as ToModel);
+  return HelperMethodBuilder.url().handleModelCall(
+    this as unknown as PolymorphicHost,
+    options as ToModel,
+  );
 }
 
 export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): string {

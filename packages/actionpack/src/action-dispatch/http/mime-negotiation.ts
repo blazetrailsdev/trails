@@ -58,6 +58,7 @@ export class MimeNegotiation {
 
 const BROWSER_LIKE_ACCEPTS = /,\s*\*\/\*|\*\/\*\s*,/;
 
+/** @missingRailsName downcase — PERMANENT */
 export function contentMimeType(this: MimeNegotiationHost): MimeType | null {
   return this.fetchHeader("action_dispatch.request.content_type", (k) => {
     try {

@@ -505,6 +505,7 @@ export class Response {
   /** @internal */
   declare parameterFilteredLocation: () => string;
 
+  /** @missingRailsName status — PERMANENT */
   toA(): [number, Record<string, string>, unknown] {
     this.commitBang();
     return this.rackResponse(this._status, this._headers.toH() as Record<string, string>);

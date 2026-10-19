@@ -247,6 +247,7 @@ export class Pattern {
     return this.toRegexp().source;
   }
 
+  /** @missingRailsName separators — PERMANENT */
   toRegexp(): RegExp {
     if (this._re) return this._re;
     this._re = new this.regexpVisitor(this._separators, this.requirements).accept(this.spec);
