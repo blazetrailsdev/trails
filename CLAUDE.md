@@ -779,7 +779,7 @@ constructor(attributes = null) { … }
 - **It is not a licence for arel's `inlined-from` bucket.** That bucket is the
   general case, a module member whose body sits on an including class's file,
   and it is pinned at 0. The tag admits a constructor segment from the closed
-  list of hooks in `eslint/inlined-from-only-on-constructors.mjs` and nothing
+  list of hooks in `eslint/inlined-from-placement.mjs` and nothing
   else.
 
 **A module installed at run time is inlined behind a guard.** Where the
