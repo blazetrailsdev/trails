@@ -1461,10 +1461,10 @@ export class Base extends Model {
         }
       }
     }
-    attributes ??= {};
-    attributes = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
-    const assocPending = _extractAssociationAttrs(new.target, attributes);
-    if (assocPending) attributes = assocPending.rest;
+    const assocPending =
+      attributes == null || isEmpty(attributes)
+        ? null
+        : _extractAssociationAttrs(new.target, sanitizeForMassAssignment(attributes));
     super(null);
 
     if (!allocating) {
@@ -1478,7 +1478,7 @@ export class Base extends Model {
     this.initInternals();
     if (!allocating) this.initializeInternalsCallback();
 
-    if (attributes != null) this.assignAttributes(attributes);
+    if (attributes != null) this.assignAttributes(assocPending?.rest ?? attributes);
 
     if (assocPending) {
       _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
