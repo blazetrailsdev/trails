@@ -1,3 +1,4 @@
+import { Time } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { MockRequest, FatalWarning } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
@@ -46,7 +47,7 @@ it("provides access to persistent cookies set with max-age", async () => {
   const c = res.cookie("foo");
   expect(c).toBeDefined();
   expect(c!.expires).toBeDefined();
-  expect(c!.expires!.getTime()).toBeGreaterThan(Date.now());
+  expect((c!.expires as Time).compare(Time.now().plus(3600))).toBe(-1);
 });
 
 it("provides access to persistent cookies set with expires", async () => {
@@ -61,6 +62,7 @@ it("provides access to persistent cookies set with expires", async () => {
   const c = res.cookie("foo");
   expect(c).toBeDefined();
   expect(c!.expires).toBeDefined();
+  expect((c!.expires as Time).compare(Time.httpdate(future))).toBe(0);
 });
 
 it("parses cookies giving max-age precedence over expires", async () => {
@@ -73,7 +75,7 @@ it("parses cookies giving max-age precedence over expires", async () => {
     ];
   const res = await new MockRequest(cookieApp).get("/");
   const c = res.cookie("foo");
-  expect(c!.expires!.getTime()).toBeGreaterThan(Date.now());
+  expect((c!.expires as Time).compare(Time.now().plus(3600))).toBe(-1);
 });
 
 it("provides access to secure cookies", async () => {
