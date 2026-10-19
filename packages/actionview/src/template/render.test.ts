@@ -8,7 +8,12 @@ import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
-import { assertNil, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import {
+  assertMatch,
+  assertNil,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
 import { ArgumentError, File, chomp, rbInspect } from "@blazetrails/ruby-compat";
 import { MissingTemplate } from "./error.js";
 
@@ -108,14 +113,17 @@ describe("CachedViewRenderTest", () => {
   });
 
   it("render template with format", async () => {
-    expect(String(await view.render({ template: "comments/empty", formats: [":html"] }))).toContain(
+    assertMatch(
       "<h1>No Comment</h1>",
+      String(await view.render({ template: "comments/empty", formats: [":html"] })),
     );
-    expect(String(await view.render({ template: "comments/empty", formats: [":xml"] }))).toContain(
+    assertMatch(
       "<error>No Comment</error>",
+      String(await view.render({ template: "comments/empty", formats: [":xml"] })),
     );
-    expect(String(await view.render({ template: "comments/empty", formats: ":xml" }))).toContain(
+    assertMatch(
       "<error>No Comment</error>",
+      String(await view.render({ template: "comments/empty", formats: ":xml" })),
     );
   });
 
@@ -224,17 +232,21 @@ describe("CachedViewRenderTest", () => {
   });
 
   it("render partial with incompatible object", async () => {
-    const e = await assertRaises([ArgumentError], {}, () =>
-      view.render({ partial: null as never }),
-    );
-    expect(e.message).toContain(
-      "'nil' is not an ActiveModel-compatible object. It must implement #to_partial_path.",
+    await assertRaises(
+      [ArgumentError],
+      {
+        match: "'nil' is not an ActiveModel-compatible object. It must implement #to_partial_path.",
+      },
+      () => view.render({ partial: null as never }),
     );
   });
 
   it("render renderable with nil", async () => {
-    const e = await assertRaises([ArgumentError], {}, () => view.render({ renderable: null }));
-    expect(e.message).toContain("'nil' is not a renderable object. It must implement #render_in.");
+    await assertRaises(
+      [ArgumentError],
+      { match: "'nil' is not a renderable object. It must implement #render_in." },
+      () => view.render({ renderable: null }),
+    );
   });
 
   it("render renderable with incompatible object", async () => {
