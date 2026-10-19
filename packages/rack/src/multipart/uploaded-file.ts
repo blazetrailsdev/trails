@@ -1,4 +1,11 @@
-import { Encoding, File, FileUtils, StringIO, Tempfile } from "@blazetrails/ruby-compat";
+import {
+  Encoding,
+  File,
+  FileUtils,
+  StringIO,
+  Tempfile,
+  methodMissingProxy,
+} from "@blazetrails/ruby-compat";
 
 export interface UploadedFileOptions {
   path?: string | null;
@@ -8,6 +15,13 @@ export interface UploadedFileOptions {
   io?: StringIO;
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the merge is how the delegated surface reaches the class type. */
+export interface UploadedFile {
+  /** @noRailsEquivalent PERMANENT */
+  read(): string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class UploadedFile {
   readonly originalFilename: string;
   contentType: string;
@@ -48,6 +62,8 @@ export class UploadedFile {
       this._tempfile = tempfile;
     }
     this.contentType = contentType;
+
+    return methodMissingProxy(this, { delegate: (uploadedFile) => uploadedFile._tempfile });
   }
 
   get path(): string | undefined {
@@ -56,10 +72,6 @@ export class UploadedFile {
 
   get localPath(): string | undefined {
     return this.path;
-  }
-
-  read(): string {
-    return this._tempfile.read();
   }
 
   /**

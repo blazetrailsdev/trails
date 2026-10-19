@@ -34,62 +34,32 @@ let _defaultQueryParser = QueryParser.makeDefault(32);
 let _multipartFileLimit = 128;
 let _multipartTotalPartLimit = 4096;
 
-export function getDefaultQueryParser(): QueryParser {
+export function defaultQueryParser(): QueryParser {
   return _defaultQueryParser;
 }
 export function setDefaultQueryParser(parser: QueryParser): void {
   _defaultQueryParser = parser;
 }
 
-export function getParamDepthLimit(): number {
-  return _defaultQueryParser.paramDepthLimit;
+export function paramDepthLimit(): number {
+  return defaultQueryParser().paramDepthLimit;
 }
 export function setParamDepthLimit(v: number): void {
-  defaultQueryParser(defaultQueryParser().newDepthLimit(v));
+  setDefaultQueryParser(defaultQueryParser().newDepthLimit(v));
 }
 
-export function getMultipartFileLimit(): number {
-  return _multipartFileLimit;
-}
-export function setMultipartFileLimit(v: number): void {
-  _multipartFileLimit = v;
-}
-
-export function getMultipartTotalPartLimit(): number {
+export function multipartTotalPartLimit(): number {
   return _multipartTotalPartLimit;
 }
 export function setMultipartTotalPartLimit(v: number): void {
   _multipartTotalPartLimit = v;
 }
 
-export function defaultQueryParser(): QueryParser;
-export function defaultQueryParser(parser: QueryParser): void;
-export function defaultQueryParser(parser?: QueryParser): QueryParser | void {
-  if (parser !== undefined) {
-    _defaultQueryParser = parser;
-    return;
-  }
-  return _defaultQueryParser;
-}
-
-export function multipartTotalPartLimit(): number;
-export function multipartTotalPartLimit(v: number): void;
-export function multipartTotalPartLimit(v?: number): number | void {
-  if (v !== undefined) {
-    _multipartTotalPartLimit = v;
-    return;
-  }
-  return _multipartTotalPartLimit;
-}
-
-export function multipartFileLimit(): number;
-export function multipartFileLimit(v: number): void;
-export function multipartFileLimit(v?: number): number | void {
-  if (v !== undefined) {
-    _multipartFileLimit = v;
-    return;
-  }
+export function multipartFileLimit(): number {
   return _multipartFileLimit;
+}
+export function setMultipartFileLimit(v: number): void {
+  _multipartFileLimit = v;
 }
 
 export function clockTime(): number {

@@ -1,4 +1,6 @@
 import { bytes } from "./string/bytes.js";
+import { ArgumentError } from "./argument-error.js";
+import { rbFArray } from "./array.js";
 
 /**
  * `CGI::Util` (`vendor/ruby/v3.3.11/lib/cgi/util.rb:5`), which `CGI` extends,
@@ -100,4 +102,62 @@ export class CGI {
       }
     });
   }
+
+  /** @noRailsEquivalent PERMANENT */
+  static Cookie: typeof Cookie;
 }
+
+/**
+ * `CGI::Cookie` (`vendor/ruby/v3.3.11/lib/cgi/cookie.rb:40`), narrowed to the
+ * options-hash arm of `initialize` that `Rack::MockResponse` calls. A Ruby
+ * `Cookie < Array` is its own value, so `value` holds the Array here.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class Cookie {
+  /** @noRailsEquivalent PERMANENT */
+  name: string;
+  /** @noRailsEquivalent PERMANENT */
+  value: string[];
+  /** @noRailsEquivalent PERMANENT */
+  path: string | null;
+  /** @noRailsEquivalent PERMANENT */
+  domain: string | null;
+  /** @noRailsEquivalent PERMANENT */
+  expires: Date | null;
+  /** @noRailsEquivalent PERMANENT */
+  secure: boolean;
+  /** @noRailsEquivalent PERMANENT */
+  httponly: boolean;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(options: Record<string, unknown>) {
+    if (!Object.hasOwn(options, "name")) {
+      throw new ArgumentError("`name' required");
+    }
+
+    this.name = options["name"] as string;
+    const value = rbFArray(options["value"]) as string[];
+    this.path = (options["path"] as string | null | undefined) ?? "";
+    this.domain = (options["domain"] as string | null | undefined) ?? null;
+    this.expires = (options["expires"] as Date | null | undefined) ?? null;
+    this.secure = options["secure"] === true;
+    this.httponly = options["httponly"] === true;
+
+    this.value = value;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  toString(): string {
+    const val = this.value.map((v) => CGI.escape(v)).join("&");
+    let buf = `${this.name}=${val}`;
+    if (this.domain != null) buf += `; domain=${this.domain}`;
+    if (this.path != null) buf += `; path=${this.path}`;
+    if (this.expires != null) buf += `; expires=${this.expires.toUTCString()}`;
+    if (this.secure) buf += "; secure";
+    if (this.httponly) buf += "; HttpOnly";
+    return buf;
+  }
+}
+
+CGI.Cookie = Cookie;

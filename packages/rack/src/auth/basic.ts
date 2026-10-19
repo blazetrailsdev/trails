@@ -1,13 +1,42 @@
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { AbstractHandler } from "./abstract/handler.js";
 import { AbstractRequest } from "./abstract/request.js";
-import type { RackApp } from "../mock-request.js";
 
-export class BasicRequest extends AbstractRequest {
+export class Basic extends AbstractHandler {
+  declare static Request: typeof Request;
+
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+    const auth = new Basic.Request(env);
+
+    if (!auth.provided()) return this.unauthorized();
+
+    if (!auth.basic()) return this.badRequest();
+
+    if (await this.isValid(auth)) {
+      env["REMOTE_USER"] = auth.username();
+
+      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    }
+
+    return this.unauthorized();
+  }
+
+  /** @internal */
+  protected challenge(): string {
+    return `Basic realm="${this.realm}"`;
+  }
+
+  /** @internal */
+  private isValid(auth: Request): boolean | Promise<boolean> {
+    return this.authenticator(...auth.credentials());
+  }
+}
+
+export class Request extends AbstractRequest {
   private _credentials?: string[];
 
   basic(): boolean {
-    return this.scheme() === "basic" && this.credentials().length === 2;
+    return "basic" === this.scheme() && this.credentials().length === 2;
   }
 
   credentials(): string[] {
@@ -24,32 +53,4 @@ export class BasicRequest extends AbstractRequest {
   }
 }
 
-export class Basic extends AbstractHandler {
-  static readonly Request = BasicRequest;
-
-  constructor(
-    app: RackApp,
-    realm?: string,
-    authenticator?: (...args: any[]) => boolean | Promise<boolean>,
-  ) {
-    super(app, realm, authenticator);
-  }
-
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    const auth = new BasicRequest(env);
-
-    if (!auth.provided()) return this.unauthorized();
-    if (!auth.basic()) return this.badRequest();
-
-    if (await this.authenticator(...auth.credentials())) {
-      env["REMOTE_USER"] = auth.username();
-      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
-    }
-
-    return this.unauthorized();
-  }
-
-  protected challenge(): string {
-    return `Basic realm="${this.realm}"`;
-  }
-}
+Basic.Request = Request;

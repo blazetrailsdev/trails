@@ -2,7 +2,7 @@ import { Exception, StandardError, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse, RackBody } from "./index.js";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
-import { ResponseRaw } from "./response.js";
+import { Raw } from "./response.js";
 
 export const Abstract = {
   onStart(_req: Request, _res: BufferedResponse | null): void {},
@@ -50,7 +50,7 @@ export class EventedBodyProxy extends BodyProxy {
 }
 
 /** @internal */
-export class BufferedResponse extends ResponseRaw {
+export class BufferedResponse extends Raw {
   readonly body: RackBody;
 
   constructor(status: number, headers: Record<string, any>, body: RackBody) {

@@ -3,7 +3,6 @@ import {
   RACK_METHODOVERRIDE_ORIGINAL_METHOD,
   SERVER_NAME,
   SERVER_PORT,
-  SERVER_PROTOCOL,
   QUERY_STRING,
   PATH_INFO,
   SCRIPT_NAME,
@@ -34,13 +33,6 @@ import {
   RACK_REQUEST_FORM_ERROR,
   RACK_REQUEST_COOKIE_HASH,
   RACK_REQUEST_COOKIE_STRING,
-  HTTP_FORWARDED,
-  HTTP_X_FORWARDED_FOR,
-  HTTP_X_FORWARDED_PORT,
-  HTTP_X_FORWARDED_HOST,
-  HTTP_X_FORWARDED_PROTO,
-  HTTP_X_FORWARDED_SCHEME,
-  HTTP_X_FORWARDED_SSL,
 } from "./constants.js";
 import {
   forwardedValues,
@@ -84,6 +76,20 @@ export const DEFAULT_PORTS: Record<string, number | undefined> = {
   https: 443,
   coffee: 80,
 };
+
+export const HTTP_X_FORWARDED_FOR = "HTTP_X_FORWARDED_FOR";
+
+export const HTTP_X_FORWARDED_HOST = "HTTP_X_FORWARDED_HOST";
+
+export const HTTP_FORWARDED = "HTTP_FORWARDED";
+
+export const HTTP_X_FORWARDED_SCHEME = "HTTP_X_FORWARDED_SCHEME";
+
+export const HTTP_X_FORWARDED_PROTO = "HTTP_X_FORWARDED_PROTO";
+
+export const HTTP_X_FORWARDED_PORT = "HTTP_X_FORWARDED_PORT";
+
+export const HTTP_X_FORWARDED_SSL = "HTTP_X_FORWARDED_SSL";
 
 const ALLOWED_SCHEMES = ["https", "http", "wss", "ws"] as const;
 const FORWARDED_SCHEME_HEADERS: Record<string, string> = {
@@ -729,16 +735,6 @@ export class Request {
     return this.env[name];
   }
 
-  get(key: string, defaultValue?: any): any {
-    if (key in this.env) return this.env[key];
-    if (typeof defaultValue === "function") return defaultValue();
-    return defaultValue;
-  }
-
-  set(key: string, value: any): void {
-    this.env[key] = value;
-  }
-
   addHeader(key: string, v: string | null): any {
     if (v == null) {
       return this.getHeader(key);
@@ -753,12 +749,6 @@ export class Request {
     return hashDelete(this.env, name);
   }
 
-  each(callback: (key: string, value: any) => void): void {
-    for (const [k, v] of Object.entries(this.env)) {
-      callback(k, v);
-    }
-  }
-
   fetchHeader(name: string): any;
   fetchHeader(name: string, block: (key: string) => any): any;
   fetchHeader(name: string, block?: (key: string) => any): any {
@@ -770,18 +760,7 @@ export class Request {
   }
 
   eachHeader(callback: (key: string, value: any) => void): void {
-    this.each(callback);
-  }
-
-  get serverProtocol(): string {
-    return this.env[SERVER_PROTOCOL];
-  }
-
-  get prefetch(): boolean {
-    const purpose = (this.env["HTTP_X_MOZ"] || "").toLowerCase();
-    const secPurpose = (this.env["HTTP_SEC_PURPOSE"] || "").toLowerCase();
-    const purpose2 = (this.env["HTTP_PURPOSE"] || "").toLowerCase();
-    return purpose === "prefetch" || secPurpose === "prefetch" || purpose2 === "prefetch";
+    for (const [k, v] of Object.entries(this.env)) callback(k, v);
   }
 
   /** @noRailsEquivalent CONVERGEABLE port-rack-request-form-pairs */

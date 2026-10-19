@@ -15,7 +15,6 @@ import {
   RACK_IS_HIJACK,
   RACK_EARLY_HINTS,
   RACK_RESPONSE_FINISHED,
-  RACK_PROTOCOL,
   CONTENT_TYPE,
   CONTENT_LENGTH,
   STATUS_WITH_NO_ENTITY_BODY,
@@ -67,16 +66,16 @@ export class Lint {
       }
     }
 
-    if (headers[RACK_PROTOCOL]) {
-      if (!Array.isArray(headers[RACK_PROTOCOL])) {
+    if (headers["rack.protocol"]) {
+      if (!Array.isArray(headers["rack.protocol"])) {
         throw new LintError("rack.protocol must be an Array");
       }
-      for (const p of headers[RACK_PROTOCOL]) {
+      for (const p of headers["rack.protocol"]) {
         if (typeof p !== "string") {
           throw new LintError("rack.protocol values must be Strings");
         }
       }
-      if (!env[RACK_PROTOCOL]) {
+      if (!env["rack.protocol"]) {
         throw new LintError("rack.protocol in response but not in request");
       }
     }

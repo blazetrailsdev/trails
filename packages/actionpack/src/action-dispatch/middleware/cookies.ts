@@ -641,7 +641,7 @@ export class Cookies {
     if (request.isHaveCookieJar()) {
       const cookieJar = request.cookieJar();
       if (!cookieJar.isCommitted()) {
-        response = Response.create(...response);
+        response = Response.get(...response);
         cookieJar.write(response);
       }
     }

@@ -121,7 +121,7 @@ export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
  * Gated packages whose `novel` is still a number to burn down rather than a
  * rule to hold, so the mark's value governs both dimensions.
  */
-export const COUNTED_PACKAGES = [] as const;
+export const COUNTED_PACKAGES = ["rack"] as const;
 
 /**
  * Gated packages whose `novel` is pinned at the constant 0 regardless of what

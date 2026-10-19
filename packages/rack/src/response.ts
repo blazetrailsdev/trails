@@ -234,6 +234,10 @@ export abstract class Helpers {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:373`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
+  static get(status: number, headers: Record<string, string | string[]>, body: any): Response {
+    return new this(body, status, headers);
+  }
+
   status: number;
   headers: Record<string, string | string[]>;
   protected _body: any;
@@ -285,17 +289,6 @@ export class Response {
 
   set body(value: any) {
     this._body = value;
-  }
-
-  static create(status: number, headers: Record<string, string | string[]>, body: any): Response {
-    return new Response(body, status, headers);
-  }
-
-  get(key: string): any {
-    return this.headers[key];
-  }
-  set(key: string, value: any): void {
-    this.headers[key] = value;
   }
 
   includes(key: string): boolean {
@@ -391,7 +384,7 @@ export class Response {
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:376`); the class/interface merge is how a mixin surfaces on the type side. */
-export class ResponseRaw {
+export class Raw {
   status: number;
   headers: Record<string, any>;
 
@@ -431,9 +424,9 @@ export interface Response extends Omit<
   | "deleteHeader"
 > {}
 
-include(ResponseRaw, Helpers);
+include(Raw, Helpers);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:376`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface ResponseRaw extends Omit<
+export interface Raw extends Omit<
   Helpers,
   | "status"
   | "headers"

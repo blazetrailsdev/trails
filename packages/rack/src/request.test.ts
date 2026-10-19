@@ -37,7 +37,7 @@ describe("RackRequestTest", () => {
 
   it("can get a key from the env", () => {
     const req = makeReq();
-    expect(req.get("REQUEST_METHOD")).toBe("GET");
+    expect(req.getHeader("REQUEST_METHOD")).toBe("GET");
   });
 
   it("can calculate the authority", () => {
@@ -74,11 +74,11 @@ describe("RackRequestTest", () => {
     let capturedKey: string | undefined;
     req.fetchHeader("FOO", (k) => {
       capturedKey = k;
-      req.set("FOO", "bar");
+      req.setHeader("FOO", "bar");
       return "bar";
     });
     expect(capturedKey).toBe("FOO");
-    expect(req.get("FOO")).toBe("bar");
+    expect(req.getHeader("FOO")).toBe("bar");
     const err = (() => {
       try {
         req.fetchHeader("MISSING");
@@ -92,7 +92,7 @@ describe("RackRequestTest", () => {
 
   it("can iterate over values", () => {
     const req = makeReq();
-    req.set("foo", "bar");
+    req.setHeader("foo", "bar");
     const hash: Record<string, any> = {};
     req.eachHeader((k, v) => {
       hash[k] = v;
@@ -102,20 +102,20 @@ describe("RackRequestTest", () => {
 
   it("can set values in the env", () => {
     const req = makeReq();
-    req.set("X_CUSTOM", "val");
+    req.setHeader("X_CUSTOM", "val");
     expect(req.env["X_CUSTOM"]).toBe("val");
   });
 
   it("can add to multivalued headers in the env", () => {
     const req = makeReq();
-    req.set("HTTP_X_MULTI", "a");
+    req.setHeader("HTTP_X_MULTI", "a");
     req.addHeader("HTTP_X_MULTI", "b");
     expect(req.env["HTTP_X_MULTI"]).toBe("a,b");
   });
 
   it("can delete env values", () => {
     const req = makeReq();
-    req.set("HTTP_X_DEL", "val");
+    req.setHeader("HTTP_X_DEL", "val");
     const deleted = req.deleteHeader("HTTP_X_DEL");
     expect(deleted).toBe("val");
     expect(req.hasHeader("HTTP_X_DEL")).toBe(false);
@@ -757,12 +757,6 @@ describe("RackRequestTest", () => {
   it("figure out if called via XHR", () => {
     expect(makeReq("/", { HTTP_X_REQUESTED_WITH: "XMLHttpRequest" }).xhr).toBe(true);
     expect(makeReq("/").xhr).toBe(false);
-  });
-
-  it("figure out if prefetch request", () => {
-    expect(makeReq("/", { HTTP_X_MOZ: "prefetch" }).prefetch).toBe(true);
-    expect(makeReq("/", { HTTP_PURPOSE: "prefetch" }).prefetch).toBe(true);
-    expect(makeReq("/").prefetch).toBe(false);
   });
 
   it("ssl detection", () => {

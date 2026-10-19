@@ -37,13 +37,13 @@ export {
   QueryLimitError,
   QueryParser,
   Params,
-  getDefaultQueryParser,
+  defaultQueryParser,
   setDefaultQueryParser,
-  getParamDepthLimit,
+  paramDepthLimit,
   setParamDepthLimit,
-  getMultipartFileLimit,
+  multipartFileLimit,
   setMultipartFileLimit,
-  getMultipartTotalPartLimit,
+  multipartTotalPartLimit,
   setMultipartTotalPartLimit,
   setCookieHeader,
   deleteSetCookieHeaderBang,
@@ -55,7 +55,7 @@ export { Builder } from "./builder.js";
 export { Headers } from "./headers.js";
 export { BodyProxy } from "./body-proxy.js";
 export { DEFAULT_PORTS, Request, Helpers as RequestHelpers } from "./request.js";
-export { Response, ResponseRaw, Helpers as ResponseHelpers } from "./response.js";
+export { Response, Raw as ResponseRaw, Helpers as ResponseHelpers } from "./response.js";
 export {
   CONTENT_TYPE,
   CONTENT_LENGTH,
