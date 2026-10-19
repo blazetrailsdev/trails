@@ -92,6 +92,38 @@ describe("parseScript", () => {
     expect(find(program, "Literal", "/a[/]b/i")).not.toBeNull();
   });
 
+  it("covers switch, do-while, labels and class", () => {
+    const source = [
+      "<% switch (kind) { case 'a': case 'b': %>ab<% break; default: %>other<% } %>",
+      "<% let i = 0; do { i++ } while (i < 3); %>",
+      "<% outer: for (const row of rows) { for (const c of row) { if (c) continue outer; break outer; } } %>",
+      "<% class Row extends Base.Item { static count = 0; #id; static { Row.count = 1 } get id() { return this.#id } static of(x) { return new Row(x) } } %>",
+      "<%= new (class { name = 'anon' })().name %>",
+    ].join("\n");
+    const { code } = compileJs(source, { async: true });
+    const program = parseScript(code).value;
+    const types = new Set<string>();
+    program.breadthFirstSearch((node) => (types.add(node.type), false));
+    for (const type of [
+      "SwitchStatement",
+      "SwitchCase",
+      "DoWhileStatement",
+      "LabeledStatement",
+      "ClassDeclaration",
+      "ClassExpression",
+      "ClassBody",
+      "StaticBlock",
+      "MethodDefinition",
+      "PropertyDefinition",
+    ]) {
+      expect(types, type).toContain(type);
+    }
+    expect(find(program, "SwitchCase", "case 'a':")).not.toBeNull();
+    expect(find(program, "ContinueStatement", "continue outer;")).not.toBeNull();
+    expect(find(program, "BreakStatement", "break outer;")).not.toBeNull();
+    expect(find(program, "MethodDefinition", "get id() { return this.#id }")).not.toBeNull();
+  });
+
   it("raises JsParseError with the offending offset", () => {
     expect(() => parseScript("a(b,;")).toThrow(JsParseError);
     expect(() => parseScript("async\n(x) => x")).toThrow('Unexpected token "=>"');
