@@ -3644,12 +3644,6 @@ function enclosingEntity(node: ts.Node): { name: string; seatsModule: boolean } 
   return undefined;
 }
 
-/**
- * A top-level `ActiveSupport.on_load(:action_view) do ... end` sits lexically in
- * Ruby's `module ActionView`, so the Ruby extractor seats its macros there. The
- * TS `onLoad("action_view", (base) => …)` has no lexical module; its hook name
- * camelized is the same constant.
- */
 function onLoadHookModule(expr: ts.Expression): string | undefined {
   if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
   if (expr.expression.text !== "onLoad") return undefined;
