@@ -2181,9 +2181,6 @@ class TestExtractor
     true
   end
 
-  # Minitest::Spec's `expect(x)` is `_(x)` (vendor/minitest/v5.27.0/lib/minitest/spec.rb:326-331),
-  # which only wraps the value the `must_*`/`wont_*` call on it asserts, so the
-  # `expect` receiver of a receiver-form assertion is not a second assertion.
   def mark_spec_value_receiver(recv)
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_arg
     return unless recv.is_a?(Array) && recv[0] == :fcall && ident_name(recv[1]) == "expect"
@@ -2480,9 +2477,6 @@ class TestExtractor
     end
   end
 
-  # `x.must_be :empty?` is minitest's `assert_operator x, :empty?`, which with no
-  # third operand `return assert_predicate o1, op` (vendor/minitest/v5.27.0/lib/minitest/assertions.rb:315-316);
-  # `wont_be` is the `refute_operator` twin (assertions.rb:771-772).
   PREDICATE_FORMS = { "must_be" => "assert_predicate", "wont_be" => "refute_predicate" }.freeze
 
   # Assertion method names whose comparable expected value is NOT the first
