@@ -1,5 +1,13 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
-import { PATH_INFO, QUERY_STRING, SCRIPT_NAME, RACK_RECURSIVE_INCLUDE } from "./constants.js";
+import { ArgumentError, StringIO, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  GET,
+  PATH_INFO,
+  QUERY_STRING,
+  RACK_INPUT,
+  RACK_RECURSIVE_INCLUDE,
+  REQUEST_METHOD,
+  SCRIPT_NAME,
+} from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
 export class ForwardRequest extends Error {
@@ -55,15 +63,23 @@ export class Recursive {
     path: string,
     scriptName = "",
   ): Promise<[number, Record<string, string | string[]>, any]> {
-    if (scriptName !== "" && !(path.startsWith(scriptName + "/") || path === scriptName)) {
-      throw new Error(`can only include below ${scriptName}, not ${path}`);
+    if (
+      !(
+        path.indexOf(scriptName) === 0 &&
+        (path[scriptName.length] === "/" || path[scriptName.length] === undefined)
+      )
+    ) {
+      throw new ArgumentError(`can only include below ${scriptName}, not ${path}`);
     }
-    const url = new URL(path, "http://localhost");
+
     const newEnv = {
       ...env,
-      [PATH_INFO]: url.pathname,
-      [QUERY_STRING]: url.search ? url.search.substring(1) : "",
+      [PATH_INFO]: path,
       [SCRIPT_NAME]: scriptName,
+      [REQUEST_METHOD]: GET,
+      CONTENT_LENGTH: "0",
+      CONTENT_TYPE: "",
+      [RACK_INPUT]: new StringIO(""),
     };
     return rbFSend(this.app, "call", newEnv) as ReturnType<typeof this.app>;
   }
