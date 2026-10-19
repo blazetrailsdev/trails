@@ -623,7 +623,6 @@ export class Emitter {
     // `after_teardown`, and counts its assertions (minitest/test.rb `run`);
     // `setup` / `teardown` run inside them.
     const hctx = this.baseCtx(u, f, {});
-    this.lw.resolver.wanted.set("TestHost", (this.lw.resolver.wanted.get("TestHost") ?? 0) + 1);
     this.lw.imp(hctx, "@blazetrails/activesupport/testing/autorun", "", "");
     // The test class is a top-level constant, as Ruby's `class ExceptionsTest <
     // ActiveJob::TestCase` is: declared at module level, beside the `describe`
@@ -656,7 +655,13 @@ export class Emitter {
     const declared = !bare || !!supRef;
     const host = !declared
       ? ""
-      : (supRef ?? this.lw.imp(hctx, "@root/codegen-runtime.js", "TestHost"));
+      : (supRef ??
+        this.lw.imp(
+          hctx,
+          "@blazetrails/activesupport/test-case",
+          "TestCase",
+          "ActiveSupportTestCase",
+        ));
     const mix = declared ? this.mixinDecls(u, f, short, hostMembers) : { iface: null, statics: [] };
     // The ivars the tests keep on the test case (`@logger` in `setup`).
     const testIvars = new Set<string>();
@@ -685,7 +690,8 @@ export class Emitter {
                   "}",
                 ].join("\n")
               : `class ${short} extends ${host} {}`,
-            ...(mix.iface ? [mix.iface] : []),
+            // The test class is module-local: its merged interface is too.
+            ...(mix.iface ? [mix.iface.replace(/^export interface /, "interface ")] : []),
             `${this.lw.rc(hctx, "registerConstant")}(${JSON.stringify(short)}, ${short});`,
           ]),
       ...classLines,
@@ -896,14 +902,40 @@ export class Emitter {
       // (minitest/spec.rb), which autorun builds a `describe`'s class from, so a
       // test class with nothing of its own needs no declaration.
       if (file.file === "test/helper.rb") {
-        this.lw.resolver.wanted.set("TestHost", (this.lw.resolver.wanted.get("TestHost") ?? 0) + 1);
         const reg = this.lw.imp(
           tctx,
           "@blazetrails/activesupport/testing/autorun",
           "registerSpecType",
         );
-        const host = this.lw.imp(tctx, "@root/codegen-runtime.js", "TestHost");
+        const host = this.lw.imp(
+          tctx,
+          "@blazetrails/activesupport/test-case",
+          "TestCase",
+          "ActiveSupportTestCase",
+        );
         chunks.push(`${reg}(/(?:)/, ${host});`);
+        // Minitest's `assert_equal` is Ruby's `==` (minitest/assertions.rb
+        // `assert_equal`): a test's `expect(…).toEqual(…)` compares two Ruby
+        // values (a Date, a Time, a class with its own `==`) by `rbEqual`, as
+        // activesupport's own tests register for theirs (multibyte-chars.test.ts).
+        {
+          const ex = this.lw.imp(tctx, "vitest", "expect");
+          const eq = this.lw.rc(tctx, "rbEqual");
+          chunks.push(
+            [
+              `${ex}.addEqualityTesters([`,
+              `  function rubyEquals(a: unknown, b: unknown): boolean | undefined {`,
+              `    const plain = (x: unknown) =>`,
+              `      x === null || typeof x !== "object" || Array.isArray(x) || Object.getPrototypeOf(x) === Object.prototype;`,
+              `    if (plain(a) && plain(b)) return undefined;`,
+              // Ruby's `==` holding is equality; where it does not (a JS
+              // `String` subclass, whose `==` trails cannot dispatch), vitest's own decides.
+              `    return ${eq}(a, b) ? true : undefined;`,
+              `  },`,
+              `]);`,
+            ].join("\n"),
+          );
+        }
       }
       for (const s of top) chunks.push(...this.lw.stmt(s, tctx, false));
       // A top-level `def` (helper.rb's `adapter_is?`) is a method on Ruby's main

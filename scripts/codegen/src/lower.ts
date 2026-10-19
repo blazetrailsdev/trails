@@ -2481,9 +2481,40 @@ export class Lowerer {
 
   call(n0: N, ctx: Ctx): string {
     let n = callbackFilterSymbols(n0);
-    // A Minitest / ActiveSupport assertion outside a test body (a test helper
-    // module's `assert_equal`) is activesupport's flat assertion function
-    // (testing/assertions.ts), where the gem defines no method of that name.
+    // A Minitest assertion outside a test body (a test helper's `assert_equal`,
+    // a test class's own helper method) is the same vitest `expect` a test body
+    // uses: autorun counts both toward the test's assertions.
+    if (
+      (n.recv === null || n.recv?.k === "self") &&
+      !ctx.testMode &&
+      !this.index.methodNames.has(n.name)
+    ) {
+      const a = this.assertion(n, ctx);
+      if (a !== null) {
+        this.imp(ctx, "vitest", "expect");
+        return a;
+      }
+    }
+    // ActiveSupport::Testing::TimeHelpers, included into every test case
+    // (test_case.rb:151), is activesupport's flat functions.
+    if (
+      (n.recv === null || n.recv?.k === "self") &&
+      TIME_HELPERS.has(n.name) &&
+      !this.index.methodNames.has(n.name)
+    ) {
+      const argv = n.args.map((x: N) => this.argExpr(x, ctx));
+      if (n.block) argv.push(this.blockArg(n.block, ctx));
+      const call = `${this.as(ctx, tsMethodName(n.name))}(${argv.join(", ")})`;
+      if (n.block && ctx.asyncBox) {
+        ctx.asyncBox.awaits = true;
+        return `(await ${call})`;
+      }
+      return call;
+    }
+    // An assertion with no `expect` form (`assert_in_delta`, the
+    // `_assert_nothing_raised_or_warn` helper) is activesupport's flat
+    // function (testing/assertions.ts), where the gem defines no method of
+    // that name.
     if (
       n.recv === null &&
       !ctx.testMode &&
@@ -2697,6 +2728,9 @@ export class Lowerer {
         return n.args.length >= 2 ? `expect(${a(1)}).not.toBeInstanceOf(${a(0)})` : null;
       case "assert_instance_of":
         return n.args.length >= 2 ? `expect(${a(1)}).toBeInstanceOf(${a(0)})` : null;
+      // Minitest::Assertions#pass: an assertion that passes.
+      case "pass":
+        return n.args.length <= 1 ? "expect(true).toBe(true)" : null;
       case "assert_empty":
         return n.args.length >= 1 ? `expect(${this.rc(ctx, "isEmpty")}(${a(0)})).toBe(true)` : null;
       case "assert_raises":
@@ -5093,6 +5127,15 @@ function asyncEnumBody(name: string, argc: number): string | null {
   }
   return null;
 }
+
+/** ActiveSupport::Testing::TimeHelpers' methods (testing/time_helpers.rb). */
+const TIME_HELPERS = new Set([
+  "travel",
+  "travel_to",
+  "travel_back",
+  "freeze_time",
+  "unfreeze_time",
+]);
 
 /** Enumerable methods whose awaiting block is run sequentially by `rbAsyncEnum`. */
 const ASYNC_ENUM = new Set(
