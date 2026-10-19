@@ -10,7 +10,7 @@
  *
  *   - a committed mark per gated package — `novel`, `total`,
  *     `noCounterpartFiles` and `allowed`;
- *   - CI fails on ANY increase in either number;
+ *   - CI fails on ANY increase in any of them;
  *   - converging surface makes the mark stale-HIGH, which `--tighten` narrows
  *     to the current measurement — never a reseed, and never a widening.
  *
@@ -334,6 +334,24 @@ export function unmeasuredPackages(current: SurfaceMarks): string[] {
 export function unmarkedPackages(marks: SurfaceMarks): string[] {
   const rowless = new Set<string>(ROWLESS_PACKAGES);
   return GATED_PACKAGES.filter((name) => !rowless.has(name) && marks[name] === undefined);
+}
+
+/**
+ * Every gated dimension a committed row is missing, as `package dimension`.
+ * Each comparison skips a dimension the row lacks, so a dropped field would
+ * disarm that dimension silently — the dimension-level twin of
+ * {@link unmarkedPackages}.
+ */
+export function incompleteMarks(marks: SurfaceMarks): string[] {
+  const missing: string[] = [];
+  for (const name of GATED_PACKAGES) {
+    const mark = marks[name];
+    if (!mark) continue;
+    for (const dimension of dimensionsFor(name)) {
+      if (mark[dimension] === undefined) missing.push(`${name} ${dimension}`);
+    }
+  }
+  return missing;
 }
 
 /**

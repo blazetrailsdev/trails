@@ -6,7 +6,9 @@ import {
   MARK_DIMENSIONS,
   ROWLESS_PACKAGES,
   TAGGED_ONLY_PACKAGES,
+  UNGATED_ALLOWED_PACKAGES,
   exceedances,
+  incompleteMarks,
   measure,
   staleMarks,
   strandedMarks,
@@ -398,6 +400,25 @@ describe("extra-surface mark", () => {
     expect(
       taggedOnlyViolations({ arel: { novel: 0, total: 0, noCounterpartFiles: 3, allowed: 40 } }),
     ).toEqual([]);
+  });
+
+  it("names a gated dimension a committed row is missing", () => {
+    expect(
+      incompleteMarks({
+        thor: { novel: 0, total: 0, noCounterpartFiles: 0, allowed: 0 },
+        "ruby-compat": { novel: 0, total: 0, noCounterpartFiles: 0 },
+      }),
+    ).toEqual([]);
+    expect(
+      incompleteMarks({
+        thor: { novel: 0, total: 0, allowed: 0 } as unknown as SurfaceMarks[string],
+        actiondispatch: { novel: 0, total: 0, noCounterpartFiles: 0 },
+      }),
+    ).toEqual(["actiondispatch allowed", "thor noCounterpartFiles"]);
+  });
+
+  it("leaves allowed ungated for ruby-compat only", () => {
+    expect(UNGATED_ALLOWED_PACKAGES).toEqual(["ruby-compat"]);
   });
 
   it("gates every package in exactly one mode", () => {

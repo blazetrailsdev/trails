@@ -3,7 +3,8 @@
  * CI gate for the extra-surface ratchet (RFC 0117). Fails on:
  *
  *   - GROWTH — a gated package's `novel`, `total`, `noCounterpartFiles` or
- *     `allowed` extra-surface count rose above its committed mark in extra-surface-mark.json. The fix is to
+ *     `allowed` extra-surface count rose above its committed mark in
+ *     extra-surface-mark.json. The fix is to
  *     remove the invented surface (delete it, fold it into the ported method,
  *     or — for a genuine TypeScript shortcoming — tag it `@noRailsEquivalent
  *     <reason>`), never to raise the mark;
@@ -49,6 +50,7 @@ import {
   ROWLESS_PACKAGES,
   TAGGED_ONLY_PACKAGES,
   exceedances,
+  incompleteMarks,
   loadMarks,
   measure,
   staleMarks,
@@ -109,6 +111,16 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
         "would pass on it silently rather than half-enabling. Seed it from a clean\n" +
         "measurement before gating:\n" +
         "  pnpm parity:api:extra --package <pkg>\n",
+    );
+    return 1;
+  }
+
+  const incomplete = incompleteMarks(marks).filter((d) => inScope(d.split(" ")[0]));
+  if (incomplete.length > 0) {
+    console.error(
+      `\nextra-surface gate: ${incomplete.length} gated dimension(s) missing from a committed row: ${incomplete.join(", ")}.\n` +
+        "A dimension a row lacks is skipped by every comparison, so the gate would\n" +
+        "pass on it silently. Seed it from a clean measurement.\n",
     );
     return 1;
   }
