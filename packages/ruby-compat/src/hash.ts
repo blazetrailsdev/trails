@@ -1716,6 +1716,46 @@ export class Hash<K, V> extends Map<K, V> {
   }
 
   /**
+   * `Hash#assoc` (`vendor/ruby/v3.3.11/hash.c:4193` `rb_hash_assoc`): the stored
+   * key and its value for `key`, else `nil`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  assoc(key: K): [K, V] | null {
+    const stored = this.hashStlikeLookup(key);
+    if (!super.has(stored)) return null;
+    return [stored, super.get(stored)!];
+  }
+
+  /**
+   * `Hash#dig` (`vendor/ruby/v3.3.11/hash.c:4627` `rb_hash_dig`): `self[key]`,
+   * then `rb_obj_dig` (`vendor/ruby/v3.3.11/object.c:3906`) over the rest, which
+   * answers `nil` through a `nil` and sends `dig` to anything else.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  dig(key: K, ...rest: unknown[]): unknown {
+    const obj: unknown = this.get(key);
+    if (rest.length === 0) return obj;
+    if (obj == null) return null;
+    const dig = (obj as { dig?: unknown }).dig;
+    if (typeof dig !== "function") {
+      throw new TypeError(`${rbBuiltinClassName(obj)} does not have #dig method`);
+    }
+    return dig.call(obj, ...rest);
+  }
+
+  /**
+   * `Hash#fetch_values` (`vendor/ruby/v3.3.11/hash.c:2745`
+   * `rb_hash_fetch_values`): `rb_hash_fetch` for each key.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  fetchValues(...argv: K[]): V[] {
+    return argv.map((key) => fetch(this as Map<K, V>, key) as V);
+  }
+
+  /**
    * `Hash#rassoc` (`vendor/ruby/v3.3.11/hash.c:4254` `rb_hash_rassoc`): the
    * first pair whose value is `==` to `obj` (`rassoc_i`), else `nil`.
    *

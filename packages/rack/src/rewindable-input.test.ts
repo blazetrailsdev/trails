@@ -107,7 +107,7 @@ it("handle partial writes to tempfile", () => {
   r.isFilesystemHasPosixSemantics = function (this: any) {
     const tempfile = this.rewindableIo;
     const write = tempfile.write.bind(tempfile);
-    tempfile.write = (buffer: string) => write(buffer.slice(0, 2));
+    tempfile.write = (buffer: Uint8Array) => write(buffer.subarray(0, 2));
     return original.call(this);
   };
   rio!.read(1);
@@ -134,8 +134,8 @@ it("be possible to call #close multiple times", () => {
 });
 
 it("wraps rack.input in RewindableInput", async () => {
-  let app: any = (env: any) => [200, {}, [env[RACK_INPUT].constructor.name]];
-  expect(app({ [RACK_INPUT]: new StringIO("") })[2]).toEqual(["StringIO"]);
+  let app: any = { call: (env: any) => [200, {}, [env[RACK_INPUT].constructor.name]] };
+  expect(app.call({ [RACK_INPUT]: new StringIO("") })[2]).toEqual(["StringIO"]);
   app = new RewindableInput.Middleware(app);
   expect((await app.call({ [RACK_INPUT]: new StringIO("") }))[2]).toEqual(["RewindableInput"]);
 });

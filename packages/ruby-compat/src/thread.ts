@@ -52,18 +52,13 @@ export class Thread<R = unknown> {
   });
 
   /**
-   * `Thread.list` (`vendor/ruby/v3.3.11/thread.c:2924` `thread_list`), the
+   * `Thread.list` (`vendor/ruby/v3.3.11/thread.c:2922` `thread_list`), the
    * main thread and every thread still alive (`rb_thread_list`, `:2895`).
    *
-   * @noRailsEquivalent PERMANENT — Ruby core `Thread.list` (`vendor/ruby/v3.3.11/thread.c:5388`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.list` (`vendor/ruby/v3.3.11/thread.c:2922`).
    */
   static list(): Thread[] {
-    const list: Thread[] = [Thread.main];
-    for (const th of _threads) {
-      if (th.isAlive()) list.push(th);
-      else _threads.delete(th);
-    }
-    return list;
+    return [Thread.main, ..._threads];
   }
 
   /**
@@ -177,18 +172,23 @@ export class Thread<R = unknown> {
     } catch (error) {
       this.#error = { raised: error };
       this.status = "dead";
+      _threads.delete(this as Thread);
       if (this.abortOnException) this.#abort(error);
       return;
     }
     const value = this.#value as unknown;
     if (value && typeof (value as PromiseLike<unknown>).then === "function") {
-      const die = () => void (this.status = "dead");
+      const die = () => {
+        this.status = "dead";
+        _threads.delete(this as Thread);
+      };
       (value as PromiseLike<unknown>).then(die, (error) => {
         die();
         if (this.abortOnException) this.#abort(error);
       });
     } else {
       this.status = "dead";
+      _threads.delete(this as Thread);
     }
   }
 
@@ -242,6 +242,7 @@ export class Thread<R = unknown> {
   exit(): this {
     if (this.status === "dead") return this;
     this.status = "dead";
+    _threads.delete(this as Thread);
     this.#kill();
     return this;
   }

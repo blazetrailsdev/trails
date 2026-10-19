@@ -75,7 +75,7 @@ export const Stat = {
     this: StatHost,
     file: string | null | false | undefined,
   ): [string, FsStatResult] | false | null | undefined {
-    if (!file) return undefined;
+    if (file == null || file === false) return undefined;
     try {
       const stat = File.stat(file);
       if (stat.isFile()) return [file, stat];
@@ -97,16 +97,16 @@ export class Reloader {
   static Stat = Stat;
 
   private app: any;
-  private cooldown: number | null | false;
+  private cooldown: number;
   private last: number;
   private cache: Record<string, string>;
   private mtimes: Record<string, Date>;
   private reloadMutex: Mutex;
 
-  constructor(app: any, cooldown: number | null | false = 10, backend: object = Stat) {
+  constructor(app: any, cooldown: number = 10, backend: object = Stat) {
     this.app = app;
     this.cooldown = cooldown;
-    this.last = Date.now() / 1000 - (cooldown as number);
+    this.last = Date.now() / 1000 - cooldown;
     this.cache = {};
     this.mtimes = {};
     this.reloadMutex = new Mutex();
@@ -115,11 +115,7 @@ export class Reloader {
   }
 
   async call(env: Record<string, any>): Promise<unknown> {
-    if (
-      this.cooldown != null &&
-      this.cooldown !== false &&
-      Date.now() / 1000 > this.last + this.cooldown
-    ) {
+    if (this.cooldown != null && Date.now() / 1000 > this.last + this.cooldown) {
       if (Thread.list().length > 1) {
         await this.reloadMutex.synchronize(() => this.reloadBang());
       } else {

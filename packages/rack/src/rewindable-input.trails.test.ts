@@ -30,7 +30,7 @@ describe("Rack::RewindableInput with binary bytes", () => {
       const rio = new RewindableInput(makeIo());
       try {
         expect(rio.read()).toBe("\xff\xfehello");
-        expect(rio.size).toBe(7);
+        expect(rio.size()).toBe(7);
         rio.rewind();
         expect(rio.read(2)).toBe("\xff\xfe");
       } finally {
@@ -54,4 +54,12 @@ describe("Rack::RewindableInput with binary bytes", () => {
       rio.close();
     }
   });
+});
+
+it("buffers multi-byte input byte for byte", () => {
+  const bytes = new TextEncoder().encode("héllo wörld ✓");
+  const rio = new RewindableInput(new StringIO(bytes));
+  expect(rio.read()).toBe(String.fromCharCode(...bytes));
+  expect(rio.size()).toBe(bytes.length);
+  rio.close();
 });

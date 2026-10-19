@@ -1,5 +1,5 @@
 import { RACK_INPUT } from "./constants.js";
-import { Encoding, RUBY_PLATFORM, RuntimeError, Tempfile, rbFSend } from "@blazetrails/ruby-compat";
+import { Encoding, RUBY_PLATFORM, RuntimeError, Tempfile } from "@blazetrails/ruby-compat";
 
 export class Middleware {
   private app: any;
@@ -10,7 +10,7 @@ export class Middleware {
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
     env[RACK_INPUT] = new RewindableInput(env[RACK_INPUT]);
-    return rbFSend(this.app, "call", env) as [number, Record<string, any>, any];
+    return this.app.call(env);
   }
 }
 
@@ -75,17 +75,19 @@ export class RewindableInput {
       this.unlinked = true;
     }
 
-    const buffer = new Uint8Array(1024 * 4);
-    let chunk: string | null;
-    while ((chunk = this.io.read(1024 * 4, buffer)) != null) {
+    let buffer = new Uint8Array(1024 * 4);
+    let read: string | null;
+    while ((read = this.io.read(1024 * 4, buffer)) != null) {
+      buffer = buffer.subarray(0, read.length);
       let entireBufferWrittenOut = false;
       while (!entireBufferWrittenOut) {
-        const written = this.rewindableIo.write(chunk);
-        entireBufferWrittenOut = written === chunk.length;
+        const written = this.rewindableIo.write(buffer);
+        entireBufferWrittenOut = written === buffer.byteLength;
         if (!entireBufferWrittenOut) {
-          chunk = chunk.slice(written);
+          buffer = buffer.subarray(written);
         }
       }
+      buffer = new Uint8Array(1024 * 4);
     }
     this.rewindableIo.rewind();
   }

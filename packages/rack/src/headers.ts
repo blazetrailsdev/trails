@@ -1,12 +1,104 @@
-import { ArgumentError, dup, except, fetch, Hash } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  dup,
+  eachPair,
+  except,
+  fetch,
+  Hash,
+  isPlainHash,
+} from "@blazetrails/ruby-compat";
 
 type PairBlock = (key: string, value: string) => unknown;
 
+const KNOWN_HEADERS: Record<string, string> = {};
+for (const str of [
+  "Accept-CH",
+  "Accept-Patch",
+  "Accept-Ranges",
+  "Access-Control-Allow-Credentials",
+  "Access-Control-Allow-Headers",
+  "Access-Control-Allow-Methods",
+  "Access-Control-Allow-Origin",
+  "Access-Control-Expose-Headers",
+  "Access-Control-Max-Age",
+  "Age",
+  "Allow",
+  "Alt-Svc",
+  "Cache-Control",
+  "Connection",
+  "Content-Disposition",
+  "Content-Encoding",
+  "Content-Language",
+  "Content-Length",
+  "Content-Location",
+  "Content-MD5",
+  "Content-Range",
+  "Content-Security-Policy",
+  "Content-Security-Policy-Report-Only",
+  "Content-Type",
+  "Date",
+  "Delta-Base",
+  "ETag",
+  "Expect-CT",
+  "Expires",
+  "Feature-Policy",
+  "IM",
+  "Last-Modified",
+  "Link",
+  "Location",
+  "NEL",
+  "P3P",
+  "Permissions-Policy",
+  "Pragma",
+  "Preference-Applied",
+  "Proxy-Authenticate",
+  "Public-Key-Pins",
+  "Referrer-Policy",
+  "Refresh",
+  "Report-To",
+  "Retry-After",
+  "Server",
+  "Set-Cookie",
+  "Status",
+  "Strict-Transport-Security",
+  "Timing-Allow-Origin",
+  "Tk",
+  "Trailer",
+  "Transfer-Encoding",
+  "Upgrade",
+  "Vary",
+  "Via",
+  "WWW-Authenticate",
+  "Warning",
+  "X-Cascade",
+  "X-Content-Duration",
+  "X-Content-Security-Policy",
+  "X-Content-Type-Options",
+  "X-Correlation-ID",
+  "X-Correlation-Id",
+  "X-Download-Options",
+  "X-Frame-Options",
+  "X-Permitted-Cross-Domain-Policies",
+  "X-Powered-By",
+  "X-Redirect-By",
+  "X-Request-ID",
+  "X-Request-Id",
+  "X-Runtime",
+  "X-UA-Compatible",
+  "X-WebKit-CS",
+  "X-XSS-Protection",
+]) {
+  const downcased = str.toLowerCase();
+  KNOWN_HEADERS[str] = KNOWN_HEADERS[downcased] = downcased;
+}
+
 export class Headers extends Hash<string, string> {
+  static KNOWN_HEADERS = KNOWN_HEADERS;
+
   static get(...items: any[]): Headers {
     if (items.length % 2 !== 0) {
-      if (items.length === 1 && typeof items[0] === "object" && items[0] !== null) {
-        return new this().update(items[0]);
+      if (items.length === 1 && (items[0] instanceof Hash || isPlainHash(items[0]))) {
+        return new this().update(items[0] as Record<string, string> | Headers);
       } else {
         throw new ArgumentError("odd number of arguments for Rack::Headers");
       }
@@ -27,17 +119,18 @@ export class Headers extends Hash<string, string> {
   }
 
   override set(key: string, value: string): this {
-    return super.set(key.toLowerCase(), value);
+    return super.set(
+      Object.hasOwn(KNOWN_HEADERS, key) ? KNOWN_HEADERS[key] : key.toLowerCase(),
+      value,
+    );
   }
 
   store(key: string, value: string): this {
     return this.set(key, value);
   }
 
-  assoc(key: string): [string, string] | null {
-    const k = this.downcaseKey(key);
-    if (super.has(k)) return [k, super.get(k)!];
-    return null;
+  override assoc(key: string): [string, string] | null {
+    return super.assoc(this.downcaseKey(key));
   }
 
   override compareByIdentity(): never {
@@ -48,11 +141,8 @@ export class Headers extends Hash<string, string> {
     return super.delete(this.downcaseKey(key), block);
   }
 
-  dig(key: string, ...a: any[]): string | undefined | null {
-    const val = this.get(key);
-    if (a.length === 0) return val;
-    if (val === undefined || val === null) return undefined;
-    throw new TypeError("String does not have #dig method");
+  override dig(key: string, ...a: unknown[]): unknown {
+    return super.dig(this.downcaseKey(key), ...a);
   }
 
   fetch(key: string, ...defaultValue: any[]): string {
@@ -60,8 +150,8 @@ export class Headers extends Hash<string, string> {
     return fetch(this as Map<string, string>, key, ...defaultValue) as string;
   }
 
-  fetchValues(...a: string[]): string[] {
-    return a.map((key) => this.fetch(key));
+  override fetchValues(...a: string[]): string[] {
+    return super.fetchValues(...a.map((key) => this.downcaseKey(key)));
   }
 
   hasKey(key: string): boolean {
@@ -116,13 +206,12 @@ export class Headers extends Hash<string, string> {
     hash: Record<string, string> | Headers,
     block?: (key: string, oldVal: string, newVal: string) => string,
   ): this {
-    const pairs = hash instanceof Map ? [...hash] : Object.entries(hash);
-    for (const [key, value] of pairs) {
+    eachPair(hash, (key, value) => {
       this.set(
         key,
         block !== undefined && this.isInclude(key) ? block(key, this.get(key)!, value) : value,
       );
-    }
+    });
     return this;
   }
 
@@ -156,6 +245,10 @@ export class Headers extends Hash<string, string> {
 
   /** @internal */
   private downcaseKey(key: string): string {
-    return typeof key === "string" ? key.toLowerCase() : key;
+    return typeof key === "string"
+      ? Object.hasOwn(KNOWN_HEADERS, key)
+        ? KNOWN_HEADERS[key]
+        : key.toLowerCase()
+      : key;
   }
 }
