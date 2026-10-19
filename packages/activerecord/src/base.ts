@@ -1420,9 +1420,11 @@ export class Base extends Model {
    * @inlinedFrom ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:56-78
    * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482
    * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84
+   * @inventedArm if — PERMANENT
+   * @inventedArm completeAttributesOnSchemaLoad — CONVERGEABLE save-chain-schema-warm-and-cold-built-records
    */
   constructor(
-    attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes = {},
+    attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes | null = {},
     initBlock?: (record: Base) => void,
   ) {
     const allocating = _Core._allocation.klass === new.target;
@@ -1459,12 +1461,25 @@ export class Base extends Model {
         }
       }
     }
-    attributes ??= {};
-    let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
-    const assocPending = _extractAssociationAttrs(new.target, attrs);
-    if (assocPending) attrs = assocPending.rest;
-    if (allocating) _Core._allocation.klass = new.target;
-    super(attrs);
+    const assocPending =
+      attributes == null || isEmpty(attributes)
+        ? null
+        : _extractAssociationAttrs(new.target, sanitizeForMassAssignment(attributes));
+    super(null);
+
+    if (!allocating) {
+      this._newRecord = true;
+      this._attributes = new.target._defaultAttributes().deepDup();
+      if (!ModelSchema.isSchemaLoaded.call(new.target as never)) {
+        _Core.completeAttributesOnSchemaLoad(this, this._attributes);
+      }
+    }
+
+    this.initInternals();
+    if (!allocating) this.initializeInternalsCallback();
+
+    if (attributes != null) this.assignAttributes(assocPending?.rest ?? attributes);
+
     if (assocPending) {
       _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
     }
@@ -1474,6 +1489,9 @@ export class Base extends Model {
     }
   }
 
+  /** @internal */
+  declare initInternals: () => void;
+  declare initializeInternalsCallback: () => void;
   /** @internal */
   declare _runInitializeCallbacks: (block?: () => unknown) => unknown;
   /** @internal */
@@ -1967,7 +1985,9 @@ export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
   _updateRecord(attributeNames?: string[], block?: (record: this) => void): Promise<unknown>;
   slice(...keys: string[]): HashWithIndifferentAccess<unknown>;
   valuesAt(...keys: string[]): unknown[];
-  assignAttributes(attrs: Record<string, unknown> | PermittedAttributes): void;
+  assignAttributes(
+    attrs: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
+  ): void;
   setAttributes(
     attrs: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
   ): Promise<void> | void;

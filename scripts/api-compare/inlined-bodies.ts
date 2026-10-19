@@ -81,30 +81,85 @@ export function moduleAncestors(
   klassFqn: string,
   modules: Record<string, unknown>,
   resolve: (incName: string, contextFqn: string) => string,
+  inherited: ReadonlySet<string> = new Set(),
 ): ModuleAncestors {
-  const visited = new Set<string>();
-  const ordered = (mod: ClassInfo | undefined, kind: "include" | "prepend"): string[] =>
-    mod?.mixinOrder !== undefined
-      ? [...mod.mixinOrder]
-          .reverse()
-          .filter((statement) => statement.kind === kind)
-          .flatMap((statement) => statement.names)
-      : [...((kind === "include" ? mod?.includes : mod?.prepends) ?? [])].reverse();
-  const walk = (names: readonly string[], contextFqn: string, into: string[]): void => {
-    for (const name of names) {
+  const visited = new Set<string>(inherited);
+  type Statement = { kind: string; names: string[]; context: string };
+  const statements = (mod: ClassInfo | undefined, contextFqn: string): Statement[] => {
+    const written = (
+      mod?.mixinOrder ?? [
+        { kind: "prepend", names: [...(mod?.prepends ?? [])].reverse() },
+        { kind: "include", names: [...(mod?.includes ?? [])].reverse() },
+      ]
+    ).map((statement) => ({ ...statement, context: contextFqn }));
+    return [
+      ...written.flatMap((statement) => [
+        statement,
+        ...(statement.kind !== "include"
+          ? []
+          : statement.names.flatMap((name) => {
+              const fqn = resolve(name, contextFqn);
+              return ((modules[fqn] as ClassInfo | undefined)?.includedHookMixins ?? []).map(
+                (hook) => ({ ...hook, context: fqn }),
+              );
+            })),
+      ]),
+      ...(mod?.bootMixins ?? []).map((statement) => ({ ...statement, context: contextFqn })),
+    ];
+  };
+  const ordered = (mod: ClassInfo | undefined, contextFqn: string, kind: "include" | "prepend") =>
+    statements(mod, contextFqn)
+      .reverse()
+      .filter((statement) => statement.kind === kind)
+      .flatMap((statement) => statement.names.map((name) => [name, statement.context] as const));
+  const walk = (names: readonly (readonly [string, string])[], into: string[]): void => {
+    for (const [name, contextFqn] of names) {
       const fqn = resolve(name, contextFqn);
       if (visited.has(fqn)) continue;
       visited.add(fqn);
       const mod = modules[fqn] as ClassInfo | undefined;
-      walk(ordered(mod, "prepend"), fqn, into);
+      walk(ordered(mod, fqn, "prepend"), into);
       into.push(fqn);
-      walk(ordered(mod, "include"), fqn, into);
+      walk(ordered(mod, fqn, "include"), into);
     }
   };
   const ancestors: ModuleAncestors = { prepended: [], included: [] };
-  walk(ordered(klass, "prepend"), klassFqn, ancestors.prepended);
-  walk(ordered(klass, "include"), klassFqn, ancestors.included);
+  walk(ordered(klass, klassFqn, "prepend"), ancestors.prepended);
+  walk(ordered(klass, klassFqn, "include"), ancestors.included);
   return ancestors;
+}
+
+/**
+ * The modules `klass`'s superclass chain already holds. `include_modules_at`
+ * skips a module it finds there (vendor/ruby/v3.3.11/class.c:1281,1291,1296), so
+ * `ResourceHelpers.included`'s `base.include(ModelHelpers)` adds nothing to a
+ * `ResourceGenerator` whose `ModelGenerator` superclass includes it. A
+ * `DelegateClass(Value)` superclass is a `Delegator`, not `Value`, so the walk
+ * stops there.
+ */
+export function inheritedModules(
+  klass: ClassInfo,
+  klassFqn: string,
+  classes: Record<string, unknown>,
+  modules: Record<string, unknown>,
+  resolve: (incName: string, contextFqn: string) => string,
+  resolveClass: (name: string, contextFqn: string) => string,
+): Set<string> {
+  const held = new Set<string>();
+  const seen = new Set<string>([klassFqn]);
+  for (
+    let info: ClassInfo | undefined = klass, fqn = klassFqn;
+    info?.superclass != null && info.delegateClass !== true;
+  ) {
+    fqn = resolveClass(info.superclass, fqn);
+    if (seen.has(fqn)) break;
+    seen.add(fqn);
+    info = classes[fqn] as ClassInfo | undefined;
+    if (info === undefined) break;
+    const ancestors = moduleAncestors(info, fqn, modules, resolve);
+    for (const mod of [...ancestors.prepended, ...ancestors.included]) held.add(mod);
+  }
+  return held;
 }
 
 /** The ancestors that define `hook` in the class's own Ruby file. */
@@ -315,8 +370,10 @@ const consumesSuper = (segments: readonly MethodInfo[], index: number): boolean 
   index < segments.length - 1;
 
 /**
- * The union call set of a chain. A segment's `super` is the call into the next
- * segment, which the inlining spends, so only the last segment's is kept.
+ * The union call set of a chain, in Ruby's evaluation order. A segment's
+ * `super` is the call into the next segment, which the inlining spends, so the
+ * next segment's calls stand at its position and only the last segment's
+ * `super` is kept. A segment that names no `super` is followed by the rest.
  */
 export function inlinedRubyBody(segments: readonly MethodInfo[]): RubyBody {
   const calls = new Set<string>();
@@ -329,11 +386,19 @@ export function inlinedRubyBody(segments: readonly MethodInfo[]): RubyBody {
       into[call] = [...new Set([...(into[call] ?? []), ...values])].sort();
     }
   };
+  const ordered = (index: number): string[] => {
+    if (index >= segments.length) return [];
+    const own = segments[index].calls ?? [];
+    const at = consumesSuper(segments, index) ? own.indexOf("super") : -1;
+    return at === -1
+      ? [...own, ...ordered(index + 1)]
+      : [...own.slice(0, at), ...ordered(index + 1), ...own.slice(at + 1)];
+  };
+  for (const call of ordered(0)) calls.add(call);
   segments.forEach((segment, index) => {
     const weak = new Set(segment.weakCalls ?? []);
     for (const call of segment.calls ?? []) {
       if (call === "super" && consumesSuper(segments, index)) continue;
-      calls.add(call);
       if (!weak.has(call)) strong.add(call);
     }
     merge(receivers, segment.callReceivers);

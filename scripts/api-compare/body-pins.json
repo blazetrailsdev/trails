@@ -18152,13 +18152,6 @@
   {
     "package": "activemodel",
     "rubyFile": "attributes.rb",
-    "rubyName": "initialize",
-    "digest": "9864ad4e56e18275",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activemodel",
-    "rubyFile": "attributes.rb",
     "rubyName": "initialize_dup",
     "digest": "b55d32c174154f58",
     "ref": "v8.0.2",

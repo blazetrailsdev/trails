@@ -740,7 +740,11 @@ const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
 
-function completeAttributesOnSchemaLoad(record: object, attributes: AttributeSet): void {
+/**
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE save-chain-schema-warm-and-cold-built-records
+ */
+export function completeAttributesOnSchemaLoad(record: object, attributes: AttributeSet): void {
   Object.defineProperty(record, "_attributes", {
     get(this: object) {
       const klass = record.constructor as unknown as {
@@ -764,44 +768,6 @@ function completeAttributesOnSchemaLoad(record: object, attributes: AttributeSet
     enumerable: true,
     configurable: true,
   });
-}
-
-/**
- * @inventedArm if — PERMANENT
- * @inventedArm completeAttributesOnSchemaLoad — CONVERGEABLE save-chain-schema-warm-and-cold-built-records
- */
-export function constructor(
-  this: CoreRecord & {
-    _attributes: AttributeSet;
-    _newRecord: boolean;
-    initInternals(): void;
-    initializeInternalsCallback(): void;
-  },
-  attributes: unknown = null,
-  block?: (record: CoreRecord) => void,
-): void {
-  const allocating = _allocation.klass === this.constructor;
-  if (allocating) _allocation.klass = null;
-  if (!allocating) {
-    this._newRecord = true;
-    this._attributes = (
-      this.constructor as unknown as {
-        _defaultAttributes(): AttributeSet;
-      }
-    )
-      ._defaultAttributes()
-      .deepDup();
-    if (!isSchemaLoaded.call(this.constructor as never)) {
-      completeAttributesOnSchemaLoad(this, this._attributes);
-    }
-  }
-
-  this.initInternals();
-  if (!allocating) this.initializeInternalsCallback();
-
-  SuperMethods.superMethod(this, "initialize")!(attributes);
-
-  if (block) block(this);
 }
 
 /** @internal */
@@ -835,7 +801,6 @@ export function initInternals(
 }
 
 const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initialize", constructor);
   mod.defineMethod("initInternals", initInternals);
   mod.defineMethod("initializeDup", initializeDup);
   mod.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
