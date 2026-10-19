@@ -1,12 +1,5 @@
 import { Minitest, presence, TopLevel } from "@blazetrails/activesupport";
-import {
-  Encoding,
-  File,
-  getFs,
-  Module,
-  Pathname,
-  rbModMethodDefined,
-} from "@blazetrails/ruby-compat";
+import { Encoding, File, getFs, Pathname, rbModMethodDefined } from "@blazetrails/ruby-compat";
 import { vite } from "../server.js";
 
 declare module "vitest" {
@@ -29,9 +22,15 @@ export interface ScreenshotHelperHost {
   metadata: Record<string, unknown>;
 }
 
-export const ScreenshotHelper = Object.assign(new Module(), {
+export const ScreenshotHelper = { takeScreenshot, takeFailedScreenshot } as {
+  takeScreenshot: typeof takeScreenshot;
+  takeFailedScreenshot: typeof takeFailedScreenshot;
   /** @noRailsEquivalent PERMANENT */
-  screenshotDirectory: undefined as string | undefined,
+  screenshotDirectory: string | undefined;
+};
+Object.defineProperty(ScreenshotHelper, "screenshotDirectory", {
+  value: undefined,
+  writable: true,
 });
 
 function env(key: string): string | undefined {
@@ -191,6 +190,3 @@ function failed(this: ScreenshotHelperHost): boolean {
 export function supportsScreenshot(this: ScreenshotHelperHost): boolean {
   return vite.currentDriver !== "rack_test";
 }
-
-ScreenshotHelper.defineMethod("takeScreenshot", takeScreenshot);
-ScreenshotHelper.defineMethod("takeFailedScreenshot", takeFailedScreenshot);

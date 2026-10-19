@@ -1,6 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Concern, Module, extend, include } from "@blazetrails/activesupport";
+import { Concern, extend, include } from "@blazetrails/activesupport";
 import { rbObjClone } from "@blazetrails/ruby-compat";
 import { Callbacks, type CallbackOptions } from "../../abstract-controller/callbacks.js";
 import { Helpers, type HelpersClass } from "../../abstract-controller/helpers.js";
@@ -80,25 +80,22 @@ export function currentContentSecurityPolicy(this: ContentSecurityPolicyInstance
 
 export const ClassMethods = { contentSecurityPolicy, contentSecurityPolicyReportOnly };
 
-export const ContentSecurityPolicy = new Module((mod) => {
-  extend(mod, Concern);
-
-  include(mod, Helpers);
-  include(mod, Callbacks);
-
-  (
-    mod as unknown as {
-      included(base: null, block: (this: HelpersClass) => void): void;
-    }
-  ).included(null, function () {
-    this.helperMethod("isContentSecurityPolicy");
-    this.helperMethod("contentSecurityPolicyNonce");
-  });
-
-  mod.defineMethod("isContentSecurityPolicy", isContentSecurityPolicy);
-  mod.defineMethod("contentSecurityPolicyNonce", contentSecurityPolicyNonce);
-  mod.defineMethod("currentContentSecurityPolicy", currentContentSecurityPolicy);
-}) as Module & { ClassMethods: typeof ClassMethods };
-ContentSecurityPolicy.ClassMethods = ClassMethods;
+export const ContentSecurityPolicy = {
+  ClassMethods,
+  isContentSecurityPolicy,
+  contentSecurityPolicyNonce,
+  currentContentSecurityPolicy,
+};
+extend(ContentSecurityPolicy, Concern);
+include(ContentSecurityPolicy, Helpers);
+include(ContentSecurityPolicy, Callbacks);
+(
+  ContentSecurityPolicy as unknown as {
+    included(base: null, block: (this: HelpersClass) => void): void;
+  }
+).included(null, function () {
+  this.helperMethod("isContentSecurityPolicy");
+  this.helperMethod("contentSecurityPolicyNonce");
+});
 
 rbModConstSet(ActionController, "ContentSecurityPolicy", ContentSecurityPolicy);

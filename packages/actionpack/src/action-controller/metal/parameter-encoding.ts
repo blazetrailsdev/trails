@@ -1,6 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Concern, Module, extend } from "@blazetrails/activesupport";
+import { Concern, extend } from "@blazetrails/activesupport";
 import { Encoding, extended, Hash, rbModSingletonP, toS } from "@blazetrails/ruby-compat";
 import type { EncodingTemplate } from "../../action-dispatch/http/param-builder.js";
 
@@ -62,9 +62,7 @@ export const ClassMethods = {
   },
 };
 
-export const ParameterEncoding = new Module((mod) => {
-  extend(mod, Concern);
-}) as Module & { ClassMethods: typeof ClassMethods };
-ParameterEncoding.ClassMethods = ClassMethods;
+export const ParameterEncoding = { ClassMethods };
+extend(ParameterEncoding, Concern);
 
 rbModConstSet(ActionController, "ParameterEncoding", ParameterEncoding);

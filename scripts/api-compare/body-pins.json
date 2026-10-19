@@ -674,20 +674,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "api.rb",
-    "rubyName": "instrument_name",
-    "digest": "024b77880f43dc5a",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "instrument_payload",
-    "digest": "8d18e7fe976f896e",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
     "rubyName": "params",
     "digest": "e279a70b89f7368b",
     "ref": "v8.0.2"
@@ -704,13 +690,6 @@
     "rubyFile": "api.rb",
     "rubyName": "process_action",
     "digest": "267e83f1a7f29b00",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api.rb",
-    "rubyName": "rate_limiting",
-    "digest": "895ca33f785077d2",
     "ref": "v8.0.2"
   },
   {
