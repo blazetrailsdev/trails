@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { HTML5 } from "@blazetrails/nokogiri";
 import { include, isModuleIncluded, Module, NoMethodError } from "@blazetrails/ruby-compat";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { TestCase } from "../../action-controller/test-case.js";
@@ -50,7 +51,17 @@ describe("ActionDispatch::Assertions", () => {
     const test = new HtmlDocumentTest("test") as HtmlDocumentTest & Assertions;
     Object.assign(test, { response: { mediaType: "application/xml", body: "<a><b/></a>" } });
 
-    expect(test.htmlDocument.root.name).toBe("a");
+    expect(test.htmlDocument.root!.name).toBe("a");
+  });
+
+  it("parses a non-xml response as an HTML5 document", () => {
+    class HtmlDocumentTest extends ActiveSupportTestCase {}
+    include(HtmlDocumentTest, Assertions);
+    const test = new HtmlDocumentTest("test") as HtmlDocumentTest & Assertions;
+    Object.assign(test, { response: { mediaType: "text/html", body: '<p class="x">hi</p>' } });
+
+    expect(test.htmlDocument).toBeInstanceOf(HTML5.Document);
+    expect(test.htmlDocument.root!.name).toBe("html");
   });
 
   it("method_missing sends a named route to the controller, and supers otherwise", () => {

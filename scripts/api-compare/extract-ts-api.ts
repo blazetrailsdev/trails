@@ -1387,6 +1387,22 @@ export function extractFromProgram(
       fileFunctions.push(credited);
     }
 
+    for (const statement of sourceFile.statements) {
+      const call = ts.isExpressionStatement(statement) ? statement.expression : undefined;
+      if (!call || !ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) {
+        continue;
+      }
+      const [alias, original] = call.arguments;
+      if (call.expression.name.text !== "aliasMethod" || !alias || !original) continue;
+      if (!ts.isStringLiteralLike(alias) || !ts.isStringLiteralLike(original)) continue;
+      if (info.modules[`${relPath}:${call.expression.expression.getText(sourceFile)}`]) continue;
+      const receiver = call.expression.expression;
+      if (!ts.isIdentifier(receiver) || !importedModuleBinding(receiver, checker)) continue;
+      const aliased = fileFunctions.find((f) => f.name === original.text);
+      if (!aliased || fileFunctions.some((f) => f.name === alias.text)) continue;
+      fileFunctions.push({ ...aliased, name: alias.text, aliasOf: original.text });
+    }
+
     // Always record file-level functions so compare.ts can match methods
     // against the file regardless of whether a class/interface wrapper exists.
     if (fileFunctions.length > 0) {
@@ -2287,6 +2303,13 @@ function extractPrototypeAssignmentForOf(
   for (const stmt of loopBodyStatements(node)) {
     if (!ts.isExpressionStatement(stmt)) continue;
     const expr = stmt.expression;
+    const defined = definePropertyValueCall(expr, nameVar);
+    if (defined !== null) {
+      hosts = resolvePrototypeHosts(defined.target, info, checker, srcDir, program);
+      if (hosts.length === 0) continue;
+      params = paramsOfDescriptorValue(defined.value, checker);
+      break;
+    }
     if (!ts.isBinaryExpression(expr)) continue;
     if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) continue;
     const lhs = unwrapTsExpression(expr.left);
@@ -2318,6 +2341,26 @@ function extractPrototypeAssignmentForOf(
       });
     }
   }
+}
+
+/**
+ * `Object.defineProperty(<target>, <nameVar>, { value: fn })`, the
+ * non-enumerable spelling of `Cls.prototype[name] = fn` for a generator whose
+ * Ruby methods are private (`date_helper.rb:867-876`).
+ */
+function definePropertyValueCall(
+  expr: ts.Expression,
+  nameVar: string,
+): { target: ts.Expression; value: ts.Expression } | null {
+  if (!ts.isCallExpression(expr) || !ts.isPropertyAccessExpression(expr.expression)) return null;
+  const pa = expr.expression;
+  if (!ts.isIdentifier(pa.expression) || pa.expression.text !== "Object") return null;
+  if (pa.name.text !== "defineProperty" || expr.arguments.length < 3) return null;
+  const [target, propName, descriptor] = expr.arguments;
+  if (!ts.isIdentifier(propName) || propName.text !== nameVar) return null;
+  if (!ts.isObjectLiteralExpression(descriptor)) return null;
+  const value = definePropertyValue(descriptor);
+  return value === null ? null : { target, value };
 }
 
 /** The `get` / `set` initializers of an `Object.defineProperty` descriptor. */
@@ -2702,9 +2745,9 @@ export function inventedArmTags(node: ts.Node): string[] | undefined {
 }
 
 /**
- * The Ruby bodies a constructor's JSDoc names as inlined into it
- * (`@inlinedFrom Module#initialize <citation>`, RFC 0188), in written order, or
- * undefined. compare.ts joins them to the constructor's Rails call set.
+ * The Ruby bodies a constructor's or method's JSDoc names as inlined into it
+ * (`@inlinedFrom Module#method <citation>`, RFC 0188 / RFC 0197), in written
+ * order, or undefined. compare.ts joins them to the member's Rails call set.
  */
 export function inlinedFromTags(node: ts.Node): InlinedFrom[] | undefined {
   const tags = taggedCommentOf(node, INLINED_FROM_TAG, fileHasInlinedFromTag, inlinedFromIn);
@@ -3592,11 +3635,37 @@ function enclosingEntity(node: ts.Node): { name: string; seatsModule: boolean } 
       return { name: cur.name.text, seatsModule };
     }
     if (ts.isExpressionStatement(cur) && ts.isSourceFile(cur.parent)) {
+      const hook = onLoadHookModule(cur.expression);
+      if (hook !== undefined) return { name: hook, seatsModule: true };
       const name = includedHookOwner(cur.expression);
       if (name !== undefined) return { name, seatsModule: isExportedModuleConst(cur.parent, name) };
     }
   }
   return undefined;
+}
+
+function onLoadHookModule(expr: ts.Expression): string | undefined {
+  if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
+  if (expr.expression.text !== "onLoad") return undefined;
+  const [hook] = expr.arguments;
+  if (hook === undefined || !ts.isStringLiteralLike(hook)) return undefined;
+  const frameworkHooks = [
+    "action_cable",
+    "action_controller",
+    "action_dispatch",
+    "action_mailer",
+    "action_view",
+    "active_job",
+    "active_model",
+    "active_record",
+    "active_storage",
+    "active_support",
+  ];
+  if (!frameworkHooks.includes(hook.text)) return undefined;
+  return hook.text
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
 }
 
 /**
@@ -3794,6 +3863,18 @@ export function harvestModuleInstanceMethods(
   };
   visit(block.body);
   return out;
+}
+
+function importedModuleBinding(receiver: ts.Identifier, checker: ts.TypeChecker): boolean {
+  const symbol = checker.getSymbolAtLocation(receiver);
+  if (!symbol?.declarations?.some((d) => ts.isImportSpecifier(d))) return false;
+  const target = checker.getAliasedSymbol(symbol);
+  return (target.declarations ?? []).some(
+    (d) =>
+      ts.isVariableDeclaration(d) &&
+      d.initializer !== undefined &&
+      /^\(?new Module\b/.test(unwrapAssertions(d.initializer).getText()),
+  );
 }
 
 /**
@@ -4393,6 +4474,7 @@ export function extractClass(
     const memberInventedArms = inventedArmTags(member);
     const memberMissingRailsCallReasons = missingRailsCallTagReasons(member);
     const memberMissingRailsArgsReasons = missingRailsArgsTagReasons(member);
+    const inlinedFrom = inlinedFromTags(member);
     const tagged = {
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       ...(memberMissingRailsCalls !== undefined
@@ -4409,6 +4491,7 @@ export function extractClass(
       ...(memberMissingRailsArgsReasons !== undefined
         ? { missingRailsArgsReasons: memberMissingRailsArgsReasons }
         : {}),
+      ...(inlinedFrom !== undefined ? { inlinedFrom } : {}),
     };
     const isStatic = hasModifier(member, ts.SyntaxKind.StaticKeyword);
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;
@@ -4445,6 +4528,7 @@ export function extractClass(
         ...(internal ? { internal: true } : {}),
         ...tagged,
         ...(signatureReturnsVoid(member, checker) ? { returnsVoid: true } : {}),
+        ...(member.asteriskToken ? { generator: true } : {}),
         ...(optionKeys !== undefined ? { optionKeys } : {}),
         ...(optionKeys != null && optionReads !== undefined ? { optionReads } : {}),
         ...(calls !== undefined ? { calls } : {}),
@@ -4475,7 +4559,6 @@ export function extractClass(
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
       const shapeTokens = extractShapeTokens(member.body);
-      const inlinedFrom = inlinedFromTags(member);
       instanceMethods.push({
         name: "constructor",
         visibility,
@@ -4484,7 +4567,6 @@ export function extractClass(
         file,
         ...(internal ? { internal: true } : {}),
         ...tagged,
-        ...(inlinedFrom !== undefined ? { inlinedFrom } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),

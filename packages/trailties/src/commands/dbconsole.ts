@@ -161,6 +161,7 @@ export class DbconsoleCommand extends Base {
     });
   }
 
+  /** @inlinedFrom Rails::Command::EnvironmentArgument#initialize rails/v8.0.2/railties/lib/rails/command/environment_argument.rb:16-26 */
   constructor(options: DBConsoleOptions = {}) {
     super(options);
 

@@ -12,7 +12,7 @@ export function isIn<T>(
   if (typeof anotherObject === "string") return anotherObject.includes(value as unknown as string);
   if (anotherObject instanceof Map) return anotherObject.has(value);
   if (isPlainObject(anotherObject)) {
-    return Object.prototype.hasOwnProperty.call(anotherObject, value as string);
+    return Object.hasOwn(anotherObject, value as string);
   }
   throw new ArgumentError("The parameter passed to #in? must respond to #include?");
 }

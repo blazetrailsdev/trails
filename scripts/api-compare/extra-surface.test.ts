@@ -4569,6 +4569,28 @@ describe("inlinedModuleMembers", () => {
     expect(inlinedModuleMembers("arel", classes, modules, byShort, bodied, tagged)).toEqual([]);
   });
 
+  it("drops a module method whose super the host's tagged method inlines, and only that one", () => {
+    const modules = {
+      "Arel::Crud": rubyClass({
+        name: "Crud",
+        file: "crud.rb",
+        instance: [{ ...method("compile_insert"), calls: ["super"] }, method("compile_update")],
+      }),
+    };
+    const bodied = new Map([
+      ["select-manager.ts", new Set(["compileInsert", "compileUpdate"])],
+      ["crud.ts", new Set<string>()],
+    ]);
+    const tagged = new Map([
+      ["select-manager.ts", new Set(["Arel::Crud#compile_insert", "Arel::Crud#compile_update"])],
+    ]);
+    expect(
+      inlinedModuleMembers("arel", rubyClasses, modules, byShort, bodied, tagged).map(
+        (f) => f.tsName,
+      ),
+    ).toEqual(["compileUpdate"]);
+  });
+
   it("reports nothing when the module's own twin carries the body", () => {
     // The settled shape: the body stays in the file mirroring the mixin's own
     // Rails file, and the host keeps only the include seam.
@@ -4764,6 +4786,68 @@ describe("inlinedModuleMembers", () => {
           rubyName: "new",
         },
       ]);
+    });
+  });
+
+  describe("a module `initialize` and a module name the includer's own `.rb` defines", () => {
+    const urlForModules = {
+      "ActionDispatch::Routing::UrlFor": rubyClass({
+        name: "UrlFor",
+        file: "routing/url_for.rb",
+        instance: [method("initialize"), method("default_url_options=")],
+      }),
+    };
+    const urlForShort = new Map([["UrlFor", ["ActionDispatch::Routing::UrlFor"]]]);
+
+    it("leaves the constructor of an includer that defines `initialize` alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "actiondispatch",
+          {
+            "ActionDispatch::Routing::RoutesProxy": rubyClass({
+              name: "RoutesProxy",
+              file: "routing/routes_proxy.rb",
+              includes: ["UrlFor"],
+              instance: [method("initialize")],
+            }),
+          },
+          urlForModules,
+          urlForShort,
+          new Map([
+            ["routing/routes-proxy.ts", new Set(["constructor"])],
+            ["routing/url-for.ts", new Set<string>()],
+          ]),
+        ),
+      ).toEqual([]);
+    });
+
+    it("leaves a body a sibling in the includer's `.rb` defines alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "actiondispatch",
+          {
+            "ActionDispatch::Integration::Session": rubyClass({
+              name: "Session",
+              file: "testing/integration.rb",
+              includes: ["UrlFor"],
+              instance: [],
+            }),
+          },
+          {
+            ...urlForModules,
+            "ActionDispatch::Integration::Runner": rubyClass({
+              name: "Runner",
+              file: "testing/integration.rb",
+              instance: [method("default_url_options=")],
+            }),
+          },
+          urlForShort,
+          new Map([
+            ["testing/integration.ts", new Set(["setDefaultUrlOptions"])],
+            ["routing/url-for.ts", new Set<string>()],
+          ]),
+        ),
+      ).toEqual([]);
     });
   });
 });

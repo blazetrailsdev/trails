@@ -31,8 +31,26 @@ ActionView.eagerAutoload(() => {
 
 TopLevel.ActionView = ActionView;
 
-export const Tags = { name: "ActionView::Helpers::Tags" } as {
-  name: string;
+const tagsLoadPath: Record<string, () => Promise<unknown>> = {
+  "action_view/helpers/tags/collection_check_boxes": () =>
+    import("./helpers/tags/collection-check-boxes.js"),
+  "action_view/helpers/tags/collection_radio_buttons": () =>
+    import("./helpers/tags/collection-radio-buttons.js"),
+  "action_view/helpers/tags/collection_select": () => import("./helpers/tags/collection-select.js"),
+  "action_view/helpers/tags/date_select": () => import("./helpers/tags/date-select.js"),
+  "action_view/helpers/tags/datetime_select": () => import("./helpers/tags/datetime-select.js"),
+  "action_view/helpers/tags/grouped_collection_select": () =>
+    import("./helpers/tags/grouped-collection-select.js"),
+  "action_view/helpers/tags/select": () => import("./helpers/tags/select.js"),
+  "action_view/helpers/tags/time_select": () => import("./helpers/tags/time-select.js"),
+  "action_view/helpers/tags/time_zone_select": () => import("./helpers/tags/time-zone-select.js"),
+  "action_view/helpers/tags/weekday_select": () => import("./helpers/tags/weekday-select.js"),
+};
+
+export const Tags = {
+  name: "ActionView::Helpers::Tags",
+  loadPath: tagsLoadPath,
+} as AutoloadModule & {
   Select: typeof Select;
   CollectionCheckBoxes: typeof CollectionCheckBoxes;
   CollectionRadioButtons: typeof CollectionRadioButtons;
@@ -44,3 +62,16 @@ export const Tags = { name: "ActionView::Helpers::Tags" } as {
   TimeZoneSelect: typeof TimeZoneSelect;
   WeekdaySelect: typeof WeekdaySelect;
 };
+extend(Tags, Autoload);
+Tags.eagerAutoload(() => {
+  Tags.autoload("CollectionCheckBoxes");
+  Tags.autoload("CollectionRadioButtons");
+  Tags.autoload("CollectionSelect");
+  Tags.autoload("DateSelect");
+  Tags.autoload("DatetimeSelect");
+  Tags.autoload("GroupedCollectionSelect");
+  Tags.autoload("Select");
+  Tags.autoload("TimeSelect");
+  Tags.autoload("TimeZoneSelect");
+  Tags.autoload("WeekdaySelect");
+});

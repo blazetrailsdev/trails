@@ -35,7 +35,7 @@ export namespace Configurable {
 
   export namespace ClassMethods {
     export function config(this: any): Configuration {
-      if (!Object.prototype.hasOwnProperty.call(this, "_config")) {
+      if (!Object.hasOwn(this, "_config")) {
         const superclass = Object.getPrototypeOf(this);
         if (superclass != null && typeof superclass.config === "function") {
           this._config = superclass.config().inheritableCopy();
@@ -99,7 +99,7 @@ export namespace Configurable {
   }
 
   export function config(this: any): Configuration {
-    if (!Object.prototype.hasOwnProperty.call(this, "_config")) {
+    if (!Object.hasOwn(this, "_config")) {
       this._config = this.constructor.config().inheritableCopy();
     }
     return this._config;

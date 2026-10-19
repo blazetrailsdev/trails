@@ -26,6 +26,7 @@ import {
   rbObjClass,
   rbObjIsKindOf,
   rbObjRespondTo,
+  size,
   rtest,
   StandardError,
   isSymbol,
@@ -34,6 +35,7 @@ import {
   toH,
   transformValues,
 } from "@blazetrails/ruby-compat";
+import { GlobalID, type GlobalIDModel, Locator, MissingModelIdError } from "@blazetrails/globalid";
 import { ActiveJob } from "./namespaces.js";
 import { Serializers } from "./serializers.js";
 
@@ -47,7 +49,7 @@ export class DeserializationError extends StandardError {
       cause: errinfo,
     });
     this.name = "ActiveJob::DeserializationError";
-    excSetBacktrace(this, excBacktrace(errinfo as Error)!);
+    excSetBacktrace(this, excBacktrace(errinfo as Error));
   }
 }
 rbModConstSet(ActiveJob, "DeserializationError", DeserializationError);
@@ -135,6 +137,8 @@ function serializeArgument(argument: unknown): unknown {
         return argument;
       }
     }
+  } else if (rbObjIsKindOf(argument, GlobalID.Identification)) {
+    return convertToGlobalIdHash(argument as GlobalIDModel);
   } else if (Array.isArray(argument)) {
     return argument.map((arg) => serializeArgument(arg));
   } else if (argument instanceof HashWithIndifferentAccess) {
@@ -172,7 +176,9 @@ async function deserializeArgument(argument: unknown): Promise<unknown> {
   } else if (Array.isArray(argument)) {
     return Promise.all(argument.map((arg) => deserializeArgument(arg)));
   } else if (rbObjIsKindOf(argument, Hash)) {
-    if (isCustomSerialized(argument as AnyHash)) {
+    if (isSerializedGlobalId(argument as AnyHash)) {
+      return deserializeGlobalId(argument as AnyHash);
+    } else if (isCustomSerialized(argument as AnyHash)) {
       return Serializers.deserialize(argument as Record<string, unknown>);
     } else {
       return deserializeHash(argument as AnyHash);
@@ -180,6 +186,16 @@ async function deserializeArgument(argument: unknown): Promise<unknown> {
   } else {
     throw new ArgumentError(`Can only deserialize primitive arguments: ${rbInspect(argument)}`);
   }
+}
+
+/** @internal */
+function isSerializedGlobalId(hash: AnyHash): boolean {
+  return size(hash) === 1 && hasKey(hash, GLOBALID_KEY);
+}
+
+/** @internal */
+function deserializeGlobalId(hash: AnyHash): Promise<unknown> {
+  return Locator.locate(hashAref(hash, GLOBALID_KEY) as string);
 }
 
 /** @internal */
@@ -241,6 +257,22 @@ function transformSymbolKeys(hash: AnyHash, symbolKeys: string[]): AnyHash {
       return key;
     }
   });
+}
+
+/** @internal */
+function convertToGlobalIdHash(argument: GlobalIDModel): Record<string, unknown> {
+  try {
+    return {
+      [GLOBALID_KEY]: (argument as GlobalIDModel & { toGlobalId(): GlobalID })
+        .toGlobalId()
+        .toString(),
+    };
+  } catch (error) {
+    if (!(error instanceof MissingModelIdError)) throw error;
+    throw new SerializationError(
+      `Unable to serialize ${rbModName(rbObjClass(argument))} without an id. (Maybe you forgot to call save?)`,
+    );
+  }
 }
 
 export const Arguments = { serialize, deserialize, OBJECT_SERIALIZER_KEY };

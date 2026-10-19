@@ -239,7 +239,7 @@ const RESTRICTED_CLASS_METHODS = new Set([
 
 let _dangerousMethodsCache: Set<string> | null = null;
 
-/** @missingRailsCall map — CONVERGEABLE dangerous-attribute-methods-computed-not-curated */
+/** @missingRailsCall map — PERMANENT */
 export function dangerousAttributeMethods(): Set<string> {
   return (_dangerousMethodsCache ||= new Set([
     "save",
@@ -299,7 +299,7 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
 
 /** @internal */
 export function generatedAttributeMethods(this: AttributeMethodsHost): Module {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+  if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }
   return this._generatedAttributeMethods!;
@@ -308,10 +308,7 @@ export function generatedAttributeMethods(this: AttributeMethodsHost): Module {
 export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldName: string): void {
   AttributeMethods.ClassMethods.aliasAttribute.call(this as never, newName, oldName);
 
-  if (
-    Object.prototype.hasOwnProperty.call(this, "_aliasAttributesMassGenerated") &&
-    this._aliasAttributesMassGenerated
-  ) {
+  if (Object.hasOwn(this, "_aliasAttributesMassGenerated") && this._aliasAttributesMassGenerated) {
     CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
       generateAliasAttributeMethods.call(this, codeGenerator, newName, oldName);
     });
@@ -368,17 +365,11 @@ export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean
 }
 
 export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
-  if (
-    Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
-    this._attributeMethodsGenerated
-  ) {
+  if (Object.hasOwn(this, "_attributeMethodsGenerated") && this._attributeMethodsGenerated) {
     return false;
   }
   return GeneratedAttributeMethods.LOCK.synchronize(() => {
-    if (
-      Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
-      this._attributeMethodsGenerated
-    ) {
+    if (Object.hasOwn(this, "_attributeMethodsGenerated") && this._attributeMethodsGenerated) {
       return false;
     }
 
@@ -404,10 +395,7 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
   if (rbClassSuperclass(this) !== ActiveRecord.Base) {
     rbClassSuperclass(this)!.generateAliasAttributes!();
   }
-  if (
-    Object.prototype.hasOwnProperty.call(this, "_aliasAttributesMassGenerated") &&
-    this._aliasAttributesMassGenerated
-  ) {
+  if (Object.hasOwn(this, "_aliasAttributesMassGenerated") && this._aliasAttributesMassGenerated) {
     return;
   }
   CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
@@ -424,10 +412,7 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
 
 export function undefineAttributeMethods(this: AttributeMethodsHost): void {
   GeneratedAttributeMethods.LOCK.synchronize(() => {
-    if (
-      Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
-      this._attributeMethodsGenerated
-    ) {
+    if (Object.hasOwn(this, "_attributeMethodsGenerated") && this._attributeMethodsGenerated) {
       AttributeMethods.ClassMethods.undefineAttributeMethods.call(this as never);
     }
     this._attributeMethodsGenerated = false;
@@ -444,9 +429,9 @@ function instanceMethodOwner(klass: any, name: string): unknown {
     const descriptor = Object.getOwnPropertyDescriptor(proto, name);
     if (!descriptor) continue;
     if ("value" in descriptor && descriptor.value === undefined) return undefined;
-    if (Object.prototype.hasOwnProperty.call(proto, "constructor")) return proto;
+    if (Object.hasOwn(proto, "constructor")) return proto;
     for (let c = klass; typeof c === "function"; c = Object.getPrototypeOf(c)) {
-      const mod = Object.prototype.hasOwnProperty.call(c, "_generatedAttributeMethods")
+      const mod = Object.hasOwn(c, "_generatedAttributeMethods")
         ? c._generatedAttributeMethods
         : undefined;
       const entry = mod instanceof Module ? mod.instanceMethod(name) : undefined;

@@ -128,18 +128,36 @@ function isReceiverExpect(call: ts.CallExpression): boolean {
  */
 function isTestObject(owner: ts.Expression): boolean {
   if (ts.isCallExpression(owner)) owner = owner.arguments.length === 0 ? owner.expression : owner;
+  if (ts.isPropertyAccessExpression(owner) && owner.name.text === "openSession") {
+    owner = owner.expression;
+  }
   return (
     ts.isIdentifier(owner) &&
     (owner.text === "self" ||
       owner.text === "testCase" ||
+      owner.text === "test" ||
       owner.text === "tc" ||
       owner.text === "t")
   );
 }
 
+function isAssertionDotCall(expression: ts.Expression): boolean {
+  return (
+    ts.isPropertyAccessExpression(expression) &&
+    expression.name.text === "call" &&
+    ts.isIdentifier(expression.expression) &&
+    isAssertionCallee(expression.expression.text)
+  );
+}
+
+function helperCalleeArguments(call: ts.CallExpression): readonly ts.Expression[] {
+  return isAssertionDotCall(call.expression) ? call.arguments.slice(1) : call.arguments;
+}
+
 function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
   if (!ts.isPropertyAccessExpression(expression)) return null;
+  if (isAssertionDotCall(expression)) return (expression.expression as ts.Identifier).text;
   const owner = expression.expression;
   if (isTestObject(owner)) return expression.name.text;
   const namespace = ts.isIdentifier(owner)
@@ -394,7 +412,7 @@ function collectAssertionKinds(
             // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
             if (name !== "expect") {
               kinds.push(name);
-              values.push(helperCalleeValue(name, n.arguments, sourceFile));
+              values.push(helperCalleeValue(name, helperCalleeArguments(n), sourceFile));
             }
           } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
             visiting.add(name);

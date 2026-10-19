@@ -1,4 +1,3 @@
-import { Module } from "@blazetrails/ruby-compat";
 import { tag, type TagHelperHost, type TagBuilder } from "./tag-helper.js";
 import type { SafeBuffer } from "@blazetrails/activesupport";
 
@@ -20,8 +19,6 @@ export function cspMetaTag(
   return null;
 }
 
-export const CspHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { cspMetaTag });
-  });
-});
+export const CspHelper = {
+  cspMetaTag,
+};

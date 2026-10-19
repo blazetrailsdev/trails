@@ -4,6 +4,7 @@ import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
 import type { BacktraceCleaner } from "./backtrace-cleaner.js";
 import type { CacheStore } from "./cache/index.js";
+import type { Duration } from "./duration.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
 import type { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import type * as Inflector from "./inflector.js";
@@ -35,6 +36,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 
 export const ActiveSupport = { name: "ActiveSupport", loadPath } as AutoloadModule & {
   BroadcastLogger: typeof BroadcastLogger;
+  Duration: typeof Duration;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
   Inflector: typeof Inflector;
   MessagePack?: typeof MessagePack;
@@ -93,6 +95,7 @@ export const TopLevel: {
     };
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
+  ActiveRecord?: { Railties: { ControllerRuntime?: object } };
   ActionCable?: { Engine?: unknown };
   BCrypt?: {
     Engine: { readonly MIN_COST: number; readonly cost: number };

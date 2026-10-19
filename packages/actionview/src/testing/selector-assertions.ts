@@ -1,10 +1,22 @@
 import { assert, assertEqual, assertOperator } from "@blazetrails/activesupport";
-import { ArgumentError, NotImplementedError, rbInspect } from "@blazetrails/ruby-compat";
-import { HTML5, XML, type Html5Node, type NodeSet } from "@blazetrails/nokogiri";
+import {
+  ArgumentError,
+  LocalJumpError,
+  NotImplementedError,
+  rbInspect,
+} from "@blazetrails/ruby-compat";
+import {
+  HTML5,
+  XML,
+  type Html5DocumentFragment,
+  type Html5Node,
+  type NodeSet,
+} from "@blazetrails/nokogiri";
+import { Testing } from "../testing.js";
 import { HTMLSelector, type EqualityTests } from "./selector-assertions/html-selector.js";
 
 export interface SelectorAssertionsHost {
-  _selected?: NodeSet | null;
+  _selected?: NodeSet | Html5DocumentFragment | null;
   documentRootElement(): unknown;
 }
 
@@ -32,11 +44,43 @@ export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): Nod
   const matches = selector.select();
   assertSizeMatch(matches.size, selector.tests, selector.cssSelector, selector.message);
 
-  if (block && !matches.isEmpty()) nestSelection.call(this, matches, block);
+  if (block && !matches.isEmpty()) (nestSelection<NodeSet>).call(this, matches, block);
   return matches;
 }
 
 export const assertSelect = assertDom;
+
+export function assertDomEncoded(
+  this: SelectorAssertionsHost,
+  element: unknown = null,
+  { htmlVersion = null }: { htmlVersion?: string | null } = {},
+  block?: (selected: NodeSet | Html5DocumentFragment) => void,
+): void {
+  if (element == null && this._selected == null) {
+    throw new ArgumentError("Element is required when called from a nonnested assert_dom");
+  }
+
+  const content = nodeset(element ?? this._selected)
+    .map((elem) =>
+      elem.children
+        .filter((child) => child.isCdata() || (child.isText() && !child.isBlank()))
+        .map((child) => child.content),
+    )
+    .flat()
+    .join("");
+
+  const selected = Testing.htmlDocumentFragment({ htmlVersion }).parse(content);
+  (nestSelection<Html5DocumentFragment>).call(this, selected, () => {
+    if (content.length === 0) {
+      if (!block) throw new LocalJumpError("no block given (yield)");
+      block(selected);
+    } else {
+      assertDom.call(this, ":root", ...(block ? [block] : []));
+    }
+  });
+}
+
+export const assertSelectEncoded = assertDomEncoded;
 
 /** @internal */
 export function documentRootElement(): never {
@@ -81,15 +125,15 @@ function pluralizeElement(quantity: number): string {
   return quantity === 1 ? "element" : "elements";
 }
 
-function nestSelection(
+function nestSelection<T extends NodeSet | Html5DocumentFragment>(
   this: SelectorAssertionsHost,
-  selection: NodeSet,
-  block: (selected: NodeSet) => void,
+  selection: T,
+  block: (selected: T) => void,
 ): void {
   const oldSelected = this._selected;
   this._selected = selection;
   try {
-    block(this._selected);
+    block(this._selected as T);
   } finally {
     this._selected = oldSelected;
   }

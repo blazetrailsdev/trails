@@ -100,7 +100,7 @@ describe("loadSchemaFromAdapter", () => {
     class Post extends ApplicationRecord {
       static override tableName = "posts";
     }
-    expect(Object.prototype.hasOwnProperty.call(Post, "_abstractClass")).toBe(false);
+    expect(Object.hasOwn(Post, "_abstractClass")).toBe(false);
     const adapter = makeAdapter({ guid: { sqlType: "uuid" } }, { uuid: new UuidType() });
     await establishConnectionTo(Post, adapter as never);
 

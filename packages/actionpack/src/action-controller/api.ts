@@ -5,8 +5,8 @@ import {
   type ClassMethods as RateLimitingClassMethods,
 } from "./metal/rate-limiting.js";
 import { Logging, type logAt } from "./metal/logging.js";
-import { include, runLoadHooks, type Included } from "@blazetrails/activesupport";
-import { rbModConstGet } from "@blazetrails/ruby-compat";
+import { include, runLoadHooks, TopLevel, type Included } from "@blazetrails/activesupport";
+import { isModuleIncluded, rbModConstGet } from "@blazetrails/ruby-compat";
 import { ActionController } from "../namespaces.js";
 import { Caching } from "./caching.js";
 import { ConditionalGet } from "./metal/conditional-get.js";
@@ -149,6 +149,9 @@ export class API extends Metal {
     if ("_routes" in this) this._routes = null;
     this._urlOptions = null;
     this.viewRuntime = null;
+    if (isModuleIncluded(new.target, TopLevel.ActiveRecord?.Railties.ControllerRuntime as never)) {
+      (this as unknown as { dbRuntime: number | null }).dbRuntime = null;
+    }
   }
 }
 

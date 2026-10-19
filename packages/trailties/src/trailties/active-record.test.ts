@@ -1,7 +1,7 @@
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, setEnv } from "@blazetrails/ruby-compat";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { Trailtie, type ActiveRecordConfig } from "./active-record.js";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/activerecord";
 import { Fixture, FixtureSet } from "@blazetrails/activerecord/fixtures";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
+import { ActionController } from "@blazetrails/actionpack";
 import { SchemaReflection } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
@@ -61,7 +62,6 @@ describe("RailtieTest", () => {
   let savedExtendQueries: boolean;
   let savedAddToFilterParameters: boolean;
   let savedEncryptFixtures: boolean;
-  let savedFixtureInitialize: typeof Fixture.prototype.initialize;
 
   beforeEach(() => {
     savedConfig = structuredClone(Trailtie.config.get("activeRecord") as ActiveRecordConfig);
@@ -77,7 +77,6 @@ describe("RailtieTest", () => {
     savedRaiseOnAssignToAttrReadonly = raiseOnAssignToAttrReadonly();
     savedExtendQueries = Encryption.config.extendQueries;
     savedEncryptFixtures = Encryption.config.encryptFixtures;
-    savedFixtureInitialize = Fixture.prototype.initialize;
 
     resetLoadHooks();
     runLoadHooks("active_record", Base);
@@ -100,7 +99,6 @@ describe("RailtieTest", () => {
     Encryption.config.addToFilterParameters = savedAddToFilterParameters;
     Encryption.config.extendQueries = savedExtendQueries;
     Encryption.config.encryptFixtures = savedEncryptFixtures;
-    Fixture.prototype.initialize = savedFixtureInitialize;
     setVerifyForeignKeysForFixtures(false);
     if (savedExtendQueries) {
       ExtendedDeterministicUniquenessValidator.installSupport();
@@ -277,20 +275,29 @@ describe("RailtieTest", () => {
     }
   });
 
-  it("runInitializers prepends EncryptedFixtures when encrypt_fixtures is set", async () => {
-    Encryption.config.encryptFixtures = true;
-    await runTrailtieInitializers(Trailtie, blogApp());
-    runLoadHooks("active_record_fixture_set", FixtureSet);
-
-    expect(Fixture.prototype.initialize).not.toBe(savedFixtureInitialize);
-  });
-
   it("runInitializers does not prepend EncryptedFixtures when encrypt_fixtures is unset", async () => {
     Encryption.config.encryptFixtures = false;
     await runTrailtieInitializers(Trailtie, blogApp());
     runLoadHooks("active_record_fixture_set", FixtureSet);
 
-    expect(Fixture.prototype.initialize).toBe(savedFixtureInitialize);
+    expect(isModuleIncluded(Fixture, Encryption.EncryptedFixtures)).toBe(false);
+  });
+
+  it("runInitializers prepends EncryptedFixtures when encrypt_fixtures is set", async () => {
+    Encryption.config.encryptFixtures = true;
+    await runTrailtieInitializers(Trailtie, blogApp());
+    runLoadHooks("active_record_fixture_set", FixtureSet);
+
+    expect(isModuleIncluded(Fixture, Encryption.EncryptedFixtures)).toBe(true);
+  });
+
+  it("seats dbRuntime to null on a fresh controller", async () => {
+    await runTrailtieInitializers(Trailtie, blogApp());
+    runLoadHooks("action_controller", ActionController.Base);
+    class SeatController extends ActionController.Base {}
+
+    const controller = new SeatController() as SeatController & { dbRuntime: number | null };
+    expect(controller.dbRuntime).toBe(null);
   });
 
   it("runInitializers installs the executor hooks that open an async query session", async () => {

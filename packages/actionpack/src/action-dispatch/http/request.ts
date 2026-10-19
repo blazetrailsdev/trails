@@ -141,37 +141,7 @@ const HTTP_METHOD_LOOKUP: Record<string, string> = Object.assign(
   Object.fromEntries(HTTP_METHODS.map((m) => [m, m.toLowerCase().replace(/-/g, "_")])),
 );
 
-const HTTP_HEADER_NAME = /^[A-Za-z0-9-]+$/;
-const CGI_VARIABLES: ReadonlySet<string> = new Set([
-  "AUTH_TYPE",
-  "CONTENT_LENGTH",
-  "CONTENT_TYPE",
-  "GATEWAY_INTERFACE",
-  "HTTPS",
-  "PATH_INFO",
-  "PATH_TRANSLATED",
-  "QUERY_STRING",
-  "REMOTE_ADDR",
-  "REMOTE_HOST",
-  "REMOTE_IDENT",
-  "REMOTE_USER",
-  "REQUEST_METHOD",
-  "SCRIPT_NAME",
-  "SERVER_NAME",
-  "SERVER_PORT",
-  "SERVER_PROTOCOL",
-  "SERVER_SOFTWARE",
-]);
-
 const TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING";
-
-function envName(key: string): string {
-  if (HTTP_HEADER_NAME.test(key)) {
-    const upper = key.toUpperCase().replace(/-/g, "_");
-    return CGI_VARIABLES.has(upper) ? upper : `HTTP_${upper}`;
-  }
-  return key;
-}
 
 export const ENV_METHODS: readonly string[] = Object.freeze([
   "AUTH_TYPE",
@@ -411,11 +381,11 @@ export class Request {
   }
 
   getHeader(name: string): any {
-    return this.env[envName(name)];
+    return this.env[name];
   }
 
   hasHeader(key: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.env, key);
+    return Object.hasOwn(this.env, key);
   }
 
   setHeader(key: string, value: unknown): unknown {
@@ -454,7 +424,7 @@ export class Request {
   fetchHeader(key: string): unknown;
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   fetchHeader<T>(key: string, fallback?: (key: string) => T): unknown | T {
-    if (Object.prototype.hasOwnProperty.call(this.env, key)) return this.env[key];
+    if (Object.hasOwn(this.env, key)) return this.env[key];
     if (fallback) return fallback(key);
     throw new Error(`key not found: ${key}`);
   }
@@ -769,9 +739,9 @@ export class Request {
   /** @internal */
   parseFormattedParameters(
     parsers: ParameterParsers,
-    fallback: () => Record<string, unknown>,
+    fn: () => Record<string, unknown>,
   ): ReturnType<ParameterParser> {
-    return _parseFormattedParameters.call(this, parsers, fallback);
+    return _parseFormattedParameters.call(this, parsers, fn);
   }
   /** @internal */
   logParseErrorOnce(): void {
@@ -977,8 +947,9 @@ Request.prototype.formatFromPathExtension = function (this: Request) {
 Request.prototype.setFormat = _setFormat;
 Request.prototype.isParamsReadable = _isParamsReadable;
 
-ActionDispatch.Request = Request;
+rbModConstSet(ActionDispatch, "Request", Request);
 rbModConstSet(Request, "Utils", Utils);
+rbModConstSet(Request, "Session", Session);
 rbModConstSet(ActionDispatch, "MissingController", MissingController);
 
 runLoadHooks("action_dispatch_request", Request);

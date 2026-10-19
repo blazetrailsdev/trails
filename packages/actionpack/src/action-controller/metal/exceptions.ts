@@ -15,7 +15,7 @@ export class BadRequest extends ActionControllerError {
   constructor(msg?: string, errinfo?: Error | null) {
     super(msg);
     this.name = "ActionController::BadRequest";
-    if (errinfo) excSetBacktrace(this, excBacktrace(errinfo)!);
+    if (errinfo) excSetBacktrace(this, excBacktrace(errinfo));
   }
 }
 
@@ -49,7 +49,7 @@ export class UrlGenerationError extends ActionControllerError {
     methodName: string | null = null,
   ) {
     super(message);
-    this.name = "UrlGenerationError";
+    this.name = "ActionController::UrlGenerationError";
     this.routes = routes;
     this.routeName = routeName;
     this.methodName = methodName;

@@ -178,9 +178,9 @@ export class LogSubscriber extends BaseLogSubscriber implements UtilsHost {
   /** @internal */
   cacheMessage(payload: Record<string, unknown>): string | undefined {
     switch (payload["cache_hit"]) {
-      case ":hit":
+      case "hit":
         return "[cache hit]";
-      case ":miss":
+      case "miss":
         return "[cache miss]";
     }
     return undefined;

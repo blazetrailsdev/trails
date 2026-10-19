@@ -782,13 +782,14 @@ export class File extends IO {
   /**
    * `vendor/ruby/v3.3.11/file.c:4705` `rb_file_s_basename`. The optional `suffix` is
    * stripped, and the literal `".*"` strips whatever extension is there
-   * (`file.c:4664-4680`).
+   * (`file.c:4664-4680`). A path of separators only answers `"/"`
+   * (`vendor/ruby/v3.3.11/file.c:4625` `ruby_enc_find_basename`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.basename`
    * (`vendor/ruby/v3.3.11/file.c:4705`).
    */
   static basename(fileName: string, suffix?: string): string {
-    const base = getPath().basename(fileName);
+    const base = /^\/+$/.test(fileName) ? "/" : getPath().basename(fileName);
     if (suffix === undefined) return base;
     if (suffix === ".*") {
       const extname = File.extname(base);

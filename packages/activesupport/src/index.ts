@@ -372,8 +372,7 @@ export {
 } from "./testing/deprecation.js";
 
 export * from "./time-ext.js";
-export * as DateCalculations from "./core-ext/date/calculations.js";
-export { DAYS_INTO_WEEK } from "./core-ext/date-and-time/calculations.js";
+import "./core-ext/date/calculations.js";
 import "./core-ext/time/calculations.js";
 import "./core-ext/date-time/calculations.js";
 import "./core-ext/date/zones.js";

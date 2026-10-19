@@ -511,7 +511,10 @@ export function generateCsrfToken(): string {
   return SecureRandom.urlsafeBase64(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsName csrfToken — PERMANENT
+ */
 export function encodeCsrfToken(csrfToken: Bytes): string {
   return Base64.urlsafeEncode64(csrfToken.toString("latin1"), { padding: false });
 }

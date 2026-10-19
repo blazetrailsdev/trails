@@ -677,6 +677,40 @@ is `classAttribute()` from `@blazetrails/activesupport`, which already gives
 Rails' semantics (reads walk the constructor chain, writes are local to the
 class); do not hand-roll copy-on-first-write per call site.
 
+### A Ruby module is a plain object or a class module
+
+ruby-compat's `Module` class, and any carrier object spliced into an
+includer's prototype chain, is being retired (RFC 0197). A Ruby module takes
+one of two shapes:
+
+- **Plain-object module.** Its own enumerable members are its instance
+  methods, which `include()` copies onto the includer's prototype. Its own
+  non-enumerable members are its singleton methods (what `extend()` installs,
+  such as `Concern`'s hooks) and its module state (`Concern`'s
+  `@_dependencies`). A member whose name starts with a capital is a constant
+  and is not copied. Reach for this shape first.
+- **Class module.** A TS class marked with `static readonly [classModule] = true`.
+  Its prototype holds the instance methods, enumerable or not, and its
+  statics hold the singleton methods. Use it when a module has a singleton
+  and an instance member of the same name (`mattr_accessor`), or when a
+  definer writes instance members non-enumerably (`attr_internal`,
+  `delegate`, accessor `defineProperties`): `FormHelper`, `SanitizeHelper`.
+
+**A module that includes a module records it.** `include(mod, other)` on
+either shape copies nothing onto `mod`. When a class later includes `mod`,
+`rbModAppendFeatures` appends the recorded modules first, as
+`include_modules_at` (`vendor/ruby/v3.3.11/class.c:1253`) walks the included
+module's ancestry, so `mod`'s own methods outrank them and the class reports
+`other` as included. A `Concern` dependency still goes through
+`Concern#append_features`.
+
+**A method defined on a module after it is included** has no carrier-free
+form: Ruby's includers share the module's method table (`rb_include_module`,
+`vendor/ruby/v3.3.11/class.c:1179`), and the repo owner has ruled out both a
+carrier and a list of a module's includers. Each such site is ported so that
+its definitions exist before the include, or is left on a `Module` until its
+own story settles it.
+
 ## A module's `initialize` is inlined into the constructor (`@inlinedFrom`)
 
 Ruby lets a module define `initialize` and reach the next one up the ancestor
@@ -725,10 +759,12 @@ constructor(attributes = null) { … }
 
 `@inlinedFrom` names the Ruby body a segment of a constructor came from:
 
-- **Where.** On a class constructor's JSDoc and nowhere else, one tag per
-  inlined segment, in chain order.
+- **Where.** On a class constructor's JSDoc, or on the JSDoc of a class
+  method that inlines a module method's `super` (below), and nowhere else, one
+  tag per inlined segment, in chain order.
 - **Value.** Exactly one shape: a Ruby `Module#initialize` or
-  `Mod::ClassMethods#new`, then its citation
+  `Mod::ClassMethods#new` on a constructor, or the `Module#<method>` the method
+  is named after, whose Rails body calls `super`, then its citation
   `<source>/<version>/<file>:<first>-<last>`, the span of the `def`, relative
   to `vendor/` and not spelling it. No prose, no story id, no `PERMANENT`.
 - **The tag follows the file.** Only a body whose `def` lives in a different
@@ -746,12 +782,35 @@ constructor(attributes = null) { … }
   list of hooks in `eslint/inlined-from-only-on-constructors.mjs` and nothing
   else.
 
+**A module installed at run time is inlined behind a guard.** Where the
+include or prepend happens in a load hook, conditionally, or on a subclass the
+port cannot see (`EncryptedFixtures` prepended onto `Fixture` only under
+`encrypt_fixtures`, `railtie.rb:357-362`; `Thor::Actions` included by a user's
+Thor class), the body is still inlined at Ruby's `super` position in the
+nearest constructor, wrapped in `if (isModuleIncluded(new.target, Mod))`, the
+`include?` question Ruby's ancestor chain answers. The guard carries
+`@inventedArm if — PERMANENT` where the arm gate compares the declaration, and
+the segment is tagged only where the Rails manifest records the include
+(`inlined-from-manifest-follows-included-hook-includes`). Ruled by the repo owner on 2026-10-19.
+
 `parity:api` credits a tagged module hook to the constructor, both call gates
 compare the constructor against the tagged bodies in chain order, and
 `pnpm parity:api:inlined` reds on a stale or unfounded tag (see "Before you
 open the PR"). `initialize_copy` / `initialize_dup` / `initialize_clone` are
 the `rbObjDup` / `rbObjClone` protocol and stay methods. This rule was set by
 the repo owner on 2026-10-08 (RFC 0188).
+
+**A module method's `super` is inlined the same way** (RFC 0197). A copied
+plain-module method has no link to resume a `super` search from, so a module
+method `M#foo` whose Rails body calls `super` is not kept as a member of `M`.
+For each class `C` that includes `M`, `C#foo` is `M#foo`'s body with the next
+`foo` in `C`'s Rails ancestry inlined at the `super` position, line for line,
+until a body makes no `super` call or the chain reaches `C`'s JS superclass,
+where the `super` stays a real `super.foo()`. `C#foo` carries one
+`@inlinedFrom <Module>#foo <citation>` per segment from another Ruby file, in
+ancestor order, with the citation shape above. A module that is a `super`
+target converts in the same PR as the module whose `super` reaches it, because
+a plain module's copied methods outrank every carrier link.
 
 ## Generated attribute readers are properties (`define_method_attribute`)
 
@@ -1354,12 +1413,27 @@ Rules that apply across the table:
   cannot see it. `Function.prototype.call` answers `call` before the trap can,
   so `Engine` forwards that one name with an explicit `static call`.
 - `rails/engine/lazy_route_set.rb`'s `method_missing_module` is spliced beneath
-  the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since a
-  trails `Module` copies its carrier into each includer and a Proxy on the
+  the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since
+  `include()` copies a module's methods into each includer and a Proxy on the
   module itself would reach no includer. That row is not converged: the reload
   is async, so `respondToMissing` starts it and answers `super`, the in-line
   re-send is unported, and test_help's integration `before_setup` awaits the
   reload — debt tracked by `lazy-route-set-method-missing-resends-in-line`.
+
+## A private generator may stand in for a block (`find_routes`, `match_route`)
+
+A Ruby block ports as a trailing block parameter, marked with ruby-compat's
+`block()` where it rides at the end of a `*args` splat and read back with
+`rbBlockGivenP`; a public method Rails lets run blockless answers `toEnum`
+there, as `enum_for` does. One case has no callback shape: a block whose body
+takes a non-local `return` or `next`, or an `await`
+(`Journey::Router#serve` over `find_routes`,
+`actionpack/lib/action_dispatch/journey/router.rb:33-65`). There the yielding
+method is a JS generator and the block body is the caller's `for…of` body.
+**Only a TS-`private` or `@internal` method may do this**, so a generator never
+reaches public API; `parity:api:blocks` credits a non-public generator's
+`yield` as its block and still flags a public one. Ruled by the repo owner on
+trails#9053.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 
@@ -1367,7 +1441,7 @@ Rules that apply across the table:
 that fires when `class Child extends Parent` is evaluated, so wherever Rails'
 `inherited` resets or seeds per-class state, trails defers it to the first read
 or first write on the subclass: a memo is answered only when it is an own
-property of the class being asked (`Object.prototype.hasOwnProperty.call(host,
+property of the class being asked (`Object.hasOwn(host,
 key)`), so an inherited memo reads as unset — the observable state `inherited`'s
 reset leaves behind — with nothing running at definition time. A lazy reset at
 first read would clobber memos written to the child before it, and a decorator
@@ -1425,8 +1499,8 @@ A JS class has no metaclass apart from its own statics, so
 `rbObjSingletonClass` raises `TypeError` for a class receiver. Code whose Rails
 body reaches a class's singleton class keeps working on the class itself, and
 `ClassAttribute.redefine`'s `attached_object.is_a?(Module)` arm is unported
-for a JS-class receiver only. A ruby-compat `Module` instance is a plain
-object with a real singleton class, so for it the arm is taken
+for a JS-class receiver only. A plain-object module is an ordinary object with
+a real singleton class, so for it the arm is taken
 (`rbClassAttachedObject`).
 
 ## A revived object copies a constructed instance (`init_with` / `marshal_load`'s `initialize`)

@@ -1,0 +1,3 @@
+<% await context.cache(cached_customer, {}, async () => { %>
+  Hello: <%= cached_customer.name %>
+<% }) %>

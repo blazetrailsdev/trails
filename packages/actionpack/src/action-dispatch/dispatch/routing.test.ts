@@ -1,16 +1,22 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { RouteSet, type DrawCallback, type NamedRouteHelper } from "../routing/route-set.js";
-import { bodyFromString, bodyToString, MockRequest } from "@blazetrails/rack";
+import {
+  Config,
+  RouteSet,
+  type DrawCallback,
+  type NamedRouteHelper,
+} from "../routing/route-set.js";
+import { bodyFromString, bodyToString, MockRequest, Utils as RackUtils } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import { controllerConstants, Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
-import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
+import { Utils } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   pluralize,
   assertDeprecated,
   assertEqual,
   assertNothingRaised,
+  assertPredicate,
   assertRaises,
   stub,
   underscore,
@@ -18,6 +24,7 @@ import {
 import {
   Encoding,
   include,
+  NoMethodError,
   rbConstGet,
   rbObjRespondTo,
   registerConstant,
@@ -85,7 +92,6 @@ beforeEach(() => {
     "home",
     "images",
     "infos",
-    "internal",
     "invoices",
     "involvements",
     "journey",
@@ -185,6 +191,8 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("");
   }
 
+  const SprocketsApp = (_env: unknown) => [200, { "Content-Type": "text/html" }, ["javascripts"]];
+
   class IpRestrictor {
     static matches(request: Request): boolean {
       return /192\.168\.1\.1\d\d/.test(request.ip!);
@@ -243,23 +251,38 @@ describe("TestRoutingMapper", () => {
     expect(t.loginUrl()).toBe("http://rubyonrails.org/login");
   });
 
-  it("session singleton resource", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resource("session");
+  it("session singleton resource", async () => {
+    draw(function () {
+      this.resource("session", () => {
+        this.get(":create");
+        this.post(":reset");
+      });
     });
 
-    expect(routes.recognizePath("/session").action).toBe("show");
-    expect(routes.recognizePath("/session", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/session", { method: "put" }).action).toBe("update");
-    expect(routes.recognizePath("/session", { method: "patch" }).action).toBe("update");
-    expect(routes.recognizePath("/session", { method: "delete" }).action).toBe("destroy");
-    expect(routes.recognizePath("/session/new").action).toBe("new");
-    expect(routes.recognizePath("/session/edit").action).toBe("edit");
+    await t.get("/session");
+    expect(t.response.body).toBe("sessions#create");
+    expect(t.sessionPath()).toBe("/session");
 
-    expect(routes.pathFor({}, "session")).toBe("/session");
-    expect(routes.pathFor({}, "new_session")).toBe("/session/new");
-    expect(routes.pathFor({}, "edit_session")).toBe("/session/edit");
+    await t.post("/session");
+    expect(t.response.body).toBe("sessions#create");
+
+    await t.put("/session");
+    expect(t.response.body).toBe("sessions#update");
+
+    await t.delete("/session");
+    expect(t.response.body).toBe("sessions#destroy");
+
+    await t.get("/session/new");
+    expect(t.response.body).toBe("sessions#new");
+    expect(t.newSessionPath()).toBe("/session/new");
+
+    await t.get("/session/edit");
+    expect(t.response.body).toBe("sessions#edit");
+    expect(t.editSessionPath()).toBe("/session/edit");
+
+    await t.post("/session/reset");
+    expect(t.response.body).toBe("sessions#reset");
+    expect(t.resetSessionPath()).toBe("/session/reset");
   });
 
   it("projects (resources)", () => {
@@ -307,15 +330,16 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("projects#index");
   });
 
-  it("scoped root", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope("/api", { as: "api" }, () => {
-        this.get("/status", { to: "status#show", as: "status" });
+  it("scoped root", async () => {
+    draw(function () {
+      this.scope("(:locale)", { locale: /en|pl/ }, () => {
+        this.root({ to: "projects#index" });
       });
     });
-    expect(() => routes.recognizePath("/api/status")).not.toThrow();
-    expect(routes.pathFor({}, "api_status")).toBe("/api/status");
+
+    expect(t.rootPath({ locale: "en" })).toBe("/en");
+    await t.get("/en");
+    expect(t.response.body).toBe("projects#index");
   });
 
   it("nested namespace", async () => {
@@ -427,52 +451,118 @@ describe("TestRoutingMapper", () => {
     expect(params.id).toBe("3");
   });
 
-  it("session singleton resource for api app", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resource("session", { except: ["new", "edit"] });
+  it("session singleton resource for api app", async () => {
+    const config = new Config();
+    config.apiOnly = true;
+
+    IntegrationTest.stubControllers(config, (routes) => {
+      routes.draw(function () {
+        this.resource("session", () => {
+          this.get(":create");
+          this.post(":reset");
+        });
+      });
+      t.app = new RoutedRackApp(routes);
     });
-    expect(routes.recognizePath("/session").action).toBe("show");
-    expect(routes.recognizePath("/session", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/session", { method: "delete" }).action).toBe("destroy");
-    expect(() => routes.recognizePath("/session/new")).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/session/edit")).toThrow(RoutingError);
+
+    await t.get("/session");
+    expect(t.response.body).toBe("sessions#create");
+    expect(t.sessionPath()).toBe("/session");
+
+    await t.post("/session");
+    expect(t.response.body).toBe("sessions#create");
+
+    await t.put("/session");
+    expect(t.response.body).toBe("sessions#update");
+
+    await t.delete("/session");
+    expect(t.response.body).toBe("sessions#destroy");
+
+    await t.post("/session/reset");
+    expect(t.response.body).toBe("sessions#reset");
+    expect(t.resetSessionPath()).toBe("/session/reset");
+
+    await t.get("/session/new");
+    expect(t.response.body).toBe("Not Found");
+
+    await t.get("/session/edit");
+    expect(t.response.body).toBe("Not Found");
   });
 
-  it("resource routes with only and except", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resource("post", { only: ["show", "update", "destroy"] });
+  it("resource routes with only and except", async () => {
+    draw(function () {
+      this.resources("posts", { only: ["index", "show"] }, () => {
+        this.resources("comments", { except: "destroy" });
+      });
     });
-    expect(routes.recognizePath("/post").action).toBe("show");
-    expect(routes.recognizePath("/post", { method: "put" }).action).toBe("update");
-    expect(routes.recognizePath("/post", { method: "delete" }).action).toBe("destroy");
-    expect(() => routes.recognizePath("/post", { method: "post" })).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/post/new")).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/post/edit")).toThrow(RoutingError);
+
+    await t.get("/posts");
+    expect(t.response.body).toBe("posts#index");
+    expect(t.postsPath()).toBe("/posts");
+
+    await t.get("/posts/1");
+    expect(t.response.body).toBe("posts#show");
+    expect(t.postPath({ id: 1 })).toBe("/posts/1");
+
+    await t.get("/posts/1/comments");
+    expect(t.response.body).toBe("comments#index");
+    expect(t.postCommentsPath({ post_id: 1 })).toBe("/posts/1/comments");
+
+    await t.post("/posts");
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+    await t.put("/posts/1");
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+    await t.delete("/posts/1");
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+    await t.delete("/posts/1/comments");
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
   });
 
-  it("resource routes only create update destroy", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resource("profile", { only: ["create", "update", "destroy"] });
+  it("resource routes only create update destroy", async () => {
+    draw(function () {
+      this.resource("past", { only: "destroy" });
+      this.resource("present", { only: "update" });
+      this.resource("future", { only: "create" });
     });
-    expect(routes.recognizePath("/profile", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/profile", { method: "put" }).action).toBe("update");
-    expect(routes.recognizePath("/profile", { method: "delete" }).action).toBe("destroy");
-    expect(() => routes.recognizePath("/profile")).toThrow(RoutingError);
+
+    await t.delete("/past");
+    expect(t.response.body).toBe("pasts#destroy");
+    expect(t.pastPath()).toBe("/past");
+
+    await t.patch("/present");
+    expect(t.response.body).toBe("presents#update");
+    expect(t.presentPath()).toBe("/present");
+
+    await t.put("/present");
+    expect(t.response.body).toBe("presents#update");
+    expect(t.presentPath()).toBe("/present");
+
+    await t.post("/future");
+    expect(t.response.body).toBe("futures#create");
+    expect(t.futurePath()).toBe("/future");
   });
 
-  it("resources routes only create update destroy", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("products", { only: ["create", "update", "destroy"] });
+  it("resources routes only create update destroy", async () => {
+    draw(function () {
+      this.resources("relationships", { only: ["create", "destroy"] });
+      this.resources("friendships", { only: ["update"] });
     });
-    expect(routes.recognizePath("/products", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/products/1", { method: "put" }).action).toBe("update");
-    expect(routes.recognizePath("/products/1", { method: "delete" }).action).toBe("destroy");
-    expect(() => routes.recognizePath("/products")).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/products/1")).toThrow(RoutingError);
+
+    await t.post("/relationships");
+    expect(t.response.body).toBe("relationships#create");
+    expect(t.relationshipsPath()).toBe("/relationships");
+
+    await t.delete("/relationships/1");
+    expect(t.response.body).toBe("relationships#destroy");
+    expect(t.relationshipPath(1)).toBe("/relationships/1");
+
+    await t.patch("/friendships/1");
+    expect(t.response.body).toBe("friendships#update");
+    expect(t.friendshipPath(1)).toBe("/friendships/1");
+
+    await t.put("/friendships/1");
+    expect(t.response.body).toBe("friendships#update");
+    expect(t.friendshipPath(1)).toBe("/friendships/1");
   });
 
   it("projects involvements (nested resources)", () => {
@@ -506,50 +596,52 @@ describe("TestRoutingMapper", () => {
     expect(t.projectAttachmentsPath({ project_id: "1" })).toBe("/projects/1/attachments");
   });
 
-  it("openid", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.match("openid/login", { to: "openid#login", via: ["GET", "POST"] });
+  it("openid", async () => {
+    draw(function () {
+      this.match("openid/login", { via: ["get", "post"], to: "openid#login" });
     });
-    expect(routes.recognizePath("/openid/login").controller).toBe("openid");
-    expect(routes.recognizePath("/openid/login", { method: "post" }).controller).toBe("openid");
+
+    await t.get("/openid/login");
+    expect(t.response.body).toBe("openid#login");
+
+    await t.post("/openid/login");
+    expect(t.response.body).toBe("openid#login");
   });
 
-  it("namespace with options", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.namespace("api", () => {
-        this.namespace("v1", () => {
-          this.resources("users");
-        });
+  it("namespace with options", async () => {
+    draw(function () {
+      this.namespace("users", { path: "usuarios" }, () => {
+        this.root({ to: "home#index" });
       });
     });
-    expect(routes.recognizePath("/api/v1/users").action).toBe("index");
-    expect(routes.pathFor({}, "api_v1_users")).toBe("/api/v1/users");
+
+    await t.get("/usuarios");
+    expect(t.usersRootPath()).toBe("/usuarios");
+    expect(t.response.body).toBe("users/home#index");
   });
 
-  it("namespace containing numbers", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.namespace("api", () => {
-        this.namespace("v2", () => {
-          this.resources("articles");
-        });
+  it("namespace containing numbers", async () => {
+    draw(function () {
+      this.namespace("v2", () => {
+        this.resources("subscriptions");
       });
     });
-    expect(routes.recognizePath("/api/v2/articles").action).toBe("index");
-    expect(routes.pathFor({}, "api_v2_articles")).toBe("/api/v2/articles");
+
+    await t.get("/v2/subscriptions");
+    expect(t.response.body).toBe("v2/subscriptions#index");
+    expect(t.v2SubscriptionsPath()).toBe("/v2/subscriptions");
   });
 
-  it("namespaced roots", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("namespaced roots", async () => {
+    draw(function () {
       this.namespace("account", () => {
-        this.root("account#index");
+        this.root({ to: "account#index" });
       });
     });
-    expect(routes.recognizePath("/account").action).toBe("index");
-    expect(routes.pathFor({}, "account_root")).toBe("/account");
+
+    expect(t.accountRootPath()).toBe("/account");
+    await t.get("/account");
+    expect(t.response.body).toBe("account/account#index");
   });
 
   it("resource does not modify passed options", () => {
@@ -606,15 +698,14 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor({}, "products_root")).toBe("/products");
   });
 
-  it("module scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope({ module: "api" }, () => {
-        this.resource("token");
-      });
+  it("module scope", async () => {
+    draw(function () {
+      this.resource("token", { module: "api" });
     });
-    expect(routes.recognizePath("/token").action).toBe("show");
-    expect(routes.pathFor({}, "token")).toBe("/token");
+
+    await t.get("/token");
+    expect(t.response.body).toBe("api/tokens#show");
+    expect(t.tokenPath()).toBe("/token");
   });
 
   it("path scope", async () => {
@@ -661,17 +752,17 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("projects#info");
   });
 
-  it("normalize namespaced matches", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("normalize namespaced matches", async () => {
+    draw(function () {
       this.namespace("account", () => {
         this.get("description", { action: "description", as: "description" });
       });
     });
-    expect(routes.pathFor({}, "account_description")).toBe("/account/description");
-    const m = routes.recognizePath("/account/description");
-    expect(m.controller).toBe("account");
-    expect(m.action).toBe("description");
+
+    expect(t.accountDescriptionPath()).toBe("/account/description");
+
+    await t.get("/account/description");
+    expect(t.response.body).toBe("account#description");
   });
 
   it("session info nested singleton resource", async () => {
@@ -686,26 +777,22 @@ describe("TestRoutingMapper", () => {
     expect(t.sessionInfoPath()).toBe("/session/info");
   });
 
-  it("member on resource", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("replies", () => {
+  it("member on resource", async () => {
+    draw(function () {
+      this.resource("session", () => {
         this.member(() => {
-          this.put(":answer", { action: "mark_as_answer" });
-          this.delete(":answer", { action: "unmark_as_answer" });
+          this.get(":crush");
         });
       });
     });
-    const putM = routes.recognizePath("/replies/1/answer", { method: "put" });
-    expect(putM.action).toBe("mark_as_answer");
 
-    const delM = routes.recognizePath("/replies/1/answer", { method: "delete" });
-    expect(delM.action).toBe("unmark_as_answer");
+    await t.get("/session/crush");
+    expect(t.response.body).toBe("sessions#crush");
+    expect(t.crushSessionPath()).toBe("/session/crush");
   });
 
-  it("replies", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("replies", async () => {
+    draw(function () {
       this.resources("replies", () => {
         this.member(() => {
           this.put(":answer", { action: "mark_as_answer" });
@@ -713,12 +800,12 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognizePath("/replies/1/answer", { method: "put" }).action).toBe(
-      "mark_as_answer",
-    );
-    expect(routes.recognizePath("/replies/1/answer", { method: "delete" }).action).toBe(
-      "unmark_as_answer",
-    );
+
+    await t.put("/replies/1/answer");
+    expect(t.response.body).toBe("replies#mark_as_answer");
+
+    await t.delete("/replies/1/answer");
+    expect(t.response.body).toBe("replies#unmark_as_answer");
   });
 
   it("projects participants", async () => {
@@ -866,75 +953,149 @@ describe("TestRoutingMapper", () => {
     );
   });
 
-  it("account namespace", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("account namespace", async () => {
+    draw(function () {
       this.namespace("account", () => {
-        this.resources("subscriptions");
+        this.resource("subscription", "credit", "credit_card");
       });
     });
-    expect(routes.recognizePath("/account/subscriptions").action).toBe("index");
-    expect(routes.pathFor({}, "account_subscriptions")).toBe("/account/subscriptions");
-    expect(routes.pathFor({ id: 1 }, "account_subscription")).toBe("/account/subscriptions/1");
+
+    await t.get("/account/subscription");
+    expect(t.response.body).toBe("account/subscriptions#show");
+    expect(t.accountSubscriptionPath()).toBe("/account/subscription");
+
+    await t.get("/account/credit");
+    expect(t.response.body).toBe("account/credits#show");
+    expect(t.accountCreditPath()).toBe("/account/credit");
+
+    await t.get("/account/credit_card");
+    expect(t.response.body).toBe("account/credit_cards#show");
+    expect(t.accountCreditCardPath()).toBe("/account/credit_card");
   });
 
-  it("resource constraints", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("products", { constraints: { id: /\d{4}/ } });
+  it("resource constraints", async () => {
+    draw(function () {
+      this.resources("products", { constraints: { id: /\d{4}/ } }, () => {
+        this.root({ to: "products#root" });
+        this.get("favorite", { on: "collection" });
+        this.resources("images");
+      });
+
+      this.resource("dashboard", { constraints: { ip: /192\.168\.1\.\d{1,3}/ } });
     });
-    expect(routes.recognizePath("/products/1234").action).toBe("show");
-    expect(() => routes.recognizePath("/products/abc")).toThrow(RoutingError);
+
+    await t.get("/products/1");
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+    await t.get("/products");
+    expect(t.response.body).toBe("products#root");
+    await t.get("/products/favorite");
+    expect(t.response.body).toBe("products#favorite");
+    await t.get("/products/0001");
+    expect(t.response.body).toBe("products#show");
+
+    await t.get("/products/1/images");
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+    await t.get("/products/0001/images");
+    expect(t.response.body).toBe("images#index");
+    await t.get("/products/0001/images/0001");
+    expect(t.response.body).toBe("images#show");
+
+    await t.get("/dashboard", { headers: { REMOTE_ADDR: "10.0.0.100" } });
+    expect(t.response.headers.get("x-cascade")).toBe("pass");
+    await t.get("/dashboard", { headers: { REMOTE_ADDR: "192.168.1.100" } });
+    expect(t.response.body).toBe("dashboards#show");
   });
 
-  it("url generator for generic route", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("whatever/:controller/:action", { to: "foo#bar" });
-    });
-    expect(() => routes.recognizePath("/whatever/foo/bar")).not.toThrow();
-  });
-
-  it("url generator for namespaced generic route", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("whatever/:controller/:action/:id", { to: "foo#bar", constraints: { id: /\d+/ } });
-    });
-    expect(() => routes.recognizePath("/whatever/foo/show/1")).not.toThrow();
-    expect(() => routes.recognizePath("/whatever/foo/show/abc")).toThrow(RoutingError);
-  });
-
-  it("resources merges options from scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("products", { only: ["index", "show"] }, () => {
-        this.resources("images", { only: ["index"] });
+  it("url generator for generic route", async () => {
+    draw(function () {
+      deprecator().silence(() => {
+        this.get("whatever/:controller(/:action(/:id))");
       });
     });
-    expect(() => routes.recognizePath("/products")).not.toThrow();
-    expect(() => routes.recognizePath("/products/1")).not.toThrow();
-    expect(() => routes.recognizePath("/products/1/edit")).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/products", { method: "post" })).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/products/1/images")).not.toThrow();
+
+    await t.get("/whatever/foo/bar");
+    expect(t.response.body).toBe("foo#bar");
+
+    expect(t.urlFor({ controller: "foo", action: "bar", id: 1 })).toBe(
+      "http://www.example.com/whatever/foo/bar/1",
+    );
   });
 
-  it("resource merges options from scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resource("account", { only: ["show"] });
+  it("url generator for namespaced generic route", async () => {
+    draw(function () {
+      deprecator().silence(() => {
+        this.get("whatever/:controller(/:action(/:id))", { id: /\d+/ });
+      });
     });
-    expect(routes.recognizePath("/account").action).toBe("show");
-    expect(() => routes.recognizePath("/account/new")).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/account/edit")).toThrow(RoutingError);
+
+    await t.get("/whatever/foo/bar/show");
+    expect(t.response.body).toBe("foo/bar#show");
+
+    await t.get("/whatever/foo/bar/show/1");
+    expect(t.response.body).toBe("foo/bar#show");
+
+    expect(t.urlFor({ controller: "foo/bar", action: "show" })).toBe(
+      "http://www.example.com/whatever/foo/bar/show",
+    );
+
+    expect(t.urlFor({ controller: "foo/bar", action: "show", id: "1" })).toBe(
+      "http://www.example.com/whatever/foo/bar/show/1",
+    );
   });
 
-  it("resource merges options from scope hash", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resource("account", { only: ["show"] });
+  it("resources merges options from scope", async () => {
+    draw(function () {
+      this.scope({ only: ["index", "show"] }, () => {
+        this.resources("products", () => {
+          this.resources("images");
+        });
+      });
     });
-    expect(routes.recognizePath("/account").action).toBe("show");
-    expect(() => routes.recognizePath("/account/new")).toThrow(RoutingError);
+
+    await assertRaises([NoMethodError], {}, () => rbFSend(t, "editProductPath", "1"));
+
+    await t.get("/products/1/edit");
+    expect(t.status).toBe(404);
+
+    await assertRaises([NoMethodError], {}, () => rbFSend(t, "editProductImagePath", "1", "2"));
+
+    await t.post("/products/1/images/2/edit");
+    expect(t.status).toBe(404);
+  });
+
+  it("resource merges options from scope", async () => {
+    draw(function () {
+      this.scope({ only: "show" }, () => {
+        this.resource("account");
+      });
+    });
+
+    expect(t.accountPath()).toBe("/account");
+    await assertRaises([NoMethodError], {}, () => rbFSend(t, "newAccountPath"));
+
+    await t.get("/account/new");
+    expect(t.status).toBe(404);
+
+    await t.get("/account");
+    expect(t.status).toBe(200);
+  });
+
+  it("resource merges options from scope hash", async () => {
+    draw(function () {
+      const scopeOptions = { only: "show" };
+      this.scope(scopeOptions, () => {
+        this.resource("account");
+      });
+    });
+
+    expect(t.accountPath()).toBe("/account");
+    await assertRaises([NoMethodError], {}, () => rbFSend(t, "newAccountPath"));
+
+    await t.get("/account/new");
+    expect(t.status).toBe(404);
+
+    await t.get("/account");
+    expect(t.status).toBe(200);
   });
 
   it("match without via", () => {
@@ -946,12 +1107,36 @@ describe("TestRoutingMapper", () => {
     ).toThrow(ArgumentError);
   });
 
-  it("non greedy regexp", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+?/ } });
+  it("non greedy regexp", async () => {
+    draw(function () {
+      this.namespace("api", () => {
+        this.scope(":version", { version: /.+/ }, () => {
+          this.resources("users", { id: /.+?/, format: /json|xml/ });
+        });
+      });
     });
-    expect(() => routes.recognizePath("/posts/1")).not.toThrow();
+
+    await t.get("/api/1.0/users");
+    expect(t.response.body).toBe("api/users#index");
+    expect(t.apiUsersPath({ version: "1.0" })).toBe("/api/1.0/users");
+
+    await t.get("/api/1.0/users.json");
+    expect(t.response.body).toBe("api/users#index");
+    expect((t.request.format as unknown as { isJson(): boolean }).isJson()).toBe(true);
+    expect(t.apiUsersPath({ version: "1.0", format: "json" })).toBe("/api/1.0/users.json");
+
+    await t.get("/api/1.0/users/first.last");
+    expect(t.response.body).toBe("api/users#show");
+    expect(t.request.params["id"]).toBe("first.last");
+    expect(t.apiUserPath({ version: "1.0", id: "first.last" })).toBe("/api/1.0/users/first.last");
+
+    await t.get("/api/1.0/users/first.last.xml");
+    expect(t.response.body).toBe("api/users#show");
+    expect(t.request.params["id"]).toBe("first.last");
+    expect((t.request.format as unknown as { isXml(): boolean }).isXml()).toBe(true);
+    expect(t.apiUserPath({ version: "1.0", id: "first.last", format: "xml" })).toBe(
+      "/api/1.0/users/first.last.xml",
+    );
   });
 
   it("default string params", async () => {
@@ -1019,13 +1204,15 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("mes#show");
   });
 
-  it("update person route", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("people");
+  it("update person route", async () => {
+    draw(function () {
+      this.get("people/:id/update", { to: "people#update", as: "update_person" });
     });
-    expect(routes.recognizePath("/people/1", { method: "put" }).action).toBe("update");
-    expect(routes.recognizePath("/people/1", { method: "patch" }).action).toBe("update");
+
+    await t.get("/people/1/update");
+    expect(t.response.body).toBe("people#update");
+
+    expect(t.updatePersonPath({ id: 1 })).toBe("/people/1/update");
   });
 
   it("update project person", async () => {
@@ -1092,25 +1279,30 @@ describe("TestRoutingMapper", () => {
     expect(t.articleWithTitlePath({ title: "rails", id: 1 })).toBe("/articles/rails/1");
   });
 
-  it("articles perma", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("articles", { constraints: { id: /\d+/ } });
+  it("articles perma", async () => {
+    draw(function () {
+      this.get("articles/:year/:month/:day/:title", { to: "articles#show", as: "article" });
     });
-    expect(routes.recognizePath("/articles/42").action).toBe("show");
-    expect(() => routes.recognizePath("/articles/abc")).toThrow(RoutingError);
+
+    await t.get("/articles/2009/08/18/rails-3");
+    expect(t.response.body).toBe("articles#show");
+
+    expect(t.articlePath({ year: 2009, month: 8, day: 18, title: "rails-3" })).toBe(
+      "/articles/2009/8/18/rails-3",
+    );
   });
 
-  it("controller option with nesting and leading slash", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.namespace("foo", () => {
-        this.namespace("bar", () => {
-          this.get("baz", { to: "baz#index" });
+  it("controller option with nesting and leading slash", async () => {
+    draw(function () {
+      this.scope("/job", { controller: "job" }, () => {
+        this.scope(":id", { action: "manage_applicant" }, () => {
+          this.get("/active");
         });
       });
     });
-    expect(routes.recognizePath("/foo/bar/baz").action).toBe("index");
+
+    await t.get("/job/5/active");
+    expect(t.response.body).toBe("job#manage_applicant");
   });
 
   it("multiple nested controller", () => {
@@ -1127,13 +1319,13 @@ describe("TestRoutingMapper", () => {
     expect(() => routes.recognizePath("/pooh")).not.toThrow();
   });
 
-  it("sprockets", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/assets/*path", { to: "assets#show", as: "asset" });
+  it("sprockets", async () => {
+    draw(function () {
+      this.get({ "sprockets.js": SprocketsApp });
     });
-    expect(() => routes.recognizePath("/assets/application.js")).not.toThrow();
-    expect(routes.pathFor({ path: "application.js" }, "asset")).toBe("/assets/application.js");
+
+    await t.get("/sprockets.js");
+    expect(t.response.body).toBe("javascripts");
   });
 
   it("projects status", () => {
@@ -1166,51 +1358,87 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("rooms#edit");
   });
 
-  it("resources controller name is not pluralized", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("resources controller name is not pluralized", async () => {
+    draw(function () {
       this.resources("content");
     });
-    expect(routes.recognizePath("/content").controller).toBe("content");
+
+    await t.get("/content");
+    expect(t.response.body).toBe("content#index");
   });
 
-  it("resources are not pluralized", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("resources are not pluralized", async () => {
+    draw(function () {
       this.namespace("transport", () => {
         this.resources("taxis");
       });
     });
-    expect(routes.recognizePath("/transport/taxis").action).toBe("index");
-    expect(routes.pathFor({}, "transport_taxis")).toBe("/transport/taxis");
-    expect(routes.recognizePath("/transport/taxis/1").action).toBe("show");
-    expect(routes.pathFor({ id: 1 }, "transport_taxi")).toBe("/transport/taxis/1");
-    expect(routes.recognizePath("/transport/taxis/new").action).toBe("new");
-    expect(routes.pathFor({}, "new_transport_taxi")).toBe("/transport/taxis/new");
-    expect(routes.recognizePath("/transport/taxis/1/edit").action).toBe("edit");
-    expect(routes.pathFor({ id: 1 }, "edit_transport_taxi")).toBe("/transport/taxis/1/edit");
+
+    await t.get("/transport/taxis");
+    expect(t.response.body).toBe("transport/taxis#index");
+    expect(t.transportTaxisPath()).toBe("/transport/taxis");
+
+    await t.get("/transport/taxis/new");
+    expect(t.response.body).toBe("transport/taxis#new");
+    expect(t.newTransportTaxiPath()).toBe("/transport/taxis/new");
+
+    await t.post("/transport/taxis");
+    expect(t.response.body).toBe("transport/taxis#create");
+
+    await t.get("/transport/taxis/1");
+    expect(t.response.body).toBe("transport/taxis#show");
+    expect(t.transportTaxiPath({ id: "1" })).toBe("/transport/taxis/1");
+
+    await t.get("/transport/taxis/1/edit");
+    expect(t.response.body).toBe("transport/taxis#edit");
+    expect(t.editTransportTaxiPath({ id: "1" })).toBe("/transport/taxis/1/edit");
+
+    await t.put("/transport/taxis/1");
+    expect(t.response.body).toBe("transport/taxis#update");
+
+    await t.delete("/transport/taxis/1");
+    expect(t.response.body).toBe("transport/taxis#destroy");
   });
 
-  it("singleton resources are not singularized", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("singleton resources are not singularized", async () => {
+    draw(function () {
       this.namespace("medical", () => {
         this.resource("taxis");
       });
     });
-    expect(routes.recognizePath("/medical/taxis").action).toBe("show");
-    expect(routes.recognizePath("/medical/taxis", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/medical/taxis/new").action).toBe("new");
-    expect(routes.recognizePath("/medical/taxis/edit").action).toBe("edit");
+
+    await t.get("/medical/taxis/new");
+    expect(t.response.body).toBe("medical/taxis#new");
+    expect(t.newMedicalTaxisPath()).toBe("/medical/taxis/new");
+
+    await t.post("/medical/taxis");
+    expect(t.response.body).toBe("medical/taxis#create");
+
+    await t.get("/medical/taxis");
+    expect(t.response.body).toBe("medical/taxis#show");
+    expect(t.medicalTaxisPath()).toBe("/medical/taxis");
+
+    await t.get("/medical/taxis/edit");
+    expect(t.response.body).toBe("medical/taxis#edit");
+    expect(t.editMedicalTaxisPath()).toBe("/medical/taxis/edit");
+
+    await t.put("/medical/taxis");
+    expect(t.response.body).toBe("medical/taxis#update");
+
+    await t.delete("/medical/taxis");
+    expect(t.response.body).toBe("medical/taxis#destroy");
   });
 
-  it("router removes invalid conditions", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/tickets", { to: "tickets#index", as: "tickets" });
+  it("router removes invalid conditions", async () => {
+    draw(function () {
+      this.scope({ constraints: { id: /\d+/ } }, () => {
+        this.get("/tickets", { to: "tickets#index", as: "tickets" });
+      });
     });
-    expect(() => routes.recognizePath("/tickets")).not.toThrow();
-    expect(routes.pathFor({}, "tickets")).toBe("/tickets");
+
+    await t.get("/tickets");
+    expect(t.response.body).toBe("tickets#index");
+    expect(t.ticketsPath()).toBe("/tickets");
   });
 
   it("route defined in resources scope level", async () => {
@@ -1225,97 +1453,271 @@ describe("TestRoutingMapper", () => {
     expect(t.customerExportPath({ customer_id: "1" })).toBe("/customers/1/export");
   });
 
-  it("only should be read from scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("clubs", { only: ["index", "show"] });
-    });
-    expect(() => routes.recognizePath("/clubs")).not.toThrow();
-    expect(() => routes.recognizePath("/clubs/1")).not.toThrow();
-    expect(() => routes.recognizePath("/clubs/1/edit")).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/clubs", { method: "post" })).toThrow(RoutingError);
-  });
-
-  it("except should be read from scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("clubs", { except: ["new", "edit"] });
-    });
-    expect(() => routes.recognizePath("/clubs")).not.toThrow();
-    expect(() => routes.recognizePath("/clubs/1")).not.toThrow();
-    expect(routes.recognizePath("/clubs/new").action).toBe("show");
-    expect(() => routes.recognizePath("/clubs/1/edit")).toThrow(RoutingError);
-  });
-
-  it("only option should override scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", { only: ["index"] });
-    });
-    expect(() => routes.recognizePath("/posts")).not.toThrow();
-    expect(() => routes.recognizePath("/posts/1")).toThrow(RoutingError);
-  });
-
-  it("except option should override scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", { except: ["destroy"] });
-    });
-    expect(() => routes.recognizePath("/posts/1", { method: "delete" })).toThrow(RoutingError);
-    expect(() => routes.recognizePath("/posts")).not.toThrow();
-  });
-
-  it("only option should not inherit", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", { only: ["index", "show"] }, () => {
-        this.resources("comments");
+  it("only should be read from scope", async () => {
+    draw(function () {
+      this.scope({ only: ["index", "show"] }, () => {
+        this.namespace("only", () => {
+          this.resources("clubs", () => {
+            this.resources("players");
+            this.resource("chairman");
+          });
+        });
       });
     });
-    expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
-    expect(() => routes.recognizePath("/posts/1/comments", { method: "post" })).not.toThrow();
-    expect(() => routes.recognizePath("/posts/1/comments/new")).not.toThrow();
+
+    await t.get("/only/clubs");
+    expect(t.response.body).toBe("only/clubs#index");
+    expect(t.onlyClubsPath()).toBe("/only/clubs");
+
+    await t.get("/only/clubs/1/edit");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([NoMethodError], {}, () => rbFSend(t, "editOnlyClubPath", { id: "1" }));
+
+    await t.get("/only/clubs/1/players");
+    expect(t.response.body).toBe("only/players#index");
+    expect(t.onlyClubPlayersPath({ club_id: "1" })).toBe("/only/clubs/1/players");
+
+    await t.get("/only/clubs/1/players/2/edit");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([NoMethodError], {}, () =>
+      rbFSend(t, "editOnlyClubPlayerPath", { club_id: "1", id: "2" }),
+    );
+
+    await t.get("/only/clubs/1/chairman");
+    expect(t.response.body).toBe("only/chairmen#show");
+    expect(t.onlyClubChairmanPath({ club_id: "1" })).toBe("/only/clubs/1/chairman");
+
+    await t.get("/only/clubs/1/chairman/edit");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([NoMethodError], {}, () =>
+      rbFSend(t, "editOnlyClubChairmanPath", { club_id: "1" }),
+    );
   });
 
-  it("except option should not inherit", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", { except: ["destroy"] }, () => {
-        this.resources("comments");
+  it("except should be read from scope", async () => {
+    draw(function () {
+      this.scope({ except: ["new", "create", "edit", "update", "destroy"] }, () => {
+        this.namespace("except", () => {
+          this.resources("clubs", () => {
+            this.resources("players");
+            this.resource("chairman");
+          });
+        });
       });
     });
-    expect(() => routes.recognizePath("/posts/1/comments/2", { method: "delete" })).not.toThrow();
+
+    await t.get("/except/clubs");
+    expect(t.response.body).toBe("except/clubs#index");
+    expect(t.exceptClubsPath()).toBe("/except/clubs");
+
+    await t.get("/except/clubs/1/edit");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([NoMethodError], {}, () => rbFSend(t, "editExceptClubPath", { id: "1" }));
+
+    await t.get("/except/clubs/1/players");
+    expect(t.response.body).toBe("except/players#index");
+    expect(t.exceptClubPlayersPath({ club_id: "1" })).toBe("/except/clubs/1/players");
+
+    await t.get("/except/clubs/1/players/2/edit");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([NoMethodError], {}, () =>
+      rbFSend(t, "editExceptClubPlayerPath", { club_id: "1", id: "2" }),
+    );
+
+    await t.get("/except/clubs/1/chairman");
+    expect(t.response.body).toBe("except/chairmen#show");
+    expect(t.exceptClubChairmanPath({ club_id: "1" })).toBe("/except/clubs/1/chairman");
+
+    await t.get("/except/clubs/1/chairman/edit");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([NoMethodError], {}, () =>
+      rbFSend(t, "editExceptClubChairmanPath", { club_id: "1" }),
+    );
   });
 
-  it("projects for api app", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("projects", { except: ["new", "edit"] });
-    });
-    expect(() => routes.recognizePath("/projects")).not.toThrow();
-    expect(() => routes.recognizePath("/projects/1")).not.toThrow();
-    expect(routes.recognizePath("/projects/new").action).toBe("show");
-    expect(() => routes.recognizePath("/projects/1/edit")).toThrow(RoutingError);
-  });
-
-  it("constraints are merged from scope", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("movies", { constraints: { id: /\d{4}/ } });
-    });
-    expect(routes.recognizePath("/movies/0001").action).toBe("show");
-    expect(() => routes.recognizePath("/movies/00001")).toThrow(RoutingError);
-  });
-
-  it("nested resource constraints", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("lists", { constraints: { id: /\d+/ } }, () => {
-        this.resources("todos", { constraints: { id: /\d+/ } });
+  it("only option should override scope", async () => {
+    draw(function () {
+      this.scope({ only: "show" }, () => {
+        this.namespace("only", () => {
+          this.resources("sectors", { only: "index" });
+        });
       });
     });
-    expect(() => routes.recognizePath("/lists/1/todos/2")).not.toThrow();
-    expect(() => routes.recognizePath("/lists/abc/todos/2")).toThrow(RoutingError);
+
+    await t.get("/only/sectors");
+    expect(t.response.body).toBe("only/sectors#index");
+    expect(t.onlySectorsPath()).toBe("/only/sectors");
+
+    await t.get("/only/sectors/1");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([NoMethodError], {}, () => rbFSend(t, "onlySectorPath", { id: "1" }));
+  });
+
+  it("except option should override scope", async () => {
+    draw(function () {
+      this.scope({ except: "index" }, () => {
+        this.namespace("except", () => {
+          this.resources("sectors", { except: ["show", "update", "destroy"] });
+        });
+      });
+    });
+
+    await t.get("/except/sectors");
+    expect(t.response.body).toBe("except/sectors#index");
+    expect(t.exceptSectorsPath()).toBe("/except/sectors");
+
+    await t.get("/except/sectors/1");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([NoMethodError], {}, () => rbFSend(t, "exceptSectorPath", { id: "1" }));
+  });
+
+  it("only option should not inherit", async () => {
+    draw(function () {
+      this.scope({ only: "show" }, () => {
+        this.namespace("only", () => {
+          this.resources("sectors", { only: "index" }, () => {
+            this.resources("companies");
+            this.resource("leader");
+          });
+        });
+      });
+    });
+
+    await t.get("/only/sectors/1/companies/2");
+    expect(t.response.body).toBe("only/companies#show");
+    expect(t.onlySectorCompanyPath({ sector_id: "1", id: "2" })).toBe(
+      "/only/sectors/1/companies/2",
+    );
+
+    await t.get("/only/sectors/1/leader");
+    expect(t.response.body).toBe("only/leaders#show");
+    expect(t.onlySectorLeaderPath({ sector_id: "1" })).toBe("/only/sectors/1/leader");
+  });
+
+  it("except option should not inherit", async () => {
+    draw(function () {
+      this.scope({ except: "index" }, () => {
+        this.namespace("except", () => {
+          this.resources("sectors", { except: ["show", "update", "destroy"] }, () => {
+            this.resources("companies");
+            this.resource("leader");
+          });
+        });
+      });
+    });
+
+    await t.get("/except/sectors/1/companies/2");
+    expect(t.response.body).toBe("except/companies#show");
+    expect(t.exceptSectorCompanyPath({ sector_id: "1", id: "2" })).toBe(
+      "/except/sectors/1/companies/2",
+    );
+
+    await t.get("/except/sectors/1/leader");
+    expect(t.response.body).toBe("except/leaders#show");
+    expect(t.exceptSectorLeaderPath({ sector_id: "1" })).toBe("/except/sectors/1/leader");
+  });
+
+  it("projects for api app", async () => {
+    const config = new Config();
+    config.apiOnly = true;
+
+    IntegrationTest.stubControllers(config, (routes) => {
+      routes.draw(function () {
+        this.resources("projects", { controller: "project" });
+      });
+      t.app = new RoutedRackApp(routes);
+    });
+
+    await t.get("/projects");
+    expect(t.response.body).toBe("project#index");
+    expect(t.projectsPath()).toBe("/projects");
+
+    await t.post("/projects");
+    expect(t.response.body).toBe("project#create");
+
+    await t.get("/projects.xml");
+    expect(t.response.body).toBe("project#index");
+    expect(t.projectsPath({ format: "xml" })).toBe("/projects.xml");
+
+    await t.get("/projects/1");
+    expect(t.response.body).toBe("project#show");
+    expect(t.projectPath({ id: "1" })).toBe("/projects/1");
+
+    await t.get("/projects/1.xml");
+    expect(t.response.body).toBe("project#show");
+    expect(t.projectPath({ id: "1", format: "xml" })).toBe("/projects/1.xml");
+
+    await t.get("/projects/1/edit");
+    expect(t.response.body).toBe("Not Found");
+  });
+
+  it("constraints are merged from scope", async () => {
+    draw(function () {
+      this.scope({ constraints: { id: /\d{4}/ } }, () => {
+        this.resources("movies", () => {
+          this.resources("reviews");
+          this.resource("trailer");
+        });
+      });
+    });
+
+    await t.get("/movies/0001");
+    expect(t.response.body).toBe("movies#show");
+    expect(t.moviePath({ id: "0001" })).toBe("/movies/0001");
+
+    await t.get("/movies/00001");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([UrlGenerationError], {}, () => t.moviePath({ id: "00001" }));
+
+    await t.get("/movies/0001/reviews");
+    expect(t.response.body).toBe("reviews#index");
+    expect(t.movieReviewsPath({ movie_id: "0001" })).toBe("/movies/0001/reviews");
+
+    await t.get("/movies/00001/reviews");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([UrlGenerationError], {}, () => t.movieReviewsPath({ movie_id: "00001" }));
+
+    await t.get("/movies/0001/reviews/0001");
+    expect(t.response.body).toBe("reviews#show");
+    expect(t.movieReviewPath({ movie_id: "0001", id: "0001" })).toBe("/movies/0001/reviews/0001");
+
+    await t.get("/movies/00001/reviews/0001");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([UrlGenerationError], {}, () =>
+      t.moviePath({ movie_id: "00001", id: "00001" }),
+    );
+
+    await t.get("/movies/0001/trailer");
+    expect(t.response.body).toBe("trailers#show");
+    expect(t.movieTrailerPath({ movie_id: "0001" })).toBe("/movies/0001/trailer");
+
+    await t.get("/movies/00001/trailer");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([UrlGenerationError], {}, () => t.movieTrailerPath({ movie_id: "00001" }));
+  });
+
+  it("nested resource constraints", async () => {
+    draw(function () {
+      this.resources("lists", { id: /([A-Za-z0-9]{25})|default/ }, () => {
+        this.resources("todos", { id: /\d+/ });
+      });
+    });
+
+    await t.get("/lists/01234012340123401234fffff");
+    expect(t.response.body).toBe("lists#show");
+    expect(t.listPath({ id: "01234012340123401234fffff" })).toBe(
+      "/lists/01234012340123401234fffff",
+    );
+
+    await t.get("/lists/01234012340123401234fffff/todos/1");
+    expect(t.response.body).toBe("todos#show");
+    expect(t.listTodoPath({ list_id: "01234012340123401234fffff", id: "1" })).toBe(
+      "/lists/01234012340123401234fffff/todos/1",
+    );
+
+    await t.get("/lists/2/todos/1");
+    expect(t.response.body).toBe("Not Found");
+    await assertRaises([UrlGenerationError], {}, () => t.listTodoPath({ list_id: "2", id: "1" }));
   });
 
   it("URL helpers raise a missing keys error for a nil param", () => {
@@ -1326,27 +1728,30 @@ describe("TestRoutingMapper", () => {
     expect(() => routes.pathFor({}, "post")).toThrow(/missing required keys: \[:id\]/);
   });
 
-  it("resource with slugs in ids", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", { constraints: { id: /[a-z0-9-]+/ } });
+  it("resource with slugs in ids", async () => {
+    draw(function () {
+      this.resources("posts");
     });
-    expect(routes.recognizePath("/posts/hello-world").action).toBe("show");
-    expect(routes.recognizePath("/posts/123-abc").id).toBe("123-abc");
+
+    await t.get("/posts/rails-rocks");
+    expect(t.response.body).toBe("posts#show");
+    expect(t.postPath({ id: "rails-rocks" })).toBe("/posts/rails-rocks");
   });
 
-  it("named character classes in regexp constraints", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("named character classes in regexp constraints", async () => {
+    draw(function () {
       this.get("/purchases/:token/:filename", {
         to: "purchases#fetch",
-        constraints: { token: /[a-zA-Z0-9]{10}/, filename: /(.+)/ },
+        token: /[a-zA-Z0-9]{10}/,
+        filename: /(.+)/,
         as: "purchase",
       });
     });
-    expect(() => routes.recognizePath("/purchases/315004be7e/Ruby_on_Rails.pdf")).not.toThrow();
-    expect(routes.pathFor({ token: "315004be7e", filename: "Ruby_on_Rails.pdf" }, "purchase")).toBe(
-      "/purchases/315004be7e/Ruby_on_Rails.pdf",
+
+    await t.get("/purchases/315004be7e/Ruby_on_Rails_3.pdf");
+    expect(t.response.body).toBe("purchases#fetch");
+    expect(t.purchasePath({ token: "315004be7e", filename: "Ruby_on_Rails_3.pdf" })).toBe(
+      "/purchases/315004be7e/Ruby_on_Rails_3.pdf",
     );
   });
 
@@ -1517,130 +1922,402 @@ describe("TestRoutingMapper", () => {
   });
 
   it("resources for uncountable names", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("sheep");
-    });
-    expect(() => routes.recognizePath("/sheep")).not.toThrow();
-    expect(() => routes.recognizePath("/sheep/1")).not.toThrow();
-  });
-
-  it("path names", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", { pathNames: { new: "novo", edit: "editar" } });
-    });
-    expect(() => routes.recognizePath("/posts/novo")).not.toThrow();
-    expect(routes.recognizePath("/posts/novo").action).toBe("new");
-    expect(() => routes.recognizePath("/posts/1/editar")).not.toThrow();
-    expect(routes.recognizePath("/posts/1/editar").action).toBe("edit");
-  });
-
-  it("projects with resources path names", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("projects", { pathNames: { new: "nuevo" } }, () => {
-        this.resources("tasks", { pathNames: { new: "nueva" } });
+    draw(function () {
+      this.resources("sheep", () => {
+        this.get("_it", { on: "member" });
       });
     });
-    expect(routes.recognizePath("/projects/nuevo").action).toBe("new");
-    expect(routes.recognizePath("/projects/1/tasks/nueva").action).toBe("new");
+
+    expect(t.sheepIndexPath()).toBe("/sheep");
+    expect(t.sheepPath(1)).toBe("/sheep/1");
+    expect(t.newSheepPath()).toBe("/sheep/new");
+    expect(t.editSheepPath(1)).toBe("/sheep/1/edit");
+    expect(t.ItSheepPath(1)).toBe("/sheep/1/_it");
   });
 
-  it("shallow nested resources", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", () => {
-        this.resources("comments", { shallow: true });
+  it("path names", async () => {
+    draw(function () {
+      this.scope("pt", { as: "pt" }, () => {
+        this.resources("projects", {
+          pathNames: { edit: "editar", new: "novo" },
+          path: "projetos",
+        });
+        this.resource(
+          "admin",
+          { pathNames: { new: "novo", activate: "ativar" }, path: "administrador" },
+          () => {
+            this.put(":activate", { on: "member" });
+          },
+        );
       });
     });
-    expect(() => routes.recognizePath("/posts/1/comments")).not.toThrow();
-    expect(() => routes.recognizePath("/posts/1/comments", { method: "post" })).not.toThrow();
-    expect(() => routes.recognizePath("/comments/1")).not.toThrow();
-    expect(routes.recognizePath("/comments/1").action).toBe("show");
-    expect(() => routes.recognizePath("/comments/1", { method: "delete" })).not.toThrow();
+
+    await t.get("/pt/projetos");
+    expect(t.response.body).toBe("projects#index");
+    expect(t.ptProjectsPath()).toBe("/pt/projetos");
+
+    await t.get("/pt/projetos/1/editar");
+    expect(t.response.body).toBe("projects#edit");
+    expect(t.editPtProjectPath(1)).toBe("/pt/projetos/1/editar");
+
+    await t.get("/pt/administrador");
+    expect(t.response.body).toBe("admins#show");
+    expect(t.ptAdminPath()).toBe("/pt/administrador");
+
+    await t.get("/pt/administrador/novo");
+    expect(t.response.body).toBe("admins#new");
+    expect(t.newPtAdminPath()).toBe("/pt/administrador/novo");
+
+    await t.put("/pt/administrador/ativar");
+    expect(t.response.body).toBe("admins#activate");
+    expect(t.activatePtAdminPath()).toBe("/pt/administrador/ativar");
   });
 
-  it("shallow nested resources inside resource", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resource("account", () => {
-        this.resources("posts", { shallow: true });
+  it("projects with resources path names", async () => {
+    draw(function () {
+      this.resourcesPathNames({ correlation_indexes: "info_about_correlation_indexes" });
+
+      this.resources("projects", () => {
+        this.get(":correlation_indexes", { on: "collection" });
       });
     });
-    expect(() => routes.recognizePath("/account/posts")).not.toThrow();
-    expect(() => routes.recognizePath("/posts/1")).not.toThrow();
-    expect(routes.recognizePath("/posts/1").action).toBe("show");
+
+    await t.get("/projects/info_about_correlation_indexes");
+    expect(t.response.body).toBe("projects#correlation_indexes");
+    expect(t.correlationIndexesProjectsPath()).toBe("/projects/info_about_correlation_indexes");
   });
 
-  it("custom resource routes are scoped", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("posts", () => {
-        this.get("preview", { to: "posts#preview", as: "preview" });
+  it("shallow nested resources", async () => {
+    draw(function () {
+      this.shallow(() => {
+        this.namespace("api", () => {
+          this.resources("teams", () => {
+            this.resources("players");
+            this.resource("captain");
+          });
+        });
+      });
+
+      this.resources("threads", { shallow: true }, () => {
+        this.resource("owner");
+        this.resources("messages", () => {
+          this.resources("comments", () => {
+            this.member(() => {
+              this.post("preview");
+            });
+          });
+        });
       });
     });
-    const m = routes.recognizePath("/posts/1/preview");
-    expect(m.action).toBe("preview");
+
+    await t.get("/api/teams");
+    expect(t.response.body).toBe("api/teams#index");
+    expect(t.apiTeamsPath()).toBe("/api/teams");
+
+    await t.get("/api/teams/new");
+    expect(t.response.body).toBe("api/teams#new");
+    expect(t.newApiTeamPath()).toBe("/api/teams/new");
+
+    await t.get("/api/teams/1");
+    expect(t.response.body).toBe("api/teams#show");
+    expect(t.apiTeamPath({ id: "1" })).toBe("/api/teams/1");
+
+    await t.get("/api/teams/1/edit");
+    expect(t.response.body).toBe("api/teams#edit");
+    expect(t.editApiTeamPath({ id: "1" })).toBe("/api/teams/1/edit");
+
+    await t.get("/api/teams/1/players");
+    expect(t.response.body).toBe("api/players#index");
+    expect(t.apiTeamPlayersPath({ team_id: "1" })).toBe("/api/teams/1/players");
+
+    await t.get("/api/teams/1/players/new");
+    expect(t.response.body).toBe("api/players#new");
+    expect(t.newApiTeamPlayerPath({ team_id: "1" })).toBe("/api/teams/1/players/new");
+
+    await t.get("/api/players/2");
+    expect(t.response.body).toBe("api/players#show");
+    expect(t.apiPlayerPath({ id: "2" })).toBe("/api/players/2");
+
+    await t.get("/api/players/2/edit");
+    expect(t.response.body).toBe("api/players#edit");
+    expect(t.editApiPlayerPath({ id: "2" })).toBe("/api/players/2/edit");
+
+    await t.get("/api/teams/1/captain");
+    expect(t.response.body).toBe("api/captains#show");
+    expect(t.apiTeamCaptainPath({ team_id: "1" })).toBe("/api/teams/1/captain");
+
+    await t.get("/api/teams/1/captain/new");
+    expect(t.response.body).toBe("api/captains#new");
+    expect(t.newApiTeamCaptainPath({ team_id: "1" })).toBe("/api/teams/1/captain/new");
+
+    await t.get("/api/teams/1/captain/edit");
+    expect(t.response.body).toBe("api/captains#edit");
+    expect(t.editApiTeamCaptainPath({ team_id: "1" })).toBe("/api/teams/1/captain/edit");
+
+    await t.get("/threads");
+    expect(t.response.body).toBe("threads#index");
+    expect(t.threadsPath()).toBe("/threads");
+
+    await t.get("/threads/new");
+    expect(t.response.body).toBe("threads#new");
+    expect(t.newThreadPath()).toBe("/threads/new");
+
+    await t.get("/threads/1");
+    expect(t.response.body).toBe("threads#show");
+    expect(t.threadPath({ id: "1" })).toBe("/threads/1");
+
+    await t.get("/threads/1/edit");
+    expect(t.response.body).toBe("threads#edit");
+    expect(t.editThreadPath({ id: "1" })).toBe("/threads/1/edit");
+
+    await t.get("/threads/1/owner");
+    expect(t.response.body).toBe("owners#show");
+    expect(t.threadOwnerPath({ thread_id: "1" })).toBe("/threads/1/owner");
+
+    await t.get("/threads/1/messages");
+    expect(t.response.body).toBe("messages#index");
+    expect(t.threadMessagesPath({ thread_id: "1" })).toBe("/threads/1/messages");
+
+    await t.get("/threads/1/messages/new");
+    expect(t.response.body).toBe("messages#new");
+    expect(t.newThreadMessagePath({ thread_id: "1" })).toBe("/threads/1/messages/new");
+
+    await t.get("/messages/2");
+    expect(t.response.body).toBe("messages#show");
+    expect(t.messagePath({ id: "2" })).toBe("/messages/2");
+
+    await t.get("/messages/2/edit");
+    expect(t.response.body).toBe("messages#edit");
+    expect(t.editMessagePath({ id: "2" })).toBe("/messages/2/edit");
+
+    await t.get("/messages/2/comments");
+    expect(t.response.body).toBe("comments#index");
+    expect(t.messageCommentsPath({ message_id: "2" })).toBe("/messages/2/comments");
+
+    await t.get("/messages/2/comments/new");
+    expect(t.response.body).toBe("comments#new");
+    expect(t.newMessageCommentPath({ message_id: "2" })).toBe("/messages/2/comments/new");
+
+    await t.get("/comments/3");
+    expect(t.response.body).toBe("comments#show");
+    expect(t.commentPath({ id: "3" })).toBe("/comments/3");
+
+    await t.get("/comments/3/edit");
+    expect(t.response.body).toBe("comments#edit");
+    expect(t.editCommentPath({ id: "3" })).toBe("/comments/3/edit");
+
+    await t.post("/comments/3/preview");
+    expect(t.response.body).toBe("comments#preview");
+    expect(t.previewCommentPath({ id: "3" })).toBe("/comments/3/preview");
   });
 
-  it("glob parameter accepts regexp", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts/*path", { to: "posts#show" });
-    });
-    const m = routes.recognizePath("/posts/2024/01/hello");
-    expect(m.path).toBe("2024/01/hello");
-  });
-
-  it("optional scoped root hierarchy", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("(/:locale)/posts", { to: "posts#index" });
-      this.get("(/:locale)/posts/:id", { to: "posts#show" });
-    });
-    expect(routeSpec(routes.recognizePath("/posts"))).toBe("posts#index");
-    expect(routeSpec(routes.recognizePath("/posts/1"))).toBe("posts#show");
-    expect(routes.recognizePath("/en/posts/1").locale).toBe("en");
-  });
-
-  it("optional part of segment", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts(/:id)", { to: "posts#index" });
-    });
-    expect(() => routes.recognizePath("/posts")).not.toThrow();
-    expect(routes.recognizePath("/posts/1").id).toBe("1");
-  });
-
-  it("url generator for optional prefix dynamic segment", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("(/:locale)/posts", { to: "posts#index", as: "posts" });
-    });
-    expect(routes.pathFor({ locale: "en" }, "posts")).toBe("/en/posts");
-    expect(routes.pathFor({}, "posts")).toBe("/posts");
-  });
-
-  it("url generator for optional suffix static and dynamic segment", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts(/:id)", { to: "posts#show", as: "post" });
-    });
-    expect(routes.pathFor({ id: "1" }, "post")).toBe("/posts/1");
-    expect(routes.pathFor({}, "post")).toBe("/posts");
-  });
-
-  it("constraints block not carried to following routes", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.constraints({ id: /\d+/ }, () => {
-        this.get("/posts/:id", { to: "posts#show" });
+  it("shallow nested resources inside resource", async () => {
+    draw(function () {
+      this.resource("membership", { shallow: true }, () => {
+        this.resources("cards");
       });
-      this.get("/articles/:id", { to: "articles#show" });
     });
-    expect(() => routes.recognizePath("/posts/123")).not.toThrow();
-    expect(() => routes.recognizePath("/articles/abc")).not.toThrow();
+
+    await t.get("/membership/cards");
+    expect(t.response.body).toBe("cards#index");
+    expect(t.membershipCardsPath()).toBe("/membership/cards");
+
+    await t.get("/membership/cards/new");
+    expect(t.response.body).toBe("cards#new");
+    expect(t.newMembershipCardPath()).toBe("/membership/cards/new");
+
+    await t.post("/membership/cards");
+    expect(t.response.body).toBe("cards#create");
+
+    await t.get("/cards/1");
+    expect(t.response.body).toBe("cards#show");
+    expect(t.cardPath("1")).toBe("/cards/1");
+
+    await t.get("/cards/1/edit");
+    expect(t.response.body).toBe("cards#edit");
+    expect(t.editCardPath("1")).toBe("/cards/1/edit");
+
+    await t.put("/cards/1");
+    expect(t.response.body).toBe("cards#update");
+
+    await t.patch("/cards/1");
+    expect(t.response.body).toBe("cards#update");
+
+    await t.delete("/cards/1");
+    expect(t.response.body).toBe("cards#destroy");
+  });
+
+  it("custom resource routes are scoped", async () => {
+    draw(function () {
+      this.resources("customers", () => {
+        this.get("recent", { on: "collection" });
+        this.get("profile", { on: "member" });
+        this.get({ "secret/profile": "customers#secret", on: "member" });
+        this.post({ preview: "customers#preview", as: "another_preview", on: "new" });
+        this.resource("avatar", () => {
+          this.get({ thumbnail: "avatars#thumbnail", as: "thumbnail", on: "member" });
+        });
+        this.resources("invoices", () => {
+          this.get({ outstanding: "invoices#outstanding", on: "collection" });
+          this.get("overdue", { action: "overdue", on: "collection" });
+          this.get({ print: "invoices#print", as: "print", on: "member" });
+          this.post({ preview: "invoices#preview", as: "preview", on: "new" });
+        });
+        this.resources("notes", { shallow: true }, () => {
+          this.get({ preview: "notes#preview", as: "preview", on: "new" });
+          this.get({ print: "notes#print", as: "print", on: "member" });
+        });
+      });
+
+      this.namespace("api", () => {
+        this.resources("customers", () => {
+          this.get({ recent: "customers#recent", as: "recent", on: "collection" });
+          this.get({ profile: "customers#profile", as: "profile", on: "member" });
+          this.post({ preview: "customers#preview", as: "preview", on: "new" });
+        });
+      });
+    });
+
+    expect(t.recentCustomersPath()).toBe("/customers/recent");
+    expect(t.profileCustomerPath({ id: "1" })).toBe("/customers/1/profile");
+    expect(t.secretProfileCustomerPath({ id: "1" })).toBe("/customers/1/secret/profile");
+    expect(t.anotherPreviewNewCustomerPath()).toBe("/customers/new/preview");
+    expect(t.thumbnailCustomerAvatarPath({ customer_id: "1", format: "jpg" })).toBe(
+      "/customers/1/avatar/thumbnail.jpg",
+    );
+    expect(t.outstandingCustomerInvoicesPath({ customer_id: "1" })).toBe(
+      "/customers/1/invoices/outstanding",
+    );
+    expect(t.printCustomerInvoicePath({ customer_id: "1", id: "2" })).toBe(
+      "/customers/1/invoices/2/print",
+    );
+    expect(t.previewNewCustomerInvoicePath({ customer_id: "1" })).toBe(
+      "/customers/1/invoices/new/preview",
+    );
+    expect(t.previewNewCustomerNotePath({ customer_id: "1" })).toBe(
+      "/customers/1/notes/new/preview",
+    );
+    expect(t.printNotePath({ id: "1" })).toBe("/notes/1/print");
+    expect(t.recentApiCustomersPath()).toBe("/api/customers/recent");
+    expect(t.profileApiCustomerPath({ id: "1" })).toBe("/api/customers/1/profile");
+    expect(t.previewNewApiCustomerPath()).toBe("/api/customers/new/preview");
+
+    await t.get("/customers/1/invoices/overdue");
+    expect(t.response.body).toBe("invoices#overdue");
+
+    await t.get("/customers/1/secret/profile");
+    expect(t.response.body).toBe("customers#secret");
+  });
+
+  it("glob parameter accepts regexp", async () => {
+    draw(function () {
+      this.get("/:locale/*file.:format", { to: "files#show", file: /path\/to\/existing\/file/ });
+    });
+
+    await t.get("/en/path/to/existing/file.html");
+    expect(t.response.status).toBe(200);
+  });
+
+  it("optional scoped root hierarchy", async () => {
+    draw(function () {
+      this.scope("(:locale)", () => {
+        this.scope("(:platform)", () => {
+          this.scope("(:browser)", () => {
+            this.root({ to: "projects#index" });
+          });
+        });
+      });
+    });
+
+    expect(t.rootPath()).toBe("/");
+    expect(t.rootPath({ locale: "en" })).toBe("/en");
+    expect(t.rootPath({ locale: "en", platform: "osx" })).toBe("/en/osx");
+    expect(t.rootPath({ locale: "en", platform: "osx", browser: "chrome" })).toBe("/en/osx/chrome");
+
+    await t.get("/");
+    expect(t.response.body).toBe("projects#index");
+
+    await t.get("/en");
+    expect(t.response.body).toBe("projects#index");
+
+    await t.get("/en/osx");
+    expect(t.response.body).toBe("projects#index");
+
+    await t.get("/en/osx/chrome");
+    expect(t.response.body).toBe("projects#index");
+  });
+
+  it("optional part of segment", async () => {
+    draw(function () {
+      this.get("/star-trek(-tng)/:episode", { to: "star_trek#show" });
+    });
+
+    await t.get("/star-trek/02-15-the-trouble-with-tribbles");
+    expect(t.response.body).toBe("star_trek#show");
+
+    await t.get("/star-trek-tng/05-02-darmok");
+    expect(t.response.body).toBe("star_trek#show");
+  });
+
+  it("url generator for optional prefix dynamic segment", async () => {
+    draw(function () {
+      this.get({ "(/:username)/followers": "followers#index" });
+    });
+
+    await t.get("/bob/followers");
+    expect(t.response.body).toBe("followers#index");
+    expect(t.urlFor({ controller: "followers", action: "index", username: "bob" })).toBe(
+      "http://www.example.com/bob/followers",
+    );
+
+    await t.get("/followers");
+    expect(t.response.body).toBe("followers#index");
+    expect(t.urlFor({ controller: "followers", action: "index", username: null })).toBe(
+      "http://www.example.com/followers",
+    );
+  });
+
+  it("url generator for optional suffix static and dynamic segment", async () => {
+    draw(function () {
+      this.get({ "/groups(/user/:username)": "groups#index" });
+    });
+
+    await t.get("/groups/user/bob");
+    expect(t.response.body).toBe("groups#index");
+    expect(t.urlFor({ controller: "groups", action: "index", username: "bob" })).toBe(
+      "http://www.example.com/groups/user/bob",
+    );
+
+    await t.get("/groups");
+    expect(t.response.body).toBe("groups#index");
+    expect(t.urlFor({ controller: "groups", action: "index", username: null })).toBe(
+      "http://www.example.com/groups",
+    );
+  });
+
+  it("constraints block not carried to following routes", async () => {
+    draw(function () {
+      this.scope("/italians", () => {
+        this.get("/writers", { to: "italians#writers", constraints: IpRestrictor });
+        this.get("/sculptors", { to: "italians#sculptors" });
+        this.get("/painters/:painter", {
+          to: "italians#painters",
+          constraints: { painter: /michelangelo/ },
+        });
+      });
+    });
+
+    await t.get("/italians/writers");
+    expect(t.response.body).toBe("Not Found");
+
+    await t.get("/italians/sculptors");
+    expect(t.response.body).toBe("italians#sculptors");
+
+    await t.get("/italians/painters/botticelli");
+    expect(t.response.body).toBe("Not Found");
+
+    await t.get("/italians/painters/michelangelo");
+    expect(t.response.body).toBe("italians#painters");
   });
 
   it("concerns", () => {
@@ -1657,12 +2334,30 @@ describe("TestRoutingMapper", () => {
     expect(() => routes.recognizePath("/posts/1/comments", { method: "post" })).not.toThrow();
     expect(() => routes.recognizePath("/posts/1/comments/2")).not.toThrow();
   });
-  it("trailing slash", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts", { to: "posts#index", as: "posts" });
+  it("trailing slash", async () => {
+    draw(function () {
+      this.resources("streams");
     });
-    expect(() => routes.recognizePath("/posts/")).not.toThrow();
+
+    await t.get("/streams");
+    assertPredicate(t.response, (r) => r.isOk, "route without trailing slash should work");
+
+    await t.get("/streams/");
+    assertPredicate(t.response, (r) => r.isOk, "route with trailing slash should work");
+
+    await t.get("/streams?foobar");
+    assertPredicate(
+      t.response,
+      (r) => r.isOk,
+      "route without trailing slash and with QUERY_STRING should work",
+    );
+
+    await t.get("/streams/?foobar");
+    assertPredicate(
+      t.response,
+      (r) => r.isOk,
+      "route with trailing slash and with QUERY_STRING should work",
+    );
   });
 
   it("accepts a constraint object responding to call", async () => {
@@ -1705,18 +2400,24 @@ describe("TestRoutingMapper", () => {
     expect(m["controllers"]).toBe("foo");
   });
 
-  it("websocket", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("websocket", async () => {
+    draw(function () {
       this.connect("chat/live", { to: "chat#live" });
     });
-    expect(routes.recognizePath("/chat/live").action).toBe("live");
-    expect(routes.recognizePath("/chat/live", { method: "connect" }).action).toBe("live");
+
+    await t.get("/chat/live", {
+      headers: { REQUEST_METHOD: "GET", HTTP_CONNECTION: "Upgrade", HTTP_UPGRADE: "websocket" },
+    });
+    expect(t.response.body).toBe("chat#live");
+
+    await t.get("/chat/live", {
+      headers: { REQUEST_METHOD: "CONNECT", "rack.protocol": "websocket" },
+    });
+    expect(t.response.body).toBe("chat#live");
   });
 
-  it("bookmarks", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("bookmarks", async () => {
+    draw(function () {
       this.scope("bookmark", { controller: "bookmarks", as: "bookmark" }, () => {
         this.get(":new", { path: "build" });
         this.post(":create", { path: "create", as: "" });
@@ -1724,42 +2425,54 @@ describe("TestRoutingMapper", () => {
         this.get(":remove", { action: "destroy", as: "remove" });
       });
     });
-    expect(routes.recognizePath("/bookmark/build").controller).toBe("bookmarks");
-    expect(routes.recognizePath("/bookmark/build").action).toBe("new");
-    expect(routes.pathFor({}, "bookmark_new")).toBe("/bookmark/build");
-    expect(routes.recognizePath("/bookmark/create", { method: "post" }).controller).toBe(
-      "bookmarks",
-    );
-    expect(routes.recognizePath("/bookmark/create", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/bookmark/update", { method: "put" }).action).toBe("update");
-    expect(routes.pathFor({}, "bookmark_update")).toBe("/bookmark/update");
-    expect(routes.recognizePath("/bookmark/remove").action).toBe("destroy");
-    expect(routes.pathFor({}, "bookmark_remove")).toBe("/bookmark/remove");
+
+    await t.get("/bookmark/build");
+    expect(t.response.body).toBe("bookmarks#new");
+    expect(t.bookmarkNewPath()).toBe("/bookmark/build");
+
+    await t.post("/bookmark/create");
+    expect(t.response.body).toBe("bookmarks#create");
+    expect(t.bookmarkPath()).toBe("/bookmark/create");
+
+    await t.put("/bookmark/update");
+    expect(t.response.body).toBe("bookmarks#update");
+    expect(t.bookmarkUpdatePath()).toBe("/bookmark/update");
+
+    await t.get("/bookmark/remove");
+    expect(t.response.body).toBe("bookmarks#destroy");
+    expect(t.bookmarkRemovePath()).toBe("/bookmark/remove");
   });
 
-  it("pagemarks", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope("pagemark", { module: "pagemarks", as: "pagemark" }, () => {
+  it("pagemarks", async () => {
+    draw(function () {
+      this.scope("pagemark", { controller: "pagemarks", as: "pagemark" }, () => {
         this.get("build", { action: "new", as: "new" });
-        this.post("create", { action: "create", as: "" });
-        this.put("update", { action: "update", as: "update" });
+        this.post("create", { as: "" });
+        this.put("update");
         this.get("remove", { action: "destroy", as: "remove" });
         this.get("", { action: "show", as: "show" });
       });
     });
-    expect(routes.recognizePath("/pagemark/build").controller).toBe("pagemarks");
-    expect(routes.recognizePath("/pagemark/build").action).toBe("new");
-    expect(routes.pathFor({}, "pagemark_new")).toBe("/pagemark/build");
-    expect(routes.recognizePath("/pagemark/create", { method: "post" }).controller).toBe(
-      "pagemarks",
-    );
-    expect(routes.recognizePath("/pagemark/create", { method: "post" }).action).toBe("create");
-    expect(routes.recognizePath("/pagemark/update", { method: "put" }).action).toBe("update");
-    expect(routes.recognizePath("/pagemark/remove").action).toBe("destroy");
-    expect(routes.pathFor({}, "pagemark_remove")).toBe("/pagemark/remove");
-    expect(routes.recognizePath("/pagemark").action).toBe("show");
-    expect(routes.pathFor({}, "pagemark_show")).toBe("/pagemark");
+
+    await t.get("/pagemark/build");
+    expect(t.response.body).toBe("pagemarks#new");
+    expect(t.pagemarkNewPath()).toBe("/pagemark/build");
+
+    await t.post("/pagemark/create");
+    expect(t.response.body).toBe("pagemarks#create");
+    expect(t.pagemarkPath()).toBe("/pagemark/create");
+
+    await t.put("/pagemark/update");
+    expect(t.response.body).toBe("pagemarks#update");
+    expect(t.pagemarkUpdatePath()).toBe("/pagemark/update");
+
+    await t.get("/pagemark/remove");
+    expect(t.response.body).toBe("pagemarks#destroy");
+    expect(t.pagemarkRemovePath()).toBe("/pagemark/remove");
+
+    await t.get("/pagemark");
+    expect(t.response.body).toBe("pagemarks#show");
+    expect(t.pagemarkShowPath()).toBe("/pagemark");
   });
 
   it("admin", async () => {
@@ -1794,65 +2507,90 @@ describe("TestRoutingMapper", () => {
     expect(t.response.headers.get("x-cascade")).toBe("pass");
   });
 
-  it("global", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.scope({ module: "global" }, () => {
-        this.get("global/hide_notice", { action: "hide_notice", as: "global_hide_notice" });
+  it("global", async () => {
+    draw(function () {
+      this.controller("global", () => {
+        this.get("global/hide_notice");
         this.get("global/export", { action: "export", as: "export_request" });
         this.get("/export/:id/:file", {
           action: "export",
           as: "export_download",
           constraints: { file: /.*/ },
         });
-      });
-    });
-    expect(routes.recognizePath("/global/export").controller).toBe("global");
-    expect(routes.recognizePath("/global/export").action).toBe("export");
-    expect(routes.recognizePath("/global/hide_notice").controller).toBe("global");
-    expect(routes.recognizePath("/global/hide_notice").action).toBe("hide_notice");
-    expect(routes.recognizePath("/export/123/foo.txt").action).toBe("export");
-    expect(routes.pathFor({}, "export_request")).toBe("/global/export");
-    expect(routes.pathFor({}, "global_hide_notice")).toBe("/global/hide_notice");
-    expect(routes.pathFor({ id: "123", file: "foo.txt" }, "export_download")).toBe(
-      "/export/123/foo.txt",
-    );
-  });
 
-  it("local", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/local/dashboard", { to: "local#dashboard" });
-    });
-    expect(routes.recognizePath("/local/dashboard").action).toBe("dashboard");
-  });
-
-  it("url for with no side effects", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/projects/status(.:format)", { to: "projects#status" });
-    });
-    expect(() => routes.recognizePath("/projects/status")).not.toThrow();
-  });
-
-  it("url for does not modify controller", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/projects/status(.:format)", { to: "projects#status" });
-    });
-    expect(() => routes.recognizePath("/projects/status")).not.toThrow();
-  });
-
-  it("named route with no side effects", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.resources("customers", () => {
-        this.member(() => {
-          this.get("profile", { as: "profile" });
+        deprecator().silence(() => {
+          this.get("global/:action");
         });
       });
     });
-    expect(() => routes.recognizePath("/customers/1/profile")).not.toThrow();
+
+    await t.get("/global/dashboard");
+    expect(t.response.body).toBe("global#dashboard");
+
+    await t.get("/global/export");
+    expect(t.response.body).toBe("global#export");
+
+    await t.get("/global/hide_notice");
+    expect(t.response.body).toBe("global#hide_notice");
+
+    await t.get("/export/123/foo.txt");
+    expect(t.response.body).toBe("global#export");
+
+    expect(t.exportRequestPath()).toBe("/global/export");
+    expect(t.globalHideNoticePath()).toBe("/global/hide_notice");
+    expect(t.exportDownloadPath({ id: 123, file: "foo.txt" })).toBe("/export/123/foo.txt");
+  });
+
+  it("local", async () => {
+    draw(function () {
+      deprecator().silence(() => {
+        this.get("/local/:action", { controller: "local" });
+      });
+    });
+
+    await t.get("/local/dashboard");
+    expect(t.response.body).toBe("local#dashboard");
+  });
+
+  it("url for with no side effects", () => {
+    draw(function () {
+      this.get("/projects/status(.:format)");
+    });
+
+    const originalOptions = { controller: "projects", action: "status" };
+    const options = { ...originalOptions };
+
+    t.urlFor(options);
+
+    expect(options).toEqual(originalOptions);
+  });
+
+  it("url for does not modify controller", () => {
+    draw(function () {
+      this.get("/projects/status(.:format)");
+    });
+
+    const controller = "/projects";
+    const options = { controller: controller, action: "status", onlyPath: true };
+    const url = t.urlFor(options);
+
+    expect(url).toBe("/projects/status");
+    expect(controller).toBe("/projects");
+  });
+
+  it("named route with no side effects", () => {
+    draw(function () {
+      this.resources("customers", () => {
+        this.get("profile", { on: "member" });
+      });
+    });
+
+    const originalOptions = { host: "test.host" };
+    const options = { ...originalOptions };
+
+    t.profileCustomerUrl("customer_model", options);
+
+    expect(options).toEqual(originalOptions);
   });
 
   it("projects", async () => {
@@ -2011,9 +2749,8 @@ describe("TestRoutingMapper", () => {
     expect(t.closePtProjectPath(1)).toBe("/pt/projetos/1/fechar");
   });
 
-  it("namespace nested in resources", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("namespace nested in resources", async () => {
+    draw(function () {
       this.resources("clients", () => {
         this.namespace("google", () => {
           this.resource("account", () => {
@@ -2024,16 +2761,14 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    expect(routes.recognizePath("/clients/1/google/account").controller).toBe("google/accounts");
-    expect(routes.pathFor({ client_id: "1" }, "client_google_account")).toBe(
-      "/clients/1/google/account",
-    );
-    expect(routes.recognizePath("/clients/1/google/account/secret/info").controller).toBe(
-      "google/secret/infos",
-    );
-    expect(routes.pathFor({ client_id: "1" }, "client_google_account_secret_info")).toBe(
-      "/clients/1/google/account/secret/info",
-    );
+
+    await t.get("/clients/1/google/account");
+    expect(t.clientGoogleAccountPath(1)).toBe("/clients/1/google/account");
+    expect(t.response.body).toBe("google/accounts#show");
+
+    await t.get("/clients/1/google/account/secret/info");
+    expect(t.clientGoogleAccountSecretInfoPath(1)).toBe("/clients/1/google/account/secret/info");
+    expect(t.response.body).toBe("google/secret/infos#show");
   });
 
   it("namespaced shallow routes with module option", () => {
@@ -2374,15 +3109,14 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("account/nested#overview");
   });
 
-  it("convention with explicit end", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("sign_in", { to: "sessions#new", as: "sign_in" });
+  it("convention with explicit end", async () => {
+    draw(function () {
+      this.get({ sign_in: "sessions#new" });
     });
-    const m = routes.recognizePath("/sign_in");
-    expect(m.controller).toBe("sessions");
-    expect(m.action).toBe("new");
-    expect(routes.pathFor({}, "sign_in")).toBe("/sign_in");
+
+    await t.get("/sign_in");
+    expect(t.response.body).toBe("sessions#new");
+    expect(t.signInPath()).toBe("/sign_in");
   });
 
   it("redirect with complete url and status", async () => {
@@ -2571,28 +3305,36 @@ describe("TestRoutingMapper", () => {
     expect(ex.message).toMatch(/:param option can't contain colon/);
   });
 
-  it("invalid route name raises error", () => {
-    const routes = new RouteSet();
-    expect(() =>
-      routes.draw(function () {
+  it("invalid route name raises error", async () => {
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
         this.get("/products", { to: "products#index", as: "products " });
-      }),
-    ).toThrow(/Invalid route name/);
-    expect(() =>
-      routes.draw(function () {
+      });
+    });
+
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
+        this.get("/products", { to: "products#index", as: " products" });
+      });
+    });
+
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
         this.get("/products", { to: "products#index", as: "products!" });
-      }),
-    ).toThrow(/Invalid route name/);
-    expect(() =>
-      routes.draw(function () {
+      });
+    });
+
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
         this.get("/products", { to: "products#index", as: "products index" });
-      }),
-    ).toThrow(/Invalid route name/);
-    expect(() =>
-      routes.draw(function () {
+      });
+    });
+
+    await assertRaises([ArgumentError], {}, () => {
+      draw(function () {
         this.get("/products", { to: "products#index", as: "1products" });
-      }),
-    ).toThrow(/Invalid route name/);
+      });
+    });
   });
 
   it("duplicate route name raises error", async () => {
@@ -3734,11 +4476,11 @@ describe("ActionController::Routing", () => {
   });
 
   it("route generation escapes unsafe path characters", () => {
-    expect(escapeSegment("a b/c")).toBe("a%20b%2Fc");
+    expect(Utils.escapeSegment("a b/c")).toBe("a%20b%2Fc");
   });
 
   it("route recognition unescapes path components", () => {
-    expect(unescapeUri("a%20b%2Fc")).toBe("a b/c");
+    expect(Utils.unescapeUri("a%20b%2Fc")).toBe("a b/c");
   });
 
   it("dash with custom regexp", () => {
@@ -3929,92 +4671,109 @@ describe("TestRecognizePath", () => {
 });
 
 describe("TestTildeAndMinusPaths", () => {
-  it("recognizes tilde path", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/~user", { to: "users#show" });
-    });
-    expect(() => routes.recognizePath("/~user")).not.toThrow();
+  class TestTildeAndMinusPaths extends IntegrationTest {}
+  registerConstant("TestTildeAndMinusPaths", TestTildeAndMinusPaths);
+
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    const ok = (_env: unknown) => [200, { "Content-Type": "text/plain" }, []];
+
+    this.get({ "/~user": ok });
+    this.get({ "/young-and-fine": ok });
+  });
+  const APP = IntegrationTest.buildApp(Routes);
+
+  let t: TestTildeAndMinusPaths;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestTildeAndMinusPaths;
+    t.app = APP;
   });
 
-  it("recognizes minus path", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/young-and-fine", { to: "pages#show" });
-    });
-    expect(() => routes.recognizePath("/young-and-fine")).not.toThrow();
+  it("recognizes tilde path", async () => {
+    await t.get("/~user");
+    assertEqual("200", t.response.code);
+  });
+
+  it("recognizes minus path", async () => {
+    await t.get("/young-and-fine");
+    assertEqual("200", t.response.code);
   });
 });
 
 describe("TestUnicodePaths", () => {
-  it("recognizes unicode path", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/ほげ", { to: "pages#show" });
+  class TestUnicodePaths extends IntegrationTest {}
+  registerConstant("TestUnicodePaths", TestUnicodePaths);
+
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.get({
+      "/ほげ": (_env: unknown) => [200, { "Content-Type": "text/plain" }, []],
+      as: "unicode_path",
     });
-    expect(() => routes.recognizePath("/%E3%81%BB%E3%81%92")).not.toThrow();
+  });
+  const APP = IntegrationTest.buildApp(Routes);
+
+  let t: TestUnicodePaths;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestUnicodePaths;
+    t.app = APP;
+  });
+
+  it("recognizes unicode path", async () => {
+    await t.get(`/${RackUtils.escape("ほげ")}`);
+    assertEqual("200", t.response.code);
   });
 });
 
 describe("TestUrlGenerationErrors", () => {
-  it("URL helpers raise message with mixed parameters when generation fails", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts/:id/comments/:comment_id", { to: "comments#show", as: "post_comment" });
-    });
-    expect(() => routes.pathFor({ id: 1 }, "post_comment")).toThrow(/comment_id/);
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.get({ "/products/:id": "products#show", as: "product" });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  class TestUrlGenerationErrors extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  include(TestUrlGenerationErrors, Routes.urlHelpers());
+  registerConstant("TestUrlGenerationErrors", TestUrlGenerationErrors);
+
+  let t: TestUrlGenerationErrors & Record<string, (...args: unknown[]) => string>;
+  beforeEach(({ testCase }) => {
+    t = testCase as typeof t;
+  });
+
+  it("URL helpers raise message with mixed parameters when generation fails", async () => {
+    await assertRaises([UrlGenerationError], {}, () => t.productPath(null, { id: "url-tested" }));
   });
 
   it("correct for empty UrlGenerationError", () => {
-    const routes = new RouteSet();
-    expect(() => routes.pathFor({}, "nonexistent")).toThrow(/No route matches/);
+    const err = new UrlGenerationError("oh no!");
+
+    expect(err.corrections).toEqual([]);
   });
 
-  it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
+  it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", async () => {
     const message =
       'No route matches {:action=>"show", :controller=>"products", :id=>nil}, missing required keys: [:id]';
 
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
-    expect(() => urlHelpers.productPath(null)).toThrow(UrlGenerationError);
-    expect(() => urlHelpers.productPath(null)).toThrow(message);
+    const error = await assertRaises([UrlGenerationError], {}, () => t.productPath(null));
+    expect(error.message).toBe(message);
   });
 
   it("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", async () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
     const message =
       'No route matches {:action=>"show", :controller=>"products", :id=>nil}, possible unmatched constraints: [:id]';
 
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
-    const error = await assertRaises([UrlGenerationError], {}, () =>
-      urlHelpers.productPath({ id: null }),
-    );
+    const error = await assertRaises([UrlGenerationError], {}, () => t.productPath({ id: null }));
     expect(error.message).toMatch(message);
   });
 
   it("exceptions have suggestions for fix", async () => {
-    const Routes = new RouteSet();
-    Routes.draw(function () {
-      this.get("/products/:id", { to: "products#show", as: "product" });
-    });
-    const urlHelpers = Routes.urlHelpers() as unknown as Record<
-      string,
-      (...args: unknown[]) => string
-    >;
     const error = await assertRaises([UrlGenerationError], {}, () =>
-      urlHelpers.productPath(null, { id: "url-tested" }),
+      t.productPath(null, { id: "url-tested" }),
     );
     expect((error as UrlGenerationError & { detailedMessage(): string }).detailedMessage()).toMatch(
       "Did you mean?",
@@ -4293,7 +5052,7 @@ describe("TestOptimizedNamedRoutes", () => {
     );
 
   it("enabled when not mounted and default_url_options is empty", () => {
-    expect(Routes.urlHelpers().optimizeRoutesGeneration()).toBe(true);
+    assertPredicate(Routes.urlHelpers(), (h) => h.optimizeRoutesGeneration());
   });
 
   it("named route called as singleton method", () => {
@@ -4938,24 +5697,74 @@ describe("TestErrorsInController", () => {
 });
 
 describe("TestPartialDynamicPathSegments", () => {
-  it("paths with partial dynamic segments are recognised", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/songs/song-:song", { to: "songs#show" });
-      this.get("/songs/:song-song", { to: "songs#show2" });
-      this.get("/:artist/song-:song", { to: "songs#artist_show" });
-      this.get("/:artist/:song-song", { to: "songs#artist_show2" });
-    });
-    let m = routes.recognizePath("/songs/song-changes");
-    expect(m.song).toBe("changes");
-    m = routes.recognizePath("/songs/changes-song");
-    expect(m.song).toBe("changes");
-    m = routes.recognizePath("/david-bowie/song-changes");
-    expect(m.artist).toBe("david-bowie");
-    expect(m.song).toBe("changes");
-    m = routes.recognizePath("/david-bowie/changes-song");
-    expect(m.artist).toBe("david-bowie");
-    expect(m.song).toBe("changes");
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    const ok = (_env: Record<string, unknown>) => [
+      200,
+      { "Content-Type": "text/plain" },
+      bodyFromString(""),
+    ];
+
+    this.get("/songs/song-:song", { to: ok });
+    this.get("/songs/:song-song", { to: ok });
+    this.get("/:artist/song-:song", { to: ok });
+    this.get("/:artist/:song-song", { to: ok });
+
+    this.get("/optional/songs(/song-:song)", { to: ok });
+    this.get("/optional/songs(/:song-song)", { to: ok });
+    this.get("/optional/:artist(/song-:song)", { to: ok });
+    this.get("/optional/:artist(/:song-song)", { to: ok });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+  class TestPartialDynamicPathSegments extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestPartialDynamicPathSegments", TestPartialDynamicPathSegments);
+
+  let t: TestPartialDynamicPathSegments;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestPartialDynamicPathSegments;
+  });
+
+  function assertParams(params: Record<string, string>): void {
+    expect(t.request.pathParameters).toEqual(params);
+  }
+
+  it("paths with partial dynamic segments are recognised", async () => {
+    await t.get("/david-bowie/changes-song");
+    expect(t.response.status).toBe(200);
+    assertParams({ artist: "david-bowie", song: "changes" });
+
+    await t.get("/david-bowie/song-changes");
+    expect(t.response.status).toBe(200);
+    assertParams({ artist: "david-bowie", song: "changes" });
+
+    await t.get("/songs/song-changes");
+    expect(t.response.status).toBe(200);
+    assertParams({ song: "changes" });
+
+    await t.get("/songs/changes-song");
+    expect(t.response.status).toBe(200);
+    assertParams({ song: "changes" });
+
+    await t.get("/optional/songs/song-changes");
+    expect(t.response.status).toBe(200);
+    assertParams({ song: "changes" });
+
+    await t.get("/optional/songs/changes-song");
+    expect(t.response.status).toBe(200);
+    assertParams({ song: "changes" });
+
+    await t.get("/optional/david-bowie/changes-song");
+    expect(t.response.status).toBe(200);
+    assertParams({ artist: "david-bowie", song: "changes" });
+
+    await t.get("/optional/david-bowie/song-changes");
+    expect(t.response.status).toBe(200);
+    assertParams({ artist: "david-bowie", song: "changes" });
   });
 });
 
@@ -5063,15 +5872,40 @@ describe("TestPathParameters", () => {
 });
 
 describe("TestInternalRoutingParams", () => {
-  it("paths with partial dynamic segments are recognised", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/test_internal/:internal", { to: "internal#internal" });
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.get({ "/test_internal/:internal": "internal#internal" });
+  });
+
+  class InternalController extends Base {
+    internal(): void {
+      this.head("ok");
+    }
+  }
+  controllerConstants.set("internal", InternalController);
+
+  const APP = IntegrationTest.buildApp(Routes);
+  class TestInternalRoutingParams extends IntegrationTest {
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  registerConstant("TestInternalRoutingParams", TestInternalRoutingParams);
+
+  let t: TestInternalRoutingParams;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestInternalRoutingParams;
+  });
+
+  it("paths with partial dynamic segments are recognised", async () => {
+    await t.get("/test_internal/123");
+    expect(t.response.status).toBe(200);
+
+    expect(t.request.pathParameters).toEqual({
+      controller: "internal",
+      action: "internal",
+      internal: "123",
     });
-    const m = routes.recognizePath("/test_internal/123");
-    expect(m.internal).toBe("123");
-    expect(m.controller).toBe("internal");
-    expect(m.action).toBe("internal");
   });
 });
 

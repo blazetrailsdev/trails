@@ -9,10 +9,18 @@ import {
   rbObjClass,
 } from "@blazetrails/ruby-compat";
 import { ActiveJob, Serializers, type SerializerLike } from "./namespaces.js";
+import { SymbolSerializer } from "./serializers/symbol-serializer.js";
 import { DurationSerializer } from "./serializers/duration-serializer.js";
+import { ModuleSerializer } from "./serializers/module-serializer.js";
+import { RangeSerializer } from "./serializers/range-serializer.js";
+import { BigDecimalSerializer } from "./serializers/big-decimal-serializer.js";
 
 Serializers.autoload("ObjectSerializer");
+Serializers.autoload("SymbolSerializer");
 Serializers.autoload("DurationSerializer");
+Serializers.autoload("ModuleSerializer");
+Serializers.autoload("RangeSerializer");
+Serializers.autoload("BigDecimalSerializer");
 
 mattrAccessor.call(Serializers, "_additionalSerializers");
 Serializers._additionalSerializers = new Set();
@@ -54,6 +62,12 @@ export function addSerializers(...newSerializers: (SerializerLike | SerializerLi
 
 Object.assign(Serializers, { serialize, deserialize, serializers, addSerializers });
 
-addSerializers(DurationSerializer);
+addSerializers(
+  SymbolSerializer,
+  DurationSerializer,
+  ModuleSerializer,
+  RangeSerializer,
+  BigDecimalSerializer,
+);
 rbModConstSet(ActiveJob, "Serializers", Serializers);
 export { Serializers };

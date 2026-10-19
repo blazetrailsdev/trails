@@ -1,5 +1,5 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { ArgumentError, Zlib, Module } from "@blazetrails/ruby-compat";
+import { ArgumentError, Zlib } from "@blazetrails/ruby-compat";
 
 export const URI_REGEXP = /^[-a-z]+:\/\/|^(?:cid|data):|^\/\//i;
 
@@ -289,14 +289,37 @@ export function fontUrl(
 
 export const urlToFont = fontUrl;
 
-export const AssetUrlHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { assetPath, pathToAsset, assetUrl, urlToAsset, computeAssetExtname });
-    Object.assign(m, { computeAssetPath, publicComputeAssetPath, computeAssetHost });
-    Object.assign(m, { javascriptPath, pathToJavascript, javascriptUrl, urlToJavascript });
-    Object.assign(m, { stylesheetPath, pathToStylesheet, stylesheetUrl, urlToStylesheet });
-    Object.assign(m, { imagePath, pathToImage, imageUrl, urlToImage, videoPath, pathToVideo });
-    Object.assign(m, { videoUrl, urlToVideo, audioPath, pathToAudio, audioUrl, urlToAudio });
-    Object.assign(m, { fontPath, pathToFont, fontUrl, urlToFont });
-  });
-});
+export const AssetUrlHelper = {
+  assetPath,
+  pathToAsset,
+  assetUrl,
+  urlToAsset,
+  computeAssetExtname,
+  computeAssetPath,
+  publicComputeAssetPath,
+  computeAssetHost,
+  javascriptPath,
+  pathToJavascript,
+  javascriptUrl,
+  urlToJavascript,
+  stylesheetPath,
+  pathToStylesheet,
+  stylesheetUrl,
+  urlToStylesheet,
+  imagePath,
+  pathToImage,
+  imageUrl,
+  urlToImage,
+  videoPath,
+  pathToVideo,
+  videoUrl,
+  urlToVideo,
+  audioPath,
+  pathToAudio,
+  audioUrl,
+  urlToAudio,
+  fontPath,
+  pathToFont,
+  fontUrl,
+  urlToFont,
+};

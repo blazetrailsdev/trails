@@ -1,14 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "../test-helpers/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  DateCalculations,
-  TimeZone,
-  assertMatch,
-  assertRaises,
-  isHtmlSafe,
-} from "@blazetrails/activesupport";
+import { TimeZone, assertMatch, assertRaises, isHtmlSafe } from "@blazetrails/activesupport";
 import { ArgumentError, Range, Struct } from "@blazetrails/ruby-compat";
+import { Date as RubyDate } from "@blazetrails/date";
+import { Errors } from "@blazetrails/activemodel";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
@@ -25,6 +21,7 @@ const Post = Struct.new(
 );
 const Continent = Struct.new("continent_name", "countries");
 const Country = Struct.new("country_id", "country_name");
+const Digest = Struct.new("send_day");
 
 class Firm {
   constructor(public time_zone: unknown = null) {}
@@ -211,6 +208,55 @@ describe("FormOptionsHelperTest", () => {
     );
   });
 
+  it("collection select under fields for", () => {
+    view.post = new Post();
+    view.post.author_name = "Babe";
+
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+      (view as any).concat(
+        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
+      );
+    });
+
+    assertDomEqual(
+      '<select id="post_author_name" name="post[author_name]"><option value="&lt;Abe&gt;">&lt;Abe&gt;</option>\n<option value="Babe" selected="selected">Babe</option>\n<option value="Cabe">Cabe</option></select>',
+      outputBuffer,
+    );
+  });
+
+  it("collection select under fields for with index", () => {
+    view.post = new Post();
+    view.post.author_name = "Babe";
+
+    const outputBuffer = view.fieldsFor("post", view.post, { index: 815 }, (f: any) => {
+      (view as any).concat(
+        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
+      );
+    });
+
+    assertDomEqual(
+      '<select id="post_815_author_name" name="post[815][author_name]"><option value="&lt;Abe&gt;">&lt;Abe&gt;</option>\n<option value="Babe" selected="selected">Babe</option>\n<option value="Cabe">Cabe</option></select>',
+      outputBuffer,
+    );
+  });
+
+  it("collection select under fields for with auto index", () => {
+    view.post = new Post();
+    view.post.author_name = "Babe";
+    view.post.toParam = () => 815;
+
+    const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: any) => {
+      (view as any).concat(
+        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
+      );
+    });
+
+    assertDomEqual(
+      '<select id="post_815_author_name" name="post[815][author_name]"><option value="&lt;Abe&gt;">&lt;Abe&gt;</option>\n<option value="Babe" selected="selected">Babe</option>\n<option value="Cabe">Cabe</option></select>',
+      outputBuffer,
+    );
+  });
+
   it("collection select with blank and style", () => {
     view.post = new Post();
     view.post.author_name = "Babe";
@@ -225,6 +271,58 @@ describe("FormOptionsHelperTest", () => {
         "author_name",
         { includeBlank: true },
         { style: "width: 200px" },
+      ),
+    );
+  });
+
+  it("collection select with blank as string and style", () => {
+    view.post = new Post();
+    view.post.author_name = "Babe";
+
+    assertDomEqual(
+      '<select id="post_author_name" name="post[author_name]" style="width: 200px"><option value="">No Selection</option>\n<option value="&lt;Abe&gt;">&lt;Abe&gt;</option>\n<option value="Babe" selected="selected">Babe</option>\n<option value="Cabe">Cabe</option></select>',
+      view.collectionSelect(
+        "post",
+        "author_name",
+        dummyPosts(),
+        "author_name",
+        "author_name",
+        { includeBlank: "No Selection" },
+        { style: "width: 200px" },
+      ),
+    );
+  });
+
+  it("collection select with multiple option appends array brackets and hidden input", () => {
+    view.post = new Post();
+    view.post.author_name = "Babe";
+
+    const expected =
+      '<input type="hidden" name="post[author_name][]" value="" autocomplete="off"/><select id="post_author_name" name="post[author_name][]" multiple="multiple"><option value="" label=" "></option>\n<option value="&lt;Abe&gt;">&lt;Abe&gt;</option>\n<option value="Babe" selected="selected">Babe</option>\n<option value="Cabe">Cabe</option></select>';
+
+    assertDomEqual(
+      expected,
+      view.collectionSelect(
+        "post",
+        "author_name",
+        dummyPosts(),
+        "author_name",
+        "author_name",
+        { includeBlank: true },
+        { multiple: true },
+      ),
+    );
+
+    assertDomEqual(
+      expected,
+      view.collectionSelect(
+        "post",
+        "author_name",
+        dummyPosts(),
+        "author_name",
+        "author_name",
+        { includeBlank: true, name: "post[author_name][]" },
+        { multiple: true },
       ),
     );
   });
@@ -338,6 +436,29 @@ describe("FormOptionsHelperTest", () => {
     );
   });
 
+  it("grouped collection select under fields for", () => {
+    view.post = new Post();
+    view.post.origin = "dk";
+
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+      (view as any).concat(
+        f.groupedCollectionSelect(
+          "origin",
+          dummyContinents(),
+          "countries",
+          "continent_name",
+          "country_id",
+          "country_name",
+        ),
+      );
+    });
+
+    assertDomEqual(
+      '<select id="post_origin" name="post[origin]"><optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>\n<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option value="dk" selected="selected">Denmark</option>\n<option value="ie">Ireland</option></optgroup></select>',
+      outputBuffer,
+    );
+  });
+
   it("weekday options for select with no params", () => {
     assertDomEqual(
       '<option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>\n<option value="Sunday">Sunday</option>',
@@ -374,12 +495,12 @@ describe("FormOptionsHelperTest", () => {
   });
 
   it("weekday options for select with beginning of week set elsewhere", () => {
-    DateCalculations.setBeginningOfWeek(":sunday");
+    RubyDate.setBeginningOfWeek(":sunday");
     assertDomEqual(
       '<option value="Sunday">Sunday</option>\n<option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>',
       view.weekdayOptionsForSelect(),
     );
-    DateCalculations.setBeginningOfWeek(":monday");
+    RubyDate.setBeginningOfWeek(":monday");
   });
 
   it("weekday options for select with selected value", () => {
@@ -400,6 +521,33 @@ describe("FormOptionsHelperTest", () => {
     assertDomEqual(
       '<select name="model[weekday]" id="model_weekday"><option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option selected="selected" value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>\n<option value="Sunday">Sunday</option></select>',
       view.weekdaySelect("model", "weekday", { selected: "Friday" }),
+    );
+  });
+
+  it("weekday select under fields for", () => {
+    view.digest = new Digest();
+
+    const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
+      (view as any).concat(f.weekdaySelect("send_day"));
+    });
+
+    assertDomEqual(
+      '<select id="digest_send_day" name="digest[send_day]"><option value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>\n<option value="Sunday">Sunday</option></select>',
+      outputBuffer,
+    );
+  });
+
+  it("weekday select under fields for with value", () => {
+    view.digest = new Digest();
+    view.digest.send_day = "Monday";
+
+    const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
+      (view as any).concat(f.weekdaySelect("send_day"));
+    });
+
+    assertDomEqual(
+      '<select name="digest[send_day]" id="digest_send_day"><option selected="selected" value="Monday">Monday</option>\n<option value="Tuesday">Tuesday</option>\n<option value="Wednesday">Wednesday</option>\n<option value="Thursday">Thursday</option>\n<option value="Friday">Friday</option>\n<option value="Saturday">Saturday</option>\n<option value="Sunday">Sunday</option></select>',
+      outputBuffer,
     );
   });
   it("time zone options no params", () => {
@@ -473,12 +621,124 @@ describe("FormOptionsHelperTest", () => {
     );
   });
 
+  it("time zone select under fields for", () => {
+    view.firm = new Firm("D");
+
+    const outputBuffer = view.fieldsFor("firm", view.firm, {}, (f: any) => {
+      (view as any).concat(f.timeZoneSelect("time_zone"));
+    });
+
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      outputBuffer,
+    );
+  });
+
+  it("time zone select under fields for with index", () => {
+    view.firm = new Firm("D");
+
+    const outputBuffer = view.fieldsFor("firm", view.firm, { index: 305 }, (f: any) => {
+      (view as any).concat(f.timeZoneSelect("time_zone"));
+    });
+
+    assertDomEqual(
+      '<select id="firm_305_time_zone" name="firm[305][time_zone]"><option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      outputBuffer,
+    );
+  });
+
+  it("time zone select under fields for with auto index", () => {
+    view.firm = new Firm("D");
+    view.firm.toParam = () => 305;
+
+    const outputBuffer = view.fieldsFor("firm[]", view.firm, {}, (f: any) => {
+      (view as any).concat(f.timeZoneSelect("time_zone"));
+    });
+
+    assertDomEqual(
+      '<select id="firm_305_time_zone" name="firm[305][time_zone]"><option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      outputBuffer,
+    );
+  });
+
   it("time zone select with blank", () => {
     view.firm = new Firm("D");
     const html = view.timeZoneSelect("firm", "time_zone", null, { includeBlank: true });
     assertDomEqual(
       '<select id="firm_time_zone" name="firm[time_zone]"><option value="" label=" "></option>\n<option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
       html,
+    );
+  });
+
+  it("time zone select with blank as string", () => {
+    view.firm = new Firm("D");
+    const html = view.timeZoneSelect("firm", "time_zone", null, { includeBlank: "No Zone" });
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]"><option value="">No Zone</option>\n<option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      html,
+    );
+  });
+
+  it("time zone select with style", () => {
+    view.firm = new Firm("D");
+    const html = view.timeZoneSelect("firm", "time_zone", null, {}, { style: "color: red" });
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]" style="color: red"><option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      html,
+    );
+    assertDomEqual(
+      html,
+      view.timeZoneSelect("firm", "time_zone", null, {}, { style: "color: red" }),
+    );
+  });
+
+  it("time zone select with blank and style", () => {
+    view.firm = new Firm("D");
+    const html = view.timeZoneSelect(
+      "firm",
+      "time_zone",
+      null,
+      { includeBlank: true },
+      { style: "color: red" },
+    );
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]" style="color: red"><option value="" label=" "></option>\n<option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      html,
+    );
+    assertDomEqual(
+      html,
+      view.timeZoneSelect(
+        "firm",
+        "time_zone",
+        null,
+        { includeBlank: true },
+        { style: "color: red" },
+      ),
+    );
+  });
+
+  it("time zone select with blank as string and style", () => {
+    view.firm = new Firm("D");
+    const html = view.timeZoneSelect(
+      "firm",
+      "time_zone",
+      null,
+      { includeBlank: "No Zone" },
+      { style: "color: red" },
+    );
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]" style="color: red"><option value="">No Zone</option>\n<option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      html,
+    );
+    assertDomEqual(
+      html,
+      view.timeZoneSelect(
+        "firm",
+        "time_zone",
+        null,
+        { includeBlank: "No Zone" },
+        { style: "color: red" },
+      ),
     );
   });
 
@@ -502,6 +762,34 @@ describe("FormOptionsHelperTest", () => {
     const html = view.timeZoneSelect("firm", "time_zone", /A|D/);
     assertDomEqual(
       '<select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="D" selected="selected">D</option><option value="" disabled="disabled">-------------</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="E">E</option></select>',
+      html,
+    );
+  });
+
+  it("time zone select with priority zones is not implemented with grep", () => {
+    view.firm = new Firm("D");
+
+    for (const tz of fakeTimezones) {
+      (tz as any).caseEquals = () => {
+        throw new Error();
+      };
+    }
+
+    const html = view.timeZoneSelect("firm", "time_zone", /A|D/);
+    assertDomEqual(
+      '<select id="firm_time_zone" name="firm[time_zone]"><option value="" disabled="disabled">-------------</option>\n<option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
+      html,
+    );
+  });
+
+  it("time zone select with priority zones and errors", () => {
+    view.firm = new Firm("D");
+    view.firm.errors = new Errors(view.firm);
+    view.firm.errors.add("time_zone", "invalid");
+    const zones = [new TimeZone("A"), new TimeZone("D")];
+    const html = view.timeZoneSelect("firm", "time_zone", zones);
+    assertDomEqual(
+      '<div class="field_with_errors"><select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="D" selected="selected">D</option><option value="" disabled="disabled">-------------</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="E">E</option></select></div>',
       html,
     );
   });

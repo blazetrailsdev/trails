@@ -4,7 +4,7 @@ import {
   EOFError,
   FrozenError,
   Hash,
-  Module,
+  defineModule,
   include,
   RangeError,
   StandardError,
@@ -26,7 +26,7 @@ export class MalformedFormatError extends UnpackError {}
 
 export class StackError extends UnpackError {}
 
-export const TypeError = new Module();
+export const TypeError = defineModule({});
 
 export class UnexpectedTypeError extends UnpackError {}
 include(UnexpectedTypeError, TypeError);

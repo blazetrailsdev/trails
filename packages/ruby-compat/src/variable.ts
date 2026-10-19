@@ -96,9 +96,7 @@ export function unregisterConstant(name: string, expected: unknown): void {
  */
 export function rbModRemoveConst(mod: object, name: string): unknown {
   const tbl = mod as Record<string, unknown>;
-  if (
-    mod === Object ? !RCLASS_CONST_TBL.has(name) : !Object.prototype.hasOwnProperty.call(mod, name)
-  ) {
+  if (mod === Object ? !RCLASS_CONST_TBL.has(name) : !Object.hasOwn(mod, name)) {
     throw new NameError(`constant ${rbModName(mod)}::${name} not defined`, name);
   }
   const val = mod === Object ? RCLASS_CONST_TBL.get(name) : tbl[name];
@@ -194,7 +192,7 @@ export function rbPathToClass(pathname: string): unknown {
     }
     c = RCLASS_CONST_TBL.has(path)
       ? RCLASS_CONST_TBL.get(path)
-      : c !== Object && /^[A-Z]/.test(id) && Object.prototype.hasOwnProperty.call(c, id)
+      : c !== Object && /^[A-Z]/.test(id) && Object.hasOwn(c as object, id)
         ? (c as Record<string, unknown>)[id]
         : undefined;
     if (c === undefined) {
@@ -264,7 +262,7 @@ export function rbConstGet(klass: object, id: string): unknown {
   if (id in klass) return (klass as Record<string, unknown>)[id];
   if (typeof klass === "function") {
     for (const tmp of rbModAncestors(klass as unknown as { prototype: object })) {
-      if (Object.prototype.hasOwnProperty.call(tmp, id)) {
+      if (Object.hasOwn(tmp, id)) {
         return (tmp as Record<string, unknown>)[id];
       }
     }
@@ -323,7 +321,7 @@ export function rbModConstGet(mod: object, name: string): unknown {
     } else if (
       c !== null &&
       (typeof c === "object" || typeof c === "function") &&
-      Object.prototype.hasOwnProperty.call(c, part)
+      Object.hasOwn(c, part)
     ) {
       c = (c as Record<string, unknown>)[part];
     } else {

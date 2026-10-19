@@ -10,7 +10,15 @@
  *   `ActiveSupport::TimeWithZone` Rails stores.
  */
 
-import { fetch, include, isSymbol, rbEqual, symbolToS, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  include,
+  isSymbol,
+  rbEqual,
+  symbolToS,
+  rbFSend,
+  type Block,
+} from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
   isPlainObject,
@@ -57,9 +65,7 @@ function hashEqual(a: Record<string, unknown> | undefined, b: Record<string, unk
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
   if (aKeys.length !== bKeys.length) return false;
-  return aKeys.every(
-    (key) => Object.prototype.hasOwnProperty.call(b, key) && rbEqual(a[key], b[key]),
-  );
+  return aKeys.every((key) => Object.hasOwn(b, key) && rbEqual(a[key], b[key]));
 }
 
 export interface SetCookieOptions {
@@ -201,8 +207,8 @@ export class CookieJar implements Iterable<[string, string]> {
     return this._cookies.get(key);
   }
 
-  fetch(name: string, ...args: [] | [unknown]): unknown {
-    return fetch(this._cookies, String(name), ...args);
+  fetch(name: string, ...args: [] | [unknown] | [Block<unknown>]): unknown {
+    return fetch(this._cookies, String(name), ...(args as [unknown]));
   }
 
   isKey(name: string): boolean {

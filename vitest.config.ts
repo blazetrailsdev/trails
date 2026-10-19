@@ -306,6 +306,7 @@ const alias = {
   "@blazetrails/rack-test/": path.resolve(__dirname, "packages/rack-test/src") + "/",
   "@blazetrails/rack-test": path.resolve(__dirname, "packages/rack-test/src/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
+  "@blazetrails/actionview/": path.resolve(__dirname, "packages/actionview/src") + "/",
   "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
   "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/src/index.ts"),
   "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/src/index.ts"),

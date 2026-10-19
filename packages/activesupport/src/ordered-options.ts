@@ -243,6 +243,6 @@ export class InheritableOptions extends OrderedOptions {
   private parentIsKey(key: string): boolean {
     return this.parent instanceof OrderedOptions
       ? this.parent.isKey(key)
-      : key.startsWith(":") && Object.prototype.hasOwnProperty.call(this.parent, key.slice(1));
+      : key.startsWith(":") && Object.hasOwn(this.parent, key.slice(1));
   }
 }

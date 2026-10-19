@@ -1,3 +1,5 @@
+import { TypeError } from "./type-error.js";
+
 /**
  * Ruby's `Thread::Backtrace::Location` (`vendor/ruby/v3.3.11/vm_backtrace.c:1345`),
  * one frame of `Exception#backtrace_locations`.
@@ -66,7 +68,7 @@ export class Location {
   }
 }
 
-const setBacktraces = new WeakMap<Error, string[]>();
+const setBacktraces = new WeakMap<Error, string[] | null>();
 
 /**
  * `Exception#backtrace_locations` (`vendor/ruby/v3.3.11/error.c:1789`): nil for an
@@ -105,16 +107,43 @@ export function excBacktrace(exc: Error): string[] | null {
 }
 
 /**
+ * `rb_check_backtrace` (`vendor/ruby/v3.3.11/error.c:1800-1820`): nil stays nil, a
+ * String is wrapped as a one-element Array, and anything but an Array of
+ * Strings raises `TypeError`.
+ */
+function rbCheckBacktrace(bt: unknown): string[] | null {
+  const err = "backtrace must be Array of String";
+
+  if (bt != null) {
+    if (typeof bt === "string") return [bt];
+    if (!Array.isArray(bt)) {
+      throw new TypeError(err);
+    }
+    for (const e of bt) {
+      if (typeof e !== "string") {
+        throw new TypeError(err);
+      }
+    }
+  }
+  return (bt ?? null) as string[] | null;
+}
+
+/**
  * `Exception#set_backtrace` (`vendor/ruby/v3.3.11/error.c:1833` `exc_set_backtrace`),
  * which `raise klass, message, backtrace` calls: the frames replace the
  * exception's own, under the header line V8 keeps the message in.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function excSetBacktrace(exc: Error, bt: string[]): string[] {
-  setBacktraces.set(exc, bt);
-  exc.stack = [`${exc.name}: ${exc.message}`, ...bt.map((frame) => `    ${frame}`)].join("\n");
-  return bt;
+export function excSetBacktrace(exc: Error, bt: string | string[] | null): string[] | null {
+  const checked = rbCheckBacktrace(bt);
+  setBacktraces.set(exc, checked);
+  if (checked !== null) {
+    exc.stack = [`${exc.name}: ${exc.message}`, ...checked.map((frame) => `    ${frame}`)].join(
+      "\n",
+    );
+  }
+  return checked;
 }
 
 /**

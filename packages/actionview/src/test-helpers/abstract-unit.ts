@@ -1,6 +1,6 @@
 import { ActionController, ActionDispatch, RouteSet, UrlFor } from "@blazetrails/actionpack";
 import { RoutingUrlFor } from "../routing-url-for.js";
-import { include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { File, include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 
 type DrawCallback = Parameters<RouteSet["draw"]>[0];
 
@@ -11,8 +11,30 @@ declare module "@blazetrails/actionpack" {
     namespace TestCase {
       let withRoutes: (block: DrawCallback) => void;
     }
+    // eslint-disable-next-line @typescript-eslint/no-namespace -- Ruby reopens `class ActionController::Base` (`actionview/test/abstract_unit.rb:107-114`) to add `self.test_routes`.
+    namespace Base {
+      let testRoutes: (block: DrawCallback) => RouteSet;
+    }
   }
 }
+
+const __dir__ = decodeURIComponent(new URL(".", import.meta.url).pathname);
+
+export const FIXTURE_LOAD_PATH = File.expandPath("fixtures", __dir__);
+
+RoutingUrlFor.include(UrlFor);
+
+ActionController.Base.viewPaths(FIXTURE_LOAD_PATH);
+
+ActionController.Base.testRoutes = function (
+  this: typeof ActionController.Base,
+  block: DrawCallback,
+): RouteSet {
+  const routes = new RouteSet();
+  routes.draw(block);
+  include(this, routes.urlHelpers());
+  return routes;
+};
 
 include(ActionController.TestCase, ActionDispatch.TestProcess);
 
@@ -29,5 +51,3 @@ ActionController.TestCase.withRoutes = function (
     }
   });
 };
-
-RoutingUrlFor.include(UrlFor);

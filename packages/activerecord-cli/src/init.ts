@@ -177,7 +177,7 @@ export async function addDepsToPackageJson(
   const alreadyPresent: string[] = [];
 
   for (const [name, version] of Object.entries(deps)) {
-    if (Object.prototype.hasOwnProperty.call(pkg.dependencies, name)) {
+    if (Object.hasOwn(pkg.dependencies, name)) {
       alreadyPresent.push(name);
     } else {
       pkg.dependencies[name] = version;
@@ -188,7 +188,7 @@ export async function addDepsToPackageJson(
   if (Object.keys(devDeps).length > 0) {
     if (!pkg.devDependencies) pkg.devDependencies = {};
     for (const [name, version] of Object.entries(devDeps)) {
-      if (Object.prototype.hasOwnProperty.call(pkg.devDependencies, name)) {
+      if (Object.hasOwn(pkg.devDependencies, name)) {
         alreadyPresent.push(name);
       } else {
         pkg.devDependencies[name] = version;
@@ -261,7 +261,7 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
     }
   }
 
-  if (!skipTsconfig && !Object.prototype.hasOwnProperty.call(effectiveOverrides, "tsconfig.json")) {
+  if (!skipTsconfig && !Object.hasOwn(effectiveOverrides, "tsconfig.json")) {
     const tsconfigPath = join(root, "tsconfig.json");
     let tsconfigExists = false;
     try {
@@ -289,9 +289,7 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
   }
 
   for (const [rel, defaultBody] of SCAFFOLD) {
-    const body = Object.prototype.hasOwnProperty.call(effectiveOverrides, rel)
-      ? effectiveOverrides[rel]
-      : defaultBody;
+    const body = Object.hasOwn(effectiveOverrides, rel) ? effectiveOverrides[rel] : defaultBody;
     const target = join(root, rel);
     await mkdir(dirname(target), { recursive: true });
     try {

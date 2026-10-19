@@ -48,6 +48,7 @@ import {
   rbObjSingletonClass,
   rbInspect,
   rbCString,
+  rbCSymbol,
   rbCTime,
   rbModAttrReader,
   rbModAttrWriter,
@@ -58,6 +59,7 @@ import {
   UNDEF_METHOD_TABLES,
   reopened,
 } from "./object.js";
+import { isSymbol } from "./symbol.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -146,7 +148,7 @@ export function rbModConstDefined(
       throw new NameError(`wrong constant name ${name}`, name);
     }
     if (c === null || (typeof c !== "object" && typeof c !== "function")) return false;
-    if (i === 0 && recur ? part in c : Object.prototype.hasOwnProperty.call(c, part)) {
+    if (i === 0 && recur ? part in c : Object.hasOwn(c, part)) {
       c = (c as Record<string, unknown>)[part];
     } else if (i === 0 && recur && isRegisteredConstant(part)) {
       c = registeredConstant(part);
@@ -294,34 +296,7 @@ export class Module<I extends object = Record<never, never>> {
       }
       return this;
     }
-    const carrier = carrierOf(this);
-    if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
-      trackIncludedModule(carrier, mod);
-      const installed = trackedKeys(carrier);
-      const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
-        string,
-        unknown
-      >;
-      const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
-      for (const key of typeof mod === "function"
-        ? Object.getOwnPropertyNames(members)
-        : Object.keys(members)) {
-        if (key === "constructor") continue;
-        const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
-        const accessor = !("value" in descriptor) && namespace !== "Module";
-        if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
-        if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
-        installed.add(key);
-        Object.defineProperty(
-          carrier,
-          key,
-          accessor
-            ? { get: descriptor.get, set: descriptor.set, configurable: true }
-            : { value: members[key], writable: true, configurable: true },
-        );
-      }
-      relinkIncluders(this);
-    }
+    appendPlainFeatures(this, mod);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(this);
     }
@@ -381,7 +356,7 @@ export class Module<I extends object = Record<never, never>> {
   ancestors(): object[] {
     const ary: object[] = [this];
     const carrier = carrierOf(this) as Record<symbol, unknown>;
-    const mods = Object.prototype.hasOwnProperty.call(carrier, includedModulesKey)
+    const mods = Object.hasOwn(carrier, includedModulesKey)
       ? [...(carrier[includedModulesKey] as Set<object>)]
       : [];
     for (const mod of mods.reverse()) {
@@ -425,7 +400,7 @@ export class Module<I extends object = Record<never, never>> {
     const carrier = carrierOf(this);
     try {
       for (const name of names) {
-        if (!Object.prototype.hasOwnProperty.call(carrier, name)) {
+        if (!Object.hasOwn(carrier, name)) {
           throw new NameError(`method '${name}' not defined in #<Module>`, name);
         }
         delete carrier[name];
@@ -446,7 +421,7 @@ export class Module<I extends object = Record<never, never>> {
     const carrier = carrierOf(this);
     try {
       for (const name of names) {
-        if (!Object.prototype.hasOwnProperty.call(carrier, name) || isUndefEntry(carrier, name)) {
+        if (!Object.hasOwn(carrier, name) || isUndefEntry(carrier, name)) {
           throw new NameError(`undefined method '${name}' for module '#<Module>'`, name);
         }
         trackedKeys(carrier).delete(name);
@@ -679,7 +654,7 @@ export class Module<I extends object = Record<never, never>> {
             ? (descriptor.value as (...args: unknown[]) => unknown).bind(receiver)
             : undefined;
         }
-        const root = writer ? undefined : Kernel.instanceMethod(key)?.value;
+        const root = writer || !Object.hasOwn(Kernel, key) ? undefined : Reflect.get(Kernel, key);
         return typeof root === "function"
           ? (root as (...args: unknown[]) => unknown).bind(receiver)
           : undefined;
@@ -718,7 +693,7 @@ export class Module<I extends object = Record<never, never>> {
   isMethodDefined(name: string): boolean {
     const carrier = carrierOf(this);
     return (
-      Object.prototype.hasOwnProperty.call(carrier, name) &&
+      Object.hasOwn(carrier, name) &&
       !isUndefEntry(carrier, name) &&
       !isAbsentHalf(Object.getOwnPropertyDescriptor(carrier, name)!.get)
     );
@@ -747,6 +722,42 @@ export class Module<I extends object = Record<never, never>> {
     const nested = nestedModules.get(this);
     if (nested) nestedModules.set(copy, [...nested]);
     return copy;
+  }
+}
+
+function appendPlainFeatures(base: Module, mod: ModuleObject): void {
+  const carrier = carrierOf(base);
+  if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
+    if (Object.hasOwn(mod, moduleIncludesKey)) {
+      for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
+        base.include(nested);
+      }
+    }
+    trackIncludedModule(carrier, mod);
+    const installed = trackedKeys(carrier);
+    const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
+      string,
+      unknown
+    >;
+    const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
+    for (const key of typeof mod === "function"
+      ? Object.getOwnPropertyNames(members)
+      : Object.keys(members)) {
+      if (key === "constructor") continue;
+      const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
+      const accessor = !("value" in descriptor) && namespace !== "Module";
+      if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
+      if (Object.hasOwn(carrier, key) && !installed.has(key)) continue;
+      installed.add(key);
+      Object.defineProperty(
+        carrier,
+        key,
+        accessor
+          ? { get: descriptor.get, set: descriptor.set, configurable: true }
+          : { value: members[key], writable: true, configurable: true },
+      );
+    }
+    relinkIncluders(base);
   }
 }
 
@@ -809,10 +820,7 @@ function relinkIncluders(mod: Module): void {
   const table = carrierOf(mod);
   for (const link of linksOf(mod)) {
     for (const name of Object.getOwnPropertyNames(link)) {
-      if (
-        !Object.prototype.hasOwnProperty.call(table, name) &&
-        Object.getOwnPropertyDescriptor(link, name)!.configurable
-      )
+      if (!Object.hasOwn(table, name) && Object.getOwnPropertyDescriptor(link, name)!.configurable)
         delete (link as Record<string, unknown>)[name];
     }
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(table));
@@ -927,7 +935,7 @@ export function initializeIncludedModules(instance: object, ...args: unknown[]):
   ) {
     const level: Array<(this: object, ...args: unknown[]) => void> = [];
     for (const registry of [instanceInitializers, prependedInstanceInitializers]) {
-      if (!Object.prototype.hasOwnProperty.call(proto, registry)) continue;
+      if (!Object.hasOwn(proto, registry)) continue;
       level.push(
         ...((proto as Record<symbol, unknown>)[registry] as Array<
           (this: object, ...args: unknown[]) => void
@@ -935,7 +943,7 @@ export function initializeIncludedModules(instance: object, ...args: unknown[]):
       );
     }
     if (level.length !== 0) chain.unshift(level);
-    if (Object.prototype.hasOwnProperty.call(proto, delegateClass)) break;
+    if (Object.hasOwn(proto, delegateClass)) break;
   }
   const initializers = chain.flat();
   const unwind = (index: number): void => {
@@ -972,7 +980,7 @@ function trackInstanceInitializer(
   let list = (proto as Record<symbol, unknown>)[registry] as
     | Array<(this: object, ...args: never[]) => void>
     | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
+  if (!Object.hasOwn(proto, registry)) {
     list = [];
     Object.defineProperty(proto, registry, {
       value: list,
@@ -1015,6 +1023,7 @@ const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
 const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
 const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
+const moduleIncludesKey = Symbol.for("@blazetrails/ruby-compat:moduleIncludes");
 const extendedOwners = new WeakMap<object, Map<string, object>>();
 
 const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
@@ -1023,7 +1032,7 @@ const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
 
 function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string | symbol> {
   let set = (proto as Record<symbol, unknown>)[registry] as Set<string | symbol> | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
+  if (!Object.hasOwn(proto, registry)) {
     set = new Set<string | symbol>();
     Object.defineProperty(proto, registry, {
       value: set,
@@ -1035,11 +1044,15 @@ function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string
   return set!;
 }
 
-function trackIncludedModule(proto: object, mod: unknown): void {
-  let set = (proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown> | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) {
+function trackIncludedModule(
+  proto: object,
+  mod: unknown,
+  registry: symbol = includedModulesKey,
+): void {
+  let set = (proto as Record<symbol, unknown>)[registry] as Set<unknown> | undefined;
+  if (!Object.hasOwn(proto, registry)) {
     set = new Set<unknown>();
-    Object.defineProperty(proto, includedModulesKey, {
+    Object.defineProperty(proto, registry, {
       value: set,
       writable: true,
       configurable: true,
@@ -1056,12 +1069,12 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
     if (
-      Object.prototype.hasOwnProperty.call(proto, includedModulesKey) &&
+      Object.hasOwn(proto, includedModulesKey) &&
       ((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>).has(mod)
     ) {
       return true;
     }
-    if (Object.prototype.hasOwnProperty.call(proto, delegateClass)) break;
+    if (Object.hasOwn(proto, delegateClass)) break;
   }
   return false;
 }
@@ -1107,7 +1120,7 @@ export function includedModules(mod: { prototype: object }): unknown[] {
     proto;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) continue;
+    if (!Object.hasOwn(proto, includedModulesKey)) continue;
     const mods = [...((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>)];
     for (const m of mods.reverse()) if (!result.includes(m)) result.push(m);
   }
@@ -1132,11 +1145,11 @@ export function includedModules(mod: { prototype: object }): unknown[] {
 export function rbModAncestors(mod: { prototype: object }): object[] {
   const ary: object[] = [];
   for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
-    if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
+    if (Object.hasOwn(p, "constructor")) {
       const klass = (p as { constructor: object }).constructor;
       if (!ary.includes(reopened(klass))) ary.push(klass);
     }
-    if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
+    if (Object.hasOwn(p, includedModulesKey)) {
       const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>)];
       for (const m of mods.reverse()) if (!ary.includes(m)) ary.push(m);
     }
@@ -1153,11 +1166,15 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
  * `rb_obj_is_kind_of` (`vendor/ruby/v3.3.11/object.c:889`), `Object#kind_of?`
  * and `Module#===`: whether `c` is in the ancestry of `obj`'s class. A plain
  * object is a module's seat, as `include()` takes one, and JS's own `Set` is
- * the seat of the `Set` that reopens it (`class Set extends JsSet`).
+ * the seat of the `Set` that reopens it (`class Set extends JsSet`). A Symbol
+ * is a colon-spelled string, whose class `rbObjClass` answers as `String`, so
+ * `Symbol === obj` and `String === obj` are answered by the spelling.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
+  if (c === rbCSymbol) return isSymbol(obj);
+  if (c === rbCString && isSymbol(obj)) return false;
   if (
     (typeof c === "function" || (typeof c === "object" && c !== null)) &&
     singletonSearchAncestor(obj, c)
@@ -1225,11 +1242,11 @@ export function rbClassInheritedP(mod: unknown, arg: unknown): boolean | null {
 /** `class_search_ancestor` (`vendor/ruby/v3.3.11/object.c:935`). */
 function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
   for (let p: object | null = cl.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
-    if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
+    if (Object.hasOwn(p, "constructor")) {
       const klass = (p as { constructor: object }).constructor;
       if (klass === c || klass === reopened(c)) return true;
     }
-    if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
+    if (Object.hasOwn(p, includedModulesKey)) {
       if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
     }
     if (p === Uint8Array.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
@@ -1486,8 +1503,21 @@ function isClass(klass: object): klass is AnyClass {
   return typeof klass === "function";
 }
 
+/** @noRailsEquivalent PERMANENT */
+export const classModule = Symbol.for("@blazetrails/ruby-compat:classModule");
+
+function isClassReceiver(klass: object): klass is AnyClass {
+  return isClass(klass) && !Object.hasOwn(klass, classModule);
+}
+
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
-  if (!(mod instanceof Module)) return undefined;
+  if (!(mod instanceof Module)) {
+    if (mod === null || (typeof mod !== "object" && typeof mod !== "function")) return undefined;
+    const descriptor = Object.getOwnPropertyDescriptor(mod, name);
+    return descriptor && !descriptor.enumerable && typeof descriptor.value === "function"
+      ? (descriptor.value as (base: unknown) => void).bind(mod)
+      : undefined;
+  }
   const hook = (mod as unknown as Record<string, unknown>)[name];
   if (hook === (Module.prototype as unknown as Record<string, unknown>)[name]) return undefined;
   return typeof hook === "function" ? (hook as (base: unknown) => void).bind(mod) : undefined;
@@ -1511,7 +1541,8 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     }
     return;
   }
-  if (!isClass(klass)) {
+  if (!isClassReceiver(klass)) {
+    if (!(klass instanceof Module)) trackIncludedModule(klass, mod, moduleIncludesKey);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(klass);
     }
@@ -1523,12 +1554,38 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     }
     return;
   }
-  if (mod instanceof Module) {
-    mod.appendFeatures(klass);
-    if (typeof (mod as ModuleHooks)[included] === "function") {
-      (mod as ModuleHooks)[included]!(klass);
+  rbModAppendFeatures(klass, mod);
+  if (typeof (mod as ModuleHooks)[included] === "function") {
+    (mod as ModuleHooks)[included]!(klass);
+  } else if (!(mod instanceof Module)) {
+    featureHook(mod, "included")?.(klass);
+  }
+}
+
+/**
+ * Mirrors: Ruby's Module#append_features — vendor/ruby/v3.3.11/eval.c:1110
+ * `rb_mod_append_features`, the step `include` runs before `included`, which a
+ * module overriding `append_features` (`ActiveSupport::Concern`) calls as
+ * `super`. A plain-object module's instance methods are its enumerable own
+ * members; the modules it included are appended first, as `include_modules_at`
+ * (vendor/ruby/v3.3.11/class.c:1253) walks the included module's ancestry and
+ * skips one `klass` already has, so the module's own methods outrank them.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModAppendFeatures(
+  klass: AnyClass | object,
+  mod: ModuleObject | AnyClass | Module,
+): void {
+  if (!isClassReceiver(klass) && !(klass instanceof Module)) {
+    return trackIncludedModule(klass, mod, moduleIncludesKey);
+  }
+  if (mod instanceof Module) return Module.prototype.appendFeatures.call(mod, klass);
+  if (klass instanceof Module) return appendPlainFeatures(klass, mod);
+  if (Object.hasOwn(mod, moduleIncludesKey)) {
+    for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
+      if (!isModuleMethodTablePresent(klass, nested)) include(klass, nested);
     }
-    return;
   }
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
@@ -1577,21 +1634,18 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
       }
     }
   } else {
-    for (
-      let ancestor: object | null = mod as ModuleObject;
-      ancestor && ancestor !== Object.prototype;
-    ) {
+    for (let ancestor: object | null = mod; ancestor && ancestor !== Object.prototype; ) {
       const modDescs = Object.getOwnPropertyDescriptors(ancestor) as Record<
         string | symbol,
         PropertyDescriptor
       >;
       for (const key of [...Object.keys(modDescs), Symbol.iterator, Symbol.asyncIterator]) {
         const modDesc = modDescs[key];
-        if (modDesc === undefined) continue;
+        if (modDesc === undefined || (typeof key === "string" && !modDesc.enumerable)) continue;
         if (key === "constructor" || (typeof key === "string" && /^[A-Z]/.test(key))) continue;
         if ("value" in modDesc && typeof modDesc.value !== "function") continue;
-        if (Object.prototype.hasOwnProperty.call(descriptors, key)) continue;
-        if (Object.prototype.hasOwnProperty.call(klass.prototype, key) && !installed.has(key)) {
+        if (Object.hasOwn(descriptors, key)) continue;
+        if (Object.hasOwn(klass.prototype, key) && !installed.has(key)) {
           continue;
         }
         installed.add(key);
@@ -1601,10 +1655,6 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
-
-  if (typeof (mod as ModuleHooks)[included] === "function") {
-    (mod as ModuleHooks)[included]!(klass);
-  }
 }
 
 export type Extended<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
@@ -1667,7 +1717,7 @@ export function rbObjDup<T>(obj: T): T {
   if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
   if (temporalTag(obj) !== null) return obj;
   const descriptors = copiedDescriptors(obj, true);
-  const singletonKeys = Object.prototype.hasOwnProperty.call(obj, extendedKeys)
+  const singletonKeys = Object.hasOwn(obj, extendedKeys)
     ? ((obj as Record<symbol, unknown>)[extendedKeys] as Set<string>)
     : undefined;
   if (!isClassConstructor(obj)) {
@@ -1676,7 +1726,7 @@ export function rbObjDup<T>(obj: T): T {
     }
   }
   let proto = Object.getPrototypeOf(obj) as object | null;
-  if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+  if (proto !== null && Object.hasOwn(proto, FL_SINGLETON)) {
     proto = Object.getPrototypeOf(proto) as object | null;
   }
   const alloc = rbObjAlloc(obj, proto);
@@ -1862,7 +1912,20 @@ export function prepend(
   const prependFeatures = featureHook(mod, "prependFeatures");
   if (prependFeatures) return prependFeatures(klass);
   if (isModuleMethodTablePresent(klass, mod)) return;
-  if (mod instanceof Module) return mod.prependFeatures(klass);
+  rbModPrependFeatures(klass, mod);
+}
+
+/**
+ * Mirrors: Ruby's Module#prepend_features — vendor/ruby/v3.3.11/eval.c:1175
+ * `rb_mod_prepend_features`, the step `prepend` runs before `prepended`, which
+ * `ActiveSupport::Concern#prepend_features` calls as `super`. A plain-object
+ * module's non-enumerable members are its singleton methods, which `extend`
+ * installs, so only its enumerable members are prepended.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+  if (mod instanceof Module) return Module.prototype.prependFeatures.call(mod, klass);
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
@@ -1872,7 +1935,9 @@ export function prepend(
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
     const descriptor = Object.getOwnPropertyDescriptor(source, key);
-    if (descriptor) Object.defineProperty(klass.prototype, key, descriptor);
+    if (descriptor && (typeof mod === "function" || descriptor.enumerable)) {
+      Object.defineProperty(klass.prototype, key, descriptor);
+    }
   }
 }
 
@@ -2001,6 +2066,16 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
+export interface KernelModule {
+  dup(this: object): object;
+  initializeDup(this: object, orig: unknown): object;
+  initializeClone(this: object, orig: unknown): object;
+  freeze(this: object): object;
+  abort: typeof abort;
+  rand: typeof kernelRand;
+}
+
 /**
  * Ruby's `Kernel`, the module `Object` includes and so the last stop of every
  * method search. It holds the instance methods a module's `super` reaches when
@@ -2017,34 +2092,34 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
  *
  * @noRailsEquivalent PERMANENT
  */
-export const Kernel = new Module((mod) => {
+export const Kernel = {
   /** @noRailsEquivalent PERMANENT */
-  mod.defineMethod("dup", function (this: object): object {
+  dup(this: object): object {
     return rbObjDup(this);
-  });
+  },
   /** @noRailsEquivalent PERMANENT */
-  mod.defineMethod("initializeDup", function (this: object, orig: unknown): object {
+  initializeDup(this: object, orig: unknown): object {
     const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
     if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
     return this;
-  });
+  },
   /** @noRailsEquivalent PERMANENT */
-  mod.defineMethod("initializeClone", function (this: object, orig: unknown): object {
+  initializeClone(this: object, orig: unknown): object {
     const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
     if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
     return this;
-  });
+  },
   /** @noRailsEquivalent PERMANENT */
-  mod.defineMethod("freeze", function (this: object): object {
+  freeze(this: object): object {
     return Object.freeze(this);
-  });
-}) as Module & { abort: typeof abort; rand: typeof kernelRand };
+  },
+} as KernelModule;
 
 classpaths.set(Kernel, { path: "Kernel", permanent: true });
 classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
 
 // `rb_mComparable` (`vendor/ruby/v3.3.11/compar.c:315`).
-const rbMComparable = new Module();
+const rbMComparable = {};
 classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
 
 Object.setPrototypeOf(rbCClass, Module);

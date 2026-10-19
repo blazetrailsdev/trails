@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { TypeError } from "./type-error.js";
+import { Thread, rbIterBreakValue } from "./thread.js";
 import {
   Location,
   excBacktrace,
@@ -91,5 +93,50 @@ describe("Exception#set_backtrace", () => {
     const exc = new Proxy("boom");
     expect(excBacktrace(exc)).toEqual(["proxied"]);
     expect(excBacktraceLocations(exc)).toBe(locations);
+  });
+
+  it("stores nil, wraps a String and keeps an Array of Strings", () => {
+    const exc = new Error("x");
+    expect(excSetBacktrace(exc, null)).toBeNull();
+    expect(excBacktrace(exc)).toBeNull();
+    expect(excSetBacktrace(exc, "a:1")).toEqual(["a:1"]);
+    expect(excBacktrace(exc)).toEqual(["a:1"]);
+    expect(excSetBacktrace(exc, ["a", "b"])).toEqual(["a", "b"]);
+    expect(excBacktrace(exc)).toEqual(["a", "b"]);
+  });
+
+  it("raises TypeError for anything but an Array of Strings", () => {
+    const exc = new Error("x");
+    expect(() => excSetBacktrace(exc, 1 as never)).toThrow(TypeError);
+    expect(() => excSetBacktrace(exc, ["a", 1] as never)).toThrow(
+      "backtrace must be Array of String",
+    );
+  });
+});
+
+describe("Thread.each_caller_location", () => {
+  function inner(): string[] {
+    const labels: string[] = [];
+    Thread.eachCallerLocation((location) => {
+      labels.push(String(location.label));
+    });
+    return labels;
+  }
+  function outer(): string[] {
+    return inner();
+  }
+
+  it("yields from the caller of the calling method", () => {
+    expect(outer()[0]).toBe("outer");
+  });
+
+  it("stops the walk at rbIterBreakValue and answers its value", () => {
+    let seen = 0;
+    const result = Thread.eachCallerLocation<number>(() => {
+      seen += 1;
+      rbIterBreakValue(5);
+    });
+    expect(result).toBe(5);
+    expect(seen).toBe(1);
   });
 });

@@ -145,7 +145,7 @@ function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource | undefi
  * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (attribute_methods/primary_key.rb:80-81) as a this-typed function; a cold-cache read does not latch because table_exists? is async.
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
-  if (Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+  if (Object.hasOwn(this, "_primaryKey")) {
     return this._primaryKey as string | string[] | null;
   }
   if (isPrimaryKeyReflected(this)) {
@@ -196,11 +196,11 @@ export function setPrimaryKeyAttr(this: PrimaryKeyHost, value: string | string[]
 }
 
 /**
- * @inventedArm isPrimaryKeyReflected — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
- * @inventedArm isArray — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
+ * @inventedArm isPrimaryKeyReflected — PERMANENT
+ * @inventedArm isArray — PERMANENT
  */
 export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
-  if (!Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+  if (!Object.hasOwn(this, "_primaryKey")) {
     if (!isPrimaryKeyReflected(this)) return Array.isArray(getPrimaryKeyAttr.call(this));
     resetPrimaryKey.call(this);
   }

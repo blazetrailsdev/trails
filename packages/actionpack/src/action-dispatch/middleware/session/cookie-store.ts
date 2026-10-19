@@ -67,7 +67,7 @@ export interface CookieStoreSessionOptions {
 export class CookieStore extends AbstractSecureStore {
   constructor(app?: RackApp, options: CookieStoreSessionOptions = {}) {
     options.cookieOnly = true;
-    if (!Object.prototype.hasOwnProperty.call(options, "sameSite")) {
+    if (!Object.hasOwn(options, "sameSite")) {
       options.sameSite = DEFAULT_SAME_SITE;
     }
     super(app, options);

@@ -4,6 +4,7 @@ import {
   camelize,
   extend,
   onLoad,
+  type Deprecation,
   type Extended,
 } from "@blazetrails/activesupport";
 import {
@@ -23,6 +24,7 @@ import type { TestCase, TestRequest } from "./action-controller/test-case.js";
 import type { MissingController, Request } from "./action-dispatch/http/request.js";
 import type { Assertions } from "./action-dispatch/testing/assertions.js";
 import type { TestProcess } from "./action-dispatch/testing/test-process.js";
+import type { TestResponse } from "./action-dispatch/testing/test-response.js";
 import type { Session as IntegrationSession } from "./action-dispatch/testing/integration.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
 import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
@@ -70,9 +72,11 @@ export const ActionDispatch = {
   Routing: typeof Routing;
   Assertions: typeof Assertions;
   TestProcess: typeof TestProcess;
+  TestResponse: typeof TestResponse;
   Integration: { name: string; Session: typeof IntegrationSession };
   Session: typeof Session;
   testApp: unknown;
+  deprecator: () => Deprecation;
 };
 extend(ActionDispatch, Autoload);
 ActionDispatch.eagerAutoload(() => {
@@ -85,6 +89,7 @@ ActionDispatch.autoloadUnder("testing", () => {
   ActionDispatch.autoload("Assertions");
   ActionDispatch.autoload("Integration");
   ActionDispatch.autoload("TestProcess");
+  ActionDispatch.autoload("TestResponse");
 });
 
 export const Routing = { name: "ActionDispatch::Routing", loadPath } as AutoloadModule & {

@@ -105,12 +105,12 @@ export const ClassMethods = {
   },
 
   usesTransaction(this: TestFixturesClassHost, ...methods: unknown[]): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_usesTransaction")) this._usesTransaction = [];
+    if (!Object.hasOwn(this, "_usesTransaction")) this._usesTransaction = [];
     this._usesTransaction!.push(...methods.map((m) => String(m)));
   },
 
   isUsesTransaction(this: TestFixturesClassHost, method: unknown): boolean {
-    if (!Object.prototype.hasOwnProperty.call(this, "_usesTransaction")) this._usesTransaction = [];
+    if (!Object.hasOwn(this, "_usesTransaction")) this._usesTransaction = [];
     return this._usesTransaction!.includes(String(method));
   },
 };
@@ -385,7 +385,7 @@ function isLoadInstances(this: TestFixtures): boolean {
 }
 
 function methodMissing(this: TestFixtures, method: string, ...args: unknown[]): unknown {
-  if (Object.prototype.hasOwnProperty.call(this.fixtureSets, method)) {
+  if (Object.hasOwn(this.fixtureSets, method)) {
     return this.activeRecordFixture(method, ...args);
   } else {
     throw new NoMethodError(
@@ -403,7 +403,7 @@ function respondToMissing(
   method: string,
   includePrivate: boolean = false,
 ): boolean {
-  if (includePrivate && Object.prototype.hasOwnProperty.call(this.fixtureSets, method)) {
+  if (includePrivate && Object.hasOwn(this.fixtureSets, method)) {
     return true;
   } else {
     return false;

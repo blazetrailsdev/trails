@@ -37,10 +37,7 @@ export class JSON {
 
   asJson(options?: SerializeOptions & { root?: boolean | string }): Record<string, unknown> {
     const ctor = this.constructor as typeof JSON;
-    let root =
-      options && Object.prototype.hasOwnProperty.call(options, "root")
-        ? options.root
-        : ctor.includeRootInJson;
+    let root = options && Object.hasOwn(options, "root") ? options.root : ctor.includeRootInJson;
 
     return asJsonThenable(
       () => this.serializableHash(options),

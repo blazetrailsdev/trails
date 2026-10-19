@@ -1,6 +1,5 @@
+import { Date as RubyDate } from "@blazetrails/date";
 import {
-  DAYS_INTO_WEEK,
-  DateCalculations,
   I18n,
   TimeZone,
   extractOptionsBang,
@@ -15,7 +14,6 @@ import {
   fetch,
   first,
   last,
-  Module,
   rbModDefineMethod,
   rbFPublicSend,
   rbEql,
@@ -23,6 +21,7 @@ import {
   rbObjAsString,
   rbObjRespondTo,
   rtest,
+  include,
 } from "@blazetrails/ruby-compat";
 
 import { contentTag, tagBuilder, type TagHelperHost } from "./tag-helper.js";
@@ -275,7 +274,7 @@ export function weekdayOptionsForSelect(
   {
     indexAsValue = false,
     dayFormat = "day_names",
-    beginningOfWeek = DateCalculations.beginningOfWeek(),
+    beginningOfWeek = RubyDate.beginningOfWeek(),
   }: { indexAsValue?: unknown; dayFormat?: unknown; beginningOfWeek?: unknown } = {},
 ): SafeBuffer | string {
   let dayNames = I18n.translate(`date.${dayFormat}`) as unknown[];
@@ -283,7 +282,7 @@ export function weekdayOptionsForSelect(
   dayNames = rbFSend(
     dayNames,
     "rotate",
-    fetch(DAYS_INTO_WEEK, beginningOfWeek as string),
+    fetch(RubyDate.DAYS_INTO_WEEK, beginningOfWeek as string),
   ) as unknown[];
 
   return optionsForSelect.call(this, dayNames, selected);
@@ -403,20 +402,31 @@ export function promptText(prompt: unknown): unknown {
     : I18n.translate("helpers.select.prompt", { default: "Please select" });
 }
 
-export const FormOptionsHelper = new Module((mod) => {
-  mod.include(TextHelper);
+export const FormOptionsHelper = {
+  select,
+  collectionSelect,
+  groupedCollectionSelect,
+  timeZoneSelect,
+  weekdaySelect,
+  optionsForSelect,
+  optionsFromCollectionForSelect,
+  optionGroupsFromCollectionForSelect,
+  groupedOptionsForSelect,
+  timeZoneOptionsForSelect,
+  weekdayOptionsForSelect,
+  optionHtmlAttributes,
+  optionTextAndValue,
+  isOptionValueSelected,
+  extractSelectedAndDisabled,
+  extractValuesFromCollection,
+  collectionRadioButtons,
+  collectionCheckboxes,
+  collectionCheckBoxes,
+  valueForCollection,
+  promptText,
+};
 
-  mod.moduleEval((m) => {
-    Object.assign(m, { select, collectionSelect, groupedCollectionSelect, timeZoneSelect });
-    Object.assign(m, { weekdaySelect, optionsForSelect, optionsFromCollectionForSelect });
-    Object.assign(m, { optionGroupsFromCollectionForSelect, groupedOptionsForSelect });
-    Object.assign(m, { timeZoneOptionsForSelect, weekdayOptionsForSelect });
-    Object.assign(m, { optionHtmlAttributes, optionTextAndValue, isOptionValueSelected });
-    Object.assign(m, { extractSelectedAndDisabled, extractValuesFromCollection });
-    Object.assign(m, { collectionRadioButtons, collectionCheckboxes, collectionCheckBoxes });
-    Object.assign(m, { valueForCollection, promptText });
-  });
-});
+include(FormOptionsHelper, TextHelper);
 
 declare module "./form-helper.js" {
   interface FormBuilder {

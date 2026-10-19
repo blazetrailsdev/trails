@@ -169,7 +169,10 @@ export class SSE {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName options — PERMANENT
+   */
   private performWrite(
     json: string,
     options: { retry?: number | string; event?: string; id?: number | string },

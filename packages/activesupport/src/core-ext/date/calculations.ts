@@ -3,7 +3,7 @@ import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { ArgumentError, zone as timeZone } from "../../time-zone-config.js";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { TEMPORAL_METHOD_TABLE, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { DAYS_INTO_WEEK } from "../date-and-time/calculations.js";
 import { inTimeZone } from "../date-and-time/zones.js";
 
@@ -30,7 +30,7 @@ export function setBeginningOfWeek(weekStart: string): void {
 }
 
 export function findBeginningOfWeekBang(weekStart: string): string {
-  if (!Object.prototype.hasOwnProperty.call(DAYS_INTO_WEEK, weekStart)) {
+  if (!Object.hasOwn(DAYS_INTO_WEEK, weekStart)) {
     throw new ArgumentError(
       `Invalid beginning of week: ${isSymbol(weekStart) ? symbolToS(weekStart) : weekStart}`,
     );
@@ -231,7 +231,26 @@ export function compareWithoutCoercion(
 declare module "@blazetrails/date" {
   namespace Date {
     export function current(): Temporal.PlainDate;
+    export function beginningOfWeek(): string;
+    export function setBeginningOfWeek(weekStart: string): void;
+    export const DAYS_INTO_WEEK: Record<string, number>;
+  }
+  interface Date {
+    change(options: { year?: number; month?: number; day?: number }): Date;
   }
 }
 
-Object.assign(RubyDate, { current });
+Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek, DAYS_INTO_WEEK });
+
+Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { change });
+
+Object.defineProperty(RubyDate.prototype, "change", {
+  value: function (
+    this: RubyDate,
+    options: { year?: number; month?: number; day?: number },
+  ): RubyDate {
+    return change(this, options);
+  },
+  writable: true,
+  configurable: true,
+});

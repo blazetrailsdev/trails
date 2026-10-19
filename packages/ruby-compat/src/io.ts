@@ -896,6 +896,26 @@ export class IO {
   }
 
   /**
+   * `IO#each_line` (`vendor/ruby/v3.3.11/io.c:4649` `rb_io_each_line`) with the
+   * default separator: each line of the rest of the stream yielded to the
+   * block and the receiver returned, or — with no block — a generator standing
+   * for `RETURN_ENUMERATOR` (`io.c:4655`), read when it is iterated.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#each_line`
+   * (`vendor/ruby/v3.3.11/io.c:4649`).
+   */
+  eachLine(): Generator<string>;
+  eachLine(block: (line: string) => void): this;
+  eachLine(block?: (line: string) => void): this | Generator<string> {
+    const lines = function* (io: IO): Generator<string> {
+      yield* io.readAll().match(/[^\n]*\n|[^\n]+$/g) ?? [];
+    };
+    if (!block) return lines(this);
+    for (const line of lines(this)) block(line);
+    return this;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/io.c:3317` `read_all`, which `io_read` (`io.c:3774`) takes
    * when `length` is `nil`: the rest of the stream, and `""` rather than `nil`
    * at EOF. Ruby sizes the read from `remain_size(fptr)`, an `fstat` the

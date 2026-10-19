@@ -40,6 +40,40 @@ describe("Ruby extractor assertion-count collection", () => {
     }
   }
 
+  it("counts only the RUBY_VERSION arm the vendored Ruby takes", () => {
+    const c = rubyAssertionCounts({
+      "cases/foo_test.rb": `
+        class FooTest < ActiveSupport::TestCase
+          def test_version_arm
+            if RUBY_VERSION >= "3.4"
+              assert_equal 1, a
+            else
+              assert_equal 2, b
+              assert_nil c
+            end
+          end
+
+          def test_version_unless
+            unless RUBY_VERSION < "3.0"
+              assert_equal 1, a
+            end
+          end
+
+          def test_other_condition
+            if x
+              assert_equal 1, a
+            else
+              assert_equal 2, b
+            end
+          end
+        end
+      `,
+    });
+    expect(c["version arm"]).toBe(2);
+    expect(c["version unless"]).toBe(1);
+    expect(c["other condition"]).toBe(2);
+  });
+
   it("counts every assertion call without deduping kinds", () => {
     const c = rubyAssertionCounts({
       "cases/foo_test.rb": `

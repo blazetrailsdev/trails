@@ -191,6 +191,6 @@ describe("STI subclass attribute() registration", () => {
 
     expect(ticketBuilder).not.toBe(shapeBuilder);
     expect(Shape.attributesBuilder()).toBe(shapeBuilder);
-    expect(Object.prototype.hasOwnProperty.call(Ticket, "_attributesBuilder")).toBe(true);
+    expect(Object.hasOwn(Ticket, "_attributesBuilder")).toBe(true);
   });
 });

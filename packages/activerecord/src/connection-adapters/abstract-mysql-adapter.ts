@@ -601,13 +601,13 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
 
     options = { ...options };
 
-    if (!Object.prototype.hasOwnProperty.call(options, "default")) {
+    if (!Object.hasOwn(options, "default")) {
       options["default"] = column.defaultFunction ? () => column.defaultFunction : column.default;
     }
-    if (!Object.prototype.hasOwnProperty.call(options, "null")) {
+    if (!Object.hasOwn(options, "null")) {
       options["null"] = column.null;
     }
-    if (!Object.prototype.hasOwnProperty.call(options, "comment")) {
+    if (!Object.hasOwn(options, "comment")) {
       options["comment"] = column.comment ?? undefined;
     }
 
@@ -617,7 +617,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
       options["collation"] ??= column.collation ?? undefined;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(options, "autoIncrement")) {
+    if (!Object.hasOwn(options, "autoIncrement")) {
       options["autoIncrement"] = (column as MysqlColumn).isAutoIncrement();
     }
 

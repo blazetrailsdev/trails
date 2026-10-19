@@ -1,0 +1,16 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/tse/scaffold/scaffold-generator.ts",
+    "rubyName": "copy_view_files",
+    "call": "order:controllerFilePath,filenameWithExtensions",
+    "reason": "Surfaced when erb/scaffold/scaffold_generator.rb left UNPORTED_FILES; pre-existing body shape, pending scaffold-controller-hooks-test-framework-and-engine-arms."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/tse/scaffold/scaffold-generator.ts",
+    "rubyName": "copy_view_files",
+    "call": "template",
+    "reason": "Surfaced when erb/scaffold/scaffold_generator.rb left UNPORTED_FILES; the port writes views through TEMPLATES rather than Thor's template, pending scaffold-controller-hooks-test-framework-and-engine-arms."
+  }
+]

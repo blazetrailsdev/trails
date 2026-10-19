@@ -1,7 +1,6 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ArgumentError, IPAddr, rbInspect, rbFSend } from "@blazetrails/ruby-compat";
-import { ActionDispatch } from "../../namespaces.js";
-import type { Request } from "../http/request.js";
+import { Request } from "../http/request.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse> | RackResponse;
 
@@ -189,7 +188,7 @@ export class RemoteIp {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const req = new ActionDispatch.Request(env);
+    const req = new Request(env);
     req.remoteIp = new GetIp(req, this.checkIp, this.proxies);
     return await (rbFSend(this.app, "call", req.env) as ReturnType<typeof this.app>);
   }

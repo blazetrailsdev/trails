@@ -177,7 +177,7 @@ export interface RenderingClassHost extends RendererController {
 }
 
 export function renderer(this: RenderingClassHost): Renderer {
-  if (!Object.prototype.hasOwnProperty.call(this, "_renderer")) this.setupRendererBang();
+  if (!Object.hasOwn(this, "_renderer")) this.setupRendererBang();
   return this._renderer!;
 }
 

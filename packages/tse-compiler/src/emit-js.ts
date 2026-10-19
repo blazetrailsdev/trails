@@ -9,6 +9,7 @@ export interface EmitJsOptions {
   async?: boolean;
   fileName?: string;
   sourceFileName?: string;
+  bufvar?: string;
 }
 
 export interface EmitResult {
@@ -199,6 +200,7 @@ function netUnclosedParens(code: string): number {
 
 function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: LineMapping[] } {
   const exprAppend = options.escapeIgnore === true ? "safeExprAppend" : "append";
+  const bufvar = options.bufvar ?? "context.outputBuffer";
   let code = "";
   const lineMappings: LineMapping[] = [];
   let genLine = 0;
@@ -223,7 +225,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   };
 
   push(`export default ${options.async ? "async " : ""}function render(context, locals) {`);
-  push("const _ob = context.outputBuffer;");
+  push(`const _ob = ${bufvar};`);
   if (options.preamble) push(options.preamble);
   const innerDepths: number[] = [];
   const innerCallExprParens: number[] = [];
@@ -231,7 +233,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
   const functionDepths: number[] = [];
   for (const node of ast.nodes) {
     const insideBlock = innerDepths.length > 0;
-    const bufRef = insideBlock ? "context.outputBuffer" : "_ob";
+    const bufRef = insideBlock ? bufvar : "_ob";
     const awaits = options.async === true && !insideBlock && functionDepths.length === 0;
     if (node.kind === "blockExpr") {
       const trimmed = node.value.trim();
@@ -254,7 +256,7 @@ function emit(ast: TseAst, options: EmitJsOptions): { code: string; mappings: Li
         push(`${closer}${suffix}`, node.srcLine);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        push(emitNode(node, exprAppend, "context.outputBuffer"), node.srcLine);
+        push(emitNode(node, exprAppend, bufvar), node.srcLine);
       }
     } else {
       if (node.kind === "code" && options.async === true) {

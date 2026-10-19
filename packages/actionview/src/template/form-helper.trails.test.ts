@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { Base } from "../base.js";
-import { FormBuilder } from "../helpers/form-helper.js";
+import { FormBuilder, FormHelper } from "../helpers/form-helper.js";
+import { ModelNaming } from "../model-naming.js";
+import { RecordIdentifier } from "../record-identifier.js";
+import { include, isModuleIncluded } from "@blazetrails/ruby-compat";
 import { LookupContext } from "../lookup-context.js";
 
 class Post {
@@ -70,5 +73,14 @@ describe("FormHelper attr_internal :default_form_builder (form_helper.rb:122)", 
       return "";
     });
     expect(builder).toBeInstanceOf(SpecializedFormBuilder);
+  });
+});
+
+describe("FormHelper records the modules it includes (form_helper.rb:117-120)", () => {
+  it("reports ModelNaming and RecordIdentifier as included by its includer", () => {
+    class Host {}
+    include(Host, FormHelper);
+    expect(isModuleIncluded(Host, ModelNaming)).toBe(true);
+    expect(isModuleIncluded(Host, RecordIdentifier)).toBe(true);
   });
 });

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "base.ts",
+    "rubyName": "initialize",
+    "call": "assign_attributes",
+    "reason": "Base reaches ActiveModel::API#initialize's assign_attributes through super(attrs) into Model's constructor (api.ts), not inline at Rails' super position; converging needs Model's constructor split (RFC 0188); tracked by activemodel-api-attributes-core-initialize-inlined."
+  }
+]

@@ -1,5 +1,10 @@
-import { Module, extend, extended, include } from "@blazetrails/ruby-compat";
-import { isModuleIncluded, prepend } from "@blazetrails/ruby-compat/include";
+import { extend, extended, include } from "@blazetrails/ruby-compat";
+import {
+  isModuleIncluded,
+  prepend,
+  rbModAppendFeatures,
+  rbModPrependFeatures,
+} from "@blazetrails/ruby-compat/include";
 
 export class MultipleIncludedBlocks extends Error {
   static toString(): string {
@@ -25,7 +30,7 @@ export class MultiplePrependBlocks extends Error {
 
 type AnyClass = new (...args: never[]) => unknown;
 
-interface ConcernHost extends Module {
+interface ConcernHost {
   _dependencies?: ConcernHost[];
   _includedBlock?: (this: any) => void;
   _prependedBlock?: (this: any) => void;
@@ -45,38 +50,38 @@ function sourceLocation(block: object): string {
 
 export const Concern = {
   [extended](base: ConcernHost): void {
-    base._dependencies = [];
+    Object.defineProperty(base, "_dependencies", { value: [], writable: true, configurable: true });
   },
 
   appendFeatures(this: ConcernHost, base: AnyClass | ConcernHost): boolean | void {
-    if (Object.prototype.hasOwnProperty.call(base, "_dependencies")) {
+    if (Object.hasOwn(base, "_dependencies")) {
       (base as ConcernHost)._dependencies!.push(this);
       return false;
     } else {
       if (isModuleIncluded(base as AnyClass, this)) return false;
       for (const dep of this._dependencies!) include(base as AnyClass, dep);
-      Module.prototype.appendFeatures.call(this, base as AnyClass);
-      if (Object.prototype.hasOwnProperty.call(this, "ClassMethods")) {
+      rbModAppendFeatures(base as AnyClass, this);
+      if (Object.hasOwn(this, "ClassMethods")) {
         extend(base as AnyClass, this.ClassMethods!);
       }
-      if (Object.prototype.hasOwnProperty.call(this, "_includedBlock")) {
+      if (Object.hasOwn(this, "_includedBlock")) {
         this._includedBlock!.call(base);
       }
     }
   },
 
   prependFeatures(this: ConcernHost, base: AnyClass | ConcernHost): boolean | void {
-    if (Object.prototype.hasOwnProperty.call(base, "_dependencies")) {
+    if (Object.hasOwn(base, "_dependencies")) {
       (base as ConcernHost)._dependencies!.unshift(this);
       return false;
     } else {
       if (isModuleIncluded(base as AnyClass, this)) return false;
       for (const dep of this._dependencies!) prepend(base as AnyClass, dep);
-      Module.prototype.prependFeatures.call(this, base as AnyClass);
-      if (Object.prototype.hasOwnProperty.call(this, "ClassMethods")) {
+      rbModPrependFeatures(base as AnyClass, this);
+      if (Object.hasOwn(this, "ClassMethods")) {
         prepend({ prototype: base } as unknown as AnyClass, this.ClassMethods!);
       }
-      if (Object.prototype.hasOwnProperty.call(this, "_prependedBlock")) {
+      if (Object.hasOwn(this, "_prependedBlock")) {
         this._prependedBlock!.call(base);
       }
     }
@@ -84,7 +89,7 @@ export const Concern = {
 
   included(this: ConcernHost, base: unknown = null, block?: (this: any) => void): void {
     if (base == null) {
-      if (Object.prototype.hasOwnProperty.call(this, "_includedBlock")) {
+      if (Object.hasOwn(this, "_includedBlock")) {
         if (
           sourceLocation(this._includedBlock!) !== sourceLocation(block!) ||
           this._includedBlock!.toString() !== block!.toString()
@@ -93,14 +98,18 @@ export const Concern = {
         }
       } else {
         sourceLocation(block!);
-        this._includedBlock = block;
+        Object.defineProperty(this, "_includedBlock", {
+          value: block,
+          writable: true,
+          configurable: true,
+        });
       }
     }
   },
 
   prepended(this: ConcernHost, base: unknown = null, block?: (this: any) => void): void {
     if (base == null) {
-      if (Object.prototype.hasOwnProperty.call(this, "_prependedBlock")) {
+      if (Object.hasOwn(this, "_prependedBlock")) {
         if (
           sourceLocation(this._prependedBlock!) !== sourceLocation(block!) ||
           this._prependedBlock!.toString() !== block!.toString()
@@ -109,7 +118,11 @@ export const Concern = {
         }
       } else {
         sourceLocation(block!);
-        this._prependedBlock = block;
+        Object.defineProperty(this, "_prependedBlock", {
+          value: block,
+          writable: true,
+          configurable: true,
+        });
       }
     }
   },
@@ -118,9 +131,7 @@ export const Concern = {
     this: ConcernHost,
     classMethodsModuleDefinition: (mod: Record<string, unknown>) => void,
   ): void {
-    const mod = Object.prototype.hasOwnProperty.call(this, "ClassMethods")
-      ? this.ClassMethods!
-      : (this.ClassMethods = {});
+    const mod = Object.hasOwn(this, "ClassMethods") ? this.ClassMethods! : (this.ClassMethods = {});
     classMethodsModuleDefinition(mod);
   },
 };

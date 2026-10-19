@@ -198,7 +198,7 @@ export function replaceNamedBindVariables(
       } else if (prefix === "\\") {
         return match.slice(1);
       } else {
-        if (!Object.prototype.hasOwnProperty.call(bindVars, name)) {
+        if (!Object.hasOwn(bindVars, name)) {
           throw new PreparedStatementInvalid(`missing value for :${name} in ${statement}`);
         }
         return replaceBindVariable(connection, bindVars[name]);

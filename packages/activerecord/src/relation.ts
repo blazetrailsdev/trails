@@ -141,8 +141,7 @@ function valuesEqual(a: unknown, b: unknown): boolean {
   const keys = Object.keys(a);
   if (keys.length !== Object.keys(b).length) return false;
   return keys.every(
-    (key) =>
-      Object.prototype.hasOwnProperty.call(b, key) && valuesEqual((a as any)[key], (b as any)[key]),
+    (key) => Object.hasOwn(b, key) && valuesEqual((a as any)[key], (b as any)[key]),
   );
 }
 
@@ -286,7 +285,7 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     if (prop === Symbol.iterator && !target._isRecordsSynchronous) return false;
     if (Reflect.has(target, prop)) return true;
     if (typeof prop === "symbol") return false;
-    if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
+    if (Object.hasOwn(ENUMERABLE_METHODS, prop)) return true;
     return target.respondToMissing(prop, false);
   },
 };
@@ -564,7 +563,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return await this.scoping(() => this._createBang(attributes, restoring));
   }
 
-  /** @noRailsEquivalent CONVERGEABLE relation-to-yaml-is-an-awaited-member-not-object-to-yaml */
+  /** @noRailsEquivalent PERMANENT */
   async toYaml(): Promise<string> {
     await this.load();
     return toYaml(this);
@@ -798,10 +797,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
     let values: [Nodes.Node, unknown][] | Nodes.SqlLiteral;
     if (typeof updates !== "string" && !Array.isArray(updates)) {
-      if (
-        this.model.lockingEnabled &&
-        !Object.prototype.hasOwnProperty.call(updates, this.model.lockingColumn)
-      ) {
+      if (this.model.lockingEnabled && !Object.hasOwn(updates, this.model.lockingColumn)) {
         const attr = this.table.get(this.model.lockingColumn);
         updates[String(attr.name)] = this._incrementAttribute(attr);
       }

@@ -8,7 +8,7 @@ import { rbInspect } from "@blazetrails/ruby-compat";
 export type LookupDetails =
   | TemplateDetails
   | Requested
-  | Readonly<Record<string, ReadonlyArray<string | symbol> | "any">>;
+  | Readonly<Record<string, ReadonlyArray<string | symbol> | ":any">>;
 
 export interface PathSetResolver {
   findAll(

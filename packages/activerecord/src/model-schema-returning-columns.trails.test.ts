@@ -92,9 +92,7 @@ describe("_returningColumnsForInsert memoization", () => {
     await sub._returningColumnsForInsert(connection);
     const afterSubMemo = calls;
     expect(afterSubMemo).toBeGreaterThan(0);
-    expect(Object.prototype.hasOwnProperty.call(Reply, "_returningColumnsForInsertCache")).toBe(
-      true,
-    );
+    expect(Object.hasOwn(Reply, "_returningColumnsForInsertCache")).toBe(true);
     await sub._returningColumnsForInsert(connection);
     expect(calls).toBe(afterSubMemo);
 

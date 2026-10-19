@@ -47,9 +47,15 @@ export class Object {
   }
 }
 
-Kernel.defineMethod("asJson", function (this: object, options: EncodeOptions | null = null) {
+declare module "@blazetrails/ruby-compat" {
+  interface KernelModule {
+    asJson(this: object, options?: EncodeOptions | null): unknown;
+  }
+}
+
+Kernel.asJson = function (this: object, options: EncodeOptions | null = null) {
   return Object.asJson(this, options);
-});
+};
 
 export class TrueClass {
   static asJson(value: boolean, options: EncodeOptions | null = null): boolean {

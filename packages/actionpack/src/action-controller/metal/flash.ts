@@ -67,10 +67,7 @@ export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
 
 export function actionMethods(this: FlashClassHost): string[] {
   const host = this as FlashClassHost & { _actionMethodCache?: Set<string> };
-  if (
-    !Object.prototype.hasOwnProperty.call(host, "_actionMethodCache") ||
-    !host._actionMethodCache
-  ) {
+  if (!Object.hasOwn(host, "_actionMethodCache") || !host._actionMethodCache) {
     const flashTypes = new Set(host._flashTypes.map(String));
     const methods = ClassMethods.superMethod(this, "actionMethods")!() as string[];
     host._actionMethodCache = new Set(methods.filter((name) => !flashTypes.has(name)));

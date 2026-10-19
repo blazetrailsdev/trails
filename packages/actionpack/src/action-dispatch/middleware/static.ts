@@ -169,7 +169,10 @@ export class FileHandler {
     return result;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName b — PERMANENT
+   */
   private isFileReadable(path: string): boolean {
     const filePath = File.join(this.root, path);
     return File.isFile(filePath) && File.isReadable(filePath);

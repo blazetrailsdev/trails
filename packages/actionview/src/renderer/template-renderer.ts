@@ -33,16 +33,16 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
   private determineTemplate(options: RenderOptions): RenderableTemplate {
     const keys = options.locals ? Object.keys(options.locals) : [];
 
-    if (Object.prototype.hasOwnProperty.call(options, "body")) {
+    if (Object.hasOwn(options, "body")) {
       return new Text(options.body);
     }
-    if (Object.prototype.hasOwnProperty.call(options, "plain")) {
+    if (Object.hasOwn(options, "plain")) {
       return new Text(options.plain);
     }
-    if (Object.prototype.hasOwnProperty.call(options, "html")) {
+    if (Object.hasOwn(options, "html")) {
       return new HTML(options.html, this.formats[0]);
     }
-    if (Object.prototype.hasOwnProperty.call(options, "file")) {
+    if (Object.hasOwn(options, "file")) {
       if (File.isExist(options.file!)) {
         return new RawFile(options.file);
       } else {
@@ -55,7 +55,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
         }
       }
     }
-    if (Object.prototype.hasOwnProperty.call(options, "inline")) {
+    if (Object.hasOwn(options, "inline")) {
       const handler = TemplateHandlers.handlerForExtension(options.type ?? "tse");
       const format = rbObjRespondTo(handler, "defaultFormat")
         ? (handler as TemplateHandler & { defaultFormat: string }).defaultFormat
@@ -65,10 +65,10 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
         format,
       });
     }
-    if (Object.prototype.hasOwnProperty.call(options, "renderable") && options.renderable) {
+    if (Object.hasOwn(options, "renderable") && options.renderable) {
       return new Renderable(options.renderable);
     }
-    if (Object.prototype.hasOwnProperty.call(options, "template") && options.template != null) {
+    if (Object.hasOwn(options, "template") && options.template != null) {
       const tmpl = options.template;
       if (typeof tmpl === "object" && typeof tmpl.render === "function") {
         return tmpl;

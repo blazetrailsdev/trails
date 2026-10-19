@@ -95,7 +95,7 @@ describe("FixtureResolverTest", () => {
     templates = resolver.findAll("path", "arbitrary", false, {
       locale: [],
       formats: [":html"],
-      variants: "any",
+      variants: ":any",
       handlers: [":tse"],
     });
     assertEqual(2, templates.length, "expected all templates");

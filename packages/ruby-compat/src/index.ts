@@ -226,6 +226,7 @@ export {
   rbModConstSet,
   defineModule,
   Kernel,
+  type KernelModule,
   extend,
   extended,
   rbObjClone,
@@ -246,6 +247,7 @@ export {
   type UnboundMethod,
   moduleVisibility,
   publicInstanceMethods,
+  classModule,
 } from "./include.js";
 export type { Extended, Included, Initialized, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
@@ -433,7 +435,7 @@ export { coreHashMergeKwd, keywordSplat, rbGetKwargs, rbScanArgs } from "./keywo
 export { Queue, SizedQueue } from "./queue.js";
 export { Fiber } from "./fiber.js";
 export { FiberError } from "./fiber-error.js";
-export { Thread } from "./thread.js";
+export { Thread, rbIterBreakValue } from "./thread.js";
 export {
   Location,
   excBacktrace,

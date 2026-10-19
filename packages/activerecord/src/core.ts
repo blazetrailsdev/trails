@@ -148,10 +148,7 @@ type FilterAttributes = (string | RegExp | ((key: string, value: unknown) => unk
 export class ClassMethods {
   static get filterAttributes(): FilterAttributes {
     const host = this as unknown as CoreHost;
-    if (
-      !Object.prototype.hasOwnProperty.call(host, "_filterAttributes") ||
-      host._filterAttributes == null
-    ) {
+    if (!Object.hasOwn(host, "_filterAttributes") || host._filterAttributes == null) {
       return parentClass(host)!.filterAttributes;
     } else {
       return host._filterAttributes;
@@ -892,7 +889,7 @@ export function initializeInternalsCallback(this: unknown): void {}
 export function isCustomInspectMethodDefined(this: {
   constructor: { prototype: object };
 }): boolean {
-  return Object.prototype.hasOwnProperty.call(this.constructor.prototype, "inspect");
+  return Object.hasOwn(this.constructor.prototype, "inspect");
 }
 
 /** @internal */

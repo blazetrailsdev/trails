@@ -38,7 +38,6 @@ export class DebugLocks {
       return rawThreads;
     });
 
-    const allInfos = Array.from(threads.values());
     const parts: string[] = [];
 
     for (const [thread, info] of threads) {
@@ -71,13 +70,17 @@ export class DebugLocks {
           msg += `  may be pre-empted for: ${compat.join(", ")}\n`;
         }
 
-        const blockers = allInfos.filter((binfo) => this.blockedBy(info, binfo, allInfos));
+        const blockers = Array.from(threads.values()).filter((binfo) =>
+          this.blockedBy(info, binfo, threads.values()),
+        );
         if (blockers.length) {
           msg += `  blocked by: ${blockers.map((i) => i.index).join(", ")}\n`;
         }
       }
 
-      const blockees = allInfos.filter((binfo) => this.blockedBy(binfo, info, allInfos));
+      const blockees = Array.from(threads.values()).filter((binfo) =>
+        this.blockedBy(binfo, info, threads.values()),
+      );
       if (blockees.length) {
         msg += `  blocking: ${blockees.map((i) => i.index).join(", ")}\n`;
       }
@@ -105,7 +108,7 @@ export class DebugLocks {
   private blockedBy(
     victim: ShareLockThreadInfo,
     blocker: ShareLockThreadInfo,
-    allThreads: ShareLockThreadInfo[],
+    allThreads: Iterable<ShareLockThreadInfo>,
   ): boolean {
     if (victim === blocker) return false;
 
@@ -128,7 +131,7 @@ export class DebugLocks {
           !!blocker.exclusive ||
           (!!victim.compatible &&
             victim.compatible.includes(blocker.purpose) &&
-            allThreads.every(
+            Array.from(allThreads).every(
               (other) =>
                 !other.compatible ||
                 other === blocker ||

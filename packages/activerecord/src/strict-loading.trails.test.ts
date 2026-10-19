@@ -6,7 +6,7 @@ import { Developer, AuditLog } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Project } from "./test-helpers/models/project.js";
 import { Firm } from "./test-helpers/models/company.js";
-import { Contract } from "./test-helpers/models/contract.js";
+import "./test-helpers/models/contract.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
@@ -29,7 +29,6 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   registerModel(Ship);
   registerModel(Project);
   registerModel(Firm);
-  registerModel(Contract);
   registerModel([Author, Post, Comment, Member, Membership, CurrentMembership, Club]);
 
   it("does not raise on lazy loading a has_many on a new strict-loading owner without the foreign key", async () => {

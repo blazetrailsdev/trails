@@ -7,7 +7,7 @@ type ClassRef = { prototype?: object };
 function owner(klass: ClassRef, name: string): unknown {
   for (let k: unknown = klass; k; k = Object.getPrototypeOf(k) as unknown) {
     const proto = (k as ClassRef).prototype;
-    if (proto && Object.prototype.hasOwnProperty.call(proto, name)) return k;
+    if (proto && Object.hasOwn(proto, name)) return k;
   }
   return null;
 }

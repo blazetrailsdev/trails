@@ -100,7 +100,7 @@ describe("per-instance @primary_key slot", () => {
     expect(Child.isCompositePrimaryKey()).toBe(true);
 
     Child.resetPrimaryKey();
-    expect(Object.prototype.hasOwnProperty.call(Child, "_compositePrimaryKey")).toBe(true);
+    expect(Object.hasOwn(Child, "_compositePrimaryKey")).toBe(true);
     expect(Child.isCompositePrimaryKey()).toBe(true);
 
     Child.primaryKey = "id";

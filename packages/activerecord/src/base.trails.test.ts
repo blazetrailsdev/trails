@@ -392,7 +392,7 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     const first = Firm.columnsHash();
     expect(Firm.columnsHash()).toBe(first);
 
-    expect(Object.prototype.hasOwnProperty.call(Company, "_schemaLoaded")).toBe(true);
+    expect(Object.hasOwn(Company, "_schemaLoaded")).toBe(true);
 
     await Company.resetColumnInformation();
     await Company.loadSchema();

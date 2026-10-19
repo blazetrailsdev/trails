@@ -1,4 +1,4 @@
-import { rbCString, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
+import { rbCDate, rbCString, rbObjClass, rbObjIsProc, rbObjRespondTo, rtest } from "./object.js";
 import { rbRegEqual } from "./regexp.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
@@ -113,7 +113,10 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
      before the `equals` arm below, mirroring `cmp`'s Temporal arm. */
   const tag = temporalTag(a);
   if (tag !== null) {
-    if (temporalTag(b) === null) return false;
+    if (temporalTag(b) === null) {
+      if (kDateP(a) && kDateP(b)) return (b as { cmp(other: unknown): number | null }).cmp(a) === 0;
+      return false;
+    }
     const x = widenPlainDate(a);
     const y = widenPlainDate(b);
     if (temporalTag(x) !== temporalTag(y)) return false;
@@ -231,4 +234,17 @@ export function rbEqq(pattern: unknown, target: unknown): boolean {
     return rtest(pattern(target));
   }
   return rbEqual(pattern, target);
+}
+
+/**
+ * `k_date_p` (`vendor/ruby/v3.3.11/ext/date/date_core.c:1992`), `f_kind_of_p(x, cDate)`.
+ * Read off `rbObjClass` rather than `rbObjIsKindOf`, whose module would close an
+ * import cycle through include.ts.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function kDateP(x: unknown): boolean {
+  const klass = rbObjClass(x);
+  return klass === rbCDate || klass.prototype instanceof rbCDate;
 }

@@ -2,6 +2,7 @@ import { type Deprecators, TopLevel } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   ActionDispatch,
+  Request,
   deprecator,
   X_REQUEST_ID,
   URL as HttpURL,
@@ -107,7 +108,7 @@ export class Trailtie extends BaseTrailtie {
 
       HttpURL.tldLength = cfg.tldLength;
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
-      ActionDispatch.Request.Utils.performDeepMunge = cfg.performDeepMunge;
+      Request.Utils.performDeepMunge = cfg.performDeepMunge;
       CacheRequest.strictFreshness = cfg.strictFreshness;
       Response.defaultCharset = cfg.defaultCharset ?? "utf-8";
 

@@ -309,7 +309,7 @@ export function thenableHash(
     },
     getOwnPropertyDescriptor(_t, key) {
       const obj = built();
-      if (!Object.prototype.hasOwnProperty.call(obj, key)) return undefined;
+      if (!Object.hasOwn(obj, key)) return undefined;
       const desc = Object.getOwnPropertyDescriptor(obj, key)!;
       desc.configurable = true;
       return desc;

@@ -1,9 +1,9 @@
 import { Encoder, ExtData } from "@msgpack/msgpack";
 import {
+  moduleVisibility,
   ArgumentError,
   FrozenError,
   Hash,
-  Module,
   NoMethodError,
   RangeError,
   TypeError,
@@ -71,7 +71,10 @@ export class Packer<Io = unknown> {
     methodName: string | null = null,
     block?: PackerProc,
   ): null {
-    if (typeof klass !== "function" && !(klass instanceof Module)) {
+    if (
+      typeof klass !== "function" &&
+      !(typeof klass === "object" && klass !== null && Object.hasOwn(klass, moduleVisibility))
+    ) {
       throw new ArgumentError(`expected Module/Class got: ${rbInspect(klass)}`);
     }
     if (block == null && methodName == null) {

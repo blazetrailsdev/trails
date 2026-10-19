@@ -1,6 +1,6 @@
 import type { Request } from "./request.js";
 import { ActionDispatch } from "../../namespaces.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, eachPair } from "@blazetrails/ruby-compat";
 
 const CGI_VARIABLES = new Set([
   "AUTH_TYPE",
@@ -37,6 +37,8 @@ function envName(key: string): string {
 }
 
 export class Headers {
+  static readonly DEFAULT: object = {};
+
   private _req: Request;
 
   constructor(request: Request) {
@@ -71,14 +73,11 @@ export class Headers {
     return this.isKey(key);
   }
 
-  fetch(key: string, ...defaultValue: unknown[]): unknown {
-    return this._req.fetchHeader(envName(String(key)), () => {
-      if (defaultValue.length > 0) {
-        const fallback = defaultValue[0];
-        if (typeof fallback === "function") return (fallback as () => unknown)();
-        return fallback;
-      }
-      throw new KeyError(String(key));
+  fetch(key: string, defaultValue: unknown = Headers.DEFAULT, block?: () => unknown): unknown {
+    return this._req.fetchHeader(envName(key), () => {
+      if (defaultValue !== Headers.DEFAULT) return defaultValue;
+      if (block) return block();
+      throw new KeyError(key);
     });
   }
 
@@ -86,16 +85,16 @@ export class Headers {
     this._req.eachHeader((key, value) => fn([key, value]));
   }
 
-  merge(headersOrEnv: Record<string, unknown>): Headers {
+  merge(headersOrEnv: Record<string, unknown> | Headers): Headers {
     const headers = this._req.dup().headers;
     headers.mergeBang(headersOrEnv);
     return headers;
   }
 
-  mergeBang(headersOrEnv: Record<string, unknown>): Record<string, unknown> {
-    for (const [key, value] of Object.entries(headersOrEnv)) {
+  mergeBang(headersOrEnv: Record<string, unknown> | Headers): Record<string, unknown> | Headers {
+    eachPair(headersOrEnv as Record<string, unknown>, (key, value) => {
       this._req.setHeader(envName(String(key)), value);
-    }
+    });
     return headersOrEnv;
   }
 }

@@ -156,7 +156,6 @@ describe("MissingTranslation::Base", () => {
 
 function findOwner(object: object, name: string): object {
   let proto: object | null = object;
-  while (proto && !Object.prototype.hasOwnProperty.call(proto, name))
-    proto = Object.getPrototypeOf(proto);
+  while (proto && !Object.hasOwn(proto, name)) proto = Object.getPrototypeOf(proto);
   return proto!;
 }

@@ -4136,6 +4136,25 @@ describe("extractFromProgram — name-list prototype generator", () => {
     ]);
   });
 
+  it("credits a for-of over an inline array defining a non-enumerable value on the prototype", () => {
+    const info = extractFromFiles("/p", {
+      "selector.ts": `
+        export class DateTimeSelector {}
+        for (const method of ["sec", "min"]) {
+          Object.defineProperty(DateTimeSelector.prototype, method, {
+            value: function (this: DateTimeSelector): unknown {
+              return method;
+            },
+            writable: true,
+            configurable: true,
+          });
+        }
+      `,
+    });
+    const names = info.classes["selector.ts:DateTimeSelector"].instanceMethods.map((m) => m.name);
+    expect(names).toEqual(expect.arrayContaining(["sec", "min"]));
+  });
+
   it("credits nothing when the name list is imported rather than same-file", () => {
     const info = extractFromFiles("/p", {
       "names.ts": `export const NAMES = ["createTable"] as const;`,
@@ -7575,6 +7594,32 @@ describe("extractFromProgram — a Module on a static property", () => {
   });
 });
 
+describe("extractFromProgram — aliasMethod on another file's module", () => {
+  it("credits the alias of a file function the file seats on that module", () => {
+    const info = extractFromFiles("/p", {
+      "live.ts": `export const Live = new Module();`,
+      "test-case.ts": `import { Live } from "./live.js";
+        Live.aliasMethod("originalNewControllerThread", "newControllerThread");
+        export function newControllerThread(block: () => void): void {}
+        Live.defineMethod("newControllerThread", newControllerThread);`,
+    });
+    expect(info.fileFunctions!["test-case.ts"].map((f) => [f.name, f.aliasOf])).toEqual([
+      ["newControllerThread", undefined],
+      ["originalNewControllerThread", "newControllerThread"],
+    ]);
+  });
+
+  it("does not credit an aliasMethod whose receiver is not an imported Module", () => {
+    const info = extractFromFiles("/p", {
+      "live.ts": `export const Live = { aliasMethod(a: string, b: string) {} };`,
+      "test-case.ts": `import { Live } from "./live.js";
+        Live.aliasMethod("originalNewControllerThread", "newControllerThread");
+        export function newControllerThread(block: () => void): void {}`,
+    });
+    expect(info.fileFunctions!["test-case.ts"].map((f) => f.name)).toEqual(["newControllerThread"]);
+  });
+});
+
 describe("extractFromProgram — configAccessor() generated accessors", () => {
   it("credits the class and instance accessors on the module whose included hook calls it", () => {
     const info = extractFromFiles("/p", {
@@ -7765,6 +7810,35 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
       true,
       true,
     ]);
+  });
+
+  it("seats a cattrAccessor inside an onLoad block on the hook's module", () => {
+    const info = extractFromFiles("/p", {
+      "form-helper.ts": `
+        import { cattrAccessor, onLoad } from "@blazetrails/activesupport";
+        onLoad("action_view", (base) => {
+          cattrAccessor.call(base, "defaultFormBuilder", { instanceReader: false, instanceWriter: false });
+        });
+      `,
+    });
+    const mod = info.modules["form-helper.ts:ActionView"];
+    expect(mod.classMethods.map((m) => `${m.name}${m.writer ? "=" : ""}`)).toEqual([
+      "defaultFormBuilder",
+      "defaultFormBuilder=",
+    ]);
+    expect(mod.instanceMethods).toEqual([]);
+  });
+
+  it("does not seat a cattrAccessor inside a lifecycle onLoad block on a module", () => {
+    const info = extractFromFiles("/p", {
+      "railtie.ts": `
+        import { cattrAccessor, onLoad } from "@blazetrails/activesupport";
+        onLoad("after_initialize", (base) => {
+          cattrAccessor.call(base, "logger");
+        });
+      `,
+    });
+    expect(Object.keys(info.modules).filter((k) => k.startsWith("railtie.ts:"))).toEqual([]);
   });
 
   it("credits a Module's attrReader / attrWriter with the instance half each installs", () => {
@@ -8094,11 +8168,14 @@ describe("extractClass — @inlinedFrom on a constructor", () => {
     ]);
   });
 
-  it("records nothing on an untagged constructor or a tagged method", () => {
+  it("records nothing on an untagged constructor, and a tagged method's tags", () => {
     const got = extractFromSource(
       `class Foo {\n  constructor() {}\n  /** @inlinedFrom ${api} */\n  save() {}\n}`,
     ).instanceMethods;
-    expect(got.map((m) => m.inlinedFrom)).toEqual([undefined, undefined]);
+    expect(got.map((m) => m.inlinedFrom?.map((t) => t.module))).toEqual([
+      undefined,
+      ["ActiveModel::API"],
+    ]);
   });
 });
 

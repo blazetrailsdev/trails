@@ -1,12 +1,6 @@
-import {
-  attrInternal,
-  Concern,
-  extend,
-  initialize,
-  Module,
-  pluralize,
-  toF,
-} from "@blazetrails/activesupport";
+import { attrInternal, Concern, extend, Module, pluralize, toF } from "@blazetrails/activesupport";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Railties } from "../namespaces.js";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
 interface ControllerRuntimeHost {
@@ -87,12 +81,6 @@ export function appendInfoToPayload(
 export const ControllerRuntime = new Module((mod) => {
   extend(mod, Concern);
 
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
-    this: ControllerRuntimeHost,
-  ): void {
-    this.dbRuntime = null;
-  };
-
   /** @internal */
   mod.moduleEval((carrier) => attrInternal.call(carrier, "dbRuntime"));
 
@@ -101,3 +89,4 @@ export const ControllerRuntime = new Module((mod) => {
   mod.defineMethod("appendInfoToPayload", appendInfoToPayload);
 }) as Module & { ClassMethods: Module };
 ControllerRuntime.ClassMethods = ClassMethods;
+rbModConstSet(Railties, "ControllerRuntime", ControllerRuntime);

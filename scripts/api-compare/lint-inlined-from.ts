@@ -6,7 +6,9 @@
  * that `def` at another path or line span, names a module the Rails
  * counterpart of its class neither includes, prepends nor extends, names a
  * `def` in the Ruby file the constructor's own file mirrors, or sits twice or
- * out of Ruby's chain order. `--fix` rewrites
+ * out of Ruby's chain order. A tag on a method (RFC 0197) is held to the same
+ * checks against the class's ancestors that define the method, and is red too
+ * when the module method's Rails body calls no `super`. `--fix` rewrites
  * a stale citation from the manifest, which is the only place one comes from.
  *
  * The reverse arm, a Rails class that reaches a module `initialize` or a
@@ -49,15 +51,23 @@ import { TAG } from "./inlined-from-tags.js";
 export const MISSING_TAG_PACKAGES: readonly string[] = [
   "actioncontroller",
   "actiondispatch",
+  "actionview",
+  "activerecord",
+  "activejob",
   "activesupport",
   "i18n",
+  "rack",
   "rack-test",
+  "thor",
+  "trailties",
 ];
 
 export interface InlinedFromFinding {
   package: string;
   tsFile: string;
   owner: string;
+  /** The tagged TS member, when it is not the constructor. */
+  member?: string;
   /** The `Module#hook` the finding is about. */
   hook: string;
   message: string;
@@ -80,7 +90,7 @@ const entities = (ruby: ApiManifest, kind: "classes" | "modules"): Entity[] =>
     })),
   );
 
-const defines = (entity: Entity | undefined, hook: InlinedFrom["hook"]) =>
+const defines = (entity: Entity | undefined, hook: string) =>
   entity?.info.instanceMethods.find((m) => m.name === hook);
 
 /**
@@ -132,7 +142,7 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
     names.flatMap((name) => (kind === "extend" ? [resolve(name, entity.fqn)] : concerns(name))),
   );
   const reached = { tagged: [] as string[], sameFile: [] as string[] };
-  const sort = (fqns: readonly string[], hook: InlinedFrom["hook"]) => {
+  const sort = (fqns: readonly string[], hook: string) => {
     for (const fqn of new Set(fqns)) {
       const mod = modules.get(fqn);
       if (hook === "new" && !fqn.endsWith("::ClassMethods")) continue;
@@ -144,6 +154,30 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   sort(singleton, "new");
   sort(mixed, "initialize");
   return reached;
+}
+
+/**
+ * The modules in `entity`'s ancestors that define `hook`, in Ruby's lookup
+ * order, split by whether each lives in `entity`'s own Ruby file.
+ */
+function methodChain(entity: Entity, hook: string, modules: ReadonlyMap<string, Entity>) {
+  const byShort = new Map<string, string[]>();
+  for (const fqn of modules.keys()) {
+    const short = shortName(fqn);
+    byShort.set(short, [...(byShort.get(short) ?? []), fqn]);
+  }
+  const infos = Object.fromEntries([...modules].map(([fqn, mod]) => [fqn, mod.info]));
+  const ancestors = moduleAncestors(entity.info, entity.fqn, infos, (name, context) =>
+    resolveModuleName(name, context, byShort),
+  );
+  const chain = { tagged: [] as string[], sameFile: [] as string[] };
+  for (const fqn of [...ancestors.prepended, ...ancestors.included]) {
+    const mod = modules.get(fqn);
+    if (defines(mod, hook) === undefined) continue;
+    const sameFile = mod!.package === entity.package && mod!.info.file === entity.info.file;
+    (sameFile ? chain.sameFile : chain.tagged).push(`${fqn}#${hook}`);
+  }
+  return chain;
 }
 
 /**
@@ -166,7 +200,10 @@ export function inlinedFromFindings(
     for (const [owner, klass] of Object.entries(pkg.classes) as unknown as [string, ClassInfo][]) {
       const ctor = klass.instanceMethods.find((m) => m.name === "constructor");
       const tags = ctor?.inlinedFrom ?? [];
-      if (tags.length === 0 && !enrolled.includes(name)) continue;
+      const methods = klass.instanceMethods.filter(
+        (m) => m.name !== "constructor" && m.inlinedFrom !== undefined,
+      );
+      if (tags.length === 0 && methods.length === 0 && !enrolled.includes(name)) continue;
       if (ctor?.file !== undefined && klass.file !== undefined && ctor.file !== klass.file)
         continue;
       const tsFile = ctor?.file ?? klass.file;
@@ -199,14 +236,23 @@ export function inlinedFromFindings(
         mirrored.find((entity) => entity.fqn.split("::").pop() === short) ??
         (classes.length === 1 && declared.length === 1 ? classes[0] : undefined);
       const reached = counterpart && reachedHooks(counterpart, modules);
+      let member: string | undefined;
       const report = (hook: string, message: string, fix?: InlinedFromFinding["fix"]) =>
-        findings.push({ package: name, tsFile, owner, hook, message, ...(fix ? { fix } : {}) });
-      for (const tag of tags) {
+        findings.push({
+          package: name,
+          tsFile,
+          owner,
+          ...(member === undefined ? {} : { member }),
+          hook,
+          message,
+          ...(fix ? { fix } : {}),
+        });
+      const resolveBody = (tag: InlinedFrom): MethodInfo | undefined => {
         const hook = `${tag.module}#${tag.hook}`;
         const body = defines(modules.get(tag.module), tag.hook);
         if (body === undefined) {
           report(hook, "names no Ruby body: the manifest has no such `def`");
-          continue;
+          return undefined;
         }
         const cited = `${tag.source}/${tag.version}/${tag.file}:${tag.firstLine}-${tag.lastLine}`;
         const actual = `${body.vendorFile}:${body.line}-${body.endLine}`;
@@ -218,6 +264,50 @@ export function inlinedFromFindings(
             actual,
           });
         }
+        return body;
+      };
+      const checkOrder = (written: readonly InlinedFrom[], chain: readonly string[]) => {
+        const placed = written.map((tag) => chain.indexOf(`${tag.module}#${tag.hook}`));
+        placed.forEach((at, index) => {
+          if (at === -1) return;
+          const earlier = placed.slice(0, index).filter((other) => other !== -1);
+          if (earlier.includes(at)) {
+            report(chain[at], "is tagged more than once: Rails runs the body once");
+          } else if (earlier.some((other) => other > at)) {
+            const after = chain[Math.max(...earlier)];
+            report(chain[at], `is out of chain order: Rails runs it before ${after}`);
+          }
+        });
+      };
+      for (const tagged of methods) {
+        member = tagged.name;
+        const written = tagged.inlinedFrom ?? [];
+        const chain = counterpart && methodChain(counterpart, written[0]?.hook ?? "", modules);
+        for (const tag of written) {
+          const hook = `${tag.module}#${tag.hook}`;
+          if (tag.hook !== written[0].hook) {
+            report(hook, `names a method other than ${written[0].hook}, which the other tags name`);
+            continue;
+          }
+          const body = resolveBody(tag);
+          if (body === undefined) continue;
+          if (!(body.calls ?? []).includes("super")) {
+            report(hook, "names a module method whose Rails body calls no `super`");
+          }
+          if (chain === undefined) {
+            report(hook, "sits on a method whose file and name mirror no Rails class or module");
+          } else if (chain.sameFile.includes(hook)) {
+            report(hook, "is redundant: a body from the mirrored Ruby file is inlined untagged");
+          } else if (!chain.tagged.includes(hook)) {
+            report(hook, `names a module ${counterpart!.fqn} does not include or prepend`);
+          }
+        }
+        checkOrder(written, chain?.tagged ?? []);
+      }
+      member = undefined;
+      for (const tag of tags) {
+        const hook = `${tag.module}#${tag.hook}`;
+        if (resolveBody(tag) === undefined) continue;
         if (reached === undefined) {
           report(hook, "sits on a constructor whose file and name mirror no Rails class or module");
         } else if (reached.sameFile.includes(hook)) {
@@ -230,17 +320,7 @@ export function inlinedFromFindings(
         }
       }
       const chain = reached?.tagged ?? [];
-      const placed = tags.map((tag) => chain.indexOf(`${tag.module}#${tag.hook}`));
-      placed.forEach((at, index) => {
-        if (at === -1) return;
-        const earlier = placed.slice(0, index).filter((other) => other !== -1);
-        if (earlier.includes(at)) {
-          report(chain[at], "is tagged more than once: Rails runs the body once");
-        } else if (earlier.some((other) => other > at)) {
-          const after = chain[Math.max(...earlier)];
-          report(chain[at], `is out of chain order: Rails runs it before ${after}`);
-        }
-      });
+      checkOrder(tags, chain);
       if (!enrolled.includes(name)) continue;
       for (const hook of chain) {
         if (tags.some((tag) => `${tag.module}#${tag.hook}` === hook)) continue;
@@ -293,13 +373,13 @@ async function main(fix: boolean): Promise<number> {
   }
   for (const f of findings) {
     console.error(
-      `  ${f.package}/${f.tsFile} ${f.owner}#constructor: ${TAG} ${f.hook} ${f.message}`,
+      `  ${f.package}/${f.tsFile} ${f.owner}#${f.member ?? "constructor"}: ${TAG} ${f.hook} ${f.message}`,
     );
   }
   if (findings.length > 0) {
     console.error(
       `\ninlined-from gate: ${findings.length} finding(s). A stale citation is rewritten by ` +
-        "`pnpm parity:api:inlined:fix`; every other one is fixed at the constructor.",
+        "`pnpm parity:api:inlined:fix`; every other one is fixed at the tagged member.",
     );
     return 1;
   }

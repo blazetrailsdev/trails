@@ -31,6 +31,33 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actionview:template/template_test.rb › TestERBTemplate › no magic comment word with utf 8": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'template/template_test.rb:150 `render.encoding` is Encoding::UTF_8 — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+    },
+  ],
+  "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › simple query string": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: "assert_nil",
+      reason:
+        'dispatch/param_builder_test.rb:15 `result` is a HashWithIndifferentAccess; trails params are a null-prototype plain object, so the port asserts the prototype is null (packages/actionpack/CLAUDE.md, "Request params are a null-prototype plain object")',
+    },
+  ],
+  "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › nested parameters": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: "assert_nil",
+      reason:
+        'dispatch/param_builder_test.rb:21 `result[:foo]` is a HashWithIndifferentAccess; trails params are a null-prototype plain object, so the port asserts the prototype is null (packages/actionpack/CLAUDE.md, "Request params are a null-prototype plain object")',
+    },
+  ],
   "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a browser":
     [
       {
@@ -372,6 +399,30 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         as: "assert_nil",
         reason:
           "safe_buffer_test.rb:195 `assert_kind_of NilClass` — JS `null` is not an instance of any class, and nil is NilClass's only instance, so the check is `assert_nil`",
+      },
+    ],
+  "actiondispatch:dispatch/routing_test.rb › TestUrlGenerationErrors › URL helpers raise message with mixed parameters when generation fails":
+    [
+      {
+        kind: "assert_raises",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/routing_test.rb:4966-4977 `{ id: nil, "id" => "url-tested" }`, in the call and in the expected message — a Ruby Symbol is a JS string, so a JS object cannot hold both `:id` and `"id"` (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`"; packages/actionpack/CLAUDE.md, "A `null` positional keeps its url-helper slot")',
+      },
+      {
+        kind: "assert_match",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/routing_test.rb:4966-4977 `{ id: nil, "id" => "url-tested" }`, in the call and in the expected message — a Ruby Symbol is a JS string, so a JS object cannot hold both `:id` and `"id"` (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`"; packages/actionpack/CLAUDE.md, "A `null` positional keeps its url-helper slot")',
+      },
+      {
+        kind: "assert_match",
+        value: null,
+        as: null,
+        reason:
+          'dispatch/routing_test.rb:4966-4977 `{ id: nil, "id" => "url-tested" }`, in the call and in the expected message — a Ruby Symbol is a JS string, so a JS object cannot hold both `:id` and `"id"` (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`"; packages/actionpack/CLAUDE.md, "A `null` positional keeps its url-helper slot")',
       },
     ],
   "actioncontroller:controller/routing_test.rb › LegacyRouteSetTests › id encoding": [

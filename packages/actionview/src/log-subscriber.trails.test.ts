@@ -111,12 +111,12 @@ describe("ActionView::LogSubscriber", () => {
   it("appends the cache hit or miss to a partial render", () => {
     Notifications.instrument(
       "render_partial.action_view",
-      { identifier: "/srv/app/app/views/test/_customer.tse", cache_hit: ":hit" },
+      { identifier: "/srv/app/app/views/test/_customer.tse", cache_hit: "hit" },
       () => undefined,
     );
     Notifications.instrument(
       "render_partial.action_view",
-      { identifier: "/srv/app/app/views/test/_customer.tse", cache_hit: ":miss" },
+      { identifier: "/srv/app/app/views/test/_customer.tse", cache_hit: "miss" },
       () => undefined,
     );
 

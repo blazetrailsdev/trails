@@ -131,7 +131,7 @@ import {
   type ArityRange,
 } from "./arity.js";
 import { isNestedConstructorHomonym, matchParamNamesAgainst } from "./param-names.js";
-import { dropsBlock } from "./block-params.js";
+import { GENERATOR_BLOCK, dropsBlock, isInternalGenerator } from "./block-params.js";
 import {
   ARITY_EXCLUDE_PATH,
   arityExcludeKeyOf,
@@ -194,6 +194,7 @@ import {
   inlinedRubyCallArgs,
   inlinedRubySkeleton,
   inlinedSegments,
+  inlinedMethodSegments,
   portsSiblingClass,
   isInitializeLessTaggedClass,
   moduleAncestors,
@@ -3999,12 +4000,14 @@ export function dedupeRubyMethodInto(
   klass = false,
   pkg?: string,
 ): void {
-  const tsMirrorNames = rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile);
+  const tsMirrorNames =
+    rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile, pkg);
   if (tsMirrorNames === null && rubyMethodToTsForFqn(itemFqn, rm.name, undefined, pkg) === null) {
     return;
   }
   if (isRubyOnlyClass(itemFqn)) return;
-  if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile)) return;
+  if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile, pkg))
+    return;
   const level = rubyOwnerSeat(itemFqn, klass);
   const key = rubyLevelKey(level, rm.name);
   if (!seen.has(key)) {
@@ -4104,12 +4107,12 @@ function rubyDefinitionBucket(
   seen: Set<string>,
   pkg: string,
 ): DenominatorBucket {
-  const tsMirrorNames = scopedSkipMirrorName(name, file);
+  const tsMirrorNames = scopedSkipMirrorName(name, file, pkg);
   if (tsMirrorNames === null && rubyMethodToTsForFqn(fqn, name, undefined, pkg) === null) {
     return OPERATORS.has(name) ? "operator" : "globalSkip";
   }
   if (isRubyOnlyClass(fqn)) return "rowlessFile";
-  if (tsMirrorNames === null && isScopedSkip(name, file)) return "scopedSkip";
+  if (tsMirrorNames === null && isScopedSkip(name, file, pkg)) return "scopedSkip";
   const key = rubyLevelKey(rubyOwnerSeat(fqn, klass), name);
   if (seen.has(key)) return "sameNameCollapse";
   seen.add(key);
@@ -4685,6 +4688,7 @@ export function main() {
       Map<string, Map<string, Map<string, string>>>
     >();
     const tsInlinedFromByFileOwner = new Map<string, Map<string, InlinedFrom[]>>();
+    const tsInlinedMethodTagsByFile = new Map<string, Map<string, InlinedFrom[]>>();
     const inlinedTagsCompared = new Set<string>();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
@@ -4814,6 +4818,7 @@ export function main() {
         const blockSigs = byName.get(m.name) ?? [];
         blockSigs.push(m.params);
         if (m.aliasParams) blockSigs.push(m.aliasParams);
+        if (isInternalGenerator(m)) blockSigs.push(GENERATOR_BLOCK);
         byName.set(m.name, blockSigs);
         tsBlockSigsByFileName.set(file, byName);
         const byOwner = tsBlockSigsByFileOwnerName.get(file) ?? new Map<string, ParamInfo[][]>();
@@ -4822,6 +4827,7 @@ export function main() {
           ...(byOwner.get(ownerKey) ?? []),
           m.params,
           ...(m.aliasParams ? [m.aliasParams] : []),
+          ...(isInternalGenerator(m) ? [GENERATOR_BLOCK] : []),
         ]);
         tsBlockSigsByFileOwnerName.set(file, byOwner);
       }
@@ -4879,6 +4885,10 @@ export function main() {
         const byOwner = tsInlinedFromByFileOwner.get(file) ?? new Map<string, InlinedFrom[]>();
         byOwner.set(owner, m.inlinedFrom);
         tsInlinedFromByFileOwner.set(file, byOwner);
+      } else if (m.inlinedFrom !== undefined && scope === "package" && declaredHere) {
+        const byKey = tsInlinedMethodTagsByFile.get(file) ?? new Map<string, InlinedFrom[]>();
+        byKey.set(`${owner}#${m.name}`, m.inlinedFrom);
+        tsInlinedMethodTagsByFile.set(file, byKey);
       }
       // A relative path is not unique across packages — activemodel and
       // activerecord both port attribute_methods.rb to attribute-methods.ts —
@@ -5604,7 +5614,30 @@ export function main() {
         rubyModule: string,
         level: OwnerSeat,
       ): MethodInfo[] => {
-        if (rubyName !== "initialize" || tsName !== "constructor") return [];
+        if (tsName !== "constructor") {
+          const byKey = tsInlinedMethodTagsByFile.get(tsFile);
+          if (byKey === undefined) return [];
+          const tsClass = resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
+          const key = `${tsClass}#${tsName}`;
+          const tags = byKey.get(key);
+          const includer = (rubyPkg.classes[rubyModule] ??
+            rubyPkg.modules[rubyModule]) as unknown as ClassInfo | undefined;
+          if (tags === undefined || includer === undefined) return [];
+          inlinedTagsCompared.add(`${tsFile} ${key}`);
+          const ancestors = moduleAncestors(includer, rubyModule, rubyPkg.modules, (incName, ctx) =>
+            resolveModuleName(incName, ctx, moduleFqnByShort),
+          );
+          return inlinedMethodSegments(
+            includer.instanceMethods.find((m) => m.name === rubyName),
+            taggedBodies(
+              ruby,
+              tags,
+              sameFileInitializeModules(includer, ancestors, rubyPkg.modules, rubyName),
+              `${pkg}/${tsFile} ${key}`,
+            ),
+          );
+        }
+        if (rubyName !== "initialize") return [];
         const klass = rubyPkg.classes[rubyModule] as unknown as ClassInfo | undefined;
         if (!klass) return [];
         const initializeOf = (fqn: string) =>
@@ -6440,17 +6473,17 @@ export function main() {
         }
 
         const creditedBy =
-          ownerIsModule && mixinFile === undefined && (rubyName === "initialize" || classMethodsNew)
+          ownerIsModule && mixinFile === undefined && (level === "instance" || classMethodsNew)
             ? inlinedHookCreditedBy(
                 classMethodsNew ? `${rubyModule}::ClassMethods` : rubyModule,
-                classMethodsNew ? "new" : "initialize",
+                classMethodsNew ? "new" : rubyName,
                 pkg,
                 moduleIncluderFiles.get(rubyModule) ?? new Set(),
                 tsInlinedHookTags,
               )
             : undefined;
         if (creditedBy !== undefined) {
-          checkBody(rubyName, "constructor", creditedBy.tsFile);
+          checkBody(rubyName, creditedBy.tsName, creditedBy.tsFile);
           fileMatched++;
           continue;
         }
@@ -6637,6 +6670,18 @@ export function main() {
         checkCalls("initialize", "constructor", expectedTs, fqn, "instance");
         checkCallArgs("initialize", "constructor", expectedTs, fqn, "instance");
       }
+      for (const [key, tags] of tsInlinedMethodTagsByFile.get(expectedTs) ?? []) {
+        if (inlinedTagsCompared.has(`${expectedTs} ${key}`)) continue;
+        const [owner, tsName] = key.split("#");
+        const rubyName = tags[0].hook;
+        const fqn = items.find(
+          (item) =>
+            resolveOwner(rubyName, tsName, expectedTs, item.fqn, "instance").tsClass === owner,
+        )?.fqn;
+        if (fqn === undefined) continue;
+        checkCalls(rubyName, tsName, expectedTs, fqn, "instance");
+        checkCallArgs(rubyName, tsName, expectedTs, fqn, "instance");
+      }
 
       const total = fileMatched + fileMissing;
       if (total === 0) continue;
@@ -6809,6 +6854,11 @@ export function main() {
     }
 
     const uncomparedInlined = uncomparedInlinedTags(tsInlinedFromByFileOwner, inlinedTagsCompared);
+    const uncomparedMethods = uncomparedInlinedTags(tsInlinedMethodTagsByFile, inlinedTagsCompared);
+    if (callsGate && uncomparedMethods.length > 0) {
+      const where = uncomparedMethods.map((key) => `${pkg}/${key}`).join(", ");
+      throw new Error(`@inlinedFrom was never compared, no Rails method paired: ${where}`);
+    }
     if (callsGate && uncomparedInlined.length > 0) {
       const where = uncomparedInlined.map((key) => `${pkg}/${key}#constructor`).join(", ");
       throw new Error(`@inlinedFrom was never compared, no Rails \`initialize\` paired: ${where}`);

@@ -29,7 +29,7 @@ export class MemoryStore extends Store implements CacheStore {
     return true;
   }
 
-  private data: Map<string, Entry | string> = new Map();
+  protected data: Map<string, Entry | string> = new Map();
   private maxSize: number;
   private maxPruneTime: number;
   private cacheSize: number;

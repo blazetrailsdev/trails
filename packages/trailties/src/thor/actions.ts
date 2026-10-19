@@ -10,7 +10,6 @@ import {
   Hash,
   hashDelete,
   included,
-  initialize,
   last,
   mergeBang,
   Module,
@@ -98,7 +97,7 @@ export const ClassMethods = {
 
   async sourceRoot(this: ActionsClassHost, path: string | null = null): Promise<string | null> {
     if (path != null) this._sourceRoot = path;
-    if (!Object.prototype.hasOwnProperty.call(this, "_sourceRoot")) this._sourceRoot = null;
+    if (!Object.hasOwn(this, "_sourceRoot")) this._sourceRoot = null;
     return this._sourceRoot ?? null;
   },
 
@@ -388,29 +387,6 @@ function _cleanupOptionsAndSet(
 export const Actions = new Module((mod) => {
   (mod as unknown as Record<symbol, unknown>)[included] = function (base: object): void {
     extend(base, ClassMethods);
-  };
-
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function* (
-    this: ActionsHost,
-    args: unknown[] = [],
-    options: unknown[] | Record<string, unknown> = {},
-    config: { behavior?: string | null; destinationRoot?: string | null } = {},
-  ): Generator<void, void, void> {
-    this.behavior = (() => {
-      switch (toS(config.behavior)) {
-        case "force":
-        case "skip":
-          this._cleanupOptionsAndSet(options, config.behavior!);
-          return "invoke";
-        case "revoke":
-          return "revoke";
-        default:
-          return "invoke";
-      }
-    })();
-
-    yield;
-    this.destinationRoot = config.destinationRoot as string;
   };
 
   mod.attrReader("behavior");

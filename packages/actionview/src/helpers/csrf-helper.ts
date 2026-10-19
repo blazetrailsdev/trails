@@ -1,5 +1,5 @@
 import { htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
-import { Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { tag, type TagHelperHost } from "./tag-helper.js";
 
 interface CsrfHelperHost extends TagHelperHost {
@@ -25,8 +25,7 @@ export function csrfMetaTags(this: CsrfHelperHost): SafeBuffer | null {
 
 export const csrfMetaTag = csrfMetaTags;
 
-export const CsrfHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { csrfMetaTags, csrfMetaTag });
-  });
-});
+export const CsrfHelper = {
+  csrfMetaTags,
+  csrfMetaTag,
+};

@@ -370,8 +370,8 @@ export class Session {
       }
     }
 
-    if (isPresent(wrappedHeaders.env)) {
-      Headers.fromHash(requestEnv).mergeBang(wrappedHeaders.env);
+    if (isPresent(wrappedHeaders)) {
+      Headers.fromHash(requestEnv).mergeBang(wrappedHeaders);
     }
     if (isPresent(options.env)) {
       Headers.fromHash(requestEnv).mergeBang(options.env!);
@@ -492,7 +492,7 @@ function openSession<T extends RunnerHost>(this: T, block?: (session: T) => void
   return session;
 }
 
-function getAssertions(this: RunnerHost): number {
+function assertions(this: RunnerHost): number {
   return this.rootSession
     ? this.rootSession.assertions
     : (Runner.superMethod(this, "assertions")!() as number);
@@ -639,7 +639,7 @@ export const Runner = new Module((mod) => {
   mod.moduleEval((m) => {
     Object.defineProperty(m, "integrationSession", { get: integrationSession, configurable: true });
     Object.defineProperty(m, "assertions", {
-      get: getAssertions,
+      get: assertions,
       set: setAssertions,
       configurable: true,
     });
@@ -686,8 +686,12 @@ export class IntegrationTest extends TestCase {
   routes: RouteSet = new RouteSet();
 
   /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
-  constructor(...args: ConstructorParameters<typeof TestCase>) {
-    super(...args);
+  constructor(
+    ...args:
+      | ConstructorParameters<typeof TestCase>
+      | [...ConstructorParameters<typeof TestCase>, () => unknown]
+  ) {
+    super(...(args as ConstructorParameters<typeof TestCase>));
     this._routesOverride = undefined;
     this._integrationSession = null;
   }

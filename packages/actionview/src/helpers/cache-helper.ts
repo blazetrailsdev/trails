@@ -10,7 +10,6 @@ import type { OutputBuffer } from "../buffers.js";
 import { Digestor } from "../digestor.js";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
-import { Module } from "@blazetrails/ruby-compat";
 
 export class UncacheableFragmentError extends Error {
   constructor(message: string) {
@@ -161,7 +160,7 @@ async function fragmentFor(
   } else {
     if (this.viewRenderer !== undefined)
       this.viewRenderer.cacheHits[this.currentTemplate?.virtualPath as string] = "miss";
-    return await writeFragmentFor.call(this, name, options, block);
+    return await writeFragmentFor.call(this, name, options, block!);
   }
 }
 
@@ -179,11 +178,9 @@ async function writeFragmentFor(
   this: CacheHelperHost,
   name: unknown,
   options: Record<string, unknown> | null | undefined,
-  block?: () => unknown,
+  block: () => unknown,
 ): Promise<unknown> {
-  const fragment: SafeBuffer = this.outputBuffer.capture(() => {
-    block?.();
-  });
+  const fragment: SafeBuffer = await this.outputBuffer.capture(block);
   return await this.controller.writeFragment(name, fragment, options ?? undefined);
 }
 
@@ -209,9 +206,13 @@ export const CachingRegistry = {
   },
 };
 
-export const CacheHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { cache, isCaching, uncacheableBang, cacheIf, cacheUnless });
-    Object.assign(m, { cacheFragmentName, digestPathFromTemplate, fragmentFor });
-  });
-});
+export const CacheHelper = {
+  cache,
+  isCaching,
+  uncacheableBang,
+  cacheIf,
+  cacheUnless,
+  cacheFragmentName,
+  digestPathFromTemplate,
+  fragmentFor,
+};

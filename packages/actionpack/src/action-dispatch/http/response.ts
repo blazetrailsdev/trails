@@ -227,20 +227,20 @@ export class RackBody {
 
   /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): Iterator<unknown> {
-    return (this.each() as Iterable<unknown>)[Symbol.iterator]();
+    const chunks: unknown[] = [];
+    this.each((chunk: unknown) => chunks.push(chunk));
+    return chunks[Symbol.iterator]();
   }
 
   /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
-    const stream = this._response.stream as Partial<AsyncIterable<unknown>> & {
-      each(): unknown;
-    };
+    const stream = this._response.stream as Partial<AsyncIterable<unknown>>;
     this._response.sendingBang();
     if (typeof stream[Symbol.asyncIterator] === "function") {
       for await (const chunk of stream as AsyncIterable<unknown>)
         yield chunk as string | Uint8Array;
     } else {
-      for (const chunk of stream.each() as Iterable<unknown>) yield chunk as string | Uint8Array;
+      for (const chunk of this._response.bodyParts()) yield chunk as string | Uint8Array;
     }
     this._response.sentBang();
   }
@@ -261,14 +261,11 @@ export class FileBody {
     return IO.binread(this.toPath());
   }
 
-  *each(): IterableIterator<string> {
-    const file = File.open(this.toPath(), "rb");
-    try {
+  each(block: (chunk: string) => unknown): void {
+    File.open(this.toPath(), "rb", (file) => {
       let chunk: string | null;
-      while ((chunk = file.read(16384)) !== null) yield chunk;
-    } finally {
-      file.close();
-    }
+      while ((chunk = file.read(16384)) !== null) block(chunk);
+    });
   }
 }
 
@@ -518,9 +515,8 @@ export class Response {
   }
 
   bodyParts(): unknown[] {
-    const stream = this.stream as { each(): unknown };
     const parts: unknown[] = [];
-    for (const chunk of stream.each() as Iterable<unknown>) parts.push(chunk);
+    (this.stream as { each(block: (x: unknown) => unknown): unknown }).each((x) => parts.push(x));
     return parts;
   }
 

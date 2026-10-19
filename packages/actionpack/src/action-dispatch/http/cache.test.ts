@@ -21,33 +21,33 @@ const res = (h: Record<string, string> = {}): Response => new Response(200, h);
 
 describe("Cache::Request", () => {
   it("not_modified? compares If-Modified-Since to modified_at", () => {
-    const r = req({ "If-Modified-Since": "Sun, 06 Nov 1994 08:49:37 GMT" });
+    const r = req({ HTTP_IF_MODIFIED_SINCE: "Sun, 06 Nov 1994 08:49:37 GMT" });
     expect(notModified.call(r, new Date("1994-11-06T08:49:36Z"))).toBe(true);
     expect(notModified.call(r, new Date("1994-11-06T08:49:38Z"))).toBe(false);
   });
 
   it("if_modified_since parses RFC 2822 numeric zone offsets (Time.rfc2822 parity)", () => {
-    const r = req({ "If-Modified-Since": "Sun, 06 Nov 1994 03:49:37 -0500" });
+    const r = req({ HTTP_IF_MODIFIED_SINCE: "Sun, 06 Nov 1994 03:49:37 -0500" });
     expect(notModified.call(r, new Date("1994-11-06T08:49:36Z"))).toBe(true);
   });
 
   it("if_modified_since rejects malformed values (no permissive Date.parse fallback)", () => {
-    const r = req({ "If-None-Match": '"abc"', "If-Modified-Since": "yesterday" });
+    const r = req({ HTTP_IF_NONE_MATCH: '"abc"', HTTP_IF_MODIFIED_SINCE: "yesterday" });
     expect(fresh.call(r, { etag: '"abc"' })).toBe(true);
     expect(notModified.call(r, new Date("1994-11-06T08:49:36Z"))).toBe(false);
   });
 
   it("etag_matches? handles list and wildcard", () => {
-    expect(etagMatches.call(req({ "If-None-Match": '"a", "b"' }), '"a"')).toBe(true);
-    expect(etagMatches.call(req({ "If-None-Match": "*" }), '"x"')).toBe(true);
+    expect(etagMatches.call(req({ HTTP_IF_NONE_MATCH: '"a", "b"' }), '"a"')).toBe(true);
+    expect(etagMatches.call(req({ HTTP_IF_NONE_MATCH: "*" }), '"x"')).toBe(true);
     expect(etagMatches.call(req(), '"a"')).toBe(false);
   });
 
   it("fresh? requires both validators when both sent", () => {
     expect(fresh.call(req(), {})).toBe(false);
     const r = req({
-      "If-Modified-Since": "Sun, 06 Nov 1994 08:49:37 GMT",
-      "If-None-Match": '"abc"',
+      HTTP_IF_MODIFIED_SINCE: "Sun, 06 Nov 1994 08:49:37 GMT",
+      HTTP_IF_NONE_MATCH: '"abc"',
     });
     expect(fresh.call(r, { etag: '"abc"', lastModified: new Date("1994-11-06T08:49:36Z") })).toBe(
       true,

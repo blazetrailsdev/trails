@@ -218,16 +218,6 @@ describe("RequestHeaderEnvAccess", () => {
     const req = new Request({});
     expect(req.fetchHeader("missing", () => "fallback")).toBe("fallback");
   });
-
-  it("getHeader maps HTTP-style names to HTTP_* env keys", () => {
-    const req = new Request({ HTTP_IF_NONE_MATCH: '"abc"' });
-    expect(req.getHeader("If-None-Match")).toBe('"abc"');
-  });
-
-  it("getHeader maps CGI-variable names without HTTP_ prefix", () => {
-    const req = new Request({ CONTENT_TYPE: "text/html" });
-    expect(req.getHeader("Content-Type")).toBe("text/html");
-  });
 });
 
 describe("RequestFilterParameters", () => {

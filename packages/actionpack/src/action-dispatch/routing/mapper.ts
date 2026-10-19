@@ -18,7 +18,6 @@ import {
   isBlank,
   isPlainObject,
   isPresent,
-  kernelArray,
   pluralize,
   reverseMergeBang,
   singularize,
@@ -37,6 +36,7 @@ import {
   include,
   Module,
   RFC2396_PARSER,
+  rbFArray,
   rbInspect,
   RuntimeError,
   rbFPublicSend,
@@ -46,6 +46,10 @@ import {
   rbObjRespondTo,
   rtest,
   stringSplit,
+  Thread,
+  rbIterBreakValue,
+  rbBlockGivenP,
+  type Block,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -80,7 +84,7 @@ export interface RouteOptions {
   name?: string | null | false;
   constraints?: RouteConstraints | CallableConstraint;
   defaults?: Record<string, string | null>;
-  format?: boolean;
+  format?: boolean | string | RegExp;
   as?: string | null | false;
   to?: string | MountableApp | Redirect;
   controller?: string | RegExp;
@@ -89,7 +93,7 @@ export interface RouteOptions {
   except?: ResourceAction | ResourceAction[];
   ip?: string | RegExp;
   redirect?: string | RedirectOptions | RedirectFunction;
-  pathNames?: { new?: string; edit?: string };
+  pathNames?: Record<string, string>;
   anchor?: boolean;
   shallow?: boolean;
   internal?: boolean;
@@ -116,7 +120,8 @@ type ConcernCallback = (mapper: Mapper, options: Record<string, unknown>) => voi
 type ConcernCallable =
   | ConcernCallback
   | { call(mapper: Mapper, options: Record<string, unknown>): void };
-type MapMethodArgs = (string | RouteOptions | Record<string, unknown>)[];
+type MapMethodArg = string | RouteOptions | Record<string, unknown>;
+type MapMethodArgs = MapMethodArg[] | [...MapMethodArg[], Block<unknown>];
 
 const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
   "as",
@@ -130,7 +135,7 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
 
 /** @internal */
 export class Resource {
-  static defaultActions(apiOnly: boolean): ResourceAction[] {
+  static defaultActions(apiOnly: boolean | null): ResourceAction[] {
     if (apiOnly) {
       return ["index", "create", "show", "update", "destroy"];
     } else {
@@ -145,13 +150,18 @@ export class Resource {
   protected _as: string | null | false | undefined;
   protected _options: RouteOptions;
   protected _shallow: boolean;
-  protected _apiOnly: boolean;
+  protected _apiOnly: boolean | null;
   protected _only: ResourceAction | ResourceAction[] | null;
   protected _except: ResourceAction | ResourceAction[] | null;
   protected _plural: string | undefined;
   protected _singular: string | undefined;
 
-  constructor(entities: string, apiOnly: boolean, shallow: boolean, options: RouteOptions = {}) {
+  constructor(
+    entities: string,
+    apiOnly: boolean | null,
+    shallow: boolean,
+    options: RouteOptions = {},
+  ) {
     if (String(options.param ?? "").includes(":")) {
       throw new ArgumentError(":param option can't contain colons");
     }
@@ -183,7 +193,7 @@ export class Resource {
 
   actions(): ResourceAction[] {
     if (this._except != null) {
-      const except = kernelArray(this._except);
+      const except = rbFArray(this._except) as ResourceAction[];
       return this.availableActions().filter((a) => !except.includes(a));
     } else {
       return this.availableActions();
@@ -192,7 +202,7 @@ export class Resource {
 
   availableActions(): ResourceAction[] {
     if (this._only != null) {
-      return kernelArray(this._only);
+      return rbFArray(this._only) as ResourceAction[];
     } else {
       return this.defaultActions();
     }
@@ -265,7 +275,7 @@ export class Resource {
 
 /** @internal */
 export class SingletonResource extends Resource {
-  static override defaultActions(apiOnly: boolean): ResourceAction[] {
+  static override defaultActions(apiOnly: boolean | null): ResourceAction[] {
     if (apiOnly) {
       return ["show", "create", "update", "destroy"];
     } else {
@@ -273,7 +283,7 @@ export class SingletonResource extends Resource {
     }
   }
 
-  constructor(entities: string, apiOnly: boolean, shallow: boolean, options: RouteOptions) {
+  constructor(entities: string, apiOnly: boolean | null, shallow: boolean, options: RouteOptions) {
     super(entities, apiOnly, shallow, options);
     this._as = null;
     this.controller = String(rtest(options.controller) ? options.controller : this.plural());
@@ -324,6 +334,7 @@ interface RouteSetLike {
   requestClass(): { prototype: object };
   addUrlHelper: RouteSet["addUrlHelper"];
   addPolymorphicMapping: RouteSet["addPolymorphicMapping"];
+  isApiOnly(): boolean | null;
 }
 
 /** @internal */
@@ -450,7 +461,7 @@ export class Mapping {
   private readonly _blocks: readonly unknown[];
   private readonly _anchor: boolean;
   private readonly _via: readonly string[];
-  private readonly _formatted: boolean | undefined;
+  private readonly _formatted: boolean | string | RegExp | undefined;
   private readonly _internal: boolean | undefined;
   private readonly _conditions: Record<string, unknown>;
 
@@ -462,7 +473,7 @@ export class Mapping {
     defaultAction: string | undefined,
     to: unknown,
     via: readonly string[],
-    formatted: boolean | undefined,
+    formatted: boolean | string | RegExp | undefined,
     optionsConstraints: unknown,
     anchor: boolean,
     options: Record<string, unknown>,
@@ -503,7 +514,7 @@ export class Mapping {
     return via;
   }
 
-  static normalizePath(path: string, format: boolean | undefined): string {
+  static normalizePath(path: string, format: boolean | string | RegExp | undefined): string {
     path = Mapper.normalizePath(path);
 
     if (format === true) {
@@ -515,7 +526,7 @@ export class Mapping {
     }
   }
 
-  static optionalFormat(path: string, format: boolean | undefined): boolean {
+  static optionalFormat(path: string, format: boolean | string | RegExp | undefined): boolean {
     return format !== false && !Mapping.OPTIONAL_FORMAT_REGEX.test(path);
   }
 
@@ -537,7 +548,7 @@ export class Mapping {
     controller: string | RegExp | undefined;
     defaultAction: string | undefined;
     to: unknown;
-    formatted: boolean | undefined;
+    formatted: boolean | string | RegExp | undefined;
     via: readonly string[];
     optionsConstraints: unknown;
     anchor: boolean;
@@ -890,15 +901,14 @@ export class Mapping {
   private routeSourceLocation(): string | null | undefined {
     if (Mapper.routeSourceLocations) {
       const actionDispatchDir = File.dirname(File.dirname(callerLocations(0, 1)[0].path));
-      for (const location of callerLocations(1)) {
-        if (location.path.startsWith(actionDispatchDir)) continue;
+      return Thread.eachCallerLocation<string>((location) => {
+        if (location.path.startsWith(actionDispatchDir)) return;
 
         const cleanedPath = Mapper.backtraceCleaner.cleanFrame(location.path);
-        if (cleanedPath == null) continue;
+        if (cleanedPath == null) return;
 
-        return `${cleanedPath}:${location.lineno}`;
-      }
-      return null;
+        rbIterBreakValue(`${cleanedPath}:${location.lineno}`);
+      });
     }
   }
 }
@@ -1073,8 +1083,6 @@ export class Mapper {
   _drawPaths: string[];
   /** @internal */
   _scope: Scope;
-  /** @internal */
-  _apiOnly = false;
 
   constructor(set: RouteSetLike) {
     this._set = set;
@@ -1452,8 +1460,11 @@ export class Mapper {
 
   match(
     path: string | Record<string, unknown>,
-    ...rest: (string | (RouteOptions & { via?: string | string[] }))[]
+    ...rest:
+      | (string | (RouteOptions & { via?: string | string[] }))[]
+      | [...(string | (RouteOptions & { via?: string | string[] }))[], Block<unknown>]
   ): void {
+    if (rest.length > 0 && (rest.at(-1) === undefined || rbBlockGivenP(rest.at(-1)))) rest.pop();
     let options: Record<string, unknown>;
     let paths: string[];
     if (rest.length === 0 && isPlainObject(path)) {
@@ -1506,10 +1517,16 @@ export class Mapper {
   }
 
   /** @internal */
-  mapMethod(method: string | string[], args: MapMethodArgs): this {
-    const options = extractOptionsBang(args);
+  mapMethod(
+    method: string | string[],
+    args: MapMethodArgs,
+    block: Block<unknown> | undefined = rbBlockGivenP(args.at(-1))
+      ? (args.pop() as Block<unknown>)
+      : undefined,
+  ): this {
+    const options = extractOptionsBang(args as MapMethodArg[]);
     options[args.length === 0 ? ":via" : "via"] = method;
-    this.match(...(args as [string]), options as RouteOptions);
+    this.match(...(args as [string]), options as RouteOptions, block!);
     return this;
   }
 
@@ -1655,7 +1672,7 @@ export class Mapper {
     options: RouteOptions & {
       via?: string | string[];
       on?: string;
-      format?: boolean;
+      format?: boolean | string | RegExp;
       anchor?: boolean;
       path?: string;
     },
@@ -1687,12 +1704,13 @@ export class Mapper {
     let to = options.to;
     delete options.to;
     const via = Mapping.checkVia(
-      kernelArray(
+      rbFArray(
         "via" in options ? options.via : (this._scope.get("via") as string | string[] | undefined),
-      ),
+      ) as string[],
     );
     delete options.via;
-    const formatted = options.format ?? (this._scope.get("format") as boolean | undefined);
+    const formatted =
+      options.format ?? (this._scope.get("format") as boolean | string | RegExp | undefined);
     delete options.format;
     const anchor = options.anchor ?? true;
     delete options.anchor;
@@ -1767,7 +1785,7 @@ export class Mapper {
     _path: string | undefined,
     to: string | MountableApp | Redirect | undefined,
     via: string[],
-    formatted: boolean | undefined,
+    formatted: boolean | string | RegExp | undefined,
     anchor: boolean,
     optionsConstraints: RouteOptions["constraints"],
   ): void {
@@ -1827,7 +1845,9 @@ export class Mapper {
     this._set.addUrlHelper(name, options, block);
   }
 
-  resolve(...args: unknown[]): void {
+  resolve(
+    ...args: unknown[] | [...unknown[], Parameters<RouteSet["addPolymorphicMapping"]>[2]]
+  ): void {
     if (!this._scope.isRoot()) {
       throw new RuntimeError("The resolve method can't be used inside a routes scope block");
     }
@@ -1850,7 +1870,7 @@ export class Mapper {
     _path: string | undefined,
     to: string | MountableApp | Redirect | undefined,
     via: string[],
-    formatted: boolean | undefined,
+    formatted: boolean | string | RegExp | undefined,
     anchor: boolean,
     optionsConstraints: RouteOptions["constraints"],
   ): void {
@@ -2188,8 +2208,8 @@ export class Mapper {
   }
 
   /** @internal */
-  isApiOnly(): boolean {
-    return this._apiOnly;
+  isApiOnly(): boolean | null {
+    return this._set.isApiOnly();
   }
 
   /** @internal */

@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { assertCalledWith } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
+import { assertResponse } from "../../action-dispatch/testing/assertions/response.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 
@@ -259,7 +261,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("notAuthorized", makeRequest(), makeResponse());
-    expect(c.status).toBe(403);
+    assertResponse.call(c, "forbidden");
   });
 
   it("rescue handler string", async () => {
@@ -276,7 +278,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(403);
+    assertResponse.call(c, "forbidden");
   });
 
   it("rescue handler with argument", async () => {
@@ -285,16 +287,14 @@ describe("RescueControllerTest", () => {
       async action() {
         throw new RecordInvalid("invalid record");
       }
+
+      showErrors(_exception: Error): void {}
     }
-    let caughtError: Error | null = null;
-    C.rescueFrom(RecordInvalid, {
-      with: (err: Error) => {
-        caughtError = err;
-      },
-    });
+    C.rescueFrom(RecordInvalid, { with: "showErrors" });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(caughtError).toBeInstanceOf(RecordInvalid);
+    await assertCalledWith(c, "showErrors", [Error], {}, async () => {
+      await c.dispatch("action", makeRequest(), makeResponse());
+    });
   });
 
   it("rescue handler with argument as string", async () => {
@@ -303,16 +303,14 @@ describe("RescueControllerTest", () => {
       async action() {
         throw new RecordInvalidStr("invalid");
       }
+
+      showErrors(_exception: Error): void {}
     }
-    let caughtError: Error | null = null;
-    C.rescueFrom(RecordInvalidStr, {
-      with: (err: Error) => {
-        caughtError = err;
-      },
-    });
+    C.rescueFrom(RecordInvalidStr, { with: "showErrors" });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(caughtError).toBeInstanceOf(RecordInvalidStr);
+    await assertCalledWith(c, "showErrors", [Error], {}, async () => {
+      await c.dispatch("action", makeRequest(), makeResponse());
+    });
   });
 
   it("proc rescue handler", async () => {
@@ -329,7 +327,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(403);
+    assertResponse.call(c, "forbidden");
   });
 
   it("proc rescue handler as string", async () => {
@@ -346,7 +344,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(403);
+    assertResponse.call(c, "forbidden");
   });
 
   it("proc rescue handle with argument", async () => {
@@ -405,7 +403,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(502);
+    assertResponse.call(c, 502);
   });
 
   it("block rescue handler as string", async () => {
@@ -422,7 +420,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(502);
+    assertResponse.call(c, 502);
   });
 
   it("block rescue handler with argument", async () => {
@@ -487,7 +485,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(403);
+    assertResponse.call(c, "forbidden");
   });
 
   it("rescue when cause has more specific handler than wrapper", async () => {
@@ -510,7 +508,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(403);
+    assertResponse.call(c, "forbidden");
   });
 
   it("rescue when cause has handler, but wrapper doesn't", async () => {
@@ -528,7 +526,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(422);
+    assertResponse.call(c, "unprocessable_entity");
   });
 
   it("can rescue a ParseError", async () => {
@@ -549,7 +547,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(400);
+    assertResponse.call(c, "bad_request");
     expect(c.responseBody).toBe("parse error");
   });
 });
@@ -576,7 +574,7 @@ describe("ExceptionInheritanceRescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(204);
+    assertResponse.call(c, "no_content");
   });
 
   it("inheritance works", async () => {
@@ -594,7 +592,7 @@ describe("ExceptionInheritanceRescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(201);
+    assertResponse.call(c, "created");
   });
 });
 
@@ -620,7 +618,7 @@ describe("ControllerInheritanceRescueControllerTest", () => {
     });
     const c = new Child();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(410);
+    assertResponse.call(c, "gone");
   });
 
   it("second exception in child controller", async () => {
@@ -644,7 +642,7 @@ describe("ControllerInheritanceRescueControllerTest", () => {
     });
     const c = new Child();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(410);
+    assertResponse.call(c, "gone");
   });
 
   it("exception in parent controller", async () => {
@@ -662,7 +660,7 @@ describe("ControllerInheritanceRescueControllerTest", () => {
     class Child extends Parent {}
     const c = new Child();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.status).toBe(201);
+    assertResponse.call(c, "created");
   });
 });
 

@@ -184,6 +184,11 @@ export class Lease {
   }
 }
 
+const pendingCheckouts = new WeakMap<
+  Lease,
+  { connection: Promise<DatabaseAdapter>; holders: number }
+>();
+
 export class LeaseRegistry {
   private _map = new WeakMap<object, Lease>();
 
@@ -399,6 +404,7 @@ export class ConnectionPool implements ReapablePool {
     return false;
   }
 
+  /** @inventedArm if — CONVERGEABLE with-connection-pending-checkout-join-needs-ruling */
   async withConnection<T>(
     fn: (conn: DatabaseAdapter) => T | Promise<T>,
     options: { preventPermanentCheckout?: boolean } = {},
@@ -408,18 +414,30 @@ export class ConnectionPool implements ReapablePool {
     const stickyWas = lease.sticky;
     if (preventPermanentCheckout) lease.sticky = false;
 
-    if (lease.connection) {
+    const pending = pendingCheckouts.get(lease);
+    if (lease.connection && !pending) {
       try {
         return await fn(lease.connection);
       } finally {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
       }
     } else {
+      const checkout = pending ?? { connection: this.checkout(), holders: 0 };
+      if (!pending) {
+        pendingCheckouts.set(lease, checkout);
+        checkout.connection.catch(() => {
+          if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
+        });
+      }
+      checkout.holders++;
       try {
-        return await fn((lease.connection = await this.checkout()));
+        return await fn((lease.connection = await checkout.connection));
       } finally {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-        if (!lease.sticky) this.releaseConnection(lease);
+        if (--checkout.holders === 0) {
+          if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
+          if (!lease.sticky) this.releaseConnection(lease);
+        }
       }
     }
   }

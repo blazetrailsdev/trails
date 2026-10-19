@@ -18,6 +18,7 @@ import {
   rbCheckArrayType,
   rbFSend,
   rbModSingletonP,
+  rbObjDup,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import {
@@ -101,7 +102,7 @@ const EXCLUDE: Strategy = (list, action) => !(list ?? []).includes(action);
 const NULL: Strategy = () => true;
 
 function inherited(this: typeof Metal, subclass: typeof Metal): void {
-  subclass.middlewareStack = this.middlewareStack.dup();
+  subclass.middlewareStack = rbObjDup(this.middlewareStack);
 }
 
 export class Metal extends AbstractController {
@@ -120,10 +121,7 @@ export class Metal extends AbstractController {
     Object.defineProperty(this, "middlewareStack", {
       ...reader,
       get(this: typeof Metal) {
-        if (
-          !Object.prototype.hasOwnProperty.call(this, "__class_attr_middlewareStack") &&
-          !rbModSingletonP(this)
-        ) {
+        if (!Object.hasOwn(this, "__class_attr_middlewareStack") && !rbModSingletonP(this)) {
           inherited.call(Object.getPrototypeOf(this), this);
         }
         return reader.get!.call(this);

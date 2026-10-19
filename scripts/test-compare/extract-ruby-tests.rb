@@ -170,6 +170,12 @@ class LoopSymbolName < String; end
 
 LOOP_OPAQUE_HASH = Object.new.freeze
 
+def vendored_ruby_version
+  @vendored_ruby_version ||= JSON.parse(
+    File.read(File.join(SCRIPT_DIR, "..", "..", "vendor", "sources.lock.json"))
+  ).dig("sources", "ruby", "ref").delete_prefix("v").tr("_", ".")
+end
+
 def rack_release
   @rack_release ||= JSON.parse(
     File.read(File.join(SCRIPT_DIR, "..", "..", "vendor", "sources.lock.json"))
@@ -2108,6 +2114,10 @@ class TestExtractor
   def count_assertions_expanded(node, visiting, depth, scope)
     return 0 unless node.is_a?(Array)
 
+    if (arm = ruby_version_arm(node))
+      return count_assertions_expanded(arm[0], visiting, depth, scope)
+    end
+
     count = 0
     name = self_call_name(node)
     if name
@@ -2131,6 +2141,27 @@ class TestExtractor
 
     node.each { |child| count += count_assertions_expanded(child, visiting, depth, scope) if child.is_a?(Array) }
     count
+  end
+
+  RUBY_VERSION_OPERATORS = %i[>= > <= < == !=].freeze
+
+  def ruby_version_arm(node)
+    return nil unless %i[if unless elsif].include?(node[0])
+    taken = ruby_version_condition(node[1])
+    return nil if taken.nil?
+    taken = !taken if node[0] == :unless
+    arm = taken ? node[2] : node[3]
+    arm = arm[1] if arm.is_a?(Array) && arm[0] == :else
+    [arm]
+  end
+
+  def ruby_version_condition(cond)
+    return nil unless cond.is_a?(Array) && cond[0] == :binary && RUBY_VERSION_OPERATORS.include?(cond[2])
+    lhs, rhs = cond[1], cond[3]
+    return nil unless lhs.is_a?(Array) && lhs[0] == :var_ref && lhs[1] == [:@const, "RUBY_VERSION", lhs[1][2]]
+    return nil unless rhs.is_a?(Array) && rhs[0] == :string_literal && rhs[1].is_a?(Array) &&
+                      rhs[1].length == 2 && rhs[1][1][0] == :@tstring_content
+    vendored_ruby_version.public_send(cond[2], rhs[1][1][1])
   end
 
   # Name of an implicit-`self` call (fcall/vcall/command) at this node, else nil.
@@ -2373,6 +2404,10 @@ class TestExtractor
   def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args, scope, pending_never = false)
     return unless node.is_a?(Array)
 
+    if (arm = ruby_version_arm(node))
+      return collect_assertion_kinds_expanded(arm[0], results, values, visiting, depth, nil, scope, false)
+    end
+
     if (rspec = rspec_expectation(node))
       kind, expect_node, matcher_args = rspec
       (@rspec_expects ||= {}.compare_by_identity)[expect_node] = true
@@ -2583,6 +2618,10 @@ class TestExtractor
     case node[0]
     when :string_literal
       extract_string_content(node)
+    when :string_concat
+      left = traverse_for_string(node[1])
+      right = traverse_for_string(node[2])
+      left && right ? left + right : nil
     when :@tstring_content
       node[1]
     else
