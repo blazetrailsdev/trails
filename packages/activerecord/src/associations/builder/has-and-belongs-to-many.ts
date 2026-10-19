@@ -115,7 +115,7 @@ export class HasAndBelongsToMany {
   }
 
   private tableName(): string {
-    if (this.options.joinTable) {
+    if (this.options.joinTable != null && this.options.joinTable !== false) {
       return String(this.options.joinTable);
     } else {
       const className = fetch<unknown>(
