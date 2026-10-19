@@ -65,7 +65,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @noRailsEquivalent CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
   syncWrite(records: Base[]): void {
-    for (const val of records) (this as any).raiseOnTypeMismatchBang(val);
+    for (const val of records) this.raiseOnTypeMismatchBang(val);
     if (
       (this.owner as { isPersisted?: () => boolean }).isPersisted?.() ||
       this.isFindTarget() ||
@@ -112,22 +112,18 @@ export abstract class CollectionAssociation extends Association {
       indexed = indexBy<Base, string>(
         await klass.where(new Map([[primaryKey, ids]])).toArray(),
         (record) =>
-          String(
-            (primaryKey as string[]).map((primaryKey) =>
-              (record as any)._readAttribute(primaryKey),
-            ),
-          ),
+          String((primaryKey as string[]).map((primaryKey) => record._readAttribute(primaryKey))),
       );
     } else {
       indexed = indexBy<Base, string>(
         await klass.where({ [primaryKey as string]: ids }).toArray(),
-        (record) => String((record as any)._readAttribute(primaryKey)),
+        (record) => String(record._readAttribute(primaryKey as string)),
       );
     }
     const records = compact(valuesAt(indexed, ...ids.map(String)));
 
     if (records.length !== ids.length) {
-      const foundIds = records.map((record) => String((record as any)._readAttribute(primaryKey)));
+      const foundIds = records.map((record) => String(record._readAttribute(primaryKey as string)));
       const notFoundIds = ids.filter((id) => !foundIds.includes(String(id)));
       klass
         .all()
@@ -232,9 +228,9 @@ export abstract class CollectionAssociation extends Association {
     block?: (record: Base) => void,
   ): Promise<boolean> {
     if (raise) {
-      return !!(await (record as any).saveBang({ validate }, block));
+      return !!(await record.saveBang({ validate }, block));
     } else {
-      return !!(await (record as any).save({ validate }, block));
+      return !!(await record.save({ validate }, block));
     }
   }
 
@@ -288,7 +284,7 @@ export abstract class CollectionAssociation extends Association {
     let result = true;
 
     const addRecord = (record: Base): Promise<boolean> | boolean => {
-      (this as any).raiseOnTypeMismatchBang(record);
+      this.raiseOnTypeMismatchBang(record);
       let inserted = true;
       const added = this.addToTarget(record, {}, () => {
         if (this.owner.isNewRecord() || !result) return;
@@ -392,7 +388,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns */
   replace(otherArray: Base[]): Promise<Base[] | undefined> | Base[] {
-    for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
+    for (const val of otherArray) this.raiseOnTypeMismatchBang(val);
     const replaceAgainst = (originalTarget: Base[]): Promise<Base[] | undefined> | Base[] => {
       if (this.owner.isNewRecord()) {
         return replaceRecords(this, otherArray, originalTarget);
@@ -555,7 +551,7 @@ export abstract class CollectionAssociation extends Association {
     const coerced = this.coerceToRecords(records);
     const remove = (coerced: Base[]): Promise<Base[] | undefined> | Base[] | undefined => {
       const resolved = (coerced as unknown[]).flat(Infinity) as Base[];
-      for (const record of resolved) (this as any).raiseOnTypeMismatchBang(record);
+      for (const record of resolved) this.raiseOnTypeMismatchBang(record);
       const existingRecords = resolved.filter((r) => !r.isNewRecord());
       if (existingRecords.length === 0) {
         const removed = this.removeRecords(existingRecords, resolved, method ?? "");
@@ -580,7 +576,7 @@ export abstract class CollectionAssociation extends Association {
     const isId = (r: Base | number | string | bigint): r is number | string | bigint =>
       typeof r === "number" || typeof r === "string" || typeof r === "bigint";
     if (!records.some(isId)) return records as Base[];
-    const ids = records.map((r) => (isId(r) ? r : (r as any).id));
+    const ids = records.map((r) => (isId(r) ? r : r.id));
     return this.find(...ids).then((found) => (Array.isArray(found) ? found : found ? [found] : []));
   }
 
@@ -662,10 +658,10 @@ export abstract class CollectionAssociation extends Association {
 
     if (ids.length === 1) {
       const id = ids[0];
-      const record = (await this.loadTarget()).find((r) => id === String((r as any).id));
+      const record = (await this.loadTarget()).find((r) => id === String(r.id));
       return expectsArray ? [record] : record;
     } else {
-      return (await this.loadTarget()).filter((r) => ids.includes(String((r as any).id)));
+      return (await this.loadTarget()).filter((r) => ids.includes(String(r.id)));
     }
   }
 
@@ -696,7 +692,7 @@ export abstract class CollectionAssociation extends Association {
       if (index !== -1) {
         target[index] = record;
       } else if (this._wasLoaded || !this.isLoaded()) {
-        (this as any)._associationIds = null;
+        this._associationIds = null;
         target.push(record);
       }
       if (!skipCallbacks) this.callback("afterAdd", record);
@@ -813,7 +809,7 @@ export interface CallbackHost {
 export function callback(this: CallbackHost, method: string, record: Base): void {
   for (const cb of this.callbacksFor(method)) {
     if (typeof cb !== "function") continue;
-    (cb as any)(method, this.owner, record);
+    cb(method, this.owner, record);
   }
 }
 

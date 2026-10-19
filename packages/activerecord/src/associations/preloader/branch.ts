@@ -173,10 +173,7 @@ export class Branch {
         this.association!,
       );
 
-      if (
-        (polymorphicParent && !reflection) ||
-        !(record as any).association(this.association!).klass
-      ) {
+      if ((polymorphicParent && !reflection) || !record.association(this.association!).klass) {
         continue;
       }
 
@@ -191,12 +188,12 @@ export class Branch {
   ): Association[] {
     return [
       ...groupBy(reflectionRecords, (record) => {
-        const klass: typeof Base = (record as any).association(this.association!).klass;
+        const klass: typeof Base = record.association(this.association!).klass;
 
         let reflectionScope: any;
         if (reflection.scope != null && reflection.scope.length !== 0) {
-          reflectionScope = (reflection as any)
-            .joinScopes(klass.arelTable, (klass as any).predicateBuilder, klass, record)
+          reflectionScope = reflection
+            .joinScopes(klass.arelTable, klass.predicateBuilder, klass, record)
             .reduce((memo: any, scope: any) => memo.mergeBang(scope));
         }
 
