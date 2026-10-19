@@ -266,7 +266,7 @@ describe("inlinedFromFindings", () => {
         },
       },
     } as unknown as ApiManifest;
-    const findings = inlinedFromFindings(ruby, ts);
+    const findings = inlinedFromFindings(ruby, ts, []);
     expect(findings.map((f) => f.fix)).toEqual([
       {
         cited: "rails/v7.1.0/activerecord/lib/active_record/core.rb:460-470",
@@ -299,11 +299,14 @@ describe("inlinedFromFindings", () => {
       "actioncontroller",
       "actiondispatch",
       "actionview",
+      "activerecord",
       "activejob",
       "activesupport",
       "i18n",
       "rack",
       "rack-test",
+      "thor",
+      "trailties",
     ]);
   });
 

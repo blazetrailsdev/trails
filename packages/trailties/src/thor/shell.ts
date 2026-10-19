@@ -1,12 +1,4 @@
-import {
-  env,
-  initialize,
-  Module,
-  RbConfig,
-  rbConstGet,
-  rbEnsure,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { env, Module, RbConfig, rbConstGet, rbEnsure } from "@blazetrails/ruby-compat";
 import { Basic } from "./shell/basic.js";
 import { Color } from "./shell/color.js";
 
@@ -154,16 +146,6 @@ function _sharedConfiguration(this: Shell): Record<string, unknown> {
 
 export const Shell = new Module((mod) => {
   Object.assign(mod, { SHELL_DELEGATED_METHODS, Basic, Color });
-
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
-    this: Shell,
-    args: unknown[] = [],
-    options: unknown = {},
-    config: { shell?: Basic | null } = {},
-  ) {
-    this.shell = config.shell as Basic;
-    if (rbObjRespondTo(this.shell, "base")) this.shell.base ||= this as never;
-  };
 
   mod.moduleEval((m) => {
     Object.defineProperty(m, "shell", { get: shell, set: setShell, configurable: true });

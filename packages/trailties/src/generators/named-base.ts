@@ -6,7 +6,7 @@ import {
   humanize,
   upcaseFirst,
 } from "@blazetrails/activesupport";
-import { compact, initializeIncludedModules, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { compact, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "@blazetrails/activerecord";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
@@ -36,10 +36,6 @@ export class NamedBase extends GeneratorBase {
     this.name = options.name;
     this.assignNamesBang(this.name);
     this.attributes = (options.attributes ?? []).map((a) => GeneratedAttribute.parse(a));
-    initializeIncludedModules(this, [], this.options, {
-      behavior: options.behavior,
-      destinationRoot: options.cwd,
-    });
   }
 
   singularName = (): string => this.fileName;

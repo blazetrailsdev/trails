@@ -4,10 +4,10 @@ import type { ValueType } from "@blazetrails/activemodel";
 
 type FixtureRow = Record<string, unknown>;
 
-interface EncryptedFixtureHost {
+export interface EncryptedFixtureHost {
   cleanValues: Record<string, unknown>;
-  encryptFixtureData(fixture: FixtureRow, modelClass: FixtureModelClass): void;
-  processPreservedOriginalColumns(fixture: FixtureRow, modelClass: FixtureModelClass): void;
+  encryptFixtureData(fixture: FixtureRow, modelClass: unknown): void;
+  processPreservedOriginalColumns(fixture: FixtureRow, modelClass: unknown): void;
 }
 
 type FixtureModelClass = {
@@ -17,20 +17,6 @@ type FixtureModelClass = {
 } | null;
 
 export const EncryptedFixtures: Module = new Module((mod) => {
-  mod.defineMethod(
-    "initialize",
-    function (
-      this: EncryptedFixtureHost,
-      fixture: FixtureRow,
-      modelClass: FixtureModelClass,
-    ): unknown {
-      this.cleanValues = {};
-      this.encryptFixtureData(fixture, modelClass);
-      this.processPreservedOriginalColumns(fixture, modelClass);
-      return EncryptedFixtures.superMethod(this, "initialize")!(fixture, modelClass);
-    },
-  );
-
   /** @internal */
   mod.defineMethod(
     "encryptFixtureData",

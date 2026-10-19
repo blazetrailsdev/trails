@@ -259,33 +259,4 @@ describe("ControllerRuntimeTest", () => {
       ).toEqual(["Views: 1ms", "ActiveRecord: 2.0ms (0 queries, 0 cached)"]);
     });
   });
-
-  describe("initialize", () => {
-    it("seats dbRuntime to null on a fresh controller", () => {
-      class SeatController {
-        logger: { "info?": boolean } | null = null;
-        constructor() {
-          initializeIncludedModules(this);
-        }
-      }
-      include(SeatController as never, FakeInstrumentation);
-      include(SeatController as never, ControllerRuntime);
-
-      const controller = new SeatController() as SeatController & { dbRuntime: number | null };
-      expect(
-        typeof Object.getOwnPropertyDescriptor(
-          Object.getPrototypeOf(SeatController.prototype),
-          "dbRuntime",
-        )?.get,
-      ).toBe("function");
-      expect(controller.dbRuntime).toBe(null);
-      expect(Object.hasOwn(controller, "_dbRuntime")).toBe(true);
-
-      controller.dbRuntime = 1.5;
-      expect(Object.hasOwn(controller, "_dbRuntime")).toBe(true);
-      expect(new SeatController() as unknown as { dbRuntime: unknown }).toMatchObject({
-        dbRuntime: null,
-      });
-    });
-  });
 });

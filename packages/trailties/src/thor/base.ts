@@ -11,7 +11,6 @@ import {
   hashDelete,
   include,
   included,
-  initialize,
   last,
   max,
   NotImplementedError,
@@ -45,9 +44,7 @@ import type {
   ThorOptions,
 } from "./core-ext/hash-with-indifferent-access.js";
 import { Argument, type ArgumentOptions } from "./parser/argument.js";
-import { Arguments } from "./parser/arguments.js";
 import { Option, type OptionOptions } from "./parser/option.js";
-import { Options } from "./parser/options.js";
 import { Base as ThorBase, Shell } from "./shell.js";
 import type { Basic } from "./shell/basic.js";
 import { namespaceFromThorClass } from "./util.js";
@@ -82,7 +79,7 @@ export function deprecationWarning(message: string): void {
   }
 }
 
-type Relations = { exclusiveOptionNames?: string[][]; atLeastOneOptionNames?: string[][] };
+export type Relations = { exclusiveOptionNames?: string[][]; atLeastOneOptionNames?: string[][] };
 
 type RelationBlock = (this: BaseClass) => unknown;
 
@@ -193,64 +190,6 @@ export interface BaseClass {
 
 ThorBase.attrReader("options", "parentOptions", "args");
 ThorBase.attrWriter("options", "parentOptions", "args");
-
-(ThorBase as unknown as Record<symbol, unknown>)[initialize] = function (
-  this: Base,
-  args: unknown[] = [],
-  localOptions: unknown[] | Record<string, unknown> = {},
-  config: BaseConfig = {},
-): void {
-  const klass = this.constructor as unknown as BaseClass;
-  let parseOptions = klass.classOptions();
-
-  const commandOptions = hashDelete(config, "commandOptions") as Record<string, Option> | null;
-  if (rtest(commandOptions)) parseOptions = { ...parseOptions, ...commandOptions };
-
-  let arrayOptions: unknown[];
-  let hashOptions: Record<string, unknown>;
-  if (Array.isArray(localOptions)) {
-    arrayOptions = localOptions;
-    hashOptions = {};
-  } else {
-    arrayOptions = [];
-    hashOptions = localOptions;
-  }
-
-  const currentCommand = config.currentCommand ?? null;
-  const stopOnUnknown = klass.isStopOnUnknownOption(currentCommand);
-
-  const relations: Relations =
-    currentCommand == null
-      ? { exclusiveOptionNames: [], atLeastOneOptionNames: [] }
-      : currentCommand.optionsRelation;
-
-  klass.classExclusiveOptionNames().map((n) => relations.exclusiveOptionNames!.push(n));
-  klass.classAtLeastOneOptionNames().map((n) => relations.atLeastOneOptionNames!.push(n));
-
-  const disableRequiredCheck = klass.isDisableRequiredCheck(currentCommand);
-
-  const opts = new Options(
-    parseOptions,
-    hashOptions,
-    stopOnUnknown,
-    disableRequiredCheck,
-    relations,
-  );
-
-  this.options = opts.parse(arrayOptions);
-  if (rtest(config.classOptions)) {
-    this.options = config.classOptions.merge(this.options) as typeof this.options;
-  }
-
-  if (klass.isCheckUnknownOptions(config)) opts.checkUnknownBang();
-
-  let toParse = args;
-  if (!klass["strictArgsPosition?"](config)) toParse = toParse.concat(opts.remaining());
-
-  const thorArgs = new Arguments(klass.arguments());
-  for (const [k, v] of Object.entries(thorArgs.parse(toParse))) rbFSend(this, `${k}=`, v);
-  this.args = thorArgs.remaining();
-};
 
 function subclasses(this: object): BaseClass[] {
   return ((this as { _subclasses?: BaseClass[] })._subclasses ||= []);

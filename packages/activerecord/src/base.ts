@@ -1416,6 +1416,11 @@ export class Base extends Model {
   _readonly = false;
   _previouslyNewRecord = false;
 
+  /**
+   * @inlinedFrom ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:56-78
+   * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482
+   * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84
+   */
   constructor(
     attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes = {},
     initBlock?: (record: Base) => void,

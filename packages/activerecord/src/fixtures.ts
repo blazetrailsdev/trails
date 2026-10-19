@@ -24,8 +24,10 @@ import {
   slice,
   update,
   valuesAt,
+  isModuleIncluded,
 } from "@blazetrails/ruby-compat";
-import { ActiveRecord } from "./namespaces.js";
+import { ActiveRecord, Encryption } from "./namespaces.js";
+import type { EncryptedFixtureHost } from "./encryption/encrypted-fixtures.js";
 import { TableRows } from "./fixture-set/table-rows.js";
 import { File } from "./fixture-set/file.js";
 import { verifyForeignKeysForFixtures } from "./active-record.js";
@@ -403,10 +405,12 @@ export class Fixture {
   fixture!: FixtureAttrs;
 
   constructor(fixture: FixtureAttrs, modelClass: BaseClass | null) {
-    this.initialize(fixture, modelClass);
-  }
-
-  initialize(fixture: FixtureAttrs, modelClass: BaseClass | null): void {
+    if (isModuleIncluded(new.target, Encryption.EncryptedFixtures)) {
+      const encrypted = this as unknown as EncryptedFixtureHost;
+      encrypted.cleanValues = {};
+      encrypted.encryptFixtureData(fixture, modelClass);
+      encrypted.processPreservedOriginalColumns(fixture, modelClass);
+    }
     this.fixture = fixture;
     this.modelClass = modelClass;
   }

@@ -1,4 +1,4 @@
-import { Autoload, extend, type Extended } from "@blazetrails/activesupport";
+import { Autoload, extend, type Extended, TopLevel } from "@blazetrails/activesupport";
 import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
@@ -212,8 +212,10 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Tasks: typeof Tasks;
   Point: new (x: number, y: number) => { x: number; y: number };
   TestCase: typeof TestCase;
+  Railties: typeof Railties;
 };
 registerConstant("ActiveRecord", ActiveRecord);
+TopLevel.ActiveRecord = ActiveRecord;
 extend(ActiveRecord, Autoload);
 ActiveRecord.autoload("Base");
 ActiveRecord.autoload("ConnectionHandling");
@@ -409,3 +411,9 @@ Encryption.eagerAutoload(() => {
   Encryption.autoload("ReadOnlyNullEncryptor");
   Encryption.autoload("Scheme");
 });
+
+export const Railties = { name: "ActiveRecord::Railties" } as {
+  name: string;
+  ControllerRuntime?: Module;
+};
+rbModConstSet(ActiveRecord, "Railties", Railties);

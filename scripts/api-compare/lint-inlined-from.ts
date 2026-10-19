@@ -50,11 +50,14 @@ export const MISSING_TAG_PACKAGES: readonly string[] = [
   "actioncontroller",
   "actiondispatch",
   "actionview",
+  "activerecord",
   "activejob",
   "activesupport",
   "i18n",
   "rack",
   "rack-test",
+  "thor",
+  "trailties",
 ];
 
 export interface InlinedFromFinding {

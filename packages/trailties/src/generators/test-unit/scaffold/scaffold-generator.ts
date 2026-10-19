@@ -1,12 +1,21 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rails::Generators::ResourceHelpers` (`test_unit/scaffold/scaffold_generator.rb:9`); the class/interface merge is how a mixin surfaces on the type side. */
-import { include, type Included } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rails::Generators::ResourceHelpers` (`test_unit/scaffold/scaffold_generator.rb:9`); the class/interface merge is how a mixin surfaces on the type side. */
+import {
+  include,
+  type Included,
+  pluralize,
+  singularize,
+  underscore,
+} from "@blazetrails/activesupport";
+import { GeneratorError } from "../../generated-attribute.js";
+import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
+import { format, File } from "@blazetrails/ruby-compat";
 import { dasherize } from "../../base.js";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import { ResourceHelpers } from "../../resource-helpers.js";
 import { TEMPLATES } from "./templates.js";
 
-export interface ScaffoldGenerator extends Included<typeof ResourceHelpers> {}
+export interface ScaffoldGenerator
+  extends Included<typeof ResourceHelpers>, Included<typeof ModelHelpers> {}
 
 export class ScaffoldGenerator extends NamedBase {
   /** @internal */
@@ -15,8 +24,41 @@ export class ScaffoldGenerator extends NamedBase {
   declare controllerFileName: string;
   /** @internal */
   declare _controllerClassPath: string[];
-  declare options: NamedBaseOptions & { api?: boolean };
+  declare options: NamedBaseOptions & ModelHelpersOptions & { api?: boolean; modelName?: string };
   /** @internal */
+
+  /** @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26 */
+  constructor(options: NamedBaseOptions) {
+    super(options);
+    const controllerName = this.name;
+    if (this.options.modelName != null) {
+      this.name = this.options.modelName;
+      this.assignNamesBang(this.name);
+    }
+
+    this.assignControllerNamesBang(pluralize(controllerName));
+
+    if (this.isPluralModelName(this.name) && !this.options.forcePlural) {
+      const singular = singularize(this.name);
+      if (!ModelHelpers.skipWarn) {
+        this.say(format(ModelHelpers.PLURAL_MODEL_NAME_WARN_MESSAGE, this.name, singular));
+      }
+      this.name = (this.options as { name?: string }).name = singular;
+      this.assignNamesBang(this.name);
+    }
+    if (this.isInflectionImpossible(this.name)) {
+      const option1 = underscore(singularize(this.name));
+      const option2 = singularize(underscore(pluralize(this.name)));
+      throw new GeneratorError(
+        format(ModelHelpers.INFLECTION_IMPOSSIBLE_ERROR_MESSAGE, this.name, option1, option2),
+      );
+    }
+    if (this.isIrregularModelName(this.name) && !ModelHelpers.skipWarn) {
+      this.say(format(ModelHelpers.IRREGULAR_MODEL_NAME_WARN_MESSAGE, pluralize(this.name)));
+    }
+    ModelHelpers.skipWarn = true;
+  }
+
   _fixtureName?: string;
 
   static {
@@ -38,7 +80,6 @@ export class ScaffoldGenerator extends NamedBase {
     );
   }
 
-  /** @missingRailsCall mountable_engine? — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms */
   fixtureName(): string {
     return (this._fixtureName ??= this.tableName());
   }
