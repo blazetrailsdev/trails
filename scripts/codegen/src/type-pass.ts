@@ -377,6 +377,42 @@ export class TypePass {
     return n;
   }
 
+  /**
+   * Last: no `any` is left. An `x as any` is `x`, whose error (if any) is the
+   * real one the cast hid; any other `any` (`any[]`, `Map<any, number>`, a
+   * parameter no round could type) is `unknown`.
+   */
+  sweepAny(): number {
+    const program = this.program();
+    let n = 0;
+    for (const f of this.files) {
+      const sf = program.getSourceFile(f);
+      if (!sf) continue;
+      const edits: Edit[] = [];
+      const visit = (node: ts.Node): void => {
+        if (ts.isAsExpression(node) && isAnyNode(node.type)) {
+          const inner = node.expression;
+          edits.push({
+            pos: node.getStart(sf),
+            end: node.getEnd(),
+            text: `(${inner.getText(sf)})`,
+          });
+          // A cast's own operand may hold another `any`: swept on the next call.
+          return;
+        }
+        if (node.kind === ts.SyntaxKind.AnyKeyword) {
+          edits.push({ pos: node.getStart(sf), end: node.getEnd(), text: "unknown" });
+          return;
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sf);
+      applyEdits(f, edits);
+      n += edits.length;
+    }
+    return n;
+  }
+
   run(): Record<string, number> {
     const stats: Record<string, number> = { returns: 0, locals: 0, params: 0, uninferable: 0 };
     stats.returns += this.dropAnyReturns();
@@ -390,6 +426,12 @@ export class TypePass {
     for (let round = 0; round < 3; round++) {
       const k = this.annotateUninferable();
       stats.uninferable += k;
+      if (!k) break;
+    }
+    stats.swept = 0;
+    for (let round = 0; round < 4; round++) {
+      const k = this.sweepAny();
+      stats.swept += k;
       if (!k) break;
     }
     return stats;

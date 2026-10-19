@@ -1145,7 +1145,7 @@ export class Lowerer {
 
   /** `f` applied to `r` evaluated once: directly for a plain reference, else through an arrow. */
   withOnce(r: string, f: (x: string) => string): string {
-    return /^[\w$]+(\.[\w$]+)*$/.test(r) ? f(r) : `((x: any) => ${f("x")})(${r})`;
+    return /^[\w$]+(\.[\w$]+)*$/.test(r) ? f(r) : `((x) => ${f("x")})(${r})`;
   }
 
   /** A Hash's `[key, value]` pairs (`Hash#each`), a Map's entries, an Array itself. */
@@ -1168,7 +1168,7 @@ export class Lowerer {
     const check = this.rc(ctx, "rbCheckArrayType");
     return this.withOnce(
       value,
-      (x) => `(${x} == null ? [] : ((${check}(${x}) as any[] | null) ?? [${x}]))`,
+      (x) => `(${x} == null ? [] : ((${check}(${x}) as unknown[] | null) ?? [${x}]))`,
     );
   }
 
@@ -2872,7 +2872,7 @@ export class Lowerer {
         // Where Symbols are colon strings, a class known only at run time
         // (`argument.is_a?(klass)`) may be Symbol: `rbIsA` answers `isSymbol` for it.
         if (ctx.f.symbolColon && GEM.gem === "activejob" && name !== "instance_of?")
-          return `((x: any, k: any) => k === ${rc("rbCSymbol")} ? ${rc("isSymbol")}(x) : k === ${rc("rbCString")} && typeof x === "string" ? !${rc("isSymbol")}(x) : ${rc("rbObjIsKindOf")}(x, k))(${R}, ${argList()})`;
+          return `((x, k) => k === ${rc("rbCSymbol")} ? ${rc("isSymbol")}(x) : k === ${rc("rbCString")} && typeof x === "string" ? !${rc("isSymbol")}(x) : ${rc("rbObjIsKindOf")}(x, k))(${R}, ${argList()})`;
         return `${rc("rbObjIsKindOf")}(${R}, ${argList()})`;
       case "respond_to?":
         // The name asked about is the TS member's (`:permitted?` is `isPermitted`).
@@ -2965,7 +2965,7 @@ export class Lowerer {
           if (hz?.size) body.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
           const asy = inner.asyncBox!.awaits;
           if (asy && ctx.asyncBox) ctx.asyncBox.awaits = true;
-          const fn = `(${asy ? "async " : ""}(${jsIdent(p)}: any) => {\n${indent([...body, `return ${jsIdent(p)};`]).join("\n")}\n})(${R})`;
+          const fn = `(${asy ? "async " : ""}(${jsIdent(p)}) => {\n${indent([...body, `return ${jsIdent(p)};`]).join("\n")}\n})(${R})`;
           return asy ? `(await ${fn})` : fn;
         }
         break;
@@ -3040,7 +3040,7 @@ export class Lowerer {
         ) {
           const unit = name.endsWith("s") ? name : name + "s";
           const D = this.as(ctx, "Duration");
-          return `${D}.${unit}(${this.withOnce(r, (x) => `(${x} instanceof ${D} ? (${x} as any).value : ${x})`)})`;
+          return `${D}.${unit}(${this.withOnce(r, (x) => `(${x} instanceof ${D} ? ${x}.value : ${x})`)})`;
         }
         break;
       // `"59.123456789".to_r` on a decimal literal: the Rational String#to_r
@@ -3098,7 +3098,7 @@ export class Lowerer {
             const v = /^[A-Za-z_$][\w$]*$/.test(R) ? R : null;
             const body = (x: string) =>
               `${rc("isSymbol")}(${x}) ? ${rc("symbolToS")}(${x}) : ${rc("rbObjAsString")}(${x})`;
-            return v ? `(${body(v)})` : `((v: any) => ${body("v")})(${R})`;
+            return v ? `(${body(v)})` : `((v) => ${body("v")})(${R})`;
           }
           return `${rc("rbObjAsString")}(${R})`;
         }
@@ -3303,7 +3303,7 @@ export class Lowerer {
       !this.index.resolveConst(recvNode.path, ctx.nesting) &&
       name === "rand"
     )
-      return `((${rc("Kernel")} as any).rand ?? ${rc("kernelRand")})(${argList()})`;
+      return `((${rc("Kernel")} as { rand?: typeof ${rc("kernelRand")} }).rand ?? ${rc("kernelRand")})(${argList()})`;
 
     // ── `x.class_eval("def …")`: Ruby source evaluated at run time has no generated form.
     if (
@@ -4345,8 +4345,8 @@ export class Lowerer {
           const xs =
             this.typeOf(recvNode, ctx)?.k === "array"
               ? "self"
-              : "(self instanceof globalThis.Map || self instanceof globalThis.Set ? [...self] : Array.isArray(self) ? self : Object.entries(self ?? {}))";
-          return `(await (async (self: any, g: any${extra.map((_: string, i: number) => `, a${i}: any`).join("")}) => { const xs: any[] = ${xs}; ${native} })(${[r, g, ...extra].join(", ")}))`;
+              : "(self instanceof globalThis.Map || self instanceof globalThis.Set ? [...self] : Array.isArray(self) ? self : Object.entries((self ?? {}) as object))";
+          return `(await (async (self, g${extra.map((_: string, i: number) => `, a${i}`).join("")}) => { const xs: unknown[] = ${xs}; ${native} })(${[r, g, ...extra].join(", ")}))`;
         }
         return `(await ${rc("rbAsyncEnum")}(${[r, JSON.stringify(name), ...n.args.map((x: N) => this.argExpr(x, ctx)), g].join(", ")}))`;
       }
@@ -4380,13 +4380,13 @@ export class Lowerer {
     const recvType = this.typeOf(recvNode, ctx);
     const enumOf = (x: string) =>
       `${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map ? [...${x}] : ` +
-      `${x}?.constructor === Object ? Object.entries(${x}) : ${x}`;
+      `Object.getPrototypeOf(${x}) === Object.prototype ? Object.entries(${x} as object) : (${x} as unknown[])`;
     const E =
       recvType?.k === "array"
         ? R
         : /^[\w$]+(\.[\w$]+)*$/.test(r)
-          ? `(${enumOf(`(${r} as any)`)})`
-          : `((x: any) => ${enumOf("x")})(${r})`;
+          ? `(${enumOf(r)})`
+          : `((x) => ${enumOf("x")})(${r})`;
     switch (name) {
       case "clear":
         // Array#clear / Hash#clear (array.c rb_ary_clear, hash.c rb_hash_clear)
@@ -4545,7 +4545,7 @@ export class Lowerer {
           return `${rc("aryJoin")}(${[r, ...args()].join(", ")})`;
         return `${R}${nav}join(${args().join(", ")})`;
       case "drop":
-        if (!blk && n.args.length === 1) return `${rc("drop")}(${r} as any[], ${args()[0]})`;
+        if (!blk && n.args.length === 1) return `${rc("drop")}(${r} as unknown[], ${args()[0]})`;
         break;
       case "compact":
         // Hash#compact (hash.c rb_hash_compact) on a plain object is activesupport's.
@@ -4877,17 +4877,17 @@ function asyncEnumBody(name: string, argc: number): string | null {
       return "for (let i = 0; i < xs.length; i++) await g(xs[i], i); return self;";
     case "map":
     case "collect":
-      return "const out: any[] = []; for (const x of xs) out.push(await g(x)); return out;";
+      return "const out: unknown[] = []; for (const x of xs) out.push(await g(x)); return out;";
     case "flat_map":
     case "collect_concat":
-      return "const out: any[] = []; for (const x of xs) out.push(...[await g(x)].flat()); return out;";
+      return "const out: unknown[] = []; for (const x of xs) out.push(...[await g(x)].flat()); return out;";
     case "select":
     case "filter":
-      return `const out: any[] = []; for (const x of xs) { const v = await g(x); if ${T("v")} out.push(x); } return out;`;
+      return `const out: unknown[] = []; for (const x of xs) { const v = await g(x); if ${T("v")} out.push(x); } return out;`;
     case "reject":
-      return `const out: any[] = []; for (const x of xs) { const v = await g(x); if (!${T("v")}) out.push(x); } return out;`;
+      return `const out: unknown[] = []; for (const x of xs) { const v = await g(x); if (!${T("v")}) out.push(x); } return out;`;
     case "filter_map":
-      return `const out: any[] = []; for (const x of xs) { const v = await g(x); if ${T("v")} out.push(v); } return out;`;
+      return `const out: unknown[] = []; for (const x of xs) { const v = await g(x); if ${T("v")} out.push(v); } return out;`;
     case "find":
     case "detect":
       return `for (const x of xs) { const v = await g(x); if ${T("v")} return x; } return null;`;
@@ -4906,7 +4906,7 @@ function asyncEnumBody(name: string, argc: number): string | null {
       return "let acc = a0; for (const x of xs) acc = await g(acc, x); return acc;";
     // hash.c rb_hash_transform_values on a plain-object Hash (a Map keeps the helper).
     case "transform_values":
-      return "const out: any = {}; for (const [k, v] of Object.entries(self ?? {})) out[k] = await g(v); return out;";
+      return "const out: Record<string, unknown> = {}; for (const [k, v] of Object.entries(self ?? {})) out[k] = await g(v); return out;";
   }
   return null;
 }
