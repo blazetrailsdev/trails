@@ -159,7 +159,6 @@ export const ConditionalGet = {
   httpCacheForever: typeof httpCacheForever;
   noStore: typeof noStore;
   combineEtags: typeof combineEtags;
-  head: typeof head;
 };
 extend(ConditionalGet, Concern);
 include(ConditionalGet, Head);

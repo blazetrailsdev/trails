@@ -37,6 +37,7 @@ import {
 } from "../abstract-controller/rendering.js";
 import type { Renderer } from "./renderer.js";
 import { UrlFor } from "./metal/url-for.js";
+import type { Head } from "./metal/head.js";
 import { Rescue } from "./metal/rescue.js";
 import { Instrumentation } from "./metal/instrumentation.js";
 import {
@@ -53,6 +54,7 @@ export interface API
     Included<typeof UrlFor>,
     Included<typeof Redirecting>,
     Included<typeof ConditionalGet>,
+    Included<typeof Head>,
     Included<typeof DataStreaming> {
   render: OmitThisParameter<typeof render>;
   get params(): Params;

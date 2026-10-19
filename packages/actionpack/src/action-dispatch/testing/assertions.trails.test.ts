@@ -11,7 +11,7 @@ import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/te
 import { TestCase } from "../../action-controller/test-case.js";
 import { TemplateAssertions } from "../../action-controller/template-assertions.js";
 import { RouteSet } from "../routing/route-set.js";
-import { Assertions } from "./assertions.js";
+import { Assertions, htmlDocument } from "./assertions.js";
 import { ResponseAssertions, assertResponse } from "./assertions/response.js";
 import {
   ClassMethods,
@@ -30,6 +30,9 @@ describe("ActionDispatch::Assertions", () => {
       }
       expect(klass.prototype.assertResponse).toBe(assertResponse);
       expect(klass.prototype.assertRouting).toBe(assertRouting);
+      expect(Object.getOwnPropertyDescriptor(klass.prototype, "htmlDocument")?.get).toBe(
+        htmlDocument,
+      );
     }
     expect(isModuleIncluded(TestCase, TemplateAssertions)).toBe(true);
   });
@@ -40,7 +43,7 @@ describe("ActionDispatch::Assertions", () => {
     expect(Assertions.RoutingAssertions).toBe(RoutingAssertions);
     expect(rbModName(Assertions)).toBe("ActionDispatch::Assertions");
     expect(rbModName(ResponseAssertions)).toBe("ActionDispatch::Assertions::ResponseAssertions");
-    expect(RoutingAssertions.name).toBe("ActionDispatch::Assertions::RoutingAssertions");
+    expect(rbModName(RoutingAssertions)).toBe("ActionDispatch::Assertions::RoutingAssertions");
     expect(ActionController.TemplateAssertions).toBe(TemplateAssertions);
     expect(rbModName(TemplateAssertions)).toBe("ActionController::TemplateAssertions");
     expect(ActionController.TestCase).toBe(TestCase);
