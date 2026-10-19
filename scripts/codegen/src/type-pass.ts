@@ -93,13 +93,75 @@ export class TypePass {
     return p;
   }
 
+  /** Type-only imports each file needs for the types written into it: file → spec → name → local. */
+  private pendingImports = new Map<string, Map<string, Map<string, string>>>();
+
   /**
-   * A type as source text usable in `file`: a type out of scope there is an
-   * `import("…")` type, rewritten to the generated file's relative path or the
-   * dependency package's root; null when it cannot be named from `file`.
+   * The local name `name` from `spec` has in `sf`: the file's own import of it
+   * if there is one, else a new `import type` (aliased if the name is taken).
+   */
+  private typeLocal(sf: ts.SourceFile, spec: string, name: string): string {
+    for (const st of sf.statements) {
+      if (!ts.isImportDeclaration(st) || !ts.isStringLiteral(st.moduleSpecifier)) continue;
+      if (st.moduleSpecifier.text !== spec) continue;
+      const nb = st.importClause?.namedBindings;
+      if (nb && ts.isNamedImports(nb))
+        for (const el of nb.elements)
+          if ((el.propertyName ?? el.name).text === name) return el.name.text;
+    }
+    const pf =
+      this.pendingImports.get(sf.fileName) ??
+      this.pendingImports.set(sf.fileName, new Map()).get(sf.fileName)!;
+    const pm = pf.get(spec) ?? pf.set(spec, new Map()).get(spec)!;
+    const have = pm.get(name);
+    if (have) return have;
+    const taken = new Set<string>();
+    for (const m of pf.values()) for (const l of m.values()) taken.add(l);
+    const declared = (n: string) =>
+      taken.has(n) || new RegExp(`\\b${n.replace(/\$/g, "\\$")}\\b`).test(sf.text);
+    let local = name;
+    for (let i = 2; declared(local); i++) local = `${name}${i}`;
+    pm.set(name, local);
+    return local;
+  }
+
+  /** The `import type` lines a file is owed, as one edit after its last import. */
+  private importEdit(sf: ts.SourceFile): Edit | null {
+    const pf = this.pendingImports.get(sf.fileName);
+    if (!pf?.size) return null;
+    this.pendingImports.delete(sf.fileName);
+    const lines = [...pf].map(
+      ([spec, m]) =>
+        `import type { ${[...m].map(([k, v]) => (k === v ? k : `${k} as ${v}`)).join(", ")} } from "${spec}";`,
+    );
+    const last = [...sf.statements].filter(ts.isImportDeclaration).at(-1);
+    const pos = last ? last.getEnd() : 0;
+    return { pos, end: pos, text: (last ? "\n" : "") + lines.join("\n") + (last ? "" : "\n") };
+  }
+
+  /**
+   * A type as source text usable in `file`: a type out of scope there is
+   * named through an `import type` at the top of the file, from the generated
+   * file's relative path or the dependency package's root; null when it cannot
+   * be named from `file`.
    */
   typeText(checker: ts.TypeChecker, t: ts.Type, at: ts.Node, file: string): string | null {
     if (t.flags & (ts.TypeFlags.Any | ts.TypeFlags.Never)) return null;
+    // Library code never names a test's class: a test job reaching a library
+    // parameter is typed by its nearest library superclass (`HelloJob` → `Base`).
+    if (!isTestPath(file)) {
+      // An array's element type, a union's members, each in turn.
+      if (checker.isArrayType(t)) {
+        const el = checker.getTypeArguments(t as ts.TypeReference)[0];
+        const inner = el ? this.typeText(checker, el, at, file) : null;
+        return inner === null ? null : /[|&\s]/.test(inner) ? `(${inner})[]` : `${inner}[]`;
+      }
+      if (t.isUnion()) {
+        const parts = t.types.map((u) => this.typeText(checker, u, at, file));
+        return parts.some((x) => x === null) ? null : TypePass.union(parts as string[]);
+      }
+      t = this.libraryType(checker, t);
+    }
     const node = checker.typeToTypeNode(
       checker.getBaseTypeOfLiteralType(t),
       at,
@@ -111,19 +173,49 @@ export class TypePass {
       .printNode(ts.EmitHint.Unspecified, node, at.getSourceFile());
     if (/\bany\b|\(Anonymous|__object|__type|\bthis\b/.test(text) || text.length > 400) return null;
     let ok = true;
+    const sf = at.getSourceFile();
+    const wanted: [string, string][] = [];
     text = text.replace(/import\("([^"]+)"\)\.([\w$]+)/g, (_m, spec: string, name: string) => {
+      let id: string | null = null;
       if (path.isAbsolute(spec) && spec.startsWith(this.srcDir)) {
-        let rel = path.relative(path.dirname(file), spec).replace(/\.d$|\.ts$/, "");
-        if (!rel.startsWith(".")) rel = `./${rel}`;
-        return `import("${rel}.js").${name}`;
+        id = path.relative(path.dirname(file), spec).replace(/\.d$|\.ts$/, "");
+        if (!id.startsWith(".")) id = `./${id}`;
+        id = `${id}.js`;
+      } else {
+        const pkg = /\/packages\/([\w-]+)\//.exec(spec)?.[1];
+        const pid = pkg ? `@blazetrails/${pkg}` : null;
+        if (pid && this.exportsOf.get(pid)?.has(name)) id = pid;
       }
-      const pkg = /\/packages\/([\w-]+)\//.exec(spec)?.[1];
-      const id = pkg ? `@blazetrails/${pkg}` : null;
-      if (id && this.exportsOf.get(id)?.has(name)) return `import("${id}").${name}`;
-      ok = false;
-      return _m;
+      if (!id) {
+        ok = false;
+        return _m;
+      }
+      wanted.push([id, name]);
+      return `@@type${wanted.length - 1}@@`;
     });
-    return ok ? text : null;
+    if (!ok) return null;
+    // Only now that the whole type can be written are its imports recorded.
+    return text.replace(/@@type(\d+)@@/g, (_m, i: string) =>
+      this.typeLocal(sf, ...wanted[Number(i)]),
+    );
+  }
+
+  /** `t`, or for a class (or `typeof` a class) declared in test code, its nearest non-test superclass. */
+  private libraryType(checker: ts.TypeChecker, t: ts.Type): ts.Type {
+    const declFile = (x: ts.Type) => x.getSymbol()?.declarations?.[0]?.getSourceFile().fileName;
+    for (let i = 0; i < 20; i++) {
+      const f = declFile(t);
+      if (!f || !isTestPath(f)) return t;
+      const decl = t.getSymbol()!.declarations![0];
+      if (!ts.isClassLike(decl)) return t;
+      const isCtor = t.getConstructSignatures().length > 0;
+      const ext = decl.heritageClauses?.find((h) => h.token === ts.SyntaxKind.ExtendsKeyword)
+        ?.types[0];
+      if (!ext) return t;
+      const baseInstance = checker.getTypeAtLocation(ext);
+      t = isCtor ? checker.getTypeOfSymbolAtLocation(baseInstance.getSymbol()!, ext) : baseInstance;
+    }
+    return t;
   }
 
   /** The union of `types`, `unknown` when empty. */
@@ -297,6 +389,10 @@ export class TypePass {
       const t = (d as ts.PropertyDeclaration).type!;
       push(sf, { pos: t.getStart(sf), end: t.getEnd(), text: TypePass.union(texts as string[]) });
       n++;
+    }
+    for (const sf of sourceFiles) {
+      const ie = this.importEdit(sf);
+      if (ie) push(sf, ie);
     }
     for (const [f, es] of edits) applyEdits(f, es);
     return n;
@@ -520,6 +616,11 @@ export class TypePass {
     }
     return stats;
   }
+}
+
+/** A test file or a test helper (test jobs, adapters, models). */
+function isTestPath(f: string): boolean {
+  return /\.test\.ts$|\/test-helpers\//.test(f);
 }
 
 /** The top-level members of a union type's text (`A | (B | C)[]` → `A`, `(B | C)[]`). */

@@ -129,6 +129,8 @@ export interface FileCtx {
   rubyFile: string;
   tsFile: string;
   imports: Map<string, Map<string, string>>; // module specifier → (exported name → local name)
+  /** Names used only as types (`import type { … }`), same shape as `imports`. */
+  typeImports?: Map<string, Map<string, string>>;
   /** Each class's ivar types, by class fqn then Ruby ivar name (emit.ts `ivarTypes`). */
   ivarTypes?: Map<string, Map<string, TypeRef>>;
   usedLocalNames: Set<string>;
@@ -289,6 +291,28 @@ export class Lowerer {
       if (m.size === 0) ctx.f.imports.delete(spec);
       return `${this.imp(ctx, spec, "*", NS[spec])}.${name}`;
     }
+    m.set(name, local);
+    return local;
+  }
+
+  /**
+   * A name used only in a type, imported with `import type` at the top of the
+   * file (no runtime edge, so no import cycle). A name the file already imports
+   * as a value is reused.
+   */
+  impType(ctx: Ctx, spec: string, name: string): string {
+    const value = ctx.f.imports.get(spec)?.get(name);
+    if (value) return value;
+    const tm = (ctx.f.typeImports ??= new Map());
+    let m = tm.get(spec);
+    if (!m) tm.set(spec, (m = new Map()));
+    const existing = m.get(name);
+    if (existing) return existing;
+    const taken = new Set<string>(ctx.f.usedLocalNames);
+    for (const mm of [...ctx.f.imports.values(), ...tm.values()])
+      for (const l of mm.values()) taken.add(l);
+    let local = name;
+    for (let i = 2; taken.has(local); i++) local = `${name}${i}`;
     m.set(name, local);
     return local;
   }

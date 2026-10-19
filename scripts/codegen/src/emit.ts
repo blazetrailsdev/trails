@@ -977,6 +977,14 @@ export class Emitter {
         .map(([k, v]) => (k === v ? k : `${k} as ${v}`));
       if (names.length) lines.push(`import { ${names.join(", ")} } from "${s}";`);
     }
+    for (const [spec, m] of [...(f.typeImports ?? new Map<string, Map<string, string>>())].sort()) {
+      if (spec.startsWith("@root/") && spec.slice(6).replace(/\.js$/, ".ts") === f.tsFile) continue;
+      const s = spec.startsWith("@root/") ? rel(spec.slice(6)) : spec;
+      const names = [...m.entries()]
+        .filter(([k]) => !f.imports.get(spec)?.has(k))
+        .map(([k, v]) => (k === v ? k : `${k} as ${v}`));
+      if (names.length) lines.push(`import type { ${names.join(", ")} } from "${s}";`);
+    }
     return lines;
   }
 
@@ -1670,8 +1678,8 @@ export class Emitter {
 
   /**
    * The `this` of a module's functions: the gem classes the module enters the
-   * Ruby ancestors of (`include M` on `Base`), as an `import()` type so the
-   * module file takes no runtime import of its includer; `typeof` them for a
+   * Ruby ancestors of (`include M` on `Base`), imported with `import type` so
+   * the module file takes no runtime import of its includer; `typeof` them for a
    * Concern's `ClassMethods`. `any` (for the type pass) where no lib class
    * includes it, or more than a few do.
    */
@@ -1695,12 +1703,15 @@ export class Emitter {
       return e && !/\.test\.ts$|(^|\/)test-helpers\//.test(e.tsFile);
     });
     if (!lib.length || lib.length > 3) return "any";
+    const ctx = this.baseCtx(u, f, {});
     return lib
       .map((h) => {
         const e = this.resolver.exportNames.get(h)!;
-        let rel = path.relative(path.dirname(f.tsFile), e.tsFile).replace(/\.ts$/, ".js");
-        if (!rel.startsWith(".")) rel = `./${rel}`;
-        return `${isCm ? "typeof " : ""}import("${rel}").${e.name}`;
+        const local =
+          e.tsFile === f.tsFile
+            ? e.name
+            : this.lw.impType(ctx, `@root/${e.tsFile.replace(/\.ts$/, ".js")}`, e.name);
+        return `${isCm ? "typeof " : ""}${local}`;
       })
       .join(" | ");
   }
