@@ -1,5 +1,13 @@
 import { htmlSafe, stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
-import { hashDelete, include, rbObjRespondTo, slice, toI } from "@blazetrails/ruby-compat";
+import {
+  hashDelete,
+  include,
+  rbFSend,
+  rbObjRespondTo,
+  rtest,
+  slice,
+  toI,
+} from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
 import { Checkable } from "./checkable.js";
@@ -53,8 +61,8 @@ export class CheckBox extends Base {
       return false;
     } else if (typeof value === "string") {
       return value === this._checkedValue;
-    } else if (rbObjRespondTo(value, "includes")) {
-      return (value as { includes(v: unknown): boolean }).includes(this._checkedValue);
+    } else if (rbObjRespondTo(value, "isInclude")) {
+      return rtest(rbFSend(value, "isInclude", this._checkedValue));
     } else {
       return toI(value) === toI(this._checkedValue);
     }

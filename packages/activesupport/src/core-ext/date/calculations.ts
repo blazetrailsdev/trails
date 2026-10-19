@@ -235,8 +235,22 @@ declare module "@blazetrails/date" {
     export function setBeginningOfWeek(weekStart: string): void;
     export const DAYS_INTO_WEEK: Record<string, number>;
   }
+  interface Date {
+    change(options: { year?: number; month?: number; day?: number }): Date;
+  }
 }
 
 Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek, DAYS_INTO_WEEK });
 
 Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { change });
+
+Object.defineProperty(RubyDate.prototype, "change", {
+  value: function (
+    this: RubyDate,
+    options: { year?: number; month?: number; day?: number },
+  ): RubyDate {
+    return change(this, options);
+  },
+  writable: true,
+  configurable: true,
+});
