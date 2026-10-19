@@ -488,7 +488,13 @@ describe("TestCaseTest", () => {
   it("should impose childless html tags in html", async () => {
     await tc.process("testXmlOutput", { params: { response_as: "text/html" } });
 
-    tc.assertSelect("root > area + p");
+    const JRUBY_VERSION: string | null = null;
+    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors test_case_test.rb:435
+    if (JRUBY_VERSION != null) {
+      tc.assertSelect("root > map > area + p");
+    } else {
+      tc.assertSelect("root > area + p");
+    }
   });
 
   it("should not impose childless html tags in xml", async () => {
