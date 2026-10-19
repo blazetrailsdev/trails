@@ -679,7 +679,7 @@ export class Module<I extends object = Record<never, never>> {
             ? (descriptor.value as (...args: unknown[]) => unknown).bind(receiver)
             : undefined;
         }
-        const root = writer ? undefined : Kernel.instanceMethod(key)?.value;
+        const root = writer || !Object.hasOwn(Kernel, key) ? undefined : Reflect.get(Kernel, key);
         return typeof root === "function"
           ? (root as (...args: unknown[]) => unknown).bind(receiver)
           : undefined;
@@ -2001,6 +2001,16 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
+export interface KernelModule {
+  dup(this: object): object;
+  initializeDup(this: object, orig: unknown): object;
+  initializeClone(this: object, orig: unknown): object;
+  freeze(this: object): object;
+  abort: typeof abort;
+  rand: typeof kernelRand;
+}
+
 /**
  * Ruby's `Kernel`, the module `Object` includes and so the last stop of every
  * method search. It holds the instance methods a module's `super` reaches when
@@ -2017,34 +2027,34 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
  *
  * @noRailsEquivalent PERMANENT
  */
-export const Kernel = new Module((mod) => {
+export const Kernel = {
   /** @noRailsEquivalent PERMANENT */
-  mod.defineMethod("dup", function (this: object): object {
+  dup(this: object): object {
     return rbObjDup(this);
-  });
+  },
   /** @noRailsEquivalent PERMANENT */
-  mod.defineMethod("initializeDup", function (this: object, orig: unknown): object {
+  initializeDup(this: object, orig: unknown): object {
     const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
     if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
     return this;
-  });
+  },
   /** @noRailsEquivalent PERMANENT */
-  mod.defineMethod("initializeClone", function (this: object, orig: unknown): object {
+  initializeClone(this: object, orig: unknown): object {
     const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
     if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
     return this;
-  });
+  },
   /** @noRailsEquivalent PERMANENT */
-  mod.defineMethod("freeze", function (this: object): object {
+  freeze(this: object): object {
     return Object.freeze(this);
-  });
-}) as Module & { abort: typeof abort; rand: typeof kernelRand };
+  },
+} as KernelModule;
 
 classpaths.set(Kernel, { path: "Kernel", permanent: true });
 classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
 
 // `rb_mComparable` (`vendor/ruby/v3.3.11/compar.c:315`).
-const rbMComparable = new Module();
+const rbMComparable = {};
 classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
 
 Object.setPrototypeOf(rbCClass, Module);

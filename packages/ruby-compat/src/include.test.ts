@@ -1427,16 +1427,28 @@ describe("Module#superMethod", () => {
     class Plain {}
     const mod = new Module();
     include(Plain, mod);
-    Kernel.defineMethod("kernelProbe", function (this: object) {
-      return this;
+    Object.defineProperty(Kernel, "kernelProbe", {
+      value: function (this: object) {
+        return this;
+      },
+      configurable: true,
     });
     try {
       const plain = new Plain();
       expect(mod.superMethod(plain, "kernelProbe")!()).toBe(plain);
       expect(mod.superMethod(plain, "kernelProbe=")).toBeUndefined();
     } finally {
-      Kernel.removeMethod("kernelProbe");
+      Reflect.deleteProperty(Kernel, "kernelProbe");
     }
+  });
+
+  it("answers undefined for a name only Object.prototype defines", () => {
+    class Plain {}
+    Object.setPrototypeOf(Plain.prototype, null);
+    const mod = new Module();
+    include(Plain, mod);
+    expect(mod.superMethod(new Plain(), "toString")).toBeUndefined();
+    expect(mod.superMethod(new Plain(), "constructor")).toBeUndefined();
   });
 
   it("answers undefined for a receiver whose ancestry lacks the module", () => {

@@ -226,6 +226,7 @@ export {
   rbModConstSet,
   defineModule,
   Kernel,
+  type KernelModule,
   extend,
   extended,
   rbObjClone,
