@@ -64,5 +64,6 @@ describe("TestResponseTest", () => {
     ]);
   });
 
+  // BLOCKED: test-response-html-parsed-body-at-xpath
   it.skip("HTML response pattern matching", () => {});
 });
