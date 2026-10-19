@@ -25,10 +25,6 @@ export class JsNode {
     readonly source: string,
   ) {}
 
-  childNodes(): readonly JsNode[] {
-    return this.children;
-  }
-
   get slice(): string {
     return this.source.slice(this.location.startOffset, this.location.endOffset);
   }
@@ -83,7 +79,10 @@ const LEXEMES: [RegExp, TokType][] = [
 ];
 
 export function parseScript(source: string): { value: JsNode } {
-  const parser = new Parser(source, 0, source.length, { id: 0 });
+  const parser = new Parser(source, 0, source.length, {
+    id: 0,
+    lines: [0, ...[...source.matchAll(/\n/g)].map((m) => m.index + 1)],
+  });
   return { value: parser.parseProgram() };
 }
 
@@ -96,7 +95,7 @@ class Parser {
     private readonly src: string,
     start: number,
     private readonly limit: number,
-    private readonly ids: { id: number },
+    private readonly ids: { id: number; lines: number[] },
   ) {
     this.pos = start;
     this.next();
@@ -216,8 +215,14 @@ class Parser {
   }
 
   private position(offset: number): [number, number] {
-    const lines = this.src.slice(0, offset).split("\n");
-    return [lines.length, lines[lines.length - 1].length];
+    const { lines } = this.ids;
+    let lo = 0;
+    for (let hi = lines.length - 1; lo < hi; ) {
+      const mid = (lo + hi + 1) >> 1;
+      if (lines[mid] <= offset) lo = mid;
+      else hi = mid - 1;
+    }
+    return [lo + 1, offset - lines[lo]];
   }
 
   private finish(
@@ -259,21 +264,19 @@ class Parser {
       this.eat("default");
       const decl = this.isFunctionStart()
         ? this.parseFunction("FunctionDeclaration")
-        : this.parseExpressionStatement();
+        : this.parseStatement();
       return this.finish("ExportDeclaration", start, [decl]);
     }
     if (kw === "const" || kw === "var" || (kw === "let" && this.peekIsBindingStart())) {
       const decl = this.parseVariableDeclaration();
       this.semicolon();
-      return this.finish("VariableDeclaration", start, decl.children as JsNode[]);
+      return decl;
     }
     if (this.isFunctionStart()) return this.parseFunction("FunctionDeclaration");
     switch (kw) {
       case "if": {
         this.next();
-        const test = this.parseParenExpression();
-        const consequent = this.parseStatement();
-        const children = [test, consequent];
+        const children = [this.parseParenExpression(), this.parseStatement()];
         if (this.eat("else")) children.push(this.parseStatement());
         return this.finish("IfStatement", start, children);
       }
@@ -443,23 +446,11 @@ class Parser {
   private tryArrow(): JsNode | null {
     const start = this.tok.start;
     const saved = this.save();
-    if (this.is("async")) {
-      this.next();
-      if (this.tok.nlBefore || !(this.tok.type === "name" || this.is("("))) {
-        this.restore(saved);
-        return null;
-      }
-    }
-    let params: JsNode[];
-    if (this.tok.type === "name" && !this.is("async")) {
-      params = [this.parseIdentifier()];
-    } else if (this.is("(") && this.parenFollowedByArrow()) {
-      params = this.parseParams();
-    } else {
-      this.restore(saved);
-      return null;
-    }
-    if (!this.is("=>") || this.tok.nlBefore) {
+    if (!this.eat("async") || this.tok.nlBefore) this.restore(saved);
+    let params: JsNode[] | null = null;
+    if (this.tok.type === "name" && !this.is("async")) params = [this.parseIdentifier()];
+    else if (this.is("(") && this.parenFollowedByArrow()) params = this.parseParams();
+    if (params === null || !this.is("=>") || this.tok.nlBefore) {
       this.restore(saved);
       return null;
     }

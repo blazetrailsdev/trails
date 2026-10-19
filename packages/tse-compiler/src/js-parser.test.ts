@@ -94,6 +94,9 @@ describe("parseScript", () => {
 
   it("raises JsParseError with the offending offset", () => {
     expect(() => parseScript("a(b,;")).toThrow(JsParseError);
+    expect(parseScript("export const x = 1;").value.children[0].children[0].type).toBe(
+      "VariableDeclaration",
+    );
     expect(() => parseScript("x = 'open")).toThrow("(at offset 4)");
   });
 });
