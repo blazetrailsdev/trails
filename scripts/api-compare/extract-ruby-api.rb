@@ -972,11 +972,6 @@ class ApiExtractor
     record_included_hook_mixins(target, node[5], find_params_defs(node)) if name == "included"
   end
 
-  # `ActionView::RoutingUrlFor.include(ActionDispatch::Routing::UrlFor)` inside
-  # `ActiveSupport.on_load(:action_controller)` (actionview/railtie.rb:98-102)
-  # mixes `UrlFor` into `RoutingUrlFor` at boot. It is filed on the receiver as
-  # `bootMixins`, apart from `includes`, so nothing credits `UrlFor`'s methods
-  # to `RoutingUrlFor`; only the ancestry the inlined-from gates read follows it.
   def record_boot_mixin(receiver, name, args)
     return false unless @in_on_load.positive? && %w[include prepend].include?(name)
     return false unless receiver.is_a?(Array) && %i[var_ref const_path_ref top_const_ref].include?(receiver[0])
@@ -998,11 +993,6 @@ class ApiExtractor
     end
   end
 
-  # `def self.included(base)` whose body runs `base.send :include, Invocation`
-  # (thor/base.rb:116-121) or `base.include(ModelHelpers)`
-  # (railties/generators/resource_helpers.rb:11-15) mixes those modules into
-  # every includer. Filed on the module as `includedHookMixins`, apart from
-  # `includes`, for the ancestry the inlined-from gates read.
   def record_included_hook_mixins(target, body, params)
     base = params.is_a?(Array) && params[1].is_a?(Array) && params[1][0].is_a?(Array) ? ident_name(params[1][0]) : nil
     return unless base
@@ -1049,11 +1039,6 @@ class ApiExtractor
   # reopens `Cipher`, and "encryption.rb" sorts before "encryption/cipher.rb",
   # so without this the whole class is attributed to the umbrella file and every
   # faithfully-placed TS member scores as a `moved` extra.
-  #
-  # The file named for the constant (`thor.rb` for `Thor`, the path Zeitwerk
-  # would load it from) outranks the first file that defines a method on it:
-  # `thor/base.rb` sorts first and defines `Thor.deprecation_warning`, but
-  # `class Thor`'s body lives in `thor.rb`.
   def maybe_update_module_file(fqn, target)
     return unless @modules[fqn] || @classes[fqn]
     return if target[:named_file]

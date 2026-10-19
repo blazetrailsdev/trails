@@ -85,9 +85,6 @@ export function moduleAncestors(
 ): ModuleAncestors {
   const visited = new Set<string>(inherited);
   type Statement = { kind: string; names: string[]; context: string };
-  // A module's `self.included` hook runs its statements on the includer right
-  // after the `include`, and an `on_load` block runs its own after the whole
-  // body; each names its modules from where it is written.
   const statements = (mod: ClassInfo | undefined, contextFqn: string): Statement[] => {
     const written = (
       mod?.mixinOrder ?? [
