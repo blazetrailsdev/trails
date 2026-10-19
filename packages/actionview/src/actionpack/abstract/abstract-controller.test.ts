@@ -62,7 +62,6 @@ class RenderingController extends AbstractController.AbstractController {
 interface RenderingController {
   renderToString(...args: unknown[]): unknown;
   renderToBody(options?: Record<string, unknown>): unknown;
-  formats: unknown;
 }
 include(RenderingController, AbstractController.Rendering);
 include(RenderingController, Rendering);

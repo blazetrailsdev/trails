@@ -9,7 +9,7 @@ import { bodyFromString, bodyToString, MockRequest } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import { controllerConstants, Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
-import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
+import { Utils } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   pluralize,
@@ -4470,11 +4470,11 @@ describe("ActionController::Routing", () => {
   });
 
   it("route generation escapes unsafe path characters", () => {
-    expect(escapeSegment("a b/c")).toBe("a%20b%2Fc");
+    expect(Utils.escapeSegment("a b/c")).toBe("a%20b%2Fc");
   });
 
   it("route recognition unescapes path components", () => {
-    expect(unescapeUri("a%20b%2Fc")).toBe("a b/c");
+    expect(Utils.unescapeUri("a%20b%2Fc")).toBe("a b/c");
   });
 
   it("dash with custom regexp", () => {

@@ -4,7 +4,7 @@ import { ViewPaths } from "@blazetrails/actionview";
 import { Concern, extend, include, isPlainObject } from "@blazetrails/activesupport";
 import { ArgumentError, Hash, Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Mime } from "../action-dispatch/http/mime-type.js";
-import { AbstractControllerError } from "./error.js";
+import { Error as AbstractControllerError } from "./error.js";
 
 const DEFAULT_DOUBLE_RENDER_MESSAGE =
   "Render and/or redirect were called multiple times in this action. " +

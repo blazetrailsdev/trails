@@ -1,9 +1,9 @@
 import type { Node } from "./nodes/node.js";
-import { escapePath, escapeSegment } from "./router/utils.js";
+import { Utils } from "./router/utils.js";
 
 type Escaper = (value: unknown) => string;
-const ESCAPE_PATH: Escaper = (value) => escapePath(value);
-const ESCAPE_SEGMENT: Escaper = (value) => escapeSegment(value);
+const ESCAPE_PATH: Escaper = (value) => Utils.escapePath(value);
+const ESCAPE_SEGMENT: Escaper = (value) => Utils.escapeSegment(value);
 
 export class Parameter {
   constructor(

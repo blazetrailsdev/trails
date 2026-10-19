@@ -21,6 +21,7 @@ import {
   mergeBang,
   Module,
   URI,
+  rbAnyToS,
   rbInspect,
   rbObjClone,
   rbObjRespondTo,
@@ -63,7 +64,7 @@ import { ActionController } from "../../namespaces.js";
 import { Request as AdRequest } from "../http/request.js";
 import { camelize, NameError, squish } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { normalizePath } from "../journey/router/utils.js";
+import { Utils } from "../journey/router/utils.js";
 import { URL, type UrlOptions } from "../http/url.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
 import {
@@ -728,6 +729,10 @@ export class RouteSet {
     return new this(routeSetConfig);
   }
 
+  inspect(): string {
+    return rbAnyToS(this);
+  }
+
   static Config = Config;
 
   static readonly DEFAULT_CONFIG: Config = new Config(null, false, null);
@@ -1253,7 +1258,7 @@ export class RouteSet {
     environment: { method?: string | null; extras?: Record<string, unknown> } = {},
   ): Record<string, unknown> {
     const method = String(environment.method ?? "GET").toUpperCase();
-    if (!(path != null && path.includes("://"))) path = normalizePath(path);
+    if (!(path != null && path.includes("://"))) path = Utils.normalizePath(path);
     const extras = environment.extras ?? {};
 
     let env: RackEnv;
@@ -1289,7 +1294,7 @@ export class RouteSet {
 
   async call(env: RackEnv): Promise<RackResponse> {
     const req = this.makeRequest(env);
-    req.pathInfo = normalizePath(req.pathInfo);
+    req.pathInfo = Utils.normalizePath(req.pathInfo);
     return (await this.router.serve(req as unknown as RouterRequest)) as unknown as RackResponse;
   }
 }

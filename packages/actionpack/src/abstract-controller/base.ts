@@ -80,6 +80,15 @@ export class AbstractController {
     this._responseBody = value;
   }
 
+  protected _formats: unknown = null;
+
+  get formats(): unknown {
+    return this._formats;
+  }
+  set formats(value: unknown) {
+    this._formats = value;
+  }
+
   private static readonly _internalMethods: ReadonlySet<string> = new Set([
     "constructor",
     "processAction",
