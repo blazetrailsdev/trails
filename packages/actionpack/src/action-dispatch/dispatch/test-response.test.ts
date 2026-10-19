@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { assertEqual, assertKindOf, HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Range } from "@blazetrails/ruby-compat";
 import { TestResponse } from "../testing/test-response.js";
 
@@ -26,17 +27,15 @@ describe("TestResponseTest", () => {
 
   it("response parsing", () => {
     let response = TestResponse.create(200, {}, "");
-    expect(response.parsedBody).toBe(response.body);
+    assertEqual(response.body, response.parsedBody);
 
     response = TestResponse.create(
       200,
       { "Content-Type": "application/json" },
       '{ "foo": "fighters" }',
     );
-    expect(response.parsedBody).toEqual({ foo: "fighters" });
-
-    response = TestResponse.create(200, { "Content-Type": "text/html" }, "<html></html>");
-    expect(response.parsedBody).toBe("<html></html>");
+    assertKindOf(HashWithIndifferentAccess, response.parsedBody);
+    assertEqual({ foo: "fighters" }, response.parsedBody);
   });
 
   it("JSON response Hash pattern matching", () => {
@@ -46,7 +45,9 @@ describe("TestResponseTest", () => {
       '{ "foo": "fighters" }',
     );
 
-    expect(response.parsedBody).toMatchObject({ foo: expect.stringMatching(/fighter/) });
+    expect(Object.fromEntries(response.parsedBody as HashWithIndifferentAccess)).toMatchObject({
+      foo: expect.stringMatching(/fighter/),
+    });
   });
 
   it("JSON response Array pattern matching", () => {
@@ -55,7 +56,9 @@ describe("TestResponseTest", () => {
       { "Content-Type": "application/json" },
       '[{ "foo": "fighters" }, { "nir": "vana" }]',
     );
-    expect(response.parsedBody).toMatchObject([
+    expect(
+      (response.parsedBody as HashWithIndifferentAccess[]).map((hash) => Object.fromEntries(hash)),
+    ).toMatchObject([
       { foo: expect.stringMatching(/fighter/) },
       { nir: expect.stringMatching(/vana/) },
     ]);

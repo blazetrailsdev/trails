@@ -76,7 +76,9 @@ export namespace JSON {
    * `ASCII-8BIT` source as UTF-8, so a source held as its bytes is decoded here.
    * A malformed source raises `SyntaxError`, JS's `JSON::ParserError`. With an
    * options hash an object is parsed into a `Hash`, its names Symbols under
-   * `symbolizeNames` and every value frozen under `freeze` (`parser.rl:742-752`).
+   * `symbolizeNames` and every value frozen under `freeze` (`parser.rl:742-752`),
+   * or into a new `objectClass` instance filled through its `[]=`
+   * (`parser.rl:139-143,179`).
    *
    * @inventedArm try — CONVERGEABLE json-parse-skips-comments-in-one-pass-and-takes-options
    * @noRailsEquivalent PERMANENT — Ruby stdlib `JSON.parse`
@@ -84,7 +86,11 @@ export namespace JSON {
    */
   export function parse(
     source: string | Uint8Array,
-    opts?: { symbolizeNames?: boolean; freeze?: boolean },
+    opts?: {
+      symbolizeNames?: boolean;
+      freeze?: boolean;
+      objectClass?: new () => Hash<string, unknown>;
+    },
   ): unknown {
     if (source instanceof Uint8Array) {
       try {
@@ -102,7 +108,7 @@ export namespace JSON {
         : (_key: string, value: unknown): unknown => {
             if (Array.isArray(value)) return opts.freeze ? Object.freeze(value) : value;
             if (typeof value !== "object" || value === null) return value;
-            const hash = new Hash<unknown, unknown>();
+            const hash = opts.objectClass ? new opts.objectClass() : new Hash<string, unknown>();
             for (const [name, v] of Object.entries(value)) {
               hash.set(opts.symbolizeNames ? `:${name}` : name, v);
             }

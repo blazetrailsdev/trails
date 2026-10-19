@@ -1373,7 +1373,7 @@ describe("IntegrationRequestEncodersTest", () => {
       });
 
       assertResponse("success");
-      expect(t.response.parsedBody).toEqual({ foo: "fighters" });
+      assertEqual({ foo: "fighters" }, t.response.parsedBody);
     });
   });
 
@@ -1384,7 +1384,7 @@ describe("IntegrationRequestEncodersTest", () => {
       expect(t.request.accepts[0].toString()).toBe("application/json");
       expect(t.request.format.ref()).toBe(":json");
       expect(t.request.requestParameters).toEqual({ foo: "fighters" });
-      expect(t.response.parsedBody).toEqual({ foo: "fighters" });
+      assertEqual({ foo: "fighters" }, t.response.parsedBody);
     });
   });
 
@@ -1458,7 +1458,7 @@ describe("IntegrationRequestEncodersTest", () => {
 
       await t.get("/foos_json.json", { params: { foo: "heyo" } });
 
-      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+      assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
   });
 
@@ -1472,7 +1472,7 @@ describe("IntegrationRequestEncodersTest", () => {
 
       await t.get("/foos_json?foo=heyo", { as: "json" });
 
-      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+      assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
   });
 
@@ -1488,7 +1488,7 @@ describe("IntegrationRequestEncodersTest", () => {
 
       expect(t.request.method).toBe("POST");
       expect(t.request.headers.get("X-Http-Method-Override")).toBe("GET");
-      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+      assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
   });
 

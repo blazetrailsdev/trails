@@ -13,6 +13,7 @@ import {
 import {
   ActionableError,
   cattrAccessor,
+  SyntaxErrorProxy,
   TopLevel,
   type BacktraceCleaner,
 } from "@blazetrails/activesupport";
@@ -132,9 +133,12 @@ export class ExceptionWrapper {
     const backtraceCleaner = b !== undefined ? (a as BacktraceCleaner | null) : null;
     const exception = b !== undefined ? b : (a as Error);
     this.backtraceCleaner = backtraceCleaner;
-    this.exception = exception;
     this.exceptionClassName = rbObjClassname(exception);
     this.wrappedCauses = this.wrappedCausesFor(exception, backtraceCleaner);
+    this.exception = exception;
+    if (exception instanceof SyntaxError) {
+      this.exception = new SyntaxErrorProxy(exception);
+    }
     this.statusCode = this.computeStatusCode();
     this.backtrace = this.buildBacktrace();
   }

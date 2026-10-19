@@ -1,8 +1,10 @@
-import { ArgumentError, rbFSend, symbolToS } from "@blazetrails/ruby-compat";
+import { ArgumentError, JSON, rbFSend, symbolToS } from "@blazetrails/ruby-compat";
 import {
+  HashWithIndifferentAccess,
   ToJsonWithActiveSupportEncoder,
   type ToJsonWithActiveSupportEncoderHost,
 } from "@blazetrails/activesupport";
+import { Testing } from "@blazetrails/actionview/testing";
 import { Mime, MimeType } from "../http/mime-type.js";
 
 export type ResponseParser = (body: string) => unknown;
@@ -93,10 +95,9 @@ export class RequestEncoder {
   }
 }
 
-RequestEncoder.registerEncoder("json", {
-  responseParser: (body) => (body ? JSON.parse(body) : body),
-});
-
 RequestEncoder.registerEncoder("html", {
-  responseParser: (body) => body,
+  responseParser: (body) => Testing.htmlDocument().parse(body),
+});
+RequestEncoder.registerEncoder("json", {
+  responseParser: (body) => JSON.parse(body, { objectClass: HashWithIndifferentAccess }),
 });

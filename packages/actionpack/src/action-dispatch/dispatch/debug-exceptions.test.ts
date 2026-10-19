@@ -234,8 +234,8 @@ describe("DebugExceptionsTest", () => {
 
     await t.get("/pass", { headers: { "action_dispatch.show_exceptions": "all" } });
 
-    assertMatch(/<h2[^>]*>Request<\/h2>/, body());
-    assertMatch(/<h2[^>]*>Response<\/h2>/, body());
+    t.assertSelect("h2", /Request/);
+    t.assertSelect("h2", /Response/);
   });
 
   it("rescue with diagnostics message", async () => {
@@ -300,6 +300,7 @@ describe("DebugExceptionsTest", () => {
 
       t.assertResponse(500);
       assertMatch("Extracted source (around line #", body());
+      t.assertSelect("pre", { count: 0 }, body());
     } finally {
       TopLevel.Trails = trails;
     }
@@ -853,7 +854,9 @@ describe("DebugExceptionsTest", () => {
     });
 
     t.assertResponse(500);
-    assertMatch(/syntax error, unexpected|syntax errors found/, body());
+    t.assertSelect("#Application-Trace-0", () => {
+      t.assertSelect("code", /syntax error, unexpected|syntax errors found/);
+    });
   });
 
   // BLOCKED: debug-view-rescue-templates-are-never-shipped
