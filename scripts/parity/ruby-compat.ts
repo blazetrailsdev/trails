@@ -52,7 +52,6 @@
 export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Comparable#<=>", "cmp"],
   ["Comparable#between?", "isBetween"],
-  ["Hash#delete_if", "deleteIf"],
   ["Hash#each_key", "eachKey"],
   ["Hash#each_pair", "eachPair"],
   ["Hash#has_key?", "hasKey"],
@@ -121,6 +120,7 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Array#delete_if", { tsExport: "aryDeleteIf", receiver: "array" }],
   ["Array#sort", { tsExport: "sort", receiver: "array" }],
   ["Hash#delete", { tsExport: "hashDelete", receiver: "hash" }],
+  ["Hash#delete_if", { tsExport: "deleteIf", receiver: "hash" }],
   ["Hash#except", { tsExport: "except", receiver: "hash" }],
   ["Hash#fetch", { tsExport: "fetch", receiver: "hash" }],
   // MRI defines `include?` onto `rb_hash_has_key` (`vendor/ruby/v3.3.11/hash.c:7255`),

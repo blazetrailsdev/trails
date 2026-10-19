@@ -287,7 +287,6 @@ export class Route {
     return this._requiredDefaults.includes(key);
   }
 
-  /** @missingRailsArgs delete_if — PERMANENT */
   get requiredDefaults(): Record<string, unknown> {
     if (this._requiredDefaultsCache) return this._requiredDefaultsCache;
     this._requiredDefaultsCache = deleteIf(

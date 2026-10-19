@@ -204,20 +204,15 @@ export abstract class Helpers {
         );
         this._buffered = true;
       } else if (this._body && typeof this._body.each === "function") {
-        const oldBody = this._body;
+        const body = this._body;
         this._body = [];
         this._buffered = true;
 
-        oldBody.each((part: string | Uint8Array) => {
+        body.each((part: string | Uint8Array) => {
           this._writer(toS(part));
         });
 
-        if (rbObjRespondTo(oldBody, "close")) oldBody.close();
-      } else if (this._body && typeof this._body[Symbol.iterator] === "function") {
-        const oldBody = this._body;
-        this._body = [];
-        this._buffered = true;
-        for (const part of oldBody as Iterable<string | Uint8Array>) this._writer(toS(part));
+        if (rbObjRespondTo(body, "close")) body.close();
       } else {
         this._buffered = false;
       }

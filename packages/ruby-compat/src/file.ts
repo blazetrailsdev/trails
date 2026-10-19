@@ -877,6 +877,19 @@ export class File extends IO {
   size(): number {
     return this.stat().size;
   }
+
+  /**
+   * `vendor/ruby/v3.3.11/file.c:2599` `rb_file_chmod`, which answers `0`. MRI
+   * calls `fchmod(2)` on the descriptor; the `FsAdapter` contract has no
+   * `fchmodSync`, so the open file's path takes the mode instead.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File#chmod`
+   * (`vendor/ruby/v3.3.11/file.c:2599`).
+   */
+  chmod(mode: number): number {
+    getFs().chmodSync?.(this.path()!, mode);
+    return 0;
+  }
 }
 
 registerConstant("File", File);

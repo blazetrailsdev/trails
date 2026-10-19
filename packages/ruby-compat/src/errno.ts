@@ -74,6 +74,28 @@ class EPIPE extends SystemCallError {
 }
 
 /**
+ * `Errno::ESPIPE`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: the error `lseek(2)` raises on a pipe.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ESPIPE`, which rack's
+ * rewindable-input spec raises without defining.
+ */
+class ESPIPE extends SystemCallError {
+  static readonly Errno = 29;
+  readonly code = "ESPIPE";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Illegal seek" : `Illegal seek - ${mesg}`);
+    this.name = "Errno::ESPIPE";
+    this.errno = ESPIPE.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ESPIPE";
+  }
+}
+
+/**
  * `Errno::EEXIST`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
  * {@link ENOTTY} is. The fs layer's own error carrying `code: "EEXIST"` is this
  * class to `rescue Errno::EEXIST`.
@@ -149,4 +171,4 @@ class EISDIR extends SystemCallError {
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-export const Errno = { EEXIST, EISDIR, ENOENT, ENOTTY, EPIPE };
+export const Errno = { EEXIST, EISDIR, ENOENT, ENOTTY, EPIPE, ESPIPE };

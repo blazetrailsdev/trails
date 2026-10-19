@@ -4,7 +4,7 @@ import { Correctable } from "./core-ext/name-error.js";
 import { Formatter } from "./formatter.js";
 import { NullChecker } from "./spell-checkers/null-checker.js";
 
-const _spellCheckers = new Hash<string, unknown>(NullChecker);
+let _spellCheckers = new Hash<string, unknown>(NullChecker);
 
 export function spellCheckers(): Hash<string, unknown> {
   return _spellCheckers;
@@ -14,7 +14,12 @@ export function correctError(
   errorClass: abstract new (...args: never) => object,
   spellChecker: unknown,
 ): void {
-  spellCheckers().set(rbModToS(errorClass), spellChecker);
+  const newMapping = new Hash<string, unknown>();
+  for (const [key, value] of _spellCheckers) newMapping.set(key, value);
+  newMapping.set(rbModToS(errorClass), spellChecker);
+  newMapping.setDefault(NullChecker);
+
+  _spellCheckers = newMapping;
 
   if (typeof errorClass === "function" && rbClassInheritedP(errorClass, Correctable) !== true) {
     prepend(errorClass, Correctable);
