@@ -2,6 +2,7 @@ import { Concern } from "@blazetrails/activesupport";
 import { XML, type Html5Document, type XmlDocument } from "@blazetrails/nokogiri";
 import { Testing } from "@blazetrails/actionview/testing";
 import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/testing/assertions";
+import type * as DomAssertions from "@blazetrails/actionview/testing/dom-assertions";
 import type * as SelectorAssertions from "@blazetrails/actionview/testing/selector-assertions";
 import { extend, Module, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActionDispatch } from "../../namespaces.js";
@@ -21,7 +22,13 @@ export function htmlDocument(this: HtmlDocumentHost): XmlDocument | Html5Documen
 
 export type Assertions = ResponseAssertions &
   RoutingAssertions & {
+    assertDomEqual: OmitThisParameter<typeof DomAssertions.assertDomEqual>;
+    assertDomNotEqual: OmitThisParameter<typeof DomAssertions.assertDomNotEqual>;
+    cssSelect: OmitThisParameter<typeof SelectorAssertions.cssSelect>;
+    assertDom: OmitThisParameter<typeof SelectorAssertions.assertDom>;
     assertSelect: OmitThisParameter<typeof SelectorAssertions.assertSelect>;
+    assertDomEncoded: OmitThisParameter<typeof SelectorAssertions.assertDomEncoded>;
+    assertSelectEncoded: OmitThisParameter<typeof SelectorAssertions.assertSelectEncoded>;
     /** @internal */
     _htmlDocument?: XmlDocument | Html5Document | null;
     readonly htmlDocument: XmlDocument | Html5Document;
