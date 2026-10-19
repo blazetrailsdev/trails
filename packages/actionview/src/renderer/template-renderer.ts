@@ -68,13 +68,12 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
     if (Object.hasOwn(options, "renderable")) {
       return new Renderable(options.renderable);
     }
-    if (Object.hasOwn(options, "template") && options.template != null) {
-      const tmpl = options.template;
-      if (typeof tmpl === "object" && typeof tmpl.render === "function") {
-        return tmpl;
+    if (Object.hasOwn(options, "template")) {
+      if (rbObjRespondTo(options.template, "render")) {
+        return options.template as RenderableTemplate;
       }
       return this.lookupContext.findTemplate(
-        tmpl as string,
+        options.template as string,
         options.prefixes,
         false,
         keys,

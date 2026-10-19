@@ -9,10 +9,12 @@ import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { assertNil, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
-import { ArgumentError, chomp, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, chomp, rbInspect } from "@blazetrails/ruby-compat";
 import { MissingTemplate } from "./error.js";
 
 Template.mimeTypesImplementation = Mime;
+
+const __dir__ = new URL(".", import.meta.url).pathname;
 
 class Customer {
   constructor(readonly name: string) {}
@@ -71,57 +73,6 @@ describe("CachedViewRenderTest", () => {
     TemplateHandlers.clear();
   });
 
-  it("render partial collection", async () => {
-    expect(
-      String(
-        await view.render({
-          partial: "test/customer",
-          collection: [new Customer("david"), new Customer("mary")],
-        }),
-      ),
-    ).toBe("Hello: davidHello: mary");
-  });
-
-  it("render partial collection as by string", async () => {
-    expect(
-      String(
-        await view.render({
-          partial: "test/customer_with_var",
-          collection: [new Customer("david"), new Customer("mary")],
-          as: "customer",
-        }),
-      ),
-    ).toBe("david david davidmary mary mary");
-  });
-
-  it("render partial collection as by symbol", async () => {
-    expect(
-      String(
-        await view.render({
-          partial: "test/customer_with_var",
-          collection: [new Customer("david"), new Customer("mary")],
-          as: ":customer",
-        }),
-      ),
-    ).toBe("david david davidmary mary mary");
-  });
-
-  it("render partial collection without as", async () => {
-    expect(
-      String(
-        await view.render({ partial: "test/local_inspector", collection: [new Customer("mary")] }),
-      ),
-    ).toBe("local_inspector,local_inspector_counter,local_inspector_iteration");
-  });
-
-  it("render partial with empty collection should return nil", async () => {
-    assertNil(await view.render({ partial: "test/customer", collection: [] }));
-  });
-
-  it("render partial with nil collection should return nil", async () => {
-    assertNil(await view.render({ partial: "test/customer", collection: null as never }));
-  });
-
   it("render without options", async () => {
     const e = await assertRaises([ArgumentError], {}, () => view.render({}));
     expect(e.message).toMatch(/You invoked render but did not give any of (.+) option\./);
@@ -131,8 +82,19 @@ describe("CachedViewRenderTest", () => {
     expect(String(await view.render({ template: "test/hello_world" }))).toBe("Hello world!");
   });
 
+  it("render file", async () => {
+    const templatePath = File.expandPath("./fixtures/test/hello_world.tse", __dir__);
+    expect(String(await view.render({ file: templatePath }))).toBe("Hello world!");
+  });
+
+  it("render file with full path no extension", async () => {
+    const templatePath = File.expandPath("./fixtures/test/hello_world", __dir__);
+    const e = await assertRaises([ArgumentError], {}, () => view.render({ file: templatePath }));
+    expect(e.message).toMatch(/File (.+) does not exist/);
+  });
+
   it("render file with invalid full path", async () => {
-    const templatePath = "/fixtures/test/hello_world_invalid.tse";
+    const templatePath = File.expandPath("./fixtures/test/hello_world_invalid.tse", __dir__);
     const e = await assertRaises([ArgumentError], {}, () => view.render({ file: templatePath }));
     expect(e.message).toMatch(/File (.+) does not exist/);
   });
@@ -275,6 +237,15 @@ describe("CachedViewRenderTest", () => {
     expect(e.message).toContain("'nil' is not a renderable object. It must implement #render_in.");
   });
 
+  it("render renderable with incompatible object", async () => {
+    const object = new Object();
+    await assertRaises(
+      [ArgumentError],
+      { match: `'${rbInspect(object)}' is not a renderable object. It must implement #render_in.` },
+      () => view.render({ renderable: object }),
+    );
+  });
+
   it("render partial starting with a capital", async () => {
     await assertNothingRaised(() => view.render({ partial: "test/FooBar" }));
   });
@@ -309,33 +280,6 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  it("render inline", async () => {
-    expect(String(await view.render({ inline: "Hello, World!" }))).toBe("Hello, World!");
-  });
-
-  it("render inline with locals", async () => {
-    expect(
-      String(await view.render({ inline: "Hello, <%= name %>!", locals: { name: "Josh" } })),
-    ).toBe("Hello, Josh!");
-  });
-
-  it("render body", async () => {
-    expect(String(await view.render({ body: "some body" }))).toBe("some body");
-  });
-
-  it("render plain", async () => {
-    expect(String(await view.render({ plain: "some plaintext" }))).toBe("some plaintext");
-  });
-
-  it("render renderable with incompatible object", async () => {
-    const object = new Object();
-    await assertRaises(
-      [ArgumentError],
-      { match: `'${rbInspect(object)}' is not a renderable object. It must implement #render_in.` },
-      () => view.render({ renderable: object }),
-    );
-  });
-
   it("render object different name", async () => {
     expect(
       chomp(
@@ -354,6 +298,57 @@ describe("CachedViewRenderTest", () => {
     expect(String(await view.render({ partial: "test/object_inspector", object: [1, 2, 3] }))).toBe(
       "[1, 2, 3]",
     );
+  });
+
+  it("render partial collection", async () => {
+    expect(
+      String(
+        await view.render({
+          partial: "test/customer",
+          collection: [new Customer("david"), new Customer("mary")],
+        }),
+      ),
+    ).toBe("Hello: davidHello: mary");
+  });
+
+  it("render partial collection as by string", async () => {
+    expect(
+      String(
+        await view.render({
+          partial: "test/customer_with_var",
+          collection: [new Customer("david"), new Customer("mary")],
+          as: "customer",
+        }),
+      ),
+    ).toBe("david david davidmary mary mary");
+  });
+
+  it("render partial collection as by symbol", async () => {
+    expect(
+      String(
+        await view.render({
+          partial: "test/customer_with_var",
+          collection: [new Customer("david"), new Customer("mary")],
+          as: ":customer",
+        }),
+      ),
+    ).toBe("david david davidmary mary mary");
+  });
+
+  it("render partial collection without as", async () => {
+    expect(
+      String(
+        await view.render({ partial: "test/local_inspector", collection: [new Customer("mary")] }),
+      ),
+    ).toBe("local_inspector,local_inspector_counter,local_inspector_iteration");
+  });
+
+  it("render partial with empty collection should return nil", async () => {
+    assertNil(await view.render({ partial: "test/customer", collection: [] }));
+  });
+
+  it("render partial with nil collection should return nil", async () => {
+    assertNil(await view.render({ partial: "test/customer", collection: null as never }));
   });
 
   it("render partial without object does not put partial name to local assigns", async () => {
@@ -432,5 +427,23 @@ describe("CachedViewRenderTest", () => {
     expect(
       String(await view.render({ partial: "test/layout_for_partial", locals: { name: "Josh" } })),
     ).toBe("Before (Josh)\n\nAfter");
+  });
+
+  it("render inline", async () => {
+    expect(String(await view.render({ inline: "Hello, World!" }))).toBe("Hello, World!");
+  });
+
+  it("render inline with locals", async () => {
+    expect(
+      String(await view.render({ inline: "Hello, <%= name %>!", locals: { name: "Josh" } })),
+    ).toBe("Hello, Josh!");
+  });
+
+  it("render body", async () => {
+    expect(String(await view.render({ body: "some body" }))).toBe("some body");
+  });
+
+  it("render plain", async () => {
+    expect(String(await view.render({ plain: "some plaintext" }))).toBe("some plaintext");
   });
 });
