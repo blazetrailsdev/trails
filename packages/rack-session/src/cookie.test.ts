@@ -20,6 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SessionHash } from "./index.js";
 import { Cookie } from "./index.js";
+import { mustBe, wontBe } from "./test-helpers/assertions.js";
 
 describe("Rack::Session::Cookie", () => {
   const incrementor = async (env: RackEnv): Promise<RackResponse> => {
@@ -183,7 +184,7 @@ describe("Rack::Session::Cookie", () => {
     expect(warnings[0]).toMatch(/no secret/i);
     warnings.length = 0;
     new Cookie(incrementor, { secrets: secret });
-    expect(warnings).toEqual([]);
+    mustBe(warnings, "isEmpty");
   });
 
   it("abort if secret is too short", () => {
@@ -194,7 +195,7 @@ describe("Rack::Session::Cookie", () => {
 
   it("doesn't warn if coder is configured to handle encoding", () => {
     new Cookie(incrementor, { coder: {}, letCoderHandleSecureEncoding: true });
-    expect(warnings).toEqual([]);
+    mustBe(warnings, "isEmpty");
   });
 
   it("still warns if coder is not set", () => {
@@ -470,7 +471,7 @@ describe("Rack::Session::Cookie", () => {
 
     const lint = new Lint(sessionId);
     response = await responseFor({ app: (env: RackEnv) => lint.call(env), cookie: response });
-    expect(response.body).not.toBeNull();
+    wontBe(response.body, "isNil");
   });
 
   it("can handle middleware that inspects the env", async () => {
@@ -489,7 +490,7 @@ describe("Rack::Session::Cookie", () => {
       app: (env: RackEnv) => inspector.call(env),
       cookie: response,
     });
-    expect(response.body).not.toBeNull();
+    wontBe(response.body, "isNil");
   });
 
   it("returns the session id in the session hash", async () => {
@@ -508,7 +509,7 @@ describe("Rack::Session::Cookie", () => {
     expect(response.getHeader("Set-Cookie")).toBeUndefined();
 
     response = await responseFor({ app, request: { HTTPS: "on" } });
-    expect(response.getHeader("Set-Cookie")).not.toBeUndefined();
+    wontBe(response.getHeader("Set-Cookie"), "isNil");
     expect(response.getHeader("Set-Cookie")).toMatch(/secure/);
   });
 
@@ -526,7 +527,7 @@ describe("Rack::Session::Cookie", () => {
     const app = [nothing, { expireAfter: 3600 }];
     const request = { "rack.session": { not: "empty" } };
     const response = await responseFor({ app, request });
-    expect(response.getHeader("Set-Cookie")).not.toBeUndefined();
+    wontBe(response.getHeader("Set-Cookie"), "isNil");
   });
 
   it("returns no cookie if no data was written and no session was created previously, even if :expire_after is set", async () => {
