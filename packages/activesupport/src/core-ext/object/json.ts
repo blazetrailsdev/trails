@@ -342,7 +342,7 @@ export function asJson(value: unknown, options: EncodeOptions | null = null): un
   if (typeof value === "bigint") return Numeric.asJson(value, options);
 
   const own = (value as { asJson?: (o?: unknown) => unknown }).asJson;
-  if (typeof own === "function") return own.call(value, options ?? undefined);
+  if (typeof own === "function") return own.call(value, options);
 
   if (typeof value === "function") return Module.asJson(value as { name: string }, options);
 
