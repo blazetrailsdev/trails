@@ -25,7 +25,6 @@ describe("RackHeadersTest", () => {
     fh = Headers.get("AB", "1", "cd", "2", "3", "4");
   });
 
-  // PERMANENT-SKIP: ruby-compat's Hash does not carry every Ruby Hash method
   it.skip("public interface", () => {
     const headersMethods = publicInstanceMethods(Headers).sort();
     const hashMethods = publicInstanceMethods(Hash).sort();
