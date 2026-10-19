@@ -6798,6 +6798,11 @@ Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], {
   marshalDump: (self: Temporal.PlainDate) => new Date(self).marshalDump(),
   iso8601: (self: Temporal.PlainDate) => new Date(self).iso8601(),
   xmlschema: (self: Temporal.PlainDate) => new Date(self).xmlschema(),
+  hour: () => 0,
+  min: () => 0,
+  minute: () => 0,
+  sec: () => 0,
+  second: () => 0,
 });
 
 for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {

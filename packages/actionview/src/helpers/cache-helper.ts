@@ -180,8 +180,8 @@ async function writeFragmentFor(
   options: Record<string, unknown> | null | undefined,
   block?: () => unknown,
 ): Promise<unknown> {
-  const fragment: SafeBuffer = this.outputBuffer.capture(() => {
-    block?.();
+  const fragment: SafeBuffer = await this.outputBuffer.capture(async () => {
+    await block?.();
   });
   return await this.controller.writeFragment(name, fragment, options ?? undefined);
 }

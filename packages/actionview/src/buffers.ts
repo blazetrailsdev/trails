@@ -86,16 +86,37 @@ export class OutputBuffer {
     return copy.initializeCopy(this);
   }
 
-  capture<TArgs extends unknown[]>(...args: [...TArgs, (...args: TArgs) => void]): SafeBuffer {
-    const block = args.pop() as (...args: unknown[]) => void;
+  capture<TArgs extends unknown[]>(
+    ...args: [...TArgs, (...args: TArgs) => PromiseLike<unknown>]
+  ): Promise<SafeBuffer>;
+  capture<TArgs extends unknown[]>(...args: [...TArgs, (...args: TArgs) => void]): SafeBuffer;
+  capture(...args: unknown[]): SafeBuffer | Promise<SafeBuffer> {
+    const block = args.pop() as (...args: unknown[]) => unknown;
     const saved = this._raw;
     this._raw = "";
+    let result: unknown;
     try {
-      block(...args);
-      return htmlSafe(this._raw);
-    } finally {
+      result = block(...args);
+    } catch (error) {
       this._raw = saved;
+      throw error;
     }
+    if (result != null && typeof (result as PromiseLike<unknown>).then === "function") {
+      return Promise.resolve(result).then(
+        () => {
+          const captured = htmlSafe(this._raw);
+          this._raw = saved;
+          return captured;
+        },
+        (error: unknown) => {
+          this._raw = saved;
+          throw error;
+        },
+      );
+    }
+    const captured = htmlSafe(this._raw);
+    this._raw = saved;
+    return captured;
   }
 
   equals(other: unknown): boolean {

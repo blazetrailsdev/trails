@@ -478,27 +478,6 @@ export class DateTimeSelector {
     }
   }
 
-  static {
-    for (const method of ["sec", "min", "hour", "day", "month", "year"]) {
-      Object.defineProperty(this.prototype, method, {
-        value(this: { _datetime: unknown }): unknown {
-          const datetime = this._datetime;
-          if (isPlainObject(datetime)) {
-            return (datetime as Record<string, unknown>)[method];
-          } else if (typeof datetime === "number") {
-            return datetime;
-          } else if (datetime == null) {
-            return null;
-          } else {
-            return rbFSend(datetime, method);
-          }
-        },
-        writable: true,
-        configurable: true,
-      });
-    }
-  }
-
   /** @internal */
   private promptText(prompt: unknown, type: string): unknown {
     return typeof prompt === "string"
@@ -841,6 +820,23 @@ export interface DateTimeSelector extends Omit<Included<typeof import("./tag-hel
 }
 
 include(DateTimeSelector, TagHelper);
+
+for (const method of ["sec", "min", "hour", "day", "month", "year"]) {
+  (DateTimeSelector.prototype as unknown as Record<string, unknown>)[method] = function (this: {
+    _datetime: unknown;
+  }): unknown {
+    const datetime = this._datetime;
+    if (isPlainObject(datetime)) {
+      return (datetime as Record<string, unknown>)[method];
+    } else if (typeof datetime === "number") {
+      return datetime;
+    } else if (datetime == null) {
+      return null;
+    } else {
+      return rbFSend(datetime, method);
+    }
+  };
+}
 
 declare module "./form-helper.js" {
   interface FormBuilder {

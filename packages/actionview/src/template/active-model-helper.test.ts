@@ -99,8 +99,7 @@ describe("ActiveModelHelperTest", () => {
     );
   });
 
-  // BLOCKED: date-seat-answers-change-for-date-select
-  it.skip("date select with errors", () => {
+  it("date select with errors", () => {
     assertDomEqual(
       '<div class="field_with_errors"><select id="post_updated_at_1i" name="post[updated_at(1i)]">\n<option selected="selected" value="2004">2004</option>\n<option value="2005">2005</option>\n</select>\n<input id="post_updated_at_2i" name="post[updated_at(2i)]" type="hidden" value="6" autocomplete="off" />\n<input id="post_updated_at_3i" name="post[updated_at(3i)]" type="hidden" value="1" autocomplete="off" />\n</div>',
       view.dateSelect("post", "updated_at", {
@@ -112,8 +111,7 @@ describe("ActiveModelHelperTest", () => {
     );
   });
 
-  // BLOCKED: date-seat-answers-change-for-date-select
-  it.skip("datetime select with errors", () => {
+  it("datetime select with errors", () => {
     assertDomEqual(
       '<div class="field_with_errors"><input id="post_updated_at_1i" name="post[updated_at(1i)]" type="hidden" value="2004" autocomplete="off" />\n<input id="post_updated_at_2i" name="post[updated_at(2i)]" type="hidden" value="6" autocomplete="off" />\n<input id="post_updated_at_3i" name="post[updated_at(3i)]" type="hidden" value="1" autocomplete="off" />\n<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n<option selected="selected" value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n</select>\n : <select id="post_updated_at_5i" name="post[updated_at(5i)]">\n<option selected="selected" value="00">00</option>\n</select>\n</div>',
       view.datetimeSelect("post", "updated_at", {
@@ -125,8 +123,7 @@ describe("ActiveModelHelperTest", () => {
     );
   });
 
-  // BLOCKED: date-seat-answers-change-for-date-select
-  it.skip("time select with errors", () => {
+  it("time select with errors", () => {
     assertDomEqual(
       '<div class="field_with_errors"><input id="post_updated_at_1i" name="post[updated_at(1i)]" type="hidden" value="2004" autocomplete="off" />\n<input id="post_updated_at_2i" name="post[updated_at(2i)]" type="hidden" value="6" autocomplete="off" />\n<input id="post_updated_at_3i" name="post[updated_at(3i)]" type="hidden" value="15" autocomplete="off" />\n<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n<option selected="selected" value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n</select>\n : <select id="post_updated_at_5i" name="post[updated_at(5i)]">\n<option selected="selected" value="00">00</option>\n</select>\n</div>',
       view.timeSelect("post", "updated_at", { minuteStep: 60 }),

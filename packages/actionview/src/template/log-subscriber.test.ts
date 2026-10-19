@@ -283,8 +283,7 @@ describe("AVLogSubscriberTest", () => {
       );
     }));
 
-  // BLOCKED: cache-helper-write-fragment-for-awaits-async-block
-  it.skip("render cached outer partial with cached inner partial", () =>
+  it("render cached outer partial with cached inner partial", () =>
     stubRoot(async () => {
       tc.setViewCacheDependencies();
       tc.setCacheController();
