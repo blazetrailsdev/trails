@@ -7,7 +7,11 @@ import {
   rbHashSRuby2KeywordsHash,
   rbModConstSet,
   rbHashSRuby2KeywordsHashP,
+  include,
+  registerConstant,
+  StandardError,
 } from "@blazetrails/ruby-compat";
+import { GlobalID, Identification } from "@blazetrails/globalid";
 import { ActiveJob } from "./index.js";
 import {
   Arguments,
@@ -154,5 +158,60 @@ describe("Arguments.deserialize of a HashWithIndifferentAccess", () => {
       _aj_symbol_keys: ["a"],
     });
     expect((await deserialize([indifferentAccessSymbolKey]))[0]).toStrictEqual({ ":a": 1 });
+  });
+});
+
+describe("ActiveJob::Arguments GlobalID arm", () => {
+  class Person {
+    static primaryKey = "id";
+    id: string | null;
+    constructor(id: string | null) {
+      this.id = id;
+    }
+    static async find(id: unknown): Promise<Person> {
+      if (id === "404") throw new PersonRecordNotFound("Person not found");
+      return new this(String(id));
+    }
+  }
+  class PersonRecordNotFound extends StandardError {}
+  include(Person, Identification);
+  registerConstant("Person", Person);
+  GlobalID.setApp("aj");
+
+  it("round-trips an Identification-including object through gid:// and the locator", async () => {
+    const serialized = serialize([new Person("5")]);
+    expect(serialized).toEqual([{ _aj_globalid: "gid://aj/Person/5" }]);
+    const [person] = await deserialize(serialized);
+    expect(person).toBeInstanceOf(Person);
+    expect((person as Person).id).toBe("5");
+  });
+
+  it("does not duck-type toGlobalId on a class that does not include Identification", () => {
+    class Impostor {
+      id = "5";
+      toGlobalId(): string {
+        return "gid://aj/Impostor/5";
+      }
+    }
+    expect(() => serialize([new Impostor()])).toThrow(SerializationError);
+  });
+
+  it("raises SerializationError for a record without an id", () => {
+    expect(() => serialize([new Person(null)])).toThrow(
+      new SerializationError(
+        "Unable to serialize Person without an id. (Maybe you forgot to call save?)",
+      ),
+    );
+  });
+
+  it("treats a hash with _aj_globalid and another key as a plain hash", async () => {
+    const [restored] = await deserialize([{ _aj_globalid: "gid://aj/Person/5", a: 1 }]);
+    expect(restored).toEqual({ _aj_globalid: "gid://aj/Person/5", a: 1 });
+  });
+
+  it("wraps a locator failure in DeserializationError with the original as cause", async () => {
+    const error = await deserialize([{ _aj_globalid: "gid://aj/Person/404" }]).catch((e) => e);
+    expect(error).toBeInstanceOf(DeserializationError);
+    expect((error as Error).cause).toBeInstanceOf(PersonRecordNotFound);
   });
 });
