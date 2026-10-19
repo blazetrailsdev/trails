@@ -16,7 +16,7 @@ export interface SearchableHost {
   css(...args: unknown[]): NodeSet;
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 interface Compound {
   tag: string | null;
   ids: string[];
@@ -86,7 +86,7 @@ function xpathQueryFromCssRule(node: SearchableHost, rule: string, _ns: Record<s
   }));
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 type Path = ReturnType<typeof xpathQueryFromCssRule>;
 
 /** @internal */
@@ -108,7 +108,7 @@ export function xpathInternal(
   );
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function xpathImpl(
   node: SearchableHost,
   path: Path,
@@ -143,7 +143,7 @@ function xpathImpl(
   );
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function xpathFromSteps(steps: [string, Compound][]): string {
   return steps
     .map(([combinator, compound], i) => {
@@ -162,7 +162,7 @@ function xpathFromSteps(steps: [string, Compound][]): string {
     .join("");
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function xpathFromCompound(c: Compound): string {
   const literal = (value: string) => {
     if (!value.includes("'")) return `'${value}'`;
@@ -207,7 +207,7 @@ function xpathFromCompound(c: Compound): string {
   return (c.tag ?? "*") + predicates.map((p) => `[${p}]`).join("");
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function evaluate(start: Parse5Node[], steps: [string, Compound][], handler: unknown) {
   let set = start.filter((n) => matches(n, steps[0][1], handler));
   for (const [combinator, compound] of steps.slice(1)) {
@@ -227,7 +227,7 @@ function evaluate(start: Parse5Node[], steps: [string, Compound][], handler: unk
   return set;
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function matches(n: Parse5Node, c: Compound, handler: unknown): boolean {
   if (!("tagName" in n)) return false;
   const attr = (name: string) => n.attrs.find((a) => a.name === name)?.value ?? null;
@@ -277,7 +277,7 @@ function matches(n: Parse5Node, c: Compound, handler: unknown): boolean {
   return true;
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function nthChild(args: string | null): [number, number] {
   const nth = /^\s*(?:([+-]?\d*)n\s*(?:([+-])\s*(\d+))?|([+-]?\d+))\s*$/.exec(
     args === "odd" ? "2n+1" : args === "even" ? "2n" : (args ?? ""),
@@ -295,36 +295,36 @@ function nthChild(args: string | null): [number, number] {
   return [a, b];
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function splitArgs(args: string): string[] {
   return [...args.matchAll(/\s*('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|[^,]+)\s*(?:,|$)/g)].map(
     ([, arg]) => unquote(arg.trim()),
   );
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function unquote(value: string): string {
   return /^(['"]).*\1$/s.test(value) ? value.slice(1, -1).replace(/\\(['"])/g, "$1") : value;
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function parentOf(n: Parse5Node): Parse5Node {
   return (n as { parentNode?: Parse5Node }).parentNode ?? n;
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function rootOf(n: Parse5Node): Parse5Node {
   while ((n as { parentNode?: Parse5Node | null }).parentNode) n = parentOf(n);
   return n;
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function elementChildren(n: Parse5Node): Parse5Element[] {
   const children = (n as { childNodes?: Parse5Node[] }).childNodes ?? [];
   return children.filter((c): c is Parse5Element => "tagName" in c);
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 function descendants(n: Parse5Node, includeSelf = false): Parse5Node[] {
   const result: Parse5Node[] = includeSelf ? [n] : [];
   const content = (n as { content?: Parse5Node }).content;
@@ -334,7 +334,7 @@ function descendants(n: Parse5Node, includeSelf = false): Parse5Node[] {
   return result;
 }
 
-/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+/** @noRailsEquivalent CONVERGEABLE nokogiri-xpath-evaluator-behind-searchable-css */
 class Parser {
   private pos = 0;
 
