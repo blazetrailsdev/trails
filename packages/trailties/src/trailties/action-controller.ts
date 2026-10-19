@@ -192,7 +192,7 @@ async function helperConstants(
 
       const exported = mod[demodulize(name)];
       if (rbObjIsKindOf(exported, Module) || (exported && typeof exported === "object")) {
-        constants.set(name, exported);
+        constants.set(name, exported as object);
       }
     }
   };
