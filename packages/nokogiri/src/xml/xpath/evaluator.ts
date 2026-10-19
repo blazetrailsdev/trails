@@ -404,7 +404,7 @@ function stringToNumber(s: string): number {
   return /^\s*-?(\d+(\.\d*)?|\.\d+)\s*$/.test(s) ? Number(s) : NaN;
 }
 
-export function numberToString(n: number): string {
+function numberToString(n: number): string {
   if (Number.isNaN(n)) return "NaN";
   if (n === Infinity) return "Infinity";
   if (n === -Infinity) return "-Infinity";
