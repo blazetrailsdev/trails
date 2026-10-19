@@ -9,6 +9,7 @@ import {
   merge,
   rbFSend,
   rbObjDup,
+  rbModDefineMethod,
   rbObjRespondTo,
   symbolToS,
   valuesAt,
@@ -555,6 +556,18 @@ export function toXml(
   builder.closeTag(root);
   return builder.target();
 }
+
+rbModDefineMethod(
+  Hash,
+  "toXml",
+  function (
+    this: AnyObject,
+    options?: XmlMini.ToXmlOptions,
+    block?: (builder: XmlMini.XmlBuilder) => void,
+  ) {
+    return toXml(this, options, block);
+  },
+);
 
 export function fromXml(
   xml: string | StringIO | null | undefined,
