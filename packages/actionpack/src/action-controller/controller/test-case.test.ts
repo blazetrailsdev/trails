@@ -491,8 +491,7 @@ describe("TestCaseTest", () => {
     tc.assertSelect("root > area + p");
   });
 
-  // BLOCKED: nokogiri-xml-document-searchable
-  it.skip("should not impose childless html tags in xml", async () => {
+  it("should not impose childless html tags in xml", async () => {
     await tc.process("testXmlOutput", { params: { response_as: "application/xml" } });
 
     tc.assertSelect("root > area > p");
