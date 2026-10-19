@@ -134,7 +134,7 @@ export class Cookie {
   /** @noRailsEquivalent PERMANENT */
   domain!: string | null;
   /** @noRailsEquivalent PERMANENT */
-  expires: Date | null;
+  expires: unknown;
   /** @noRailsEquivalent PERMANENT */
   secure: boolean;
 
@@ -151,7 +151,7 @@ export class Cookie {
     const value = rbFArray(options["value"]) as string[];
     this.setPath((options["path"] as string | null | undefined) || "");
     this.setDomain((options["domain"] as string | null | undefined) ?? null);
-    this.expires = (options["expires"] as Date | null | undefined) ?? null;
+    this.expires = options["expires"] ?? null;
     this.secure = options["secure"] === true;
 
     this.value = value;
