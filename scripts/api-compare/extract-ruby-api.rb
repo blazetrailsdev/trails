@@ -3855,8 +3855,6 @@ class ApiExtractor
       elsif lhs.is_a?(Array) && lhs[0] == :const_path_field && self_ref?(lhs[1])
         lhs[2]
       elsif lhs.is_a?(Array) && lhs[0] == :const_path_field
-        # `Rack::BUILDER_TOPLEVEL_BINDING = ->(builder){…}` (rack/builder.rb:6):
-        # a constant seated on a named namespace from outside its body.
         lhs[2]
       end
     return unless const.is_a?(Array) && const[0] == :@const
