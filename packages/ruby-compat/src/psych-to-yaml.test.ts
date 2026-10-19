@@ -3,13 +3,13 @@ import { toYaml } from "./yaml.js";
 import { Struct } from "./struct.js";
 import { Range } from "./range.js";
 import { registerConstant } from "./variable.js";
-import { defineModule, rbModConstSet } from "./include.js";
+import { rbModConstSet } from "./include.js";
 
 function cleanYaml(yaml: string): string {
   return yaml.replace(/([^-]|^---)[ \t]+\n/gm, "$1\n").replace(/\n\.\.\.\n$/, "\n");
 }
 
-const YAMLSpecs = rbModConstSet(Object, "YAMLSpecs", defineModule({}));
+const YAMLSpecs = rbModConstSet(Object, "YAMLSpecs", {});
 const Example = rbModConstSet(
   YAMLSpecs,
   "Example",

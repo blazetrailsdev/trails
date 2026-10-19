@@ -11,10 +11,10 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
-  defineModule,
   Dir,
   include,
   isModuleIncluded,
+  isPlainHash,
   isSymbol,
   Module,
   rbClassSuperclass,
@@ -63,7 +63,7 @@ export function modulesForHelpers(
   modulesOrHelperPrefixes: HelperArgument[],
 ): HelperMethodsModule[] {
   return (modulesOrHelperPrefixes as unknown[]).flat(Infinity).map((moduleOrHelperPrefix) => {
-    if (rbObjIsKindOf(moduleOrHelperPrefix, Module)) {
+    if (rbObjIsKindOf(moduleOrHelperPrefix, Module) || isPlainHash(moduleOrHelperPrefix)) {
       return moduleOrHelperPrefix as HelperMethodsModule;
     } else if (typeof moduleOrHelperPrefix === "string") {
       let helperPrefix = isSymbol(moduleOrHelperPrefix)
@@ -173,7 +173,7 @@ export function helper(
 
 export function clearHelpers(this: HelpersClass): void {
   const inheritedHelperMethods = this._helperMethods;
-  this._helpers = defineModule({});
+  this._helpers = {};
   this._helperMethods = [];
 
   inheritedHelperMethods.forEach((meth) => this.helperMethod(meth));
@@ -201,7 +201,7 @@ export function defineHelpersModule(
     return rbModConstGet(klass, "HelperMethods") as HelperMethodsModule;
   }
 
-  const mod: HelperMethodsModule = defineModule({});
+  const mod: HelperMethodsModule = {};
   rbModConstSet(klass, "HelperMethods", mod);
   if (helpers != null) include(mod, helpers);
   return mod;

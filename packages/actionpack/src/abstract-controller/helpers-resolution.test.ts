@@ -77,12 +77,9 @@ describe("modulesForHelpers", () => {
     );
   });
 
-  it("raises ArgumentError for a Hash, which is not a Module", () => {
-    const hash = { foo: () => "FOO" } as unknown as HelperMethodsModule;
-    expect(() => modulesForHelpers([hash])).toThrow(ArgumentError);
-    expect(() => modulesForHelpers([{} as HelperMethodsModule])).toThrow(
-      "helper must be a String, Symbol, or Module",
-    );
+  it("passes a plain-object module through", () => {
+    const mod = { foo: () => "FOO" };
+    expect(modulesForHelpers([mod])).toEqual([mod]);
   });
 });
 

@@ -1832,9 +1832,9 @@ describe("Module#const_set", () => {
     expect(mod.inspect()).toBe("Topic::Generated");
   });
 
-  it("names a defineModule plain module after the constant it is bound to", () => {
+  it("names a plain-object module after the constant it is bound to", () => {
     class Topic {}
-    const mod = defineModule({ name: () => "method" });
+    const mod = {};
     expect(rbModName(mod)).toBeNull();
     expect(rbModToS(mod as never)).toMatch(/^#<Module:0x/);
     rbModConstSet(Topic, "Generated", mod);
@@ -1844,13 +1844,13 @@ describe("Module#const_set", () => {
   });
 
   it("orders a plain module's ancestors as include_modules_at does, and lists no constant as a method", () => {
-    const Y = defineModule({ y: () => "y" });
-    const Z = defineModule({ z: () => "z" });
+    const Y = { y: () => "y" };
+    const Z = { z: () => "z" };
     include(Z, Y);
-    const W = defineModule({ w: () => "w" });
+    const W = { w: () => "w" };
     include(W, Y);
     include(W, Z);
-    rbModConstSet(W, "Inner", defineModule({}));
+    rbModConstSet(W, "Inner", {});
     expect(rbModAncestors(W)).toEqual([W, Z, Y]);
     expect(isModuleIncluded(W, Y)).toBe(true);
     expect(isModuleIncluded(W, W)).toBe(false);

@@ -1,7 +1,8 @@
 import { ArgumentError } from "./argument-error.js";
+import { classpaths } from "./classpath.js";
 import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
-import { Module, extend, moduleVisibility, prepend, rbGetAllocFunc } from "./include.js";
+import { Module, extend, prepend, rbGetAllocFunc } from "./include.js";
 
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
@@ -9,6 +10,7 @@ import { Rational, nuratDumper, nuratLoader } from "./rational.js";
 import {
   FL_SINGLETON,
   T_ICLASS,
+  isPlainHash,
   rbFSend,
   rbInspect,
   rbModName,
@@ -657,7 +659,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
         wCstr(path, arg);
         wEncname(encname, arg);
       }
-    } else if (obj instanceof Module || Object.hasOwn(obj as object, moduleVisibility)) {
+    } else if (obj instanceof Module || (isPlainHash(obj) && classpaths.has(obj))) {
       const path = class2path(obj as Module);
       const encname = wEncivar(path, arg);
       wByte(TYPE_MODULE, arg);
@@ -1076,12 +1078,7 @@ function path2class(path: string): AnyClass {
 
 /** `must_be_module` (`vendor/ruby/v3.3.11/marshal.c:1803`), under `path2module` (`marshal.c:1800`). */
 function mustBeModule(v: unknown, path: string): Module {
-  if (
-    !(
-      v instanceof Module ||
-      (typeof v === "object" && v !== null && Object.hasOwn(v, moduleVisibility))
-    )
-  ) {
+  if (!(v instanceof Module || isPlainHash(v))) {
     throw new ArgumentError(`${path} does not refer to module`);
   }
   return v as Module;

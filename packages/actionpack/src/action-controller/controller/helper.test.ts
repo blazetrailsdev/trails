@@ -1,10 +1,4 @@
-import {
-  defineModule,
-  publicInstanceMethods,
-  rbFSend,
-  rbModAncestors,
-  rbModToS,
-} from "@blazetrails/ruby-compat";
+import { publicInstanceMethods, rbFSend, rbModAncestors, rbModToS } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   include,
@@ -283,7 +277,7 @@ describe("HelperTest", () => {
     controllerClass.helpersPath = File.expandPath("alternate-helpers", fixtures);
     await ActionPackTestSuiteUtils.requireHelpers(controllerClass.helpersPath);
 
-    controllerClass._helpers = defineModule({});
+    controllerClass._helpers = {};
     controllerClass.helper(":all");
 
     expect(masterHelperMethods()).not.toContain("bareA");

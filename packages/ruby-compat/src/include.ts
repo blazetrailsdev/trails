@@ -37,6 +37,7 @@ import {
   FL_SINGLETON,
   T_ICLASS,
   classpaths,
+  isPlainHash,
   rbSetClassPathString,
   rbAnyToS,
   rbCBasicObject,
@@ -101,7 +102,7 @@ export function rbModConstSet<T>(
   Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
   if (
     value instanceof Module ||
-    (typeof value === "object" && value !== null && Object.hasOwn(value, moduleVisibility)) ||
+    isPlainHash(value) ||
     (typeof value === "function" &&
       Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false)
   ) {
@@ -112,7 +113,7 @@ export function rbModConstSet<T>(
       return value;
     }
     const parentalPathPermanent =
-      mod instanceof Module || Object.hasOwn(mod, moduleVisibility)
+      mod instanceof Module || (isPlainHash(mod) && classpaths.has(mod))
         ? classpaths.get(mod)?.permanent === true
         : Boolean((mod as { readonly name?: string }).name);
     const parentalPath = parentalPathPermanent
@@ -1105,7 +1106,7 @@ export function isModuleIncluded(
   klass: { prototype: object } | ModuleObject,
   mod: ModuleObject | AnyClass | Module,
 ): boolean {
-  if (Object.hasOwn(klass, moduleVisibility)) {
+  if (isPlainHash(klass) && !Object.hasOwn(klass, "prototype")) {
     return klass !== mod && rbModAncestors(klass as { prototype: object }).includes(mod);
   }
   return isModuleMethodTablePresent(klass as { prototype: object }, mod);
@@ -1152,18 +1153,13 @@ export function includedModules(mod: { prototype: object }): unknown[] {
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
 export function rbModAncestors(mod: { prototype: object } | ModuleObject): object[] {
-  if (Object.hasOwn(mod, moduleVisibility)) {
+  if (isPlainHash(mod) && !Object.hasOwn(mod, "prototype")) {
     const ary: object[] = [mod];
     const mods = Object.hasOwn(mod, moduleIncludesKey)
       ? [...(mod as Record<symbol, Set<object>>)[moduleIncludesKey]]
       : [];
     for (const m of mods.reverse()) {
-      const chain =
-        m instanceof Module
-          ? m.ancestors()
-          : Object.hasOwn(m, moduleVisibility)
-            ? rbModAncestors(m)
-            : [m];
+      const chain = m instanceof Module ? m.ancestors() : isPlainHash(m) ? rbModAncestors(m) : [m];
       for (const a of chain) if (!ary.includes(a)) ary.push(a);
     }
     return ary;
@@ -1501,18 +1497,9 @@ export function publicInstanceMethods(
   const sections = (mod as Record<symbol, unknown>)[moduleVisibility] as
     | ModuleVisibility
     | undefined;
-  if (!sections) return Object.keys(mod);
-  const names = sections.public.filter((name) => Object.hasOwn(mod, name));
-  for (const name of Object.keys(mod)) {
-    if (
-      !/^[A-Z]/.test(name) &&
-      !names.includes(name) &&
-      !sections.protected.includes(name) &&
-      !sections.private.includes(name)
-    ) {
-      names.push(name);
-    }
-  }
+  const names = sections
+    ? [...sections.public]
+    : Object.keys(mod).filter((name) => !/^[A-Z]/.test(name));
   if (!includeSuper) return names;
   for (const m of rbModAncestors(mod).slice(1)) {
     for (const name of publicInstanceMethods(m, false)) {

@@ -18,8 +18,6 @@ import { NoMethodError } from "./no-method-error.js";
 import { Hash } from "./hash.js";
 import { toEnum } from "./enumerator.js";
 
-const moduleVisibility = Symbol.for("@blazetrails/ruby-compat:moduleVisibility");
-
 type Klass = abstract new (...args: never) => unknown;
 
 /**
@@ -72,8 +70,6 @@ export function rbObjClass(obj: unknown): Klass {
   if (tag === "Temporal.PlainDate") return reopened(rbCDate) as Klass;
   if (tag === "Temporal.PlainDateTime") return reopened(rbCDateTime) as Klass;
   if (tag === "Temporal.PlainTime") return reopened(rbCTime) as Klass;
-  if (Object.hasOwn(obj as object, moduleVisibility))
-    return Object.getPrototypeOf(rbCClass) as Klass;
   if (isPlainHash(obj)) return Hash;
   const klass = (obj as object).constructor as Klass | undefined;
   if (klass === Date) return reopened(rbCTime) as Klass;
@@ -468,7 +464,6 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * @noRailsEquivalent PERMANENT
  */
 export function rbModName(klass: object): string | null {
-  if (Object.hasOwn(klass, moduleVisibility)) return classpaths.get(klass)?.path ?? null;
   return classpaths.get(klass)?.path ?? ((klass as { name?: string | null }).name || null);
 }
 
@@ -1459,7 +1454,7 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (isSymbol(value)) return symInspect(value);
   if (typeof value === "string") return stringInspect(value);
   if (Array.isArray(value)) return inspectAry(value, recursing);
-  if (typeof value === "object" && Object.hasOwn(value, moduleVisibility)) {
+  if (isPlainHash(value) && classpaths.has(value)) {
     return rbModToS(value as unknown as abstract new (...args: never) => unknown);
   }
   if (isPlainHash(value) || value instanceof Map) return inspectHash(value, recursing);
