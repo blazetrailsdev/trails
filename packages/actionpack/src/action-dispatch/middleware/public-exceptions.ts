@@ -50,7 +50,7 @@ export class PublicExceptions {
     const format = contentType
       ? camelize(`to_${contentType.toSym()?.slice(1) ?? ""}`, false)
       : null;
-    if (format && rbObjRespondTo(body, format)) {
+    if (format != null && rbObjRespondTo(body, format)) {
       return this.renderFormat(status, contentType!, rbFPublicSend(body, format) as string);
     } else {
       return this.renderHtml(status);

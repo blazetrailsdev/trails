@@ -34,9 +34,7 @@ function toJSON(
 
 export const ToJsonWithActiveSupportEncoder = { toJSON };
 
-rbModDefineMethod(RubyHash, "toJson", function (this: object, options?: EncodeOptions | null) {
-  return ActiveSupportJSON.encode(this, options ?? undefined);
-});
+rbModDefineMethod(RubyHash, "toJson", toJSON);
 
 export class Module {
   static asJson(value: { name: string }, options: EncodeOptions | null = null): string {
