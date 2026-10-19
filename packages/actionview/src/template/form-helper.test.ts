@@ -173,7 +173,7 @@ class Relevance {
 class CommentRelevance extends Relevance {}
 class TagRelevance extends Relevance {}
 
-class HashBackedAuthor extends Hash {
+class HashBackedAuthor extends Hash<string, unknown> {
   static {
     extend(this, Naming);
     include(this, Conversion);

@@ -271,7 +271,18 @@ export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-mi
 export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
-export { FLOAT_DIG, anybits, fixDiv, fixMod, isFinite, isNan, round, toF, toI } from "./numeric.js";
+export {
+  FLOAT_DIG,
+  anybits,
+  fixDiv,
+  fixMod,
+  isFinite,
+  isNan,
+  numStep,
+  round,
+  toF,
+  toI,
+} from "./numeric.js";
 export {
   intXor,
   numericMinus,

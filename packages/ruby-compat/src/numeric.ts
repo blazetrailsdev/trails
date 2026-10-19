@@ -622,3 +622,74 @@ export function rbPlus(v: unknown, i: unknown): unknown {
  * @noRailsEquivalent PERMANENT
  */
 export const FLOAT_DIG = 15;
+
+/**
+ * Ruby `Numeric#step(to, step) { |i| }` over the `number` seat, with a block
+ * (`num_step`, `vendor/ruby/v3.3.11/numeric.c:3034`). An integral `number` is a
+ * Fixnum and takes the `long` loop; any other takes `ruby_float_step`
+ * (`numeric.c:2767`), so an infinite or NaN bound yields nothing where a naive
+ * `for` loop would never end.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function numStep(
+  from: number,
+  to: number,
+  step: number,
+  block: (i: number) => void,
+): number {
+  const desc = step < 0;
+  let inf: boolean;
+  if (step === 0) {
+    inf = true;
+  } else if (!Number.isInteger(to)) {
+    inf = !Number.isFinite(to) && !Number.isNaN(to) && (to < 0 ? desc : !desc);
+  } else inf = false;
+
+  if (Number.isInteger(from) && (inf || Number.isInteger(to)) && Number.isInteger(step)) {
+    let i = from;
+    if (inf) {
+      for (; ; i += step) block(i);
+    } else if (desc) {
+      for (; i >= to; i += step) block(i);
+    } else {
+      for (; i <= to; i += step) block(i);
+    }
+  } else {
+    rubyFloatStep(from, to, step, block);
+  }
+  return from;
+}
+
+function rubyFloatStepSize(beg: number, end: number, unit: number): number {
+  const epsilon = Number.EPSILON;
+  if (unit === 0) return Infinity;
+  if (!Number.isFinite(unit)) return Number(unit > 0 ? beg <= end : beg >= end);
+  let n = (end - beg) / unit;
+  let err = ((Math.abs(beg) + Math.abs(end) + Math.abs(end - beg)) / Math.abs(unit)) * epsilon;
+  if (err > 0.5) err = 0.5;
+  if (n < 0) return 0;
+  n = Math.floor(n + err);
+  const d = (n + 1) * unit + beg;
+  if (beg < end) {
+    if (d <= end) n++;
+  } else if (beg > end) {
+    if (d >= end) n++;
+  }
+  return n + 1;
+}
+
+function rubyFloatStep(beg: number, end: number, unit: number, block: (i: number) => void): void {
+  const n = rubyFloatStepSize(beg, end, unit);
+  if (!Number.isFinite(unit)) {
+    if (n) block(beg);
+  } else if (unit === 0) {
+    for (;;) block(beg);
+  } else {
+    for (let i = 0; i < n; i++) {
+      let d = i * unit + beg;
+      if (unit >= 0 ? end < d : d < end) d = end;
+      block(d);
+    }
+  }
+}

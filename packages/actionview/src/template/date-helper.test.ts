@@ -3,11 +3,20 @@ import "../test-helpers/abstract-unit.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Struct, block, sprintf } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Time } from "@blazetrails/date";
-import { ordinalize, travelTo } from "@blazetrails/activesupport";
+import {
+  TimeZone,
+  assertPredicate,
+  isHtmlSafe,
+  ordinalize,
+  setZone,
+  travelTo,
+  zone,
+} from "@blazetrails/activesupport";
 import {
   distanceOfTimeInWords,
   selectDay,
   selectDate,
+  selectDatetime,
   selectHour,
   selectMinute,
   selectMonth,
@@ -2719,6 +2728,322 @@ describe("DateHelperTest", () => {
     expected += `</select>\n`;
 
     assertDomEqual(expected, view.datetimeSelect(`post`, `updated_at`, {}, { class: `selector` }));
+  });
+
+  it("date select with nil", () => {
+    view.post = new Post();
+
+    const startYear = Time.now().year - 5;
+    const endYear = Time.now().year + 5;
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    for (const i of upto(startYear, endYear)) {
+      expected += `<option value="${i}"${i === Time.now().year ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === Time.now().month ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === Time.now().day ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`));
+  });
+
+  it("date select with nil and blank and discard month", () => {
+    view.post = new Post();
+
+    const startYear = Time.now().year - 5;
+    const endYear = Time.now().year + 5;
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(startYear, endYear)) {
+      expected += `<option value="${i}">${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected +=
+      '<input name="post[written_on(2i)]" type="hidden" id="post_written_on_2i" value="1" autocomplete="off"/>' +
+      `\n`;
+    expected +=
+      '<input name="post[written_on(3i)]" type="hidden" id="post_written_on_3i" value="1" autocomplete="off"/>' +
+      `\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, { discardMonth: true, includeBlank: true }),
+    );
+  });
+
+  it("datetime select with default value as hash", () => {
+    view.post = new Post();
+    view.post.updated_at = null;
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    for (const i of upto(Time.now().year - 5, Time.now().year + 5)) {
+      expected += `<option value="${i}"${i === Time.now().year ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 10 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === Time.now().day ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 9 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 42 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, { default: { month: 10, minute: 42, hour: 9 } }),
+    );
+  });
+
+  it("datetime select defaults to time zone now when config time zone is set", () => {
+    const mytz = class extends TimeZone {
+      nowValue: unknown = null;
+      override now(): any {
+        return this.nowValue;
+      }
+    }.create("tenderlove", 0, TimeZone.findTzinfo("UTC"));
+
+    const now = Time.mktime(2004, 6, 15, 16, 35, 0);
+    mytz.nowValue = now;
+    setZone(mytz);
+    try {
+      expect(zone()).toBe(mytz);
+
+      view.post = new Post();
+
+      let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+      expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+      expected += `</select>\n`;
+      expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+      expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+      expected += `</select>\n`;
+      expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+      expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+      expected += `</select>\n`;
+      expected += ` &mdash; `;
+      expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+      expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16" selected="selected">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+      expected += `</select>\n`;
+      expected += ` : `;
+      expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+      expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35" selected="selected">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+      expected += `</select>\n`;
+
+      assertDomEqual(expected, view.datetimeSelect("post", "updated_at"));
+    } finally {
+      setZone(null);
+    }
+  });
+
+  it("datetime select with integer", () => {
+    view.post = new Post();
+    view.post.updated_at = 3;
+    expect(() => view.datetimeSelect("post", "updated_at")).not.toThrow();
+  });
+
+  it("datetime select with infinity", () => {
+    view.post = new Post();
+    view.post.updated_at = -1.0 / 0;
+    expect(() => view.datetimeSelect("post", "updated_at")).not.toThrow();
+  });
+
+  it("date select should not change passed options hash", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2008, 7, 16, 23, 30);
+
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    view.dateSelect(view.post, "updated_at", options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("datetime select should not change passed options hash", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2008, 7, 16, 23, 30);
+
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    view.datetimeSelect(view.post, "updated_at", options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("time select should not change passed options hash", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2008, 7, 16, 23, 30);
+
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    view.timeSelect(view.post, "updated_at", options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("select date should not change passed options hash", () => {
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    selectDate.call(view, RubyDate.today(), options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("select datetime should not change passed options hash", () => {
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    selectDatetime.call(view, Time.now(), options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("select time should not change passed options hash", () => {
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    selectTime.call(view, Time.now(), options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("select html safety", () => {
+    assertPredicate(selectDay.call(view, 16), isHtmlSafe);
+    assertPredicate(selectMonth.call(view, 8), isHtmlSafe);
+    assertPredicate(selectYear.call(view, Time.mktime(2003, 8, 16, 8, 4, 18)), isHtmlSafe);
+    assertPredicate(selectMinute.call(view, Time.mktime(2003, 8, 16, 8, 4, 18)), isHtmlSafe);
+    assertPredicate(selectSecond.call(view, Time.mktime(2003, 8, 16, 8, 4, 18)), isHtmlSafe);
+
+    assertPredicate(selectMinute.call(view, 8, { useHidden: true }), isHtmlSafe);
+    assertPredicate(selectMonth.call(view, 8, { prompt: "Choose month" }), isHtmlSafe);
+
+    assertPredicate(
+      selectTime.call(view, Time.mktime(2003, 8, 16, 8, 4, 18), {}, { class: "selector" }),
+      isHtmlSafe,
+    );
+    assertPredicate(
+      selectDate.call(view, Time.mktime(2003, 8, 16), {
+        dateSeparator: " / ",
+        startYear: 2003,
+        endYear: 2005,
+        prefix: "date[first]",
+      }),
+      isHtmlSafe,
+    );
+  });
+
+  it("object select html safety", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    assertPredicate(
+      view.dateSelect("post", "written_on", {
+        default: Time.local(2006, 9, 19, 15, 16, 35),
+        includeBlank: true,
+      }),
+      isHtmlSafe,
+    );
   });
 
   it("time tag with date", () => {
