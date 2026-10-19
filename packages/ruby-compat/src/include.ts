@@ -2029,7 +2029,19 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   }
   if (Object.hasOwn(mod, moduleIncludesKey)) {
     for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
-      if (!singletonSearchAncestor(klass, nested)) extendObject(klass, nested);
+      if (singletonSearchAncestor(klass, nested)) continue;
+      if (typeof nested !== "function") {
+        extendObject(klass, nested);
+        continue;
+      }
+      const { constructor: _constructor, ...methods } = Object.getOwnPropertyDescriptors(
+        (nested as AnyClass).prototype,
+      );
+      for (const descriptor of Object.values(methods)) descriptor.enumerable = true;
+      const table = Object.defineProperties({}, methods);
+      extendObject(klass, table);
+      (klass as Record<symbol, Set<object>>)[includedModulesKey].delete(table);
+      trackIncludedModule(klass, nested);
     }
   }
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;

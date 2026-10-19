@@ -39,6 +39,8 @@ describe("MessagesSerializerWithFallbackTrailsTest", () => {
     ActiveSupport.MessagePack = undefined;
 
     expect(SerializerWithFallback.SERIALIZERS.message_pack.dumped(dumped)).toBe(false);
-    expect(CacheSerializerWithFallback.SERIALIZERS.message_pack.dumped(cacheDumped)).toBe(false);
+    expect(CacheSerializerWithFallback.SERIALIZERS.get("message_pack")!.dumped(cacheDumped)).toBe(
+      false,
+    );
   });
 });
