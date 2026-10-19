@@ -150,15 +150,6 @@ export const ConditionalGet = {
   httpCacheForever,
   noStore,
   combineEtags,
-} as {
-  ClassMethods: typeof ClassMethods;
-  freshWhen: typeof freshWhen;
-  isStale: typeof isStale;
-  expiresIn: typeof expiresIn;
-  expiresNow: typeof expiresNow;
-  httpCacheForever: typeof httpCacheForever;
-  noStore: typeof noStore;
-  combineEtags: typeof combineEtags;
 };
 extend(ConditionalGet, Concern);
 include(ConditionalGet, Head);
