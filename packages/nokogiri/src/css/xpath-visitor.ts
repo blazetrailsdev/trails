@@ -6,8 +6,6 @@ import { GLOBAL_SEARCH_PREFIX } from "../xml/xpath.js";
 import { Node } from "./node.js";
 import { SyntaxError } from "./syntax-error.js";
 
-const GLOBAL_SEARCH_PREFIX = "//";
-
 export const BuiltinsConfig = {
   NEVER: "never",
   ALWAYS: "always",
