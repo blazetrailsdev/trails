@@ -4,7 +4,9 @@ import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
 import {
   ARRAY_METHOD_TABLE,
+  Hash as RubyHash,
   Kernel,
+  rbModDefineMethod,
   Range as RangeValue,
   STRING_METHOD_TABLE,
   toS,
@@ -31,6 +33,8 @@ function toJSON(
 }
 
 export const ToJsonWithActiveSupportEncoder = { toJSON };
+
+rbModDefineMethod(RubyHash, "toJson", toJSON);
 
 export class Module {
   static asJson(value: { name: string }, options: EncodeOptions | null = null): string {

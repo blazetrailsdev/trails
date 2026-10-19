@@ -1,5 +1,5 @@
-import { I18n } from "@blazetrails/activesupport";
-import { fetch, File } from "@blazetrails/ruby-compat";
+import { I18n, camelize } from "@blazetrails/activesupport";
+import { fetch, File, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
@@ -47,14 +47,14 @@ export class PublicExceptions {
   }
 
   private render(status: number, contentType: MimeType | undefined, body: ErrorBody): RackResponse {
-    const sym = contentType?.symbol;
-    if (sym === ":json") {
-      return this.renderFormat(status, contentType!, JSON.stringify(body));
+    const format = contentType
+      ? camelize(`to_${contentType.toSym()?.slice(1) ?? ""}`, false)
+      : null;
+    if (format != null && rbObjRespondTo(body, format)) {
+      return this.renderFormat(status, contentType!, rbFPublicSend(body, format) as string);
+    } else {
+      return this.renderHtml(status);
     }
-    if (sym === ":xml") {
-      return this.renderFormat(status, contentType!, toXml(body));
-    }
-    return this.renderHtml(status);
   }
 
   private renderFormat(status: number, contentType: MimeType | string, body: string): RackResponse {
@@ -87,23 +87,4 @@ export class PublicExceptions {
     }
     return [404, { [X_CASCADE]: "pass" }, emptyBody()];
   }
-}
-
-function toXml(body: ErrorBody): string {
-  return (
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<hash>\n` +
-    `  <status type="integer">${body.status}</status>\n` +
-    `  <error>${escapeXml(body.error)}</error>\n` +
-    `</hash>\n`
-  );
-}
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }
