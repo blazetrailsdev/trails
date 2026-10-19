@@ -9,3 +9,4 @@ export {
   type RawSourceMap,
   type LineMapping,
 } from "./source-map.js";
+export { parseScript, JsNode, JsParseError, type JsLocation } from "./js-parser.js";

@@ -18,6 +18,12 @@ declare module "@blazetrails/actionpack" {
   }
 }
 
+const __dir__ = decodeURIComponent(new URL(".", import.meta.url).pathname);
+
+export const FIXTURE_LOAD_PATH = File.expandPath("fixtures", __dir__);
+
+ActionController.Base.viewPaths(FIXTURE_LOAD_PATH);
+
 ActionController.Base.testRoutes = function (
   this: typeof ActionController.Base,
   block: DrawCallback,
@@ -45,7 +51,3 @@ ActionController.TestCase.withRoutes = function (
 };
 
 RoutingUrlFor.include(UrlFor);
-
-const __dir__ = decodeURIComponent(new URL(".", import.meta.url).pathname);
-
-export const FIXTURE_LOAD_PATH = File.expandPath("fixtures", __dir__);
