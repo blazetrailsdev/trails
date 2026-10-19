@@ -116,7 +116,10 @@ const RESERVED_KEYS = [
 
 type AnyHash = Record<string, unknown> | Map<string, unknown>;
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm isSymbol — PERMANENT
+ */
 function serializeArgument(argument: unknown): unknown {
   if (
     argument == null ||
