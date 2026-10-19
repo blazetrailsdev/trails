@@ -6,7 +6,7 @@ import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
-import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
@@ -279,7 +279,7 @@ export class TitlePrimaryKeyTopic extends Topic {
 }
 registerModel(TitlePrimaryKeyTopic);
 
-export const Web = new Module();
+export const Web = {};
 registerConstant("Web", Web);
 
 export class WebTopic extends Base {

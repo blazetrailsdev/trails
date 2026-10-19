@@ -131,7 +131,7 @@ export class Column {
     if (this.defaultFunction != null) this.defaultFunction = strUminus(this.defaultFunction);
     if (this.collation != null) this.collation = strUminus(this.collation);
     if (this.comment != null) this.comment = strUminus(this.comment);
-    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
+    return Object.freeze(this);
   }
 
   initWith(coder: ColumnCoder): void {

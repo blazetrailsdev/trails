@@ -56,11 +56,11 @@ export class Developer extends Base {
 
   declare static ProjectsAssociationExtension: Module;
 
-  static ProjectsAssociationExtension2 = new Module((mod) => {
-    mod.defineMethod("findLeastRecent", async function (this: Relation<Base>) {
+  static ProjectsAssociationExtension2 = {
+    async findLeastRecent(this: Relation<Base>) {
       return this.order("id ASC").first();
-    });
-  });
+    },
+  };
 
   static {
     this.ignoredColumns = ["first_name", "last_name"];
