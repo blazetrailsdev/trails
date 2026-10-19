@@ -267,7 +267,6 @@ export class Template {
     return this.strictLocalsBang() != null;
   }
 
-  /** @internal */
   marshalDump(): unknown[] {
     return [
       this._source,
@@ -281,7 +280,6 @@ export class Template {
     ];
   }
 
-  /** @internal */
   marshalLoad(array: unknown[]): void {
     const [_source, identifier, handler, _compiled, _locals, virtualPath, format, variant] = array;
     Object.assign(this, {
