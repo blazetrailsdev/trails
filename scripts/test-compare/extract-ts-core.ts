@@ -162,7 +162,10 @@ function helperCalleeArguments(call: ts.CallExpression): readonly ts.Expression[
  */
 function predicateFormOf(name: string, args: readonly ts.Expression[]): string | null {
   if (args.length !== 2) return null;
-  return name === "mustBe" ? "assertPredicate" : name === "wontBe" ? "refutePredicate" : null;
+  const nilPred = ts.isStringLiteralLike(args[1]) && args[1].text === "isNil";
+  if (name === "mustBe") return nilPred ? "assertNil" : "assertPredicate";
+  if (name === "wontBe") return nilPred ? "refuteNil" : "refutePredicate";
+  return null;
 }
 
 function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string | null {

@@ -42,6 +42,8 @@ describe("TS extractor assertion-count collection", () => {
         mustBe(x, "isEmpty");
         wontBe(x, "isEmpty");
         mustBe(x, "<", 3);
+        mustBe(x, "isNil");
+        wontBe(x, "isNil");
       });
     `;
     const info = extractTestsFromSource(src, "packages/rack-test/src/x.test.ts");
@@ -49,6 +51,8 @@ describe("TS extractor assertion-count collection", () => {
       "assertPredicate",
       "refutePredicate",
       "mustBe",
+      "assertNil",
+      "refuteNil",
     ]);
   });
 
