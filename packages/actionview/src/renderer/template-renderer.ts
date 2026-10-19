@@ -65,7 +65,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
         format,
       });
     }
-    if (Object.hasOwn(options, "renderable") && options.renderable) {
+    if (Object.hasOwn(options, "renderable")) {
       return new Renderable(options.renderable);
     }
     if (Object.hasOwn(options, "template") && options.template != null) {
@@ -81,7 +81,7 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
         this.details,
       ) as RenderableTemplate;
     }
-    throw new Error(
+    throw new ArgumentError(
       "You invoked render but did not give any of :body, :file, :html, :inline, :partial, :plain, :renderable, or :template option.",
     );
   }
