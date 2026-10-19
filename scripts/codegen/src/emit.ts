@@ -446,9 +446,9 @@ export class Emitter {
       return why
         ? [
             `// PERMANENT-SKIP: ${why}`,
-            `${vitest("it")}.skip(${nm}, async ({ testCase }: any) => {`,
+            `${vitest("it")}.skip@@TC@@(${nm}, async ({ testCase }) => {`,
           ]
-        : [`${itCall(guard)}(${nm}, async ({ testCase }: any) => {`];
+        : [`${itCall(guard)}@@TC@@(${nm}, async ({ testCase }) => {`];
     };
     const guarded = (guard: string | null, lines: string[]): string[] =>
       guard ? [`if (${guard}) {`, ...indent(lines), "}"] : lines;
@@ -486,7 +486,7 @@ export class Emitter {
           const hook = vitest(s.name === "setup" ? "beforeEach" : "afterEach");
           out.push(
             ...guarded(guard, [
-              `${hook}(async ({ testCase }: any) => {`,
+              `${hook}@@TC@@(async ({ testCase }) => {`,
               ...indent(body(s.block.body)),
               "});",
             ]),
@@ -635,30 +635,69 @@ export class Emitter {
       !classLines.length &&
       f.rubyFile.startsWith("test/cases/") &&
       ![...this.index.scopes.keys()].some((k) => k.startsWith(`${u.fqn}::`));
-    const host = bare ? "" : this.lw.imp(hctx, "@root/codegen-runtime.js", "TestHost");
+    // A test class whose Ruby superclass is the gem's (`ActiveJob::TestCase`)
+    // extends it, and gets `TestHelper`'s members through it.
+    const supHit =
+      u.superclass?.k === "const"
+        ? this.index.resolveConst(u.superclass.path, u.nesting)
+        : undefined;
+    // A dependency's class a test support file reopens (`ActiveSupport::TestCase`
+    // in support/job_buffer.rb) is not the gem's.
+    const depRoot = /^(ActiveSupport|ActiveRecord|ActiveModel|Minitest|Rails)::/.test(
+      supHit?.kind === "scope" ? `${supHit.fqn}::` : "",
+    );
+    const supRef =
+      supHit?.kind === "scope" &&
+      !depRoot &&
+      this.index.scopes.get(supHit.fqn)?.kind === "class" &&
+      this.resolver.exportNames.get(supHit.fqn)
+        ? this.resolver.fqnRef(supHit.fqn, hctx, this.lw)
+        : null;
+    const declared = !bare || !!supRef;
+    const host = !declared
+      ? ""
+      : (supRef ?? this.lw.imp(hctx, "@root/codegen-runtime.js", "TestHost"));
+    const mix = declared ? this.mixinDecls(u, f, short, hostMembers) : { iface: null, statics: [] };
+    // The ivars the tests keep on the test case (`@logger` in `setup`).
+    const testIvars = new Set<string>();
+    for (const l of [...out, ...hostMembers])
+      for (const m of l.matchAll(/\btestCase\.(_[\w$]+)\b(?!\s*\()/g)) testIvars.add(m[1]);
+    const inheritedT = this.inheritedFields(u.fqn);
+    const ivarLines = [...testIvars]
+      .filter(
+        (x) =>
+          !inheritedT.has(x) &&
+          !hostMembers.some((m) => new RegExp(`\\b${x}\\b`).test(m.split("\n")[0])),
+      )
+      .map((x) => `declare ${x}: unknown;`);
+    const members = [...ivarLines, ...mix.statics, ...hostMembers];
+    // Each test and hook receives this class's instance as `testCase`.
+    const tc = declared ? `<{ testCase: ${short} }>` : "";
+    const sub = (l: string) => l.split("@@TC@@").join(tc);
     return [
-      ...(bare
+      ...(!declared
         ? []
         : [
-            hostMembers.length
+            members.length
               ? [
                   `class ${short} extends ${host} {`,
-                  ...indent(hostMembers.join("\n\n").split("\n")),
+                  ...indent(members.join("\n\n").split("\n")),
                   "}",
                 ].join("\n")
               : `class ${short} extends ${host} {}`,
+            ...(mix.iface ? [mix.iface] : []),
             `${this.lw.rc(hctx, "registerConstant")}(${JSON.stringify(short)}, ${short});`,
           ]),
       ...classLines,
       `${desc}(${JSON.stringify(short)}, () => {`,
       ...indent([
-        `${vitest("beforeEach")}(async ({ testCase }: any) => {`,
+        `${vitest("beforeEach")}${tc}(async ({ testCase }) => {`,
         "  await testCase.setup();",
         "});",
-        `${vitest("afterEach")}(async ({ testCase }: any) => {`,
+        `${vitest("afterEach")}${tc}(async ({ testCase }) => {`,
         "  await testCase.teardown();",
         "});",
-        ...out,
+        ...out.map(sub),
       ]),
       "});",
     ].join("\n");
@@ -682,7 +721,7 @@ export class Emitter {
         });
         const lines = this.lw.block(this.lw.seqBody(s.block.body), ctx, false);
         const hook = this.lw.imp(ctx, "vitest", s.name === "setup" ? "beforeEach" : "afterEach");
-        out.push(`${hook}(async ({ testCase }: any) => {`, ...indent(lines), "});");
+        out.push(`${hook}(async ({ testCase }) => {`, ...indent(lines), "});");
       } else {
         const ctx = this.baseCtx(u, f, { selfKind: "static", selfExpr: "testCase" });
         out.push(
