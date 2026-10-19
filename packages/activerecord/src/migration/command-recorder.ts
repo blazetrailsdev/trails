@@ -244,12 +244,12 @@ export class CommandRecorder {
 
   /** @internal */
   invertAddBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["removeReference", args, block];
+    return CommandRecorder.StraightReversions.invertAddReference(args, block);
   }
 
   /** @internal */
   invertRemoveBelongsTo(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    return ["addReference", args, block];
+    return CommandRecorder.StraightReversions.invertRemoveReference(args, block);
   }
 
   /** @internal */

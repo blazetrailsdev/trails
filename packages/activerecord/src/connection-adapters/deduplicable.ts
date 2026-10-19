@@ -3,10 +3,9 @@ import { Hash, extend, hashAref, hashAset } from "@blazetrails/ruby-compat";
 
 type DeduplicableClass = { registry(): Hash<object, object> };
 
-export function deduplicate<T>(this: T): T {
-  const registry = ((this as object).constructor as unknown as DeduplicableClass).registry();
-  return (hashAref(registry, this as object) ??
-    hashAset(registry, this as object, (this as { deduplicated(): object }).deduplicated())) as T;
+export function deduplicate<T extends object & { deduplicated(): T }>(this: T): T {
+  const registry = (this.constructor as unknown as DeduplicableClass).registry();
+  return (hashAref(registry, this) ?? hashAset(registry, this, this.deduplicated())) as T;
 }
 export const negate = deduplicate;
 
@@ -32,8 +31,8 @@ export const Deduplicable: {
   deduplicated(): object;
 } = {
   ClassMethods,
-  deduplicate,
-  negate,
+  deduplicate: deduplicate as <T>(this: T) => T,
+  negate: negate as <T>(this: T) => T,
   deduplicated,
 };
 extend(Deduplicable, Concern);
