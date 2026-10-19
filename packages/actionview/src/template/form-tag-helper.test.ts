@@ -414,7 +414,7 @@ describe("FormTagHelperTest", () => {
     );
   });
 
-  // BLOCKED: port-form-tag-helper-and-checkable-test-remainder
+  // BLOCKED: actionview-tests-needing-actionpack-controller-and-parameters
   it.skip("file field tag with direct upload when rails direct uploads url is defined", () => {});
 
   it("file field tag with direct upload dont mutate arguments", () => {
@@ -673,7 +673,7 @@ describe("FormTagHelperTest", () => {
     assertDomEqual(expected, actual);
   });
 
-  // BLOCKED: port-form-tag-helper-and-checkable-test-remainder
+  // BLOCKED: actionview-tests-needing-actionpack-controller-and-parameters
   it.skip("text field tag with ac parameters", () => {});
 
   it("text field tag size string", () => {
@@ -951,6 +951,16 @@ describe("FormTagHelperTest", () => {
     );
   });
 
+  it("button tag defaults with block and options", () => {
+    const output = view.buttonTag({ name: "temptation", value: "within" }, null, () =>
+      view.contentTag("strong", "Do not press me"),
+    );
+    assertDomEqual(
+      '<button name="temptation" value="within" type="submit" ><strong>Do not press me</strong></button>',
+      output,
+    );
+  });
+
   it("button tag with confirmation", () => {
     assertDomEqual(
       `<button name="button" type="submit" data-confirm="Are you sure?">Save</button>`,
@@ -962,6 +972,13 @@ describe("FormTagHelperTest", () => {
     assertDomEqual(
       `<button name="button" type="submit" data-disable-with="Please wait...">Checkout</button>`,
       view.buttonTag("Checkout", { data: { disable_with: "Please wait..." } }),
+    );
+  });
+
+  it("image submit tag with confirmation", () => {
+    assertDomEqual(
+      `<input type="image" src="/images/save.gif" data-confirm="Are you sure?" />`,
+      view.imageSubmitTag("save.gif", { data: { confirm: "Are you sure?" } }),
     );
   });
 
@@ -1074,6 +1091,36 @@ describe("FormTagHelperTest", () => {
 
     expected = `<fieldset><legend>You legend!</legend></fieldset>`;
     assertDomEqual(expected, outputBuffer);
+  });
+
+  it("textarea tag options symbolize keys side effects", () => {
+    const options = { option: "random_option" };
+    view.textareaTag("body", "hello world", options);
+    assertEqual({ option: "random_option" }, options);
+  });
+
+  it("submit tag options symbolize keys side effects", () => {
+    const options = { option: "random_option" };
+    view.submitTag("submit value", options);
+    assertEqual({ option: "random_option" }, options);
+  });
+
+  it("button tag options symbolize keys side effects", () => {
+    const options = { option: "random_option" };
+    view.buttonTag("button value", options);
+    assertEqual({ option: "random_option" }, options);
+  });
+
+  it("image submit tag options symbolize keys side effects", () => {
+    const options = { option: "random_option" };
+    view.imageSubmitTag("submit source", options);
+    assertEqual({ option: "random_option" }, options);
+  });
+
+  it("image label tag options symbolize keys side effects", () => {
+    const options = { option: "random_option" };
+    view.labelTag("submit source", "title", options);
+    assertEqual({ option: "random_option" }, options);
   });
 
   it("content exfiltration prevention", () => {

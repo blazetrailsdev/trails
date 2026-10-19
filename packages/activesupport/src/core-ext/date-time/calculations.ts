@@ -283,3 +283,15 @@ export function compare(datetime: DateTime, other: unknown): number | null {
 for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
   Object.assign(TEMPORAL_METHOD_TABLE[seat], { isUtc, getutc, getlocal, nsec, change });
 }
+
+declare module "@blazetrails/date" {
+  interface DateTime {
+    change(options: ChangeOptions): DateTime;
+  }
+}
+
+Object.assign(RubyDateTime.prototype, {
+  change(this: RubyDateTime, options: ChangeOptions): DateTime {
+    return change(this.toDatetime(), options);
+  },
+});

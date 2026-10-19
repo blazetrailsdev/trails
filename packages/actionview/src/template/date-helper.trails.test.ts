@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Date as RubyDate } from "@blazetrails/date";
 import {
+  selectDate,
   distanceOfTimeInWords,
   distanceOfTimeInWordsToNow,
   timeAgoInWords,
@@ -25,5 +27,12 @@ describe("DateHelperTest", () => {
 
   it("supports custom scope via I18n lookup", () => {
     expect(distanceOfTimeInWords(0, 60, { scope: "datetime.distance_in_words" })).toBe("1 minute");
+  });
+
+  it("selects a Date class instance with discard_day", () => {
+    const date = new RubyDate(2004, 6, 15);
+    const discarded = String(selectDate(date, { discardDay: true }));
+    expect(discarded).toContain('name="date[day]" value="1"');
+    expect(discarded).toContain('<option value="6" selected="selected">June</option>');
   });
 });
