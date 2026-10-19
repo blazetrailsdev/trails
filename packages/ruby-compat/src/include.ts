@@ -1607,7 +1607,7 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
   }
 }
 
-export type Extended<M extends object> = CallableMethods<M>;
+export type Extended<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
 
 /**
  * Mirrors: Ruby's Object#clone — vendor/ruby/v3.3.11/object.c:536 `rb_obj_clone`, via

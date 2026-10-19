@@ -3381,8 +3381,6 @@ export class Lowerer {
         });
       this.stat(ctx, "class-new");
       const members = [
-        "static [key: string]: any;",
-        "[key: string]: any;",
         ...methods,
         ...(lines.length ? [`static {\n${indent(lines).join("\n")}\n}`] : []),
       ];

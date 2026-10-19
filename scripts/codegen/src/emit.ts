@@ -18,7 +18,7 @@ import { TS_CONSTANT_RENAMES } from "./constant-renames.js";
 import { TS_CLASS_RENAMES } from "../../parity/conventions.js";
 import type { IrFile, N, Param } from "./ir.js";
 import { walk } from "./ir.js";
-import { GemIndex, lexicalChain, qualify, type ScopeInfo } from "./gem-index.js";
+import { GemIndex, lexicalChain, qualify, rubyAncestors, type ScopeInfo } from "./gem-index.js";
 import {
   indent,
   jsIdent,
@@ -1655,18 +1655,121 @@ export class Emitter {
     if (!members.some((m) => /^(?:override )?static (?:override )?toString\(/.test(m)))
       members.unshift(`static toString(): string {\n  return ${JSON.stringify(u.fqn)};\n}`);
     const head = `export class ${name}${ext} {`;
-    const sig = [
-      "[key: string]: any;",
-      "static [key: string]: any;",
-      ...this.ivarDecls(u, f, members),
-    ];
+    const mix = this.mixinDecls(u, f, name, members);
+    const sig = [...this.ivarDecls(u, f, members), ...mix.statics];
     const text = [
       head,
       ...indent([...sig, ...dedupeMembers(members).flatMap((m) => ["", m])]),
       "}",
+      ...(mix.iface ? [mix.iface] : []),
       ...after,
     ].join("\n");
     return { text, defs };
+  }
+
+  /**
+   * The members a class gets from the modules that enter its Ruby ancestors at
+   * this class (`include M`, and a Concern's `ClassMethods`, which its
+   * `append_features` extends the class with), typed through ruby-compat's
+   * `Included<>` / `Extended<>`: the instance side as an interface merged with
+   * the class, the class side as `declare static` members. A name the class
+   * defines itself, or a nearer module already gave it, is left to that one.
+   */
+  mixinDecls(
+    u: Unit,
+    f: FileCtx,
+    name: string,
+    members: string[],
+  ): { iface: string | null; statics: string[] } {
+    const sc = this.index.scopes.get(u.fqn);
+    if (!sc || sc.kind !== "class") return { iface: null, statics: [] };
+    const ctx = this.baseCtx(u, f, {});
+    const inherited = new Set(sc.superclassFqn ? rubyAncestors(this.index, sc.superclassFqn) : []);
+    const mods = rubyAncestors(this.index, u.fqn).filter(
+      (m) => m !== u.fqn && !inherited.has(m) && this.index.scopes.get(m)?.kind === "module",
+    );
+    const ownName = (m: string) =>
+      /^(?:override )?(static )?(?:override )?(?:async )?(?:get |set )?\*?([\w$]+)\(/.exec(m) ??
+      null;
+    const own = { inst: new Set<string>(), stat: new Set<string>() };
+    for (const m of members) {
+      const hit = ownName(m);
+      if (hit) (hit[1] ? own.stat : own.inst).add(hit[2]);
+    }
+    const ref = (fqn: string) =>
+      this.lw.expr({ k: "const", path: ["", ...fqn.split("::")] } as N, ctx);
+    const quote = (n: string) => JSON.stringify(n);
+    const bases: string[] = [];
+    const statics: string[] = [];
+    const attrs: string[] = [];
+    const Included = this.lw.imp(ctx, "@blazetrails/ruby-compat", "Included");
+    const Extended = this.lw.imp(ctx, "@blazetrails/ruby-compat", "Extended");
+    const key = this.resolver.oracleKey(u.fqn);
+    // A `class_attribute` / `mattr_accessor` an `included do` block declares on
+    // the includer: activesupport's accessor property, typed by the hand twin.
+    const attrType = (a: string, isStatic: boolean): string => {
+      const t = key ? this.resolver.types.member(key, a, isStatic)?.info.ret : undefined;
+      const ts = this.lw.tsType(t ?? undefined, ctx);
+      return ts === "any" ? "unknown" : ts;
+    };
+    // A writer `def x=` is the module function `setX` (CLAUDE.md's `setX()` spelling).
+    const fnName = (d: string, owner: string) =>
+      d.endsWith("=") && !/[=!<>]=$/.test(d)
+        ? `set${propName(d.slice(0, -1))[0].toUpperCase()}${propName(d.slice(0, -1)).slice(1)}`
+        : tsMethodName(d, owner);
+    // Names a gem subclass redefines as a method: a property in the merged
+    // interface would clash with its method (TS2425), so these are declared as
+    // method signatures of the module function's type.
+    const overridden = new Set<string>();
+    for (const o of this.index.scopes.values())
+      if (o.kind === "class" && o.fqn !== u.fqn && rubyAncestors(this.index, o.fqn).includes(u.fqn))
+        for (const d of o.defs.keys()) overridden.add(fnName(d, o.fqn));
+    const methods: string[] = [];
+    for (const m of mods) {
+      const ms = this.index.scopes.get(m)!;
+      const t = `${Included}<typeof ${ref(m)}>`;
+      const names: string[] = [];
+      for (const [d, info] of ms.defs) {
+        // A reader whose writer another scope declares is an accessor half: a property.
+        if (info.params.length === 0 && this.index.instanceWriters.has(d)) continue;
+        names.push(fnName(d, m));
+      }
+      const omit = names.filter((n) => own.inst.has(n) || overridden.has(n));
+      if (names.length) bases.push(omit.length ? `Omit<${t}, ${omit.map(quote).join(" | ")}>` : t);
+      for (const n of names) {
+        if (!own.inst.has(n) && overridden.has(n))
+          methods.push(
+            `${n}(...args: Parameters<${t}[${quote(n)}]>): ReturnType<${t}[${quote(n)}]>;`,
+          );
+        own.inst.add(n);
+      }
+      for (const a of ms.sattrs) {
+        const n = propName(a);
+        if (own.stat.has(n)) continue;
+        own.stat.add(n);
+        statics.push(`declare static ${n}: ${attrType(a, true)};`);
+      }
+      for (const a of ms.attrs) {
+        const n = propName(a);
+        if (own.inst.has(n)) continue;
+        own.inst.add(n);
+        attrs.push(`${n}: ${attrType(a, false)};`);
+      }
+      const cm = this.index.scopes.get(`${m}::ClassMethods`);
+      if (ms.concern && cm) {
+        for (const d of cm.defs.keys()) {
+          const n = fnName(d, cm.fqn);
+          if (own.stat.has(n)) continue;
+          own.stat.add(n);
+          statics.push(`declare static ${n}: ${Extended}<typeof ${ref(cm.fqn)}>[${quote(n)}];`);
+        }
+      }
+    }
+    const iface =
+      bases.length || attrs.length || methods.length
+        ? `export interface ${name}${bases.length ? ` extends ${bases.join(", ")}` : ""} {${attrs.length || methods.length ? `\n${indent([...attrs, ...methods]).join("\n")}\n` : ""}}`
+        : null;
+    return { iface, statics };
   }
 
   /**
@@ -1734,7 +1837,7 @@ export class Emitter {
       const field = this.lw.ivar(ivar, ctx).replace(/^this\./, "");
       if (members.some((m) => new RegExp(`^(?:get |set |static )?${field}\\b`).test(m))) continue;
       const ts = this.lw.tsType(t, ctx);
-      if (ts !== "any") out.push(`declare ${field}: ${ts};`);
+      out.push(`declare ${field}: ${ts === "any" ? "unknown" : ts};`);
     }
     return out;
   }
@@ -2099,14 +2202,36 @@ export class Emitter {
         const syms = d.args.filter((a: N) => a.k === "sym").map((a: N) => a.value as string);
         for (const a of syms) if (syms.includes(`${a}=`)) readerHalves.add(tsMethodName(a, u.fqn));
       }
+    // A method written inline is hoisted to a named function, so the Module's
+    // method table can be typed by `typeof` each entry (`Included<>` / `Extended<>`).
+    const hoistedFns: string[] = [];
     const defs2 = dedupeMembers(members).map((m) => {
-      const line = toDefineMethod(m);
+      let line = toDefineMethod(m);
+      const inline =
+        /^((?:\/\*\*[^]*?\*\/\n)?)mod\.defineMethod\("([\w$]+)", ((?:async )?function \([^]*)\);$/.exec(
+          line,
+        );
+      if (inline) {
+        const fn = `${inline[2]}$method`;
+        hoistedFns.push(`${inline[1]}const ${fn} = ${inline[3]};`);
+        line = `mod.defineMethod(${JSON.stringify(inline[2])}, ${fn});`;
+      }
       const hit = /^mod\.defineMethod\("([\w$]+)", ([\w$]+|function[\s\S]*)\);$/.exec(line);
       return hit && readerHalves.has(hit[1])
         ? `mod.moduleEval((table: any) => Object.defineProperty(table, ${JSON.stringify(hit[1])}, { configurable: true, get: ${hit[2]} }));`
         : line;
     });
     const out: string[] = [...fns.flatMap((x) => [x, ""])];
+    // The Module's instance-method table as a type: each `defineMethod` entry.
+    const tableType = (): string => {
+      const entries = defs2
+        .map((l) => /^mod\.defineMethod\("([\w$]+)", ([\w$]+)\);$/.exec(l))
+        .filter((h): h is RegExpExecArray => !!h)
+        .map(
+          (h) => `${/^[A-Za-z_$][\w$]*$/.test(h[1]) ? h[1] : JSON.stringify(h[1])}: typeof ${h[2]}`,
+        );
+      return entries.length ? `<{ ${entries.join("; ")} }>` : "";
+    };
     // CLAUDE.md "Module mixins": a module is a plain object of its `this`-typed
     // functions, which `include()` copies onto the includer (activerecord's
     // `Integration`). It is a ruby-compat `Module` only for what needs its
@@ -2188,7 +2313,9 @@ export class Emitter {
       ? plainMembers.length
         ? `{\n${indent(plainMembers.join(",\n").split("\n")).join("\n")},\n}`
         : "{}"
-      : `new ${ModuleRef}(${ctorBody})`;
+      : seatNames.length
+        ? `Object.assign(new ${ModuleRef}${tableType()}(${ctorBody}), { ${seatNames.join(", ")} })`
+        : `new ${ModuleRef}${tableType()}(${ctorBody})`;
     // The gem's top namespace is seated by the hand port's `namespaces.ts`, a
     // plain object extended with `ActiveSupport::Autoload` (CLAUDE.md, "Call-time
     // constant resolution"); this file adds its module functions, not a second object.
@@ -2209,7 +2336,8 @@ export class Emitter {
     }
     // `X[included] = fn` at top level is the shape the extractor reads an
     // `included do` port from (includedHookOwner).
-    out.push(`export const ${name}${plain && !stateful ? "" : ": any"} = ${modExpr};`);
+    if (!plain) out.push(...hoistedFns.flatMap((x) => [x, ""]));
+    out.push(`export const ${name}${plain && !stateful ? "" : plain ? ": any" : ""} = ${modExpr};`);
     // A constant in the module body (`VERSION::STRING`) lives in the module's
     // constant table, as well as the file's flat export.
     {
@@ -2217,7 +2345,7 @@ export class Emitter {
       const set = cs.length ? this.lw.rc(this.baseCtx(u, f, {}), "rbModConstSet") : "";
       for (const c of cs) out.push(`${set}(${name}, ${JSON.stringify(c.path[0])}, ${c.path[0]});`);
     }
-    if (seatLine && !plain) out.push(seatLine);
+    if (seatLine && !plain && !modExpr.startsWith("Object.assign(")) out.push(seatLine);
     if (isConcern && !plain) out.push(concernLine());
     if (incl) out.push(incl);
     if (tops.length) {
