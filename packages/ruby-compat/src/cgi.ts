@@ -159,7 +159,7 @@ export class Cookie {
 
   /** @noRailsEquivalent PERMANENT */
   setName(str: string | null): void {
-    if (str && !Cookie.TOKEN_RE.test(str)) {
+    if (str != null && !Cookie.TOKEN_RE.test(str)) {
       throw new ArgumentError(`invalid name: ${JSON.stringify(str)}`);
     }
     this.name = str;
@@ -167,7 +167,7 @@ export class Cookie {
 
   /** @noRailsEquivalent PERMANENT */
   setPath(str: string | null): void {
-    if (str && !Cookie.PATH_VALUE_RE.test(str)) {
+    if (str != null && !Cookie.PATH_VALUE_RE.test(str)) {
       throw new ArgumentError(`invalid path: ${JSON.stringify(str)}`);
     }
     this.path = str;
@@ -175,7 +175,7 @@ export class Cookie {
 
   /** @noRailsEquivalent PERMANENT */
   setDomain(str: string | null): void {
-    if (str && (bytes(str).length > 255 || !Cookie.DOMAIN_VALUE_RE.test(str))) {
+    if (str != null && (bytes(str).length > 255 || !Cookie.DOMAIN_VALUE_RE.test(str))) {
       throw new ArgumentError(`invalid domain: ${JSON.stringify(str)}`);
     }
     this.domain = str;
