@@ -2732,6 +2732,219 @@ describe("FormHelperTest", () => {
     );
   });
 
+  it("fields for", () => {
+    rendered = view.fieldsFor("post", post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+      "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for field id", () => {
+    view.fieldsFor("post", post, {}, (fields) => {
+      expect(fields.fieldId("title")).toBe("post_title");
+    });
+  });
+
+  it("fields for with index", () => {
+    rendered = view.fieldsFor("post[]", post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[123][title]' type='text' id='post_123_title' value='Hello World' />" +
+      "<textarea name='post[123][body]' id='post_123_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[123][secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[123][secret]' checked='checked' type='checkbox' id='post_123_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for field id with index option", () => {
+    view.fieldsFor("post", post, {}, (fields) => {
+      expect(fields.fieldId("title", { index: 5 })).toBe("post_5_title");
+    });
+  });
+
+  it("fields for with nil index option override", () => {
+    rendered = view.fieldsFor("post[]", post, { index: null }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[][title]' type='text' id='post__title' value='Hello World' />" +
+      "<textarea name='post[][body]' id='post__body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[][secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[][secret]' checked='checked' type='checkbox' id='post__secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for with index option override field id", () => {
+    view.fieldsFor("post", post, { index: 1 }, (fields) => {
+      expect(fields.fieldId("title")).toBe("post_1_title");
+    });
+  });
+
+  it("fields for with index option override", () => {
+    rendered = view.fieldsFor("post[]", post, { index: "abc" }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[abc][title]' type='text' id='post_abc_title' value='Hello World' />" +
+      "<textarea name='post[abc][body]' id='post_abc_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[abc][secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[abc][secret]' checked='checked' type='checkbox' id='post_abc_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for without object", () => {
+    rendered = view.fieldsFor("post", null, {}, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+      "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for with only object", () => {
+    rendered = view.fieldsFor(post, null, {}, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+      "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for object with bracketed name", () => {
+    rendered = view.fieldsFor("author[post]", post, {}, (f) => {
+      concat(f.label("title"));
+      concat(f.textField("title"));
+    });
+
+    assertDomEqual(
+      '<label for="author_post_title">Title</label>' +
+        "<input name='author[post][title]' type='text' id='author_post_title' value='Hello World' />",
+      rendered,
+    );
+  });
+
+  it("fields for object with bracketed name and index", () => {
+    rendered = view.fieldsFor("author[post]", post, { index: 1 }, (f) => {
+      concat(f.label("title"));
+      concat(f.textField("title"));
+    });
+
+    assertDomEqual(
+      '<label for="author_post_1_title">Title</label>' +
+        "<input name='author[post][1][title]' type='text' id='author_post_1_title' value='Hello World' />",
+      rendered,
+    );
+  });
+
+  it("form builder does not have form for method", () => {
+    expect("formFor" in FormBuilder.prototype).toBe(false);
+  });
+
+  it("form for and fields for", () => {
+    formFor(post, { as: "post", html: { id: "create-post" } }, (postForm) => {
+      concat(postForm.textField("title"));
+      concat(postForm.textarea("body"));
+
+      concat(
+        view.fieldsFor("parent_post", post, {}, (parentFields) => {
+          concat(parentFields.checkbox("secret"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "create-post",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='parent_post[secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='parent_post[secret]' checked='checked' type='checkbox' id='parent_post_secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for and fields for with object", () => {
+    formFor(post, { as: "post", html: { id: "create-post" } }, (postForm) => {
+      concat(postForm.textField("title"));
+      concat(postForm.textarea("body"));
+
+      concat(
+        postForm.fieldsFor(comment, null, null, (commentFields) => {
+          concat(commentFields.textField("name"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "create-post",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[comment][name]' type='text' id='post_comment_name' value='new comment' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for and fields for with non nested association and without object", () => {
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("category", null, null, (c) => {
+          concat(c.textField("name"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () => "<input name='post[category][name]' type='text' id='post_category_name' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
   it("nested fields for with existing records on a nested attributes collection association", () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
     formFor(post, {}, (f) => {
