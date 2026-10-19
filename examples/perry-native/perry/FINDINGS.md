@@ -28,7 +28,8 @@ Status of each wall after re-verification:
 
 | Wall                               | Status                                                                                                                               |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 1 — codegen memory                 | 362 modules fit in 20GB. The app's 32GB exhaustion was **misattributed to this wall**; it happens in resolution, before collection — see the correction. |
+| 1 — codegen memory                 | 362 modules fit in 20GB. **Still the live blocker**, and the only one: the app's 32GB exhaustion was misattributed to it — see the correction. |
+| 1b — resolver symlink cycle        | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased. |
 | 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                                               |
 | 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                                      |
 | 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship.                      |
@@ -361,8 +362,24 @@ module count was never the blocker, and the 3.5x-the-362-module-subgraph
 framing below it was measuring the wrong thing.
 
 This is a Perry resolver bug and it affects any pnpm workspace, not just this
-one. It is not filed upstream yet; the reproducer is about ten lines of
-workspace setup.
+one. **Filed and fixed upstream**: [issue 12822](https://github.com/PerryTS/perry/issues/12822)
+(reported independently by @lws2004 a day before our own duplicate, closed as
+[12893](https://github.com/PerryTS/perry/issues/12893)), fixed by
+[PR 12895](https://github.com/PerryTS/perry/pull/12895), merged into Perry
+`main` as `86ab1c0c8f`.
+
+`collect_packages_in_node_modules` recursed into every nested `node_modules`
+with no visited set and never canonicalized the symlinked spelling, so a cycle
+re-entered the same physical directory forever. The fix threads a set of
+canonical paths through the recursion. A two-package reproducer is enough when
+the back-pointer is the scope *directory*, which is the shape pnpm produces:
+before the fix it issued 73,578 `openat` calls in 25s and never terminated;
+after it, the same tree resolves in under a second.
+
+So this wall is gone at source, but not yet in a release — npm `latest` is
+still 0.5.1520 (2026-09-11). Until a release carries `86ab1c0c8f`, reproducing
+the full-app collection needs either a from-source Perry or the symlink
+deletion above.
 
 ## The SQLite result is weaker than it looks
 
@@ -478,9 +495,11 @@ Treat only `perry compile` — and then running the binary — as a result.
    not the cause of any Perry failure here, but circular value imports in the
    foundation layer are a genuine code-quality question and they pair with the
    module graph measured in [runtime-graph.md](runtime-graph.md).
-8. **File the resolver symlink cycle — it is the best filing candidate left.**
-   See the correction above. It is not specific to trails: any pnpm workspace
-   hits it, the reproducer is about ten lines, and it currently reads to a user
-   as "my project is too big to compile".
-9. **Nothing here asks trails to change for Perry's sake.** Every wall is
+8. **The resolver symlink cycle is fixed upstream — do not re-diagnose it.**
+   See the correction above: issue 12822, PR 12895, merged as `86ab1c0c8f`.
+   Unreleased as of 2026-10-19, so a published Perry still hits it.
+9. **Wall 3b, the shape mint, is now the only live bug with a reproducer and
+   no filing.** Narrowed in [upstream/SHAPE-MINT.md](upstream/SHAPE-MINT.md)
+   and re-verified on from-source `main` (0.5.1662); still unfiled.
+10. **Nothing here asks trails to change for Perry's sake.** Every wall is
    Perry's and no change in this repo moves them.
