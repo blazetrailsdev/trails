@@ -18,6 +18,8 @@ import { NoMethodError } from "./no-method-error.js";
 import { Hash } from "./hash.js";
 import { toEnum } from "./enumerator.js";
 
+const moduleVisibility = Symbol.for("@blazetrails/ruby-compat:moduleVisibility");
+
 type Klass = abstract new (...args: never) => unknown;
 
 /**
@@ -433,6 +435,9 @@ export function rbClassAttachedObject(klass: abstract new (...args: never) => un
  * @noRailsEquivalent PERMANENT
  */
 export function rbModToS(klass: abstract new (...args: never) => unknown): string {
+  if (typeof klass !== "function") {
+    return classpaths.get(klass)?.path ?? `#<Module:${objAddress(klass)}>`;
+  }
   if (rbModSingletonP(klass)) {
     let s = "#<Class:";
     const v = (klass as unknown as { [FL_SINGLETON]: object })[FL_SINGLETON];
@@ -461,6 +466,7 @@ export function rbModToS(klass: abstract new (...args: never) => unknown): strin
  * @noRailsEquivalent PERMANENT
  */
 export function rbModName(klass: object): string | null {
+  if (Object.hasOwn(klass, moduleVisibility)) return classpaths.get(klass)?.path ?? null;
   return classpaths.get(klass)?.path ?? ((klass as { name?: string | null }).name || null);
 }
 
@@ -1451,6 +1457,9 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (isSymbol(value)) return symInspect(value);
   if (typeof value === "string") return stringInspect(value);
   if (Array.isArray(value)) return inspectAry(value, recursing);
+  if (typeof value === "object" && Object.hasOwn(value, moduleVisibility)) {
+    return rbModToS(value as unknown as abstract new (...args: never) => unknown);
+  }
   if (isPlainHash(value) || value instanceof Map) return inspectHash(value, recursing);
   if (value instanceof RegExp) return regDesc(value);
   if (value instanceof Set) return setInspect(value, recursing);

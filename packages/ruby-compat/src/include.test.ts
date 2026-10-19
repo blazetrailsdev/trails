@@ -4,6 +4,7 @@ import { NameError } from "./name-error.js";
 import { rbModConstGet, registerConstant, unregisterConstant } from "./variable.js";
 import { Hash } from "./hash.js";
 import {
+  rbInspect,
   rbCBasicObject,
   rbClassSuperclass,
   rbObjClass,
@@ -1829,6 +1830,17 @@ describe("Module#const_set", () => {
     expect((Topic as unknown as { Generated: Module }).Generated).toBe(mod);
     expect(mod.name).toBe("Topic::Generated");
     expect(mod.inspect()).toBe("Topic::Generated");
+  });
+
+  it("names a defineModule plain module after the constant it is bound to", () => {
+    class Topic {}
+    const mod = defineModule({ name: () => "method" });
+    expect(rbModName(mod)).toBeNull();
+    expect(rbModToS(mod as never)).toMatch(/^#<Module:0x/);
+    rbModConstSet(Topic, "Generated", mod);
+    expect(rbModName(mod)).toBe("Topic::Generated");
+    expect(rbModToS(mod as never)).toBe("Topic::Generated");
+    expect(rbInspect(mod)).toBe("Topic::Generated");
   });
 
   it("names a class after the constant it is bound to", () => {

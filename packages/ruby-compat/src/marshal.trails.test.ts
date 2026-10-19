@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { ArgumentError } from "./argument-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { Hash } from "./hash.js";
-import { Module, extend, rbDefineAllocFunc, rbModConstSet } from "./include.js";
+import { Module, defineModule, extend, rbDefineAllocFunc, rbModConstSet } from "./include.js";
 import { Marshal, rbMarshalDefineCompat } from "./marshal.js";
 import {
   rbCBasicObject,
@@ -39,7 +39,7 @@ class Shape {
 }
 const Geo = { name: "Geo", Shape };
 rbSetClassPathString(Shape, Geo, "Shape");
-const Kind = rbModConstSet(Geo, "Kind", new Module());
+const Kind = rbModConstSet(Geo, "Kind", defineModule({}));
 class Pair extends Struct.new("a", "b") {}
 rbModConstSet(Geo, "Pair", Pair);
 class Shadow extends Struct.new("a") {

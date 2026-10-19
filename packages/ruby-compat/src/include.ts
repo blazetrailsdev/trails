@@ -75,7 +75,8 @@ type ModuleHooks = {
  * letter (`rb_sym_constant_char_p`, vendor/ruby/v3.3.11/symbol.c:218-250), then
  * identifier characters (`is_identchar`, symbol.c:54). It then calls `const_set`
  * (vendor/ruby/v3.3.11/variable.c:3607). Binding a module names it after the
- * owner (variable.c:3648-3668), as it does a class: permanently under a named
+ * owner (variable.c:3648-3668), as it does a class or a `defineModule` plain
+ * module: permanently under a named
  * owner, and under an anonymous one with the owner's temporary path, until a
  * named owner re-paths it. `Module#name` and `Module#inspect` read that path.
  * `rb_namespace_p` (variable.c:83) admits a class or a module: a class here is a function
@@ -96,6 +97,7 @@ export function rbModConstSet<T>(
   Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
   if (
     value instanceof Module ||
+    (typeof value === "object" && value !== null && Object.hasOwn(value, moduleVisibility)) ||
     (typeof value === "function" &&
       Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false)
   ) {
@@ -106,7 +108,9 @@ export function rbModConstSet<T>(
       return value;
     }
     const parentalPathPermanent =
-      mod instanceof Module ? classpaths.get(mod)?.permanent === true : Boolean(mod.name);
+      mod instanceof Module || Object.hasOwn(mod, moduleVisibility)
+        ? classpaths.get(mod)?.permanent === true
+        : Boolean(mod.name);
     const parentalPath = parentalPathPermanent
       ? mod instanceof Module
         ? mod.name

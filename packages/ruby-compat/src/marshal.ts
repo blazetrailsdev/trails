@@ -1,7 +1,10 @@
 import { ArgumentError } from "./argument-error.js";
 import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
-import { Module, prepend, rbGetAllocFunc } from "./include.js";
+import { Module, extend, moduleVisibility, prepend, rbGetAllocFunc } from "./include.js";
+
+const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
+const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
 import { Rational, nuratDumper, nuratLoader } from "./rational.js";
@@ -359,13 +362,22 @@ function singletonDumpUnableP(klass: object): boolean {
  * singleton check and the `RICLASS_IS_ORIGIN` guard (`marshal.c:561-562`) have
  * no iclass to meet. `rb_class_name` answers an anonymous module's temporary
  * path, which `w_unique` refuses (`must_not_be_anonymous`, `marshal.c:530`).
+ * A plain-object module `extend` copied onto `obj` is recorded on `obj`
+ * itself, and stands for the iclass `extend` puts beneath the singleton class.
  */
-function wExtended(klass: object | null, arg: DumpArg, check: boolean): void {
+function wExtended(obj: object, arg: DumpArg, check: boolean): void {
+  let klass = Object.getPrototypeOf(obj) as object | null;
   if (check && klass !== null && Object.hasOwn(klass, FL_SINGLETON)) {
     if (singletonDumpUnableP(klass)) {
       throw new TypeError("singleton can't be dumped");
     }
     klass = Object.getPrototypeOf(klass) as object | null;
+  }
+  if (Object.hasOwn(obj, extendedKeys) && Object.hasOwn(obj, includedModulesKey)) {
+    for (const m of [...(obj as Record<symbol, Set<object>>)[includedModulesKey]].reverse()) {
+      wByte(TYPE_EXTENDED, arg);
+      wUnique(rbModName(m) ?? rbModToS(m as AnyClass), arg);
+    }
   }
   while (klass !== null && Object.hasOwn(klass, T_ICLASS)) {
     const m = (klass as Record<symbol, AnyClass | Module>)[T_ICLASS];
@@ -394,7 +406,7 @@ function wClass(type: number, obj: object, arg: DumpArg, check: boolean): void {
   if (temporalTag(obj) !== null) {
     klass = registeredConstant(rbModToS(rbObjClass(obj))) as AnyClass;
   }
-  wExtended(Object.getPrototypeOf(obj) as object | null, arg, check);
+  wExtended(obj, arg, check);
   wByte(type, arg);
   const path = class2path(klass);
   wUnique(path, arg);
@@ -404,7 +416,7 @@ function wClass(type: number, obj: object, arg: DumpArg, check: boolean): void {
 function wUclass(obj: object, sup: AnyClass, arg: DumpArg): void {
   const klass = obj.constructor as AnyClass | undefined;
 
-  wExtended(Object.getPrototypeOf(obj) as object | null, arg, true);
+  wExtended(obj, arg, true);
   if (klass !== undefined && klass !== sup) {
     wByte(TYPE_UCLASS, arg);
     wUnique(class2path(klass), arg);
@@ -644,8 +656,8 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
         wCstr(path, arg);
         wEncname(encname, arg);
       }
-    } else if (obj instanceof Module) {
-      const path = class2path(obj);
+    } else if (obj instanceof Module || Object.hasOwn(obj as object, moduleVisibility)) {
+      const path = class2path(obj as Module);
       const encname = wEncivar(path, arg);
       wByte(TYPE_MODULE, arg);
       wCstr(path, arg);
@@ -1063,7 +1075,12 @@ function path2class(path: string): AnyClass {
 
 /** `must_be_module` (`vendor/ruby/v3.3.11/marshal.c:1803`), under `path2module` (`marshal.c:1800`). */
 function mustBeModule(v: unknown, path: string): Module {
-  if (!(v instanceof Module)) {
+  if (
+    !(
+      v instanceof Module ||
+      (typeof v === "object" && v !== null && Object.hasOwn(v, moduleVisibility))
+    )
+  ) {
     throw new ArgumentError(`${path} does not refer to module`);
   }
   return v;
@@ -1201,7 +1218,7 @@ function rObjectFor(
           v = rObject0(arg, null, extmod);
           while (extmod.length > 0) {
             m = extmod.pop();
-            (m as Module).extendObject(v as object);
+            extend(v as object, m as Module);
           }
         }
         v = rLeave(v, arg);
