@@ -1,29 +1,40 @@
-import { ArgumentError, StringIO, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
+import { ArgumentError, StringIO, URI, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
+import type { Generic } from "@blazetrails/ruby-compat";
 import {
   GET,
+  HTTP_HOST,
+  HTTP_PORT,
   PATH_INFO,
   QUERY_STRING,
   RACK_INPUT,
   RACK_RECURSIVE_INCLUDE,
+  RACK_URL_SCHEME,
   REQUEST_METHOD,
   SCRIPT_NAME,
 } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
 export class ForwardRequest extends Error {
-  url: string;
-  env?: Record<string, any>;
+  url: Generic;
+  env: Record<string, any>;
 
-  constructor(url: string, env?: Record<string, any>) {
-    super(`ForwardRequest: ${url}`);
-    this.url = url;
+  constructor(url: string, env: Record<string, any> = {}) {
+    const uri = URI.parse(url);
+    super(`forwarding to ${url}`);
+    this.url = uri;
     this.env = env;
+
+    this.env[PATH_INFO] = this.url.path;
+    if (this.url.query != null) this.env[QUERY_STRING] = this.url.query;
+    if (this.url.host != null) this.env[HTTP_HOST] = this.url.host;
+    if (this.url.port != null) this.env[HTTP_PORT] = this.url.port;
+    if (this.url.scheme != null) this.env[RACK_URL_SCHEME] = this.url.scheme;
   }
 }
 
 export class Recursive {
   private app: RackApp;
-  private scriptName: string = "";
+  private scriptName!: string;
 
   constructor(app: RackApp) {
     this.app = app;
@@ -35,25 +46,15 @@ export class Recursive {
 
   /** @internal */
   async _call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    let currentEnv = env;
-    while (true) {
-      this.scriptName = currentEnv[SCRIPT_NAME];
-      try {
-        return await (rbFSend(this.app, "call", {
-          ...currentEnv,
-          [RACK_RECURSIVE_INCLUDE]: this.include.bind(this),
-        }) as ReturnType<typeof this.app>);
-      } catch (e) {
-        if (e instanceof ForwardRequest) {
-          const fwd = new URL(e.url, "http://localhost");
-          const merged: Record<string, any> = { ...currentEnv, ...(e.env || {}) };
-          merged[PATH_INFO] = fwd.pathname;
-          merged[QUERY_STRING] = fwd.search ? fwd.search.substring(1) : "";
-          currentEnv = merged;
-        } else {
-          throw e;
-        }
-      }
+    this.scriptName = env[SCRIPT_NAME];
+    try {
+      return await (rbFSend(this.app, "call", {
+        ...env,
+        [RACK_RECURSIVE_INCLUDE]: this.include.bind(this),
+      }) as ReturnType<typeof this.app>);
+    } catch (req) {
+      if (req instanceof ForwardRequest) return this.call({ ...env, ...req.env });
+      throw req;
     }
   }
 
