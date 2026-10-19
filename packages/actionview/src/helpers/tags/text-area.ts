@@ -1,5 +1,6 @@
+import { Tags } from "../../namespaces.js";
 import { humanize, stringifyKeys } from "@blazetrails/activesupport";
-import { hashDelete, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { hashDelete, rbObjRespondTo, rbModConstSet } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
 import { Translator } from "./translator.js";
@@ -49,3 +50,5 @@ export class TextArea extends Base {
     );
   }
 }
+
+rbModConstSet(Tags, "TextArea", TextArea);

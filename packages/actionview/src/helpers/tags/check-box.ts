@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import { htmlSafe, stringifyKeys, type SafeBuffer } from "@blazetrails/activesupport";
 import {
   hashDelete,
@@ -7,6 +8,7 @@ import {
   rtest,
   slice,
   toI,
+  rbModConstSet,
 } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
@@ -83,3 +85,5 @@ export class CheckBox extends Base {
 }
 
 include(CheckBox, Checkable);
+
+rbModConstSet(Tags, "CheckBox", CheckBox);
