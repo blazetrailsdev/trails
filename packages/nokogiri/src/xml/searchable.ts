@@ -1,4 +1,5 @@
 import type { DefaultTreeAdapterMap } from "parse5";
+import { XmlDocument as LibXmlDocument, XmlTreeNode } from "libxml2-wasm";
 
 import type { Node } from "../html5/node.js";
 import type { NodeSet } from "./node-set.js";
@@ -11,7 +12,7 @@ type Parse5Element = DefaultTreeAdapterMap["element"];
 
 export interface SearchableHost {
   readonly document: unknown;
-  readonly _node: Parse5Node;
+  readonly _node: Parse5Node | XmlTreeNode | LibXmlDocument | null;
   css(...args: unknown[]): NodeSet;
 }
 
@@ -115,21 +116,87 @@ function xpathImpl(
   _ns: Record<string, string>,
   _binds: Record<string, unknown> | null,
 ): NodeSet {
+  if (node._node instanceof XmlTreeNode || node._node instanceof LibXmlDocument) {
+    const xpath = path
+      .flatMap(({ prefix, groups }) => groups.map((steps) => prefix + xpathFromSteps(steps)))
+      .join(" | ");
+    return new XML.NodeSet(
+      node.document,
+      node._node
+        .find(xpath)
+        .map((n) => new XML.Node(n as XmlTreeNode, node.document) as unknown as Node),
+    );
+  }
   const found = new Set<Parse5Node>();
   for (const { prefix, groups } of path) {
     const start =
       prefix === "self::"
-        ? [node._node]
-        : descendants(prefix === "//" ? rootOf(node._node) : node._node);
+        ? [node._node as Parse5Node]
+        : descendants(
+            prefix === "//" ? rootOf(node._node as Parse5Node) : (node._node as Parse5Node),
+          );
     for (const steps of groups) {
       for (const el of evaluate(start, steps, handler)) found.add(el);
     }
   }
-  const ordered = descendants(rootOf(node._node), true).filter((n) => found.has(n));
+  const ordered = descendants(rootOf(node._node as Parse5Node), true).filter((n) => found.has(n));
   return new XML.NodeSet(
     node.document,
     ordered.map((n) => new HTML5.Node(n as DefaultTreeAdapterMap["childNode"], node.document)),
   );
+}
+
+/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+function xpathFromSteps(steps: [string, Compound][]): string {
+  return steps
+    .map(([combinator, compound], i) => {
+      const axis =
+        i === 0
+          ? ""
+          : combinator === ">"
+            ? "/"
+            : combinator === "+"
+              ? "/following-sibling::*[1]/self::"
+              : combinator === "~"
+                ? "/following-sibling::"
+                : "//";
+      return axis + xpathFromCompound(compound);
+    })
+    .join("");
+}
+
+/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+function xpathFromCompound(c: Compound): string {
+  const literal = (value: string) => (value.includes("'") ? `"${value}"` : `'${value}'`);
+  const predicates = [
+    ...c.ids.map((id) => `@id=${literal(id)}`),
+    ...c.classes.map(
+      (klass) => `contains(concat(' ',normalize-space(@class),' '),${literal(` ${klass} `)})`,
+    ),
+    ...c.attrs.map(([name, op, value]) => {
+      const v = literal(value);
+      if (op === null) return `@${name}`;
+      if (op === "=") return `@${name}=${v}`;
+      if (op === "!=") return `@${name}!=${v}`;
+      if (op === "~=")
+        return `contains(concat(' ',normalize-space(@${name}),' '),${literal(` ${value} `)})`;
+      if (op === "^=") return `starts-with(@${name},${v})`;
+      if (op === "$=")
+        return `substring(@${name},string-length(@${name})-string-length(${v})+1)=${v}`;
+      if (op === "*=") return `contains(@${name},${v})`;
+      return `@${name}=${v} or starts-with(@${name},${literal(`${value}-`)})`;
+    }),
+    ...c.pseudos.map(([name]) => {
+      if (name === "root") return "not(parent::*)";
+      if (name === "first-child") return "count(preceding-sibling::*)=0";
+      if (name === "last-child") return "count(following-sibling::*)=0";
+      if (name === "only-child")
+        return "count(preceding-sibling::*)=0 and count(following-sibling::*)=0";
+      if (name === "empty") return "not(node())";
+      throw new XPathSyntaxError(`Unregistered function: ${name}`);
+    }),
+  ];
+  return (c.tag ?? "*") + predicates.map((p) => `[${p}]`).join("");
 }
 
 /** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */

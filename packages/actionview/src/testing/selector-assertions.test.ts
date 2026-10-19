@@ -240,8 +240,7 @@ describe("AssertSelectTest", () => {
     expect(() => cssSelect("[href=http://example.com]")).toThrow(CSS.SyntaxError);
   });
 
-  // BLOCKED: nokogiri-xml-document-searchable
-  it.skip("feed item encoded", () => {
+  it("feed item encoded", () => {
     renderXml(`<rss version="2.0">
   <channel>
     <item>
@@ -282,8 +281,7 @@ describe("AssertSelectTest", () => {
     });
   });
 
-  // BLOCKED: nokogiri-xml-document-searchable
-  it.skip("feed item encoded with html version", () => {
+  it("feed item encoded with html version", () => {
     const input = "&lt;p&gt;1&lt;b&gt;2&lt;i&gt;3&lt;/b&gt;4&lt;/i&gt;5&lt;/p&gt;";
     const html5Result = "<p>1<b>2<i>3</i></b><i>4</i>5</p>";
 
