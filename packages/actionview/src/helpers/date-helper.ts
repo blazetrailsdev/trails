@@ -535,7 +535,10 @@ export class DateTimeSelector {
     } else if (isRubyTruthy(this._options.addMonthNumbers)) {
       return `${number} - ${this.monthNames()[number]}`;
     } else if (isRubyTruthy((formatString = this._options.monthFormatString))) {
-      return format(formatString as string, { number, name: this.monthNames()[number] });
+      return format(formatString as string, {
+        ":number": number,
+        ":name": this.monthNames()[number],
+      });
     } else {
       return this.monthNames()[number];
     }
