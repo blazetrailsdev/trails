@@ -27,6 +27,7 @@ import { runtimeShim, DECLINED_SHIM } from "./runtime-shim.js";
 import { GEM, GEM_LIB, GEN_DIR, ORACLE_PATH, PKG_DIR, ROOT } from "./gem.js";
 import { nonNullPass } from "./nonnull-pass.js";
 import { typePass } from "./type-pass.js";
+import { augmentSeatTypes } from "./seat-types.js";
 
 const LIB = GEM_LIB;
 
@@ -349,6 +350,9 @@ writeFileSync(path.join(outDir, "codegen-declined.ts"), DECLINED_SHIM);
   if (existsSync(seats))
     writeFileSync(path.join(outDir, "namespaces.ts"), readFileSync(seats, "utf8"));
 }
+// The seats the hand port's `namespaces.ts` types, extended with what the
+// generated files seat on them (seat-types.ts).
+report.seatMembers = augmentSeatTypes(outDir);
 // The type pass: every `any` the lowering wrote replaced by what the checker
 // sees reach it (type-pass.ts). `--no-types` skips it.
 if (!process.argv.includes("--no-types"))

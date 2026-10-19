@@ -9,6 +9,8 @@
  * receiver gets no member lookup and no `await` — never a name-keyed guess.
  */
 import { readFileSync } from "node:fs";
+import path from "node:path";
+import { PKG_DIR } from "./gem.js";
 import { rubyMethodToTsIgnoringSkip } from "../../parity/conventions.js";
 import type { N } from "./ir.js";
 import type { ClassInfo, MemberInfo, Oracle, TypeRef } from "./hand-oracle.js";
@@ -62,7 +64,7 @@ export class TypeOracle {
     if (!this.propertyMemo) {
       const kinds = new Map<string, Set<string>>();
       for (const [k, c] of Object.entries(this.o.classes)) {
-        if (!k.startsWith("@")) continue;
+        if (!k.startsWith("@") || !depKey(k)) continue;
         for (const [n, info] of Object.entries(c.instance ?? {})) {
           if (!kinds.has(n)) kinds.set(n, new Set());
           kinds.get(n)!.add(info.kind);
@@ -84,7 +86,10 @@ export class TypeOracle {
     if (!this.kindsMemo) {
       this.kindsMemo = new Map();
       for (const [k, c] of Object.entries(this.o.classes)) {
-        if (k.endsWith("#*")) continue;
+        // Only the gem's own classes and its dependencies' say how a name is
+        // read in the gem (trailties, read for the railtie superclass, brings
+        // in packages the gem does not depend on).
+        if (k.endsWith("#*") || !depKey(k)) continue;
         for (const [n, info] of Object.entries(c.instance ?? {})) {
           if (!this.kindsMemo.has(n)) this.kindsMemo.set(n, []);
           this.kindsMemo.get(n)!.push(info);
@@ -193,3 +198,16 @@ export function isObjectLike(t: TypeRef): boolean {
 }
 
 export type { TypeRef, N };
+
+let depPrefixes: string[] | undefined;
+/** An oracle key the gem may read: its own file, or a package it depends on. */
+function depKey(k: string): boolean {
+  if (!k.startsWith("@")) return true;
+  if (!depPrefixes) {
+    const pkg = JSON.parse(readFileSync(path.join(PKG_DIR, "package.json"), "utf8"));
+    depPrefixes = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })
+      .filter((d) => d.startsWith("@blazetrails/"))
+      .map((d) => `@${d.slice("@blazetrails/".length)}/`);
+  }
+  return depPrefixes.some((p) => k.startsWith(p));
+}

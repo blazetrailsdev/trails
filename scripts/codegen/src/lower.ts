@@ -3718,6 +3718,16 @@ export class Lowerer {
     // (`I18n.locale` is a method, though the gem has `attr_accessor :locale`).
     const depConstRecv =
       recvNode?.k === "const" && !this.index.resolveConst(recvNode.path, ctx.nesting);
+    // A name a Proxy answers for Ruby's `method_missing` (CLAUDE.md, "Ruby
+    // protocol methods": railtie configuration.rb, ordered_options.rb) is read as
+    // a property, as it is written (`config.active_job = …`).
+    const PROXY_READS = new Set([
+      "@trailties/trailtie/configuration.ts#Configuration",
+      "@activesupport/ordered-options.ts#OrderedOptions",
+    ]);
+    const rk = recvNode ? this.classKey(this.typeOf(recvNode, ctx)) : undefined;
+    if (!resolved && n.args.length === 0 && !n.block && rk && PROXY_READS.has(rk))
+      return `${recv}${nav}${propName(name.replace(/[?!]$/, ""))}`;
     if (
       !resolved &&
       n.args.length === 0 &&
@@ -4170,7 +4180,31 @@ export class Lowerer {
     if (m.info.kind !== "method") {
       if (n.args.length || n.block) return null;
       e = `${recv}${nav}${m.tsName}`;
-    } else e = `${recv}${nav}${m.tsName}(${this.typedArgs(n, m.info.params, ctx) ?? argList()})`;
+    } else {
+      // A block to a dependency method whose optional positionals the call
+      // skips (`error(progname = nil, &block)` called `error { … }`): each
+      // skipped slot is `undefined`, so the block lands in its own (CLAUDE.md,
+      // "An optional positional before trailing options or a block").
+      // The block's slot is the last function-typed parameter (not always the
+      // last: activesupport's `subscribed(callback, pattern, block, monotonic)`).
+      const ps0 = m.info.params ?? [];
+      let blockAt = -1;
+      ps0.forEach((p, i) => {
+        if (p?.k === "fn") blockAt = i;
+      });
+      const missing = blockAt - n.args.length;
+      const args =
+        n.block &&
+        missing > 0 &&
+        !n.args.some((x: N) => ["splat", "kwargs", "blockpass"].includes(x.k))
+          ? [
+              ...n.args.map((x: N) => this.argExpr(x, ctx)),
+              ...Array.from({ length: missing }, () => "undefined"),
+              this.blockArg(n.block, ctx),
+            ].join(", ")
+          : (this.typedArgs(n, m.info.params, ctx) ?? argList());
+      e = `${recv}${nav}${m.tsName}(${args})`;
+    }
     if (m.info.async && ctx.isCtor && !ctx.inBlock) {
       // A JS constructor cannot await (plan: hard stop). Keep the call, count it.
       ctx.f.declines.push({ reason: "async-in-constructor", line: n.l, ruby: n.name });
@@ -5100,6 +5134,11 @@ const STRING_TABLE = new Set<string>(
  * `skip_callback` name the chain and kind first; their filters start at the third.
  */
 function callbackFilterSymbols(n: N): N {
+  // `ActiveSupport.on_load(:active_job) { self.logger = … }`: the block runs
+  // with `self` the loaded class (lazy_load_hooks.rb `execute_hook`,
+  // `base.instance_eval(&block)`), so it is a `this`-bound function.
+  if (n.name === "on_load" && n.block?.k === "block")
+    return { ...n, block: { ...n.block, k: "iexec" } };
   if (n.recv !== null && n.recv?.k !== "self") return n;
   const name: string = n.name;
   // `Rescuable#rescue_with_handler` `instance_exec`s a `rescue_from` block

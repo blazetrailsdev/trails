@@ -627,6 +627,14 @@ export class Resolver {
     }
     if (this.index.scopes.get(fqn)?.kind === "module" && this.types.cls(`${e.tsFile}#*`))
       return `${e.tsFile}#*`;
+    // A gem class the hand port has not ported, whose superclass is a
+    // dependency's (`class Railtie < Rails::Railtie`): what it inherits is the
+    // dependency class's, under its trails name (`Railtie` → `Trailtie`).
+    const sc = this.index.scopes.get(fqn);
+    if (sc?.kind === "class" && sc.superclassPath && !sc.superclassFqn) {
+      const segs = sc.superclassPath.filter((x) => x).map((x) => TS_CLASS_RENAMES[x] ?? x);
+      return this.types.depClass(segs);
+    }
     return undefined;
   }
 

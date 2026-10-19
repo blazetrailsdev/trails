@@ -580,6 +580,14 @@ export class TypePass {
           (ts.isArrowFunction(node.parent) || ts.isFunctionExpression(node.parent)) &&
           ts.isCallOrNewExpression(node.parent.parent)
         ) {
+          // `this: any` on a function handed to a call goes whole (with its
+          // comma): `this` is then the callee's (`onLoad`'s block type).
+          if (ts.isIdentifier(node.name) && node.name.text === "this") {
+            const params = (node.parent as ts.FunctionExpression).parameters;
+            const end = params.length > 1 ? params[1].getStart(sf) : node.getEnd();
+            edits.push({ pos: node.getStart(sf), end, text: "" });
+            return;
+          }
           // `x?: any` loses its `?` too: a block parameter's arity is the caller's.
           drop(node.type!);
           if (node.questionToken)

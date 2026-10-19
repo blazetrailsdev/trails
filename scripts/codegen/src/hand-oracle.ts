@@ -68,6 +68,12 @@ function main(): void {
     const entry = path.join(PKG_DIR, "..", dep, "dist/index.d.ts");
     if (existsSync(entry)) roots.push(entry);
   }
+  // trailties has no index; its Trailtie (a framework railtie's superclass,
+  // reached through activesupport's `TopLevel.Trails` seat) is read directly.
+  for (const entry of ["trailties/dist/trailtie.d.ts", "trailties/dist/initializable.d.ts"]) {
+    const f = path.join(PKG_DIR, "..", entry);
+    if (existsSync(f)) roots.push(f);
+  }
   const program = ts.createProgram(roots, {
     ...parsed.options,
     noEmit: true,
@@ -253,9 +259,10 @@ function main(): void {
   for (const sf of program.getSourceFiles()) {
     const fk = fileKey(sf);
     const ours = sf.fileName.startsWith(SRC + "/");
-    const dep = /packages\/(arel|activemodel|activesupport|ruby-compat|globalid|i18n|date)\//.test(
-      sf.fileName,
-    );
+    const dep =
+      /packages\/(arel|activemodel|activesupport|ruby-compat|globalid|i18n|date|trailties)\//.test(
+        sf.fileName,
+      );
     if (!ours && !dep) continue;
     const visit = (n: ts.Node) => {
       if ((ts.isClassDeclaration(n) || ts.isInterfaceDeclaration(n)) && n.name)
