@@ -165,6 +165,17 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["on t"]).toBe(1);
   });
 
+  it("counts an assert helper invoked with .call on a non-test-case host", () => {
+    const src = `
+      it("on c", async () => {
+        await c.dispatch("action", makeRequest(), makeResponse());
+        assertResponse.call(c, "forbidden");
+        helper.call(c);
+      });
+    `;
+    expect(tsAssertionCounts(src)["on c"]).toBe(1);
+  });
+
   it("counts trails expect* assertion helpers (twins of Rails assert_* helpers)", () => {
     const src = `
       it("mixed", () => {

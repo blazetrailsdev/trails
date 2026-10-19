@@ -137,9 +137,29 @@ function isTestObject(owner: ts.Expression): boolean {
   );
 }
 
+/**
+ * `assertResponse.call(c, "forbidden")`: a ported `this`-typed assertion
+ * invoked on a host that is not the test case (a bare controller in
+ * `controller/rescue_test.rb`'s port) is the `assertResponse` assertion, its
+ * arguments after the receiver.
+ */
+function isAssertionDotCall(expression: ts.Expression): expression is ts.PropertyAccessExpression {
+  return (
+    ts.isPropertyAccessExpression(expression) &&
+    expression.name.text === "call" &&
+    ts.isIdentifier(expression.expression) &&
+    isAssertionCallee(expression.expression.text)
+  );
+}
+
+function helperCalleeArguments(call: ts.CallExpression): readonly ts.Expression[] {
+  return isAssertionDotCall(call.expression) ? call.arguments.slice(1) : call.arguments;
+}
+
 function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
   if (!ts.isPropertyAccessExpression(expression)) return null;
+  if (isAssertionDotCall(expression)) return (expression.expression as ts.Identifier).text;
   const owner = expression.expression;
   if (isTestObject(owner)) return expression.name.text;
   const namespace = ts.isIdentifier(owner)
@@ -394,7 +414,7 @@ function collectAssertionKinds(
             // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
             if (name !== "expect") {
               kinds.push(name);
-              values.push(helperCalleeValue(name, n.arguments, sourceFile));
+              values.push(helperCalleeValue(name, helperCalleeArguments(n), sourceFile));
             }
           } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
             visiting.add(name);

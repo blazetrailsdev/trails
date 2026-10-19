@@ -1,5 +1,6 @@
-import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { assertPredicate } from "@blazetrails/activesupport";
+import { describe, it, afterEach, beforeEach } from "vitest";
+import { assertEqual, assertPredicate, stub } from "@blazetrails/activesupport";
+import { rbConstGet } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../metal/strong-parameters.js";
 
 describe("AlwaysPermittedParametersTest", () => {
@@ -14,8 +15,10 @@ describe("AlwaysPermittedParametersTest", () => {
   });
 
   it("returns super on missing constant other than NEVER_UNPERMITTED_PARAMS", () => {
-    expect(Parameters.alwaysPermittedParameters).toContain("controller");
-    expect(Parameters.alwaysPermittedParameters).toContain("action");
+    const superclass = Object.getPrototypeOf(Parameters) as { constMissing?: unknown };
+    stub(superclass, "constMissing", "super", [], () => {
+      assertEqual("super", rbConstGet(Parameters, "NON_EXISTING_CONSTANT"));
+    });
   });
 
   it("allows both explicitly listed and always-permitted parameters", () => {
