@@ -162,9 +162,8 @@ export function buildWhereNodeFromConstraints(
 }
 
 export function columnNames(this: SchemaKlass): string[] {
-  const host = this;
-  return (ownSchemaMemo(host, "_columnNames") ??
-    (host._columnNames = Object.freeze(
+  return (ownSchemaMemo(this, "_columnNames") ??
+    (this._columnNames = Object.freeze(
       this.columns().map((c: { name: string }) => c.name),
     ))) as string[];
 }
@@ -178,12 +177,11 @@ export function columnsHash(this: SchemaKlass): Record<string, Column> {
 }
 
 export function contentColumns(this: SchemaKlass): any[] {
-  const host = this;
   return (
-    ownSchemaMemo(host, "_contentColumns") ??
-    (host._contentColumns = Object.freeze(
+    ownSchemaMemo(this, "_contentColumns") ??
+    (this._contentColumns = Object.freeze(
       columns
-        .call(host)
+        .call(this)
         .filter(
           (c: { name: string }) =>
             !(
@@ -250,17 +248,16 @@ export function quotedTableName(this: SchemaKlass): string {
 }
 
 export function resetTableName(this: SchemaKlass): string | null {
-  const klass = this;
-  const superclass = rbClassSuperclass(klass) as typeof Base;
+  const superclass = rbClassSuperclass(this) as typeof Base;
   setTableName.call(
     this,
-    klass === ActiveRecord.Base
+    this === ActiveRecord.Base
       ? null
-      : klass.isAbstractClass()
+      : this.isAbstractClass()
         ? superclass.tableName
         : superclass.isAbstractClass()
-          ? superclass.tableName || computeTableName.call(klass)
-          : computeTableName.call(klass),
+          ? superclass.tableName || computeTableName.call(this)
+          : computeTableName.call(this),
   );
   return this._tableName;
 }
@@ -325,7 +322,7 @@ export function resetSequenceName(this: SchemaKlass): Promise<string | null> {
       if (this._sequenceName === sequenceName) this._sequenceName = null;
     },
   );
-  return ((this as SchemaHost)._sequenceName = sequenceName);
+  return (this._sequenceName = sequenceName);
 }
 
 export function isPrefetchPrimaryKey(this: SchemaKlass): boolean {
@@ -491,10 +488,9 @@ export function loadSchema(this: SchemaKlass): void {
 }
 
 export function loadSchemaBang(this: SchemaKlass): void {
-  const klass = this;
-  if (!klass.tableName) {
+  if (!this.tableName) {
     throw new TableNotSpecified(
-      `${klass.name} has no table configured. Set one with ${klass.name}.table_name=`,
+      `${this.name} has no table configured. Set one with ${this.name}.table_name=`,
     );
   }
 

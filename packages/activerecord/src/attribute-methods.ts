@@ -29,6 +29,7 @@ import {
   type DirtyOptions,
 } from "@blazetrails/activemodel";
 import { DangerousAttributeError } from "./errors.js";
+import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
@@ -47,19 +48,8 @@ export interface AttributeMethods {
   attributeNames(): string[];
 }
 
-interface RecordClass {
-  prototype: object;
-  attributeAliases: Record<string, string>;
-  primaryKey?: string | string[] | null;
-  defineAttributeMethods(): boolean;
-  symbolColumnToString(name: string): string | null;
-  columnNames(): string[];
-  isReadonlyAttribute(name: string): boolean;
-  isCounterCacheColumn(name: string): boolean;
-}
-
 interface AttributeRecord {
-  constructor: RecordClass;
+  constructor: typeof Base;
   _attributes: {
     isKey(name: string): boolean;
     keys(): Iterable<string>;
@@ -72,7 +62,7 @@ interface AttributeRecord {
   _readAttribute(name: string): unknown;
 }
 
-type ClassReadingHost = InstanceMethodHost & { constructor: RecordClass };
+type ClassReadingHost = InstanceMethodHost & { constructor: typeof Base };
 
 /** @internal */
 export interface InstanceMethodHost {

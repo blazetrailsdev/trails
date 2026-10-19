@@ -929,7 +929,7 @@ export class Base extends Model {
 
   declare isNoTouching: () => boolean;
 
-  static _sequenceName: string | null = null;
+  static _sequenceName: string | null | Promise<string | null> = null;
 
   static get sequenceName(): Promise<string | null> {
     return ModelSchema.sequenceName.call(this);

@@ -129,7 +129,11 @@ export function toSqlAndBinds(
 
 export type ExplainOption = string;
 
-export interface DatabaseStatementsHost {
+export interface DatabaseStatementsHost extends Partial<
+  Pick<AbstractAdapter, "visitor" | "bindParamsLength" | "withRawConnection">
+> {
+  /** @internal */
+  performQuery?: typeof performQuery;
   _transactionManager?: TransactionManager;
   readonly transactionManager?: TransactionManager;
   preparedStatements?: boolean;
@@ -192,23 +196,6 @@ export interface DatabaseStatementsHost {
     materializeTransactions?: boolean,
     batch?: boolean,
   ): Promise<unknown>;
-  /** @internal */
-  withRawConnection?<T>(
-    options: { allowRetry?: boolean; materializeTransactions?: boolean },
-    block: (raw: unknown) => Promise<T> | T,
-  ): Promise<T>;
-  /** @internal */
-  performQuery?(
-    rawConnection: unknown,
-    sql: string | null,
-    binds: unknown[],
-    typeCastedBinds: unknown[],
-    options: { prepare: boolean; notificationPayload?: unknown; batch?: boolean },
-  ): unknown;
-  /** @internal */
-  visitor?: Visitors.ToSql;
-  /** @internal */
-  bindParamsLength?(): number;
   /** @internal */
   castResult(rawResult: unknown): Result;
   /** @internal */
