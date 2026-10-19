@@ -40,6 +40,24 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'template/template_test.rb:150 `render.encoding` is Encoding::UTF_8 — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
     },
   ],
+  "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › simple query string": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: null,
+      reason:
+        'dispatch/param_builder_test.rb:15 `result` is a HashWithIndifferentAccess — trails params are a null-prototype plain object, so there is no class to assert (CLAUDE.md, "A Ruby Hash is a plain object unless it needs a Hash feature"; ruled by the repo owner 2026-10-18)',
+    },
+  ],
+  "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › nested parameters": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: null,
+      reason:
+        'dispatch/param_builder_test.rb:21 `result[:foo]` is a HashWithIndifferentAccess — trails params are a null-prototype plain object, so there is no class to assert (CLAUDE.md, "A Ruby Hash is a plain object unless it needs a Hash feature"; ruled by the repo owner 2026-10-18)',
+    },
+  ],
   "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a browser":
     [
       {
