@@ -1,4 +1,5 @@
 import { Autoload, extend, TopLevel, type Extended } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { FileSystemResolver } from "./template/resolver.js";
 import type { Template } from "./template.js";
@@ -48,6 +49,7 @@ export const ActionView = { name: "ActionView", loadPath } as AutoloadModule & {
   FileSystemResolver: typeof FileSystemResolver;
   Template: typeof Template;
 };
+registerConstant("ActionView", ActionView);
 extend(ActionView, Autoload);
 ActionView.eagerAutoload(() => {
   ActionView.autoload("Base");

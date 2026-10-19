@@ -124,15 +124,15 @@ export class Template {
     }
   }
 
-  readonly identifier: string;
-  readonly handler: TemplateHandler;
+  identifier: string;
+  handler: TemplateHandler;
   readonly variable: string | null;
-  readonly format: string | null;
-  readonly variant: string | null;
-  readonly virtualPath: string | null;
+  format: string | null;
+  variant: string | null;
+  virtualPath: string | null;
 
   private _source: string | SourcesFile;
-  private readonly _locals: readonly string[];
+  private _locals: readonly string[];
   private _strictLocals: string | null | typeof NONE = NONE;
   /** @internal */
   _strictLocalKeys: readonly string[] | null = null;
@@ -265,6 +265,43 @@ export class Template {
 
   isStrictLocals(): boolean {
     return this.strictLocalsBang() != null;
+  }
+
+  /** @internal */
+  marshalDump(): unknown[] {
+    return [
+      this._source,
+      this.identifier,
+      this.handler,
+      this._compiled,
+      this._locals,
+      this.virtualPath,
+      this.format,
+      this.variant,
+    ];
+  }
+
+  /** @internal */
+  marshalLoad(array: unknown[]): void {
+    [
+      this._source,
+      this.identifier,
+      this.handler,
+      this._compiled,
+      this._locals,
+      this.virtualPath,
+      this.format,
+      this.variant,
+    ] = array as [
+      string | SourcesFile,
+      string,
+      TemplateHandler,
+      boolean,
+      readonly string[],
+      string | null,
+      string | null,
+      string | null,
+    ];
   }
 
   async render(

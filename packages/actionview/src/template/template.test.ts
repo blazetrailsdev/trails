@@ -310,8 +310,7 @@ describe("TestTSETemplate", () => {
   // PERMANENT-SKIP: CLAUDE.md "A String has no encoding tag either" — the source is a binary String that is not valid UTF-8.
   it.skip("error when template isnt valid utf8", () => {});
 
-  // BLOCKED: template-marshal-dump-load
-  it.skip("template is marshalable", () => {
+  it("template is marshalable", () => {
     const template = newTemplate();
     const serialized = Marshal.load(Marshal.dump(template)) as Template;
     expect(serialized.identifier).toBe(template.identifier);

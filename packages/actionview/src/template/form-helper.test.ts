@@ -1,6 +1,6 @@
 import "../test-helpers/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { RouteSet } from "@blazetrails/actionpack";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
 import {
   BigDecimal,
@@ -30,6 +30,7 @@ import {
   Struct,
   include,
   publicInstanceMethods,
+  rbObjSingletonClass,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 
@@ -268,6 +269,17 @@ type View = Base &
   };
 
 describe("FormHelperTest", () => {
+  class WithActiveStorageRoutesControllers extends ActionController.Base {
+    static ROUTES = this.testRoutes(function () {
+      this.post("/rails/active_storage/direct_uploads", {
+        to: "active_storage/direct_uploads#create",
+        as: "rails_direct_uploads",
+      });
+    });
+
+    override urlOptions = (): Record<string, unknown> => ({ host: "testtwo.host" });
+  }
+
   let view: View;
   let post: Post;
   let comment: Comment;
@@ -794,8 +806,19 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, view.fileField("import", "file", { directUpload: true }));
   });
 
-  // BLOCKED: actionview-tests-needing-actionpack-controller-and-parameters
-  it.skip("file field with direct upload when rails direct uploads url is defined", () => {});
+  it("file field with direct upload when rails direct uploads url is defined", () => {
+    const controller = new WithActiveStorageRoutesControllers();
+    view = new (Base.withEmptyTemplateCache())(
+      new LookupContext(null, {}, []),
+      {},
+      controller,
+    ) as View;
+    include(rbObjSingletonClass(view), WithActiveStorageRoutesControllers.ROUTES.urlHelpers());
+
+    const expected =
+      '<input data-direct-upload-url="http://testtwo.host/rails/active_storage/direct_uploads" type="file" name="import[file]" id="import_file" />';
+    assertDomEqual(expected, view.fileField("import", "file", { directUpload: true }));
+  });
 
   it("file field with direct upload dont mutate arguments", () => {
     const originalOptions = { class: "pix", directUpload: true };
