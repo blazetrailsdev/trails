@@ -1,6 +1,7 @@
 import {
   byteslice,
   fetch,
+  Hash,
   LoadError,
   rbInspect,
   rbModToS,
@@ -90,7 +91,7 @@ export const SerializerWithFallback = new Module().include({
 }) as Module & {
   load(dumped: unknown): unknown;
   marshalLoad(payload: string): unknown;
-  SERIALIZERS: Record<string, Serializer>;
+  SERIALIZERS: Hash<string, Serializer>;
   get(format: string): Serializer;
 };
 
@@ -193,12 +194,11 @@ const messagePackWithFallback = new Module().include(SerializerWithFallback).inc
 }) as Module & Serializer;
 extend(messagePackWithFallback, messagePackWithFallback);
 
-const SERIALIZERS: Record<string, Serializer> = {
-  passthrough: passthroughWithFallback,
-  marshal_7_0: marshal70WithFallback,
-  marshal_7_1: marshal71WithFallback,
-  message_pack: messagePackWithFallback,
-};
+const SERIALIZERS = new Hash<string, Serializer>()
+  .set("passthrough", passthroughWithFallback)
+  .set("marshal_7_0", marshal70WithFallback)
+  .set("marshal_7_1", marshal71WithFallback)
+  .set("message_pack", messagePackWithFallback);
 
 rbModConstSet(SerializerWithFallback, "SERIALIZERS", SERIALIZERS);
 extend(SerializerWithFallback, {
@@ -208,6 +208,6 @@ extend(SerializerWithFallback, {
       throw new LoadError("cannot load such file -- active_support/message_pack");
     }
 
-    return fetch(SERIALIZERS, format);
+    return fetch(SERIALIZERS, format) as Serializer;
   },
 });

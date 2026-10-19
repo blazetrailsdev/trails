@@ -73,6 +73,12 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // action_dispatch/http/headers.rb:63 `def [](key)` → http/headers.ts
   // `Headers#get`, and :68 `def []=(key, value)` → `set`.
   "ActionDispatch::Http::Headers": { "[]": ["get"], "[]=": ["set"] },
+  // rack/headers.rb:91 `def self.[](*items)` → headers.ts `static get`, :110
+  // `def [](key)` → `get`, and :114 `def []=(key, value)` → `set`.
+  "Rack::Headers": { "self.[]": ["get"], "[]": ["get"], "[]=": ["set"] },
+  "Rack::Response": { "self.[]": ["get"] },
+  "Rack::Multipart::ParamList": { "<<": ["push"] },
+  "Rack::NullLogger": { "<<": ["append"] },
   // action_dispatch/middleware/cookies.rb:345 `def [](name)` → middleware/cookies.ts
   // `CookieJar#get`, :379 `def []=(name, options)` → `set`; :513 / :525 on
   // `AbstractCookieJar` likewise.

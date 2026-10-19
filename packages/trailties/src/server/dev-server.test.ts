@@ -2,17 +2,12 @@ import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { bodyFromString } from "@blazetrails/rack";
 import type { RackApp } from "@blazetrails/actionpack";
 import { build } from "vite";
 import { AppGenerator } from "../generators/app-generator.js";
 import { DevServer } from "./dev-server.js";
 
-const rackApp: RackApp = async () => [
-  200,
-  { "content-type": "text/plain" },
-  bodyFromString("from rack"),
-];
+const rackApp: RackApp = async () => [200, { "content-type": "text/plain" }, ["from rack"]];
 
 let tmpDir: string | undefined;
 let server: DevServer | undefined;

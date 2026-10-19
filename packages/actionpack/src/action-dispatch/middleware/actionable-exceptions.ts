@@ -1,7 +1,7 @@
 import { rbFSend, rbModConstSet, URI } from "@blazetrails/ruby-compat";
 import { ActionableError, cattrAccessor } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString, CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
+import { CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
 import { LOCATION } from "../constants.js";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
@@ -50,11 +50,7 @@ export class ActionableExceptions {
     if (uri.isRelative() || uri.scheme === "http" || uri.scheme === "https") {
       body = "";
     } else {
-      return [
-        400,
-        { [CONTENT_TYPE]: "text/plain; charset=utf-8" },
-        bodyFromString("Invalid redirection URI"),
-      ];
+      return [400, { [CONTENT_TYPE]: "text/plain; charset=utf-8" }, ["Invalid redirection URI"]];
     }
 
     return [
@@ -64,7 +60,7 @@ export class ActionableExceptions {
         [CONTENT_LENGTH]: String(new TextEncoder().encode(body).byteLength),
         [LOCATION]: location,
       },
-      bodyFromString(body),
+      [body],
     ];
   }
 }

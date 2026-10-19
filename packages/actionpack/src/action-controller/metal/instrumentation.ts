@@ -12,13 +12,10 @@ import {
   toF,
 } from "@blazetrails/activesupport";
 import { Logger } from "../../abstract-controller/logger.js";
-import {
-  ExceptionWrapper,
-  classNameOf,
-} from "../../action-dispatch/middleware/exception-wrapper.js";
+import { ExceptionWrapper } from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
-import { Exception, StandardError, throwDataP } from "@blazetrails/ruby-compat";
+import { Exception, StandardError, rbObjClassname, throwDataP } from "@blazetrails/ruby-compat";
 import type { DataStreamingHost, SendDataOptions, SendFileOptions } from "./data-streaming.js";
 import type { redirectTo as flashRedirectTo } from "./flash.js";
 
@@ -68,7 +65,7 @@ export function render(
 
 /**
  * @internal
- * @missingRailsName name — CONVERGEABLE instrumentation-status-code-reads-the-exception-class-path
+ * @missingRailsName name — PERMANENT
  */
 export async function processAction(
   this: InstrumentationHost,
@@ -101,7 +98,7 @@ export async function processAction(
       } catch (error) {
         if (throwDataP(error)) throw error;
         if (error instanceof Exception && !(error instanceof StandardError)) throw error;
-        payload.status = ExceptionWrapper.statusCodeForException(classNameOf(error as Error));
+        payload.status = ExceptionWrapper.statusCodeForException(rbObjClassname(error));
         throw error;
       } finally {
         this.appendInfoToPayload(payload as Record<string, unknown>);

@@ -1,8 +1,8 @@
-import { Module, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
-export const PdfHelper = new Module().include({
+export const PdfHelper = {
   foobar(): string {
     return "baz";
   },
-});
+};
 registerConstant("Fun::PdfHelper", PdfHelper);

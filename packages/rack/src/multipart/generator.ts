@@ -1,8 +1,7 @@
 import { File } from "@blazetrails/ruby-compat";
 import { ArgumentError, escapePath } from "../utils.js";
 import { UploadedFile } from "./uploaded-file.js";
-import { MULTIPART_BOUNDARY } from "../multipart-boundary.js";
-import { buildMultipart } from "../multipart.js";
+import { buildMultipart, MULTIPART_BOUNDARY } from "../multipart.js";
 
 type Params = Record<string, unknown>;
 

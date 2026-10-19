@@ -12,6 +12,9 @@ import {
 import {
   ArgumentError,
   Dir,
+  include,
+  isModuleIncluded,
+  isPlainHash,
   isSymbol,
   Module,
   rbClassSuperclass,
@@ -27,16 +30,16 @@ import {
   symbolToS,
 } from "@blazetrails/ruby-compat";
 
-export type HelperMethodsModule = Module;
+export type HelperMethodsModule = object;
 
 export interface HelpersClassMethods {
-  _helpers?: Module;
+  _helpers?: HelperMethodsModule;
   _helperMethods?: string[];
   name?: string;
 }
 
 export interface HelpersClass extends HelpersClassMethods {
-  _helpers: Module;
+  _helpers: HelperMethodsModule;
   _helperMethods: string[];
   name: string;
   helperMethod: typeof helperMethod;
@@ -53,14 +56,14 @@ type HelperArgument = HelperMethodsModule | string | HelperArgument[];
 export type HelperMethodNameList = string | HelperMethodNameList[];
 
 export interface HelpersHost {
-  constructor: { _helpers: Module };
+  constructor: { _helpers: HelperMethodsModule };
 }
 
 export function modulesForHelpers(
   modulesOrHelperPrefixes: HelperArgument[],
 ): HelperMethodsModule[] {
   return (modulesOrHelperPrefixes as unknown[]).flat(Infinity).map((moduleOrHelperPrefix) => {
-    if (rbObjIsKindOf(moduleOrHelperPrefix, Module)) {
+    if (rbObjIsKindOf(moduleOrHelperPrefix, Module) || isPlainHash(moduleOrHelperPrefix)) {
       return moduleOrHelperPrefix as HelperMethodsModule;
     } else if (typeof moduleOrHelperPrefix === "string") {
       let helperPrefix = isSymbol(moduleOrHelperPrefix)
@@ -98,6 +101,12 @@ export function helperModulesFromPaths(
 export const Resolution = { modulesForHelpers, allHelpersFromPath, helperModulesFromPaths };
 
 /**
+ * `_helpers` is a plain-object module, so a method defined here reaches only a
+ * class that includes the module afterwards. A view context class built before
+ * this call keeps the methods it copied, where Rails' includers share the
+ * module's method table (`rb_include_module`, vendor/ruby/v3.3.11/class.c:1179);
+ * CLAUDE.md, "A method defined on a module after it is included".
+ *
  * @inventedArm if — PERMANENT
  * @inventedArm getScriptNameOrSourceURL — PERMANENT
  * @inventedArm getLineNumber — PERMANENT
@@ -115,30 +124,30 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
   for (const method of flat) {
     const attr = /^[A-Za-z_]\w*=$/.test(method) ? method.slice(0, -1) : method;
     const writer = this._helperMethods.includes(`${attr}=`);
-    this._helpersForModification().moduleEval((mod) => {
-      Object.defineProperty(
-        mod,
-        attr,
-        (0, eval)(
-          `${"\n".repeat(line - 1)}(function (rbFSend, attr, writer) { return { ` +
-            `get() { const controller = this.controller; ` +
-            `if (attr in controller && typeof controller[attr] !== "function") return rbFSend(controller, attr); ` +
-            `return (...args) => rbFSend(controller, attr, ...args); }, ` +
-            `set: writer ? function (value) { rbFSend(this.controller, attr + "=", value); } : undefined, ` +
-            `configurable: true }; })` +
-            (file ? `\n//# sourceURL=${file.replace(/[\r\n\u2028\u2029]/g, "")}` : ""),
-        )(rbFSend, attr, writer),
-      );
-      if (method !== attr) {
-        Object.defineProperty(mod, method, {
-          value(this: { controller: object }, ...args: unknown[]): unknown {
-            return rbFSend(this.controller, method, ...args);
-          },
-          writable: true,
-          configurable: true,
-        });
-      }
-    });
+    const mod = this._helpersForModification();
+    Object.defineProperty(
+      mod,
+      attr,
+      (0, eval)(
+        `${"\n".repeat(line - 1)}(function (rbFSend, attr, writer) { return { ` +
+          `get() { const controller = this.controller; ` +
+          `if (attr in controller && typeof controller[attr] !== "function") return rbFSend(controller, attr); ` +
+          `return (...args) => rbFSend(controller, attr, ...args); }, ` +
+          `set: writer ? function (value) { rbFSend(this.controller, attr + "=", value); } : undefined, ` +
+          `enumerable: true, configurable: true }; })` +
+          (file ? `\n//# sourceURL=${file.replace(/[\r\n\u2028\u2029]/g, "")}` : ""),
+      )(rbFSend, attr, writer),
+    );
+    if (method !== attr) {
+      Object.defineProperty(mod, method, {
+        value(this: { controller: object }, ...args: unknown[]): unknown {
+          return rbFSend(this.controller, method, ...args);
+        },
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    }
   }
 }
 
@@ -152,16 +161,19 @@ export function helper(
       ? (args.pop() as (mod: Record<string, unknown>) => void)
       : null;
   for (const mod of this.modulesForHelpers(args as HelperArgument[])) {
-    if (this._helpers.isInclude(mod)) continue;
-    this._helpersForModification().include(mod);
+    if (isModuleIncluded(this._helpers, mod)) continue;
+    include(this._helpersForModification(), mod);
   }
 
-  if (block) this._helpersForModification().moduleEval(block);
+  if (block) {
+    const mod = this._helpersForModification();
+    block.call(mod, mod as Record<string, unknown>);
+  }
 }
 
 export function clearHelpers(this: HelpersClass): void {
   const inheritedHelperMethods = this._helperMethods;
-  this._helpers = new Module();
+  this._helpers = {};
   this._helperMethods = [];
 
   inheritedHelperMethods.forEach((meth) => this.helperMethod(meth));
@@ -169,7 +181,7 @@ export function clearHelpers(this: HelpersClass): void {
 }
 
 /** @inventedArm if — PERMANENT */
-export function _helpersForModification(this: HelpersClass): Module {
+export function _helpersForModification(this: HelpersClass): HelperMethodsModule {
   if (!rbObjIvarDefined(this, "@_helpers") && !rbModSingletonP(this as never)) {
     inherited.call(rbClassSuperclass(this)!, this);
   }
@@ -183,15 +195,15 @@ export function _helpersForModification(this: HelpersClass): Module {
 export function defineHelpersModule(
   this: HelpersClass,
   klass: HelpersClass,
-  helpers: Module | null = null,
-): Module {
+  helpers: HelperMethodsModule | null = null,
+): HelperMethodsModule {
   if (rbModConstDefined(klass, "HelperMethods", false)) {
-    return rbModConstGet(klass, "HelperMethods") as Module;
+    return rbModConstGet(klass, "HelperMethods") as HelperMethodsModule;
   }
 
-  const mod = new Module();
+  const mod: HelperMethodsModule = {};
   rbModConstSet(klass, "HelperMethods", mod);
-  if (helpers != null) mod.include(helpers);
+  if (helpers != null) include(mod, helpers);
   return mod;
 }
 
@@ -207,7 +219,7 @@ export function defaultHelperModuleBang(this: HelpersClass): void {
 }
 
 function inherited(this: HelpersClass, klass: HelpersClass): void {
-  (klass as { _helpers: Module | null })._helpers = null;
+  (klass as { _helpers: HelperMethodsModule | null })._helpers = null;
 
   if (!isAnonymous(klass)) klass.defaultHelperModuleBang();
 }
@@ -254,10 +266,10 @@ export const Helpers = new Module((mod) => {
     },
   );
 }).include({
-  get _helpers(): Module {
+  get _helpers(): HelperMethodsModule {
     return (this as unknown as HelpersHost).constructor._helpers;
   },
-}) as Module<{ readonly _helpers: Module }> & {
+}) as Module<{ readonly _helpers: HelperMethodsModule }> & {
   ClassMethods: typeof ClassMethods;
 } & typeof Resolution;
 Helpers.ClassMethods = ClassMethods;

@@ -1,4 +1,4 @@
-import { Module, rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActionController } from "../../namespaces.js";
 
 export function clearInstanceVariablesBetweenRequests(this: Record<string, unknown>): void {
@@ -17,17 +17,9 @@ export function recycleBang(this: Record<string, unknown>): void {
   this.params = null;
 }
 
-type Functional = Module<{
-  clearInstanceVariablesBetweenRequests: typeof clearInstanceVariablesBetweenRequests;
-  recycleBang: typeof recycleBang;
-}>;
+export const Functional = { clearInstanceVariablesBetweenRequests, recycleBang };
 
-export const Testing = new Module() as Module & { Functional: Functional };
+export const Testing = {} as { Functional: typeof Functional };
 rbModConstSet(ActionController, "Testing", Testing);
-
-export const Functional = new Module((mod) => {
-  mod.defineMethod("clearInstanceVariablesBetweenRequests", clearInstanceVariablesBetweenRequests);
-  mod.defineMethod("recycleBang", recycleBang);
-}) as Functional;
 
 rbModConstSet(Testing, "Functional", Functional);

@@ -1,21 +1,65 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { Exception, StandardError, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse, RackBody } from "./index.js";
+import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
+import { Raw } from "./response.js";
 
-export interface EventHandler {
-  onStart?(req: Request, res: EventResponse): void;
-  onCommit?(req: Request, res: EventResponse): void;
-  onSend?(req: Request, res: EventResponse): void;
-  onFinish?(req: Request, res: EventResponse): void;
-  onError?(req: Request, res: EventResponse, error: Error): void;
+export const Abstract = {
+  onStart(_req: Request, _res: BufferedResponse | null): void {},
+
+  onCommit(_req: Request, _res: BufferedResponse): void {},
+
+  onSend(_req: Request, _res: BufferedResponse): void {},
+
+  onFinish(_req: Request, _res: BufferedResponse | undefined): void {},
+
+  onError(_req: Request, _res: BufferedResponse | undefined, _e: unknown): void {},
+};
+
+export type EventHandler = typeof Abstract;
+
+/** @internal */
+export class EventedBodyProxy extends BodyProxy {
+  readonly request: Request;
+  readonly response: BufferedResponse;
+  private handlers: EventHandler[];
+
+  constructor(
+    body: RackBody,
+    request: Request,
+    response: BufferedResponse,
+    handlers: EventHandler[],
+    block: () => void,
+  ) {
+    super(body, block);
+    this.request = request;
+    this.response = response;
+    this.handlers = handlers;
+  }
+
+  override each(callback: (item: any) => void): void {
+    [...this.handlers].reverse().forEach((handler) => handler.onSend(this.request, this.response));
+    super.each(callback);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  override async *[Symbol.asyncIterator](): AsyncIterator<any> {
+    [...this.handlers].reverse().forEach((handler) => handler.onSend(this.request, this.response));
+    yield* { [Symbol.asyncIterator]: () => super[Symbol.asyncIterator]() };
+  }
 }
 
-export class EventResponse {
-  status: number;
-  headers: Record<string, string | string[]>;
-  constructor(status: number, headers: Record<string, string | string[]>) {
-    this.status = status;
-    this.headers = headers;
+/** @internal */
+export class BufferedResponse extends Raw {
+  readonly body: RackBody;
+
+  constructor(status: number, headers: Record<string, any>, body: RackBody) {
+    super(status, headers);
+    this.body = body;
+  }
+
+  toA(): RackResponse {
+    return [this.status, this.headers, this.body];
   }
 }
 
@@ -29,38 +73,49 @@ export class Events {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
-    const req = new Request(env);
-    const res = new EventResponse(0, {});
+    const request = this.makeRequest(env);
+    this.onStart(request, null);
 
-    for (const h of this.handlers) {
-      h.onStart?.(req, res);
-    }
-
-    let response: RackResponse;
+    let body: RackBody;
+    let response: BufferedResponse | undefined;
     try {
-      response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
-    } catch (error) {
-      for (const h of this.handlers) {
-        h.onError?.(req, res, error as Error);
-      }
-      for (const h of [...this.handlers].reverse()) {
-        h.onFinish?.(req, res);
-      }
-      throw error;
+      let status: number, headers: Record<string, string | string[]>;
+      [status, headers, body] = await (rbFSend(this.app, "call", request.env) as ReturnType<
+        typeof this.app
+      >);
+      response = this.makeResponse(status, headers, body);
+      this.onCommit(request, response);
+    } catch (e) {
+      if (e instanceof Exception && !(e instanceof StandardError)) throw e;
+      this.onError(request, response, e);
+      this.onFinish(request, response);
+      throw e;
     }
 
-    res.status = response[0];
-    res.headers = response[1];
+    body = new EventedBodyProxy(body, request, response, this.handlers, () => {
+      this.onFinish(request, response);
+    }) as unknown as RackBody;
+    return [response.status, response.headers, body];
+  }
 
-    for (const h of this.handlers) {
-      h.onCommit?.(req, res);
-    }
+  /** @internal */
+  private onError(request: Request, response: BufferedResponse | undefined, e: unknown): void {
+    [...this.handlers].reverse().forEach((handler) => handler.onError(request, response, e));
+  }
 
-    const originalBody = response[2];
-    const handlers = this.handlers;
-    const wrappedBody = wrapBody(originalBody, handlers, req, res);
+  /** @internal */
+  private onCommit(request: Request, response: BufferedResponse): void {
+    [...this.handlers].reverse().forEach((handler) => handler.onCommit(request, response));
+  }
 
-    return [response[0], response[1], wrappedBody];
+  /** @internal */
+  private onStart(request: Request, _response: BufferedResponse | null): void {
+    this.handlers.forEach((handler) => handler.onStart(request, null));
+  }
+
+  /** @internal */
+  private onFinish(request: Request, response: BufferedResponse | undefined): void {
+    [...this.handlers].reverse().forEach((handler) => handler.onFinish(request, response));
   }
 
   /** @internal */
@@ -72,46 +127,8 @@ export class Events {
   private makeResponse(
     status: number,
     headers: Record<string, string | string[]>,
-    _body: RackBody,
-  ): EventResponse {
-    return new EventResponse(status, headers);
+    body: RackBody,
+  ): BufferedResponse {
+    return new BufferedResponse(status, headers, body);
   }
-}
-
-interface EventBody extends AsyncIterable<string | Uint8Array> {
-  close(): void;
-}
-
-function wrapBody(
-  body: RackBody,
-  handlers: EventHandler[],
-  req: Request,
-  res: EventResponse,
-): EventBody {
-  let sent = false;
-  let finished = false;
-
-  const iter: EventBody = {
-    async *[Symbol.asyncIterator]() {
-      for await (const chunk of body) {
-        yield chunk;
-      }
-      if (!sent) {
-        sent = true;
-        for (const h of handlers) {
-          h.onSend?.(req, res);
-        }
-      }
-    },
-    close() {
-      if (!finished) {
-        finished = true;
-        for (const h of [...handlers].reverse()) {
-          h.onFinish?.(req, res);
-        }
-      }
-    },
-  };
-
-  return iter;
 }

@@ -7,7 +7,7 @@ import {
   stderr,
 } from "@blazetrails/ruby-compat";
 
-import { block, fetch, merge, type Hash } from "@blazetrails/ruby-compat";
+import { block, fetch, merge, rbModConstSet, type Hash } from "@blazetrails/ruby-compat";
 import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
 import { Mime, MimeType } from "./mime-type.js";
 import type { ParamHash } from "../request/utils.js";
@@ -192,3 +192,6 @@ const PARSE_ERROR_LOGGED_KEY = "action_dispatch.request.parse_error_logged";
 export function paramsParsers(this: ParametersHost): ParameterParsers {
   return Parameters.parameterParsers;
 }
+
+rbModConstSet(ActionDispatch.Http, "Parameters", Parameters);
+rbModConstSet(Parameters, "ParseError", ParseError);

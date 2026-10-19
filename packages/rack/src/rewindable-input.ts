@@ -1,101 +1,95 @@
 import { RACK_INPUT } from "./constants.js";
-import { RUBY_PLATFORM, rbFSend } from "@blazetrails/ruby-compat";
+import { Encoding, RUBY_PLATFORM, RuntimeError, Tempfile } from "@blazetrails/ruby-compat";
 
-export class RewindableInput {
-  private _io: any;
-  private _buffer: Buffer | null = null;
-  private _pos = 0;
-  private _closed = false;
+export class Middleware {
+  private app: any;
 
-  constructor(io: any) {
-    this._io = io;
+  constructor(app: any) {
+    this.app = app;
   }
 
-  read(length?: number | null, buffer?: Buffer): Buffer | string | null {
-    this._bufferData();
-    if (this._buffer === null) return length != null ? null : "";
+  async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
+    env[RACK_INPUT] = new RewindableInput(env[RACK_INPUT]);
+    return this.app.call(env);
+  }
+}
 
-    if (length == null) {
-      const result = this._buffer.subarray(this._pos);
-      this._pos = this._buffer.length;
-      if (buffer) {
-        result.copy(buffer);
-        return buffer.subarray(0, result.length);
-      }
-      return result.toString();
-    }
+export class RewindableInput {
+  static Middleware: typeof Middleware;
 
-    if (this._pos >= this._buffer.length) return null;
-    const end = Math.min(this._pos + length, this._buffer.length);
-    const slice = this._buffer.subarray(this._pos, end);
-    this._pos = end;
-    if (buffer) {
-      slice.copy(buffer);
-      return buffer.subarray(0, slice.length);
-    }
-    return slice.toString();
+  private io: any;
+  private rewindableIo: Tempfile | null;
+  private unlinked: boolean;
+
+  constructor(io: any) {
+    this.io = io;
+    this.rewindableIo = null;
+    this.unlinked = false;
   }
 
   gets(): string | null {
-    this._bufferData();
-    if (this._buffer === null || this._pos >= this._buffer.length) return null;
-    const str = this._buffer.toString("utf8", this._pos);
-    const nlIdx = str.indexOf("\n");
-    if (nlIdx === -1) {
-      this._pos = this._buffer.length;
-      return str;
+    if (!this.rewindableIo) this.makeRewindable();
+    return this.rewindableIo!.gets();
+  }
+
+  read(...args: [] | [number | null] | [number | null, Uint8Array | null]): string | null {
+    if (!this.rewindableIo) this.makeRewindable();
+    return this.rewindableIo!.read(...(args as [number | null, Uint8Array | null]));
+  }
+
+  each(block: (line: string) => void): Tempfile {
+    if (!this.rewindableIo) this.makeRewindable();
+    return this.rewindableIo!.each(block);
+  }
+
+  rewind(): number {
+    if (!this.rewindableIo) this.makeRewindable();
+    return this.rewindableIo!.rewind();
+  }
+
+  size(): number {
+    if (!this.rewindableIo) this.makeRewindable();
+    return this.rewindableIo!.size();
+  }
+
+  close(): null {
+    if (this.rewindableIo) {
+      if (this.unlinked) {
+        this.rewindableIo.close();
+      } else {
+        this.rewindableIo.closeBang();
+      }
+      this.rewindableIo = null;
     }
-    const line = str.substring(0, nlIdx + 1);
-    this._pos += Buffer.byteLength(line);
-    return line;
-  }
-
-  rewind(): void {
-    this._pos = 0;
-  }
-
-  get size(): number {
-    this._bufferData();
-    return this._buffer ? this._buffer.length : 0;
-  }
-
-  each(callback: (line: string) => void): void {
-    this._bufferData();
-    if (!this._buffer) return;
-    const str = this._buffer.toString();
-    const lines = str.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      const line = i < lines.length - 1 ? lines[i] + "\n" : lines[i];
-      if (line) callback(line);
-    }
-  }
-
-  close(): void {
-    this._closed = true;
-    this._buffer = null;
-  }
-
-  get closed(): boolean {
-    return this._closed;
-  }
-
-  private _bufferData(): void {
-    if (this._buffer !== null || this._closed) return;
-    if (!this._io) return;
-
-    let data: string | Buffer = "";
-    if (typeof this._io.read === "function") {
-      data = this._io.read() || "";
-    } else if (typeof this._io === "string") {
-      data = this._io;
-    }
-
-    this._buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    return null;
   }
 
   /** @internal */
   private makeRewindable(): void {
-    this._bufferData();
+    this.rewindableIo = Tempfile.new("RackRewindableInput");
+    this.rewindableIo.chmod(0o000);
+    this.rewindableIo.setEncoding(Encoding.BINARY);
+    this.rewindableIo.binmode();
+    if (this.isFilesystemHasPosixSemantics()) {
+      if (this.rewindableIo.isClosed()) throw new RuntimeError("Unlink failed. IO closed.");
+      this.unlinked = true;
+    }
+
+    let buffer = new Uint8Array(1024 * 4);
+    let read: string | null;
+    while ((read = this.io.read(1024 * 4, buffer)) != null) {
+      buffer = buffer.subarray(0, read.length);
+      let entireBufferWrittenOut = false;
+      while (!entireBufferWrittenOut) {
+        const written = this.rewindableIo.write(buffer);
+        entireBufferWrittenOut = written === buffer.byteLength;
+        if (!entireBufferWrittenOut) {
+          buffer = buffer.subarray(written);
+        }
+      }
+      buffer = new Uint8Array(1024 * 4);
+    }
+    this.rewindableIo.rewind();
   }
 
   /** @internal */
@@ -104,17 +98,4 @@ export class RewindableInput {
   }
 }
 
-export class RewindableInputMiddleware {
-  private app: any;
-
-  constructor(app: any) {
-    this.app = app;
-  }
-
-  async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    if (env[RACK_INPUT]) {
-      env[RACK_INPUT] = new RewindableInput(env[RACK_INPUT]);
-    }
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
-  }
-}
+RewindableInput.Middleware = Middleware;

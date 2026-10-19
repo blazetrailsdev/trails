@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { File } from "@blazetrails/ruby-compat";
+import { File, isModuleIncluded } from "@blazetrails/ruby-compat";
 import { helpersPath, setHelpersPath } from "../metal/helpers.js";
 import { Base as ActionControllerBase } from "../base.js";
 import { inherited, type HelpersPathControllerClass } from "./helpers.js";
@@ -35,7 +35,7 @@ describe("ActionController::Railties::Helpers.inherited", async () => {
     await inherited(klass);
 
     expect(klass.helpersPath).toEqual(helpersPath());
-    expect(klass._helpers!.isInclude(FooHelper)).toBe(true);
+    expect(isModuleIncluded(klass._helpers!, FooHelper)).toBe(true);
   });
 
   it("includes nothing into a class that is not a direct subclass of Base", async () => {
@@ -46,7 +46,7 @@ describe("ActionController::Railties::Helpers.inherited", async () => {
     await inherited(grandchild);
 
     expect(grandchild.helpersPath).toEqual(helpersPath());
-    expect(grandchild._helpers?.isInclude(FooHelper)).toBeFalsy();
+    expect(isModuleIncluded(grandchild._helpers!, FooHelper)).toBeFalsy();
   });
 
   it("includes nothing when includeAllHelpers is false", async () => {
@@ -57,7 +57,7 @@ describe("ActionController::Railties::Helpers.inherited", async () => {
 
     await inherited(klass);
 
-    expect(klass._helpers?.isInclude(FooHelper)).toBeFalsy();
+    expect(isModuleIncluded(klass._helpers!, FooHelper)).toBeFalsy();
   });
 
   it("returns without touching a class that has no helpersPath slot", async () => {

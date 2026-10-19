@@ -67,10 +67,8 @@
     "byFile": {}
   },
   "rack": {
-    "total": 1,
-    "byFile": {
-      "rewindable-input.ts": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "rack-session": {
     "total": 0,

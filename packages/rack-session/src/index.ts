@@ -11,3 +11,4 @@ export {
 } from "./abstract/id.js";
 export { ID } from "./abstract/id.js";
 export { Pool } from "./pool.js";
+export { Encryptor, type EncryptorOptions } from "./encryptor.js";

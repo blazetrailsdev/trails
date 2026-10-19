@@ -685,8 +685,7 @@ describe("TestCaseTest", () => {
     assertEqual("application/json", parsedEnv["CONTENT_TYPE"]);
   });
 
-  // BLOCKED: mime-type-initialize-validates-mime-regexp
-  it.skip("blank Content-Type header", async () => {
+  it("blank Content-Type header", async () => {
     tc.request.headers.set("Content-Type", "");
     await assertRaises([InvalidType], {}, async () => {
       await tc.get("testHeaders");
@@ -1391,9 +1390,27 @@ describe("ManuallySetStringNameTest", () => {
   });
 });
 
+class NamedRoutesControllerTest extends TestCase {
+  static {
+    this.tests(ContentController);
+  }
+}
+
 describe("NamedRoutesControllerTest", () => {
-  // BLOCKED: routing-assertions-method-missing-delegates-to-controller
-  it.skip("should be able to use named routes before a request is done", () => {});
+  it("should be able to use named routes before a request is done", async ({ task }) => {
+    const tc = new NamedRoutesControllerTest(task.name) as NamedRoutesControllerTest & {
+      newContentUrl(): string;
+      contentUrl(options: { id: number }): string;
+    };
+    await tc.beforeSetup();
+    tc.withRouting((set: RouteSet) => {
+      set.draw(function () {
+        this.resources("contents");
+      });
+      assertEqual("http://test.host/contents/new", tc.newContentUrl());
+      assertEqual("http://test.host/contents/1", tc.contentUrl({ id: 1 }));
+    });
+  });
 });
 
 class AnonymousControllerTest extends TestCase {

@@ -2,12 +2,11 @@ import { describe, it, expect } from "vitest";
 import { HostAuthorization } from "../middleware/host-authorization.js";
 import { IPAddr } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString, bodyToString } from "@blazetrails/rack";
 
 const okApp = async (_env: RackEnv): Promise<RackResponse> => [
   200,
   { "content-type": "text/plain" },
-  bodyFromString("OK"),
+  ["OK"],
 ];
 
 describe("HostAuthorization (trails)", () => {
@@ -30,7 +29,7 @@ describe("HostAuthorization (trails)", () => {
     });
     expect(status).toBe(403);
     expect(headers["content-type"]).toContain("text/html");
-    expect(await bodyToString(body)).toBe("");
+    expect([...(body as Iterable<string>)].join("")).toBe("");
   });
 
   it("default response renders DebugView body when show_detailed_exceptions is set", async () => {
@@ -43,7 +42,7 @@ describe("HostAuthorization (trails)", () => {
     });
     expect(status).toBe(403);
     expect(headers["content-type"]).toContain("text/html");
-    const rendered = await bodyToString(body);
+    const rendered = [...(body as Iterable<string>)].join("");
     expect(rendered).toContain("Blocked host");
     expect(rendered).toContain("evil.com");
   });
@@ -183,7 +182,7 @@ describe("HostAuthorization (trails)", () => {
     const customApp = async (_env: RackEnv): Promise<RackResponse> => [
       503,
       { "content-type": "text/plain" },
-      bodyFromString("Service Unavailable"),
+      ["Service Unavailable"],
     ];
     const mw = new HostAuthorization(okApp, ["example.com"], {
       responseApp: customApp,
@@ -194,7 +193,7 @@ describe("HostAuthorization (trails)", () => {
       PATH_INFO: "/",
     });
     expect(status).toBe(503);
-    expect(await bodyToString(body)).toBe("Service Unavailable");
+    expect([...(body as Iterable<string>)].join("")).toBe("Service Unavailable");
   });
 
   it("falls back to SERVER_NAME when HTTP_HOST is absent", async () => {

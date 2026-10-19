@@ -2,13 +2,6 @@
   {
     "package": "rack",
     "tsFile": "show-exceptions.ts",
-    "rubyName": "accepts_html?",
-    "call": "best_q_match",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "show-exceptions.ts",
     "rubyName": "pretty",
     "call": "template",
     "kind": "args",

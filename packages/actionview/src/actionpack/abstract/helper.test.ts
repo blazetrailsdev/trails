@@ -52,8 +52,8 @@ class HelperyTestController extends AbstractHelpers {}
 (HelperyTestController as unknown as HelpersStatics).clearHelpers();
 
 class AbstractHelpersBlock extends ControllerWithHelpers {}
-(AbstractHelpersBlock as unknown as HelpersStatics).helper(function (this: Module) {
-  this.include(HelperyTest);
+(AbstractHelpersBlock as unknown as HelpersStatics).helper(function (this: object) {
+  include(this, HelperyTest);
 });
 
 describe("TestHelpers", () => {

@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { publicInstanceMethods, rbFSend, rbModAncestors, rbModToS } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   include,
@@ -244,14 +244,14 @@ describe("HelperTest", () => {
 
   it("default helpers only", () => {
     expect(
-      (JustMeController._helpers.ancestors() as Module[])
+      (rbModAncestors(JustMeController._helpers) as Module[])
         .filter((mod) => !isAnonymous(mod as { name: string }))
-        .map((mod) => mod.toS()),
+        .map((mod) => rbModToS(mod as never)),
     ).toEqual(["JustMeHelper"]);
     expect(
-      (MeTooController._helpers.ancestors() as Module[])
+      (rbModAncestors(MeTooController._helpers) as Module[])
         .filter((mod) => !isAnonymous(mod as { name: string }))
-        .map((mod) => mod.toS()),
+        .map((mod) => rbModToS(mod as never)),
     ).toEqual(["MeTooController::HelperMethods", "MeTooHelper", "JustMeHelper"]);
   });
 
@@ -264,7 +264,7 @@ describe("HelperTest", () => {
   });
 
   it("all helpers", () => {
-    const methods = AllHelpersController._helpers.instanceMethods();
+    const methods = publicInstanceMethods(AllHelpersController._helpers);
 
     expect(methods).toContain("bareA");
 
@@ -277,7 +277,7 @@ describe("HelperTest", () => {
     controllerClass.helpersPath = File.expandPath("alternate-helpers", fixtures);
     await ActionPackTestSuiteUtils.requireHelpers(controllerClass.helpersPath);
 
-    controllerClass._helpers = new Module();
+    controllerClass._helpers = {};
     controllerClass.helper(":all");
 
     expect(masterHelperMethods()).not.toContain("bareA");
@@ -323,11 +323,11 @@ describe("HelperTest", () => {
   }
 
   function expectedHelperMethods(): string[] {
-    return constants.TestHelper!.instanceMethods();
+    return publicInstanceMethods(constants.TestHelper!);
   }
 
   function masterHelperMethods(): string[] {
-    return controllerClass._helpers.instanceMethods();
+    return publicInstanceMethods(controllerClass._helpers);
   }
 
   function missingMethods(): string[] {

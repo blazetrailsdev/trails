@@ -10,7 +10,6 @@ import "../../test-helpers/abstract-unit.js";
 import { Base } from "../../action-controller/base.js";
 import {
   Lint,
-  bodyFromString,
   MockRequest,
   type RackApp,
   type RackEnv,
@@ -580,7 +579,7 @@ describe("ContentSecurityPolicyMiddlewareTest", () => {
   });
 
   it("rack lint", async () => {
-    const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
+    const app = async (): Promise<RackResponse> => [200, {}, [""]];
 
     await assertNothingRaised(() => buildApp(app).call(env));
   });
@@ -589,7 +588,7 @@ describe("ContentSecurityPolicyMiddlewareTest", () => {
     const app = async (): Promise<RackResponse> => [
       200,
       { [CONTENT_SECURITY_POLICY]: defaultCsp },
-      bodyFromString(""),
+      [""],
     ];
     const [, headers] = await buildApp(app).call(env);
 
@@ -600,7 +599,7 @@ describe("ContentSecurityPolicyMiddlewareTest", () => {
     const app = async (): Promise<RackResponse> => [
       200,
       { [CONTENT_SECURITY_POLICY_REPORT_ONLY]: defaultCsp },
-      bodyFromString(""),
+      [""],
     ];
     env["action_dispatch.content_security_policy_report_only"] = true;
     const [, headers] = await buildApp(app).call(env);

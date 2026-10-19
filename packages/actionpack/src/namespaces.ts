@@ -12,12 +12,15 @@ import {
   RuntimeError,
   rbInspect,
   rbModConstGet,
+  rbModConstSet,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import type { Base as ControllerBase } from "./action-controller/base.js";
 import type { Parameters } from "./action-controller/metal/strong-parameters.js";
+import type { MimeNegotiation } from "./action-dispatch/http/mime-negotiation.js";
+import type { Parameters as HttpParameters } from "./action-dispatch/http/parameters.js";
 import type { TemplateAssertions } from "./action-controller/template-assertions.js";
 import type { Testing } from "./action-controller/metal/testing.js";
 import type { TestCase, TestRequest } from "./action-controller/test-case.js";
@@ -75,6 +78,7 @@ export const ActionDispatch = {
   TestResponse: typeof TestResponse;
   Integration: { name: string; Session: typeof IntegrationSession };
   Session: typeof Session;
+  Http: typeof Http;
   testApp: unknown;
   deprecator: () => Deprecation;
 };
@@ -103,6 +107,13 @@ Routing.eagerAutoload(() => {
 });
 Routing.autoload("PolymorphicRoutes");
 ActionDispatch.Routing = Routing;
+
+export const Http = { name: "ActionDispatch::Http" } as {
+  name: string;
+  MimeNegotiation: typeof MimeNegotiation;
+  Parameters: typeof HttpParameters;
+};
+rbModConstSet(ActionDispatch, "Http", Http);
 
 export const Session = { name: "ActionDispatch::Session", loadPath } as AutoloadModule & {
   AbstractStore: typeof AbstractStore;

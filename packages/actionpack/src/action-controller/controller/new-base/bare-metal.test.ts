@@ -110,7 +110,7 @@ describe("BareTest", () => {
     assertPredicate(controller, (c) => c.performed);
     assert(typeof controller.responseBody === "function");
     assertEqual(200, controller.response.status);
-    assertPredicate(controller.response.headers, (h) => h.empty);
+    assertPredicate(controller.response.headers, (h) => h.isEmpty());
   });
 
   it("connect a request to controller instance without dispatch", () => {

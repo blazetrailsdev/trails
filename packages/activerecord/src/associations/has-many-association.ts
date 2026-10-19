@@ -73,7 +73,7 @@ export class HasManyAssociation extends CollectionAssociation {
       case "destroy": {
         const records = await this.loadTarget();
         for (const record of records) {
-          (record as any).destroyedByAssociation = this.reflection;
+          record.destroyedByAssociation = this.reflection;
         }
         await this.destroyAll();
         break;
@@ -82,15 +82,15 @@ export class HasManyAssociation extends CollectionAssociation {
       case "destroyAsync": {
         const records = await this.loadTarget();
         for (const t of records) {
-          (t as any).destroyedByAssociation = this.reflection;
+          t.destroyedByAssociation = this.reflection;
         }
 
         if (!isEmpty(this.target)) {
           const associationClass = first(this.target)!.constructor as typeof Base;
           let primaryKeyColumn: string | string[];
           let ids: unknown[];
-          if (queryConstraintsList.call(associationClass as any)) {
-            primaryKeyColumn = queryConstraintsList.call(associationClass as any)!;
+          if (queryConstraintsList.call(associationClass)) {
+            primaryKeyColumn = queryConstraintsList.call(associationClass)!;
             ids = this.target.map((assoc) =>
               (primaryKeyColumn as string[]).map((col) => (assoc as any)[col]),
             );
@@ -105,7 +105,7 @@ export class HasManyAssociation extends CollectionAssociation {
           )) {
             this.enqueueDestroyAssociation({
               ownerModelName: this.owner.constructor.name,
-              ownerId: (this.owner as any).id,
+              ownerId: this.owner.id,
               associationClass: String(this.reflection.klass.name),
               associationIds: idsBatch,
               associationPrimaryKeyColumn: primaryKeyColumn,
@@ -133,7 +133,7 @@ export class HasManyAssociation extends CollectionAssociation {
 
   /** @internal */
   protected override async deleteOrNullifyAllRecords(method?: string): Promise<number> {
-    const count = await this.deleteCount(method ?? "", (this as any).scope());
+    const count = await this.deleteCount(method ?? "", this.scope());
     await this.updateCounter(-count);
     return count;
   }
@@ -146,7 +146,7 @@ export class HasManyAssociation extends CollectionAssociation {
         return this.updateCounter(-records.length);
       }
     } else {
-      const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass as any);
+      const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass);
       const values = records.map((r) => queryConstraints.map((col) => r._readAttribute(col)));
       const scope = this.scope().where(new Map([[queryConstraints, values]]));
       return this.updateCounter(-(await this.deleteCount(method, scope)));
@@ -192,20 +192,18 @@ export class HasManyAssociation extends CollectionAssociation {
       count =
         counterCacheColumn == null
           ? 0
-          : (toI((this.owner as any).readAttribute(counterCacheColumn)) as number);
+          : (toI(this.owner.readAttribute(counterCacheColumn)) as number);
     } else {
-      count = await (this as unknown as CollectionAssociation).scope().count(":all");
+      count = await this.scope().count(":all");
     }
 
     if (count === 0) {
-      selectBang((this as unknown as CollectionAssociation).target, (record) =>
-        record.isNewRecord(),
-      );
-      (this as unknown as CollectionAssociation).loadedBang();
+      selectBang(this.target, (record) => record.isNewRecord());
+      this.loadedBang();
     }
 
     const limitValue = (
-      (this as unknown as CollectionAssociation).associationScope() as {
+      this.associationScope() as {
         limitValue?: number | null;
       } | null
     )?.limitValue;

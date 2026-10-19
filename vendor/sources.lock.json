@@ -4,6 +4,10 @@
       "ref": "v3.1.20",
       "sha": "58f8afd33d8813e84706b938815bb1aa08d0b470"
     },
+    "crass": {
+      "ref": "v1.0.6",
+      "sha": "87f642e80670dc1093eddf4d3a93cbd40a9551c6"
+    },
     "date": {
       "ref": "v3.4.1",
       "sha": "a3295ad262773a80ad61526beb500b29e770b817"
@@ -23,6 +27,10 @@
     "libyaml": {
       "ref": "0.2.5",
       "sha": "2c891fc7a770e8ba2fec34fc6b545c672beb37e6"
+    },
+    "loofah": {
+      "ref": "v2.24.0",
+      "sha": "85990602c6fdb40489138e80080ca508200c7137"
     },
     "minitest": {
       "ref": "v5.27.0",
@@ -67,6 +75,10 @@
     "rails-dom-testing": {
       "ref": "v2.2.0",
       "sha": "a14001a41d514ece1a7c4d03a1d9bc69edf677d1"
+    },
+    "rails-html-sanitizer": {
+      "ref": "v1.6.2",
+      "sha": "9160d49020b57828ea536ffedc9cac8fef98ee59"
     },
     "ruby": {
       "ref": "v3_3_11",

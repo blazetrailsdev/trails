@@ -25,14 +25,6 @@ import {
   type AttributeRegistrationHost,
 } from "./attribute-registration.js";
 
-export function constructor(
-  this: AttributeInstanceHost & { constructor: { _defaultAttributes(): AttributeSet } },
-  ...args: unknown[]
-): void {
-  this._attributes = this.constructor._defaultAttributes().deepDup();
-  SuperMethods.superMethod(this, "initialize")!(...args);
-}
-
 export function initializeDup(this: AttributeInstanceHost, other: unknown): void {
   this._attributes = this._attributes.deepDup();
   SuperMethods.superMethod(this, "initializeDup")!(other);
@@ -69,7 +61,6 @@ export function freeze<T extends AttributeInstanceHost>(this: T): T {
 }
 
 const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initialize", constructor);
   mod.defineMethod("initializeDup", initializeDup);
   mod.defineMethod("freeze", freeze);
 });

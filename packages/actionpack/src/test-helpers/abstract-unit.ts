@@ -24,14 +24,7 @@ import {
   stringSplit,
   URI,
 } from "@blazetrails/ruby-compat";
-import {
-  bodyFromString,
-  bodyToString,
-  Head,
-  MethodOverride,
-  type RackEnv,
-  type RackResponse,
-} from "@blazetrails/rack";
+import { Head, MethodOverride, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { withRoutesHelpers } from "../abstract-controller/trailties/routes-helpers.js";
 import { ActionDispatch } from "../namespaces.js";
 import { API } from "../action-controller/api.js";
@@ -177,11 +170,7 @@ class NullController extends Metal {
     req: Request,
     res: Response,
   ): Promise<RackResponse> {
-    return [
-      200,
-      { "Content-Type": "text/html" },
-      bodyFromString(`${req.params["controller"]}#${action}`),
-    ];
+    return [200, { "Content-Type": "text/html" }, [`${req.params["controller"]}#${action}`]];
   }
 }
 
@@ -368,7 +357,7 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "GET", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "GET", path))[2] as Iterable<string>)].join("");
   },
 
   async post(
@@ -376,7 +365,7 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "POST", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "POST", path))[2] as Iterable<string>)].join("");
   },
 
   async put(
@@ -384,7 +373,7 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "PUT", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "PUT", path))[2] as Iterable<string>)].join("");
   },
 
   async delete(
@@ -392,7 +381,9 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "DELETE", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "DELETE", path))[2] as Iterable<string>)].join(
+      "",
+    );
   },
 
   async patch(
@@ -400,7 +391,9 @@ export const RoutingVerbs = {
     uriOrHost: Generic | string,
     path: string | null = null,
   ): Promise<string> {
-    return bodyToString((await this.sendRequest(uriOrHost, "PATCH", path))[2]);
+    return [...((await this.sendRequest(uriOrHost, "PATCH", path))[2] as Iterable<string>)].join(
+      "",
+    );
   },
 };
 

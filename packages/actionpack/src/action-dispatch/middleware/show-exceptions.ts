@@ -1,6 +1,6 @@
 import { excBacktrace, rbFSend, stderr } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { CONTENT_LENGTH, CONTENT_TYPE, bodyFromString } from "@blazetrails/rack";
+import { CONTENT_LENGTH, CONTENT_TYPE } from "@blazetrails/rack";
 import type { BacktraceCleaner } from "@blazetrails/activesupport";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 import { Request } from "../http/request.js";
@@ -64,12 +64,12 @@ export class ShowExceptions {
       return [
         500,
         { [CONTENT_TYPE]: "text/plain; charset=utf-8" },
-        bodyFromString(
+        [
           "500 Internal Server Error\n" +
             "If you are the administrator of this website, then please read this web " +
             "application's log file and/or the web server's log file to find out what " +
             "went wrong.",
-        ),
+        ],
       ];
     }
   }
@@ -93,10 +93,6 @@ export class ShowExceptions {
 
   /** @internal */
   private passResponse(status: number): RackResponse {
-    return [
-      status,
-      { [CONTENT_TYPE]: "text/html; charset=utf-8", [CONTENT_LENGTH]: "0" },
-      bodyFromString(""),
-    ];
+    return [status, { [CONTENT_TYPE]: "text/html; charset=utf-8", [CONTENT_LENGTH]: "0" }, [""]];
   }
 }

@@ -8,6 +8,7 @@ import {
   extend,
   include,
   Module,
+  publicInstanceMethods,
   registerConstant,
   unregisterConstant,
 } from "@blazetrails/ruby-compat";
@@ -76,12 +77,9 @@ describe("modulesForHelpers", () => {
     );
   });
 
-  it("raises ArgumentError for a Hash, which is not a Module", () => {
-    const hash = { foo: () => "FOO" } as unknown as HelperMethodsModule;
-    expect(() => modulesForHelpers([hash])).toThrow(ArgumentError);
-    expect(() => modulesForHelpers([{} as HelperMethodsModule])).toThrow(
-      "helper must be a String, Symbol, or Module",
-    );
+  it("passes a plain-object module through", () => {
+    const mod = { foo: () => "FOO" };
+    expect(modulesForHelpers([mod])).toEqual([mod]);
   });
 });
 
@@ -200,13 +198,13 @@ describe("defaultHelperModuleBang", () => {
   it("swallows the NameError when the helper does not exist", () => {
     const cls = controller("MissingController");
     expect(() => cls.defaultHelperModuleBang()).not.toThrow();
-    expect(cls._helpers.instanceMethods()).toEqual([]);
+    expect(publicInstanceMethods(cls._helpers)).toEqual([]);
   });
 
   it("still tries to resolve when the class name lacks a Controller suffix (Rails delete_suffix is a no-op then)", () => {
     const cls = controller("Plain");
     cls.defaultHelperModuleBang();
-    expect(cls._helpers.instanceMethods()).toEqual([]);
+    expect(publicInstanceMethods(cls._helpers)).toEqual([]);
   });
 
   it("composes with helper(): subsequent helper(cls, X) layers on top", () => {

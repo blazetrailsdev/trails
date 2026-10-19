@@ -1,5 +1,6 @@
 import { SERVER_PROTOCOL, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
 import { Process, sprintf, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
 import { BodyProxy } from "./body-proxy.js";
@@ -40,34 +41,11 @@ export class CommonLogger {
     const request = new Request(env);
     const length = this.extractContentLength(responseHeaders);
 
-    // boundary: Common Log Format timestamp (`[10/Oct/2000:13:55:36 -0700]`)
-    const now = new Date();
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const tz = now.getTimezoneOffset();
-    const tzSign = tz <= 0 ? "+" : "-";
-    const tzH = pad(Math.floor(Math.abs(tz) / 60));
-    const tzM = pad(Math.abs(tz) % 60);
-    const timestamp = `${pad(now.getDate())}/${months[now.getMonth()]}/${now.getFullYear()}:${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} ${tzSign}${tzH}${tzM}`;
-
     let msg = sprintf(
       CommonLogger.FORMAT,
       request.ip || "-",
       request.getHeader("REMOTE_USER") || "-",
-      timestamp,
+      Time.now().strftime("%d/%b/%Y:%H:%M:%S %z"),
       request.requestMethod,
       request.scriptName,
       request.pathInfo,

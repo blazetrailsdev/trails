@@ -1063,6 +1063,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 rbModConstSet(ActionController, "ParameterMissing", ParameterMissing);
+rbModConstSet(ActionController, "ExpectedParameterMissing", ExpectedParameterMissing);
+rbModConstSet(ActionController, "UnpermittedParameters", UnpermittedParameters);
+rbModConstSet(ActionController, "UnfilteredParameters", UnfilteredParameters);
+rbModConstSet(ActionController, "InvalidParameterKey", InvalidParameterKey);
 rbModConstSet(ActionController, "Parameters", Parameters);
 Parameters.hookIntoYamlLoading();
 

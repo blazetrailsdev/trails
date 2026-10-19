@@ -405,7 +405,10 @@ export class Session {
     this.host = value;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName app — PERMANENT
+   */
   get _mockSession(): RackTestSession {
     this._mockSessionMemo ??= new RackTestSession(this._app as RackApp | RackMiddleware, this.host);
     return this._mockSessionMemo;
@@ -720,7 +723,7 @@ export class IntegrationTest extends TestCase {
 
   response!: TestResponse;
 
-  get documentRootElement() {
+  documentRootElement() {
     return this.htmlDocument.root;
   }
 

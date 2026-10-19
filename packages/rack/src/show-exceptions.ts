@@ -3,7 +3,7 @@ import { chomp } from "@blazetrails/ruby-compat";
 
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
 import { Request } from "./request.js";
-import { escapeHtml } from "./utils.js";
+import { bestQMatch, escapeHtml } from "./utils.js";
 import type { RackApp } from "./mock-request.js";
 
 export class Frame {
@@ -202,9 +202,8 @@ export class ShowExceptions {
   }
 
   /** @internal */
-  private acceptsHtml(env: Record<string, any>): boolean {
-    const accept = env["HTTP_ACCEPT"] || "";
-    return accept.includes("text/html") || accept.includes("*/*");
+  private acceptsHtml(env: Record<string, any>): string | null {
+    return bestQMatch(env["HTTP_ACCEPT"], ["text/html"]);
   }
 
   private renderPlaintext(

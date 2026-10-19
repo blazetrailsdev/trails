@@ -38,6 +38,7 @@ import { resolveModuleName } from "./compare.js";
 import { OUTPUT_DIR, ROOT_DIR, packageSrcDir } from "./config.js";
 import {
   INLINED_FROM_PAIRS_FILE,
+  inheritedModules,
   moduleAncestors,
   shortName,
   type InlinedFromPair,
@@ -105,7 +106,29 @@ const defines = (entity: Entity | undefined, hook: string) =>
  */
 export const CONCERN = "ActiveSupport::Concern";
 
-function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
+/** {@link inheritedModules} over the manifest's classes. */
+function inherited(
+  entity: Entity,
+  infos: Record<string, unknown>,
+  resolve: (name: string, context: string) => string,
+  classes: ReadonlyMap<string, Entity>,
+): Set<string> {
+  const byShort = new Map<string, string[]>();
+  for (const fqn of classes.keys()) {
+    const short = shortName(fqn);
+    byShort.set(short, [...(byShort.get(short) ?? []), fqn]);
+  }
+  const classInfos = Object.fromEntries([...classes].map(([fqn, klass]) => [fqn, klass.info]));
+  return inheritedModules(entity.info, entity.fqn, classInfos, infos, resolve, (name, context) =>
+    resolveModuleName(name, context, byShort),
+  );
+}
+
+function reachedHooks(
+  entity: Entity,
+  modules: ReadonlyMap<string, Entity>,
+  classes: ReadonlyMap<string, Entity>,
+) {
   const byShort = new Map<string, string[]>();
   for (const fqn of modules.keys()) {
     const short = shortName(fqn);
@@ -113,7 +136,13 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
   }
   const resolve = (name: string, context: string) => resolveModuleName(name, context, byShort);
   const infos = Object.fromEntries([...modules].map(([fqn, mod]) => [fqn, mod.info]));
-  const ancestors = moduleAncestors(entity.info, entity.fqn, infos, resolve);
+  const ancestors = moduleAncestors(
+    entity.info,
+    entity.fqn,
+    infos,
+    resolve,
+    inherited(entity, infos, resolve, classes),
+  );
   const callsSuper = (body: MethodInfo | undefined) =>
     body?.line === undefined || (body.calls ?? []).includes("super");
   const behind = (fqns: readonly string[]) => {
@@ -160,15 +189,25 @@ function reachedHooks(entity: Entity, modules: ReadonlyMap<string, Entity>) {
  * The modules in `entity`'s ancestors that define `hook`, in Ruby's lookup
  * order, split by whether each lives in `entity`'s own Ruby file.
  */
-function methodChain(entity: Entity, hook: string, modules: ReadonlyMap<string, Entity>) {
+function methodChain(
+  entity: Entity,
+  hook: string,
+  modules: ReadonlyMap<string, Entity>,
+  classes: ReadonlyMap<string, Entity>,
+) {
   const byShort = new Map<string, string[]>();
   for (const fqn of modules.keys()) {
     const short = shortName(fqn);
     byShort.set(short, [...(byShort.get(short) ?? []), fqn]);
   }
   const infos = Object.fromEntries([...modules].map(([fqn, mod]) => [fqn, mod.info]));
-  const ancestors = moduleAncestors(entity.info, entity.fqn, infos, (name, context) =>
-    resolveModuleName(name, context, byShort),
+  const resolve = (name: string, context: string) => resolveModuleName(name, context, byShort);
+  const ancestors = moduleAncestors(
+    entity.info,
+    entity.fqn,
+    infos,
+    resolve,
+    inherited(entity, infos, resolve, classes),
   );
   const chain = { tagged: [] as string[], sameFile: [] as string[] };
   for (const fqn of [...ancestors.prepended, ...ancestors.included]) {
@@ -193,7 +232,8 @@ export function inlinedFromFindings(
   pairs: readonly InlinedFromPair[] = [],
 ): InlinedFromFinding[] {
   const modules = new Map(entities(ruby, "modules").map((mod) => [mod.fqn, mod]));
-  const rubyEntities = [...entities(ruby, "classes"), ...modules.values()];
+  const rubyClasses = new Map(entities(ruby, "classes").map((klass) => [klass.fqn, klass]));
+  const rubyEntities = [...rubyClasses.values(), ...modules.values()];
   const findings: InlinedFromFinding[] = [];
   const visited = new Set<string>();
   for (const [name, pkg] of Object.entries(ts.packages)) {
@@ -235,7 +275,7 @@ export function inlinedFromFindings(
         (paired && rubyEntities.find((e) => e.package === name && e.fqn === paired.rubyModule)) ??
         mirrored.find((entity) => entity.fqn.split("::").pop() === short) ??
         (classes.length === 1 && declared.length === 1 ? classes[0] : undefined);
-      const reached = counterpart && reachedHooks(counterpart, modules);
+      const reached = counterpart && reachedHooks(counterpart, modules, rubyClasses);
       let member: string | undefined;
       const report = (hook: string, message: string, fix?: InlinedFromFinding["fix"]) =>
         findings.push({
@@ -282,7 +322,8 @@ export function inlinedFromFindings(
       for (const tagged of methods) {
         member = tagged.name;
         const written = tagged.inlinedFrom ?? [];
-        const chain = counterpart && methodChain(counterpart, written[0]?.hook ?? "", modules);
+        const chain =
+          counterpart && methodChain(counterpart, written[0]?.hook ?? "", modules, rubyClasses);
         for (const tag of written) {
           const hook = `${tag.module}#${tag.hook}`;
           if (tag.hook !== written[0].hook) {

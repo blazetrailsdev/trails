@@ -910,6 +910,7 @@ class ApiExtractor
       line: @current_line,
     }
     record_body_facts(method_info, node[3], find_params(node), fqn)
+    record_included_hook_mixins(target, node[3], find_params(node)) if @in_sclass && name == "included"
     if INLINED_HOOKS.include?(name)
       @def_end_lines ||= DefEndLines.new(@source).tap(&:parse).ends
       end_line = @def_end_lines[method_info[:line]]
@@ -968,6 +969,57 @@ class ApiExtractor
     maybe_update_module_file(fqn, target)
 
     each_base_class_attribute(node[5]) { |call| process_method_add_arg(call) } if %w[extended included].include?(name)
+    record_included_hook_mixins(target, node[5], find_params_defs(node)) if name == "included"
+  end
+
+  def record_boot_mixin(receiver, name, args)
+    return false unless @in_on_load.positive? && %w[include prepend].include?(name)
+    return false unless receiver.is_a?(Array) && %i[var_ref const_path_ref top_const_ref].include?(receiver[0])
+    target = const_name(receiver)
+    return false unless target && target.match?(/\A[A-Z]/)
+    names = extract_const_args(args, keep_absolute: true)
+    return true if names.empty?
+    (@boot_mixins ||= []) << { target: target, context: current_fqn, statement: { kind: name, names: names } }
+    true
+  end
+
+  public def resolve_boot_mixins!
+    (@boot_mixins || []).each do |mixin|
+      scopes = mixin[:context].to_s.split("::")
+      candidates = scopes.length.downto(0).map { |n| (scopes.first(n) + [mixin[:target]]).join("::") }
+      fqn = candidates.find { |c| @classes[c] || @modules[c] }
+      next unless fqn
+      ((@classes[fqn] || @modules[fqn])[:bootMixins] ||= []) << mixin[:statement]
+    end
+  end
+
+  def record_included_hook_mixins(target, body, params)
+    base = params.is_a?(Array) && params[1].is_a?(Array) && params[1][0].is_a?(Array) ? ident_name(params[1][0]) : nil
+    return unless base
+    on_base = ->(n) { n.is_a?(Array) && %i[var_ref vcall].include?(n[0]) && ident_name(n[1]) == base }
+    scan = lambda do |n|
+      return unless n.is_a?(Array)
+      statement =
+        if n[0] == :command_call && on_base.(n[1])
+          name = ident_name(n[3])
+          args = n[4].is_a?(Array) && n[4][0] == :args_add_block ? n[4][1] : nil
+          if name == "send" && args.is_a?(Array) && args[0].is_a?(Array) && args[0][0] == :symbol_literal
+            kind = ident_name(args[0][1][1])
+            { kind: kind, names: extract_const_args(args[1..], keep_absolute: true) } if %w[include prepend].include?(kind)
+          elsif %w[include prepend].include?(name)
+            { kind: name, names: extract_const_args(n[4], keep_absolute: true) }
+          end
+        elsif n[0] == :method_add_arg && n[1].is_a?(Array) && n[1][0] == :call && on_base.(n[1][1]) &&
+              %w[include prepend].include?(ident_name(n[1][3]))
+          { kind: ident_name(n[1][3]), names: extract_const_args_from_paren(n[2], keep_absolute: true) }
+        end
+      if statement
+        (target[:includedHookMixins] ||= []) << statement if statement[:names].any?
+      else
+        n.each { |c| scan.(c) }
+      end
+    end
+    scan.(body)
   end
 
   def each_base_class_attribute(node, &block)
@@ -989,6 +1041,14 @@ class ApiExtractor
   # faithfully-placed TS member scores as a `moved` extra.
   def maybe_update_module_file(fqn, target)
     return unless @modules[fqn] || @classes[fqn]
+    return if target[:named_file]
+    if File.basename(@current_file.to_s, ".rb") == fqn.to_s.gsub("::", "/").gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase &&
+       !fqn.to_s.include?("::")
+      target[:named_file] = true
+      target[:first_method_file] = @current_file
+      target[:file] = @current_file
+      return
+    end
     return if target[:first_method_file]
     target[:first_method_file] = @current_file
     target[:file] = @current_file
@@ -1013,6 +1073,8 @@ class ApiExtractor
     # Umbrella scans harvest no methods; ignore every command in the umbrella file.
     return if @scanning_umbrella
 
+    return if node[0] == :command_call && record_boot_mixin(node[1], cmd_name, args)
+
     case cmd_name
     when "private", "protected", "public"
       # No-args form (`private`) flips the default visibility for the scope.
@@ -1031,7 +1093,7 @@ class ApiExtractor
       process_prepend(extract_const_args(args, keep_absolute: true))
     when "extend"
       process_extend(args)
-    when "attr_reader"
+    when "attr_reader", "attr"
       process_attr(args, :reader, force_class: on_singleton)
     when "attr_writer"
       process_attr(args, :writer, force_class: on_singleton)
@@ -1097,6 +1159,11 @@ class ApiExtractor
   end
 
   def process_method_add_arg(node)
+    if node[1].is_a?(Array) && node[1][0] == :call &&
+       record_boot_mixin(node[1][1], ident_name(node[1][3]), node[2])
+      return
+    end
+
     # `base.class_attribute(:foo, …)` inside `def self.extended(base)` /
     # `def self.included(base)` (activerecord/lib/active_record/enum.rb:166-168)
     # declares the attribute on whatever extends the module, as the bare
@@ -3787,6 +3854,8 @@ class ApiExtractor
         lhs[1]
       elsif lhs.is_a?(Array) && lhs[0] == :const_path_field && self_ref?(lhs[1])
         lhs[2]
+      elsif lhs.is_a?(Array) && lhs[0] == :const_path_field
+        lhs[2]
       end
     return unless const.is_a?(Array) && const[0] == :@const
     rhs = unwrap_freeze(rhs)
@@ -5063,6 +5132,7 @@ def run
     # package has been seen (a reopened class may define the target elsewhere).
     extractor.resolve_aliases!
     extractor.resolve_method_missing_forwards!
+    extractor.resolve_boot_mixins!
 
     # Normalize into the JSON shape. Non-public methods are kept (tagged
     # `internal: true`) so consumers can opt into private-API coverage.
@@ -5126,6 +5196,8 @@ def normalize_class_info(info)
     out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods]
     out[:prepends] = info[:prepends].uniq if info[:prepends]&.any?
     out[:mixinOrder] = info[:mixinOrder] if info[:mixinOrder]&.any?
+    out[:includedHookMixins] = info[:includedHookMixins] if info[:includedHookMixins]&.any?
+    out[:bootMixins] = info[:bootMixins] if info[:bootMixins]&.any?
   end
 end
 

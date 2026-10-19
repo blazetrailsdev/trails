@@ -1,4 +1,4 @@
-import { Hash, Rational, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { Hash, Rational, isSymbol, rbObjDup, symbolToS } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
@@ -140,7 +140,7 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected defaultFormatOptions(): Record<string, unknown> {
     const ns = (this.constructor as typeof NumberConverter).namespace;
-    const base = { ...DEFAULTS.format };
+    const base = rbObjDup(DEFAULTS.format);
     if (ns && DEFAULTS[ns]) {
       const nsDefaults = DEFAULTS[ns];
       for (const [k, v] of Object.entries(nsDefaults)) {
@@ -154,7 +154,7 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   protected i18nFormatOptions(): Record<string, unknown> {
     const locale = (this.opts as Record<string, unknown>).locale as string | undefined;
-    const raw = I18n.translate("number.format", { locale, default: {} });
+    const raw = rbObjDup(I18n.translate("number.format", { locale, default: {} }));
     const options: Record<string, unknown> = {};
     if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) {
       for (const [k, v] of raw instanceof Map ? raw : Object.entries(raw)) {

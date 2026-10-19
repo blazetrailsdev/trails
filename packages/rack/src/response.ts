@@ -1,4 +1,4 @@
-import { ArgumentError, hasKey, toS } from "@blazetrails/ruby-compat";
+import { ArgumentError, hasKey, hashDelete, rbObjRespondTo, toS } from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -23,7 +23,7 @@ export abstract class Helpers {
   declare _body: any;
   declare length: number | null;
   declare _buffered: boolean | null;
-  declare _writer: (chunk: string) => string;
+  declare _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
   abstract hasHeader(key: any): boolean;
   abstract getHeader(key: any): any;
@@ -204,17 +204,15 @@ export abstract class Helpers {
         );
         this._buffered = true;
       } else if (this._body && typeof this._body.each === "function") {
-        const oldBody = this._body;
+        const body = this._body;
         this._body = [];
         this._buffered = true;
-        this.length = 0;
-        oldBody.each((part: string | Uint8Array) => this.append(toS(part)));
-      } else if (this._body && typeof this._body[Symbol.iterator] === "function") {
-        const oldBody = this._body;
-        this._body = [];
-        this._buffered = true;
-        this.length = 0;
-        for (const part of oldBody as Iterable<string | Uint8Array>) this.append(toS(part));
+
+        body.each((part: string | Uint8Array) => {
+          this._writer(toS(part));
+        });
+
+        if (rbObjRespondTo(body, "close")) body.close();
       } else {
         this._buffered = false;
       }
@@ -236,6 +234,10 @@ export abstract class Helpers {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:373`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
+  static get(status: number, headers: Record<string, string | string[]>, body: any): Response {
+    return new this(body, status, headers);
+  }
+
   status: number;
   headers: Record<string, string | string[]>;
   protected _body: any;
@@ -287,17 +289,6 @@ export class Response {
 
   set body(value: any) {
     this._body = value;
-  }
-
-  static create(status: number, headers: Record<string, string | string[]>, body: any): Response {
-    return new Response(body, status, headers);
-  }
-
-  get(key: string): any {
-    return this.headers[key];
-  }
-  set(key: string, value: any): void {
-    this.headers[key] = value;
   }
 
   includes(key: string): boolean {
@@ -387,15 +378,13 @@ export class Response {
     return value;
   }
   deleteHeader(key: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    const val = this.headers[downcaseKey(key)];
-    delete this.headers[downcaseKey(key)];
-    return val ?? null;
+    if (typeof key !== "string") throw new ArgumentError();
+    return hashDelete(this.headers, downcaseKey(key));
   }
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:376`); the class/interface merge is how a mixin surfaces on the type side. */
-export class ResponseRaw {
+export class Raw {
   status: number;
   headers: Record<string, any>;
 
@@ -415,10 +404,7 @@ export class ResponseRaw {
     return value;
   }
   deleteHeader(key: any): any {
-    const k = String(key);
-    const val = this.headers[k];
-    delete this.headers[k];
-    return val ?? null;
+    return hashDelete(this.headers, key);
   }
 }
 
@@ -438,9 +424,9 @@ export interface Response extends Omit<
   | "deleteHeader"
 > {}
 
-include(ResponseRaw, Helpers);
+include(Raw, Helpers);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:376`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface ResponseRaw extends Omit<
+export interface Raw extends Omit<
   Helpers,
   | "status"
   | "headers"

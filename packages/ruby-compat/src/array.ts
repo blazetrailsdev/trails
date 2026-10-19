@@ -84,8 +84,9 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * `l<` and `@` directives `ActiveSupport::Cache::Coder` packs its header with
  * (`cache/coder.rb:44,77-82`), and the `L>` `MessagePack::Bigint` packs its
  * words with (`vendor/msgpack/v1.8.0/lib/msgpack/bigint.rb:8`), and the `q>` `MessagePack::Timestamp`
- * packs a timestamp96's seconds with (`vendor/msgpack/v1.8.0/lib/msgpack/timestamp.rb:65`): `C`, `l`,
- * `L`, `q` and `Q` through `pack_integer` (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
+ * packs a timestamp96's seconds with (`vendor/msgpack/v1.8.0/lib/msgpack/timestamp.rb:65`), and the `v`
+ * `Rack::Session::Encryptor` packs its padding length with (`vendor/rack-session/v2.1.0/lib/rack/session/encryptor.rb:173`): `C`, `l`,
+ * `L`, `q`, `Q` and `v` through `pack_integer` (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
  * an absolute byte position (`pack.c:617-639`). Every other directive is a
  * separate port, so each reaches `unknown_directive` (`pack.c:761`) here, and
  * of the modifiers only `<` / `>` (`pack.c:268-277`) are ported.
@@ -166,9 +167,18 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
       }
       continue;
     }
-    if (type === "C" || type === "l" || type === "L" || type === "q" || type === "Q") {
-      const integerSize = type === "C" ? 1 : type === "q" || type === "Q" ? 8 : 4;
-      const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
+    if (
+      type === "C" ||
+      type === "l" ||
+      type === "L" ||
+      type === "q" ||
+      type === "Q" ||
+      type === "v"
+    ) {
+      const integerSize =
+        type === "C" ? 1 : type === "v" ? 2 : type === "q" || type === "Q" ? 8 : 4;
+      const bigendianP =
+        type === "v" ? false : explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       while (len-- > 0) {
         const from = nextfrom();
         if (typeof from !== "number" && typeof from !== "bigint") {
@@ -252,7 +262,7 @@ export function unpack1(
  * `String#unpack1` (`vendor/ruby/v3.3.11/pack.c:1621` `pack_unpack1`), which is
  * `pack_unpack_internal` (`pack.c:936`) in `UNPACK_1` mode: the first item
  * the format pushes, or nil when none does. Narrowed to the directives
- * {@link pack} answers bytes for — `C`, `l`, `L`, `q` and `Q` through `unpack_integer`
+ * {@link pack} answers bytes for — `C`, `l`, `L`, `q`, `Q` and `v` through `unpack_integer`
  * (`pack.c:1177-1281`), `E` (`pack.c:1306-1315`), and `@` moving to an
  * absolute byte position (`pack.c:1531-1535`) — plus the `<` / `>` modifiers
  * (`pack.c:1014-1023`). Every other directive reaches `unknown_directive`.
@@ -351,10 +361,19 @@ function packUnpackInternal(
       len = type !== "@" ? 1 : 0;
     }
 
-    if (type === "C" || type === "l" || type === "L" || type === "q" || type === "Q") {
+    if (
+      type === "C" ||
+      type === "l" ||
+      type === "L" ||
+      type === "q" ||
+      type === "Q" ||
+      type === "v"
+    ) {
       const signedP = type === "l" || type === "q";
-      const integerSize = type === "C" ? 1 : type === "q" || type === "Q" ? 8 : 4;
-      const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
+      const integerSize =
+        type === "C" ? 1 : type === "v" ? 2 : type === "q" || type === "Q" ? 8 : 4;
+      const bigendianP =
+        type === "v" ? false : explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       if (len > Math.floor((send - s) / integerSize)) len = Math.floor((send - s) / integerSize);
       while (len-- > 0) {
         let val = 0n;

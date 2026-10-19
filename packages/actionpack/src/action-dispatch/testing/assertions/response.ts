@@ -5,7 +5,7 @@ import {
   isPresent,
   UnexpectedError,
 } from "@blazetrails/activesupport";
-import { Module, rbEqq } from "@blazetrails/ruby-compat";
+import { rbEqq } from "@blazetrails/ruby-compat";
 import { AssertionResponse } from "../assertion-response.js";
 import { Redirecting, type RedirectingHost } from "../../../action-controller/metal/redirecting.js";
 
@@ -143,18 +143,14 @@ export type ResponseAssertions = {
   codeWithName: typeof codeWithName;
 };
 
-export const ResponseAssertions = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      assertResponse,
-      assertRedirectedTo,
-      parameterize,
-      normalizeArgumentToRedirection,
-      generateResponseMessage,
-      responseBodyIfShort,
-      exceptionIfPresent,
-      locationIfRedirected,
-      codeWithName,
-    });
-  });
-});
+export const ResponseAssertions = {
+  assertResponse,
+  assertRedirectedTo,
+  parameterize,
+  normalizeArgumentToRedirection,
+  generateResponseMessage,
+  responseBodyIfShort,
+  exceptionIfPresent,
+  locationIfRedirected,
+  codeWithName,
+};

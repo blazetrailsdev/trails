@@ -111,9 +111,12 @@ it("close the original body", async () => {
       closed = true;
     },
   };
-  const app = new ShowStatus(
-    async () => [404, { "content-type": "text/plain", "content-length": "0" }, body] as any,
+  const req = new MockRequest((env) =>
+    showStatus(
+      async () => [404, { "content-type": "text/plain", "content-length": "0" }, body] as any,
+    ).call(env),
   );
-  await app.call(MockRequest.envFor("/"));
+
+  await req.get("/");
   expect(closed).toBe(true);
 });

@@ -74,6 +74,28 @@ class EPIPE extends SystemCallError {
 }
 
 /**
+ * `Errno::ESPIPE`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: the error `lseek(2)` raises on a pipe.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ESPIPE`, which rack's
+ * rewindable-input spec raises without defining.
+ */
+class ESPIPE extends SystemCallError {
+  static readonly Errno = 29;
+  readonly code = "ESPIPE";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Illegal seek" : `Illegal seek - ${mesg}`);
+    this.name = "Errno::ESPIPE";
+    this.errno = ESPIPE.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ESPIPE";
+  }
+}
+
+/**
  * `Errno::EEXIST`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
  * {@link ENOTTY} is. The fs layer's own error carrying `code: "EEXIST"` is this
  * class to `rescue Errno::EEXIST`.
@@ -143,10 +165,56 @@ class EISDIR extends SystemCallError {
 }
 
 /**
+ * `Errno::ENOTDIR`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is. The fs layer's own error carrying `code: "ENOTDIR"` is this
+ * class to `rescue Errno::ENOTDIR`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ENOTDIR`, which Rack rescues
+ * without defining.
+ */
+class ENOTDIR extends SystemCallError {
+  static readonly Errno = 20;
+  readonly code = "ENOTDIR";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Not a directory" : `Not a directory - ${mesg}`);
+    this.name = "Errno::ENOTDIR";
+    this.errno = ENOTDIR.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ENOTDIR";
+  }
+}
+
+/**
+ * `Errno::ESRCH`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is. The fs layer's own error carrying `code: "ESRCH"` is this
+ * class to `rescue Errno::ESRCH`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ESRCH`, which Rack rescues
+ * without defining.
+ */
+class ESRCH extends SystemCallError {
+  static readonly Errno = 3;
+  readonly code = "ESRCH";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "No such process" : `No such process - ${mesg}`);
+    this.name = "Errno::ESRCH";
+    this.errno = ESRCH.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ESRCH";
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-export const Errno = { EEXIST, EISDIR, ENOENT, ENOTTY, EPIPE };
+export const Errno = { EEXIST, EISDIR, ENOENT, ENOTDIR, ENOTTY, EPIPE, ESPIPE, ESRCH };

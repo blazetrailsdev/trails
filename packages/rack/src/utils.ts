@@ -10,6 +10,11 @@ import {
 } from "./query-parser.js";
 import {
   ArgumentError,
+  aryDeleteIf,
+  block,
+  stringSplit,
+  fetch,
+  warn,
   Process,
   RFC2396_PARSER,
   URI,
@@ -29,62 +34,32 @@ let _defaultQueryParser = QueryParser.makeDefault(32);
 let _multipartFileLimit = 128;
 let _multipartTotalPartLimit = 4096;
 
-export function getDefaultQueryParser(): QueryParser {
+export function defaultQueryParser(): QueryParser {
   return _defaultQueryParser;
 }
 export function setDefaultQueryParser(parser: QueryParser): void {
   _defaultQueryParser = parser;
 }
 
-export function getParamDepthLimit(): number {
-  return _defaultQueryParser.paramDepthLimit;
-}
-export function setParamDepthLimit(v: number): void {
-  defaultQueryParser(defaultQueryParser().newDepthLimit(v));
-}
-
-export function getMultipartFileLimit(): number {
-  return _multipartFileLimit;
-}
-export function setMultipartFileLimit(v: number): void {
-  _multipartFileLimit = v;
-}
-
-export function getMultipartTotalPartLimit(): number {
+export function multipartTotalPartLimit(): number {
   return _multipartTotalPartLimit;
 }
 export function setMultipartTotalPartLimit(v: number): void {
   _multipartTotalPartLimit = v;
 }
 
-export function defaultQueryParser(): QueryParser;
-export function defaultQueryParser(parser: QueryParser): void;
-export function defaultQueryParser(parser?: QueryParser): QueryParser | void {
-  if (parser !== undefined) {
-    _defaultQueryParser = parser;
-    return;
-  }
-  return _defaultQueryParser;
-}
-
-export function multipartTotalPartLimit(): number;
-export function multipartTotalPartLimit(v: number): void;
-export function multipartTotalPartLimit(v?: number): number | void {
-  if (v !== undefined) {
-    _multipartTotalPartLimit = v;
-    return;
-  }
-  return _multipartTotalPartLimit;
-}
-
-export function multipartFileLimit(): number;
-export function multipartFileLimit(v: number): void;
-export function multipartFileLimit(v?: number): number | void {
-  if (v !== undefined) {
-    _multipartFileLimit = v;
-    return;
-  }
+export function multipartFileLimit(): number {
   return _multipartFileLimit;
+}
+export function setMultipartFileLimit(v: number): void {
+  _multipartFileLimit = v;
+}
+
+export function paramDepthLimit(): number {
+  return defaultQueryParser().paramDepthLimit;
+}
+export function setParamDepthLimit(v: number): void {
+  setDefaultQueryParser(defaultQueryParser().newDepthLimit(v));
 }
 
 export function clockTime(): number {
@@ -132,10 +107,12 @@ export function buildNestedQuery(value: any, prefix: string | null = null): stri
   if (Array.isArray(value)) {
     return value.map((v) => buildNestedQuery(v, `${prefix ?? ""}[]`)).join("&");
   } else if (value !== null && value !== undefined && typeof value === "object") {
-    return Object.entries(value)
-      .map(([k, v]) => buildNestedQuery(v, prefix != null ? `${prefix}[${k}]` : k))
-      .filter((s) => s.length > 0)
-      .join("&");
+    return aryDeleteIf(
+      Object.entries(value).map(([k, v]) =>
+        buildNestedQuery(v, prefix != null ? `${prefix}[${k}]` : k),
+      ),
+      (s) => s.length === 0,
+    ).join("&");
   } else if (value === null || value === undefined) {
     return escape(prefix);
   } else {
@@ -163,11 +140,12 @@ export function forwardedValues(
   forwardedHeader = forwardedHeader.replace(/\n/g, ";");
   const result: Record<string, string[]> = {};
 
-  for (const field of forwardedHeader.split(";")) {
-    for (const pair of field.split(",")) {
-      const trimmed = pair.trim().replace(/\s*=\s*/, "=");
-      if (!trimmed) continue;
-      const match = trimmed.match(/^(by|for|host|proto)="?([^"]+)"?$/i);
+  for (const field of stringSplit(forwardedHeader, ";")) {
+    for (let pair of stringSplit(field, ",")) {
+      pair = stringSplit(pair, "=")
+        .map((s) => s.trim())
+        .join("=");
+      const match = pair.match(/^(by|for|host|proto)="?([^"]+)"?$/i);
       if (!match) return null;
       const key = match[1].toLowerCase();
       if (!result[key]) result[key] = [];
@@ -460,15 +438,25 @@ export function statusCode(status: number | string): number {
   ) {
     const symbol = stringToSym(status);
     const name = symbolToS(symbol);
-    if (Object.hasOwn(SYMBOL_TO_STATUS_CODE, name)) return SYMBOL_TO_STATUS_CODE[name];
-    if (!Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, name)) {
-      throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
-    }
-    const fallbackCode = OBSOLETE_SYMBOLS_TO_STATUS_CODES[name];
-    const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
-    const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[name];
-    if (canonicalSymbol === undefined) console.warn(message);
-    return fallbackCode;
+    return fetch(
+      SYMBOL_TO_STATUS_CODE,
+      name,
+      block(() => {
+        const fallbackCode = fetch(
+          OBSOLETE_SYMBOLS_TO_STATUS_CODES,
+          name,
+          block(() => {
+            throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
+          }),
+        ) as number;
+        const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
+        const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[name];
+        if (canonicalSymbol == null) {
+          warn(message, { uplevel: 3 });
+        }
+        return fallbackCode;
+      }),
+    );
   } else {
     return typeof status === "number" ? Math.trunc(status) : parseInt(status, 10) || 0;
   }

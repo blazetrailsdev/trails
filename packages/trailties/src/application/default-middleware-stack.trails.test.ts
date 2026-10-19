@@ -23,7 +23,6 @@ import {
   Runtime,
   Sendfile,
   TempfileReaper,
-  bodyFromString,
 } from "@blazetrails/rack";
 import type { RackEnv } from "@blazetrails/rack";
 import "../trailties/action-dispatch.js";
@@ -116,10 +115,10 @@ describe("DefaultMiddlewareStack (trails)", () => {
     let seen: unknown;
     const endpoint = async (env: RackEnv) => {
       seen = env["REQUEST_METHOD"];
-      return [200, { "content-type": "text/plain" }, bodyFromString("ok")] as [
+      return [200, { "content-type": "text/plain" }, ["ok"]] as [
         number,
         Record<string, string>,
-        AsyncIterable<string>,
+        string[],
       ];
     };
     const env = MockRequest.envFor("/posts/1", {

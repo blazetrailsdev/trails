@@ -1,18 +1,12 @@
-import { I18n } from "@blazetrails/activesupport";
-import { fetch, File } from "@blazetrails/ruby-compat";
-import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
+import { I18n, camelize } from "@blazetrails/activesupport";
+import { fetch, File, rbFPublicSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
 import { Mime, MimeType } from "../http/mime-type.js";
 import { InvalidType } from "../http/mime-negotiation.js";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
-
-async function* emptyBody(): RackBody {}
-
-async function* bodyFromBytes(bytes: Uint8Array): RackBody {
-  yield bytes;
-}
 
 const LOCALE_RE = /^[A-Za-z0-9_-]+$/;
 
@@ -47,14 +41,14 @@ export class PublicExceptions {
   }
 
   private render(status: number, contentType: MimeType | undefined, body: ErrorBody): RackResponse {
-    const sym = contentType?.symbol;
-    if (sym === ":json") {
-      return this.renderFormat(status, contentType!, JSON.stringify(body));
+    const format = contentType
+      ? camelize(`to_${contentType.toSym()?.slice(1) ?? ""}`, false)
+      : null;
+    if (format != null && rbObjRespondTo(body, format)) {
+      return this.renderFormat(status, contentType!, rbFPublicSend(body, format) as string);
+    } else {
+      return this.renderHtml(status);
     }
-    if (sym === ":xml") {
-      return this.renderFormat(status, contentType!, toXml(body));
-    }
-    return this.renderHtml(status);
   }
 
   private renderFormat(status: number, contentType: MimeType | string, body: string): RackResponse {
@@ -65,7 +59,7 @@ export class PublicExceptions {
         "content-type": `${contentType}; charset=${Response.defaultCharset ?? ""}`,
         "content-length": String(encoded.byteLength),
       },
-      bodyFromBytes(encoded),
+      [body],
     ];
   }
 
@@ -85,25 +79,6 @@ export class PublicExceptions {
     if (found && path != null) {
       return this.renderFormat(status, "text/html", File.read(path));
     }
-    return [404, { [X_CASCADE]: "pass" }, emptyBody()];
+    return [404, { [X_CASCADE]: "pass" }, []];
   }
-}
-
-function toXml(body: ErrorBody): string {
-  return (
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<hash>\n` +
-    `  <status type="integer">${body.status}</status>\n` +
-    `  <error>${escapeXml(body.error)}</error>\n` +
-    `</hash>\n`
-  );
-}
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
 }

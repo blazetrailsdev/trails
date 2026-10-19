@@ -40,7 +40,10 @@ export class ScaffoldControllerGenerator extends NamedBase {
   declare _controllerClassPath: string[];
   declare options: ScaffoldControllerGeneratorOptions;
 
-  /** @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26 */
+  /**
+   * @inlinedFrom Rails::Generators::ModelHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/model_helpers.rb:26-45
+   * @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26
+   */
   constructor(options: ScaffoldControllerGeneratorOptions) {
     super(options);
     const controllerName = this.name;

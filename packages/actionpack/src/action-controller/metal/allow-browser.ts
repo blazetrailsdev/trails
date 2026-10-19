@@ -3,7 +3,6 @@ import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { UAParser } from "ua-parser-js";
 import {
   Concern,
-  Module,
   Notifications,
   TopLevel,
   extend,
@@ -54,12 +53,8 @@ export const ClassMethods = {
   },
 };
 
-export const AllowBrowser = new Module((mod) => {
-  extend(mod, Concern);
-
-  mod.defineMethod("allowBrowser", allowBrowser);
-}) as Module<{ allowBrowser: typeof allowBrowser }> & { ClassMethods: typeof ClassMethods };
-AllowBrowser.ClassMethods = ClassMethods;
+export const AllowBrowser = { ClassMethods, allowBrowser };
+extend(AllowBrowser, Concern);
 
 /**
  * @missingRailsCall require — PERMANENT

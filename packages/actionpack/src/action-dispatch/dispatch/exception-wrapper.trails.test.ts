@@ -10,7 +10,25 @@ import {
   TemplateHandlers,
   TseHandler,
 } from "@blazetrails/actionview";
-import { RoutingError, UnknownFormat } from "../../action-controller/metal/exceptions.js";
+import { rbObjClassname } from "@blazetrails/ruby-compat";
+import { ParameterTypeError, InvalidParameterError } from "@blazetrails/rack";
+import { ActionNotFound } from "../../abstract-controller/base.js";
+import {
+  BadRequest,
+  MethodNotAllowed,
+  MissingExactTemplate,
+  NotImplemented,
+  RoutingError,
+  UnknownFormat,
+  UnknownHttpMethod,
+} from "../../action-controller/metal/exceptions.js";
+import {
+  InvalidAuthenticityToken,
+  InvalidCrossOriginRequest,
+} from "../../action-controller/metal/request-forgery-protection.js";
+import { ParameterMissing } from "../../action-controller/metal/strong-parameters.js";
+import { InvalidType } from "../http/mime-negotiation.js";
+import { ParseError } from "../http/parameters.js";
 import { ExceptionWrapper } from "../middleware/exception-wrapper.js";
 
 class Holder {}
@@ -60,6 +78,41 @@ describe("ExceptionWrapper template spots", () => {
 });
 
 describe("ExceptionWrapper tables keyed on qualified class names", () => {
+  it("every rescue_responses class answers its key as class.name", () => {
+    const klasses = [
+      RoutingError,
+      ActionNotFound,
+      MethodNotAllowed,
+      UnknownHttpMethod,
+      NotImplemented,
+      UnknownFormat,
+      InvalidType,
+      MissingExactTemplate,
+      InvalidAuthenticityToken,
+      InvalidCrossOriginRequest,
+      ParseError,
+      BadRequest,
+      ParameterMissing,
+      ParameterTypeError,
+      InvalidParameterError,
+    ];
+    const names = klasses.map((klass) => rbObjClassname(Object.create(klass.prototype)));
+    expect(names).toEqual(Object.keys(ExceptionWrapper.rescueResponses));
+  });
+
+  it("every rescue_templates class answers its key as class.name", () => {
+    const names = [
+      MissingTemplate,
+      RoutingError,
+      ActionNotFound,
+      TemplateError,
+      MissingExactTemplate,
+    ].map((klass) => rbObjClassname(Object.create(klass.prototype)));
+    expect(names).toEqual(
+      Object.keys(ExceptionWrapper.rescueTemplates).filter((k) => !k.startsWith("ActiveRecord::")),
+    );
+  });
+
   it("rescue_responses maps a raised ActionController::UnknownFormat to :not_acceptable", () => {
     const wrapper = new ExceptionWrapper(null, new UnknownFormat(""));
     expect(wrapper.exceptionClassName).toBe("ActionController::UnknownFormat");

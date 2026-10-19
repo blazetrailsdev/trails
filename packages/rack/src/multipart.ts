@@ -1,6 +1,6 @@
 import { UploadedFile } from "./multipart/uploaded-file.js";
 import { Generator } from "./multipart/generator.js";
-import { getDefaultQueryParser } from "./utils.js";
+import { defaultQueryParser } from "./utils.js";
 import {
   RACK_INPUT,
   RACK_MULTIPART_BUFFER_SIZE,
@@ -9,10 +9,9 @@ import {
 } from "./constants.js";
 import { include } from "@blazetrails/ruby-compat";
 import { BadRequest } from "./bad-request.js";
-import { MULTIPART_BOUNDARY } from "./multipart-boundary.js";
 import type { QueryParser } from "./query-parser.js";
 
-export { MULTIPART_BOUNDARY } from "./multipart-boundary.js";
+export const MULTIPART_BOUNDARY = "AaB03x";
 export { UploadedFile } from "./multipart/uploaded-file.js";
 import {
   MultipartPartLimitError,
@@ -47,7 +46,7 @@ include(MissingInputError, BadRequest);
 
 export function parseMultipart(
   env: Record<string, any>,
-  params: QueryParser = getDefaultQueryParser(),
+  params: QueryParser = defaultQueryParser(),
 ): Record<string, any> | null {
   const io = env[RACK_INPUT];
   if (io == null || io === false) {
@@ -78,7 +77,7 @@ export class ParamList {
   }
 
   static normalizeParams(params: ParamList, key: string, value: unknown): void {
-    params._pairs.push([key, value]);
+    params.push([key, value]);
   }
 
   push(pair: [string, unknown]): void {
@@ -92,7 +91,7 @@ export class ParamList {
 
 export function extractMultipart(
   request: { env: Record<string, any> },
-  _params: QueryParser = getDefaultQueryParser(),
+  _params: QueryParser = defaultQueryParser(),
 ): Record<string, any> | null {
   return parseMultipart(request.env);
 }

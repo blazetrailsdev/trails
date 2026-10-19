@@ -33,6 +33,29 @@ describe("JSON.parse options", () => {
     expect(en.isFrozen()).toBe(true);
     expect(Object.isFrozen(en.get(":foo"))).toBe(true);
   });
+
+  it("parses every object into a new objectClass instance through its []=", () => {
+    const set: [unknown, unknown][] = [];
+    class Recording extends Hash<string, unknown> {
+      override set(key: string, value: unknown): this {
+        set.push([key, value]);
+        return super.set(key, value);
+      }
+    }
+    const parsed = JSON.parse('[{"a":{"b":1}}]', { objectClass: Recording }) as Recording[];
+    expect(parsed[0]).toBeInstanceOf(Recording);
+    expect(parsed[0].get("a")).toBeInstanceOf(Recording);
+    expect((parsed[0].get("a") as Recording).get("b")).toBe(1);
+    expect(set.map(([key]) => key)).toEqual(["b", "a"]);
+  });
+
+  it("names an objectClass instance's keys as Symbols under symbolizeNames", () => {
+    const parsed = JSON.parse('{"a":1}', { objectClass: Hash, symbolizeNames: true }) as Hash<
+      string,
+      unknown
+    >;
+    expect(parsed.get(":a")).toBe(1);
+  });
 });
 
 describe("JSON.parse comments", () => {

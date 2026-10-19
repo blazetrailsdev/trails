@@ -3,7 +3,6 @@ import {
   RACK_METHODOVERRIDE_ORIGINAL_METHOD,
   SERVER_NAME,
   SERVER_PORT,
-  SERVER_PROTOCOL,
   QUERY_STRING,
   PATH_INFO,
   SCRIPT_NAME,
@@ -34,17 +33,10 @@ import {
   RACK_REQUEST_FORM_ERROR,
   RACK_REQUEST_COOKIE_HASH,
   RACK_REQUEST_COOKIE_STRING,
-  HTTP_FORWARDED,
-  HTTP_X_FORWARDED_FOR,
-  HTTP_X_FORWARDED_PORT,
-  HTTP_X_FORWARDED_HOST,
-  HTTP_X_FORWARDED_PROTO,
-  HTTP_X_FORWARDED_SCHEME,
-  HTTP_X_FORWARDED_SSL,
 } from "./constants.js";
 import {
   forwardedValues,
-  getDefaultQueryParser,
+  defaultQueryParser,
   parseCookiesHeader,
   QueryParser,
   unescape,
@@ -84,6 +76,20 @@ export const DEFAULT_PORTS: Record<string, number | undefined> = {
   https: 443,
   coffee: 80,
 };
+
+export const HTTP_X_FORWARDED_FOR = "HTTP_X_FORWARDED_FOR";
+
+export const HTTP_X_FORWARDED_HOST = "HTTP_X_FORWARDED_HOST";
+
+export const HTTP_FORWARDED = "HTTP_FORWARDED";
+
+export const HTTP_X_FORWARDED_SCHEME = "HTTP_X_FORWARDED_SCHEME";
+
+export const HTTP_X_FORWARDED_PROTO = "HTTP_X_FORWARDED_PROTO";
+
+export const HTTP_X_FORWARDED_PORT = "HTTP_X_FORWARDED_PORT";
+
+export const HTTP_X_FORWARDED_SSL = "HTTP_X_FORWARDED_SSL";
 
 const ALLOWED_SCHEMES = ["https", "http", "wss", "ws"] as const;
 const FORWARDED_SCHEME_HEADERS: Record<string, string> = {
@@ -488,29 +494,23 @@ export abstract class Helpers {
   }
 
   updateParam(k: string, v: any): void {
-    const get = this.GET;
-    const post = this.POST;
-    if (k in post) {
-      post[k] = v;
-    } else {
-      get[k] = v;
+    let found = false;
+    if (Object.hasOwn(this.GET, k)) {
+      found = true;
+      this.GET[k] = v;
+    }
+    if (Object.hasOwn(this.POST, k)) {
+      found = true;
+      this.POST[k] = v;
+    }
+    if (!found) {
+      this.GET[k] = v;
     }
   }
 
   deleteParam(k: string): any {
-    const post = this.POST;
-    if (k in post) {
-      const val = post[k];
-      delete post[k];
-      return val;
-    }
-    const get = this.GET;
-    if (k in get) {
-      const val = get[k];
-      delete get[k];
-      return val;
-    }
-    return undefined;
+    const [postValue, getValue] = [hashDelete(this.POST, k), hashDelete(this.GET, k)];
+    return postValue != null && postValue !== false ? postValue : getValue;
   }
 
   get baseUrl(): string {
@@ -588,7 +588,7 @@ export abstract class Helpers {
 
   /** @internal */
   queryParser(): QueryParser {
-    return getDefaultQueryParser();
+    return defaultQueryParser();
   }
 
   /** @internal */
@@ -688,8 +688,39 @@ export class Request {
   ];
   static xForwardedProtoPriority: Array<"proto" | "scheme" | null> = ["proto", "scheme"];
 
+  /** @internal */
+  private _params: Record<string, any> | null;
+
   constructor(env: Record<string, any>) {
     this.env = env;
+    this._params = null;
+  }
+
+  get params(): Record<string, any> {
+    return (this._params ||= { ...this.GET, ...this.POST });
+  }
+
+  updateParam(k: string, v: any): void {
+    let found = false;
+    if (Object.hasOwn(this.GET, k)) {
+      found = true;
+      this.GET[k] = v;
+    }
+    if (Object.hasOwn(this.POST, k)) {
+      found = true;
+      this.POST[k] = v;
+    }
+    if (!found) {
+      this.GET[k] = v;
+    }
+    this._params = null;
+  }
+
+  deleteParam(k: string): any {
+    const [postValue, getValue] = [hashDelete(this.POST, k), hashDelete(this.GET, k)];
+    const v = postValue != null && postValue !== false ? postValue : getValue;
+    this._params = null;
+    return v;
   }
 
   dup(): Request {
@@ -702,16 +733,6 @@ export class Request {
 
   getHeader(name: string): any {
     return this.env[name];
-  }
-
-  get(key: string, defaultValue?: any): any {
-    if (key in this.env) return this.env[key];
-    if (typeof defaultValue === "function") return defaultValue();
-    return defaultValue;
-  }
-
-  set(key: string, value: any): void {
-    this.env[key] = value;
   }
 
   addHeader(key: string, v: string | null): any {
@@ -728,12 +749,6 @@ export class Request {
     return hashDelete(this.env, name);
   }
 
-  each(callback: (key: string, value: any) => void): void {
-    for (const [k, v] of Object.entries(this.env)) {
-      callback(k, v);
-    }
-  }
-
   fetchHeader(name: string): any;
   fetchHeader(name: string, block: (key: string) => any): any;
   fetchHeader(name: string, block?: (key: string) => any): any {
@@ -745,18 +760,7 @@ export class Request {
   }
 
   eachHeader(callback: (key: string, value: any) => void): void {
-    this.each(callback);
-  }
-
-  get serverProtocol(): string {
-    return this.env[SERVER_PROTOCOL];
-  }
-
-  get prefetch(): boolean {
-    const purpose = (this.env["HTTP_X_MOZ"] || "").toLowerCase();
-    const secPurpose = (this.env["HTTP_SEC_PURPOSE"] || "").toLowerCase();
-    const purpose2 = (this.env["HTTP_PURPOSE"] || "").toLowerCase();
-    return purpose === "prefetch" || secPurpose === "prefetch" || purpose2 === "prefetch";
+    for (const [k, v] of Object.entries(this.env)) callback(k, v);
   }
 
   /** @noRailsEquivalent CONVERGEABLE port-rack-request-form-pairs */

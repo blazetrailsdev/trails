@@ -11,7 +11,6 @@ import {
 import { RuntimeError, block } from "@blazetrails/ruby-compat";
 import { Middleware, MiddlewareStack, type MiddlewareBlock } from "../middleware/stack.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -285,7 +284,7 @@ describe("MiddlewareStackTest", () => {
     };
 
     await Notifications.subscribed(subscriber, "process_middleware.action_dispatch", async () => {
-      const app = stack.build(async () => [200, {}, bodyFromString("")]);
+      const app = stack.build(async () => [200, {}, [""]]);
       await assertNothingRaised(() => rbFSend(app, "call", {} as RackEnv) as Promise<RackResponse>);
     });
 
@@ -299,7 +298,7 @@ describe("MiddlewareStackTest", () => {
 
   it("build creates a callable app", async () => {
     const stack = new MiddlewareStack();
-    const app = stack.build(async () => [200, {}, bodyFromString("OK")]);
+    const app = stack.build(async () => [200, {}, ["OK"]]);
     const [status] = await (rbFSend(app, "call", {} as RackEnv) as Promise<RackResponse>);
     expect(status).toBe(200);
   });

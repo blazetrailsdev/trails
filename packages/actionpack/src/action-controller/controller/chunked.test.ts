@@ -1,5 +1,5 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual, HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { ApplicationController, type RoutedRackApp } from "../../test-helpers/abstract-unit.js";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
@@ -39,7 +39,7 @@ describe("ChunkedTest", () => {
       headers: { "Transfer-Encoding": "gzip, chunked;foo=bar" },
     });
 
-    assertEqual(7, (t.response.parsedBody as Record<string, unknown>)["content_length"]);
-    assertEqual("foo=bar", (t.response.parsedBody as Record<string, unknown>)["raw_post"]);
+    assertEqual(7, (t.response.parsedBody as HashWithIndifferentAccess).get("content_length"));
+    assertEqual("foo=bar", (t.response.parsedBody as HashWithIndifferentAccess).get("raw_post"));
   });
 });

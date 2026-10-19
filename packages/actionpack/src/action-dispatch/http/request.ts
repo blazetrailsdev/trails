@@ -485,7 +485,10 @@ export class Request {
     return this.getHeader(routes.envKey);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName dup — PERMANENT
+   */
   setEngineScriptName(name: string): void {
     this.setHeader((this.routes as { envKey: string }).envKey, rbObjDup(name));
   }

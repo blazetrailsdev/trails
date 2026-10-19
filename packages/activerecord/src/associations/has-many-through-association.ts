@@ -16,7 +16,7 @@ import {
   rbDeclareIvar,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
-import { underscore, isBlank, wrap } from "@blazetrails/activesupport";
+import { exceptBang, underscore, isBlank, wrap } from "@blazetrails/activesupport";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import type { Association } from "./association.js";
@@ -278,25 +278,24 @@ function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base
 
 /** @internal */
 function throughScope(this: HasManyThroughAssociation): unknown {
-  return (this as any)._throughScope ?? null;
+  return this._throughScope ?? null;
 }
 
 /** @internal */
 function throughScopeAttributes(this: HasManyThroughAssociation): Record<string, unknown> {
   const throughName = this.reflection.options.through;
   if (!throughName) return {};
-  const throughAssoc = (this.owner as any).association?.(throughName);
+  const throughAssoc = this.owner.association(throughName);
   if (!throughAssoc) return {};
-  const scope: any = this.throughScope() ?? (this as any).scope?.() ?? throughAssoc.scope?.();
+  const scope: any = this.throughScope() ?? this.scope();
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
-  const throughTable = throughAssoc.klass?.tableName ?? "";
+  const throughTable = throughAssoc.reflection.klass.tableName;
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
-  const throughFk = throughAssoc.reflection?.options?.foreignKey ?? "";
-  const inheritanceCol = throughAssoc.klass?.inheritanceColumn ?? "type";
-  for (const key of [String(throughFk), inheritanceCol]) {
-    if (key in attrs) delete attrs[key];
-  }
-  return attrs;
+  const exceptKeys = [
+    ...[throughAssoc.reflection.foreignKey()].flat(),
+    throughAssoc.reflection.klass.inheritanceColumn as string,
+  ];
+  return exceptBang(attrs, ...exceptKeys);
 }
 
 /** @internal */
@@ -309,7 +308,7 @@ async function saveThroughRecord(this: HasManyThroughAssociation, record: Base):
     const joinRecord = this.buildThroughRecord(record);
     if (!joinRecord) return true;
     if (!joinRecord.isChanged) return true;
-    await (joinRecord as any).saveBang();
+    await joinRecord.saveBang();
     return true;
   } finally {
     this._throughRecords.delete(record);
@@ -320,11 +319,11 @@ async function saveThroughRecord(this: HasManyThroughAssociation, record: Base):
 function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation): boolean {
   const throughRefl = assoc.reflection.options.through;
   if (!throughRefl) return false;
-  const throughAssoc = (assoc.owner as any).association?.(throughRefl);
+  const throughAssoc = assoc.owner.association(throughRefl);
   if (!throughAssoc) return false;
-  const fk = throughAssoc.reflection?.foreignKey();
+  const fk = throughAssoc.reflection.foreignKey();
   if (!fk) return true;
-  return !!(assoc.owner as any).readAttribute?.(fk as string);
+  return !!assoc.owner.readAttribute(fk as string);
 }
 
 /** @internal */

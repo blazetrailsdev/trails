@@ -27,7 +27,10 @@ export class ScaffoldGenerator extends NamedBase {
   declare options: NamedBaseOptions & ModelHelpersOptions & { api?: boolean; modelName?: string };
   /** @internal */
 
-  /** @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26 */
+  /**
+   * @inlinedFrom Rails::Generators::ModelHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/model_helpers.rb:26-45
+   * @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26
+   */
   constructor(options: NamedBaseOptions) {
     super(options);
     const controllerName = this.name;

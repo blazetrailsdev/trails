@@ -10,7 +10,7 @@ import {
   type Included,
   isPresent,
 } from "@blazetrails/activesupport";
-import { Utils, bodyFromString } from "@blazetrails/rack";
+import { Utils } from "@blazetrails/rack";
 import {
   RFC2396_PARSER,
   URI,
@@ -174,7 +174,7 @@ describe("LegacyRouteSetTests", () => {
       this.get("/:artist/:song-omg", {
         to: (env: any) => {
           const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
-          return [200, {}, bodyFromString(resp)];
+          return [200, {}, [resp]];
         },
       });
     });
@@ -191,7 +191,7 @@ describe("LegacyRouteSetTests", () => {
         to: (env: any) => {
           const param = new Request(env).pathParameters;
           const resp = ActiveSupportJSON.encode(param);
-          return [200, {}, bodyFromString(resp)];
+          return [200, {}, [resp]];
         },
       });
     });
@@ -207,7 +207,7 @@ describe("LegacyRouteSetTests", () => {
       this.get("/journey/:id", {
         to: (env: any) => {
           const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
-          return [200, {}, bodyFromString(resp)];
+          return [200, {}, [resp]];
         },
       });
     });
@@ -224,7 +224,7 @@ describe("LegacyRouteSetTests", () => {
         constraints: { song: /\d+/ },
         to: (env: any) => {
           const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
-          return [200, {}, bodyFromString(resp)];
+          return [200, {}, [resp]];
         },
       });
     });
@@ -241,7 +241,7 @@ describe("LegacyRouteSetTests", () => {
       this.get("/:artist/omg-:song", {
         to: (env: any) => {
           const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
-          return [200, {}, bodyFromString(resp)];
+          return [200, {}, [resp]];
         },
       });
     });
@@ -258,7 +258,7 @@ describe("LegacyRouteSetTests", () => {
         constraints: { song: /\d+/ },
         to: (env: any) => {
           const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
-          return [200, {}, bodyFromString(resp)];
+          return [200, {}, [resp]];
         },
       });
     });
@@ -275,7 +275,7 @@ describe("LegacyRouteSetTests", () => {
       this.get("/*path", {
         to: (env: any) => {
           const x = env["action_dispatch.request.path_parameters"]["path"];
-          return [200, {}, bodyFromString(x)];
+          return [200, {}, [x]];
         },
         format: false,
       });
@@ -290,7 +290,7 @@ describe("LegacyRouteSetTests", () => {
       this.get("/*path", {
         to: (env: any) => {
           const x = ActiveSupportJSON.encode(env["action_dispatch.request.path_parameters"]);
-          return [200, {}, bodyFromString(x)];
+          return [200, {}, [x]];
         },
       });
     });
@@ -305,7 +305,7 @@ describe("LegacyRouteSetTests", () => {
       this.get("/(*filters)", {
         to: (env: any) => {
           const x = env["action_dispatch.request.path_parameters"]["filters"];
-          return [200, {}, bodyFromString(x)];
+          return [200, {}, [x]];
         },
         format: false,
       });
@@ -320,7 +320,7 @@ describe("LegacyRouteSetTests", () => {
       this.get("/(*filters)", {
         to: (env: any) => {
           const x = ActiveSupportJSON.encode(env["action_dispatch.request.path_parameters"]);
-          return [200, {}, bodyFromString(x)];
+          return [200, {}, [x]];
         },
       });
     });
@@ -334,10 +334,10 @@ describe("LegacyRouteSetTests", () => {
     rs.draw(function () {
       this.get("/whois/:domain", {
         constraints: { domain: /\w+\.[\w.]+/ },
-        to: (_env: any) => [200, {}, bodyFromString("regexp")],
+        to: (_env: any) => [200, {}, ["regexp"]],
       });
 
-      this.get("/whois/:id", { to: (_env: any) => [200, {}, bodyFromString("id")] });
+      this.get("/whois/:id", { to: (_env: any) => [200, {}, ["id"]] });
     });
 
     expect(await tc.get(URI.parse("http://example.org/whois/example.org"))).toBe("regexp");
@@ -354,11 +354,11 @@ describe("LegacyRouteSetTests", () => {
     rs.draw(function () {
       this.get("/", {
         constraints: new subdomain(),
-        to: (_env: any) => [200, {}, bodyFromString("default")],
+        to: (_env: any) => [200, {}, ["default"]],
       });
       this.get("/", {
         constraints: { subdomain: "clients" },
-        to: (_env: any) => [200, {}, bodyFromString("clients")],
+        to: (_env: any) => [200, {}, ["clients"]],
       });
     });
 
@@ -370,11 +370,11 @@ describe("LegacyRouteSetTests", () => {
     rs.draw(function () {
       this.get("/api", {
         constraints: { format: "json" },
-        to: (_env: any) => [200, {}, bodyFromString("json")],
+        to: (_env: any) => [200, {}, ["json"]],
       });
       this.get("/api", {
         constraints: { format: "xml" },
-        to: (_env: any) => [200, {}, bodyFromString("xml")],
+        to: (_env: any) => [200, {}, ["xml"]],
       });
     });
 
@@ -386,12 +386,12 @@ describe("LegacyRouteSetTests", () => {
     rs.draw(function () {
       this.get("/", {
         constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() !== "clients",
-        to: (_env: any) => [200, {}, bodyFromString("default")],
+        to: (_env: any) => [200, {}, ["default"]],
       });
 
       this.get("/", {
         constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() === "clients",
-        to: (_env: any) => [200, {}, bodyFromString("clients")],
+        to: (_env: any) => [200, {}, ["clients"]],
       });
     });
 
@@ -403,7 +403,7 @@ describe("LegacyRouteSetTests", () => {
     let scopeCalled = false;
     rs.draw(function () {
       this.scope("/foo", { constraints: (_req: Request) => (scopeCalled = true) }, () => {
-        this.get("/", { to: (_env: any) => [200, {}, bodyFromString("default")] });
+        this.get("/", { to: (_env: any) => [200, {}, ["default"]] });
       });
     });
 
@@ -421,7 +421,7 @@ describe("LegacyRouteSetTests", () => {
         () => {
           this.get("/", {
             constraints: (_req: Request) => (innerCalled = true),
-            to: (_env: any) => [200, {}, bodyFromString("default")],
+            to: (_env: any) => [200, {}, ["default"]],
           });
         },
       );
@@ -435,7 +435,7 @@ describe("LegacyRouteSetTests", () => {
     rs.draw(function () {
       this.get("/:username", {
         constraints: { username: /[^/]+/ },
-        to: (_e: any) => [200, {}, bodyFromString("foo")],
+        to: (_e: any) => [200, {}, ["foo"]],
       });
     });
     expect(await tc.get(URI.parse("http://example.org/"))).toBe("Not Found");
@@ -449,7 +449,7 @@ describe("LegacyRouteSetTests", () => {
         constraints: { filters: /.+?/ },
         to: (e: any) => {
           params = e["action_dispatch.request.path_parameters"];
-          return [200, {}, bodyFromString("foo")];
+          return [200, {}, ["foo"]];
         },
       });
     });

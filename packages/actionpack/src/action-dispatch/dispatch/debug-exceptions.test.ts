@@ -27,7 +27,6 @@ import {
   excSetupMessage,
 } from "@blazetrails/ruby-compat";
 import { Lint } from "@blazetrails/rack";
-import { bodyToString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { Base as ControllerBase } from "../../action-controller/base.js";
@@ -234,8 +233,8 @@ describe("DebugExceptionsTest", () => {
 
     await t.get("/pass", { headers: { "action_dispatch.show_exceptions": "all" } });
 
-    assertMatch(/<h2[^>]*>Request<\/h2>/, body());
-    assertMatch(/<h2[^>]*>Response<\/h2>/, body());
+    t.assertSelect("h2", /Request/);
+    t.assertSelect("h2", /Response/);
   });
 
   it("rescue with diagnostics message", async () => {
@@ -300,6 +299,7 @@ describe("DebugExceptionsTest", () => {
 
       t.assertResponse(500);
       assertMatch("Extracted source (around line #", body());
+      t.assertSelect("pre", { count: 0 }, body());
     } finally {
       TopLevel.Trails = trails;
     }
@@ -853,7 +853,9 @@ describe("DebugExceptionsTest", () => {
     });
 
     t.assertResponse(500);
-    assertMatch(/syntax error, unexpected|syntax errors found/, body());
+    t.assertSelect("#Application-Trace-0", () => {
+      t.assertSelect("code", /syntax error, unexpected|syntax errors found/);
+    });
   });
 
   // BLOCKED: debug-view-rescue-templates-are-never-shipped
@@ -1042,7 +1044,7 @@ describe("DebugExceptions", () => {
     const [status, headers, raw] = await mw.call(env({ HTTP_ACCEPT: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
-    const text = await bodyToString(raw);
+    const text = [...(raw as Iterable<string>)].join("");
     const json = JSON.parse(text);
     expect(json.exception).toBeDefined();
     expect(json.traces["Application Trace"]).toBeDefined();

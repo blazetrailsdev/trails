@@ -146,6 +146,7 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
  */
 export const CROSS_PACKAGE_TEST_FILES: Record<string, { package: string; tsFile: string }> = {
   "activemodel:railtie_test.rb": { package: "trailties", tsFile: "trailties/active-model.test.ts" },
+  "globalid:railtie_test.rb": { package: "trailties", tsFile: "trailties/global-id.test.ts" },
 };
 
 /**

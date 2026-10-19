@@ -109,6 +109,10 @@ const OPTION_READER_FUNCTIONS = new Set([
  * `rbFSend(value, "usec")`), as `dispatchedCallName` does for `X.call`.
  */
 const SEND_CALLEES = new Set(["rbFSend", "rbFPublicSend"]);
+const SEND_CALLEES_RUBY_NAME: Record<string, string> = {
+  rbFSend: "send",
+  rbFPublicSend: "publicSend",
+};
 /**
  * ruby-compat's `Kernel#load` (`rb_f_load`, vendor/ruby/v3.3.11/load.c:903),
  * which is a call to Ruby's `load`.
@@ -847,6 +851,7 @@ export function extractFromProgram(
             instanceMethods: [],
             classMethods: [],
             declaredAsNamespace: true,
+            noRailsEquivalent: noRailsEquivalentReason(node),
           };
           fileHasClassOrModule = true;
         } else if (
@@ -6881,12 +6886,12 @@ function describeArg(node: ts.Expression, flags: string[]): string {
     const dispatched = dispatchedCallName(expr);
     if (dispatched !== undefined) return `call:${dispatched}`;
     const sent = expr.arguments[1];
-    if (
-      ts.isIdentifier(expr.expression) &&
-      SEND_CALLEES.has(currentImportAliases?.get(expr.expression.text) ?? expr.expression.text) &&
-      sent !== undefined &&
-      ts.isStringLiteralLike(sent)
-    ) {
+    const sender = ts.isIdentifier(expr.expression)
+      ? (currentImportAliases?.get(expr.expression.text) ?? expr.expression.text)
+      : undefined;
+    if (sender !== undefined && SEND_CALLEES.has(sender) && sent !== undefined) {
+      // A computed method name is Ruby's own `send` / `public_send` call.
+      if (!ts.isStringLiteralLike(sent)) return `call:${SEND_CALLEES_RUBY_NAME[sender]}`;
       return `call:${sent.text}`;
     }
     const name = callSiteName(expr);

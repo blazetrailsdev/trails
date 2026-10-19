@@ -3,7 +3,6 @@ import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   I18n,
   HtmlSafeTranslation,
-  Module,
   htmlEscape,
   dasherize,
   kernelArray,
@@ -64,11 +63,6 @@ export function localize(
 
 export const l = localize;
 
-export const Translation = new Module((mod) => {
-  mod.defineMethod("translate", translate);
-  mod.aliasMethod("t", "translate");
-  mod.defineMethod("localize", localize);
-  mod.aliasMethod("l", "localize");
-});
+export const Translation = { translate, t: translate, localize, l: localize };
 
 rbModConstSet(AbstractController, "Translation", Translation);

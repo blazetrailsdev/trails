@@ -34,6 +34,7 @@ export {
   objRespondToMissing,
   rbBuiltinClassName,
   rbInspect,
+  isPlainHash,
   rbDefineInspectCustom,
   rbObjInspect,
   rbAnyToS,

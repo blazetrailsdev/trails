@@ -6,7 +6,6 @@ import {
   htmlEscape,
   htmlEscapeOnce,
   InheritableOptions,
-  initializeIncludedModules,
   jsonEscape,
   runLoadHooks,
   TseUtil,
@@ -250,7 +249,6 @@ export class Base {
     this._prepareContext();
 
     this._routes = null;
-    initializeIncludedModules(this);
 
     this.assign(assigns);
   }

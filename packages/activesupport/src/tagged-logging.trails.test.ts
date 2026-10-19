@@ -14,6 +14,18 @@ describe("TaggedLogging.new clone", () => {
     const tagged = TaggedLogging.new(broadcast) as unknown as { foo(): unknown };
     expect(tagged.foo()).toEqual("foo");
   });
+
+  it("keeps the type of the logger it wraps", () => {
+    class TestLogger extends Logger {
+      messages: string[] = [];
+      constructor() {
+        super({ write: (s: string) => this.messages.push(s) });
+      }
+    }
+    const tagged = TaggedLogging.new(new TestLogger());
+    tagged.tagged("BCX").info("Funky time");
+    expect(tagged.messages).toEqual(["[BCX] Funky time\n"]);
+  });
 });
 
 describe("TaggedLogging#tagged with an async block", () => {

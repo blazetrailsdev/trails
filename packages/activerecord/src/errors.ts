@@ -1,5 +1,6 @@
 export { NotImplementedError } from "@blazetrails/ruby-compat";
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActiveRecord } from "./namespaces.js";
 import type { Column } from "./connection-adapters/column.js";
 
 export class ActiveRecordError extends StandardError {}
@@ -649,3 +650,63 @@ export class MultiparameterAssignmentErrors extends ActiveRecordError {
     this.errors = errors;
   }
 }
+
+rbModConstSet(ActiveRecord, "ActiveRecordError", ActiveRecordError);
+rbModConstSet(ActiveRecord, "SubclassNotFound", SubclassNotFound);
+rbModConstSet(ActiveRecord, "AssociationTypeMismatch", AssociationTypeMismatch);
+rbModConstSet(ActiveRecord, "SerializationTypeMismatch", SerializationTypeMismatch);
+rbModConstSet(ActiveRecord, "AdapterNotSpecified", AdapterNotSpecified);
+rbModConstSet(ActiveRecord, "TableNotSpecified", TableNotSpecified);
+rbModConstSet(ActiveRecord, "AdapterNotFound", AdapterNotFound);
+rbModConstSet(ActiveRecord, "AdapterError", AdapterError);
+rbModConstSet(ActiveRecord, "ConnectionNotEstablished", ConnectionNotEstablished);
+rbModConstSet(ActiveRecord, "ConnectionTimeoutError", ConnectionTimeoutError);
+rbModConstSet(ActiveRecord, "ExclusiveConnectionTimeoutError", ExclusiveConnectionTimeoutError);
+rbModConstSet(ActiveRecord, "ConnectionNotDefined", ConnectionNotDefined);
+rbModConstSet(ActiveRecord, "DatabaseConnectionError", DatabaseConnectionError);
+rbModConstSet(ActiveRecord, "ReadOnlyError", ReadOnlyError);
+rbModConstSet(ActiveRecord, "RecordNotFound", RecordNotFound);
+rbModConstSet(ActiveRecord, "RecordNotSaved", RecordNotSaved);
+rbModConstSet(ActiveRecord, "RecordNotDestroyed", RecordNotDestroyed);
+rbModConstSet(ActiveRecord, "SoleRecordExceeded", SoleRecordExceeded);
+rbModConstSet(ActiveRecord, "StatementInvalid", StatementInvalid);
+rbModConstSet(ActiveRecord, "QueryAborted", QueryAborted);
+rbModConstSet(ActiveRecord, "ConnectionFailed", ConnectionFailed);
+rbModConstSet(ActiveRecord, "TransactionRollbackError", TransactionRollbackError);
+rbModConstSet(
+  ActiveRecord,
+  "AsynchronousQueryInsideTransactionError",
+  AsynchronousQueryInsideTransactionError,
+);
+rbModConstSet(ActiveRecord, "SerializationFailure", SerializationFailure);
+rbModConstSet(ActiveRecord, "Deadlocked", Deadlocked);
+rbModConstSet(ActiveRecord, "LockWaitTimeout", LockWaitTimeout);
+rbModConstSet(ActiveRecord, "StatementTimeout", StatementTimeout);
+rbModConstSet(ActiveRecord, "AdapterTimeout", AdapterTimeout);
+rbModConstSet(ActiveRecord, "QueryCanceled", QueryCanceled);
+rbModConstSet(ActiveRecord, "WrappedDatabaseException", WrappedDatabaseException);
+rbModConstSet(ActiveRecord, "RecordNotUnique", RecordNotUnique);
+rbModConstSet(ActiveRecord, "InvalidForeignKey", InvalidForeignKey);
+rbModConstSet(ActiveRecord, "MismatchedForeignKey", MismatchedForeignKey);
+rbModConstSet(ActiveRecord, "NotNullViolation", NotNullViolation);
+rbModConstSet(ActiveRecord, "ValueTooLong", ValueTooLong);
+rbModConstSet(ActiveRecord, "PreparedStatementInvalid", PreparedStatementInvalid);
+rbModConstSet(ActiveRecord, "PreparedStatementCacheExpired", PreparedStatementCacheExpired);
+rbModConstSet(ActiveRecord, "NoDatabaseError", NoDatabaseError);
+rbModConstSet(ActiveRecord, "DatabaseVersionError", DatabaseVersionError);
+rbModConstSet(ActiveRecord, "RangeError", RangeError);
+rbModConstSet(ActiveRecord, "DatabaseAlreadyExists", DatabaseAlreadyExists);
+rbModConstSet(ActiveRecord, "StaleObjectError", StaleObjectError);
+rbModConstSet(ActiveRecord, "ConfigurationError", ConfigurationError);
+rbModConstSet(ActiveRecord, "ReadOnlyRecord", ReadOnlyRecord);
+rbModConstSet(ActiveRecord, "StrictLoadingViolationError", StrictLoadingViolationError);
+rbModConstSet(ActiveRecord, "Rollback", Rollback);
+rbModConstSet(ActiveRecord, "DangerousAttributeError", DangerousAttributeError);
+rbModConstSet(ActiveRecord, "AttributeAssignmentError", AttributeAssignmentError);
+rbModConstSet(ActiveRecord, "TransactionIsolationError", TransactionIsolationError);
+rbModConstSet(ActiveRecord, "UnmodifiableRelation", UnmodifiableRelation);
+rbModConstSet(ActiveRecord, "IrreversibleOrderError", IrreversibleOrderError);
+rbModConstSet(ActiveRecord, "SQLWarning", SQLWarning);
+rbModConstSet(ActiveRecord, "UnknownAttributeReference", UnknownAttributeReference);
+rbModConstSet(ActiveRecord, "UnknownPrimaryKey", UnknownPrimaryKey);
+rbModConstSet(ActiveRecord, "MultiparameterAssignmentErrors", MultiparameterAssignmentErrors);

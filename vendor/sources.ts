@@ -481,6 +481,54 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rails-html-sanitizer",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/rails-html-sanitizer.git",
+      ref: "v1.6.2",
+    },
+    packages: [
+      {
+        name: "rails-html-sanitizer",
+        libPath: "lib/rails/html",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "loofah",
+    origin: {
+      type: "git",
+      url: "https://github.com/flavorjones/loofah.git",
+      ref: "v2.24.0",
+    },
+    packages: [
+      {
+        name: "loofah",
+        libPath: "lib/loofah",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "crass",
+    origin: {
+      type: "git",
+      url: "https://github.com/rgrove/crass.git",
+      ref: "v1.0.6",
+    },
+    packages: [
+      {
+        name: "crass",
+        libPath: "lib/crass",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "ruby",
     origin: {
       type: "git",

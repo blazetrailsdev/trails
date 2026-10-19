@@ -4,6 +4,7 @@ import {
   File,
   Location,
   Pathname,
+  rbObjClassname,
   rbObjRespondTo,
   toEnum,
   type Enumerator,
@@ -12,6 +13,7 @@ import {
 import {
   ActionableError,
   cattrAccessor,
+  SyntaxErrorProxy,
   TopLevel,
   type BacktraceCleaner,
 } from "@blazetrails/activesupport";
@@ -43,14 +45,6 @@ export class SourceMapLocation extends DelegateClass(Location) {
 
 export interface ShowExceptionsRequest {
   getHeader(name: string): unknown;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function classNameOf(e: Error): string {
-  if (e.name && e.name !== "Error") return e.name;
-  const ctor = e.constructor?.name;
-  if (ctor && ctor !== "Error") return ctor;
-  return e.name || ctor || "Error";
 }
 
 const EXCEPTION_IDS = new WeakMap<object, number>();
@@ -139,9 +133,12 @@ export class ExceptionWrapper {
     const backtraceCleaner = b !== undefined ? (a as BacktraceCleaner | null) : null;
     const exception = b !== undefined ? b : (a as Error);
     this.backtraceCleaner = backtraceCleaner;
-    this.exception = exception;
-    this.exceptionClassName = classNameOf(exception);
+    this.exceptionClassName = rbObjClassname(exception);
     this.wrappedCauses = this.wrappedCausesFor(exception, backtraceCleaner);
+    this.exception = exception;
+    if (exception instanceof SyntaxError) {
+      this.exception = new SyntaxErrorProxy(exception);
+    }
     this.statusCode = this.computeStatusCode();
     this.backtrace = this.buildBacktrace();
   }
@@ -158,7 +155,7 @@ export class ExceptionWrapper {
 
   get exceptionName(): string {
     const cause = this.exception.cause;
-    return cause instanceof Error ? classNameOf(cause) : this.exceptionClassName;
+    return cause instanceof Error ? rbObjClassname(cause) : this.exceptionClassName;
   }
 
   get message(): string {
@@ -435,6 +432,6 @@ export class ExceptionWrapper {
   }
 
   private computeStatusCode(): number {
-    return ExceptionWrapper.statusCodeForException(classNameOf(this.unwrappedException));
+    return ExceptionWrapper.statusCodeForException(rbObjClassname(this.unwrappedException));
   }
 }

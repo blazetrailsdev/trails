@@ -1,4 +1,4 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File, isModuleIncluded } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { FooHelper } from "../../test-helpers/fixtures/alternate-helpers/foo-helper.js";
@@ -27,7 +27,7 @@ describe("ActionController::Helpers.modulesForHelpers", () => {
 
     AllHelpersController.helper(":all");
 
-    expect(AllHelpersController._helpers.isInclude(FooHelper)).toBe(true);
+    expect(isModuleIncluded(AllHelpersController._helpers, FooHelper)).toBe(true);
   });
 
   it("appends the application helpers after the arguments that stay", () => {

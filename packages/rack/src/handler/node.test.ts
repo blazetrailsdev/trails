@@ -4,7 +4,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { HttpRequest, HttpResponse, HttpSocket, StringIO } from "@blazetrails/ruby-compat";
-import { bodyFromString } from "../index.js";
 import type { RackApp, RackBody, RackEnv } from "../index.js";
 import { RACK_ERRORS, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "../constants.js";
 import { Files } from "../files.js";
@@ -27,7 +26,7 @@ async function envFor(path: string, init?: RequestInit): Promise<RackEnv> {
   await serving(
     async (e) => {
       env = e;
-      return [200, {}, bodyFromString("")];
+      return [200, {}, [""]];
     },
     async (url) => void (await fetch(`${url}${path}`, init)),
   );
@@ -56,7 +55,7 @@ async function mockReq(req: Partial<HttpRequest>): Promise<HttpRequest> {
 }
 
 async function metaVars(req: Partial<HttpRequest>): Promise<RackEnv> {
-  const app: RackApp = async () => [200, {}, bodyFromString("")];
+  const app: RackApp = async () => [200, {}, [""]];
   return new Node(app).metaVars(await mockReq(req));
 }
 
@@ -160,7 +159,7 @@ describe("Rack::Handler::Node", () => {
     } as unknown as Record<string, string>;
 
     await serving(
-      async () => [200, headers, bodyFromString("")],
+      async () => [200, headers, [""]],
       async (url) => {
         const response = await fetch(url);
 
@@ -298,11 +297,7 @@ describe("Rack::Handler::Node", () => {
 
   it("writes a rendered view of non-ASCII text as UTF-8", async () => {
     const view = "<p>em dash \u2014 caf\u00e9 \u65e5\u672c\u8a9e</p>";
-    const app: RackApp = async () => [
-      200,
-      { "content-type": "text/html; charset=utf-8" },
-      bodyFromString(view),
-    ];
+    const app: RackApp = async () => [200, { "content-type": "text/html; charset=utf-8" }, [view]];
 
     await serving(app, async (url) => {
       const received = Buffer.from(await (await fetch(url)).arrayBuffer());
@@ -317,7 +312,7 @@ describe("Rack::Handler::Node", () => {
       let lintError: unknown = null;
       const linted = new Lint(async (e) => {
         env = { ...e };
-        return [200, { "content-type": "text/plain", "content-length": "0" }, bodyFromString("")];
+        return [200, { "content-type": "text/plain", "content-length": "0" }, [""]];
       });
       await serving(
         async (e) => {
@@ -325,7 +320,7 @@ describe("Rack::Handler::Node", () => {
             return await linted.call({ ...e, [RACK_ERRORS]: lintableErrors });
           } catch (error) {
             lintError = error;
-            return [500, {}, bodyFromString("")];
+            return [500, {}, [""]];
           }
         },
         async (url) => void (await upgradeRequest(url, "/cable")),
@@ -349,7 +344,7 @@ describe("Rack::Handler::Node", () => {
               io.write(`echo:${Buffer.from(chunk).toString()}`);
               io.end();
             });
-            return [-1, {}, bodyFromString("")];
+            return [-1, {}, [""]];
           },
           async (url) => {
             const { text } = await upgradeRequest(url, "/cable", "after-handshake");
@@ -370,7 +365,7 @@ describe("Rack::Handler::Node", () => {
               io.write(`head:${Buffer.from(chunk).toString()}`);
               io.end();
             });
-            return [-1, {}, bodyFromString("")];
+            return [-1, {}, [""]];
           },
           async (url) => {
             const { text } = await upgradeRequest(url, "/cable", "", "first-frame");
@@ -386,7 +381,7 @@ describe("Rack::Handler::Node", () => {
       let text = "";
       let closed = false;
       await serving(
-        async () => [404, { "content-type": "text/plain" }, bodyFromString("Page not found")],
+        async () => [404, { "content-type": "text/plain" }, ["Page not found"]],
         async (url) => {
           ({ text, closed } = await upgradeRequest(url, "/cable"));
         },
@@ -435,7 +430,7 @@ describe("Rack::Handler::Node", () => {
     it("keeps the app's own connection header on an upgrade it answers", async () => {
       let text = "";
       await serving(
-        async () => [101, { connection: "Upgrade", upgrade: "websocket" }, bodyFromString("")],
+        async () => [101, { connection: "Upgrade", upgrade: "websocket" }, [""]],
         async (url) => {
           ({ text } = await upgradeRequest(url, "/cable"));
         },
@@ -551,10 +546,10 @@ describe("Rack::Handler::Node", () => {
         async (env) => {
           if (env.PATH_INFO === "/taken") {
             hijackedIo = (env[RACK_HIJACK] as () => HttpSocket)();
-            return [-1, {}, bodyFromString("")];
+            return [-1, {}, [""]];
           }
           await new Promise(() => {});
-          return [200, {}, bodyFromString("")];
+          return [200, {}, [""]];
         },
         { Port: 0, Host: "127.0.0.1" },
       );

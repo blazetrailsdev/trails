@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getFs, getOsAsync, getPath } from "@blazetrails/ruby-compat";
+import { getFs, getOsAsync, getPath, rbObjClassname } from "@blazetrails/ruby-compat";
 import { useInMemoryDatabaseUrl } from "../support/in-memory-database-url.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Trailtie } from "./active-record.js";
@@ -26,8 +26,11 @@ import {
   Base,
   LogSubscriber,
   Migration,
+  RecordInvalid,
   RecordNotFound,
+  RecordNotSaved,
   RuntimeRegistry,
+  StaleObjectError,
   disablePreparedStatements,
   generateSecureTokenOn,
   QueryLogs,
@@ -313,8 +316,21 @@ describe("ActiveRecord::Railtie rescue_responses", () => {
       "ActiveRecord::RecordInvalid": ":unprocessable_entity",
       "ActiveRecord::RecordNotSaved": ":unprocessable_entity",
     });
+    expect(
+      [RecordNotFound, StaleObjectError, RecordInvalid, RecordNotSaved].map((klass) =>
+        rbObjClassname(Object.create(klass.prototype)),
+      ),
+    ).toEqual([
+      "ActiveRecord::RecordNotFound",
+      "ActiveRecord::StaleObjectError",
+      "ActiveRecord::RecordInvalid",
+      "ActiveRecord::RecordNotSaved",
+    ]);
     await runTrailtieInitializers(ActionDispatchTrailtie, { deprecators: new Deprecators() });
     expect(new ExceptionWrapper(null, new RecordNotFound("gone")).statusCode).toBe(404);
+    expect(new ExceptionWrapper(null, new RecordInvalid(null)).statusCode).toBe(422);
+    expect(new ExceptionWrapper(null, new StaleObjectError()).statusCode).toBe(409);
+    expect(new ExceptionWrapper(null, new RecordNotSaved("unsaved")).statusCode).toBe(422);
   });
 });
 describe("ActiveRecord::ConnectionHandling::RAILS_ENV", () => {

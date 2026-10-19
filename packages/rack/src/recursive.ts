@@ -1,69 +1,84 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
-import { PATH_INFO, QUERY_STRING, SCRIPT_NAME, RACK_RECURSIVE_INCLUDE } from "./constants.js";
+import { ArgumentError, StringIO, URI, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
+import type { Generic } from "@blazetrails/ruby-compat";
+import {
+  GET,
+  HTTP_HOST,
+  HTTP_PORT,
+  PATH_INFO,
+  QUERY_STRING,
+  RACK_INPUT,
+  RACK_RECURSIVE_INCLUDE,
+  RACK_URL_SCHEME,
+  REQUEST_METHOD,
+  SCRIPT_NAME,
+} from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
 export class ForwardRequest extends Error {
-  url: string;
-  env?: Record<string, any>;
+  url: Generic;
+  env: Record<string, any>;
 
-  constructor(url: string, env?: Record<string, any>) {
-    super(`ForwardRequest: ${url}`);
-    this.url = url;
+  constructor(url: string, env: Record<string, any> = {}) {
+    const uri = URI.parse(url);
+    super(`forwarding to ${url}`);
+    this.url = uri;
     this.env = env;
+
+    this.env[PATH_INFO] = this.url.path;
+    if (this.url.query != null) this.env[QUERY_STRING] = this.url.query;
+    if (this.url.host != null) this.env[HTTP_HOST] = this.url.host;
+    if (this.url.port != null) this.env[HTTP_PORT] = this.url.port;
+    if (this.url.scheme != null) this.env[RACK_URL_SCHEME] = this.url.scheme;
   }
 }
 
 export class Recursive {
   private app: RackApp;
+  private scriptName!: string;
 
   constructor(app: RackApp) {
     this.app = app;
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    return this._call(env);
+    return rbObjDup(this)._call(env);
   }
 
   /** @internal */
   async _call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    let currentEnv = env;
-    while (true) {
-      const scriptName: string = currentEnv[SCRIPT_NAME] || "";
-      const include = (newEnv: Record<string, any>, path: string) =>
-        this.include(newEnv, path, scriptName);
-      try {
-        return await (rbFSend(this.app, "call", {
-          ...currentEnv,
-          [RACK_RECURSIVE_INCLUDE]: include,
-        }) as ReturnType<typeof this.app>);
-      } catch (e) {
-        if (e instanceof ForwardRequest) {
-          const fwd = new URL(e.url, "http://localhost");
-          const merged: Record<string, any> = { ...currentEnv, ...(e.env || {}) };
-          merged[PATH_INFO] = fwd.pathname;
-          merged[QUERY_STRING] = fwd.search ? fwd.search.substring(1) : "";
-          currentEnv = merged;
-        } else {
-          throw e;
-        }
-      }
+    this.scriptName = env[SCRIPT_NAME];
+    try {
+      return await (rbFSend(this.app, "call", {
+        ...env,
+        [RACK_RECURSIVE_INCLUDE]: this.include.bind(this),
+      }) as ReturnType<typeof this.app>);
+    } catch (req) {
+      if (req instanceof ForwardRequest) return this.call({ ...env, ...req.env });
+      throw req;
     }
   }
 
   async include(
     env: Record<string, any>,
     path: string,
-    scriptName = "",
   ): Promise<[number, Record<string, string | string[]>, any]> {
-    if (scriptName !== "" && !(path.startsWith(scriptName + "/") || path === scriptName)) {
-      throw new Error(`can only include below ${scriptName}, not ${path}`);
+    if (
+      !(
+        path.indexOf(this.scriptName) === 0 &&
+        (path[this.scriptName.length] === "/" || path[this.scriptName.length] === undefined)
+      )
+    ) {
+      throw new ArgumentError(`can only include below ${this.scriptName}, not ${path}`);
     }
-    const url = new URL(path, "http://localhost");
+
     const newEnv = {
       ...env,
-      [PATH_INFO]: url.pathname,
-      [QUERY_STRING]: url.search ? url.search.substring(1) : "",
-      [SCRIPT_NAME]: scriptName,
+      [PATH_INFO]: path,
+      [SCRIPT_NAME]: this.scriptName,
+      [REQUEST_METHOD]: GET,
+      CONTENT_LENGTH: "0",
+      CONTENT_TYPE: "",
+      [RACK_INPUT]: new StringIO(""),
     };
     return rbFSend(this.app, "call", newEnv) as ReturnType<typeof this.app>;
   }

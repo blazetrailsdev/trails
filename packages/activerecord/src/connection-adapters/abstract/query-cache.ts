@@ -226,13 +226,13 @@ export const ConnectionPoolConfiguration: Module = new Module((mod) => {
 
   mod.include({
     get queryCacheEnabled(): boolean {
-      return (this as unknown as ConnectionPoolConfigurationHost).queryCache.enabled;
+      return this.queryCache.enabled;
     },
 
     get dirtiesQueryCache(): boolean {
-      return (this as unknown as ConnectionPoolConfigurationHost).queryCache.dirties;
+      return this.queryCache.dirties;
     },
-  });
+  } satisfies ThisType<ConnectionPoolConfigurationHost>);
 
   mod.defineMethod("clearQueryCache", function (this: ConnectionPoolConfigurationHost): void {
     if (this._pinnedConnection) {
@@ -243,12 +243,12 @@ export const ConnectionPoolConfiguration: Module = new Module((mod) => {
 
   mod.include({
     get queryCache(): Store {
-      const pool = this as unknown as ConnectionPoolConfigurationHost;
+      const pool = this;
       return pool._threadQueryCaches.computeIfAbsent(IsolatedExecutionState.context(), () => {
         return new Store(pool._queryCacheVersion, pool._queryCacheMaxSize);
       });
     },
-  });
+  } satisfies ThisType<ConnectionPoolConfigurationHost>);
 });
 
 export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
@@ -427,7 +427,7 @@ function cacheNotificationInfo(
   name: string | null | undefined,
   binds: unknown[],
 ): Record<string, unknown> {
-  const userTx = (this as any).currentTransaction?.()?.userTransaction ?? null;
+  const userTx = this.currentTransaction?.()?.userTransaction ?? null;
   const transaction =
     userTx !== null && typeof userTx?.isOpen === "function" && userTx.isOpen() ? userTx : null;
   return {
@@ -473,13 +473,13 @@ export const QueryCache: Module & {
   }) => void;
 } = new Module().include({
   get queryCache(): Store | null {
-    return (this as unknown as QueryCacheHost)._queryCache;
+    return this._queryCache;
   },
   set queryCache(value: Store | null) {
-    (this as unknown as QueryCacheHost)._queryCache = value;
+    this._queryCache = value;
   },
   get queryCacheEnabled(): boolean | undefined {
-    return (this as unknown as QueryCacheHost)._queryCache?.enabled;
+    return this._queryCache?.enabled;
   },
   cache,
   enableQueryCacheBang,
@@ -492,7 +492,7 @@ export const QueryCache: Module & {
   cacheNotificationInfoResult,
   cacheNotificationInfo,
   selectAll,
-});
+} satisfies ThisType<QueryCacheHost>);
 
 QueryCache[included] = function (base: {
   prototype: object;

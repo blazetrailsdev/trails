@@ -1,14 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
+import { stderr } from "@blazetrails/ruby-compat";
 import * as Utils from "./utils.js";
 
 describe("Utils.statusCode", () => {
   it("takes the Symbol arm for a ':name' Symbol value", () => {
     expect(Utils.statusCode(":ok")).toBe(200);
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warn = vi.spyOn(stderr, "write").mockImplementation(() => true);
     try {
       expect(Utils.statusCode(":not_extended")).toBe(510);
-      expect(warn).toHaveBeenLastCalledWith(
-        "Status code :not_extended is deprecated and will be removed in a future version of Rack.",
+      expect(warn.mock.lastCall![0]).toContain(
+        "warning: Status code :not_extended is deprecated and will be removed in a future version of Rack.\n",
       );
     } finally {
       warn.mockRestore();

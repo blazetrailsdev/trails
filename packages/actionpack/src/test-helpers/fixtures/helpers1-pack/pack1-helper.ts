@@ -1,8 +1,8 @@
-import { Module, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 
-export const Pack1Helper = new Module().include({
+export const Pack1Helper = {
   conflictingHelper(): string {
     return "pack1";
   },
-});
+};
 registerConstant("Pack1Helper", Pack1Helper);

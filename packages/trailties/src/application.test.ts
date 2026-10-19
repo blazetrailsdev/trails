@@ -1,5 +1,10 @@
 import type { RackResponse } from "@blazetrails/rack";
-import { rbFSend, rbModConstSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import {
+  publicInstanceMethods,
+  rbFSend,
+  rbModConstSet,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished } from "vitest";
 import {
   NullLogger,
@@ -16,7 +21,6 @@ import {
   fsAdapterConfig,
   registerFsAdapter,
   type FsAdapter,
-  type Module,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
@@ -47,7 +51,6 @@ import { Collection } from "./initializable.js";
 import { Root } from "./paths.js";
 import { Trails } from "./rails.js";
 import { HelloWorldApp, buildRoutes } from "./__fixtures__/hello-world/app.js";
-import { bodyToString } from "@blazetrails/rack";
 
 const posixPath: PathAdapter = {
   join: (...p) => p.join("/").replace(/\/+/g, "/"),
@@ -382,7 +385,7 @@ describe("Trails.application integration (PR 2.6 hello-world fixture)", () => {
       PATH_INFO: "/hello",
     });
     expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("hello world");
+    expect([...(body as Iterable<string>)].join("")).toBe("hello world");
   });
 });
 
@@ -406,7 +409,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       PATH_INFO: "/posts",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(await bodyToString(body))).toEqual({ posts: [] });
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ posts: [] });
     expect(app.routesReloader().loaded).toBe(true);
 
     const [nestedStatus, , nestedBody] = await (rbFSend(app.app(), "call", {
@@ -414,7 +417,9 @@ describe("Trails.application integration (boot-app fixture)", () => {
       PATH_INFO: "/admin/sessions",
     }) as Promise<RackResponse>);
     expect(nestedStatus).toBe(200);
-    expect(JSON.parse(await bodyToString(nestedBody))).toEqual({ scope: "admin" });
+    expect(JSON.parse([...(nestedBody as Iterable<string>)].join(""))).toEqual({
+      scope: "admin",
+    });
   });
 
   it("assigns the drawn route set to the controller's _routes", async () => {
@@ -434,7 +439,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       HTTP_ACCEPT: "*/*",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(await bodyToString(body)).toContain('<a href="/posts">All posts</a>');
+    expect([...(body as Iterable<string>)].join("")).toContain('<a href="/posts">All posts</a>');
   });
 
   it("calls a named route helper from a controller action with lazily drawn routes", async () => {
@@ -452,7 +457,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       PATH_INFO: "/posts/link",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(await bodyToString(body))).toEqual({ href: "/posts" });
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({ href: "/posts" });
   });
 
   it("calls a named *_url helper from a controller action against the request host", async () => {
@@ -472,7 +477,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       "rack.url_scheme": "https",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(await bodyToString(body))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       href: "https://blog.example.com:8080/posts",
     });
   });
@@ -494,7 +499,7 @@ describe("Trails.application integration (boot-app fixture)", () => {
       "rack.url_scheme": "https",
     }) as Promise<RackResponse>);
     expect(status).toBe(200);
-    expect(JSON.parse(await bodyToString(body))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       href: "https://blog.example.com:8080/posts",
     });
     expect(
@@ -526,8 +531,8 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
     const { ApplicationController } =
       await import("./__fixtures__/boot-app/app/controllers/application-controller.js");
-    const helpers = (ApplicationController as unknown as { _helpers: Module })._helpers;
-    expect(helpers.instanceMethods()).toContain("statusBadge");
+    const helpers = (ApplicationController as unknown as { _helpers: object })._helpers;
+    expect(publicInstanceMethods(helpers)).toContain("statusBadge");
   });
 });
 

@@ -5,7 +5,6 @@ import { Request, controllerConstants } from "../../action-dispatch/http/request
 import { Response } from "../../action-dispatch/http/response.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
-import { bodyToString } from "@blazetrails/rack";
 import { StringIO } from "@blazetrails/ruby-compat";
 
 afterEach(() => {
@@ -26,7 +25,7 @@ describe("Controller JSON rendering integration", () => {
 
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
-    expect(JSON.parse(await bodyToString(body))).toEqual({
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
       posts: [{ id: 1, title: "Hello" }],
     });
   });
@@ -125,7 +124,10 @@ describe("Controller JSON rendering integration", () => {
 
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");
-    expect(JSON.parse(await bodyToString(body))).toEqual({ id: "7", found: true });
+    expect(JSON.parse([...(body as Iterable<string>)].join(""))).toEqual({
+      id: "7",
+      found: true,
+    });
   });
 
   it("returns 404 for unmatched routes", async () => {
@@ -140,7 +142,7 @@ describe("Controller JSON rendering integration", () => {
     });
 
     expect(status).toBe(404);
-    expect(await bodyToString(body)).toContain("Not Found");
+    expect([...(body as Iterable<string>)].join("")).toContain("Not Found");
   });
 
   it("API controller renders JSON", async () => {

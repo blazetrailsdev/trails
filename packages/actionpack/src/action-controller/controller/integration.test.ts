@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { bodyFromString, Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { assertEqual } from "@blazetrails/activesupport";
 import {
   assert,
   assertIncludes,
   assertInstanceOf,
+  assertKindOf,
   assertNot,
   assertNotIncludes,
   include,
@@ -24,7 +25,7 @@ import {
   rbObjSingletonClass,
   stderr,
 } from "@blazetrails/ruby-compat";
-import { XML } from "@blazetrails/nokogiri";
+import { HTML5, XML } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
 import { IntegrationTest, Session } from "../../action-dispatch/testing/integration.js";
@@ -52,7 +53,7 @@ describe("SessionTest", () => {
   const StubApp = (_env: RackEnv): RackResponse => [
     200,
     { "Content-Type": "text/html", "Content-Length": "13" },
-    bodyFromString("Hello, World!"),
+    ["Hello, World!"],
   ];
 
   let session: Session;
@@ -254,7 +255,7 @@ describe("RackLintIntegrationTest", () => {
     const t = new RackLintIntegrationTest(task.name);
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.get("/", { to: (_: RackEnv): RackResponse => [200, {}, bodyFromString("")] });
+        this.get("/", { to: (_: RackEnv): RackResponse => [200, {}, [""]] });
       });
 
       await t.get("/");
@@ -406,7 +407,7 @@ describe("IntegrationProcessTest", () => {
     t = new IntegrationProcessTest(task.name);
   });
 
-  it.skip("get", async () => {
+  it("get", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/get");
       expect(t.status).toBe(200);
@@ -417,7 +418,7 @@ describe("IntegrationProcessTest", () => {
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("OK");
       expect(t.response.body).toBe("OK");
-      expect(t.htmlDocument).toBeInstanceOf(XML.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
     });
   });
@@ -440,7 +441,7 @@ describe("IntegrationProcessTest", () => {
     }
   });
 
-  it.skip("post", async () => {
+  it("post", async () => {
     await t.withTestRouteSet(async () => {
       await t.post("/post");
       expect(t.status).toBe(201);
@@ -451,7 +452,7 @@ describe("IntegrationProcessTest", () => {
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("Created");
       expect(t.response.body).toBe("Created");
-      expect(t.htmlDocument).toBeInstanceOf(XML.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
     });
   });
@@ -509,7 +510,7 @@ describe("IntegrationProcessTest", () => {
     });
   });
 
-  it.skip("redirect", async () => {
+  it("redirect", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/redirect");
       expect(t.status).toBe(302);
@@ -518,7 +519,7 @@ describe("IntegrationProcessTest", () => {
       assertResponse("redirect");
       assertResponse("found");
       expect(t.response.body).toBe("");
-      expect(t.htmlDocument).toBeInstanceOf(XML.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
 
       await t.followRedirectBang();
@@ -550,7 +551,7 @@ describe("IntegrationProcessTest", () => {
     });
   });
 
-  it.skip("redirect reset html document", async () => {
+  it("redirect reset html document", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/redirect");
       const previousHtmlDocument = t.htmlDocument;
@@ -790,13 +791,9 @@ describe("IntegrationProcessTest", () => {
 const Poller = {
   async call(env: RackEnv): Promise<RackResponse> {
     if (/^\/success/.test(env["PATH_INFO"] as string)) {
-      return [
-        200,
-        { "Content-Type": "text/plain", "Content-Length": "12" },
-        bodyFromString("Hello World!"),
-      ];
+      return [200, { "Content-Type": "text/plain", "Content-Length": "12" }, ["Hello World!"]];
     } else {
-      return [404, { "Content-Type": "text/plain", "Content-Length": "0" }, bodyFromString("")];
+      return [404, { "Content-Type": "text/plain", "Content-Length": "0" }, [""]];
     }
   },
 };
@@ -933,11 +930,7 @@ describe("ApplicationIntegrationTest", () => {
 
         this.mount(MountedApp as unknown as MountableApp, { at: "/mounted", as: "mounted" });
         this.get("fooz", {
-          to: (_env: RackEnv): RackResponse => [
-            200,
-            { [X_CASCADE]: "pass" },
-            bodyFromString("omg"),
-          ],
+          to: (_env: RackEnv): RackResponse => [200, { [X_CASCADE]: "pass" }, ["omg"]],
           anchor: false,
         });
         this.get("fooz", { to: "application_integration_test/test#index" });
@@ -1373,7 +1366,7 @@ describe("IntegrationRequestEncodersTest", () => {
       });
 
       assertResponse("success");
-      expect(t.response.parsedBody).toEqual({ foo: "fighters" });
+      assertEqual({ foo: "fighters" }, t.response.parsedBody);
     });
   });
 
@@ -1384,7 +1377,7 @@ describe("IntegrationRequestEncodersTest", () => {
       expect(t.request.accepts[0].toString()).toBe("application/json");
       expect(t.request.format.ref()).toBe(":json");
       expect(t.request.requestParameters).toEqual({ foo: "fighters" });
-      expect(t.response.parsedBody).toEqual({ foo: "fighters" });
+      assertEqual({ foo: "fighters" }, t.response.parsedBody);
     });
   });
 
@@ -1458,7 +1451,7 @@ describe("IntegrationRequestEncodersTest", () => {
 
       await t.get("/foos_json.json", { params: { foo: "heyo" } });
 
-      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+      assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
   });
 
@@ -1472,7 +1465,7 @@ describe("IntegrationRequestEncodersTest", () => {
 
       await t.get("/foos_json?foo=heyo", { as: "json" });
 
-      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+      assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
   });
 
@@ -1488,7 +1481,7 @@ describe("IntegrationRequestEncodersTest", () => {
 
       expect(t.request.method).toBe("POST");
       expect(t.request.headers.get("X-Http-Method-Override")).toBe("GET");
-      expect(t.response.parsedBody).toEqual({ foo: "heyo" });
+      assertEqual({ foo: "heyo" }, t.response.parsedBody);
     });
   });
 

@@ -24,6 +24,7 @@ export function rbIterBreakValue(val: unknown): never {
 let _current: AsyncContext<Thread> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
+const _threads = new Set<Thread>();
 const _locations = new WeakMap<object, string>();
 const _locals = new WeakMap<object, Map<string, unknown>>();
 const _variables = new WeakMap<object, Map<string, unknown>>();
@@ -49,6 +50,16 @@ export class Thread<R = unknown> {
     status: "run",
     name: null,
   });
+
+  /**
+   * `Thread.list` (`vendor/ruby/v3.3.11/thread.c:2922` `thread_list`), the
+   * main thread and every thread still alive (`rb_thread_list`, `:2895`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread.list` (`vendor/ruby/v3.3.11/thread.c:2922`).
+   */
+  static list(): Thread[] {
+    return [Thread.main, ..._threads];
+  }
 
   /**
    * `rb_thread_s_handle_interrupt` (`vendor/ruby/v3.3.11/thread.c:2230`), which
@@ -151,6 +162,7 @@ export class Thread<R = unknown> {
     const block = argsAndBlock.pop() as (...args: unknown[]) => R;
     const args = argsAndBlock;
     this.id = ++_threadIdCounter;
+    _threads.add(this as Thread);
     this.status = "run";
     const frame = new Error().stack?.split("\n")[2] ?? "";
     const location = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);
@@ -160,18 +172,23 @@ export class Thread<R = unknown> {
     } catch (error) {
       this.#error = { raised: error };
       this.status = "dead";
+      _threads.delete(this as Thread);
       if (this.abortOnException) this.#abort(error);
       return;
     }
     const value = this.#value as unknown;
     if (value && typeof (value as PromiseLike<unknown>).then === "function") {
-      const die = () => void (this.status = "dead");
+      const die = () => {
+        this.status = "dead";
+        _threads.delete(this as Thread);
+      };
       (value as PromiseLike<unknown>).then(die, (error) => {
         die();
         if (this.abortOnException) this.#abort(error);
       });
     } else {
       this.status = "dead";
+      _threads.delete(this as Thread);
     }
   }
 
@@ -225,6 +242,7 @@ export class Thread<R = unknown> {
   exit(): this {
     if (this.status === "dead") return this;
     this.status = "dead";
+    _threads.delete(this as Thread);
     this.#kill();
     return this;
   }

@@ -5,35 +5,15 @@
  *   from `Date.now()`.
  */
 
-import { fetch, rbFArray, rbStrSNew } from "@blazetrails/ruby-compat";
+import { CGI, fetch, rbFArray, rbStrSNew } from "@blazetrails/ruby-compat";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
 
-export class MockCookie {
-  name: string;
-  value: string[];
-  path?: string;
-  domain?: string;
-  expires?: Date;
-  secure: boolean;
-
-  constructor(args: Record<string, any>) {
-    this.name = args.name;
-    this.value = args.value;
-    this.path = args.path;
-    this.domain = args.domain;
-    this.expires = args.expires;
-    this.secure = args.secure || false;
-  }
-
-  toString(): string {
-    return this.value.join("&");
-  }
-}
+type Cookie = InstanceType<typeof CGI.Cookie>;
 
 export class MockResponse extends Response {
   originalHeaders: Record<string, any>;
-  cookies: Record<string, MockCookie>;
+  cookies: Record<string, Cookie>;
   private _errors: any;
   private _bufferedBody: string | undefined;
 
@@ -82,7 +62,7 @@ export class MockResponse extends Response {
     return [201, 204, 304].includes(this.status);
   }
 
-  cookie(name: string): MockCookie | null {
+  cookie(name: string): Cookie | null {
     return fetch(this.cookies, name, null);
   }
 
@@ -91,8 +71,8 @@ export class MockResponse extends Response {
   }
 
   /** @internal */
-  private parseCookiesFromHeader(): Record<string, MockCookie> {
-    const cookies: Record<string, MockCookie> = {};
+  private parseCookiesFromHeader(): Record<string, Cookie> {
+    const cookies: Record<string, Cookie> = {};
     const setCookieHeader = this.headers[SET_COOKIE];
     if (setCookieHeader && setCookieHeader.length !== 0) {
       for (const cookie of rbFArray(setCookieHeader) as string[]) {
@@ -100,7 +80,7 @@ export class MockResponse extends Response {
         const [cookieName, cookieFilling] =
           i === -1 ? [cookie, undefined] : [cookie.slice(0, i), cookie.slice(i + 1)];
         const cookieAttributes = this.identifyCookieAttributes(cookieFilling!);
-        const parsedCookie = new MockCookie({
+        const parsedCookie = new CGI.Cookie({
           name: cookieName.trim(),
           value: fetch(cookieAttributes, "value"),
           path: fetch(cookieAttributes, "path", null),
@@ -117,7 +97,7 @@ export class MockResponse extends Response {
   /** @internal */
   private identifyCookieAttributes(cookieFilling: string): Record<string, any> {
     const bits = cookieFilling.split(";");
-    const attrs: Record<string, any> = { value: [bits[0].trim()] };
+    const attrs: Record<string, any> = { value: bits[0].trim() };
 
     for (let i = 1; i < bits.length; i++) {
       const bit = bits[i].trim();
@@ -125,7 +105,7 @@ export class MockResponse extends Response {
         const [k, v] = bit.split("=", 2);
         attrs[k.trim().toLowerCase()] = v.trim();
       }
-      if (bit.toLowerCase().includes("secure")) {
+      if (bit.includes("secure")) {
         attrs.secure = true;
       }
     }

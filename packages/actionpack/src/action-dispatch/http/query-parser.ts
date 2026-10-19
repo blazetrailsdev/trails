@@ -1,13 +1,19 @@
 import { cattrAccessor } from "@blazetrails/activesupport";
+import { deprecator } from "../deprecator.js";
+import { QueryParser as RackQueryParser } from "@blazetrails/rack";
 import { ArgumentError, bytes, strNew, toEnum, type Enumerator } from "@blazetrails/ruby-compat";
 
 const DEFAULT_SEP = /& */;
+const COMPAT_SEP = /[&;] */;
 const COMMON_SEP: Record<string, RegExp> = Object.assign(Object.create(null), {
   ";": /; */,
   ";,": /[;,] */,
   "&": /& */,
   "&;": /[&;] */,
 });
+
+const SEMICOLON_COMPAT =
+  RackQueryParser.DEFAULT_SEP != null && RackQueryParser.DEFAULT_SEP.source.includes(";");
 
 export type QueryPair = [string, string | null];
 
@@ -37,6 +43,15 @@ export class QueryParser {
     let splitter: RegExp;
     if (separator) {
       splitter = COMMON_SEP[separator] ?? new RegExp(`[${escapeChars(separator)}] *`);
+    } else if (this.strictQueryStringSeparator) {
+      splitter = DEFAULT_SEP;
+    } else if (SEMICOLON_COMPAT && s.includes(";")) {
+      if (this.strictQueryStringSeparator == null) {
+        deprecator().warn(
+          "Using semicolon as a query string separator is deprecated and will not be supported in Rails 8.1 or Rack 3.0. Use `&` instead.",
+        );
+      }
+      splitter = COMPAT_SEP;
     } else {
       splitter = DEFAULT_SEP;
     }

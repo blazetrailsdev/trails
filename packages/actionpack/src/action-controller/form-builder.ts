@@ -1,6 +1,6 @@
 import { ActionController } from "../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Concern, Module, classAttribute, extend } from "@blazetrails/activesupport";
+import { Concern, classAttribute, extend } from "@blazetrails/activesupport";
 
 interface FormBuilderClassHost {
   _defaultFormBuilder: unknown;
@@ -12,20 +12,19 @@ export function defaultFormBuilder(this: FormBuilderClassHost, builder: unknown)
 
 export const ClassMethods = { defaultFormBuilder };
 
-export const FormBuilder = new Module((mod) => {
-  extend(mod, Concern);
+export const FormBuilder = {
+  ClassMethods,
 
-  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
-    null,
-    function () {
-      classAttribute.call(this, "_defaultFormBuilder", { instanceAccessor: false });
-    },
-  );
-
-  mod.defineMethod("defaultFormBuilder", function (this: { constructor: unknown }): unknown {
+  defaultFormBuilder(this: { constructor: unknown }): unknown {
     return (this.constructor as FormBuilderClassHost)._defaultFormBuilder;
-  });
-}) as Module & { ClassMethods: typeof ClassMethods };
-FormBuilder.ClassMethods = ClassMethods;
+  },
+};
+extend(FormBuilder, Concern);
+(FormBuilder as unknown as { included(base: null, block: (this: object) => void): void }).included(
+  null,
+  function () {
+    classAttribute.call(this, "_defaultFormBuilder", { instanceAccessor: false });
+  },
+);
 
 rbModConstSet(ActionController, "FormBuilder", FormBuilder);

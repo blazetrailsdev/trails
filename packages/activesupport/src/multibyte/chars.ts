@@ -25,6 +25,7 @@ export class Chars {
 
   wrappedString: string;
 
+  /** @missingRailsCall dup — PERMANENT */
   constructor(string: string) {
     this.wrappedString = string;
     return new Proxy(this, {

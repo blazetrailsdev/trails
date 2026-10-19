@@ -1,138 +1,141 @@
-import { it, expect } from "vitest";
-import { RewindableInput, RewindableInputMiddleware } from "./rewindable-input.js";
+import { afterEach, beforeEach, it, expect } from "vitest";
+import { StringIO, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { RewindableInput } from "./rewindable-input.js";
 import { RACK_INPUT } from "./constants.js";
 
-function makeInput(data: string) {
-  return new RewindableInput({
-    read() {
-      return data;
-    },
-  });
+let io: StringIO;
+let rio: RewindableInput | null;
+
+beforeEach(() => {
+  io = new StringIO("hello world");
+  rio = new RewindableInput(io);
+});
+
+afterEach(() => {
+  rio?.close();
+  rio = null;
+});
+
+function rewindableIo(): any {
+  return rbObjIvarGet(rio!, "@rewindable_io");
 }
 
 it("be able to handle to read()", () => {
-  const input = makeInput("hello");
-  expect(input.read()).toBe("hello");
+  expect(rio!.read()).toBe("hello world");
 });
 
 it("be able to handle to read(nil)", () => {
-  const input = makeInput("hello");
-  expect(input.read(null)).toBe("hello");
+  expect(rio!.read(null)).toBe("hello world");
 });
 
 it("be able to handle to read(length)", () => {
-  const input = makeInput("hello");
-  expect(input.read(3)).toBe("hel");
+  expect(rio!.read(1)).toBe("h");
 });
 
 it("be able to handle to read(length, buffer)", () => {
-  const input = makeInput("hello");
-  const buf = Buffer.alloc(10);
-  const result = input.read(3, buf);
-  expect(result).toBeDefined();
-  expect(result!.toString()).toBe("hel");
+  const buffer = new Uint8Array(1);
+  const result = rio!.read(1, buffer);
+  expect(result).toBe("h");
+  expect(buffer[0]).toBe("h".charCodeAt(0));
 });
 
 it("be able to handle to read(nil, buffer)", () => {
-  const input = makeInput("hello");
-  const buf = Buffer.alloc(10);
-  const result = input.read(null, buf);
-  expect(result).toBeDefined();
-  expect(result!.toString()).toBe("hello");
+  const buffer = new Uint8Array(11);
+  const result = rio!.read(null, buffer);
+  expect(result).toBe("hello world");
+  expect(new TextDecoder().decode(buffer)).toBe("hello world");
 });
 
 it("rewind to the beginning when #rewind is called", () => {
-  const input = makeInput("hello");
-  expect(input.read()).toBe("hello");
-  input.rewind();
-  expect(input.read()).toBe("hello");
+  rio!.rewind();
+  expect(rio!.read(1)).toBe("h");
+  rio!.rewind();
+  expect(rio!.read()).toBe("hello world");
 });
 
 it("be able to handle gets", () => {
-  const input = makeInput("hello\nworld\n");
-  expect(input.gets()).toBe("hello\n");
-  expect(input.gets()).toBe("world\n");
-  expect(input.gets()).toBeNull();
+  expect(rio!.gets()).toBe("hello world");
+  rio!.rewind();
+  expect(rio!.gets()).toBe("hello world");
 });
 
 it("be able to handle size", () => {
-  const input = makeInput("hello");
-  expect(input.size).toBe(5);
+  expect(rio!.size()).toBe("hello world".length);
+  expect(rio!.size()).toBe("hello world".length);
+  rio!.rewind();
+  expect(rio!.gets()).toBe("hello world");
 });
 
 it("be able to handle each", () => {
-  const input = makeInput("hello\nworld\n");
-  const lines: string[] = [];
-  input.each((line) => lines.push(line));
-  expect(lines).toEqual(["hello\n", "world\n"]);
+  let array: string[] = [];
+  rio!.each((data) => {
+    array.push(data);
+  });
+  expect(array).toEqual(["hello world"]);
+
+  rio!.rewind();
+  array = [];
+  rio!.each((data) => {
+    array.push(data);
+  });
+  expect(array).toEqual(["hello world"]);
 });
 
 it("not buffer into a Tempfile if no data has been read yet", () => {
-  const input = makeInput("hello");
-  expect(input.size).toBe(5);
+  expect(rewindableIo()).toBeNull();
 });
 
 it("buffer into a Tempfile when data has been consumed for the first time", () => {
-  const input = makeInput("hello");
-  input.read();
-  input.rewind();
-  expect(input.read()).toBe("hello");
+  rio!.read(1);
+  const tempfile = rewindableIo();
+  expect(tempfile).not.toBeNull();
+  rio!.read(1);
+  const tempfile2 = rewindableIo();
+  expect(tempfile2.path()).toBe(tempfile.path());
 });
 
 it("close the underlying tempfile upon calling #close", () => {
-  const input = makeInput("hello");
-  input.read();
-  input.close();
-  expect(input.closed).toBe(true);
+  rio!.read(1);
+  const tempfile = rewindableIo();
+  rio!.close();
+  expect(tempfile.isClosed()).toBe(true);
 });
 
 it("handle partial writes to tempfile", () => {
-  const input = makeInput("hello world");
-  expect(input.read(5)).toBe("hello");
-  expect(input.read(6)).toBe(" world");
-  expect(input.read(1)).toBeNull();
+  const r = rio as any;
+  const original = r.isFilesystemHasPosixSemantics;
+  r.isFilesystemHasPosixSemantics = function (this: any) {
+    const tempfile = this.rewindableIo;
+    const write = tempfile.write.bind(tempfile);
+    tempfile.write = (buffer: Uint8Array) => write(buffer.subarray(0, 2));
+    return original.call(this);
+  };
+  rio!.read(1);
+  const tempfile = rewindableIo();
+  rio!.close();
+  expect(tempfile.isClosed()).toBe(true);
 });
 
 it("close the underlying tempfile upon calling #close when not using posix semantics", () => {
-  const input = makeInput("hello");
-  input.read();
-  input.close();
-  expect(input.closed).toBe(true);
+  (rio as any).isFilesystemHasPosixSemantics = () => false;
+  rio!.read(1);
+  const tempfile = rewindableIo();
+  rio!.close();
+  expect(tempfile.isClosed()).toBe(true);
 });
 
 it("be possible to call #close when no data has been buffered yet", () => {
-  const input = makeInput("hello");
-  input.close();
-  expect(input.closed).toBe(true);
+  expect(rio!.close()).toBeNull();
 });
 
 it("be possible to call #close multiple times", () => {
-  const input = makeInput("hello");
-  input.close();
-  input.close();
-  expect(input.closed).toBe(true);
+  expect(rio!.close()).toBeNull();
+  expect(rio!.close()).toBeNull();
 });
 
 it("wraps rack.input in RewindableInput", async () => {
-  const app = async (env: any) => {
-    expect(env[RACK_INPUT]).toBeInstanceOf(RewindableInput);
-    return [200, {}, ["OK"]] as [number, Record<string, any>, any];
-  };
-  const mw = new RewindableInputMiddleware(app);
-  await mw.call({
-    [RACK_INPUT]: {
-      read() {
-        return "test";
-      },
-    },
-  });
-});
-
-it("preserves a nil rack.input", async () => {
-  const app = async (env: any) => {
-    expect(env[RACK_INPUT]).toBeUndefined();
-    return [200, {}, ["OK"]] as [number, Record<string, any>, any];
-  };
-  const mw = new RewindableInputMiddleware(app);
-  await mw.call({});
+  let app: any = { call: (env: any) => [200, {}, [env[RACK_INPUT].constructor.name]] };
+  expect(app.call({ [RACK_INPUT]: new StringIO("") })[2]).toEqual(["StringIO"]);
+  app = new RewindableInput.Middleware(app);
+  expect((await app.call({ [RACK_INPUT]: new StringIO("") }))[2]).toEqual(["RewindableInput"]);
 });

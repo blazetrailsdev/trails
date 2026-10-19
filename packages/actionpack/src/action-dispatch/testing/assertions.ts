@@ -4,7 +4,7 @@ import { Testing } from "@blazetrails/actionview/testing";
 import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/testing/assertions";
 import type * as DomAssertions from "@blazetrails/actionview/testing/dom-assertions";
 import type * as SelectorAssertions from "@blazetrails/actionview/testing/selector-assertions";
-import { extend, Module, rbModConstSet } from "@blazetrails/ruby-compat";
+import { extend, include, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActionDispatch } from "../../namespaces.js";
 import { ResponseAssertions } from "./assertions/response.js";
 import { RoutingAssertions } from "./assertions/routing.js";
@@ -34,20 +34,19 @@ export type Assertions = ResponseAssertions &
     readonly htmlDocument: XmlDocument | Html5Document;
   };
 
-export const Assertions = new Module((mod) => {
-  extend(mod, Concern);
-
-  mod.include(ResponseAssertions);
-  mod.include(RoutingAssertions);
-  mod.include(DomTestingAssertions);
-
-  mod.moduleEval((m) => {
-    Object.defineProperty(m, "htmlDocument", { get: htmlDocument, configurable: true });
-  });
-}) as Module & {
+export const Assertions = {} as {
   ResponseAssertions: typeof ResponseAssertions;
   RoutingAssertions: typeof RoutingAssertions;
 };
+extend(Assertions, Concern);
+include(Assertions, ResponseAssertions);
+include(Assertions, RoutingAssertions);
+include(Assertions, DomTestingAssertions);
+Object.defineProperty(Assertions, "htmlDocument", {
+  get: htmlDocument,
+  enumerable: true,
+  configurable: true,
+});
 
 rbModConstSet(ActionDispatch, "Assertions", Assertions);
 rbModConstSet(Assertions, "ResponseAssertions", ResponseAssertions);

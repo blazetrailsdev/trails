@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
-import { Request as RackRequest, ResponseRaw } from "@blazetrails/rack";
+import { Request as RackRequest, Raw } from "@blazetrails/rack";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
 
 import { Request } from "../../http/request.js";
@@ -239,7 +239,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     it("commits the session through a Rack::Response::Raw over https", async () => {
       const store = await runOver("https");
       expect(store.committed.length).toBe(1);
-      expect(store.committed[0]).toBeInstanceOf(ResponseRaw);
+      expect(store.committed[0]).toBeInstanceOf(Raw);
     });
 
     it("does not commit a secure session over http", async () => {
@@ -248,7 +248,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
 
     it("writes the session cookie onto the response headers", async () => {
       const headers: Record<string, string> = {};
-      const res = new ResponseRaw(200, headers);
+      const res = new Raw(200, headers);
       Persisted.prototype.setCookie.call(new Persisted(), new Request({}), res, {
         value: "abc",
         path: "/",

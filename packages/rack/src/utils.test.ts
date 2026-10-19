@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { stderr } from "@blazetrails/ruby-compat";
 import * as Utils from "./utils.js";
 import { MockRequest } from "./mock-request.js";
 
@@ -91,7 +92,7 @@ it("parse nil as an empty query string", () => {
 });
 
 it("raise an exception if the params are too deep", () => {
-  const len = Utils.getParamDepthLimit();
+  const len = Utils.paramDepthLimit();
   expect(() => {
     Utils.parseNestedQuery("foo" + "[a]".repeat(len) + "=bar");
   }).toThrow(Utils.ParamsTooDeepError);
@@ -371,7 +372,7 @@ it("return status code and give deprecation warning for obsolete symbols", () =>
   };
   const droppedStatuses = { bandwidth_limit_exceeded: 509, not_extended: 510 };
 
-  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const warn = vi.spyOn(stderr, "write").mockImplementation(() => true);
   try {
     for (const [symbol, valueHash] of Object.entries(replacedStatuses)) {
       expect(Utils.statusCode(symbol)).toBe(valueHash.statusCode);
@@ -380,8 +381,8 @@ it("return status code and give deprecation warning for obsolete symbols", () =>
 
     for (const [symbol, code] of Object.entries(droppedStatuses)) {
       expect(Utils.statusCode(symbol)).toBe(code);
-      expect(warn).toHaveBeenLastCalledWith(
-        `Status code :${symbol} is deprecated and will be removed in a future version of Rack.`,
+      expect(warn.mock.lastCall![0]).toContain(
+        `warning: Status code :${symbol} is deprecated and will be removed in a future version of Rack.\n`,
       );
     }
   } finally {
@@ -618,10 +619,10 @@ it("raises for invalid context", () => {
 });
 
 it("setParamDepthLimit affects subsequent parseNestedQuery calls via defaultQueryParser", () => {
-  const original = Utils.getParamDepthLimit();
+  const original = Utils.paramDepthLimit();
   try {
     Utils.setParamDepthLimit(2);
-    expect(Utils.getParamDepthLimit()).toBe(2);
+    expect(Utils.paramDepthLimit()).toBe(2);
     expect(() => Utils.parseNestedQuery("a[b][c]=1")).toThrow(Utils.ParamsTooDeepError);
     expect(Utils.parseNestedQuery("a[b]=1")).toEqual({ a: { b: "1" } });
   } finally {
@@ -630,7 +631,7 @@ it("setParamDepthLimit affects subsequent parseNestedQuery calls via defaultQuer
 });
 
 it("setDefaultQueryParser replaces the active parser", () => {
-  const original = Utils.getDefaultQueryParser();
+  const original = Utils.defaultQueryParser();
   try {
     const tight = Utils.QueryParser.makeDefault(2, { paramsLimit: 1 });
     Utils.setDefaultQueryParser(tight);
@@ -641,49 +642,15 @@ it("setDefaultQueryParser replaces the active parser", () => {
 });
 
 it("multipart limit accessors round-trip", () => {
-  const origFile = Utils.getMultipartFileLimit();
-  const origTotal = Utils.getMultipartTotalPartLimit();
+  const origFile = Utils.multipartFileLimit();
+  const origTotal = Utils.multipartTotalPartLimit();
   try {
     Utils.setMultipartFileLimit(64);
     Utils.setMultipartTotalPartLimit(512);
-    expect(Utils.getMultipartFileLimit()).toBe(64);
-    expect(Utils.getMultipartTotalPartLimit()).toBe(512);
+    expect(Utils.multipartFileLimit()).toBe(64);
+    expect(Utils.multipartTotalPartLimit()).toBe(512);
   } finally {
     Utils.setMultipartFileLimit(origFile);
     Utils.setMultipartTotalPartLimit(origTotal);
   }
-});
-
-it("multipartFileLimit getter/setter overload round-trips", () => {
-  const orig = Utils.multipartFileLimit();
-  try {
-    Utils.multipartFileLimit(77);
-    expect(Utils.multipartFileLimit()).toBe(77);
-  } finally {
-    Utils.multipartFileLimit(orig);
-  }
-  expect(Utils.multipartFileLimit()).toBe(orig);
-});
-
-it("multipartTotalPartLimit getter/setter overload round-trips", () => {
-  const orig = Utils.multipartTotalPartLimit();
-  try {
-    Utils.multipartTotalPartLimit(999);
-    expect(Utils.multipartTotalPartLimit()).toBe(999);
-  } finally {
-    Utils.multipartTotalPartLimit(orig);
-  }
-  expect(Utils.multipartTotalPartLimit()).toBe(orig);
-});
-
-it("defaultQueryParser getter/setter overload round-trips", () => {
-  const orig = Utils.defaultQueryParser();
-  const custom = orig.newDepthLimit(5);
-  try {
-    Utils.defaultQueryParser(custom);
-    expect(Utils.defaultQueryParser()).toBe(custom);
-  } finally {
-    Utils.defaultQueryParser(orig);
-  }
-  expect(Utils.defaultQueryParser()).toBe(orig);
 });
