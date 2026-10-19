@@ -404,7 +404,6 @@ export class Fixture {
   modelClass!: BaseClass | null;
   fixture!: FixtureAttrs;
 
-  /** @inventedArm if — PERMANENT */
   constructor(fixture: FixtureAttrs, modelClass: BaseClass | null) {
     if (isModuleIncluded(new.target, Encryption.EncryptedFixtures)) {
       const encrypted = this as unknown as EncryptedFixtureHost;

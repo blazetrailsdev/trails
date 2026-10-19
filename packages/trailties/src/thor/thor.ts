@@ -675,7 +675,6 @@ export class Thor {
     return list.sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]));
   }
 
-  /** @inventedArm if — PERMANENT */
   constructor(
     args: unknown[] = [],
     localOptions: unknown = {},

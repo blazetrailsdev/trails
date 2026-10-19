@@ -7,11 +7,12 @@ import {
   type Rescuable,
   type Module,
   runLoadHooks,
+  TopLevel,
 } from "@blazetrails/activesupport";
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
-import { rbModConstGet, rbModConstSet } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, rbModConstGet, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
 import type { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -489,6 +490,10 @@ export class Base extends Metal {
     this._urlOptions = null;
     this._markedForSameOriginVerification = null;
     this.viewRuntime = null;
+    const controllerRuntime = TopLevel.ActiveRecord?.Railties?.ControllerRuntime;
+    if (controllerRuntime != null && isModuleIncluded(new.target, controllerRuntime)) {
+      (this as unknown as { dbRuntime: number | null }).dbRuntime = null;
+    }
   }
 
   /**

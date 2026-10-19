@@ -9,7 +9,6 @@ import {
   classAttribute,
   demodulize,
   extractOptionsBang,
-  initializeIncludedModules,
   isAnonymous,
   SafeBuffer,
   underscore,
@@ -139,7 +138,6 @@ export class Metal extends AbstractController {
   constructor() {
     super();
     fireInherited(new.target, Metal);
-    initializeIncludedModules(this);
   }
 
   get params(): Parameters | Record<string, unknown> {

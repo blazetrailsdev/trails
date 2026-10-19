@@ -753,8 +753,9 @@ port cannot see (`EncryptedFixtures` prepended onto `Fixture` only under
 Thor class), the body is still inlined at Ruby's `super` position in the
 nearest constructor, wrapped in `if (isModuleIncluded(new.target, Mod))`, the
 `include?` question Ruby's ancestor chain answers. The guard carries
-`@inventedArm if — PERMANENT`, and the segment is tagged only where the Rails
-manifest records the include. Ruled by the repo owner on 2026-10-19.
+`@inventedArm if — PERMANENT` where the arm gate compares the declaration, and
+the segment is tagged only where the Rails manifest records the include
+(`inlined-from-manifest-follows-included-hook-includes`). Ruled by the repo owner on 2026-10-19.
 
 `parity:api` credits a tagged module hook to the constructor, both call gates
 compare the constructor against the tagged bodies in chain order, and

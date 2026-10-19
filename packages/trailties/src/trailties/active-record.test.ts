@@ -11,6 +11,7 @@ import {
 } from "@blazetrails/activerecord";
 import { Fixture, FixtureSet } from "@blazetrails/activerecord/fixtures";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
+import { ActionController } from "@blazetrails/actionpack";
 import { SchemaReflection } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
@@ -288,6 +289,15 @@ describe("RailtieTest", () => {
     runLoadHooks("active_record_fixture_set", FixtureSet);
 
     expect(isModuleIncluded(Fixture, Encryption.EncryptedFixtures)).toBe(true);
+  });
+
+  it("seats dbRuntime to null on a fresh controller", async () => {
+    await runTrailtieInitializers(Trailtie, blogApp());
+    runLoadHooks("action_controller", ActionController.Base);
+    class SeatController extends ActionController.Base {}
+
+    const controller = new SeatController() as SeatController & { dbRuntime: number | null };
+    expect(controller.dbRuntime).toBe(null);
   });
 
   it("runInitializers installs the executor hooks that open an async query session", async () => {
