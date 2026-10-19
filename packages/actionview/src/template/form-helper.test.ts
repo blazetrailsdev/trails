@@ -1855,6 +1855,129 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
+  it("nested fields for with nested collections", () => {
+    formFor(post, { as: "post[]" }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comment[]", comment, null, (c) => {
+          concat(c.textField("name"));
+        }),
+      );
+      concat(f.textField("body"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<input name='post[123][title]' type='text' id='post_123_title' value='Hello World' />" +
+        "<input name='post[123][comment][][name]' type='text' id='post_123_comment__name' value='new comment' />" +
+        "<input name='post[123][body]' type='text' id='post_123_body' value='Back to the hill and over it again!' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with index on both", () => {
+    formFor(post, { index: 1 }, (f) => {
+      concat(
+        f.fieldsFor("comment", post, { index: 5 }, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        "<input name='post[1][comment][5][title]' type='text' id='post_1_comment_5_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with auto index", () => {
+    formFor(post, { as: "post[]" }, (f) => {
+      concat(
+        f.fieldsFor("comment", post, null, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<input name='post[123][comment][title]' type='text' id='post_123_comment_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with auto index on both", () => {
+    formFor(post, { as: "post[]" }, (f) => {
+      concat(
+        f.fieldsFor("comment[]", post, null, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<input name='post[123][comment][123][title]' type='text' id='post_123_comment_123_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with index and auto index", () => {
+    formFor(post, { as: "post[]" }, (f) => {
+      concat(
+        f.fieldsFor("comment", post, { index: 5 }, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    let expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<input name='post[123][comment][5][title]' type='text' id='post_123_comment_5_title' value='Hello World' />",
+    );
+    assertDomEqual(expected, rendered);
+
+    formFor(post, { as: "post", index: 1 }, (f) => {
+      concat(
+        f.fieldsFor("comment[]", post, null, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    expected = wholeForm(
+      "/posts/123",
+      "edit_post",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<input name='post[1][comment][123][title]' type='text' id='post_1_comment_123_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
   it("nested fields for with a new record on a nested attributes one to one association", () => {
     post.author = new Author();
 
@@ -1899,6 +2022,97 @@ describe("FormHelperTest", () => {
 
     assertDomEqual(
       editPost(() => titleInput + authorName + authorId),
+      rendered,
+    );
+  });
+
+  it("nested fields for with an existing record on a nested attributes one to one association using erb and inline block", () => {
+    post.author = new Author(321);
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          return af.textField("name");
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorName + authorId),
+      rendered,
+    );
+  });
+
+  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id", () => {
+    post.author = new Author(321);
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, { includeId: false }, (af) => {
+          return af.textField("name");
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorName),
+      rendered,
+    );
+  });
+
+  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id inherited", () => {
+    post.author = new Author(321);
+
+    formFor(post, { includeId: false }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          return af.textField("name");
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorName),
+      rendered,
+    );
+  });
+
+  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id override", () => {
+    post.author = new Author(321);
+
+    formFor(post, { includeId: false }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, { includeId: true }, (af) => {
+          return af.textField("name");
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorName + authorId),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes one to one association with explicit hidden field placement", () => {
+    post.author = new Author(321);
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          concat(af.hiddenField("id"));
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorId + authorName),
       rendered,
     );
   });
