@@ -6794,10 +6794,20 @@ rbDefineAllocFunc(
   (klass) => new klass(SEAT, 0n, 0, 0, new Rational(0, 1), 0, DEFAULT_SG),
 );
 
+/** @internal */
+function dLiteZero(): number {
+  return 0;
+}
+
 Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], {
   marshalDump: (self: Temporal.PlainDate) => new Date(self).marshalDump(),
   iso8601: (self: Temporal.PlainDate) => new Date(self).iso8601(),
   xmlschema: (self: Temporal.PlainDate) => new Date(self).xmlschema(),
+  hour: dLiteZero,
+  min: dLiteZero,
+  minute: dLiteZero,
+  sec: dLiteZero,
+  second: dLiteZero,
 });
 
 for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {

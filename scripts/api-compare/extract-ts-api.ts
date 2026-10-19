@@ -2303,6 +2303,13 @@ function extractPrototypeAssignmentForOf(
   for (const stmt of loopBodyStatements(node)) {
     if (!ts.isExpressionStatement(stmt)) continue;
     const expr = stmt.expression;
+    const defined = definePropertyValueCall(expr, nameVar);
+    if (defined !== null) {
+      hosts = resolvePrototypeHosts(defined.target, info, checker, srcDir, program);
+      if (hosts.length === 0) continue;
+      params = paramsOfDescriptorValue(defined.value, checker);
+      break;
+    }
     if (!ts.isBinaryExpression(expr)) continue;
     if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) continue;
     const lhs = unwrapTsExpression(expr.left);
@@ -2334,6 +2341,26 @@ function extractPrototypeAssignmentForOf(
       });
     }
   }
+}
+
+/**
+ * `Object.defineProperty(<target>, <nameVar>, { value: fn })`, the
+ * non-enumerable spelling of `Cls.prototype[name] = fn` for a generator whose
+ * Ruby methods are private (`date_helper.rb:867-876`).
+ */
+function definePropertyValueCall(
+  expr: ts.Expression,
+  nameVar: string,
+): { target: ts.Expression; value: ts.Expression } | null {
+  if (!ts.isCallExpression(expr) || !ts.isPropertyAccessExpression(expr.expression)) return null;
+  const pa = expr.expression;
+  if (!ts.isIdentifier(pa.expression) || pa.expression.text !== "Object") return null;
+  if (pa.name.text !== "defineProperty" || expr.arguments.length < 3) return null;
+  const [target, propName, descriptor] = expr.arguments;
+  if (!ts.isIdentifier(propName) || propName.text !== nameVar) return null;
+  if (!ts.isObjectLiteralExpression(descriptor)) return null;
+  const value = definePropertyValue(descriptor);
+  return value === null ? null : { target, value };
 }
 
 /** The `get` / `set` initializers of an `Object.defineProperty` descriptor. */

@@ -125,8 +125,7 @@ describe("LookupContextTest", () => {
     assertEqual("pt", I18n.locale());
   });
 
-  // BLOCKED: port-action-view-i18n-proxy
-  it.skip("delegates changing the locale to the I18n configuration object if it contains a lookup_context object", () => {
+  it("delegates changing the locale to the I18n configuration object if it contains a lookup_context object", () => {
     const { I18nProxy } = ActionView as unknown as {
       I18nProxy: new (
         config: ReturnType<typeof I18n.config>,

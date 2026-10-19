@@ -4136,6 +4136,25 @@ describe("extractFromProgram — name-list prototype generator", () => {
     ]);
   });
 
+  it("credits a for-of over an inline array defining a non-enumerable value on the prototype", () => {
+    const info = extractFromFiles("/p", {
+      "selector.ts": `
+        export class DateTimeSelector {}
+        for (const method of ["sec", "min"]) {
+          Object.defineProperty(DateTimeSelector.prototype, method, {
+            value: function (this: DateTimeSelector): unknown {
+              return method;
+            },
+            writable: true,
+            configurable: true,
+          });
+        }
+      `,
+    });
+    const names = info.classes["selector.ts:DateTimeSelector"].instanceMethods.map((m) => m.name);
+    expect(names).toEqual(expect.arrayContaining(["sec", "min"]));
+  });
+
   it("credits nothing when the name list is imported rather than same-file", () => {
     const info = extractFromFiles("/p", {
       "names.ts": `export const NAMES = ["createTable"] as const;`,

@@ -3,7 +3,7 @@ import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { ArgumentError, zone as timeZone } from "../../time-zone-config.js";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { TEMPORAL_METHOD_TABLE, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { DAYS_INTO_WEEK } from "../date-and-time/calculations.js";
 import { inTimeZone } from "../date-and-time/zones.js";
 
@@ -238,3 +238,5 @@ declare module "@blazetrails/date" {
 }
 
 Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek, DAYS_INTO_WEEK });
+
+Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { change });
