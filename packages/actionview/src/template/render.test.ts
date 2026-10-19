@@ -9,6 +9,7 @@ import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import {
+  assertEqual,
   assertMatch,
   assertNil,
   assertNothingRaised,
@@ -80,7 +81,7 @@ describe("CachedViewRenderTest", () => {
 
   it("render without options", async () => {
     const e = await assertRaises([ArgumentError], {}, () => view.render({}));
-    expect(e.message).toMatch(/You invoked render but did not give any of (.+) option\./);
+    assertMatch(/You invoked render but did not give any of (.+) option\./, e.message);
   });
 
   it("render template", async () => {
@@ -95,20 +96,21 @@ describe("CachedViewRenderTest", () => {
   it("render file with full path no extension", async () => {
     const templatePath = File.expandPath("./fixtures/test/hello_world", __dir__);
     const e = await assertRaises([ArgumentError], {}, () => view.render({ file: templatePath }));
-    expect(e.message).toMatch(/File (.+) does not exist/);
+    assertMatch(/File (.+) does not exist/, e.message);
   });
 
   it("render file with invalid full path", async () => {
     const templatePath = File.expandPath("./fixtures/test/hello_world_invalid.tse", __dir__);
     const e = await assertRaises([ArgumentError], {}, () => view.render({ file: templatePath }));
-    expect(e.message).toMatch(/File (.+) does not exist/);
+    assertMatch(/File (.+) does not exist/, e.message);
   });
 
   it("render file with relative path", async () => {
     const templatePath = "fixtures/test/hello_world.tse";
     const e = await assertRaises([ArgumentError], {}, () => view.render({ file: templatePath }));
-    expect(e.message).toMatch(
+    assertMatch(
       /`render file:` should be given the absolute path to a file. (.+) was given instead/,
+      e.message,
     );
   });
 
@@ -274,10 +276,11 @@ describe("CachedViewRenderTest", () => {
     const e = await assertRaises([ArgumentError], {}, () =>
       view.render({ partial: "test/partial_only", as: "a-in", object: null }),
     );
-    expect(e.message).toBe(
+    assertEqual(
       "The value (a-in) of the option `as` is not a valid Ruby identifier; " +
         "make sure it starts with lowercase letter, " +
         "and is followed by any combination of letters, numbers and underscores.",
+      e.message,
     );
   });
 
@@ -285,10 +288,11 @@ describe("CachedViewRenderTest", () => {
     const e = await assertRaises([ArgumentError], {}, () =>
       view.render({ partial: "test/a-in", as: "a-in", object: null }),
     );
-    expect(e.message).toBe(
+    assertEqual(
       "The value (a-in) of the option `as` is not a valid Ruby identifier; " +
         "make sure it starts with lowercase letter, " +
         "and is followed by any combination of letters, numbers and underscores.",
+      e.message,
     );
   });
 
