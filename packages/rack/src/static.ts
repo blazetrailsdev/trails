@@ -60,7 +60,7 @@ export class Static {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    const path = (env["PATH_INFO"] || "/") as string;
+    let path = (env["PATH_INFO"] || "/") as string;
     const actualPath = cleanPathInfo(unescapePath(path));
 
     if (!this.canServe(actualPath)) {
@@ -78,22 +78,22 @@ export class Static {
       env["HTTP_ACCEPT_ENCODING"] &&
       /\bgzip\b/.test(env["HTTP_ACCEPT_ENCODING"])
     ) {
-      const origPath = env["PATH_INFO"] as string;
-      env["PATH_INFO"] = origPath + ".gz";
+      path = env["PATH_INFO"] as string;
+      env["PATH_INFO"] += ".gz";
       response = await this.fileServer.call(env);
-      env["PATH_INFO"] = origPath;
+      env["PATH_INFO"] = path;
 
       if (response[0] === 404) {
         response = null;
       } else if (response[0] === 304) {
         /** @empty */
       } else {
-        response[1][CONTENT_TYPE] = mimeType(File.extname(origPath), "text/plain");
+        response[1][CONTENT_TYPE] = mimeType(File.extname(path), "text/plain");
         response[1]["content-encoding"] = "gzip";
       }
     }
 
-    const servePath = env["PATH_INFO"] as string;
+    path = env["PATH_INFO"] as string;
     response ??= await this.fileServer.call(env);
 
     if (this.cascade && response[0] === 404) {
@@ -101,7 +101,7 @@ export class Static {
     }
 
     const headers = response[1];
-    for (const [_rule, newHeaders] of this.applicableRules(servePath)) {
+    for (const [_rule, newHeaders] of this.applicableRules(path)) {
       for (const [field, content] of Object.entries(newHeaders)) {
         headers[field] = content;
       }

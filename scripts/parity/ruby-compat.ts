@@ -63,6 +63,7 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Kernel#catch", "kernelCatch"],
   ["Kernel#dup", "rbObjDup"],
   ["Kernel#inspect", "rbInspect"],
+  ["Kernel#method", "rbObjMethod"],
   ["Kernel#object_id", "rbObjId"],
   ["Kernel#send", "rbFSend"],
   ["Kernel#throw", "kernelThrow"],

@@ -1,4 +1,4 @@
-import { File, rbFSend } from "@blazetrails/ruby-compat";
+import { File, rbFSend, rbInspect } from "@blazetrails/ruby-compat";
 import { chomp } from "@blazetrails/ruby-compat";
 
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
@@ -196,9 +196,13 @@ export class ShowExceptions {
     );
   }
 
+  /** @missingRailsName inspect — PERMANENT */
   h(obj: any): string {
-    const str = typeof obj === "string" ? obj : String(obj);
-    return escapeHtml(str);
+    if (typeof obj === "string") {
+      return escapeHtml(obj);
+    } else {
+      return escapeHtml(rbInspect(obj));
+    }
   }
 
   /** @internal */

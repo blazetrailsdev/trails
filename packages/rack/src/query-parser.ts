@@ -152,14 +152,9 @@ export class QueryParser {
       for (const p of str.split(sep)) {
         if (!p) continue;
         const eqIdx = p.indexOf("=");
-        let k: string, v: string | null;
-        if (eqIdx === -1) {
-          k = unescape(p);
-          v = null;
-        } else {
-          k = unescape(p.substring(0, eqIdx));
-          v = unescape(p.substring(eqIdx + 1));
-        }
+        const [k, v = null] = (
+          eqIdx === -1 ? [p] : [p.substring(0, eqIdx), p.substring(eqIdx + 1)]
+        ).map((s) => unescape(s));
         this._normalizeParams(params, k, v, 0);
       }
     } catch (e) {
@@ -181,7 +176,7 @@ export class QueryParser {
   }
 
   newDepthLimit(paramDepthLimit: number): QueryParser {
-    return new QueryParser(this.paramsClass, paramDepthLimit, this.bytesizeLimit, this.paramsLimit);
+    return new (this.constructor as typeof QueryParser)(this.paramsClass, paramDepthLimit);
   }
 
   private checkQueryString(qs: string, sep: string | null | undefined): string {
