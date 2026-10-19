@@ -101,6 +101,12 @@ export function helperModulesFromPaths(
 export const Resolution = { modulesForHelpers, allHelpersFromPath, helperModulesFromPaths };
 
 /**
+ * `_helpers` is a plain-object module, so a method defined here reaches only a
+ * class that includes the module afterwards. A view context class built before
+ * this call keeps the methods it copied, where Rails' includers share the
+ * module's method table (`rb_include_module`, vendor/ruby/v3.3.11/class.c:1179);
+ * CLAUDE.md, "A method defined on a module after it is included".
+ *
  * @inventedArm if — PERMANENT
  * @inventedArm getScriptNameOrSourceURL — PERMANENT
  * @inventedArm getLineNumber — PERMANENT
