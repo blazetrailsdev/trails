@@ -4,6 +4,7 @@ import { RouteSet } from "@blazetrails/actionpack";
 import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
 import {
   BigDecimal,
+  HashWithIndifferentAccess,
   I18n,
   assertEqual,
   assertPredicate,
@@ -17,7 +18,7 @@ import {
   isPresent,
 } from "@blazetrails/activesupport";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
-import { ArgumentError, Range, Struct, include } from "@blazetrails/ruby-compat";
+import { ArgumentError, Hash, Range, Struct, include } from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
@@ -140,6 +141,84 @@ class Tag {
   }
   get value(): string {
     return this.id == null ? "new tag" : `tag #${String(this.id)}`;
+  }
+
+  relevances: unknown = null;
+  set relevances_attributes(attributes: unknown) {}
+}
+
+class Relevance {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  constructor(public id: unknown = null) {}
+
+  toKey(): unknown[] | null {
+    return this.id != null && this.id !== false ? [this.id] : null;
+  }
+  isPersisted(): boolean {
+    return isPresent(this.id);
+  }
+  toParam(): unknown {
+    return this.id != null && this.id !== false ? String(this.id) : this.id;
+  }
+  get value(): string {
+    const name = this.constructor.name.toLowerCase();
+    return this.id == null ? `new ${name}` : `${name} #${String(this.id)}`;
+  }
+}
+
+class CommentRelevance extends Relevance {}
+class TagRelevance extends Relevance {}
+
+class HashBackedAuthor extends Hash {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  isPersisted(): boolean {
+    return false;
+  }
+  get name(): string {
+    return "hash backed author";
+  }
+}
+
+class HashWithIndifferentAccessBackedAuthor extends HashWithIndifferentAccess {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  isPersisted(): boolean {
+    return false;
+  }
+  get name(): string {
+    return "hash backed author";
+  }
+}
+
+class ArelLike {
+  toAry(): boolean {
+    return true;
+  }
+  each(block: (comment: Comment) => void): void {
+    const a = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    a.forEach(block);
+  }
+  *[Symbol.iterator](): Iterator<Comment> {
+    const a: Comment[] = [];
+    this.each((c) => a.push(c));
+    yield* a;
+  }
+}
+
+class FakeAssociationProxy {
+  toAry(): number[] {
+    return [1, 2, 3];
   }
 }
 
@@ -2487,6 +2566,170 @@ describe("FormHelperTest", () => {
         expect(cf.index).toBe("abc");
       });
     });
+  });
+
+  it("nested fields for arel like", () => {
+    post.comments = new ArelLike();
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comments", post.comments, null, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #1") +
+          commentId(0, 1) +
+          commentName(1, "comment #2") +
+          commentId(1, 2),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with child index option override on a nested attributes collection association with proxy", () => {
+    post.comments = new FakeAssociationProxy();
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comments", new Comment(321), { childIndex: "abc" }, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_comments_attributes_abc_name" name="post[comments_attributes][abc][name]" type="text" value="comment #321" />' +
+          '<input id="post_comments_attributes_abc_id" name="post[comments_attributes][abc][id]" type="hidden" value="321" autocomplete="off" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields uses unique indices for different collection associations", () => {
+    post.comments = [new Comment(321)];
+    post.tags = [new Tag(123), new Tag(456)];
+    const comments = post.comments as Comment[];
+    const tags = post.tags as Tag[];
+    comments[0].relevances = [];
+    tags[0].relevances = [];
+    tags[1].relevances = [];
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comments", comments[0], null, (cf) => {
+          concat(cf.textField("name"));
+          concat(
+            cf.fieldsFor("relevances", new CommentRelevance(314), null, (crf) => {
+              concat(crf.textField("value"));
+            }),
+          );
+        }),
+      );
+      concat(
+        f.fieldsFor("tags", tags[0], null, (tf) => {
+          concat(tf.textField("value"));
+          concat(
+            tf.fieldsFor("relevances", new TagRelevance(3141), null, (trf) => {
+              concat(trf.textField("value"));
+            }),
+          );
+        }),
+      );
+      concat(
+        f.fieldsFor("tags", tags[1], null, (tf) => {
+          concat(tf.textField("value"));
+          concat(
+            tf.fieldsFor("relevances", new TagRelevance(31415), null, (trf) => {
+              concat(trf.textField("value"));
+            }),
+          );
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        '<input id="post_comments_attributes_0_name" name="post[comments_attributes][0][name]" type="text" value="comment #321" />' +
+        '<input id="post_comments_attributes_0_relevances_attributes_0_value" name="post[comments_attributes][0][relevances_attributes][0][value]" type="text" value="commentrelevance #314" />' +
+        '<input id="post_comments_attributes_0_relevances_attributes_0_id" name="post[comments_attributes][0][relevances_attributes][0][id]" type="hidden" value="314" autocomplete="off" />' +
+        '<input id="post_comments_attributes_0_id" name="post[comments_attributes][0][id]" type="hidden" value="321" autocomplete="off" />' +
+        '<input id="post_tags_attributes_0_value" name="post[tags_attributes][0][value]" type="text" value="tag #123" />' +
+        '<input id="post_tags_attributes_0_relevances_attributes_0_value" name="post[tags_attributes][0][relevances_attributes][0][value]" type="text" value="tagrelevance #3141" />' +
+        '<input id="post_tags_attributes_0_relevances_attributes_0_id" name="post[tags_attributes][0][relevances_attributes][0][id]" type="hidden" value="3141" autocomplete="off" />' +
+        '<input id="post_tags_attributes_0_id" name="post[tags_attributes][0][id]" type="hidden" value="123" autocomplete="off" />' +
+        '<input id="post_tags_attributes_1_value" name="post[tags_attributes][1][value]" type="text" value="tag #456" />' +
+        '<input id="post_tags_attributes_1_relevances_attributes_0_value" name="post[tags_attributes][1][relevances_attributes][0][value]" type="text" value="tagrelevance #31415" />' +
+        '<input id="post_tags_attributes_1_relevances_attributes_0_id" name="post[tags_attributes][1][relevances_attributes][0][id]" type="hidden" value="31415" autocomplete="off" />' +
+        '<input id="post_tags_attributes_1_id" name="post[tags_attributes][1][id]" type="hidden" value="456" autocomplete="off" />',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with hash like model", () => {
+    const author = new HashBackedAuthor();
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("author", author, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_author_attributes_name" name="post[author_attributes][name]" type="text" value="hash backed author" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with hash with indifferent access like model and options", () => {
+    const author = new HashWithIndifferentAccessBackedAuthor();
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("author", author, {}, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_author_attributes_name" name="post[author_attributes][name]" type="text" value="hash backed author" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with hash with indifferent access like model without options", () => {
+    const author = new HashWithIndifferentAccessBackedAuthor();
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("author", author, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => ""),
+      rendered,
+    );
   });
 
   it("nested fields for with existing records on a nested attributes collection association", () => {
