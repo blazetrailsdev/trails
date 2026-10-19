@@ -483,7 +483,7 @@ class Parser {
     if (this.is("static")) {
       const saved = this.save();
       this.next();
-      if (this.is("{")) return this.finish("StaticBlock", start, this.parseBlock().children);
+      if (this.is("{")) return this.finish("StaticBlock", start, [...this.parseBlock().children]);
       if (this.is("(") || this.is("=") || this.is(";") || this.is("}")) this.restore(saved);
     }
     for (const modifier of ["async", "get", "set"]) {
