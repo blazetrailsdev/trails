@@ -1,6 +1,5 @@
 import { Concern, dasherize, extend } from "@blazetrails/activesupport";
 import { rbClassSuperclass } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
 import { LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
@@ -27,12 +26,6 @@ export interface ViewPathsClass {
   localPrefixes(): string[];
   /** @internal */
   _prefixesMemo?: string[];
-}
-
-export interface ViewPaths {
-  constructor: ViewPathsClass;
-  /** @internal */
-  _lookupContext?: LookupContext;
 }
 
 export class ClassMethods {
@@ -169,28 +162,30 @@ export function setLocale(this: ViewPaths, value: string | null): void {
   lookupContext.call(this).locale = value;
 }
 
-export const ViewPaths = new Module((mod) => {
-  extend(mod, Concern);
+export class ViewPaths {
+  static ClassMethods = ClassMethods;
+  declare ["constructor"]: ViewPathsClass;
+  /** @internal */
+  declare _lookupContext?: LookupContext;
+}
 
-  (
-    mod as unknown as { included(base: null, block: (this: ViewPathsClass) => void): void }
-  ).included(null, function (this: ViewPathsClass) {
-    PathRegistry.setViewPaths(this, new PathSet());
-  });
-
-  mod.moduleEval((m) => {
-    Object.defineProperties(m, {
-      viewPaths: { get: viewPaths, configurable: true },
-      formats: { get: formats, set: setFormats, configurable: true },
-      locale: { get: locale, set: setLocale, configurable: true },
-      lookupContext: { get: lookupContext, configurable: true },
-    });
-  });
-  mod.defineMethod("templateExists", templateExists);
-  mod.defineMethod("isAnyTemplates", isAnyTemplates);
-  mod.defineMethod("_prefixes", _prefixes);
-  mod.defineMethod("detailsForLookup", detailsForLookup);
-  mod.defineMethod("appendViewPath", appendViewPath);
-  mod.defineMethod("prependViewPath", prependViewPath);
-}) as Module & { ClassMethods: typeof ClassMethods };
-ViewPaths.ClassMethods = ClassMethods;
+Object.defineProperties(ViewPaths.prototype, {
+  viewPaths: { get: viewPaths, configurable: true },
+  formats: { get: formats, set: setFormats, configurable: true },
+  locale: { get: locale, set: setLocale, configurable: true },
+  lookupContext: { get: lookupContext, configurable: true },
+});
+Object.assign(ViewPaths.prototype, {
+  templateExists,
+  isAnyTemplates,
+  _prefixes,
+  detailsForLookup,
+  appendViewPath,
+  prependViewPath,
+});
+extend(ViewPaths, Concern);
+(
+  ViewPaths as unknown as { included(base: null, block: (this: ViewPathsClass) => void): void }
+).included(null, function (this: ViewPathsClass) {
+  PathRegistry.setViewPaths(this, new PathSet());
+});

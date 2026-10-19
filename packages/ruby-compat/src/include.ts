@@ -1502,7 +1502,7 @@ function isClass(klass: object): klass is AnyClass {
 
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
   if (!(mod instanceof Module)) {
-    if (mod === null || typeof mod !== "object") return undefined;
+    if (mod === null || (typeof mod !== "object" && typeof mod !== "function")) return undefined;
     const descriptor = Object.getOwnPropertyDescriptor(mod, name);
     return descriptor && !descriptor.enumerable && typeof descriptor.value === "function"
       ? (descriptor.value as (base: unknown) => void).bind(mod)
