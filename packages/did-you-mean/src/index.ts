@@ -7,4 +7,5 @@ export type { SpellCheckerOptions } from "./spell-checker.js";
 export { Correctable } from "./core-ext/name-error.js";
 
 export { Formatter, PlainFormatter };
-export { formatter, setFormatter } from "./did-you-mean.js";
+export { correctError, formatter, setFormatter, spellCheckers } from "./did-you-mean.js";
+export { NullChecker } from "./spell-checkers/null-checker.js";

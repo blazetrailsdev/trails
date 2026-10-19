@@ -1,4 +1,4 @@
-import { ArgumentError, hasKey, toS } from "@blazetrails/ruby-compat";
+import { ArgumentError, hasKey, hashDelete, rbObjRespondTo, toS } from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -23,7 +23,7 @@ export abstract class Helpers {
   declare _body: any;
   declare length: number | null;
   declare _buffered: boolean | null;
-  declare _writer: (chunk: string) => string;
+  declare _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
   abstract hasHeader(key: any): boolean;
   abstract getHeader(key: any): any;
@@ -207,14 +207,17 @@ export abstract class Helpers {
         const oldBody = this._body;
         this._body = [];
         this._buffered = true;
-        this.length = 0;
-        oldBody.each((part: string | Uint8Array) => this.append(toS(part)));
+
+        oldBody.each((part: string | Uint8Array) => {
+          this._writer(toS(part));
+        });
+
+        if (rbObjRespondTo(oldBody, "close")) oldBody.close();
       } else if (this._body && typeof this._body[Symbol.iterator] === "function") {
         const oldBody = this._body;
         this._body = [];
         this._buffered = true;
-        this.length = 0;
-        for (const part of oldBody as Iterable<string | Uint8Array>) this.append(toS(part));
+        for (const part of oldBody as Iterable<string | Uint8Array>) this._writer(toS(part));
       } else {
         this._buffered = false;
       }
@@ -387,10 +390,8 @@ export class Response {
     return value;
   }
   deleteHeader(key: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    const val = this.headers[downcaseKey(key)];
-    delete this.headers[downcaseKey(key)];
-    return val ?? null;
+    if (typeof key !== "string") throw new ArgumentError();
+    return hashDelete(this.headers, downcaseKey(key));
   }
 }
 
@@ -415,10 +416,7 @@ export class ResponseRaw {
     return value;
   }
   deleteHeader(key: any): any {
-    const k = String(key);
-    const val = this.headers[k];
-    delete this.headers[k];
-    return val ?? null;
+    return hashDelete(this.headers, key);
   }
 }
 

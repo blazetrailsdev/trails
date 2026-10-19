@@ -44,7 +44,7 @@ import {
 } from "./constants.js";
 import {
   forwardedValues,
-  getDefaultQueryParser,
+  defaultQueryParser,
   parseCookiesHeader,
   QueryParser,
   unescape,
@@ -488,29 +488,23 @@ export abstract class Helpers {
   }
 
   updateParam(k: string, v: any): void {
-    const get = this.GET;
-    const post = this.POST;
-    if (k in post) {
-      post[k] = v;
-    } else {
-      get[k] = v;
+    let found = false;
+    if (Object.hasOwn(this.GET, k)) {
+      found = true;
+      this.GET[k] = v;
+    }
+    if (Object.hasOwn(this.POST, k)) {
+      found = true;
+      this.POST[k] = v;
+    }
+    if (!found) {
+      this.GET[k] = v;
     }
   }
 
   deleteParam(k: string): any {
-    const post = this.POST;
-    if (k in post) {
-      const val = post[k];
-      delete post[k];
-      return val;
-    }
-    const get = this.GET;
-    if (k in get) {
-      const val = get[k];
-      delete get[k];
-      return val;
-    }
-    return undefined;
+    const [postValue, getValue] = [hashDelete(this.POST, k), hashDelete(this.GET, k)];
+    return postValue != null && postValue !== false ? postValue : getValue;
   }
 
   get baseUrl(): string {
@@ -588,7 +582,7 @@ export abstract class Helpers {
 
   /** @internal */
   queryParser(): QueryParser {
-    return getDefaultQueryParser();
+    return defaultQueryParser();
   }
 
   /** @internal */

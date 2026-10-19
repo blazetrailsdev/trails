@@ -10,6 +10,10 @@ import {
 } from "./query-parser.js";
 import {
   ArgumentError,
+  aryDeleteIf,
+  block,
+  fetch,
+  warn,
   Process,
   RFC2396_PARSER,
   URI,
@@ -132,10 +136,12 @@ export function buildNestedQuery(value: any, prefix: string | null = null): stri
   if (Array.isArray(value)) {
     return value.map((v) => buildNestedQuery(v, `${prefix ?? ""}[]`)).join("&");
   } else if (value !== null && value !== undefined && typeof value === "object") {
-    return Object.entries(value)
-      .map(([k, v]) => buildNestedQuery(v, prefix != null ? `${prefix}[${k}]` : k))
-      .filter((s) => s.length > 0)
-      .join("&");
+    return aryDeleteIf(
+      Object.entries(value).map(([k, v]) =>
+        buildNestedQuery(v, prefix != null ? `${prefix}[${k}]` : k),
+      ),
+      (s) => s.length === 0,
+    ).join("&");
   } else if (value === null || value === undefined) {
     return escape(prefix);
   } else {
@@ -165,8 +171,11 @@ export function forwardedValues(
 
   for (const field of forwardedHeader.split(";")) {
     for (const pair of field.split(",")) {
-      const trimmed = pair.trim().replace(/\s*=\s*/, "=");
-      if (!trimmed) continue;
+      if (!pair) continue;
+      const trimmed = pair
+        .split("=")
+        .map((s) => s.trim())
+        .join("=");
       const match = trimmed.match(/^(by|for|host|proto)="?([^"]+)"?$/i);
       if (!match) return null;
       const key = match[1].toLowerCase();
@@ -460,15 +469,25 @@ export function statusCode(status: number | string): number {
   ) {
     const symbol = stringToSym(status);
     const name = symbolToS(symbol);
-    if (Object.hasOwn(SYMBOL_TO_STATUS_CODE, name)) return SYMBOL_TO_STATUS_CODE[name];
-    if (!Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, name)) {
-      throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
-    }
-    const fallbackCode = OBSOLETE_SYMBOLS_TO_STATUS_CODES[name];
-    const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
-    const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[name];
-    if (canonicalSymbol === undefined) console.warn(message);
-    return fallbackCode;
+    return fetch(
+      SYMBOL_TO_STATUS_CODE,
+      name,
+      block(() => {
+        const fallbackCode = fetch(
+          OBSOLETE_SYMBOLS_TO_STATUS_CODES,
+          name,
+          block(() => {
+            throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
+          }),
+        ) as number;
+        const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
+        const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[name];
+        if (canonicalSymbol == null) {
+          warn(message, { uplevel: 3 });
+        }
+        return fallbackCode;
+      }),
+    );
   } else {
     return typeof status === "number" ? Math.trunc(status) : parseInt(status, 10) || 0;
   }

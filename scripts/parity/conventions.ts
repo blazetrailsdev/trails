@@ -666,6 +666,15 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "TODO: Remove on 3.3: `DidYouMean::DeprecatedMapping` (did_you_mean.rb:116-138) " +
+      "backs only the deprecated, private `SPELL_CHECKERS` constant. Scoped to " +
+      "did-you-mean's did_you_mean.rb.",
+    names: ["merge!"],
+    rubyFiles: ["did_you_mean.rb"],
+    packages: ["did-you-mean"],
+  },
+  {
+    reason:
       "`Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs " +
       "Thorfiles) is not ported, and these `Thor::Util` members exist only for it: " +
       "`namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside " +
