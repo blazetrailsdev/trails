@@ -1,6 +1,7 @@
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
 import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
+import { b } from "./string/b.js";
 
 /**
  * `Zlib::GzipFile` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4838`). `gzfile_s_open`
@@ -205,6 +206,32 @@ export const Zlib = {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::GzipWriter`.
    */
   GzipWriter,
+
+  /**
+   * `Zlib::Deflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4713`), whose one-shot
+   * `deflate` (`rb_deflate_s_deflate`, `zlib.c:1730`) compresses the String's
+   * bytes at `Z_DEFAULT_COMPRESSION` and answers them as a binary String.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Deflate`.
+   */
+  Deflate: {
+    deflate(src: string): string {
+      return b(getZlib().deflate(new TextEncoder().encode(src)));
+    },
+  },
+
+  /**
+   * `Zlib::Inflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4725`), whose one-shot
+   * `inflate` (`rb_inflate_s_inflate`, `zlib.c:2044`) answers the inflated bytes
+   * as a binary String, raising `Zlib::Error` on a malformed stream.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Inflate`.
+   */
+  Inflate: {
+    inflate(src: string): string {
+      return b(getZlib().inflate(Uint8Array.from(src, (c) => c.charCodeAt(0))));
+    },
+  },
 
   /**
    * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:507` `rb_zlib_crc32`, which is

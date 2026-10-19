@@ -412,7 +412,7 @@ export { Struct, isStruct, rbStructInitialize, rstructGet, type StructInstance }
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
-export { rbStrPartition, rbStrScanSubexpCall } from "./string/sub.js";
+export { rbStrPartition, rbStrRpartition, rbStrScanSubexpCall } from "./string/sub.js";
 export { rbCheckStringType, rbStrSNew, stringValue, strlen, strUminus } from "./string/support.js";
 export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-encoding.js";
 export { encode } from "./string/encode.js";
