@@ -69,6 +69,7 @@ export class InstrumentationProxy {
     };
   }
 
+  /** @missingRailsName payload — PERMANENT */
   call(env: RackEnv): Promise<RackResponse> {
     return Notifications.instrument(
       InstrumentationProxy.EVENT_NAME,

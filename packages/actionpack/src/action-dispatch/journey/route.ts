@@ -201,6 +201,7 @@ export class Route {
   /** @internal */
   private _requiredDefaultsCache: Record<string, unknown> | null = null;
 
+  /** @missingRailsName upcase — PERMANENT */
   static verbMatcher(verb: string): VerbMatcher {
     return fetch<VerbMatcher>(
       VerbMatchers.VERB_TO_CLASS as unknown as Record<string, unknown>,

@@ -187,6 +187,7 @@ export class Resource {
     this._except = hashDelete(options as Record<string, never>, "except");
   }
 
+  /** @missingRailsName apiOnly — PERMANENT */
   defaultActions(): ResourceAction[] {
     return (this.constructor as typeof Resource).defaultActions(this._apiOnly);
   }
@@ -624,6 +625,7 @@ export class Mapping {
 
   static readonly JOINED_SEPARATORS = SEPARATORS.join("");
 
+  /** @missingRailsName internal — PERMANENT */
   makeRoute(name: string | null, precedence: number): JourneyRoute {
     return new JourneyRoute({
       name,
@@ -640,10 +642,12 @@ export class Mapping {
     });
   }
 
+  /** @missingRailsName blocks — PERMANENT */
   application(): Endpoint {
     return this.app(this._blocks);
   }
 
+  /** @missingRailsName conditions — PERMANENT */
   conditions(): Record<string, unknown> {
     return this.buildConditions(this._conditions, this._set!.requestClass());
   }
@@ -1666,7 +1670,10 @@ export class Mapper {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName array — PERMANENT
+   */
   mapMatch(
     paths: string[],
     options: RouteOptions & {
@@ -1863,6 +1870,11 @@ export class Mapper {
     }
   }
 
+  /**
+   * @missingRailsName delete — PERMANENT
+   * @missingRailsName scope — PERMANENT
+   * @missingRailsName set — PERMANENT
+   */
   private addRoute(
     action: string | undefined,
     controller: string | RegExp | undefined,
@@ -2094,7 +2106,10 @@ export class Mapper {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName tr — PERMANENT
+   */
   prefixNameForAction(
     as: string | null | undefined,
     action: string | undefined,

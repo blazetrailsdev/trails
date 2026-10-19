@@ -39,6 +39,7 @@ export class Subscriber {
     this._subscriber ??= Notifications.subscribe(/^[^!]/, (e) => this.call(e));
   }
 
+  /** @missingRailsName subscriber — PERMANENT */
   unsubscribe(): void {
     if (this._subscriber) {
       Notifications.unsubscribe(this._subscriber);
