@@ -7829,6 +7829,18 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(mod.instanceMethods).toEqual([]);
   });
 
+  it("does not seat a cattrAccessor inside a lifecycle onLoad block on a module", () => {
+    const info = extractFromFiles("/p", {
+      "railtie.ts": `
+        import { cattrAccessor, onLoad } from "@blazetrails/activesupport";
+        onLoad("after_initialize", (base) => {
+          cattrAccessor.call(base, "logger");
+        });
+      `,
+    });
+    expect(Object.keys(info.modules).filter((k) => k.startsWith("railtie.ts:"))).toEqual([]);
+  });
+
   it("credits a Module's attrReader / attrWriter with the instance half each installs", () => {
     const info = extractFromFiles("/p", {
       "base.ts": `

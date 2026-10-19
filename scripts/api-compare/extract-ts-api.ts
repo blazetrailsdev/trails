@@ -3649,6 +3649,19 @@ function onLoadHookModule(expr: ts.Expression): string | undefined {
   if (expr.expression.text !== "onLoad") return undefined;
   const [hook] = expr.arguments;
   if (hook === undefined || !ts.isStringLiteralLike(hook)) return undefined;
+  const frameworkHooks = [
+    "action_cable",
+    "action_controller",
+    "action_dispatch",
+    "action_mailer",
+    "action_view",
+    "active_job",
+    "active_model",
+    "active_record",
+    "active_storage",
+    "active_support",
+  ];
+  if (!frameworkHooks.includes(hook.text)) return undefined;
   return hook.text
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
