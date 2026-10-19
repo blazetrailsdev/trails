@@ -36,7 +36,7 @@ export class Base {
     if (name != null) {
       return (this._namespace = name);
     } else {
-      if (!Object.prototype.hasOwnProperty.call(this, "_namespace")) {
+      if (!Object.hasOwn(this, "_namespace")) {
         this._namespace = underscore(this.name)
           .replace(/\//g, ":")
           .replace(/_command$/, "")
@@ -68,7 +68,7 @@ export class Base {
   }
 
   static commandName(): string {
-    if (!Object.prototype.hasOwnProperty.call(this, "_commandName")) {
+    if (!Object.hasOwn(this, "_commandName")) {
       const command = this.name.split("::").at(-1)!;
       this._commandName = underscore(command.replace(/Command$/, ""));
     }
@@ -91,7 +91,7 @@ export class Base {
 
   /** @noRailsEquivalent CONVERGEABLE vendor-thor-and-port-command-base-thor-surface */
   static classOptions(): Record<string, ClassOptionConfig> {
-    if (!Object.prototype.hasOwnProperty.call(this, "_classOptions")) {
+    if (!Object.hasOwn(this, "_classOptions")) {
       const superclass = Object.getPrototypeOf(this) as typeof Base;
       this._classOptions = { ...(superclass.classOptions?.() ?? {}) };
     }

@@ -1176,7 +1176,7 @@ export const ClassMethods = {
     name: string,
     callbacks: CallbackChain,
   ): Record<string, CallbackChain> {
-    if (!Object.prototype.hasOwnProperty.call(this, "__class_attr___callbacks")) {
+    if (!Object.hasOwn(this, "__class_attr___callbacks")) {
       this.__callbacks = { ...this.__callbacks };
       if (!rbModSingletonP(this)) {
         let klass = this as unknown as AnyClass;

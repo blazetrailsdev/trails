@@ -277,7 +277,7 @@ export function adapterClass(this: typeof Base): typeof DatabaseAdapter {
 
 export async function removeConnection(this: typeof Base): Promise<HashConfig | undefined> {
   let name: string | null | undefined;
-  if (Object.prototype.hasOwnProperty.call(this, "_connectionSpecificationName")) {
+  if (Object.hasOwn(this, "_connectionSpecificationName")) {
     name = (this as any)._connectionSpecificationName;
   }
 
@@ -296,10 +296,7 @@ export async function removeConnection(this: typeof Base): Promise<HashConfig | 
 }
 
 export function connectionSpecificationName(this: typeof Base): string {
-  const connectionSpecificationName = Object.prototype.hasOwnProperty.call(
-    this,
-    "_connectionSpecificationName",
-  )
+  const connectionSpecificationName = Object.hasOwn(this, "_connectionSpecificationName")
     ? (this as any)._connectionSpecificationName
     : null;
   if (connectionSpecificationName == null) {

@@ -146,7 +146,7 @@ async function isValidationNeeded(
   attribute: string,
 ): Promise<boolean> {
   const options = validator.options;
-  if (options.conditions || Object.prototype.hasOwnProperty.call(options, "caseSensitive")) {
+  if (options.conditions || Object.hasOwn(options, "caseSensitive")) {
     return true;
   }
   const scope = Array.isArray(options.scope)

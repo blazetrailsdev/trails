@@ -160,7 +160,7 @@ describe("assertCalledOnInstanceOf with an async block", () => {
       expect(new Widget().build()).toBe("stubbed");
     });
     expect(new Widget().build()).toBe("built");
-    expect(Object.prototype.hasOwnProperty.call(Widget.prototype, "build")).toBe(true);
+    expect(Object.hasOwn(Widget.prototype, "build")).toBe(true);
   });
 });
 
@@ -169,7 +169,7 @@ describe("assertCalledOnInstanceOf on a subclass", () => {
     assertCalledOnInstanceOf(SubWidget, "build", null, {}, () => {
       new SubWidget().build();
     });
-    expect(Object.prototype.hasOwnProperty.call(SubWidget.prototype, "build")).toBe(false);
+    expect(Object.hasOwn(SubWidget.prototype, "build")).toBe(false);
   });
 
   it("counts reads of an inherited reader", () => {

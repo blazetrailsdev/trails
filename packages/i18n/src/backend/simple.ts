@@ -120,7 +120,7 @@ export class Simple {
 for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
-    if (Object.prototype.hasOwnProperty.call(Simple.prototype, key)) continue;
+    if (Object.hasOwn(Simple.prototype, key)) continue;
     Object.defineProperty(
       Simple.prototype,
       key,

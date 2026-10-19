@@ -67,15 +67,13 @@ describe("TimeType Helpers::TimeValue ancestry", () => {
       "newTime",
       "fastStringToTime",
     ]) {
-      expect(Object.prototype.hasOwnProperty.call(type, name)).toBe(false);
+      expect(Object.hasOwn(type, name)).toBe(false);
       expect(typeof (type as unknown as Record<string, unknown>)[name]).toBe("function");
     }
   });
 
   it("keeps its own user_input_in_time_zone over the mixin's", () => {
-    expect(
-      Object.prototype.hasOwnProperty.call(Types.TimeType.prototype, "userInputInTimeZone"),
-    ).toBe(true);
+    expect(Object.hasOwn(Types.TimeType.prototype, "userInputInTimeZone")).toBe(true);
   });
 });
 

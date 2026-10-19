@@ -1428,7 +1428,7 @@ trails#9053.
 that fires when `class Child extends Parent` is evaluated, so wherever Rails'
 `inherited` resets or seeds per-class state, trails defers it to the first read
 or first write on the subclass: a memo is answered only when it is an own
-property of the class being asked (`Object.prototype.hasOwnProperty.call(host,
+property of the class being asked (`Object.hasOwn(host,
 key)`), so an inherited memo reads as unset — the observable state `inherited`'s
 reset leaves behind — with nothing running at definition time. A lazy reset at
 first read would clobber memos written to the child before it, and a decorator

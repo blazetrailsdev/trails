@@ -634,7 +634,7 @@ export class FormBuilder {
   }
 
   static _toPartialPath(): string | null {
-    if (!Object.prototype.hasOwnProperty.call(this, "__toPartialPath")) {
+    if (!Object.hasOwn(this, "__toPartialPath")) {
       const name = underscore(demodulize(this.name));
       const partialPath = name.replace(/_builder$/, "");
       this.__toPartialPath = partialPath === name ? null : partialPath;

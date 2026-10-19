@@ -332,7 +332,7 @@ export const ClassMethods = {
 
   /** @inventedArm if — PERMANENT */
   aliasesByAttributeName(this: ClassMethodsHost): Hash<string, string[]> {
-    if (!Object.prototype.hasOwnProperty.call(this, "_aliasesByAttributeName")) {
+    if (!Object.hasOwn(this, "_aliasesByAttributeName")) {
       this._aliasesByAttributeName = new Hash<string, string[]>((h, k) => {
         const v: string[] = [];
         h.set(k, v);
@@ -381,7 +381,7 @@ export const ClassMethods = {
         typeof Concurrent.Map<string, Array<AttributeMethod>>
       >;
     };
-    if (!Object.prototype.hasOwnProperty.call(h, "_attributeMethodPatternsCache")) {
+    if (!Object.hasOwn(h, "_attributeMethodPatternsCache")) {
       h._attributeMethodPatternsCache = new Concurrent.Map({ initialCapacity: 4 });
     }
     return h._attributeMethodPatternsCache!;
@@ -598,8 +598,8 @@ function isDefinedByAClassBody(klass: unknown, name: string): boolean {
     link;
     link = Object.getPrototypeOf(link) as object | null
   ) {
-    if (!Object.prototype.hasOwnProperty.call(link, name)) continue;
-    return Object.prototype.hasOwnProperty.call(link, "constructor");
+    if (!Object.hasOwn(link, name)) continue;
+    return Object.hasOwn(link, "constructor");
   }
   return false;
 }

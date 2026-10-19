@@ -224,10 +224,8 @@ describe("TestFixtures#before_setup / #after_teardown", () => {
 
   it("splices the module beneath the includer's prototype", () => {
     const proto = Object.getPrototypeOf(testCase) as object;
-    expect(Object.prototype.hasOwnProperty.call(proto, "beforeSetup")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(proto), "beforeSetup")).toBe(
-      true,
-    );
+    expect(Object.hasOwn(proto, "beforeSetup")).toBe(false);
+    expect(Object.hasOwn(Object.getPrototypeOf(proto), "beforeSetup")).toBe(true);
   });
 
   it("before_setup sets up fixtures, then calls super", async () => {

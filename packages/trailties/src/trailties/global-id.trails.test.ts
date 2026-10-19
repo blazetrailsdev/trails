@@ -80,7 +80,7 @@ describe("GlobalID::Railtie against a real Application", () => {
         keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
       } as TrailtieApp);
       expect(GlobalID.app).toBe("boot-app");
-      expect(Object.prototype.hasOwnProperty.call(app.config, "globalId")).toBe(false);
+      expect(Object.hasOwn(app.config, "globalId")).toBe(false);
     } finally {
       app.config.set("globalId", previous);
     }

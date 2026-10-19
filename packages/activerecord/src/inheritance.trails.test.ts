@@ -26,7 +26,7 @@ describe("compute_type candidates cache", () => {
 
     const cache = (Client as unknown as { _typeCandidatesCache: Map<string, string> })
       ._typeCandidatesCache;
-    expect(Object.prototype.hasOwnProperty.call(Client, "_typeCandidatesCache")).toBe(true);
+    expect(Object.hasOwn(Client, "_typeCandidatesCache")).toBe(true);
     expect(cache.get("Author")).toBe("Author");
     expect(Client.computeType("Author")).toBe(Author);
   });
@@ -114,7 +114,7 @@ describe("Inheritance::ClassMethods#initialize_clone", () => {
     const copy = rbObjClone(Company);
 
     expect(copy).not.toBe(Company);
-    expect(Object.prototype.hasOwnProperty.call(copy, "_computedBaseClass")).toBe(true);
+    expect(Object.hasOwn(copy, "_computedBaseClass")).toBe(true);
     expect(copy.baseClass).toBe(copy);
     expect(rbObjClone(Client).baseClass).toBe(Company);
   });

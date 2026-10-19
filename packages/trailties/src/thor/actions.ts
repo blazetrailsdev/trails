@@ -98,7 +98,7 @@ export const ClassMethods = {
 
   async sourceRoot(this: ActionsClassHost, path: string | null = null): Promise<string | null> {
     if (path != null) this._sourceRoot = path;
-    if (!Object.prototype.hasOwnProperty.call(this, "_sourceRoot")) this._sourceRoot = null;
+    if (!Object.hasOwn(this, "_sourceRoot")) this._sourceRoot = null;
     return this._sourceRoot ?? null;
   },
 

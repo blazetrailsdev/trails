@@ -5,7 +5,7 @@ export abstract class Sanitizer {
   declare private static _html5Support: boolean | undefined;
 
   static isHtml5Support(): boolean {
-    if (Object.prototype.hasOwnProperty.call(this, "_html5Support")) return this._html5Support!;
+    if (Object.hasOwn(this, "_html5Support")) return this._html5Support!;
 
     return (this._html5Support = "HTML5" in Nokogiri);
   }

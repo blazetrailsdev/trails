@@ -176,7 +176,7 @@ export abstract class CurrentAttributes {
 
   /** @internal */
   private static currentInstancesKey(): string {
-    if (!Object.prototype.hasOwnProperty.call(this, "_currentInstancesKey")) {
+    if (!Object.hasOwn(this, "_currentInstancesKey")) {
       (this as CurrentAttributesClass)._currentInstancesKey = this.name;
     }
     return (this as CurrentAttributesClass)._currentInstancesKey!;
@@ -225,7 +225,7 @@ type CurrentAttributesClass = typeof CurrentAttributes & {
 
 /** @internal */
 function generatedAttributeMethods(this: CurrentAttributesClass): Module {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+  if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
     const mod = new Module();
     include(this as unknown as new (...args: unknown[]) => unknown, mod);
     this._generatedAttributeMethods = mod;

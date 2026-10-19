@@ -48,7 +48,7 @@ export class IndexedRow {
   }
 
   isKey(column: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.columnIndexes, column);
+    return Object.hasOwn(this.columnIndexes, column);
   }
 
   fetch(column: string, block?: () => unknown): unknown {

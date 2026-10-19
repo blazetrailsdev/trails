@@ -99,7 +99,7 @@ export function mergeImports(imports: Import[]): Import[] {
     if (imp.named) {
       for (const alias of Object.keys(imp.named)) {
         if (valueTwin.default === alias) delete imp.named[alias];
-        else if (valueTwin.named && Object.prototype.hasOwnProperty.call(valueTwin.named, alias)) {
+        else if (valueTwin.named && Object.hasOwn(valueTwin.named, alias)) {
           delete imp.named[alias];
         }
       }
@@ -108,7 +108,7 @@ export function mergeImports(imports: Import[]): Import[] {
     if (!imp.default && namedEmpty) map.delete(key);
   }
   for (const imp of map.values()) {
-    if (imp.default && imp.named && Object.prototype.hasOwnProperty.call(imp.named, imp.default)) {
+    if (imp.default && imp.named && Object.hasOwn(imp.named, imp.default)) {
       throw new Error(`Import from "${imp.from}" binds "${imp.default}" as both default and named`);
     }
   }

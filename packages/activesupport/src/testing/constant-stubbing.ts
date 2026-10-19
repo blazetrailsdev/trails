@@ -12,7 +12,7 @@ export function stubConst<T>(
   { exists = true }: { exists?: boolean } = {},
 ): T {
   if (exists) {
-    if (!Object.prototype.hasOwnProperty.call(mod, constant)) {
+    if (!Object.hasOwn(mod, constant)) {
       throw new NameError(`uninitialized constant ${constant}`, constant);
     }
     const oldValue = mod[constant];

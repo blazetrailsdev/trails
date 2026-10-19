@@ -243,7 +243,7 @@ export class Associations {
       "extend",
       "strictLoading",
     ] as const) {
-      if (Object.prototype.hasOwnProperty.call(options, k)) hmOptions[k] = options[k];
+      if (Object.hasOwn(options, k)) hmOptions[k] = options[k];
     }
 
     this.hasMany(name, scope as ((...args: any[]) => any) | null, hmOptions, extension);

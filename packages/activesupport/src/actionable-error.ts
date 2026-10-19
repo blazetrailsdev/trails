@@ -68,7 +68,7 @@ export class ActionableError extends Error {
   }
 
   static action(name: string, block: () => void): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_actions")) {
+    if (!Object.hasOwn(this, "_actions")) {
       const parentActions = this._actions || {};
       Object.defineProperty(this, "_actions", {
         value: { ...parentActions },

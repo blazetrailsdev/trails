@@ -152,8 +152,8 @@ describe("ClassAttributeTest", () => {
   });
 
   it("can check if value is set on a sub class", () => {
-    expect(Object.prototype.hasOwnProperty.call(Sub, "__class_attr_setting")).toBe(false);
+    expect(Object.hasOwn(Sub, "__class_attr_setting")).toBe(false);
     Sub.setting = true;
-    expect(Object.prototype.hasOwnProperty.call(Sub, "__class_attr_setting")).toBe(true);
+    expect(Object.hasOwn(Sub, "__class_attr_setting")).toBe(true);
   });
 });

@@ -44,7 +44,7 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
     return constantize(typeName) as typeof Base;
   } else {
     const klass = baseClass as typeof Base & { _typeCandidatesCache: Map<string, string> };
-    if (!Object.prototype.hasOwnProperty.call(klass, "_typeCandidatesCache")) {
+    if (!Object.hasOwn(klass, "_typeCandidatesCache")) {
       klass._typeCandidatesCache = new Map();
     }
     const typeCandidate = klass._typeCandidatesCache.get(typeName);
@@ -130,15 +130,13 @@ export function polymorphicName(modelClass: typeof Base): string {
 }
 
 export function baseClass(this: typeof Base): typeof Base {
-  if (!Object.prototype.hasOwnProperty.call(this, "_computedBaseClass")) setBaseClass(this);
+  if (!Object.hasOwn(this, "_computedBaseClass")) setBaseClass(this);
   return (this as any)._computedBaseClass as typeof Base;
 }
 
 export const ClassMethods = new Module().include({
   get abstractClass(): boolean {
-    return Object.prototype.hasOwnProperty.call(this, "_abstractClass")
-      ? (this as any)._abstractClass
-      : false;
+    return Object.hasOwn(this, "_abstractClass") ? (this as any)._abstractClass : false;
   },
 
   set abstractClass(value: boolean) {
@@ -170,7 +168,7 @@ export function findStiClass(this: typeof Base, typeName: string): typeof Base {
 }
 
 export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_finderNeedsTypeCondition")) {
+  if (!Object.hasOwn(modelClass, "_finderNeedsTypeCondition")) {
     (modelClass as any)._finderNeedsTypeCondition = !modelClass.isDescendsFromActiveRecord();
   }
   return (modelClass as any)._finderNeedsTypeCondition === true;

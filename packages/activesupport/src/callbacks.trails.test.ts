@@ -128,7 +128,7 @@ describe("include ActiveSupport::Callbacks (trails)", () => {
 
     expect(Child.__callbacks).toBe(inherited);
     expect(Object.keys(Child.__callbacks)).toEqual(["save"]);
-    expect(Object.prototype.hasOwnProperty.call(Child, "__class_attr___callbacks")).toBe(false);
+    expect(Object.hasOwn(Child, "__class_attr___callbacks")).toBe(false);
   });
 });
 

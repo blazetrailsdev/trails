@@ -190,7 +190,7 @@ describe("helper", () => {
 
     child.helper(FooHelper);
 
-    expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(false);
+    expect(Object.hasOwn(child, "_helpers")).toBe(false);
     expect(child._helpers).toBe(parent._helpers);
   });
 
@@ -286,7 +286,7 @@ describe("identity tracking lives on the helpers module chain, not the class", (
     const child = Object.create(parent) as HelpersClass;
 
     child.helper(Shared);
-    expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(false);
+    expect(Object.hasOwn(child, "_helpers")).toBe(false);
 
     child.clearHelpers();
     child.helper(Shared);

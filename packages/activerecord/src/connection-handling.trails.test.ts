@@ -212,9 +212,7 @@ describe("ConnectionHandling", () => {
     try {
       __resetPrimaryAbstractClass();
       primaryAbstractClass(AppRecord);
-      expect(Object.prototype.hasOwnProperty.call(AppRecord, "_connectionSpecificationName")).toBe(
-        false,
-      );
+      expect(Object.hasOwn(AppRecord, "_connectionSpecificationName")).toBe(false);
       expect(AppRecord.connectionSpecificationName).toBe("ActiveRecord::Base");
     } finally {
       __resetPrimaryAbstractClass();

@@ -40,7 +40,7 @@ export class ClassMethods {
 
   /** @internal */
   static _prefixes(this: ViewPathsClass): string[] {
-    if (Object.prototype.hasOwnProperty.call(this, "_prefixesMemo")) return this._prefixesMemo!;
+    if (Object.hasOwn(this, "_prefixesMemo")) return this._prefixesMemo!;
     const superclass = rbClassSuperclass(this);
     const local = this.localPrefixes();
     return (this._prefixesMemo =

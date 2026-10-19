@@ -1580,7 +1580,7 @@ describe("rbObjClone", () => {
       expect(new Sub().greet()).toBe("orig parent 7");
     }
     expect((rbObjClone(Orig) as { cloned?: unknown }).cloned).toBe(Orig);
-    expect(Object.prototype.hasOwnProperty.call(rbObjDup(Orig), "cloned")).toBe(false);
+    expect(Object.hasOwn(rbObjDup(Orig), "cloned")).toBe(false);
 
     const proc = function (): number {
       return 1;
@@ -1908,7 +1908,7 @@ describe("Module#prependFeatures", () => {
 
     expect(new Klass().greet("a")).toBe("module > class a");
     expect(new Klass().other()).toBe("other");
-    expect(Object.prototype.hasOwnProperty.call(Klass.prototype, "greet")).toBe(false);
+    expect(Object.hasOwn(Klass.prototype, "greet")).toBe(false);
   });
 
   it("puts a later prepend above an earlier one, and a later include beneath the class", () => {

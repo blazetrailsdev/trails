@@ -7,7 +7,7 @@ import { Module } from "@blazetrails/ruby-compat";
 class Parameters {
   constructor(private readonly data: Record<string, unknown>) {}
   hasKey(key: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.data, key);
+    return Object.hasOwn(this.data, key);
   }
   get(key: string): unknown {
     return this.data[key];
