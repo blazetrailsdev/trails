@@ -1,5 +1,4 @@
 import type { DefaultTreeAdapterMap } from "parse5";
-import { Module } from "@blazetrails/ruby-compat";
 
 import type { Node } from "../html5/node.js";
 import type { NodeSet } from "./node-set.js";
@@ -35,9 +34,7 @@ export function atCss(this: SearchableHost, ...args: unknown[]): Node | undefine
   return this.css(...args).first();
 }
 
-export const Searchable = new Module((mod) => {
-  mod.moduleEval((m) => Object.assign(m, { css, atCss }));
-});
+export const Searchable = { css, atCss };
 
 /** @internal */
 export function extractParams(

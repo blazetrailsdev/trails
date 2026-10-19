@@ -47,9 +47,9 @@ export class Object {
   }
 }
 
-Kernel.defineMethod("asJson", function (this: object, options: EncodeOptions | null = null) {
+Kernel.asJson = function (this: object, options: EncodeOptions | null = null) {
   return Object.asJson(this, options);
-});
+};
 
 export class TrueClass {
   static asJson(value: boolean, options: EncodeOptions | null = null): boolean {

@@ -1427,15 +1427,15 @@ describe("Module#superMethod", () => {
     class Plain {}
     const mod = new Module();
     include(Plain, mod);
-    Kernel.defineMethod("kernelProbe", function (this: object) {
+    Kernel.kernelProbe = function (this: object) {
       return this;
-    });
+    };
     try {
       const plain = new Plain();
       expect(mod.superMethod(plain, "kernelProbe")!()).toBe(plain);
       expect(mod.superMethod(plain, "kernelProbe=")).toBeUndefined();
     } finally {
-      Kernel.removeMethod("kernelProbe");
+      delete Kernel.kernelProbe;
     }
   });
 
