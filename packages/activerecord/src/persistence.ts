@@ -58,13 +58,13 @@ interface PersistenceHost {
 }
 
 export async function create(
-  this: PersistenceHost,
+  this: typeof Base,
   attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
   block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {
     const records: any[] = [];
-    for (const attr of attributes) records.push(await (this as any).create(attr, block));
+    for (const attr of attributes) records.push(await this.create(attr, block));
     return records;
   }
   await this.ensureSchemaLoaded();
@@ -82,13 +82,13 @@ export async function create(
 }
 
 export async function createBang(
-  this: PersistenceHost,
+  this: typeof Base,
   attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
   block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {
     const records: any[] = [];
-    for (const attr of attributes) records.push(await (this as any).createBang(attr, block));
+    for (const attr of attributes) records.push(await this.createBang(attr, block));
     return records;
   }
   await this.ensureSchemaLoaded();
@@ -273,7 +273,7 @@ export function compositeQueryConstraintsList(this: PersistenceHost): string[] {
 }
 
 export async function _insertRecord(
-  this: PersistenceHost,
+  this: typeof Base,
   connection: {
     insert(arel: unknown, ...args: unknown[]): Promise<unknown>;
     emptyInsertStatementValue(pk?: string | null): string;
@@ -281,8 +281,8 @@ export async function _insertRecord(
   values: Record<string, unknown>,
   returning?: string[] | null,
 ): Promise<unknown> {
-  const ctor = this as any;
-  const primaryKey = ctor.primaryKey;
+  const ctor = this;
+  const primaryKey = ctor.primaryKey as string;
   let primaryKeyValue: unknown = null;
   if (ctor.isPrefetchPrimaryKey() && primaryKey) {
     if (!rtest(values[primaryKey])) {
@@ -316,17 +316,17 @@ export async function _insertRecord(
 }
 
 export async function _updateRecord(
-  this: PersistenceHost,
+  this: typeof Base,
   values: Record<string, unknown>,
   constraints: Record<string, unknown>,
 ): Promise<number> {
-  const klass = this as unknown as typeof Base;
+  const klass = this;
   const arelTable: ArelTable = klass.arelTable;
   const wheres = Object.entries(constraints).map(([name, value]) =>
     klass.predicateBuilder.get(name, value),
   );
 
-  const defaultConstraint = buildDefaultConstraint.call(klass as any);
+  const defaultConstraint = buildDefaultConstraint.call(klass);
   if (defaultConstraint != null) wheres.push(defaultConstraint as Nodes.Node);
 
   const currentScope = klass.globalCurrentScope();
@@ -342,15 +342,15 @@ export async function _updateRecord(
 }
 
 export async function _deleteRecord(
-  this: PersistenceHost,
+  this: typeof Base,
   constraints: Record<string, unknown>,
 ): Promise<number> {
-  const klass = this as unknown as typeof Base;
+  const klass = this;
   const wheres = Object.entries(constraints).map(([name, value]) =>
     klass.predicateBuilder.get(name, value),
   );
 
-  const defaultConstraint = buildDefaultConstraint.call(klass as any);
+  const defaultConstraint = buildDefaultConstraint.call(klass);
   if (defaultConstraint != null) wheres.push(defaultConstraint as Nodes.Node);
 
   const currentScope = klass.globalCurrentScope();
@@ -468,55 +468,32 @@ export async function toggleBang<T extends ToggleBangRecord>(
   return this.toggle(attribute).updateAttribute(attribute, this.readAttribute(attribute));
 }
 
-interface UpdateRecord extends AttributeIO {
-  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
-  saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
-}
-
 /** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
-export async function update<T extends UpdateRecord>(
-  this: T,
+export async function update(
+  this: Base,
   attributes: Record<string, unknown> | PermittedAttributes,
 ): Promise<boolean | undefined> {
-  const self = this as any;
+  const self = this;
   return withTransactionReturningStatus.call(self, async () => {
     await self.setAttributes(attributes);
-    return self.save() as Promise<boolean | undefined>;
+    return self.save();
   }) as Promise<boolean | undefined>;
 }
 
 /** @missingRailsCall assign_attributes — CONVERGEABLE update-must-call-assign-attributes-carried-from-0087 */
-export async function updateBang<T extends UpdateRecord>(
-  this: T,
+export async function updateBang(
+  this: Base,
   attributes: Record<string, unknown> | PermittedAttributes,
 ): Promise<true | undefined> {
-  const self = this as any;
+  const self = this;
   return withTransactionReturningStatus.call(self, async () => {
     await self.setAttributes(attributes);
-    return self.saveBang() as Promise<true | undefined>;
+    return self.saveBang();
   }) as Promise<true | undefined>;
 }
 
-interface DeleteRecord {
-  _destroyed: boolean;
-  _previouslyNewRecord: boolean;
-  id: unknown;
-  idInDatabase: unknown;
-  isPersisted(): boolean;
-  freeze(): unknown;
-  constructor: {
-    arelTable: InstanceType<typeof ArelTable>;
-    _buildQueryConstraintsWhereNode(
-      constraints: Record<string, unknown>,
-    ): Parameters<DeleteManager["where"]>[0];
-    connection: {
-      delete(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number>;
-    };
-  };
-}
-
-async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
-  if (this.isPersisted()) await _deleteRow.call(this as any);
+async function deleteRow<T extends Base>(this: T): Promise<T> {
+  if (this.isPersisted()) await _deleteRow.call(this);
   this._destroyed = true;
   this._previouslyNewRecord = false;
   this.freeze();
@@ -525,12 +502,8 @@ async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
 
 export { deleteRow as delete };
 
-interface SaveRecord {
-  createOrUpdate(touch?: boolean, block?: (record: any) => void): Promise<boolean>;
-}
-
 export async function save(
-  this: SaveRecord,
+  this: Base,
   options?: { validate?: boolean; touch?: boolean },
   block?: (record: any) => void,
 ): Promise<boolean> {
@@ -543,23 +516,18 @@ export async function save(
 }
 
 export async function saveBang(
-  this: SaveRecord,
+  this: Base,
   options?: { validate?: boolean; touch?: boolean },
   block?: (record: any) => void,
 ): Promise<true> {
   if (!(await this.createOrUpdate(options?.touch ?? true, block))) {
-    throw new RecordNotSaved("Failed to save the record", this as unknown as object);
+    throw new RecordNotSaved("Failed to save the record", this);
   }
   return true;
 }
 
-interface DestroyRecord {
-  isReadonly(): boolean;
-  constructor: { name: string };
-}
-
-export async function destroy<T extends DestroyRecord>(this: T): Promise<T> {
-  const self = this as any;
+export async function destroy<T extends Base>(this: T): Promise<T> {
+  const self = this;
   if (this.isReadonly()) self._raiseReadonlyRecordError();
   await self.destroyAssociations();
   self._triggerDestroyCallback ||= self.isPersisted() && (await self.destroyRow()) > 0;
@@ -568,35 +536,28 @@ export async function destroy<T extends DestroyRecord>(this: T): Promise<T> {
   return self.freeze();
 }
 
-export async function destroyBang<T extends DestroyRecord & { destroy(): Promise<T | boolean> }>(
-  this: T,
-): Promise<T> {
-  return (await this.destroy()) || (this as any)._raiseRecordNotDestroyed();
+export async function destroyBang<T extends Base>(this: T): Promise<T> {
+  return ((await this.destroy()) as T) || this._raiseRecordNotDestroyed();
 }
 
-interface AttributeSingleSave {
-  save(options?: { validate?: boolean }): Promise<boolean | undefined>;
-  saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
-}
-
-export async function updateAttribute<T extends AttributeSingleSave>(
-  this: T,
+export async function updateAttribute(
+  this: Base,
   name: string,
   value: unknown,
 ): Promise<boolean | undefined> {
   name = String(name);
-  verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
+  verifyReadonlyAttribute.call(this, name);
   (this as unknown as Record<string, unknown>)[name] = value;
   return this.save({ validate: false });
 }
 
-export async function updateAttributeBang<T extends AttributeSingleSave>(
-  this: T,
+export async function updateAttributeBang(
+  this: Base,
   name: string,
   value: unknown,
 ): Promise<true | undefined> {
   name = String(name);
-  verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, name);
+  verifyReadonlyAttribute.call(this, name);
   (this as unknown as Record<string, unknown>)[name] = value;
   return this.saveBang({ validate: false });
 }
@@ -755,73 +716,15 @@ export function becomesBang<
   return became;
 }
 
-interface PersistencePrivateHost {
-  _newRecord: boolean;
-  _destroyed: boolean;
-  _previouslyNewRecord: boolean;
-  _readonly?: boolean;
-  attribute(attrName: string): unknown;
-  _inMemoryQueryConstraintsHash(): Record<string, unknown>;
-  readAttribute(name: string): unknown;
-  writeAttribute(name: string, value: unknown): void;
-  isNewRecord(): boolean;
-  isDestroyed(): boolean;
-  id: unknown;
-  idInDatabase: unknown;
-  attributeInDatabase(col: string): unknown;
-  _primaryKey?: string | string[] | null;
-  _associationCache?: Map<
-    string,
-    { owner?: { isStrictLoading?(): boolean; isStrictLoadingNPlusOneOnly?(): boolean } } | null
-  >;
-  constructor: {
-    name: string;
-    primaryKey: string | string[];
-    currentScope?: unknown | (() => unknown);
-    defaultScoped(): { whereClause: { isEmpty(): boolean; ast: unknown } };
-    isReadonlyAttribute?(name: string): boolean;
-    withConnection?(fn: (conn: unknown) => Promise<void>): Promise<void>;
-    connection: { delete(arel: unknown, name?: string | null, binds?: unknown[]): Promise<number> };
-  };
-}
-
-type PersistenceInternalHost = PersistencePrivateHost & {
-  _readAttribute(name: string): unknown;
-  _writeAttribute(name: string, val: unknown): void;
-  _triggerUpdateCallback?: boolean | null;
-  _attributes?: { keys?(): Iterable<string> };
-  currentTimeFromProperTimezone(): Promise<RubyTime>;
-  constructor: PersistencePrivateHost["constructor"] & {
-    columnNames?(): string[];
-    _counterCacheColumns: string[];
-  };
-};
-
-type PersistenceInstanceChainHost = {
-  constructor: any;
-  _newRecord: boolean;
-  _previouslyNewRecord: boolean;
-  _attributes: any;
-  attributeNames(): string[];
-  readAttribute(name: string): unknown;
-  isWillSaveChangeToAttribute(name: string): boolean;
-  _readAttribute(name: string): unknown;
-  _writeAttribute(name: string, value: unknown): void;
-  typeForAttribute(name: string): { deserialize(value: unknown): unknown };
-  attributesForCreate(attributeNames: string[]): string[];
-  attributesForUpdate(attributeNames: string[]): string[];
-  attributesWithValues(attributeNames: string[]): Record<string, unknown>;
-};
-
 /** @internal */
-export function initInternals(this: PersistencePrivateHost): void {
+export function initInternals(this: Base): void {
   Persistence.superMethod(this, "initInternals")!();
-  (this as any)._triggerDestroyCallback = (this as any)._triggerUpdateCallback = null;
+  this._triggerDestroyCallback = this._triggerUpdateCallback = null;
   this._previouslyNewRecord = false;
 }
 
 /** @internal */
-export function strictLoadedAssociations(this: PersistencePrivateHost): string[] {
+export function strictLoadedAssociations(this: Base): string[] {
   return [...(this._associationCache ?? [])]
     .filter(
       ([, assoc]) =>
@@ -832,10 +735,10 @@ export function strictLoadedAssociations(this: PersistencePrivateHost): string[]
 
 /** @internal */
 export function _findRecord(
-  this: PersistencePrivateHost & { constructor: any },
+  this: Base,
   options?: { lock?: boolean | string; allQueries?: boolean | null },
 ): Promise<unknown> {
-  const ctor = this.constructor;
+  const ctor = this.constructor as typeof Base;
   const preloads = strictLoadedAssociations.call(this);
   let scope = ctor.all({ allQueries: options?.allQueries ?? null });
   if (preloads.length > 0) scope = scope.preload(...preloads);
@@ -844,70 +747,65 @@ export function _findRecord(
 }
 
 /** @internal */
-export function _inMemoryQueryConstraintsHash(
-  this: PersistencePrivateHost,
-): Record<string, unknown> {
-  if (queryConstraintsList.call(this.constructor as any) == null) {
+export function _inMemoryQueryConstraintsHash(this: Base): Record<string, unknown> {
+  if (queryConstraintsList.call(this.constructor as typeof Base) == null) {
     return { [this._primaryKey as string]: this.id };
   } else {
-    return indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
+    return indexWith(queryConstraintsList.call(this.constructor as typeof Base)!, (columnName) =>
       this.attribute(columnName),
     );
   }
 }
 
 /** @internal */
-export function isApplyScoping(
-  this: PersistencePrivateHost,
-  options?: { unscoped?: boolean } | null,
-): unknown {
+export function isApplyScoping(this: Base, options?: { unscoped?: boolean } | null): unknown {
   return (
     !(options && options.unscoped) &&
-    (isDefaultScopes.call(this.constructor as any, { allQueries: true }) ||
-      (this.constructor as any).globalCurrentScope())
+    (isDefaultScopes.call(this.constructor as typeof Base, { allQueries: true }) ||
+      (this.constructor as typeof Base).globalCurrentScope())
   );
 }
 
 /** @internal */
-export function _queryConstraintsHash(this: PersistencePrivateHost): Record<string, unknown> {
-  if (queryConstraintsList.call(this.constructor as any) == null) {
+export function _queryConstraintsHash(this: Base): Record<string, unknown> {
+  if (queryConstraintsList.call(this.constructor as typeof Base) == null) {
     return { [this._primaryKey as string]: this.idInDatabase };
   } else {
-    return indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
+    return indexWith(queryConstraintsList.call(this.constructor as typeof Base)!, (columnName) =>
       this.attributeInDatabase(columnName),
     );
   }
 }
 
 /** @internal */
-export function destroyAssociations(this: PersistencePrivateHost): void {}
+export function destroyAssociations(this: Base): void {}
 
 /** @internal */
-export function destroyRow(this: PersistencePrivateHost): Promise<number> {
+export function destroyRow(this: Base): Promise<number> {
   return _deleteRow.call(this);
 }
 
 /** @internal */
-export function _deleteRow(this: PersistencePrivateHost): Promise<number> {
-  return (this.constructor as any)._deleteRecord((this as any)._queryConstraintsHash());
+export function _deleteRow(this: Base): Promise<number> {
+  return (this.constructor as typeof Base)._deleteRecord(this._queryConstraintsHash());
 }
 
 export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   const { time = null } = extractOptionsBang(names as unknown[]) as TouchOptions;
-  if (!this.isPersisted()) (this as any)._raiseRecordNotTouchedError();
-  if (this.isReadonly()) (this as any)._raiseReadonlyRecordError();
+  if (!this.isPersisted()) this._raiseRecordNotTouchedError();
+  if (this.isReadonly()) this._raiseReadonlyRecordError();
 
   let attributeNames: string[] = (this as any).timestampAttributesForUpdateInModel();
   attributeNames = union(attributeNames, names as string[]).map((name) => {
     name = String(name);
     name = (this.constructor as typeof Base).attributeAliases[name] || name;
-    (this as any).verifyReadonlyAttribute(name);
+    this.verifyReadonlyAttribute(name);
     return name;
   });
 
   if (attributeNames.length > 0) {
-    const affectedRows = await (this as any)._touchRow(attributeNames, time);
-    return ((this as any)._triggerUpdateCallback = affectedRows === 1);
+    const affectedRows = await this._touchRow(attributeNames, time);
+    return (this._triggerUpdateCallback = affectedRows === 1);
   } else {
     return true;
   }
@@ -915,43 +813,33 @@ export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
 
 /** @internal */
 export async function _touchRow(
-  this: PersistenceInternalHost,
+  this: Base,
   attributeNames: string[],
   time?: RubyTime | null,
 ): Promise<number> {
-  time ||= await this.currentTimeFromProperTimezone();
+  time ||= await (this as any).currentTimeFromProperTimezone();
 
   for (const attrName of attributeNames) {
     this._writeAttribute(attrName, time);
   }
 
-  return (this as any)._updateRow(attributeNames, "touch");
+  return this._updateRow(attributeNames, "touch");
 }
 
 /** @internal */
 export function _updateRow(
-  this: PersistencePrivateHost,
+  this: Base,
   attributeNames: string[],
   _attemptedAction = "update",
 ): Promise<number> {
-  return (this.constructor as any)._updateRecord(
-    attributesWithValues.call(this as any, attributeNames),
-    (this as any)._queryConstraintsHash(),
+  return (this.constructor as typeof Base)._updateRecord(
+    attributesWithValues.call(this, attributeNames),
+    this._queryConstraintsHash(),
   );
 }
 
 /** @internal */
-export async function createOrUpdate(
-  this: PersistenceInstanceChainHost & {
-    isReadonly(): boolean;
-    isDestroyed(): boolean;
-    isNewRecord(): boolean;
-    _raiseReadonlyRecordError(): never;
-    _createRecord(attributeNames?: string[], block?: (record: any) => void): Promise<unknown>;
-    _updateRecord(attributeNames?: string[], block?: (record: any) => void): Promise<unknown>;
-  },
-  block?: (record: any) => void,
-): Promise<boolean> {
+export async function createOrUpdate(this: Base, block?: (record: any) => void): Promise<boolean> {
   if (this.isReadonly()) this._raiseReadonlyRecordError();
   if (this.isDestroyed()) return false;
   const result = this.isNewRecord()
@@ -974,7 +862,7 @@ export const Persistence = new Module((mod) => {
     "_updateRecord",
     /** @internal */
     async function _updateRecord(
-      this: PersistenceInstanceChainHost,
+      this: Base,
       attributeNames?: string[],
       block?: (record: any) => void,
     ): Promise<number> {
@@ -983,10 +871,10 @@ export const Persistence = new Module((mod) => {
       let affectedRows: number;
       if (attributeNames.length === 0) {
         affectedRows = 0;
-        (this as any)._triggerUpdateCallback = true;
+        this._triggerUpdateCallback = true;
       } else {
-        affectedRows = await (this as any)._updateRow(attributeNames);
-        (this as any)._triggerUpdateCallback = affectedRows === 1;
+        affectedRows = await this._updateRow(attributeNames);
+        this._triggerUpdateCallback = affectedRows === 1;
       }
 
       this._previouslyNewRecord = false;
@@ -1002,17 +890,19 @@ export const Persistence = new Module((mod) => {
 
 /** @internal */
 export async function _createRecord(
-  this: PersistenceInstanceChainHost,
+  this: Base,
   attributeNames: string[] = this.attributeNames(),
   block?: (record: any) => void,
 ): Promise<unknown> {
   attributeNames = this.attributesForCreate(attributeNames);
 
-  await this.constructor.withConnection(async (connection: any) => {
-    const returningColumns = await this.constructor._returningColumnsForInsert(connection);
+  await (this.constructor as typeof Base).withConnection(async (connection: any) => {
+    const returningColumns = await (this.constructor as typeof Base)._returningColumnsForInsert(
+      connection,
+    );
 
     const returningValues = (await _insertRecord.call(
-      this.constructor,
+      this.constructor as typeof Base,
       connection,
       this.attributesWithValues(attributeNames),
       returningColumns,
@@ -1023,7 +913,7 @@ export async function _createRecord(
         if (!rtest(this._readAttribute(column as string))) {
           this._writeAttribute(
             column as string,
-            this.typeForAttribute(column as string).deserialize(value),
+            this.typeForAttribute(column as string)!.deserialize(value),
           );
         }
       }
@@ -1035,30 +925,30 @@ export async function _createRecord(
 
   if (block) block(this);
 
-  return (this as any).id;
+  return this.id;
 }
 
 /** @internal */
-export function verifyReadonlyAttribute(this: PersistencePrivateHost, name: string): void {
-  if ((this.constructor as any).isReadonlyAttribute(name)) {
+export function verifyReadonlyAttribute(this: Base, name: string): void {
+  if ((this.constructor as typeof Base).isReadonlyAttribute(name)) {
     throw new ActiveRecordError(`${name} is marked as readonly`);
   }
 }
 
 /** @internal */
-export function _raiseRecordNotDestroyed(this: PersistencePrivateHost): never {
-  (this as any)._associationDestroyException ??= null;
-  const key = this.constructor.primaryKey;
+export function _raiseRecordNotDestroyed(this: Base): never {
+  this._associationDestroyException ??= null;
+  const key = (this.constructor as typeof Base).primaryKey;
   try {
     throw (
-      (this as any)._associationDestroyException ??
+      this._associationDestroyException ??
       new RecordNotDestroyed(
         `Failed to destroy ${this.constructor.name} with ${rbObjAsString(key)}=${rbObjAsString(this.id)}`,
-        this as unknown as object,
+        this,
       )
     );
   } finally {
-    (this as any)._associationDestroyException = null;
+    this._associationDestroyException = null;
   }
 }
 
@@ -1092,7 +982,7 @@ export function instantiateInstanceOf(
 ): any {
   const names = keys(attributes as Record<string, unknown>);
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
-  const record = klass.allocate() as any;
+  const record = klass.allocate();
   for (const name of names) {
     if (!basicObjRespondTo(record, name, false)) {
       (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
@@ -1107,12 +997,7 @@ function discriminateClassForRecord<T>(klass: T, _record: Record<string, unknown
 }
 
 /** @internal */
-export function buildDefaultConstraint(this: {
-  defaultScopes?: { allQueries: boolean; scope: (rel: any) => any }[];
-  defaultScoped(options: { allQueries?: boolean | null }): {
-    whereClause: { isEmpty(): boolean; ast: unknown };
-  };
-}): unknown {
+export function buildDefaultConstraint(this: typeof Base): unknown {
   if (!this.defaultScopes?.some((s) => s.allQueries)) return undefined;
   const defaultWhereClause = this.defaultScoped({ allQueries: true }).whereClause;
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;

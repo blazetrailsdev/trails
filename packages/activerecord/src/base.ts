@@ -1,5 +1,6 @@
 import {
   type Hash,
+  type Included,
   block as rbBlock,
   fetch,
   hasKey,
@@ -663,9 +664,9 @@ export class Base extends Model {
 
   /** @internal */
   static hookAttributeType(name: string, type: ValueType): ValueType {
-    const tzType = tzHookAttributeType.call(this as any, name, type);
+    const tzType = tzHookAttributeType.call(this, name, type);
     return LockingOptimistic.hookAttributeType.call(
-      this as any,
+      this,
       (attribute, castType) =>
         AttributeRegistration.ClassMethods.hookAttributeType.call(this as any, attribute, castType),
       name,
@@ -674,8 +675,8 @@ export class Base extends Model {
   }
 
   static typeForAttribute(name: string, block?: () => ValueType): ValueType | null {
-    (ModelSchema.loadSchema as any).call(this);
-    const resolved = (this as any).attributeAliases?.[name] ?? name;
+    ModelSchema.loadSchema.call(this);
+    const resolved = this.attributeAliases?.[name] ?? name;
     if (block) {
       return fetch(this.attributeTypes(), resolved, rbBlock(block));
     }
@@ -691,7 +692,7 @@ export class Base extends Model {
   static async loadSchema(this: typeof Base): Promise<void> {
     const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
     if (!Object.hasOwn(this, "_schemaLoadPromise") || !state._schemaLoadPromise) {
-      state._schemaLoadPromise = (ModelSchema.loadSchemaFromAdapter as any).call(this);
+      state._schemaLoadPromise = ModelSchema.loadSchemaFromAdapter.call(this);
     }
     const promise = state._schemaLoadPromise;
     try {
@@ -913,6 +914,10 @@ export class Base extends Model {
   declare static timestampAttributesForUpdateInModel: typeof Timestamp.timestampAttributesForUpdateInModel;
   declare static allTimestampAttributesInModel: typeof Timestamp.allTimestampAttributesInModel;
   declare static currentTimeFromProperTimezone: typeof Timestamp.currentTimeFromProperTimezone;
+  /** @internal */
+  declare static _updateRecord: typeof _Persistence._updateRecord;
+  /** @internal */
+  declare static _deleteRecord: typeof _Persistence._deleteRecord;
   /** @internal */
   declare static timestampAttributesForCreate: typeof Timestamp.timestampAttributesForCreate;
   /** @internal */
@@ -1481,10 +1486,10 @@ export class Base extends Model {
     if (attributes != null) this.assignAttributes(assocPending?.rest ?? attributes);
 
     if (assocPending) {
-      _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
+      _dispatchAssociationAttrs(this, assocPending.assocs);
     }
     if (!allocating) {
-      initBlock?.(this as unknown as Base);
+      initBlock?.(this);
       this._runInitializeCallbacks();
     }
   }
@@ -1553,7 +1558,7 @@ export class Base extends Model {
   /** @internal */
   private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
     const ctor = this.constructor as typeof Base;
-    if (typeof (this as any).association !== "function") return;
+    if (typeof this.association !== "function") return;
     const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
     if (!opaque && sources.length === 0) return;
     const expanded = opaque ? sources : expandCallbackSourcesWithHelpers(sources, ctor, this);
@@ -1562,7 +1567,7 @@ export class Base extends Model {
       if (!opaque && !referencesAssociationName(expanded, ref.name)) continue;
       let assoc: any;
       try {
-        assoc = (this as any).association(ref.name);
+        assoc = this.association(ref.name);
         if (!assoc || assoc.isLoaded()) continue;
         if (useSavepoint) {
           await _transaction(ctor, () => assoc.loadTarget(), { requiresNew: true });
@@ -1665,7 +1670,7 @@ export class Base extends Model {
   }
 
   static get columnDefaults(): Record<string, unknown> {
-    return ModelSchema.columnDefaults.call(this as any);
+    return ModelSchema.columnDefaults.call(this);
   }
 
   declare static strictLoadingByDefault: boolean;
@@ -1901,7 +1906,46 @@ rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
 rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
+export interface Base
+  extends
+    AutosaveAssociation,
+    JSONSerializer,
+    AMDirty,
+    Included<
+      Pick<
+        typeof _Persistence,
+        | "strictLoadedAssociations"
+        | "_findRecord"
+        | "_inMemoryQueryConstraintsHash"
+        | "isApplyScoping"
+        | "destroyAssociations"
+        | "destroyRow"
+        | "_deleteRow"
+        | "_touchRow"
+        | "_updateRow"
+        | "_queryConstraintsHash"
+        | "verifyReadonlyAttribute"
+        | "_raiseRecordNotDestroyed"
+        | "_raiseReadonlyRecordError"
+        | "_raiseRecordNotTouchedError"
+      >
+    >,
+    Included<Pick<typeof _Read, "attribute">>,
+    Included<
+      Pick<
+        typeof import("./attribute-methods.js"),
+        "attributesWithValues" | "attributesForCreate" | "attributesForUpdate" | "_hasAttribute"
+      >
+    >,
+    Pick<_PrimaryKey, "isPrimaryKeyValuesPresent"> {
+  /** @internal */
+  _primaryKey?: string | string[];
+  /** @internal */
+  _triggerUpdateCallback: boolean | null;
+  /** @internal */
+  _triggerDestroyCallback: boolean | null;
+  /** @internal */
+  _associationDestroyException?: unknown;
   normalizeAttribute(name: string): void;
   /** @internal */
   normalizeChangedInPlaceAttributes(): void;
@@ -2404,9 +2448,7 @@ for (const [name, fn] of [
     "createOrUpdate",
     function (this: Base, touch = true, block?: (record: Base) => void): Promise<boolean> {
       return Timestamp.createOrUpdate.call(this as any, touch, () =>
-        callbacksCreateOrUpdate.call(this, () =>
-          _Persistence.createOrUpdate.call(this as any, block),
-        ),
+        callbacksCreateOrUpdate.call(this, () => _Persistence.createOrUpdate.call(this, block)),
       );
     },
   ],
@@ -2427,7 +2469,7 @@ for (const [name, fn] of [
     function (this: Base): Promise<unknown> {
       return _Transactions.destroy.call(this, async () => {
         await this["_preloadBelongsToForDestroyCallbacks"]();
-        return callbacksDestroy.call(this, () => _Persistence.destroy.call(this as any));
+        return callbacksDestroy.call(this, () => _Persistence.destroy.call(this));
       });
     },
   ],
@@ -2444,7 +2486,7 @@ for (const [name, fn] of [
             dirtyNames,
             dirtyTime,
             (lockNames: string[], lockTime: unknown) =>
-              _Persistence._touchRow.call(this as any, lockNames, lockTime as any),
+              _Persistence._touchRow.call(this, lockNames, lockTime as any),
           ) as Promise<number>,
       );
     },
@@ -2454,9 +2496,7 @@ for (const [name, fn] of [
     function (this: Base): Promise<number> {
       return Promise.resolve(
         LockingOptimistic.destroyRow.call(this as any, () =>
-          CounterCache.destroyRow.call(this as any, () =>
-            _Persistence.destroyRow.call(this as any),
-          ),
+          CounterCache.destroyRow.call(this as any, () => _Persistence.destroyRow.call(this)),
         ),
       );
     },
@@ -2465,7 +2505,7 @@ for (const [name, fn] of [
     "_queryConstraintsHash",
     function (this: Base): Record<string, unknown> {
       return LockingOptimistic._queryConstraintsHash.call(this as any, () =>
-        _Persistence._queryConstraintsHash.call(this as any),
+        _Persistence._queryConstraintsHash.call(this),
       );
     },
   ],
@@ -2476,8 +2516,7 @@ for (const [name, fn] of [
         this as any,
         attributeNames,
         attemptedAction,
-        (names: string[], action: string) =>
-          _Persistence._updateRow.call(this as any, names, action),
+        (names: string[], action: string) => _Persistence._updateRow.call(this, names, action),
       );
     },
   ],
