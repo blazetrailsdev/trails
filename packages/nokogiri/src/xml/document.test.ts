@@ -90,7 +90,9 @@ describe("Nokogiri::XML::Searchable", () => {
     expect(doc.css("[href*='e.com']").size).toBe(1);
     expect(doc.css("[class~=one]").size).toBe(1);
     expect(doc.css("[lang|=en]").size).toBe(1);
-    expect(doc.css("root > [id!=x]").size).toBe(3);
+    expect(doc.css("root > [id!=x]").size).toBe(0);
+    expect(XmlDocument.parse(`<r><a k="1"/><a k="2"/><a/></r>`).css("[k!='1']").size).toBe(1);
+    expect(XmlDocument.parse(`<r><a k='x"y&apos;z'/></r>`).css(`[k='x"y\\'z']`).size).toBe(1);
   });
 
   it("css pseudo classes", () => {

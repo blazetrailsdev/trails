@@ -164,24 +164,27 @@ function xpathFromSteps(steps: [string, Compound][]): string {
 
 /** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
 function xpathFromCompound(c: Compound): string {
-  const literal = (value: string) => (value.includes("'") ? `"${value}"` : `'${value}'`);
+  const literal = (value: string) => {
+    if (!value.includes("'")) return `'${value}'`;
+    if (!value.includes('"')) return `"${value}"`;
+    return `concat("${value.split('"').join(`",'"',"`)}","")`;
+  };
+  const cssClass = (hay: string, needle: string) =>
+    `contains(concat(' ',normalize-space(${hay}),' '),' ${needle} ')`;
   const predicates = [
     ...c.ids.map((id) => `@id=${literal(id)}`),
-    ...c.classes.map(
-      (klass) => `contains(concat(' ',normalize-space(@class),' '),${literal(` ${klass} `)})`,
-    ),
+    ...c.classes.map((klass) => cssClass("@class", klass)),
     ...c.attrs.map(([name, op, value]) => {
+      const attribute = `@${name}`;
       const v = literal(value);
-      if (op === null) return `@${name}`;
-      if (op === "=") return `@${name}=${v}`;
-      if (op === "!=") return `not(@${name}=${v})`;
-      if (op === "~=")
-        return `contains(concat(' ',normalize-space(@${name}),' '),${literal(` ${value} `)})`;
-      if (op === "^=") return `starts-with(@${name},${v})`;
-      if (op === "$=")
-        return `substring(@${name},string-length(@${name})-string-length(${v})+1)=${v}`;
-      if (op === "*=") return `contains(@${name},${v})`;
-      return `@${name}=${v} or starts-with(@${name},${literal(`${value}-`)})`;
+      if (op === null) return attribute;
+      if (op === "=") return `${attribute}=${v}`;
+      if (op === "!=") return `${attribute}!=${v}`;
+      if (op === "*=") return `contains(${attribute},${v})`;
+      if (op === "^=") return `starts-with(${attribute},${v})`;
+      if (op === "|=") return `${attribute}=${v} or starts-with(${attribute},concat(${v},'-'))`;
+      if (op === "~=") return cssClass(attribute, value);
+      return `substring(${attribute},string-length(${attribute})-string-length(${v})+1,string-length(${v}))=${v}`;
     }),
     ...c.pseudos.map(([name, args]) => {
       if (name === "root") return "not(parent::*)";
