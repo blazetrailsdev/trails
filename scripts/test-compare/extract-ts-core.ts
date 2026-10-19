@@ -158,11 +158,15 @@ function helperCalleeArguments(call: ts.CallExpression): readonly ts.Expression[
  * `mustBe(obj, "isEmpty")` / `wontBe(obj, "isEmpty")` with no third operand are
  * minitest's `assert_predicate` / `refute_predicate`, the twin of the Ruby
  * extractor's PREDICATE_FORMS (`assert_operator`'s `UNDEFINED == o2` arm,
- * vendor/minitest/v5.27.0/lib/minitest/assertions.rb:315-316).
+ * vendor/minitest/v5.27.0/lib/minitest/assertions.rb:315-316); `"isNil"` is its
+ * NIL_PREDICATE_FORMS `assert_nil` / `refute_nil`.
  */
 function predicateFormOf(name: string, args: readonly ts.Expression[]): string | null {
   if (args.length !== 2) return null;
-  return name === "mustBe" ? "assertPredicate" : name === "wontBe" ? "refutePredicate" : null;
+  const nilPred = ts.isStringLiteralLike(args[1]) && args[1].text === "isNil";
+  if (name === "mustBe") return nilPred ? "assertNil" : "assertPredicate";
+  if (name === "wontBe") return nilPred ? "refuteNil" : "refutePredicate";
+  return null;
 }
 
 function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string | null {
