@@ -47,7 +47,9 @@ export class PublicExceptions {
   }
 
   private render(status: number, contentType: MimeType | undefined, body: ErrorBody): RackResponse {
-    const format = contentType ? camelize(`to_${contentType.toSym()!.slice(1)}`, false) : null;
+    const format = contentType
+      ? camelize(`to_${contentType.toSym()?.slice(1) ?? ""}`, false)
+      : null;
     if (format && rbObjRespondTo(body, format)) {
       return this.renderFormat(status, contentType!, rbFPublicSend(body, format) as string);
     } else {
