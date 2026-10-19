@@ -1025,6 +1025,24 @@ describe("extend", () => {
     });
     expect(Named.name).toBe("class body");
   });
+
+  it("reaches a class helper's inherited instance methods through a plain module", () => {
+    class Base {
+      greet(): string {
+        return "inherited";
+      }
+    }
+    class Helper extends Base {
+      own(): string {
+        return "own";
+      }
+    }
+    const mod = {};
+    include(mod, Helper);
+    const obj = extend({}, mod) as { greet(): string; own(): string };
+    expect(obj.own()).toBe("own");
+    expect(obj.greet()).toBe("inherited");
+  });
 });
 
 describe("isModuleIncluded", () => {

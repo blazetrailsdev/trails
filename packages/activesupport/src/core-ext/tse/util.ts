@@ -1,5 +1,5 @@
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
-import { Module, NotImplementedError, isEmpty } from "@blazetrails/ruby-compat";
+import { NotImplementedError, isEmpty } from "@blazetrails/ruby-compat";
 import { Unicode } from "../../multibyte/unicode.js";
 
 const HTML_ESCAPE: Record<string, string> = {
@@ -179,9 +179,5 @@ export function tokenize(source: string): [string, string][] {
   return tokens;
 }
 
-export const Util = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { htmlEscape, h, urlEncode, unwrappedHtmlEscape, htmlEscapeOnce });
-    Object.assign(m, { jsonEscape, xmlNameEscape });
-  });
-});
+export const Util = { htmlEscape, h, urlEncode, unwrappedHtmlEscape, htmlEscapeOnce };
+Object.assign(Util, { jsonEscape, xmlNameEscape });

@@ -2067,9 +2067,16 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
         extendObject(klass, nested);
         continue;
       }
-      const { constructor: _constructor, ...methods } = Object.getOwnPropertyDescriptors(
-        (nested as AnyClass).prototype,
-      );
+      const methods: PropertyDescriptorMap = {};
+      for (
+        let link: object | null = (nested as AnyClass).prototype;
+        link && link !== Object.prototype;
+        link = Object.getPrototypeOf(link) as object | null
+      ) {
+        for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(link))) {
+          if (key !== "constructor" && !Object.hasOwn(methods, key)) methods[key] = descriptor;
+        }
+      }
       for (const descriptor of Object.values(methods)) descriptor.enumerable = true;
       const table = Object.defineProperties({}, methods);
       extendObject(klass, table);
