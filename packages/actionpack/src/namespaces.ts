@@ -75,6 +75,7 @@ export const ActionDispatch = {
   TestResponse: typeof TestResponse;
   Integration: { name: string; Session: typeof IntegrationSession };
   Session: typeof Session;
+  Http: { name: string };
   testApp: unknown;
   deprecator: () => Deprecation;
 };
@@ -103,6 +104,8 @@ Routing.eagerAutoload(() => {
 });
 Routing.autoload("PolymorphicRoutes");
 ActionDispatch.Routing = Routing;
+
+ActionDispatch.Http = { name: "ActionDispatch::Http" };
 
 export const Session = { name: "ActionDispatch::Session", loadPath } as AutoloadModule & {
   AbstractStore: typeof AbstractStore;

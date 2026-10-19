@@ -2,7 +2,8 @@ import { ArrayInquirer, included, mattrAccessor } from "@blazetrails/activesuppo
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActionDispatch } from "../../namespaces.js";
 
 /** @internal */
 const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
@@ -191,3 +192,6 @@ export function formatFromPathExtension(this: MimeNegotiationHost): MimeType | u
   if (match) return MimeType.lookupByExtension(match[1]);
   return undefined;
 }
+
+rbModConstSet(ActionDispatch.Http, "MimeNegotiation", MimeNegotiation);
+rbModConstSet(MimeNegotiation, "InvalidType", InvalidType);
