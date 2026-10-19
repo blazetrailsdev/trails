@@ -802,12 +802,12 @@ export class Lowerer {
       if (allNew) names.forEach((nm) => nm && this.declareLocal(ctx, nm));
       else names.forEach((nm) => nm && this.letFor(this.nest(ctx), nm));
       const line = allNew
-        ? `let [${pat}] = ${this.rc(ctx, "rbAryEnsure")}(${value});`
-        : `[${pat}] = ${this.rc(ctx, "rbAryEnsure")}(${value});`;
+        ? `let [${pat}] = ${this.aryEnsure(value, ctx)};`
+        : `[${pat}] = ${this.aryEnsure(value, ctx)};`;
       return tail ? [line, `return ${value};`] : [line];
     }
     const tmp = this.tmp(ctx, "values");
-    const out = [`const ${tmp} = ${this.rc(ctx, "rbAryEnsure")}(${value});`];
+    const out = [`const ${tmp} = ${this.aryEnsure(value, ctx)};`];
     targets.forEach((t, i) => {
       if (t.k === "splat") {
         if (t.value) out.push(...this.assignTo(t.value, `${tmp}.slice(${i})`, ctx));
@@ -933,7 +933,7 @@ export class Lowerer {
       const recv = this.expr(n.recv, ctx);
       if (n.name === "each_pair" || (n.name === "each" && params.length === 2)) {
         params.forEach((p) => p.name && inner.scope.locals.add(p.name));
-        head = `for (const [${params.map((p) => jsIdent(p.name ?? "_")).join(", ")}] of ${this.entries(recv, ctx)})`;
+        head = `for (const [${params.map((p) => jsIdent(p.name ?? "_")).join(", ")}] of ${this.entries(recv, ctx, n.recv)})`;
       } else if (n.name === "each_value") {
         params.forEach((p) => p.name && inner.scope.locals.add(p.name));
         head = `for (const ${jsIdent(params[0]?.name ?? "_")} of Object.values(${recv}))`;
@@ -986,6 +986,31 @@ export class Lowerer {
         `}`,
       ];
       return tail ? [...out, `return ${recv};`] : out;
+    }
+    // `n.times { |i| … }` (numeric.c int_dotimes) in statement position: a
+    // counted loop, whose body may await in order.
+    if (
+      n.recv &&
+      n.name === "times" &&
+      n.args.length === 0 &&
+      n.block?.k === "block" &&
+      n.block.params.length <= 1 &&
+      (!n.block.params[0] || (n.block.params[0].kind === "req" && n.block.params[0].name)) &&
+      !tail &&
+      !this.resolver.isGemReceiver(n.recv, ctx, this)
+    ) {
+      const p0: string | undefined = n.block.params[0]?.name;
+      const i = p0 ? jsIdent(p0) : "_i";
+      const inner = this.child(ctx, {
+        scope: { locals: new Set(p0 ? [p0] : []), parent: ctx.scope },
+        inLoop: true,
+        nested: false,
+      });
+      return [
+        `for (let ${i} = 0, _n = ${this.expr(n.recv, ctx)}; ${i} < _n; ${i}++) {`,
+        ...indent(this.block(this.seqBody(n.block.body), inner, false)),
+        `}`,
+      ];
     }
     if (n.recv === null && n.name === "loop" && n.block?.k === "block") {
       const body = this.block(this.seqBody(n.block.body), this.child(ctx, { inLoop: true }), false);
@@ -1118,8 +1143,33 @@ export class Lowerer {
     return `Object.hasOwn(${r}, ${key})`;
   }
 
-  entries(recv: string, ctx: Ctx): string {
-    return `${this.rc(ctx, "rbEntries")}(${recv})`;
+  /** `f` applied to `r` evaluated once: directly for a plain reference, else through an arrow. */
+  withOnce(r: string, f: (x: string) => string): string {
+    return /^[\w$]+(\.[\w$]+)*$/.test(r) ? f(r) : `((x: any) => ${f("x")})(${r})`;
+  }
+
+  /** A Hash's `[key, value]` pairs (`Hash#each`), a Map's entries, an Array itself. */
+  entries(recv: string, ctx: Ctx, node?: N): string {
+    const t = node ? this.typeOf(node, ctx) : null;
+    if (t?.k === "array") return recv;
+    if (t?.k === "hash" && !t.map) return `Object.entries(${recv})`;
+    return this.withOnce(
+      recv,
+      (x) =>
+        `(${x} instanceof globalThis.Map ? [...${x}] : Array.isArray(${x}) ? ${x} : Object.entries(${x} ?? {}))`,
+    );
+  }
+
+  /**
+   * Splat / multiple assignment's array conversion (vm_insnhelper.c
+   * vm_expandarray): nil is empty, an Array (or `to_ary`) itself, else `[x]`.
+   */
+  aryEnsure(value: string, ctx: Ctx): string {
+    const check = this.rc(ctx, "rbCheckArrayType");
+    return this.withOnce(
+      value,
+      (x) => `(${x} == null ? [] : ((${check}(${x}) as any[] | null) ?? [${x}]))`,
+    );
   }
 
   iter(node: N, ctx: Ctx, pre?: string): string {
@@ -1161,7 +1211,12 @@ export class Lowerer {
     // instantiated, an instance raised as is (eval.c `rb_make_exception`).
     if (a[0].k === "lvar" && ctx.rescued === jsIdent(a[0].name))
       return `throw ${this.expr(a[0], ctx)};`;
-    return `throw ${this.rc(ctx, "rbMakeException")}(${a.map((x: N) => this.argExpr(x, ctx)).join(", ")});`;
+    // eval.c rb_make_exception: a String is a RuntimeError's message, a class is
+    // instantiated (Exception.exception is `new`), an instance is raised as is.
+    const xs = a.map((x: N) => this.argExpr(x, ctx));
+    const rest = xs.slice(1).join(", ");
+    const RuntimeError = this.rc(ctx, "RuntimeError");
+    return `throw ${this.withOnce(xs[0], (x) => `(typeof ${x} === "string" ? new ${RuntimeError}(${x}) : typeof ${x} === "function" ? new ${x}(${rest}) : ${rest ? `${x}.exception(${rest})` : x})`)};`;
   }
 
   // ───────────────────────────── expressions ─────────────────────────────
@@ -1283,7 +1338,7 @@ export class Lowerer {
     if (a.k === "splat") {
       const t = this.typeOf(a.value, ctx);
       if (t?.k === "array") return `...${this.expr(a.value, ctx)}`;
-      return `...${this.rc(ctx, "rbAryEnsure")}(${this.expr(a.value, ctx)})`;
+      return `...${this.aryEnsure(this.expr(a.value, ctx), ctx)}`;
     }
     if (a.k === "kwargs") return this.kwargs(a.pairs, ctx);
     if (a.k === "fwdargs") return `...args`;
@@ -1482,7 +1537,7 @@ export class Lowerer {
           return jsIdent(p.name!);
         });
         pro.push(
-          `const { ${parts.join(", ")} }: any = ${this.rc(ctx, "rbExtractKeywords")}(${restName});`,
+          `const { ${parts.join(", ")} }: any = Object.getPrototypeOf(${restName}.at(-1) ?? 0) === Object.prototype ? ${restName}.pop() : {};`,
         );
       }
       const posts = after.filter((p) => p.kind === "req");
@@ -2796,7 +2851,7 @@ export class Lowerer {
         // Where Symbols are colon strings, a class known only at run time
         // (`argument.is_a?(klass)`) may be Symbol: `rbIsA` answers `isSymbol` for it.
         if (ctx.f.symbolColon && GEM.gem === "activejob" && name !== "instance_of?")
-          return `${rc("rbIsA")}(${R}, ${argList()})`;
+          return `((x: any, k: any) => k === ${rc("rbCSymbol")} ? ${rc("isSymbol")}(x) : k === ${rc("rbCString")} && typeof x === "string" ? !${rc("isSymbol")}(x) : ${rc("rbObjIsKindOf")}(x, k))(${R}, ${argList()})`;
         return `${rc("rbObjIsKindOf")}(${R}, ${argList()})`;
       case "respond_to?":
         // The name asked about is the TS member's (`:permitted?` is `isPermitted`).
@@ -2957,7 +3012,8 @@ export class Lowerer {
           !this.typeOf(recvNode, ctx)
         ) {
           const unit = name.endsWith("s") ? name : name + "s";
-          return `${rc("rbNumDuration")}(${R}, ${JSON.stringify(unit)})`;
+          const D = this.as(ctx, "Duration");
+          return `${D}.${unit}(${this.withOnce(r, (x) => `(${x} instanceof ${D} ? (${x} as any).value : ${x})`)})`;
         }
         break;
       // `"59.123456789".to_r` on a decimal literal: the Rational String#to_r
@@ -3242,7 +3298,7 @@ export class Lowerer {
       return this.arrow(n.block.params, n.block.body, ctx);
 
     // ── `Object.new`: an instance of Ruby's Object. A plain JS object is a Hash
-    // in trails, so it is the shim's `RubyObject` (named `Object`).
+    // in trails, so it is an instance of a class named `Object`.
     if (
       recvNode?.k === "const" &&
       recvNode.path.filter((x: string) => x).join("::") === "Object" &&
@@ -3250,7 +3306,7 @@ export class Lowerer {
       n.args.length === 0 &&
       !n.block
     )
-      return `new ${rc("RubyObject")}()`;
+      return `new (class Object {})()`;
 
     // ── `Class.new(Super) do … end` → a class expression; the block runs as its static block.
     if (
@@ -4082,8 +4138,21 @@ export class Lowerer {
         // A JS string cannot be appended to in place (CLAUDE.md "Ruby Strings are JS
         // string primitives"): a local is reassigned the result, which for an
         // Array is the same receiver.
-        if (n.recv.k === "lvar") return `(${r} = ${rc("rbAppend")}(${r}, ${a[0]}))`;
-        return `${rc("rbAppend")}(${r}, ${a[0]})`;
+        {
+          // Array#<< / Set#<< / String#<< (array.c rb_ary_push, set.rb add,
+          // string.c rb_str_concat) append in place and answer the receiver; any
+          // other receiver answers its own `<<` (trails spells it `append`).
+          const t = this.typeOf(n.recv, ctx);
+          const b = needsParens(a[0]) ? `(${a[0]})` : a[0];
+          const app = (x: string) =>
+            t?.k === "array"
+              ? `(${x}.push(${b}), ${x})`
+              : t?.k === "prim" && t.name === "string"
+                ? `${x} + ${b}`
+                : `(typeof ${x} === "string" ? ${x} + ${b} : Array.isArray(${x}) ? (${x}.push(${b}), ${x}) : ${x} instanceof globalThis.Set ? ${x}.add(${b}) : ${x}.append(${b}))`;
+          if (n.recv.k === "lvar") return `(${r} = ${app(r)})`;
+          return this.withOnce(r, app);
+        }
       case "+":
       case "-":
       case "*":
@@ -4203,7 +4272,7 @@ export class Lowerer {
     // A block-less `each_pair` / `each_with_index` answers an Enumerator of
     // pairs (`[key, value]`, `[element, index]`); the pairs are an array here.
     if (!blk && n.args.length === 0) {
-      if (name === "each_pair") return this.entries(r, ctx);
+      if (name === "each_pair") return this.entries(r, ctx, recvNode);
       if (name === "each_with_index") return `Array.from(${r}, (e: any, i: number) => [e, i])`;
     }
     // A block that awaits must run sequentially, as Ruby's iteration does: an
@@ -4231,6 +4300,18 @@ export class Lowerer {
               ctx,
             )
           : f;
+        const native =
+          name === "transform_values" && this.mayBeMap(recvNode, ctx)
+            ? null
+            : asyncEnumBody(name, n.args.length);
+        if (native) {
+          const extra = n.args.map((x: N) => this.argExpr(x, ctx));
+          const xs =
+            this.typeOf(recvNode, ctx)?.k === "array"
+              ? "self"
+              : "(self instanceof globalThis.Map || self instanceof globalThis.Set ? [...self] : Array.isArray(self) ? self : Object.entries(self ?? {}))";
+          return `(await (async (self: any, g: any${extra.map((_, i) => `, a${i}: any`).join("")}) => { const xs: any[] = ${xs}; ${native} })(${[r, g, ...extra].join(", ")}))`;
+        }
         return `(await ${rc("rbAsyncEnum")}(${[r, JSON.stringify(name), ...n.args.map((x: N) => this.argExpr(x, ctx)), g].join(", ")}))`;
       }
     }
@@ -4272,11 +4353,19 @@ export class Lowerer {
           : `((x: any) => ${enumOf("x")})(${r})`;
     switch (name) {
       case "clear":
-        // Reached through a namespace import so the call keeps Ruby's name
-        // (the call gate matches callees by name; `rbClear` cost six rows).
+        // Array#clear / Hash#clear (array.c rb_ary_clear, hash.c rb_hash_clear)
+        // empty the receiver in place and answer it; a Map or Set has its own.
         if (n.args.length === 0 && !blk) {
-          this.resolver.wanted.set("clear", (this.resolver.wanted.get("clear") ?? 0) + 1);
-          return `${this.imp(ctx, "@root/codegen-runtime.js", "*", "CodegenRuntime")}.clear(${r})`;
+          if (recvType?.k === "array") return this.withOnce(r, (x) => `(${x}.length = 0, ${x})`);
+          if (recvType?.k === "hash" && !recvType.map)
+            return this.withOnce(
+              r,
+              (x) => `(Object.keys(${x}).forEach((k) => delete ${x}[k]), ${x})`,
+            );
+          return this.withOnce(
+            r,
+            (x) => `(Array.isArray(${x}) ? (${x}.length = 0) : ${x}.clear(), ${x})`,
+          );
         }
         break;
       case "grep":
@@ -4326,7 +4415,7 @@ export class Lowerer {
             } as Param,
           ];
           const m = n.name === "all?" ? "every" : "some";
-          return `${n.name === "none?" ? "!" : ""}${this.entries(r, ctx)}.${m}(${this.arrow(one, blk.body, ctx)})`;
+          return `${n.name === "none?" ? "!" : ""}${this.entries(r, ctx, recvNode)}.${m}(${this.arrow(one, blk.body, ctx)})`;
         }
         if (n.name === "all?") {
           if (blk) return `${E}${nav}every(${fn()})`;
@@ -4337,7 +4426,7 @@ export class Lowerer {
           break;
         }
         if (blk) return `${E}${nav}some(${fn()})`;
-        if (n.args.length === 0) return `${rc("isAny")}(${r})`;
+        if (n.args.length === 0) return `${E}${nav}some((x: any) => x != null && x !== false)`;
         break;
       case "each":
         // Ruby splats one yielded pair across a block's parameters (`|label, value|`),
@@ -4354,7 +4443,7 @@ export class Lowerer {
               destructure: blk.params.map((p: Param) => p.name!),
             } as Param,
           ];
-          return `${this.entries(r, ctx)}.forEach(${this.arrow(one, blk.body, ctx)})`;
+          return `${this.entries(r, ctx, recvNode)}.forEach(${this.arrow(one, blk.body, ctx)})`;
         }
         if (blk) return `${R}${nav}forEach(${fn()})`;
         break;
@@ -4362,8 +4451,11 @@ export class Lowerer {
         if (blk) return `${R}${nav}forEach(${fn()})`;
         break;
       case "each_with_object":
-        if (blk && n.args.length === 1)
-          return `${rc("eachWithObject")}(${r}, ${args().join(", ")})`;
+        // enum.c enum_each_with_object: yields each element with the memo, answers the memo.
+        if (blk && n.args.length === 1) {
+          const [memo, f] = args();
+          return `${this.entries(r, ctx, recvNode)}.reduce((memo: any, x: any) => ((${f})(x, memo), memo), ${memo})`;
+        }
         break;
       case "inject":
       case "reduce":
@@ -4388,7 +4480,11 @@ export class Lowerer {
           ctx.f.rubyFile.startsWith("test/") &&
           !["array", "prim"].includes(this.typeOf(recvNode, ctx)?.k ?? "")
         )
-          return `${rc("rbSize")}(${r})`;
+          return this.withOnce(
+            r,
+            (x) =>
+              `(${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map ? ${x}.size : ${x}.length)`,
+          );
         if (n.args.length === 0 && !blk) return `${R}${nav}length`;
         break;
       case "empty?":
@@ -4521,19 +4617,24 @@ export class Lowerer {
         // `aryDelete`, by the receiver's type (a Hash when it is not known).
         // An untyped receiver in activejob (`queue_adapter.enqueued_jobs`) is
         // dispatched at run time by the shim's `rbDelete`.
-        if (n.args.length === 1 && !blk && GEM.gem === "activejob" && !this.typeOf(recvNode, ctx))
-          return `${rc("rbDelete")}(${r}, ${args()[0]})`;
+        if (n.args.length === 1 && !blk && !recvType)
+          return this.withOnce(
+            r,
+            (x) =>
+              `(Array.isArray(${x}) ? ${rc("aryDelete")}(${x}, ${args()[0]}) : ${rc("hashDelete")}(${x}, ${args()[0]}))`,
+          );
         if (n.args.length === 1 && !blk)
           return `${rc(this.typeOf(recvNode, ctx)?.k === "array" ? "aryDelete" : "hashDelete")}(${r}, ${args()[0]})`;
         break;
       case "sort_by":
-        if (blk) return `${rc("sortBy")}(${r}, ${fn()})`;
+        // enum.c enum_sort_by: stable, the keys compared by `<=>`.
+        if (blk)
+          return `[...${E}].map((x: any) => [(${fn()})(x), x]).sort((a: any, b: any) => ${rc("cmp")}(a[0], b[0]) ?? 0).map((p: any) => p[1])`;
         break;
       case "tally":
-        if (!blk && n.args.length === 0) {
-          this.resolver.wanted.set("tally", (this.resolver.wanted.get("tally") ?? 0) + 1);
-          return `${this.imp(ctx, "@root/codegen-runtime.js", "tally")}(${r})`;
-        }
+        // enum.c enum_tally: a Hash keyed by the element itself, so a Map.
+        if (!blk && n.args.length === 0)
+          return `${E}${nav}reduce((h: Map<any, number>, x: any) => h.set(x, (h.get(x) ?? 0) + 1), new Map())`;
         break;
       case "group_by":
         if (blk) return `${rc("groupBy")}(${r}, ${fn()})`;
@@ -4548,12 +4649,43 @@ export class Lowerer {
         // Enumerable#count with a block (enum.c count_iter_i): the elements it holds for.
         if (n.args.length === 0 && blk) {
           const f = fn();
-          if (f && !f.startsWith("async ")) return `${rc("count")}(${r}, ${f})`;
+          if (f && !f.startsWith("async ")) return `${E}${nav}filter(${f}).length`;
         }
         break;
       case "max":
       case "min":
         if (!blk && n.args.length === 0) return `${rc(name)}(${r})`;
+        break;
+      case "map!":
+        // array.c rb_ary_collect_bang: each element replaced in place; answers the receiver.
+        if (blk && !this.index.methodNames.has(name))
+          return this.withOnce(
+            r,
+            (x) => `(${x}.splice(0, ${x}.length, ...${x}.map(${fn()})), ${x})`,
+          );
+        break;
+      case "flatten!":
+        // array.c rb_ary_flatten_bang: nil when nothing was nested.
+        if (!blk && n.args.length <= 1 && !this.index.methodNames.has(name)) {
+          const d = n.args.length ? args()[0] : "Infinity";
+          return this.withOnce(
+            r,
+            (x) =>
+              `(${x}.some(Array.isArray) ? (${x}.splice(0, ${x}.length, ...${x}.flat(${d})), ${x}) : null)`,
+          );
+        }
+        break;
+      case "times":
+        // numeric.c int_dotimes: yields 0...n in order and answers n.
+        if (blk && n.args.length === 0) {
+          const f = fn()!;
+          const i = blk.k === "block" && !blk.params.length ? "" : "i";
+          if (f.startsWith("async ")) {
+            if (ctx.asyncBox) ctx.asyncBox.awaits = true;
+            return `(await (async (n: number) => { for (let i = 0; i < n; i++) await (${f})(${i}); return n; })(${r}))`;
+          }
+          return `((n: number) => { for (let i = 0; i < n; i++) (${f})(${i}); return n; })(${r})`;
+        }
         break;
       case "with_index":
         if (this.index.methodNames.has(name)) return null;
@@ -4626,7 +4758,6 @@ export class Lowerer {
       case "floor":
       case "between?":
       case "succ":
-      case "times":
       case "upto":
       case "downto":
       case "step":
@@ -4666,10 +4797,8 @@ export class Lowerer {
       case "keep_if":
       case "select!":
       case "reject!":
-      case "map!":
       case "uniq!":
       case "compact!":
-      case "flatten!":
       case "sort!":
       case "reverse!":
       case "concat!":
@@ -4695,6 +4824,55 @@ export class Lowerer {
     }
     return null;
   }
+}
+
+/**
+ * The body of an Enumerable method whose block awaits, run in order as Ruby's
+ * iteration is (enum.c, array.c), over `xs` with the block `g`; `self` is the
+ * receiver and `a0…` its arguments. `null` where the method has no native body.
+ */
+function asyncEnumBody(name: string, argc: number): string | null {
+  const T = (v: string) => `(${v} != null && ${v} !== false)`;
+  switch (argc === 0 ? name : argc === 1 ? `${name}/1` : "") {
+    case "each":
+    case "each_pair":
+      return "for (const x of xs) await g(x); return self;";
+    case "each_with_index":
+      return "for (let i = 0; i < xs.length; i++) await g(xs[i], i); return self;";
+    case "map":
+    case "collect":
+      return "const out: any[] = []; for (const x of xs) out.push(await g(x)); return out;";
+    case "flat_map":
+    case "collect_concat":
+      return "const out: any[] = []; for (const x of xs) out.push(...[await g(x)].flat()); return out;";
+    case "select":
+    case "filter":
+      return `const out: any[] = []; for (const x of xs) { const v = await g(x); if ${T("v")} out.push(x); } return out;`;
+    case "reject":
+      return `const out: any[] = []; for (const x of xs) { const v = await g(x); if (!${T("v")}) out.push(x); } return out;`;
+    case "filter_map":
+      return `const out: any[] = []; for (const x of xs) { const v = await g(x); if ${T("v")} out.push(v); } return out;`;
+    case "find":
+    case "detect":
+      return `for (const x of xs) { const v = await g(x); if ${T("v")} return x; } return null;`;
+    case "any?":
+      return `for (const x of xs) { const v = await g(x); if ${T("v")} return true; } return false;`;
+    case "all?":
+      return `for (const x of xs) { const v = await g(x); if (!${T("v")}) return false; } return true;`;
+    case "none?":
+      return `for (const x of xs) { const v = await g(x); if ${T("v")} return false; } return true;`;
+    case "count":
+      return `let n = 0; for (const x of xs) { const v = await g(x); if ${T("v")} n++; } return n;`;
+    case "each_with_object/1":
+      return "for (const x of xs) await g(x, a0); return a0;";
+    case "inject/1":
+    case "reduce/1":
+      return "let acc = a0; for (const x of xs) acc = await g(acc, x); return acc;";
+    // hash.c rb_hash_transform_values on a plain-object Hash (a Map keeps the helper).
+    case "transform_values":
+      return "const out: any = {}; for (const [k, v] of Object.entries(self ?? {})) out[k] = await g(v); return out;";
+  }
+  return null;
 }
 
 /** Enumerable methods whose awaiting block is run sequentially by `rbAsyncEnum`. */

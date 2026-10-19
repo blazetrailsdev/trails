@@ -35,11 +35,13 @@ beforeAll(async () => {
 
 describe("lowering ActiveJob::Sample#collect", () => {
   it("dispatches Array#delete on an untyped receiver at run time", () => {
-    expect(text).toContain("rbDelete(jobs, payload)");
+    expect(text).toContain(
+      "(Array.isArray(jobs) ? aryDelete(jobs, payload) : hashDelete(jobs, payload))",
+    );
   });
 
   it("reassigns a local String appended to, as a JS string is immutable", () => {
-    expect(text).toContain('(message = rbAppend(message, "\\n\\nNone"))');
+    expect(text).toContain('(message = message + "\\n\\nNone")');
   });
 
   it("interpolates an untyped value natively, nil as the empty string", () => {
@@ -47,15 +49,17 @@ describe("lowering ActiveJob::Sample#collect", () => {
   });
 
   it("splats each Hash pair across an all? block's parameters", () => {
-    expect(text).toContain("rbEntries(expected).every(([key, value]: any) =>");
+    expect(text).toContain(
+      "(expected instanceof globalThis.Map ? [...expected] : Array.isArray(expected) ? expected : Object.entries(expected ?? {})).every(([key, value]: any) =>",
+    );
   });
 
   it("tests is_a?(Hash) with ruby-compat's Hash", () => {
     expect(text).toContain("rbObjIsKindOf(payload, Hash)");
   });
 
-  it("runs Integer#times and Array#join through their Ruby forms", () => {
-    expect(text).toContain("times((3), (i?: any) =>");
+  it("runs Integer#times as a counted loop and Array#join through its Ruby form", () => {
+    expect(text).toContain("for (let i = 0, _n = 3; i < _n; i++) {");
     expect(text).toContain('aryJoin(jobs, ", ")');
   });
 });
@@ -76,7 +80,7 @@ describe("lowering active_job/rules.rb", () => {
 
   it("tallies by identity and splats each pair across a two-parameter block", () => {
     expect(rules).toContain(
-      "tally(((jobs as any) instanceof globalThis.Set || (jobs as any) instanceof globalThis.Map ? [...(jobs as any)] : (jobs as any)?.constructor === Object ? Object.entries((jobs as any)) : (jobs as any)).map((x: any) => (x.constructor as any)))",
+      ".map((x: any) => (x.constructor as any)).reduce((h: Map<any, number>, x: any) => h.set(x, (h.get(x) ?? 0) + 1), new Map())",
     );
     expect(rules).toContain("([_klass, count]: any) => -count");
     expect(rules).toContain("counts.map(([klass, count]: any) =>");
@@ -123,7 +127,7 @@ describe("Ruby truthiness and interpolation in active_job/rules.rb, natively", (
 
 describe("local declarations in active_job/rules.rb", () => {
   it("lets TypeScript infer a local the method assigns once", () => {
-    expect(rules).toContain("const counts = sortBy(");
+    expect(rules).toContain("const counts = [...");
   });
 
   it("types an empty Hash literal as an open record", () => {
