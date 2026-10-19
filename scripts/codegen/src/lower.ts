@@ -2343,6 +2343,27 @@ export class Lowerer {
 
   call(n0: N, ctx: Ctx): string {
     let n = callbackFilterSymbols(n0);
+    // A Minitest / ActiveSupport assertion outside a test body (a test helper
+    // module's `assert_equal`) is activesupport's flat assertion function
+    // (testing/assertions.ts), where the gem defines no method of that name.
+    if (
+      n.recv === null &&
+      !ctx.testMode &&
+      /^_?(assert|refute)/.test(n.name) &&
+      (!n.block || n.block.k === "blockpass") &&
+      !this.index.methodNames.has(n.name)
+    ) {
+      const fname = tsMethodName(n.name);
+      if (this.resolver.pkgExports("@blazetrails/activesupport").has(fname)) {
+        const argv = n.args.map((x: N) => this.argExpr(x, ctx));
+        if (n.block) argv.push(this.blockArg(n.block, ctx));
+        const call = `${this.as(ctx, fname)}(${argv.join(", ")})`;
+        // Awaited where the method form would have been (an async assertion).
+        return this.callInner(n, this.child(ctx, {})).startsWith("(await ")
+          ? `(await ${call})`
+          : call;
+      }
+    }
     // `errors.add(attr, :taken)`: the Symbol is a message key ActiveModel looks
     // up, against a String used literally, so it keeps its colon (CLAUDE.md, "A
     // Ruby Symbol is a JS string": `Errors#add`'s `type`).
@@ -2859,7 +2880,11 @@ export class Lowerer {
           return `${rc("rbObjRespondTo")}(${[R, JSON.stringify(tsMethodName(n.args[0].value)), ...n.args.slice(1).map((x: N) => this.argExpr(x, ctx))].join(", ")})`;
         // A Ruby method name known only at run time (`QUEUE_ADAPTER_METHODS`'s
         // `:enqueue_at`) is translated to the TS member name when asked.
-        return `${rc("rbObjRespondTo")}(${[R, `${rc("rbTsName")}(${this.argExpr(n.args[0], ctx)})`, ...n.args.slice(1).map((x: N) => this.argExpr(x, ctx))].join(", ")})`;
+        // docs/ruby-ts-conventions.md: snake_case is camelCase, `x?` is `isX`.
+        {
+          const tsName = `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${this.argExpr(n.args[0], ctx)}))`;
+          return `${rc("rbObjRespondTo")}(${[R, tsName, ...n.args.slice(1).map((x: N) => this.argExpr(x, ctx))].join(", ")})`;
+        }
       // Class#descendants / #subclasses (core_ext/class/subclasses.rb) are
       // activesupport's DescendantsTracker functions on a constant receiver.
       case "descendants":
@@ -2975,7 +3000,9 @@ export class Lowerer {
           n.args.length === 1 &&
           n.args[0].k === "false"
         )
-          return `${this.rc(ctx, "rbSingletonPublicMethods")}(${this.expr(n.recv.recv, ctx)})`;
+          // A class_attribute written on the class (its own `__class_attr_<name>`
+          // storage, class_attribute.ts) is the singleton reader Ruby's setter defines.
+          return `Object.getOwnPropertyNames(${this.expr(n.recv.recv, ctx)}).filter((n) => !["length", "name", "prototype"].includes(n)).map((n) => n.replace(/^__class_attr_/, "")).map((n) => ((u: string) => (n.startsWith("_") && !u.startsWith("_") ? "_" + u : u))(${this.as(ctx, "underscore")}(n)))`;
         break;
       // `3.seconds` on a numeric literal: activesupport's `Numeric#seconds`
       // (core_ext/numeric/time.rb) is `ActiveSupport::Duration.seconds(self)`.
@@ -3268,15 +3295,15 @@ export class Lowerer {
       if (ctx.asyncBox) ctx.asyncBox.awaits = true;
       return `(await ${this.imp(ctx, "@blazetrails/activesupport", "stub")}(${r} as any, ${JSON.stringify(tsMethodName(n.args[0].value))}, ${rest[0] ?? "undefined"}, [${rest.slice(1).join(", ")}], ${this.blockArg(n.block, ctx)}))`;
     }
-    // ── `Kernel.rand` reads `rand` off ruby-compat's `Kernel`, which the shim
-    // seats with `kernelRand` (random.c rb_f_rand) so a test can stub it.
+    // ── `Kernel.rand` (random.c rb_f_rand) reads `rand` off ruby-compat's
+    // `Kernel` where a test has stubbed it there, else calls `kernelRand`.
     if (
       recvNode?.k === "const" &&
       recvNode.path.filter((x: string) => x).join("::") === "Kernel" &&
       !this.index.resolveConst(recvNode.path, ctx.nesting) &&
       name === "rand"
     )
-      return `${rc("rbKernel")}.rand(${argList()})`;
+      return `((${rc("Kernel")} as any).rand ?? ${rc("kernelRand")})(${argList()})`;
 
     // ── `x.class_eval("def …")`: Ruby source evaluated at run time has no generated form.
     if (
@@ -4177,6 +4204,17 @@ export class Lowerer {
           }
           if (lt0?.k === "prim" && (lt0.name === "number" || lt0.name === "string"))
             return `(${lhs} ${name} ${needsParens(a[0]) ? `(${a[0]})` : a[0]})`;
+          // A class the hand port types answers the operator itself, under its
+          // trails spelling (`TimeWithZone#+` is `plus`).
+          if (lt0?.k === "class") {
+            const m = this.resolver.types.member(lt0.key, name, !!lt0.static);
+            if (m?.info.kind === "method") {
+              const call = `${lhs}.${m.tsName}(${a[0]})`;
+              if (!m.info.async) return call;
+              if (ctx.asyncBox) ctx.asyncBox.awaits = true;
+              return `(await ${call})`;
+            }
+          }
           if (lt0?.k === "array" && name === "+") {
             const rt0 = this.typeOf(n.args[0], ctx);
             if (rt0?.k === "array")
