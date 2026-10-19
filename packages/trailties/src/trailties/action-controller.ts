@@ -191,8 +191,10 @@ async function helperConstants(
       const mod = (await import(path.pathToFileURL!(full).href)) as Record<string, unknown>;
 
       const exported = mod[demodulize(name)];
-      if (rbObjIsKindOf(exported, Module) || (exported && typeof exported === "object")) {
-        constants.set(name, exported as object);
+      if (rbObjIsKindOf(exported, Module)) {
+        constants.set(name, exported as AbstractController.HelperMethodsModule);
+      } else if (exported && typeof exported === "object") {
+        constants.set(name, exported);
       }
     }
   };
