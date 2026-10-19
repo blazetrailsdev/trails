@@ -32,6 +32,7 @@ const ENROLLED = [
   "packages/arel/src/**/*.test.ts",
   "packages/date/src/**/*.test.ts",
   "packages/did-you-mean/src/**/*.test.ts",
+  "packages/globalid/src/**/*.test.ts",
   "packages/i18n/src/**/*.test.ts",
 ];
 
