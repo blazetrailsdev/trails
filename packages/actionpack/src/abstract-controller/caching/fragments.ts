@@ -1,6 +1,6 @@
 /** @internal */
 
-import { Module, NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   Concern,
@@ -37,49 +37,38 @@ export function fragmentCacheKey(
   this.fragmentCacheKeys = [...this.fragmentCacheKeys!, key || (() => value)];
 }
 
-export const ClassMethods = new Module((mod) => {
-  mod.defineMethod("fragmentCacheKey", fragmentCacheKey);
+export const ClassMethods = { fragmentCacheKey };
+
+export const Fragments = {
+  ClassMethods,
+  combinedFragmentCacheKey,
+  writeFragment,
+  readFragment,
+  fragmentExist,
+  expireFragment,
+  instrumentFragmentCache,
+};
+extend(Fragments, Concern);
+(
+  Fragments as unknown as {
+    included(
+      base: null,
+      block: (this: FragmentsClassMethods & { helperMethod(...methods: string[]): void }) => void,
+    ): void;
+  }
+).included(null, function () {
+  if (rbObjRespondTo(this, "classAttribute")) {
+    classAttribute.call(this, "fragmentCacheKeys");
+  } else {
+    mattrWriter.call(this, "fragmentCacheKeys");
+  }
+
+  this.fragmentCacheKeys = [];
+
+  if (rbObjRespondTo(this, "helperMethod")) {
+    this.helperMethod("combinedFragmentCacheKey");
+  }
 });
-
-export const Fragments = new Module((mod) => {
-  extend(mod, Concern);
-
-  (
-    mod as unknown as {
-      included(
-        base: null,
-        block: (this: FragmentsClassMethods & { helperMethod(...methods: string[]): void }) => void,
-      ): void;
-    }
-  ).included(null, function () {
-    if (rbObjRespondTo(this, "classAttribute")) {
-      classAttribute.call(this, "fragmentCacheKeys");
-    } else {
-      mattrWriter.call(this, "fragmentCacheKeys");
-    }
-
-    this.fragmentCacheKeys = [];
-
-    if (rbObjRespondTo(this, "helperMethod")) {
-      this.helperMethod("combinedFragmentCacheKey");
-    }
-  });
-
-  mod.defineMethod("combinedFragmentCacheKey", combinedFragmentCacheKey);
-  mod.defineMethod("writeFragment", writeFragment);
-  mod.defineMethod("readFragment", readFragment);
-  mod.defineMethod("fragmentExist", fragmentExist);
-  mod.defineMethod("expireFragment", expireFragment);
-  mod.defineMethod("instrumentFragmentCache", instrumentFragmentCache);
-}) as Module<{
-  combinedFragmentCacheKey: typeof combinedFragmentCacheKey;
-  writeFragment: typeof writeFragment;
-  readFragment: typeof readFragment;
-  fragmentExist: typeof fragmentExist;
-  expireFragment: typeof expireFragment;
-  instrumentFragmentCache: typeof instrumentFragmentCache;
-}> & { ClassMethods: typeof ClassMethods };
-Fragments.ClassMethods = ClassMethods;
 
 export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unknown[] {
   const heads = this.constructor.fragmentCacheKeys!.map((k) => k.call(this));

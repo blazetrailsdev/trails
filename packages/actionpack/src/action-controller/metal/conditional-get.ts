@@ -3,9 +3,9 @@ import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   Concern,
   Duration,
-  Module,
   classAttribute,
   extend,
+  include,
   tryCall,
 } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
@@ -141,26 +141,17 @@ export const ClassMethods = {
   },
 };
 
-export const ConditionalGet = new Module((mod) => {
-  extend(mod, Concern);
-
-  mod.include(Head);
-
-  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
-    null,
-    function (this: object) {
-      classAttribute.call(this, "etaggers", { default: [] });
-    },
-  );
-
-  mod.defineMethod("freshWhen", freshWhen);
-  mod.defineMethod("isStale", isStale);
-  mod.defineMethod("expiresIn", expiresIn);
-  mod.defineMethod("expiresNow", expiresNow);
-  mod.defineMethod("httpCacheForever", httpCacheForever);
-  mod.defineMethod("noStore", noStore);
-  mod.defineMethod("combineEtags", combineEtags);
-}) as Module<{
+export const ConditionalGet = {
+  ClassMethods,
+  freshWhen,
+  isStale,
+  expiresIn,
+  expiresNow,
+  httpCacheForever,
+  noStore,
+  combineEtags,
+} as {
+  ClassMethods: typeof ClassMethods;
   freshWhen: typeof freshWhen;
   isStale: typeof isStale;
   expiresIn: typeof expiresIn;
@@ -169,8 +160,14 @@ export const ConditionalGet = new Module((mod) => {
   noStore: typeof noStore;
   combineEtags: typeof combineEtags;
   head: typeof head;
-}> & { ClassMethods: typeof ClassMethods };
-ConditionalGet.ClassMethods = ClassMethods;
+};
+extend(ConditionalGet, Concern);
+include(ConditionalGet, Head);
+(
+  ConditionalGet as unknown as { included(base: null, block: (this: object) => void): void }
+).included(null, function (this: object) {
+  classAttribute.call(this, "etaggers", { default: [] });
+});
 
 /** @internal */
 export function combineEtags(

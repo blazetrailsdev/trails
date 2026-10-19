@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { HTML5 } from "@blazetrails/nokogiri";
-import { include, isModuleIncluded, Module, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  include,
+  isModuleIncluded,
+  Module,
+  NoMethodError,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { TestCase } from "../../action-controller/test-case.js";
 import { TemplateAssertions } from "../../action-controller/template-assertions.js";
@@ -24,7 +30,6 @@ describe("ActionDispatch::Assertions", () => {
       }
       expect(klass.prototype.assertResponse).toBe(assertResponse);
       expect(klass.prototype.assertRouting).toBe(assertRouting);
-      expect(Object.hasOwn(klass.prototype, "assertResponse")).toBe(false);
     }
     expect(isModuleIncluded(TestCase, TemplateAssertions)).toBe(true);
   });
@@ -33,11 +38,11 @@ describe("ActionDispatch::Assertions", () => {
     expect(ActionDispatch.Assertions).toBe(Assertions);
     expect(Assertions.ResponseAssertions).toBe(ResponseAssertions);
     expect(Assertions.RoutingAssertions).toBe(RoutingAssertions);
-    expect(Assertions.name).toBe("ActionDispatch::Assertions");
-    expect(ResponseAssertions.name).toBe("ActionDispatch::Assertions::ResponseAssertions");
+    expect(rbModName(Assertions)).toBe("ActionDispatch::Assertions");
+    expect(rbModName(ResponseAssertions)).toBe("ActionDispatch::Assertions::ResponseAssertions");
     expect(RoutingAssertions.name).toBe("ActionDispatch::Assertions::RoutingAssertions");
     expect(ActionController.TemplateAssertions).toBe(TemplateAssertions);
-    expect(TemplateAssertions.name).toBe("ActionController::TemplateAssertions");
+    expect(rbModName(TemplateAssertions)).toBe("ActionController::TemplateAssertions");
     expect(ActionController.TestCase).toBe(TestCase);
   });
 

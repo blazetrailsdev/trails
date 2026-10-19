@@ -1,6 +1,5 @@
 import { ActionController } from "../../namespaces.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/activesupport";
 import { Collector as AbstractCollector } from "../../abstract-controller/collector.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { NullType } from "../../action-dispatch/http/mime-type.js";
@@ -119,9 +118,7 @@ export function respondTo(
   }
 }
 
-export const MimeResponds = new Module((mod) => {
-  mod.defineMethod("respondTo", respondTo);
-});
+export const MimeResponds = { respondTo };
 
 export class VariantCollector {
   private _variant: readonly string[] | null;
