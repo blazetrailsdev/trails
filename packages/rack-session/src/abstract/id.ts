@@ -332,6 +332,7 @@ export interface PersistedRequest {
   params: Record<string, unknown>;
   getHeader(key: string): PersistedSession;
   setHeader(key: string, value: unknown): unknown;
+  fetchHeader<T>(key: string, block: (key: string) => T): T;
   sessionOptions: Record<string, unknown>;
   ssl?: unknown;
 }

@@ -2,6 +2,9 @@ import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
 import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
 import { b } from "./string/b.js";
+import { StandardError } from "./standard-error.js";
+
+class ZError extends StandardError {}
 
 /**
  * `Zlib::GzipFile` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4838`). `gzfile_s_open`
@@ -210,26 +213,38 @@ export const Zlib = {
   /**
    * `Zlib::Deflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4713`), whose one-shot
    * `deflate` (`rb_deflate_s_deflate`, `zlib.c:1730`) compresses the String's
-   * bytes at `Z_DEFAULT_COMPRESSION` and answers them as a binary String.
+   * bytes (a text String's UTF-8 bytes) at `Z_DEFAULT_COMPRESSION` and answers them
+   * as a binary String.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Deflate`.
    */
+  /**
+   * `Zlib::Error` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4646` `cZError`), a `StandardError`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Error`.
+   */
+  Error: ZError,
+
   Deflate: {
-    deflate(src: string): string {
-      return b(getZlib().deflate(new TextEncoder().encode(src)));
+    deflate(src: string | Uint8Array): string {
+      return b(getZlib().deflate(src instanceof Uint8Array ? src : new TextEncoder().encode(src)));
     },
   },
 
   /**
    * `Zlib::Inflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4725`), whose one-shot
    * `inflate` (`rb_inflate_s_inflate`, `zlib.c:2044`) answers the inflated bytes
-   * as a binary String, raising `Zlib::Error` on a malformed stream.
+   * as a binary String, held as its bytes, raising `Zlib::Error` on a malformed stream.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Inflate`.
    */
   Inflate: {
-    inflate(src: string): string {
-      return b(getZlib().inflate(Uint8Array.from(src, (c) => c.charCodeAt(0))));
+    inflate(src: string): Uint8Array {
+      try {
+        return getZlib().inflate(Uint8Array.from(src, (c) => c.charCodeAt(0)));
+      } catch (error) {
+        throw new ZError((error as Error).message);
+      }
     },
   },
 

@@ -22,6 +22,7 @@ function stubRequest(): PersistedRequest {
     params: {},
     getHeader: () => undefined as unknown as PersistedSession,
     setHeader: () => {},
+    fetchHeader: <T>(key: string, block: (key: string) => T) => block(key),
     sessionOptions: {},
   };
 }

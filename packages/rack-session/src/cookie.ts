@@ -3,6 +3,7 @@ import { RACK_ERRORS, Utils } from "@blazetrails/rack";
 import * as RubyCompat from "@blazetrails/ruby-compat";
 import {
   DelegateClass,
+  StandardError,
   OpenSSL,
   Zlib,
   fetch,
@@ -54,7 +55,8 @@ export class Cookie extends PersistedSecure {
         if (!isTruthy(str)) return null;
         try {
           return RubyCompat.Marshal.load(super.decode(str!) as string);
-        } catch {
+        } catch (error) {
+          if (!(error instanceof StandardError)) throw error;
           return null;
         }
       }
@@ -69,7 +71,8 @@ export class Cookie extends PersistedSecure {
         if (!isTruthy(str)) return null;
         try {
           return RubyCompat.JSON.parse(super.decode(str!) as string);
-        } catch {
+        } catch (error) {
+          if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
           return null;
         }
       }
@@ -84,7 +87,8 @@ export class Cookie extends PersistedSecure {
         try {
           if (!isTruthy(str)) return null;
           return RubyCompat.JSON.parse(Zlib.Inflate.inflate(super.decode(str!) as string));
-        } catch {
+        } catch (error) {
+          if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
           return null;
         }
       }
@@ -111,20 +115,6 @@ export class Cookie extends PersistedSecure {
     }
   };
 
-  static SessionId = class SessionId extends DelegateClass(SessionSessionId) {
-    /** @internal */
-    _cookieValue: string;
-
-    override get cookieValue(): string {
-      return this._cookieValue;
-    }
-
-    constructor(sessionId: unknown, cookieValue: string) {
-      super(sessionId);
-      this._cookieValue = cookieValue;
-    }
-  };
-
   readonly coder: Coder;
   readonly encryptors: Encryptor[];
   private legacyHmac: unknown;
@@ -132,7 +122,7 @@ export class Cookie extends PersistedSecure {
   private legacyHmacCoder: Coder | undefined;
 
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
-    const secrets = rbFArray(options["secrets"] || options["secret"]);
+    const secrets = rbFArray(isTruthy(options["secrets"]) ? options["secrets"] : options["secret"]);
 
     const encryptorOpts = {
       purpose: options["key"],
@@ -141,7 +131,7 @@ export class Cookie extends PersistedSecure {
 
     super(app, {
       ...options,
-      coder: options["coder"] || new Cookie.Base64.Marshal(),
+      coder: isTruthy(options["coder"]) ? options["coder"] : new Cookie.Base64.Marshal(),
       cookieOnly: true,
     });
 
@@ -150,7 +140,9 @@ export class Cookie extends PersistedSecure {
     if ("legacyHmacSecret" in options || "secret" in options) {
       this.legacyHmac = fetch(options, "legacyHmac", "SHA1");
 
-      this.legacyHmacSecret = options["legacyHmacSecret"] || options["secret"];
+      this.legacyHmacSecret = isTruthy(options["legacyHmacSecret"])
+        ? options["legacyHmacSecret"]
+        : options["secret"];
       this.legacyHmacCoder = fetch(options, "legacyHmacCoder", new Cookie.Base64.Marshal());
     } else {
       this.legacyHmac = false;
@@ -167,7 +159,10 @@ export class Cookie extends PersistedSecure {
 `);
     }
 
-    this.coder = (options["coder"] ||= this.defaultOptions["coder"]) as Coder;
+    if (!isTruthy(options["coder"])) options["coder"] = this.defaultOptions["coder"];
+    this.coder = options["coder"] as Coder;
+
+    options["cookieOnly"] = true;
   }
 
   /** @internal */
@@ -185,9 +180,7 @@ export class Cookie extends PersistedSecure {
 
   /** @internal */
   private unpackedCookieData(request: PersistedRequest): object {
-    return (
-      request as unknown as { fetchHeader(name: string, block: (k: string) => object): object }
-    ).fetchHeader(RACK_SESSION_UNPACKED_COOKIE_DATA, (k) => {
+    return request.fetchHeader<object>(RACK_SESSION_UNPACKED_COOKIE_DATA, (k) => {
       let sessionData: unknown = null;
       const cookieData = request.cookies[this.key] as string | undefined;
       if (isTruthy(cookieData)) {
@@ -228,6 +221,20 @@ export class Cookie extends PersistedSecure {
     }
     return data;
   }
+
+  static SessionId = class SessionId extends DelegateClass(SessionSessionId) {
+    /** @internal */
+    _cookieValue: string;
+
+    override get cookieValue(): string {
+      return this._cookieValue;
+    }
+
+    constructor(sessionId: unknown, cookieValue: string) {
+      super(sessionId);
+      this._cookieValue = cookieValue;
+    }
+  };
 
   /** @internal */
   override async writeSession(
