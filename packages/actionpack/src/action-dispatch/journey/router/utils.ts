@@ -1,6 +1,6 @@
 import { format, strNew } from "@blazetrails/ruby-compat";
 
-class UriEncoder {
+export class UriEncoder {
   static readonly ENCODE = "%%%02X";
   static readonly EMPTY = "";
   static readonly DEC2HEX = Array.from({ length: 256 }, (_, i) => format(UriEncoder.ENCODE, i));

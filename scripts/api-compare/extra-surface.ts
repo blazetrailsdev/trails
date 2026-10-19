@@ -1696,7 +1696,7 @@ function collectAllowedNames(
       // mirroring a Rails-private method isn't *extra* surface, it's a
       // visibility divergence — the method exists in Rails. Excluding them
       // here would mislabel every public-port-of-a-private-method as drift.
-      const mirror = scopedSkipMirrorName(m.name, rubyFile);
+      const mirror = scopedSkipMirrorName(m.name, rubyFile, pkg);
       for (const c of mirror ?? []) allow(c);
       const candidates = rubyMethodCandidates(m.name);
       if (!candidates) continue;

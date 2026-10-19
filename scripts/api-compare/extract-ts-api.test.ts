@@ -7575,6 +7575,22 @@ describe("extractFromProgram — a Module on a static property", () => {
   });
 });
 
+describe("extractFromProgram — aliasMethod on another file's module", () => {
+  it("credits the alias of a file function the file seats on that module", () => {
+    const info = extractFromFiles("/p", {
+      "live.ts": `export const Live = new Module();`,
+      "test-case.ts": `import { Live } from "./live.js";
+        Live.aliasMethod("originalNewControllerThread", "newControllerThread");
+        export function newControllerThread(block: () => void): void {}
+        Live.defineMethod("newControllerThread", newControllerThread);`,
+    });
+    expect(info.fileFunctions["test-case.ts"].map((f) => [f.name, f.aliasOf])).toEqual([
+      ["newControllerThread", undefined],
+      ["originalNewControllerThread", "newControllerThread"],
+    ]);
+  });
+});
+
 describe("extractFromProgram — configAccessor() generated accessors", () => {
   it("credits the class and instance accessors on the module whose included hook calls it", () => {
     const info = extractFromFiles("/p", {

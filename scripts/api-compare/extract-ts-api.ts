@@ -1387,6 +1387,23 @@ export function extractFromProgram(
       fileFunctions.push(credited);
     }
 
+    // `Live.aliasMethod("originalNewControllerThread", "newControllerThread")` on a module
+    // another file defines (test-case.ts reopening `ActionController::Live`,
+    // `test_case.rb:25`) aliases a file function this file seats on it.
+    for (const statement of sourceFile.statements) {
+      const call = ts.isExpressionStatement(statement) ? statement.expression : undefined;
+      if (!call || !ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) {
+        continue;
+      }
+      const [alias, original] = call.arguments;
+      if (call.expression.name.text !== "aliasMethod" || !alias || !original) continue;
+      if (!ts.isStringLiteralLike(alias) || !ts.isStringLiteralLike(original)) continue;
+      if (info.modules[`${relPath}:${call.expression.expression.getText(sourceFile)}`]) continue;
+      const aliased = fileFunctions.find((f) => f.name === original.text);
+      if (!aliased || fileFunctions.some((f) => f.name === alias.text)) continue;
+      fileFunctions.push({ ...aliased, name: alias.text, aliasOf: original.text });
+    }
+
     // Always record file-level functions so compare.ts can match methods
     // against the file regardless of whether a class/interface wrapper exists.
     if (fileFunctions.length > 0) {

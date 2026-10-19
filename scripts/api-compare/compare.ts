@@ -3999,12 +3999,14 @@ export function dedupeRubyMethodInto(
   klass = false,
   pkg?: string,
 ): void {
-  const tsMirrorNames = rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile);
+  const tsMirrorNames =
+    rubyFile === undefined ? null : scopedSkipMirrorName(rm.name, rubyFile, pkg);
   if (tsMirrorNames === null && rubyMethodToTsForFqn(itemFqn, rm.name, undefined, pkg) === null) {
     return;
   }
   if (isRubyOnlyClass(itemFqn)) return;
-  if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile)) return;
+  if (rubyFile !== undefined && tsMirrorNames === null && isScopedSkip(rm.name, rubyFile, pkg))
+    return;
   const level = rubyOwnerSeat(itemFqn, klass);
   const key = rubyLevelKey(level, rm.name);
   if (!seen.has(key)) {
@@ -4104,12 +4106,12 @@ function rubyDefinitionBucket(
   seen: Set<string>,
   pkg: string,
 ): DenominatorBucket {
-  const tsMirrorNames = scopedSkipMirrorName(name, file);
+  const tsMirrorNames = scopedSkipMirrorName(name, file, pkg);
   if (tsMirrorNames === null && rubyMethodToTsForFqn(fqn, name, undefined, pkg) === null) {
     return OPERATORS.has(name) ? "operator" : "globalSkip";
   }
   if (isRubyOnlyClass(fqn)) return "rowlessFile";
-  if (tsMirrorNames === null && isScopedSkip(name, file)) return "scopedSkip";
+  if (tsMirrorNames === null && isScopedSkip(name, file, pkg)) return "scopedSkip";
   const key = rubyLevelKey(rubyOwnerSeat(fqn, klass), name);
   if (seen.has(key)) return "sameNameCollapse";
   seen.add(key);

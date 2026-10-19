@@ -4,7 +4,7 @@ import { ViewPaths } from "@blazetrails/actionview";
 import { Concern, extend, include, isPlainObject } from "@blazetrails/activesupport";
 import { ArgumentError, Hash, Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Mime } from "../action-dispatch/http/mime-type.js";
-import { Error as AbstractControllerError } from "./error.js";
+import { Error } from "./error.js";
 
 const DEFAULT_DOUBLE_RENDER_MESSAGE =
   "Render and/or redirect were called multiple times in this action. " +
@@ -13,7 +13,7 @@ const DEFAULT_DOUBLE_RENDER_MESSAGE =
   "execution of the action, so if you want to exit an action after " +
   'redirecting, you need to do something like "redirect_to(...); return".';
 
-export class DoubleRenderError extends AbstractControllerError {
+export class DoubleRenderError extends Error {
   constructor(message?: string) {
     super(message ?? DEFAULT_DOUBLE_RENDER_MESSAGE);
     this.name = "DoubleRenderError";
