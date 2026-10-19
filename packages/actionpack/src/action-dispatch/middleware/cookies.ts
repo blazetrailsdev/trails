@@ -10,7 +10,15 @@
  *   `ActiveSupport::TimeWithZone` Rails stores.
  */
 
-import { fetch, include, isSymbol, rbEqual, symbolToS, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  include,
+  isSymbol,
+  rbEqual,
+  symbolToS,
+  rbFSend,
+  type Block,
+} from "@blazetrails/ruby-compat";
 import {
   extractOptionsBang,
   isPlainObject,
@@ -201,8 +209,8 @@ export class CookieJar implements Iterable<[string, string]> {
     return this._cookies.get(key);
   }
 
-  fetch(name: string, ...args: [] | [unknown]): unknown {
-    return fetch(this._cookies, String(name), ...args);
+  fetch(name: string, ...args: [] | [unknown] | [Block<unknown>]): unknown {
+    return fetch(this._cookies, String(name), ...(args as [unknown]));
   }
 
   isKey(name: string): boolean {

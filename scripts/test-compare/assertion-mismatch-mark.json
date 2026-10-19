@@ -6,13 +6,13 @@
       "value": 0
     },
     "actioncontroller": {
-      "assertionCount": 1,
-      "kind": 1,
+      "assertionCount": 0,
+      "kind": 0,
       "value": 0
     },
     "actiondispatch": {
-      "assertionCount": 7,
-      "kind": 10,
+      "assertionCount": 6,
+      "kind": 9,
       "value": 0
     },
     "actionview": {

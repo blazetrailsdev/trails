@@ -103,8 +103,8 @@ export function screenshotsDir(): string {
 }
 
 /** @internal */
-function absolutePath(this: ScreenshotHelperHost): string {
-  return new Pathname(projectRoot()).join(screenshotsDir(), imageName.call(this)).toString();
+function absolutePath(this: ScreenshotHelperHost): Pathname {
+  return new Pathname(projectRoot()).join(screenshotsDir(), imageName.call(this));
 }
 
 /** @internal */
@@ -114,10 +114,10 @@ function absoluteImagePath(this: ScreenshotHelperHost): string {
 
 /**
  * @internal
- * @missingRailsCall root — CONVERGEABLE screenshot-helper-relative-image-path-uses-relative-path-from
+ * @missingRailsCall root — CONVERGEABLE screenshot-helper-reads-rails-root
  */
 export function relativeImagePath(this: ScreenshotHelperHost): string {
-  return `${File.join(screenshotsDir(), imageName.call(this))}.png`;
+  return `${absolutePath.call(this).relativePathFrom(projectRoot())}.png`;
 }
 
 /** @internal */

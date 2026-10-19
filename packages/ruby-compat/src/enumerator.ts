@@ -130,13 +130,14 @@ export class Enumerator<T = unknown> {
 
   /**
    * `enumerator_each` (`vendor/ruby/v3.3.11/enumerator.c:613`) run to completion
-   * into a snapshot, which a `for…of` then walks.
+   * into a snapshot, which a `for…of` then walks. A multi-value yield is packed
+   * into one Array (`vendor/ruby/v3.3.11/enum.c:53` `rb_enum_values_pack`).
    *
    * @noRailsEquivalent PERMANENT
    */
   *[Symbol.iterator](): globalThis.Generator<T> {
     const buffer: T[] = [];
-    this.each((value: T) => buffer.push(value));
+    this.each((...values: T[]) => buffer.push(values.length <= 1 ? values[0] : (values as T)));
     yield* buffer;
   }
 }

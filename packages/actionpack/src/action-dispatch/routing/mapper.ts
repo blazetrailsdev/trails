@@ -118,7 +118,8 @@ type ConcernCallback = (mapper: Mapper, options: Record<string, unknown>) => voi
 type ConcernCallable =
   | ConcernCallback
   | { call(mapper: Mapper, options: Record<string, unknown>): void };
-type MapMethodArgs = (string | RouteOptions | Record<string, unknown>)[];
+type MapMethodArg = string | RouteOptions | Record<string, unknown>;
+type MapMethodArgs = MapMethodArg[] | [...MapMethodArg[], MapperCallback];
 
 const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
   "as",
@@ -1096,23 +1097,28 @@ export class Mapper {
   }
 
   get(...args: MapMethodArgs): this {
-    return this.mapMethod("GET", args);
+    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
+    return this.mapMethod("GET", args as MapMethodArg[], block);
   }
 
   post(...args: MapMethodArgs): this {
-    return this.mapMethod("POST", args);
+    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
+    return this.mapMethod("POST", args as MapMethodArg[], block);
   }
 
   put(...args: MapMethodArgs): this {
-    return this.mapMethod("PUT", args);
+    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
+    return this.mapMethod("PUT", args as MapMethodArg[], block);
   }
 
   patch(...args: MapMethodArgs): this {
-    return this.mapMethod("PATCH", args);
+    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
+    return this.mapMethod("PATCH", args as MapMethodArg[], block);
   }
 
   delete(...args: MapMethodArgs): this {
-    return this.mapMethod("DELETE", args);
+    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
+    return this.mapMethod("DELETE", args as MapMethodArg[], block);
   }
 
   root(path: string | RouteOptions | null, options: RouteOptions = {}): void {
@@ -1457,8 +1463,11 @@ export class Mapper {
 
   match(
     path: string | Record<string, unknown>,
-    ...rest: (string | (RouteOptions & { via?: string | string[] }))[]
+    ...rest:
+      | (string | (RouteOptions & { via?: string | string[] }))[]
+      | [...(string | (RouteOptions & { via?: string | string[] }))[], MapperCallback]
   ): void {
+    if (typeof rest.at(-1) === "function") rest.pop();
     let options: Record<string, unknown>;
     let paths: string[];
     if (rest.length === 0 && isPlainObject(path)) {
@@ -1503,18 +1512,21 @@ export class Mapper {
   }
 
   options(...args: MapMethodArgs): this {
-    return this.mapMethod("OPTIONS", args);
+    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
+    return this.mapMethod("OPTIONS", args as MapMethodArg[], block);
   }
 
   connect(...args: MapMethodArgs): this {
-    return this.mapMethod(["GET", "CONNECT"], args);
+    const block = typeof args.at(-1) === "function" ? (args.pop() as MapperCallback) : undefined;
+    return this.mapMethod(["GET", "CONNECT"], args as MapMethodArg[], block);
   }
 
   /** @internal */
-  mapMethod(method: string | string[], args: MapMethodArgs): this {
+  mapMethod(method: string | string[], args: MapMethodArg[], block?: MapperCallback): this {
     const options = extractOptionsBang(args);
     options[args.length === 0 ? ":via" : "via"] = method;
-    this.match(...(args as [string]), options as RouteOptions);
+    if (block) this.match(...(args as [string]), options as RouteOptions, block);
+    else this.match(...(args as [string]), options as RouteOptions);
     return this;
   }
 
@@ -1833,7 +1845,9 @@ export class Mapper {
     this._set.addUrlHelper(name, options, block);
   }
 
-  resolve(...args: unknown[]): void {
+  resolve(
+    ...args: unknown[] | [...unknown[], Parameters<RouteSet["addPolymorphicMapping"]>[2]]
+  ): void {
     if (!this._scope.isRoot()) {
       throw new RuntimeError("The resolve method can't be used inside a routes scope block");
     }

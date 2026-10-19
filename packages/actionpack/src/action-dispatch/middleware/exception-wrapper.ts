@@ -5,6 +5,8 @@ import {
   Location,
   Pathname,
   rbObjRespondTo,
+  toEnum,
+  type Enumerator,
 } from "@blazetrails/ruby-compat";
 
 import {
@@ -338,12 +340,14 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  *causesFor(exception: Error): Generator<Error> {
-    let cur: unknown = exception.cause;
-    while (cur instanceof Error) {
-      yield cur;
-      cur = cur.cause;
-    }
+  causesFor(exception: Error): Enumerator<Error>;
+  /** @internal */
+  causesFor(exception: Error, block: (cause: Error) => void): void;
+  /** @internal */
+  causesFor(exception: Error, block?: (cause: Error) => void): Enumerator<Error> | void {
+    if (!block) return toEnum(this, "causesFor", exception);
+
+    while ((exception = exception.cause as Error) instanceof Error) block(exception);
   }
 
   /** @internal */

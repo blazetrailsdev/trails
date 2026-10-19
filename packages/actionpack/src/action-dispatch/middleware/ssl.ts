@@ -1,6 +1,6 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString, CONTENT_TYPE, SET_COOKIE } from "@blazetrails/rack";
-import { fetch, merge, rbFSend, toI } from "@blazetrails/ruby-compat";
+import { bodyFromString, CONTENT_TYPE, RELEASE, SET_COOKIE } from "@blazetrails/rack";
+import { fetch, Gem, merge, rbFSend, toI } from "@blazetrails/ruby-compat";
 import { LOCATION, STRICT_TRANSPORT_SECURITY } from "../constants.js";
 import { Request } from "../http/request.js";
 
@@ -121,13 +121,26 @@ export class SSL {
     const cookies = headers[SET_COOKIE];
     if (cookies == null) return;
 
-    headers[SET_COOKIE] = [cookies].flat().map((cookie) => {
-      if (!/;\s*secure\s*(;|$)/i.test(cookie)) {
-        return `${cookie}; secure`;
-      } else {
-        return cookie;
-      }
-    });
+    if (new Gem.Version(RELEASE).compare(new Gem.Version("3"))! < 0) {
+      const lines = (cookies as string).split("\n");
+      headers[SET_COOKIE] = lines
+        .map((cookie) => {
+          if (!/;\s*secure\s*(;|$)/i.test(cookie)) {
+            return `${cookie}; secure`;
+          } else {
+            return cookie;
+          }
+        })
+        .join("\n");
+    } else {
+      headers[SET_COOKIE] = [cookies].flat().map((cookie) => {
+        if (!/;\s*secure\s*(;|$)/i.test(cookie)) {
+          return `${cookie}; secure`;
+        } else {
+          return cookie;
+        }
+      });
+    }
   }
 
   /** @internal */

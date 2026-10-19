@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ParamInfo } from "@blazetrails/parity/types";
-import { dropsBlock } from "./block-params.js";
+import { GENERATOR_BLOCK, dropsBlock } from "./block-params.js";
 import { measure, staleMarkFailure, staleMarks, type ParamNameMarks } from "./param-name-mark.js";
 
 const opts: ParamInfo = { name: "opts", kind: "optional" };
@@ -17,6 +17,10 @@ describe("dropsBlock", () => {
 
   it("ignores a Ruby method that takes no block", () => {
     expect(dropsBlock(false, [[opts]])).toBe(false);
+  });
+
+  it("clears a generator method, whose yield is the block", () => {
+    expect(dropsBlock(true, [[opts], GENERATOR_BLOCK])).toBe(false);
   });
 
   it("has nothing to judge without a TS candidate", () => {

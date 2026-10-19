@@ -20,3 +20,9 @@ export function dropsBlock(rubyTakesBlock: boolean, candidates: ParamInfo[][]): 
   if (!rubyTakesBlock || candidates.length === 0) return false;
   return !candidates.some((sig) => sig.some((p) => p.admitsFunction === true));
 }
+
+/** The block a generator method takes: its `yield` hands each value to the
+ *  caller's `for…of`, the JS shape of a Ruby block whose body uses a non-local
+ *  `return` / `next` or an `await` (`Journey::Router#find_routes` under
+ *  `serve`, `journey/router.rb:33-65`), which a JS callback cannot take. */
+export const GENERATOR_BLOCK: ParamInfo[] = [{ name: "yield", kind: "rest", admitsFunction: true }];

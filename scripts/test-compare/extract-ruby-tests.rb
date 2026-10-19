@@ -170,6 +170,14 @@ class LoopSymbolName < String; end
 
 LOOP_OPAQUE_HASH = Object.new.freeze
 
+# The vendored Ruby's version, which a `RUBY_VERSION` comparison in a test body
+# is evaluated against (see `ruby_version_condition`).
+def vendored_ruby_version
+  @vendored_ruby_version ||= JSON.parse(
+    File.read(File.join(SCRIPT_DIR, "..", "..", "vendor", "sources.lock.json"))
+  ).dig("sources", "ruby", "ref").delete_prefix("v").tr("_", ".")
+end
+
 def rack_release
   @rack_release ||= JSON.parse(
     File.read(File.join(SCRIPT_DIR, "..", "..", "vendor", "sources.lock.json"))
@@ -2108,6 +2116,10 @@ class TestExtractor
   def count_assertions_expanded(node, visiting, depth, scope)
     return 0 unless node.is_a?(Array)
 
+    if (arm = ruby_version_arm(node))
+      return count_assertions_expanded(arm[0], visiting, depth, scope)
+    end
+
     count = 0
     name = self_call_name(node)
     if name
@@ -2131,6 +2143,33 @@ class TestExtractor
 
     node.each { |child| count += count_assertions_expanded(child, visiting, depth, scope) if child.is_a?(Array) }
     count
+  end
+
+  RUBY_VERSION_OPERATORS = %i[>= > <= < == !=].freeze
+
+  # `if RUBY_VERSION >= "3.4"` runs one arm on a given Ruby, so only the arm the
+  # vendored Ruby takes holds the test's assertions
+  # (actionpack/test/dispatch/exception_wrapper_test.rb:111-120). Answers that
+  # arm wrapped in a one-element Array (the arm itself may be nil), else nil.
+  def ruby_version_arm(node)
+    return nil unless %i[if unless elsif].include?(node[0])
+    taken = ruby_version_condition(node[1])
+    return nil if taken.nil?
+    taken = !taken if node[0] == :unless
+    arm = taken ? node[2] : node[3]
+    arm = arm[1] if arm.is_a?(Array) && arm[0] == :else
+    [arm]
+  end
+
+  # `RUBY_VERSION <op> "x.y"` evaluated against the vendored Ruby, else nil.
+  def ruby_version_condition(cond)
+    return nil unless cond.is_a?(Array) && cond[0] == :binary && RUBY_VERSION_OPERATORS.include?(cond[2])
+    lhs, rhs = cond[1], cond[3]
+    return nil unless lhs.is_a?(Array) && lhs[0] == :var_ref && lhs[1] == [:@const, "RUBY_VERSION", lhs[1][2]]
+    return nil unless rhs.is_a?(Array) && rhs[0] == :string_literal && rhs[1].is_a?(Array) &&
+                      rhs[1].length == 2 && rhs[1][1][0] == :@tstring_content
+    # A String comparison, as Ruby's own `RUBY_VERSION >= "3.4"` is.
+    vendored_ruby_version.public_send(cond[2], rhs[1][1][1])
   end
 
   # Name of an implicit-`self` call (fcall/vcall/command) at this node, else nil.
@@ -2372,6 +2411,10 @@ class TestExtractor
   # negated kind — the twin of the port's `expect(spy).not.toHaveBeenCalled()`.
   def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args, scope, pending_never = false)
     return unless node.is_a?(Array)
+
+    if (arm = ruby_version_arm(node))
+      return collect_assertion_kinds_expanded(arm[0], results, values, visiting, depth, nil, scope, false)
+    end
 
     if (rspec = rspec_expectation(node))
       kind, expect_node, matcher_args = rspec

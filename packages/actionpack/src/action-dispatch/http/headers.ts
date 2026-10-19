@@ -1,6 +1,6 @@
 import type { Request } from "./request.js";
 import { ActionDispatch } from "../../namespaces.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, eachPair } from "@blazetrails/ruby-compat";
 
 const CGI_VARIABLES = new Set([
   "AUTH_TYPE",
@@ -37,6 +37,8 @@ function envName(key: string): string {
 }
 
 export class Headers {
+  static DEFAULT: object = {};
+
   private _req: Request;
 
   constructor(request: Request) {
@@ -71,14 +73,11 @@ export class Headers {
     return this.isKey(key);
   }
 
-  fetch(key: string, ...defaultValue: unknown[]): unknown {
-    return this._req.fetchHeader(envName(String(key)), () => {
-      if (defaultValue.length > 0) {
-        const fallback = defaultValue[0];
-        if (typeof fallback === "function") return (fallback as () => unknown)();
-        return fallback;
-      }
-      throw new KeyError(String(key));
+  fetch(key: string, defaultValue: unknown = Headers.DEFAULT, block?: () => unknown): unknown {
+    return this._req.fetchHeader(envName(key), () => {
+      if (defaultValue !== Headers.DEFAULT) return defaultValue;
+      if (block) return block();
+      throw new KeyError(key);
     });
   }
 
@@ -92,13 +91,10 @@ export class Headers {
     return headers;
   }
 
-  /** @inventedArm if — CONVERGEABLE headers-merge-bang-single-each-dispatch */
   mergeBang(headersOrEnv: Record<string, unknown> | Headers): Record<string, unknown> | Headers {
-    const block = ([key, value]: [string, unknown]): void => {
+    eachPair(headersOrEnv as Record<string, unknown>, (key, value) => {
       this._req.setHeader(envName(String(key)), value);
-    };
-    if (headersOrEnv instanceof Headers) headersOrEnv.each(block);
-    else Object.entries(headersOrEnv).forEach(block);
+    });
     return headersOrEnv;
   }
 }

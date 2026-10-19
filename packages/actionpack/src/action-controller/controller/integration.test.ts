@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { bodyFromString, Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { assertEqual } from "@blazetrails/activesupport";
 import {
   assert,
   assertIncludes,
@@ -214,8 +215,10 @@ describe("IntegrationTestTest", () => {
 
   it("child session assertions bubble up to root", () => {
     const assertionsBefore = test.assertions;
-    test.openSession().assertions += 1;
-    expect(test.assertions - assertionsBefore).toBe(1);
+    test.openSession().assert(true);
+    const assertionsAfter = test.assertions;
+
+    assertEqual(1, assertionsAfter - assertionsBefore);
   });
 
   it("does not prevent method missing passing up to ancestors", () => {
