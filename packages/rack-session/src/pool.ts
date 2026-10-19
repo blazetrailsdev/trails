@@ -1,4 +1,5 @@
 import type { RackApp } from "@blazetrails/rack";
+import { hashDelete, Mutex } from "@blazetrails/ruby-compat";
 
 import {
   DEFAULT_OPTIONS as ID_DEFAULT_OPTIONS,
@@ -9,6 +10,7 @@ import {
 } from "./abstract/id.js";
 
 export class Pool extends PersistedSecure {
+  mutex!: Mutex;
   pool!: Record<string, Record<string, unknown> | undefined>;
 
   static override DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze({
@@ -19,12 +21,11 @@ export class Pool extends PersistedSecure {
 
   protected allowFallback: unknown;
 
-  /** @missingRailsCall delete — PERMANENT */
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
     super(app, options);
     this.pool = {};
-    this.allowFallback = this.defaultOptions["allowFallback"];
-    delete this.defaultOptions["allowFallback"];
+    this.mutex = new Mutex();
+    this.allowFallback = hashDelete(this.defaultOptions, "allowFallback");
   }
 
   /** @missingRailsArgs super(*args) — PERMANENT */

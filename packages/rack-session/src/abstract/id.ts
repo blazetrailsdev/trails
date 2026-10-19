@@ -1,4 +1,5 @@
 import {
+  hashDelete,
   ArgumentError,
   valuesAt,
   getCrypto,
@@ -363,14 +364,10 @@ export class Persisted {
       ...(this.constructor as typeof Persisted).DEFAULT_OPTIONS,
       ...options,
     };
-    this.key = this.defaultOptions["key"] as string;
-    delete this.defaultOptions["key"];
-    this.assumeSsl = this.defaultOptions["assumeSsl"];
-    delete this.defaultOptions["assumeSsl"];
-    this.cookieOnly = this.defaultOptions["cookieOnly"];
-    delete this.defaultOptions["cookieOnly"];
-    this.sameSite = this.defaultOptions["sameSite"];
-    delete this.defaultOptions["sameSite"];
+    this.key = hashDelete(this.defaultOptions, "key") as string;
+    this.assumeSsl = hashDelete(this.defaultOptions, "assumeSsl");
+    this.cookieOnly = hashDelete(this.defaultOptions, "cookieOnly");
+    this.sameSite = hashDelete(this.defaultOptions, "sameSite");
     this.initializeSid();
   }
 
@@ -432,16 +429,16 @@ export class Persisted {
   loadSession(
     req: PersistedRequest,
   ): [unknown, Record<string, unknown>] | Promise<[unknown, Record<string, unknown>]> {
-    const currentSid = this.currentSessionId(req);
-    const found = this.findSession(req, currentSid);
+    const sid = this.currentSessionId(req);
+    const found = this.findSession(req, sid);
     if (found instanceof Promise) {
       return found.then(([sid, session]): [unknown, Record<string, unknown>] => [
         sid,
         session ?? {},
       ]);
     }
-    const [sid, session] = found;
-    return [sid, session ?? {}];
+    const [foundSid, session] = found;
+    return [foundSid, session ?? {}];
   }
 
   /** @internal */
