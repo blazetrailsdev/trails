@@ -726,7 +726,7 @@ export class Module<I extends object = Record<never, never>> {
 function appendPlainFeatures(base: Module, mod: ModuleObject): void {
   const carrier = carrierOf(base);
   if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
-    if (typeof mod !== "function" && Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
+    if (Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
       for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
         base.include(nested);
       }
@@ -1500,6 +1500,13 @@ function isClass(klass: object): klass is AnyClass {
   return typeof klass === "function";
 }
 
+/** @noRailsEquivalent PERMANENT */
+export const classModule = Symbol.for("@blazetrails/ruby-compat:classModule");
+
+function isClassReceiver(klass: object): klass is AnyClass {
+  return isClass(klass) && !Object.prototype.hasOwnProperty.call(klass, classModule);
+}
+
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
   if (!(mod instanceof Module)) {
     if (mod === null || (typeof mod !== "object" && typeof mod !== "function")) return undefined;
@@ -1531,7 +1538,7 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     }
     return;
   }
-  if (!isClass(klass)) {
+  if (!isClassReceiver(klass)) {
     if (!(klass instanceof Module)) trackIncludedModule(klass, mod, moduleIncludesKey);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(klass);
@@ -1567,12 +1574,12 @@ export function rbModAppendFeatures(
   klass: AnyClass | object,
   mod: ModuleObject | AnyClass | Module,
 ): void {
-  if (!isClass(klass) && !(klass instanceof Module)) {
+  if (!isClassReceiver(klass) && !(klass instanceof Module)) {
     return trackIncludedModule(klass, mod, moduleIncludesKey);
   }
   if (mod instanceof Module) return Module.prototype.appendFeatures.call(mod, klass);
   if (klass instanceof Module) return appendPlainFeatures(klass, mod);
-  if (typeof mod !== "function" && Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
+  if (Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
     for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
       if (!isModuleMethodTablePresent(klass, nested)) include(klass, nested);
     }

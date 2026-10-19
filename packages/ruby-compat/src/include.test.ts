@@ -38,6 +38,7 @@ import {
   publicInstanceMethods,
   rbModAppendFeatures,
   rbModPrependFeatures,
+  classModule,
   type ModuleVisibility,
   type Included,
   type Initialized,
@@ -2175,5 +2176,46 @@ describe("include with a plain-object or class module's own hooks", () => {
     include(Host, Mod);
     expect(calls).toEqual(["included"]);
     expect((new Host() as unknown as Mod).greet()).toBe("hi");
+  });
+});
+
+describe("include into a class module", () => {
+  it("records the included module instead of copying it onto the prototype", () => {
+    const inner = { who: () => "inner" };
+    class Outer {
+      static readonly [classModule] = true;
+    }
+    include(Outer, inner);
+    expect("who" in Outer.prototype).toBe(false);
+  });
+
+  it("appends the recorded modules first, so the class module's own methods win", () => {
+    const inner = { who: () => "inner", innerOnly: () => "inner only" };
+    class Outer {
+      static readonly [classModule] = true;
+      who() {
+        return "outer";
+      }
+    }
+    include(Outer, inner);
+    class Host {}
+    include(Host, Outer);
+    const host = new Host() as unknown as DynMethods;
+    expect(host.who()).toBe("outer");
+    expect(host.innerOnly()).toBe("inner only");
+    expect(isModuleIncluded(Host, inner)).toBe(true);
+  });
+
+  it("appends a class module through Module#include, following its record", () => {
+    const inner = { innerOnly: () => "inner only" };
+    class Outer {
+      static readonly [classModule] = true;
+    }
+    include(Outer, inner);
+    const mod = new Module();
+    mod.include(Outer);
+    class Host {}
+    include(Host, mod);
+    expect((new Host() as unknown as DynMethods).innerOnly()).toBe("inner only");
   });
 });

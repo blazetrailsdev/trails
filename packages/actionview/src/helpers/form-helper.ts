@@ -32,7 +32,8 @@ import {
   rbInspect,
   rbObjRespondTo,
   slice,
-  Module,
+  classModule,
+  include,
 } from "@blazetrails/ruby-compat";
 
 import { ModelNaming, convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
@@ -1056,22 +1057,27 @@ onLoad("action_view", (base: unknown) => {
   });
 });
 
-export const FormHelper = new Module((mod) => {
-  extend(mod, Concern);
+export class FormHelper {
+  static readonly [classModule] = true;
+}
 
-  mod.include(FormTagHelper);
-  mod.include(UrlHelper);
-  mod.include(ModelNaming);
-  mod.include(RecordIdentifier);
+extend(FormHelper, Concern);
 
-  mod.moduleEval((m) => {
-    attrInternal.call(m, "defaultFormBuilder");
-    Object.assign(m, { formFor, applyFormForOptionsBang, formWith, fieldsFor, fields, label });
-    Object.assign(m, { textField, passwordField, hiddenField, fileField, textarea, textArea });
-    Object.assign(m, { checkbox, checkBox, radioButton, colorField });
-    Object.assign(m, { searchField, telephoneField, phoneField, dateField, timeField });
-    Object.assign(m, { datetimeField, datetimeLocalField, monthField, weekField, urlField });
-    Object.assign(m, { emailField, numberField, rangeField, _objectForFormBuilder });
-    Object.assign(m, { htmlOptionsForFormWith, instantiateBuilder, defaultFormBuilderClass });
-  });
+include(FormHelper, FormTagHelper);
+include(FormHelper, UrlHelper);
+include(FormHelper, ModelNaming);
+include(FormHelper, RecordIdentifier);
+
+attrInternal.call(FormHelper.prototype, "defaultFormBuilder");
+Object.assign(FormHelper.prototype, { formFor, applyFormForOptionsBang, formWith, fieldsFor });
+Object.assign(FormHelper.prototype, { fields, label, textField, passwordField, hiddenField });
+Object.assign(FormHelper.prototype, { fileField, textarea, textArea, checkbox, checkBox });
+Object.assign(FormHelper.prototype, { radioButton, colorField, searchField, telephoneField });
+Object.assign(FormHelper.prototype, { phoneField, dateField, timeField, datetimeField });
+Object.assign(FormHelper.prototype, { datetimeLocalField, monthField, weekField, urlField });
+Object.assign(FormHelper.prototype, { emailField, numberField, rangeField, _objectForFormBuilder });
+Object.assign(FormHelper.prototype, {
+  htmlOptionsForFormWith,
+  instantiateBuilder,
+  defaultFormBuilderClass,
 });
