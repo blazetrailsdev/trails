@@ -4346,7 +4346,7 @@ export class Lowerer {
             this.typeOf(recvNode, ctx)?.k === "array"
               ? "self"
               : "(self instanceof globalThis.Map || self instanceof globalThis.Set ? [...self] : Array.isArray(self) ? self : Object.entries(self ?? {}))";
-          return `(await (async (self: any, g: any${extra.map((_, i) => `, a${i}: any`).join("")}) => { const xs: any[] = ${xs}; ${native} })(${[r, g, ...extra].join(", ")}))`;
+          return `(await (async (self: any, g: any${extra.map((_: string, i: number) => `, a${i}: any`).join("")}) => { const xs: any[] = ${xs}; ${native} })(${[r, g, ...extra].join(", ")}))`;
         }
         return `(await ${rc("rbAsyncEnum")}(${[r, JSON.stringify(name), ...n.args.map((x: N) => this.argExpr(x, ctx)), g].join(", ")}))`;
       }

@@ -1815,12 +1815,15 @@ export class Emitter {
       }
       const seen = values.filter((v) => v?.k !== "nil").map((v) => this.lw.typeOf(v, ctx));
       const first = seen[0];
+      // Untyped: still declared (as `unknown`), for the type pass to narrow.
       if (
         !first ||
         first.k === "gemClass" ||
         !seen.every((t) => JSON.stringify(t) === JSON.stringify(first))
-      )
+      ) {
+        types.set(ivar, null);
         continue;
+      }
       const nullable =
         (assignsNil || !setInInit.has(ivar)) && first.k !== "fn" && first.k !== "hash";
       types.set(ivar, nullable ? ({ ...first, nullable: true } as TypeRef) : first);
@@ -1838,6 +1841,31 @@ export class Emitter {
       if (members.some((m) => new RegExp(`^(?:get |set |static )?${field}\\b`).test(m))) continue;
       const ts = this.lw.tsType(t, ctx);
       out.push(`declare ${field}: ${ts === "any" ? "unknown" : ts};`);
+    }
+    // An ivar only an `attr_*` accessor or a read touches (`@filter`, set through
+    // `attr_writer`) is still the instance's storage: declared, `unknown` until
+    // the type pass narrows it. A class-level ivar (`this._x` in a static
+    // member) is declared static.
+    const declared = new Set(out.map((d) => /^declare ([\w$#]+)/.exec(d)![1]));
+    const definedBy = (field: string, isStatic: boolean) =>
+      members.some((m) =>
+        new RegExp(
+          `^(?:override )?${isStatic ? "static " : ""}(?:override )?(?:async )?(?:get |set )?${field.replace(/\$/g, "\\$")}\\b`,
+        ).test(m),
+      );
+    for (const isStatic of [false, true]) {
+      const seen = new Set<string>();
+      for (const m of members) {
+        if (/^(?:override )?static\b/.test(m) !== isStatic) continue;
+        for (const hit of m.matchAll(/\bthis\.(_[\w$]+)\b(?!\s*\()/g)) seen.add(hit[1]);
+      }
+      for (const field of seen) {
+        const key = `${isStatic ? "static " : ""}${field}`;
+        if (declared.has(key) || (!isStatic && declared.has(field)) || definedBy(field, isStatic))
+          continue;
+        declared.add(key);
+        out.push(`declare ${isStatic ? "static " : ""}${field}: unknown;`);
+      }
     }
     return out;
   }
