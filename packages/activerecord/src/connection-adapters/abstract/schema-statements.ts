@@ -1451,12 +1451,12 @@ export class SchemaStatements {
       const generatedIndexName = this.indexName(tableName, {
         column: index.columns,
         ...options,
-      } as any);
+      });
       if (generatedIndexName === index.name) {
         await this.renameIndex(
           newName,
           generatedIndexName,
-          this.indexName(newName, { column: index.columns, ...options } as any),
+          this.indexName(newName, { column: index.columns, ...options }),
         );
       }
     }
@@ -1525,7 +1525,7 @@ export class SchemaStatements {
   /** @internal */
   indexColumnNames(columnNames: string | string[]): string[] {
     if (this.isExpressionColumnName(columnNames as string)) {
-      return columnNames as unknown as string[];
+      return columnNames as string[];
     }
     return wrap(columnNames);
   }
@@ -1546,7 +1546,7 @@ export class SchemaStatements {
 
   /** @internal */
   stripTableNamePrefixAndSuffix(tableName: string): string {
-    const adapter = this as any;
+    const adapter = this as { tableNamePrefix?: string; tableNameSuffix?: string };
     const prefix: string = adapter.tableNamePrefix ?? ActiveRecord.Base.tableNamePrefix;
     const suffix: string = adapter.tableNameSuffix ?? ActiveRecord.Base.tableNameSuffix;
     const str = String(tableName);
@@ -1640,7 +1640,7 @@ export class SchemaStatements {
     tableName: string,
     options: { name?: string; expression?: string | null; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition | undefined> {
-    const adapter = this as any;
+    const adapter = this as Partial<Pick<DatabaseAdapter, "supportsCheckConstraints">>;
     if (
       typeof adapter.supportsCheckConstraints === "function" &&
       !(await adapter.supportsCheckConstraints())
@@ -1779,7 +1779,12 @@ export class SchemaStatements {
   ): Promise<Array<string | [string, () => Promise<void>]>> {
     options = { ...options };
     if (options.null == null) options.null = false;
-    if (!("precision" in options) && (this as any).supportsDatetimeWithPrecision?.()) {
+    if (
+      !("precision" in options) &&
+      (
+        this as Partial<Pick<DatabaseAdapter, "supportsDatetimeWithPrecision">>
+      ).supportsDatetimeWithPrecision?.()
+    ) {
       options.precision = 6;
     }
     return [
