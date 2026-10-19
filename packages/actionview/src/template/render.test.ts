@@ -158,7 +158,7 @@ describe("CachedViewRenderTest", () => {
   });
 
   it("render partial implicitly use format of the rendered template", async () => {
-    view.lookupContext.formats = [":json"];
+    view.lookupContext!.formats = [":json"];
     expect(String(await view.render({ template: "test/one", formats: [":html"] }))).toBe(
       "Hello world",
     );
