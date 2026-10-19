@@ -1868,7 +1868,8 @@ the constructor against \`new\` then \`initialize\`, with \`new\`'s \`super\` sp
 on \`initialize\`. A \`ClassMethods#new\` in the class's own Ruby file pairs the
 same way. A module's \`initialize\`, or a \`ClassMethods#new\`, defined in another
 Ruby file is matched through the \`@inlinedFrom\` tag on the constructor it is
-inlined into (RFC 0188).
+inlined into (RFC 0188), and a module method whose body calls \`super\` through
+the tag on the includer's method of the same name (RFC 0197).
 
 Any other \`new\`, an instance method or a module's own \`self.new\`, maps to
 \`constructor\` only when its Ruby file does NOT also define \`initialize\`.

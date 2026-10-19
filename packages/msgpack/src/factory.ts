@@ -1,9 +1,9 @@
 import {
+  moduleVisibility,
   ArgumentError,
   FrozenError,
   Hash,
   Method,
-  Module,
   RangeError,
   TypeError,
   rbEnsure,
@@ -256,7 +256,14 @@ export class Factory {
       throw new TypeError(`wrong argument type ${rbObjClassname(extType)} (expected Integer)`);
     }
 
-    if (typeof extModule !== "function" && !(extModule instanceof Module)) {
+    if (
+      typeof extModule !== "function" &&
+      !(
+        typeof extModule === "object" &&
+        extModule !== null &&
+        Object.hasOwn(extModule, moduleVisibility)
+      )
+    ) {
       throw new ArgumentError(`expected Module/Class but found ${rbObjClassname(extModule)}.`);
     }
 

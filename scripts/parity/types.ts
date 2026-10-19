@@ -6,8 +6,12 @@
 export interface InlinedFrom {
   /** The Ruby module, fully qualified (`ActiveModel::API`). */
   module: string;
-  /** `initialize` on a module, `new` on a `ClassMethods` module. */
-  hook: "initialize" | "new";
+  /**
+   * The Ruby method: `initialize` on a module or `new` on a `ClassMethods`
+   * module, inlined into a constructor; or a module method whose body calls
+   * `super`, inlined into the includer's method of the same name (RFC 0197).
+   */
+  hook: string;
   /** The vendored source (`rails`) and the version the span was read at (`v8.0.2`). */
   source: string;
   version: string;
@@ -218,8 +222,8 @@ export interface MethodInfo {
   /** TS-side only: the skeleton tokens this declaration receipts as arms or
    *  calls its body adds to Rails', via `@inventedArm`. */
   inventedArms?: string[];
-  /** TS-side only (RFC 0188): the Ruby bodies a constructor names as inlined
-   *  into it, via `@inlinedFrom`, in written order. */
+  /** TS-side only (RFC 0188, RFC 0197): the Ruby bodies a constructor or
+   *  method names as inlined into it, via `@inlinedFrom`, in written order. */
   inlinedFrom?: InlinedFrom[];
   /** Ruby-side only (RFC 0188): the line an `initialize` / `new` `def` closes
    *  on, so an `@inlinedFrom` citation's span can be derived. */

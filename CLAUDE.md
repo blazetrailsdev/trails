@@ -759,10 +759,12 @@ constructor(attributes = null) { … }
 
 `@inlinedFrom` names the Ruby body a segment of a constructor came from:
 
-- **Where.** On a class constructor's JSDoc and nowhere else, one tag per
-  inlined segment, in chain order.
+- **Where.** On a class constructor's JSDoc, or on the JSDoc of a class
+  method that inlines a module method's `super` (below), and nowhere else, one
+  tag per inlined segment, in chain order.
 - **Value.** Exactly one shape: a Ruby `Module#initialize` or
-  `Mod::ClassMethods#new`, then its citation
+  `Mod::ClassMethods#new` on a constructor, or the `Module#<method>` the method
+  is named after, whose Rails body calls `super`, then its citation
   `<source>/<version>/<file>:<first>-<last>`, the span of the `def`, relative
   to `vendor/` and not spelling it. No prose, no story id, no `PERMANENT`.
 - **The tag follows the file.** Only a body whose `def` lives in a different

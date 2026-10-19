@@ -2104,6 +2104,16 @@ describe("rbModAppendFeatures on a plain-object module", () => {
     expect(isModuleIncluded(Host, inner)).toBe(true);
   });
 
+  it("reaches a class that already includes the plain module", () => {
+    const M = {};
+    class C {}
+    include(C, M);
+    const N = { n: () => "n" };
+    include(M, N);
+    expect((new C() as unknown as DynMethods).n()).toBe("n");
+    expect(isModuleIncluded(C, N)).toBe(true);
+  });
+
   it("records an include into a plain module without copying onto it", () => {
     const inner = { who: () => "inner" };
     const outer = {};

@@ -521,7 +521,7 @@ describe("a module hook is credited through the tag on an includer's constructor
         new Set(["model.ts"]),
         tags,
       ),
-    ).toEqual({ package: "activemodel", tsFile: "model.ts" });
+    ).toEqual({ package: "activemodel", tsFile: "model.ts", tsName: "constructor" });
   });
 
   it("leaves it uncredited when the tagged file in its package includes no such module", () => {
@@ -543,7 +543,7 @@ describe("a module hook is credited through the tag on an includer's constructor
   it("credits a tag on a constructor in another package", () => {
     expect(
       inlinedHookCreditedBy("ActiveModel::API", "initialize", "activemodel", new Set(), tags),
-    ).toEqual({ package: "activerecord", tsFile: "base.ts" });
+    ).toEqual({ package: "activerecord", tsFile: "base.ts", tsName: "constructor" });
   });
 
   it("keys a ClassMethods#new apart from the module's initialize, and an untagged hook from both", () => {

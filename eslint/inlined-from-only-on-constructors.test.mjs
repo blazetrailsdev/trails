@@ -14,11 +14,25 @@ const NEW =
   "ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:56-78";
 const BASE = "/repo/packages/activerecord/src/base.ts";
 
+const CONTENT_TAG =
+  "ActionView::Helpers::ActiveModelInstanceTag#content_tag rails/v8.0.2/actionview/lib/action_view/helpers/active_model_helper.rb:20-22";
+const TAGS_BASE = "/repo/packages/actionview/src/helpers/tags/base.ts";
+const onMethod = (name, ...tags) =>
+  `class Base {\n  /**\n${tags.map((tag) => `   * @inlinedFrom ${tag}\n`).join("")}   */\n  ${name}() {}\n}\n`;
+
 const onConstructor = (...tags) =>
   `class Base {\n  /**\n${tags.map((tag) => `   * @inlinedFrom ${tag}\n`).join("")}   */\n  constructor() {}\n}\n`;
 
 tester.run("inlined-from-only-on-constructors", rule, {
   valid: [
+    { code: onMethod("contentTag", CONTENT_TAG), filename: TAGS_BASE },
+    {
+      code: onMethod(
+        "isValid",
+        "ActiveModel::Validations#valid? rails/v8.0.2/activemodel/lib/active_model/validations.rb:1-2",
+      ),
+      filename: TAGS_BASE,
+    },
     { code: onConstructor(API), filename: BASE },
     { code: onConstructor(NEW, API), filename: BASE },
     {
@@ -40,6 +54,19 @@ tester.run("inlined-from-only-on-constructors", rule, {
     },
   ],
   invalid: [
+    {
+      code: onMethod("tag", CONTENT_TAG),
+      filename: TAGS_BASE,
+      errors: [{ messageId: "notThisMethod" }],
+    },
+    {
+      code: onMethod(
+        "contentTag",
+        "ActionView::Helpers::ActiveModelInstanceTag#content_tag rails/v8.0.2/actionview/lib/action_view/helpers/tags/base.rb:20-22",
+      ),
+      filename: TAGS_BASE,
+      errors: [{ messageId: "redundant" }],
+    },
     {
       code: `class Base {\n  /** @inlinedFrom ${API} */\n  initialize() {}\n}\n`,
       errors: [{ messageId: "notConstructor" }],
