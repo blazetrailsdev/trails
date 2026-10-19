@@ -1475,9 +1475,8 @@ export class Base extends Model {
       }
     }
 
-    const core = this as unknown as { initInternals(): void; initializeInternalsCallback(): void };
-    core.initInternals();
-    if (!allocating) core.initializeInternalsCallback();
+    this.initInternals();
+    if (!allocating) this.initializeInternalsCallback();
 
     if (attributes != null) this.assignAttributes(attributes);
 
@@ -1490,6 +1489,9 @@ export class Base extends Model {
     }
   }
 
+  /** @internal */
+  declare initInternals: () => void;
+  declare initializeInternalsCallback: () => void;
   /** @internal */
   declare _runInitializeCallbacks: (block?: () => unknown) => unknown;
   /** @internal */
