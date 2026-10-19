@@ -39,3 +39,19 @@ describe("SystemCallError", () => {
     expect(new Errno.ENOENT().errno).toBe(2);
   });
 });
+
+describe("Errno::EMFILE", () => {
+  it("builds strerror's message and carries errno 24", () => {
+    expect(new Errno.EMFILE().message).toBe("Too many open files");
+    expect(new Errno.EMFILE("x").message).toBe("Too many open files - x");
+    expect(new Errno.EMFILE().errno).toBe(24);
+  });
+
+  it("is the class of an fs error carrying its code, and of its subclasses only by prototype", () => {
+    const fsError = Object.assign(new Error("EMFILE"), { code: "EMFILE" });
+    class Sub extends Errno.EMFILE {}
+    expect(fsError instanceof Errno.EMFILE).toBe(true);
+    expect(fsError instanceof Sub).toBe(false);
+    expect(new Sub() instanceof Errno.EMFILE).toBe(true);
+  });
+});

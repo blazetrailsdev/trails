@@ -1,5 +1,5 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import { Generic, HTTPS, URI, b, pack } from "@blazetrails/ruby-compat";
+import { Generic, HTTPS, URI, b, hashDelete, pack } from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
@@ -148,26 +148,30 @@ export class Session {
     return this._lastResponse;
   }
 
-  async request(uri: string, env: RackEnv = {}, block?: ResponseBlock): Promise<MockResponse> {
-    const parsedUri = this.parseUri(uri, env);
-    env = this.envFor(parsedUri, env);
-    return this.processRequest(parsedUri, env, block);
+  async request(
+    uri: string | Generic,
+    env: RackEnv = {},
+    block?: ResponseBlock,
+  ): Promise<MockResponse> {
+    uri = this.parseUri(uri as string, env);
+    env = this.envFor(uri, env);
+    return this.processRequest(uri, env, block);
   }
 
   async customRequest(
     verb: string,
-    uri: string,
+    uri: string | Generic,
     params: unknown = {},
     env: RackEnv = {},
     block?: ResponseBlock,
   ): Promise<MockResponse> {
-    const parsedUri = this.parseUri(uri, env);
-    env = this.envFor(parsedUri, {
+    uri = this.parseUri(uri as string, env);
+    env = this.envFor(uri, {
       ...env,
       ":method": String(verb).toUpperCase(),
       ":params": params,
     });
-    return this.processRequest(parsedUri, env, block);
+    return this.processRequest(uri, env, block);
   }
 
   header(name: string, value: unknown): void {
@@ -320,11 +324,7 @@ export class Session {
     queryArray = queryArray.filter((q) => q !== "");
     uri.query = queryArray.join("&");
 
-    if (":cookie" in env) {
-      const cookie = env[":cookie"];
-      delete env[":cookie"];
-      this.setCookie(cookie, uri);
-    }
+    if (":cookie" in env) this.setCookie(hashDelete(env, ":cookie"), uri);
 
     return MockRequest.envFor(uri.toString(), env);
   }

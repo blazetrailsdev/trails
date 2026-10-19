@@ -2,6 +2,7 @@ import {
   ArgumentError,
   EOFError,
   Encoding,
+  Errno,
   File,
   forceEncoding,
   include,
@@ -13,9 +14,9 @@ import { BadRequest } from "../bad-request.js";
 import { QueryParser } from "../query-parser.js";
 import { multipartFileLimit, multipartTotalPartLimit, unescapePath } from "../utils.js";
 
-export class MultipartPartLimitError extends Error {
-  constructor(message = "Maximum file multiparts in content reached") {
-    super(message);
+export class MultipartPartLimitError extends Errno.EMFILE {
+  constructor(mesg?: string) {
+    super(mesg);
     this.name = "MultipartPartLimitError";
   }
 }

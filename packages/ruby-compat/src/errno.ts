@@ -211,10 +211,36 @@ class ESRCH extends SystemCallError {
 }
 
 /**
+ * `Errno::EMFILE`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is. The fs layer's own error carrying `code: "EMFILE"` is this
+ * class to `rescue Errno::EMFILE`; a subclass answers the ordinary prototype test.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EMFILE`, which Rack
+ * subclasses without defining.
+ */
+class EMFILE extends SystemCallError {
+  static readonly Errno = 24;
+  readonly code = "EMFILE";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Too many open files" : `Too many open files - ${mesg}`);
+    this.name = "Errno::EMFILE";
+    this.errno = EMFILE.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (
+      Function.prototype[Symbol.hasInstance].call(this, error) ||
+      (this === EMFILE && (error as { code?: unknown } | null | undefined)?.code === "EMFILE")
+    );
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-export const Errno = { EEXIST, EISDIR, ENOENT, ENOTDIR, ENOTTY, EPIPE, ESPIPE, ESRCH };
+export const Errno = { EEXIST, EISDIR, EMFILE, ENOENT, ENOTDIR, ENOTTY, EPIPE, ESPIPE, ESRCH };
