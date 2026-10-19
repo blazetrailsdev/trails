@@ -2117,6 +2117,194 @@ describe("FormHelperTest", () => {
     );
   });
 
+  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    post.author = new Author(321);
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, { includeId: false }, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          authorName +
+          authorId +
+          commentName(0, "comment #1") +
+          commentName(1, "comment #2"),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id inherited", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    post.author = new Author(321);
+    formFor(post, { includeId: false }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () => titleInput + authorName + commentName(0, "comment #1") + commentName(1, "comment #2"),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id override", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    post.author = new Author(321);
+    formFor(post, { includeId: false }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, { includeId: true }, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          authorName +
+          authorId +
+          commentName(0, "comment #1") +
+          commentName(1, "comment #2"),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association using erb and inline block", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            return cf.textField("name");
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #1") +
+          commentId(0, 1) +
+          commentName(1, "comment #2") +
+          commentId(1, 2),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association with explicit hidden field placement", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.hiddenField("id"));
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentId(0, 1) +
+          commentName(0, "comment #1") +
+          commentId(1, 2) +
+          commentName(1, "comment #2"),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with new records on a nested attributes collection association", () => {
+    post.comments = [new Comment(), new Comment()];
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + commentName(0, "new comment") + commentName(1, "new comment")),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing and new records on a nested attributes collection association", () => {
+    post.comments = [new Comment(321), new Comment()];
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #321") +
+          commentId(0, 321) +
+          commentName(1, "new comment"),
+      ),
+      rendered,
+    );
+  });
+
   it("nested fields for with existing records on a nested attributes collection association", () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
     formFor(post, {}, (f) => {
