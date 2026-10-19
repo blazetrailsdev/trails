@@ -47,15 +47,18 @@ export class Encryptor {
       throw new ArgumentError(`invalid secret: ${bytesize}, must be >=64`);
     }
 
-    const padSize = opts.padSize;
-    if (Number.isInteger(padSize)) {
-      if (!new Range(2, 4096).isInclude(padSize as number)) {
-        throw new ArgumentError(`invalid pad_size: ${padSize}`);
-      }
-    } else if (padSize != null) {
-      throw new ArgumentError(
-        `invalid pad_size: ${rbObjAsString(padSize)}; must be Integer or nil`,
-      );
+    switch (true) {
+      case opts.padSize == null:
+        break;
+      case Number.isInteger(opts.padSize):
+        if (!new Range(2, 4096).isInclude(opts.padSize as number)) {
+          throw new ArgumentError(`invalid pad_size: ${opts.padSize}`);
+        }
+        break;
+      default:
+        throw new ArgumentError(
+          `invalid pad_size: ${rbObjAsString(opts.padSize)}; must be Integer or nil`,
+        );
     }
 
     this.options = Object.assign({ serializeJson: false, padSize: 32, purpose: null }, opts);
