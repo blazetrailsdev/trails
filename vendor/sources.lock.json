@@ -44,6 +44,10 @@
       "ref": "v1.5.9",
       "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
     },
+    "racc": {
+      "ref": "v1.8.0",
+      "sha": "8eeca623c95c77724d3b0856806d2f9fc82684b1"
+    },
     "rack": {
       "ref": "v3.1.14",
       "sha": "5440b2c8b006f1c2ef202c2bd60dd70924c9b1c1"
