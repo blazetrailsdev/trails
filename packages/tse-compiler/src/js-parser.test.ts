@@ -122,6 +122,10 @@ describe("parseScript", () => {
     expect(find(program, "ContinueStatement", "continue outer;")).not.toBeNull();
     expect(find(program, "BreakStatement", "break outer;")).not.toBeNull();
     expect(find(program, "MethodDefinition", "get id() { return this.#id }")).not.toBeNull();
+    const afterStatement = parseScript("switch (x) { case 1: f(); default: g() }").value;
+    expect(find(afterStatement, "SwitchCase", "default: g()")).not.toBeNull();
+    expect(() => parseScript("switch (x) { case 1: f()")).toThrow(JsParseError);
+    expect(() => parseScript("class A { m() {}")).toThrow(JsParseError);
   });
 
   it("raises JsParseError with the offending offset", () => {
