@@ -170,7 +170,7 @@ export const LocalTagStorage = {
 };
 
 export const TaggedLogging = {
-  logger(...args: ConstructorParameters<typeof Logger>): Logger & TaggedLogger {
+  logger(...args: ConstructorParameters<typeof Logger>): TaggedLogger {
     return TaggedLogging.new(new Logger(...args));
   },
 
