@@ -1387,9 +1387,6 @@ export function extractFromProgram(
       fileFunctions.push(credited);
     }
 
-    // `Live.aliasMethod("originalNewControllerThread", "newControllerThread")` on a module
-    // another file defines (test-case.ts reopening `ActionController::Live`,
-    // `test_case.rb:25`) aliases a file function this file seats on it.
     for (const statement of sourceFile.statements) {
       const call = ts.isExpressionStatement(statement) ? statement.expression : undefined;
       if (!call || !ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) {

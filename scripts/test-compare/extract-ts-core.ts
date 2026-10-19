@@ -137,12 +137,6 @@ function isTestObject(owner: ts.Expression): boolean {
   );
 }
 
-/**
- * `assertResponse.call(c, "forbidden")`: a ported `this`-typed assertion
- * invoked on a host that is not the test case (a bare controller in
- * `controller/rescue_test.rb`'s port) is the `assertResponse` assertion, its
- * arguments after the receiver.
- */
 function isAssertionDotCall(expression: ts.Expression): boolean {
   return (
     ts.isPropertyAccessExpression(expression) &&
