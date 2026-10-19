@@ -26,6 +26,7 @@ import { TypeOracle } from "./types.js";
 import { runtimeShim, DECLINED_SHIM } from "./runtime-shim.js";
 import { GEM, GEM_LIB, GEN_DIR, ORACLE_PATH, PKG_DIR, ROOT } from "./gem.js";
 import { nonNullPass } from "./nonnull-pass.js";
+import { typePass } from "./type-pass.js";
 
 const LIB = GEM_LIB;
 
@@ -337,6 +338,10 @@ writeFileSync(path.join(outDir, "codegen-declined.ts"), DECLINED_SHIM);
   if (existsSync(seats))
     writeFileSync(path.join(outDir, "namespaces.ts"), readFileSync(seats, "utf8"));
 }
+// The type pass: every `any` the lowering wrote replaced by what the checker
+// sees reach it (type-pass.ts). `--no-types` skips it.
+if (!process.argv.includes("--no-types"))
+  report.typePass = typePass(outDir, path.join(PKG_DIR, "tsconfig.json"));
 // The signature index: a nullable argument or receiver meeting a non-null
 // parameter or member takes `!` (nonnull-pass.ts). `--no-nonnull` skips it.
 if (!process.argv.includes("--no-nonnull"))
