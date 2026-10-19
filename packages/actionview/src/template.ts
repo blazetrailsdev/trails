@@ -124,15 +124,15 @@ export class Template {
     }
   }
 
-  identifier: string;
-  handler: TemplateHandler;
+  readonly identifier: string;
+  readonly handler: TemplateHandler;
   readonly variable: string | null;
-  format: string | null;
-  variant: string | null;
-  virtualPath: string | null;
+  readonly format: string | null;
+  readonly variant: string | null;
+  readonly virtualPath: string | null;
 
   private _source: string | SourcesFile;
-  private _locals: readonly string[];
+  private readonly _locals: readonly string[];
   private _strictLocals: string | null | typeof NONE = NONE;
   /** @internal */
   _strictLocalKeys: readonly string[] | null = null;
@@ -283,25 +283,17 @@ export class Template {
 
   /** @internal */
   marshalLoad(array: unknown[]): void {
-    [
-      this._source,
-      this.identifier,
-      this.handler,
-      this._compiled,
-      this._locals,
-      this.virtualPath,
-      this.format,
-      this.variant,
-    ] = array as [
-      string | SourcesFile,
-      string,
-      TemplateHandler,
-      boolean,
-      readonly string[],
-      string | null,
-      string | null,
-      string | null,
-    ];
+    const [_source, identifier, handler, _compiled, _locals, virtualPath, format, variant] = array;
+    Object.assign(this, {
+      _source,
+      identifier,
+      handler,
+      _compiled,
+      _locals,
+      virtualPath,
+      format,
+      variant,
+    });
   }
 
   async render(
