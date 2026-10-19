@@ -40,6 +40,26 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'template/template_test.rb:150 `render.encoding` is Encoding::UTF_8 — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
     },
   ],
+  "actiondispatch:dispatch/test_response_test.rb › TestResponseTest › JSON response Hash pattern matching":
+    [
+      {
+        kind: "assert_pattern",
+        value: null,
+        as: "assert_match",
+        reason:
+          "dispatch/test_response_test.rb:45 `assert_pattern { x => pattern }` is Ruby rightward pattern matching, which has no JS syntax; the port matches the same pattern with `toMatchObject`",
+      },
+    ],
+  "actiondispatch:dispatch/test_response_test.rb › TestResponseTest › JSON response Array pattern matching":
+    [
+      {
+        kind: "assert_pattern",
+        value: null,
+        as: "assert_match",
+        reason:
+          "dispatch/test_response_test.rb:50 `assert_pattern { x => pattern }` is Ruby rightward pattern matching, which has no JS syntax; the port matches the same pattern with `toMatchObject`",
+      },
+    ],
   "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › simple query string": [
     {
       kind: "assert_instance_of",

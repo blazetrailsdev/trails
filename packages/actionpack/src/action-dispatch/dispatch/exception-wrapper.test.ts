@@ -3,6 +3,7 @@ import { ParameterTypeError } from "@blazetrails/rack";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 import { BacktraceCleaner, assertCalledWith, assertEmpty } from "@blazetrails/activesupport";
+import { excBacktrace, excBacktraceLocations, type Location } from "@blazetrails/ruby-compat";
 import { ExceptionWrapper } from "../middleware/exception-wrapper.js";
 
 const BACKTRACE =
@@ -13,6 +14,23 @@ function makeCleaner(): BacktraceCleaner {
   cleaner.removeFilters();
   cleaner.addSilencer((line) => !line.includes("lib/"));
   return cleaner;
+}
+
+class TopErrorProxy extends Error {
+  constructor(
+    private ex: Error,
+    private n: number,
+  ) {
+    super();
+  }
+
+  backtrace(): string[] {
+    return excBacktrace(this.ex)!.slice(0, this.n);
+  }
+
+  backtraceLocations(): Location[] {
+    return excBacktraceLocations(this.ex)!.slice(0, this.n);
+  }
 }
 
 function raised(klass: ErrorConstructor, ...frames: string[]): Error {
@@ -78,7 +96,7 @@ describe("ExceptionWrapperTest", () => {
   it("#source_extracts works with eval syntax error", async () => {
     const exception = raised(SyntaxError, "throw_syntax_error (lib/file.rb:42:1)");
 
-    const wrapper = new ExceptionWrapper(null, exception);
+    const wrapper = new ExceptionWrapper(null, new TopErrorProxy(exception, 1));
 
     await assertCalledWith(
       wrapper,

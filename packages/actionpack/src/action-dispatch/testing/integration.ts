@@ -720,7 +720,7 @@ export class IntegrationTest extends TestCase {
 
   response!: TestResponse;
 
-  get documentRootElement() {
+  documentRootElement() {
     return this.htmlDocument.root;
   }
 
