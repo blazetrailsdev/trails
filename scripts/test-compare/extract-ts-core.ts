@@ -143,7 +143,7 @@ function isTestObject(owner: ts.Expression): boolean {
  * `controller/rescue_test.rb`'s port) is the `assertResponse` assertion, its
  * arguments after the receiver.
  */
-function isAssertionDotCall(expression: ts.Expression): expression is ts.PropertyAccessExpression {
+function isAssertionDotCall(expression: ts.Expression): boolean {
   return (
     ts.isPropertyAccessExpression(expression) &&
     expression.name.text === "call" &&

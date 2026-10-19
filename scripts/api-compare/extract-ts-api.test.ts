@@ -7584,7 +7584,7 @@ describe("extractFromProgram — aliasMethod on another file's module", () => {
         export function newControllerThread(block: () => void): void {}
         Live.defineMethod("newControllerThread", newControllerThread);`,
     });
-    expect(info.fileFunctions["test-case.ts"].map((f) => [f.name, f.aliasOf])).toEqual([
+    expect(info.fileFunctions!["test-case.ts"].map((f) => [f.name, f.aliasOf])).toEqual([
       ["newControllerThread", undefined],
       ["originalNewControllerThread", "newControllerThread"],
     ]);
