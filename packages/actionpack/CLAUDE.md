@@ -211,4 +211,5 @@ A null prototype keeps a `__proto__` or `toString` param from reaching
 prototype is `null`, by rows in `scripts/test-compare/assertion-receipts.ts`
 citing this section. There is no story to make params a
 `HashWithIndifferentAccess`.
-Ruled by the repo owner on 2026-10-18 (trails#9052).
+Ruled by the repo owner on 2026-10-18, closing story
+`param-builder-make-params-is-hash-with-indifferent-access` as PERMANENT.
