@@ -255,7 +255,7 @@ export class Response {
 
   constructor(
     body: any = null,
-    status: number = 200,
+    status: number | string = 200,
     headers: Record<string, string | string[]> = {},
   ) {
     this.status = typeof status === "number" ? status : parseInt(String(status));
