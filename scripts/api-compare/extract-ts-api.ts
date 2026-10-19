@@ -3687,9 +3687,12 @@ function includedHookOwner(expr: ts.Expression): string | undefined {
           ts.isElementAccessExpression(expr.left)
         ? expr.left
         : undefined;
-  if (hook === undefined || !ts.isIdentifier(hook.expression)) return undefined;
+  if (hook === undefined) return undefined;
+  let owner: ts.Expression = hook.expression;
+  while (ts.isParenthesizedExpression(owner) || ts.isAsExpression(owner)) owner = owner.expression;
+  if (!ts.isIdentifier(owner)) return undefined;
   const name = ts.isPropertyAccessExpression(hook) ? hook.name : hook.argumentExpression;
-  return ts.isIdentifier(name) && name.text === "included" ? hook.expression.text : undefined;
+  return ts.isIdentifier(name) && name.text === "included" ? owner.text : undefined;
 }
 
 function isExportedModuleConst(sourceFile: ts.SourceFile, name: string): boolean {

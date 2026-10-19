@@ -8,7 +8,7 @@ import {
   rbObjClass,
 } from "@blazetrails/ruby-compat";
 
-import { Module, extend, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { extend, include, rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Store } from "./store.js";
@@ -53,42 +53,42 @@ export interface Serializer {
   isAvailable?(): boolean;
 }
 
-/** @internal */
-export const SerializerWithFallback = new Module().include({
-  load(dumped: unknown): unknown {
-    if (typeof dumped === "string") {
-      if (messagePackWithFallback.dumped(dumped)) {
-        return messagePackWithFallback._load(dumped);
-      } else if (marshal71WithFallback.dumped(dumped)) {
-        return marshal71WithFallback._load(dumped);
-      } else if (marshal70WithFallback.dumped(dumped)) {
-        return marshal70WithFallback._load(dumped);
-      } else {
-        Store.logger?.warn(
-          `Unrecognized payload prefix ${rbInspect(byteslice(dumped, 0))}; deserializing as nil`,
-        );
-        return null;
-      }
-    } else if (passthroughWithFallback.dumped(dumped as Entry)) {
-      return passthroughWithFallback._load(dumped as Entry);
+function load(dumped: unknown): unknown {
+  if (typeof dumped === "string") {
+    if (messagePackWithFallback.dumped(dumped)) {
+      return messagePackWithFallback._load(dumped);
+    } else if (marshal71WithFallback.dumped(dumped)) {
+      return marshal71WithFallback._load(dumped);
+    } else if (marshal70WithFallback.dumped(dumped)) {
+      return marshal70WithFallback._load(dumped);
     } else {
       Store.logger?.warn(
-        `Unrecognized payload class ${rbModToS(rbObjClass(dumped))}; deserializing as nil`,
+        `Unrecognized payload prefix ${rbInspect(byteslice(dumped, 0))}; deserializing as nil`,
       );
       return null;
     }
-  },
+  } else if (passthroughWithFallback.dumped(dumped as Entry)) {
+    return passthroughWithFallback._load(dumped as Entry);
+  } else {
+    Store.logger?.warn(
+      `Unrecognized payload class ${rbModToS(rbObjClass(dumped))}; deserializing as nil`,
+    );
+    return null;
+  }
+}
 
-  /** @internal */
-  marshalLoad(payload: string): unknown {
-    try {
-      return coder.load(payload);
-    } catch (error) {
-      if (!(error instanceof SyntaxError)) throw error;
-      throw new DeserializationError(error.message);
-    }
-  },
-}) as Module & {
+/** @internal */
+function marshalLoad(payload: string): unknown {
+  try {
+    return coder.load(payload);
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error;
+    throw new DeserializationError(error.message);
+  }
+}
+
+/** @internal */
+export const SerializerWithFallback = { load, marshalLoad } as {
   load(dumped: unknown): unknown;
   marshalLoad(payload: string): unknown;
   SERIALIZERS: Hash<string, Serializer>;
@@ -100,7 +100,7 @@ const MARK_COMPRESSED = "\x01";
 
 const MARSHAL_SIGNATURE = "\x04\x08";
 
-const passthroughWithFallback = new Module().include(SerializerWithFallback).include({
+const passthroughWithFallback = {
   dump(entry: Entry | unknown): Entry {
     return entry as Entry;
   },
@@ -116,10 +116,11 @@ const passthroughWithFallback = new Module().include(SerializerWithFallback).inc
   dumped(dumped: string | Entry): boolean {
     return dumped instanceof Entry;
   },
-}) as Module & Serializer;
+} as Serializer;
+include(passthroughWithFallback, SerializerWithFallback);
 extend(passthroughWithFallback, passthroughWithFallback);
 
-const marshal70WithFallback = new Module().include(SerializerWithFallback).include({
+const marshal70WithFallback = {
   dump(entry: Entry | unknown): string {
     return MARK_UNCOMPRESSED + toBinary(coder.dump((entry as Entry).pack()));
   },
@@ -150,10 +151,11 @@ const marshal70WithFallback = new Module().include(SerializerWithFallback).inclu
       (dumped as string).startsWith(MARK_COMPRESSED)
     );
   },
-}) as Module & Serializer;
+} as Serializer;
+include(marshal70WithFallback, SerializerWithFallback);
 extend(marshal70WithFallback, marshal70WithFallback);
 
-const marshal71WithFallback = new Module().include(SerializerWithFallback).include({
+const marshal71WithFallback = {
   dump(value: Entry | unknown): string {
     return MARSHAL_SIGNATURE + toBinary(coder.dump(value));
   },
@@ -165,10 +167,11 @@ const marshal71WithFallback = new Module().include(SerializerWithFallback).inclu
   dumped(dumped: string | Entry): boolean {
     return (dumped as string).startsWith(MARSHAL_SIGNATURE);
   },
-}) as Module & Serializer;
+} as Serializer;
+include(marshal71WithFallback, SerializerWithFallback);
 extend(marshal71WithFallback, marshal71WithFallback);
 
-const messagePackWithFallback = new Module().include(SerializerWithFallback).include({
+const messagePackWithFallback = {
   dump(value: Entry | unknown): string {
     return Buffer.from(ActiveSupport.MessagePack!.CacheSerializer.dump(value)).toString("latin1");
   },
@@ -191,7 +194,8 @@ const messagePackWithFallback = new Module().include(SerializerWithFallback).inc
   isAvailable(): boolean {
     return ActiveSupport.MessagePack !== undefined;
   },
-}) as Module & Serializer;
+} as Serializer;
+include(messagePackWithFallback, SerializerWithFallback);
 extend(messagePackWithFallback, messagePackWithFallback);
 
 const SERIALIZERS = new Hash<string, Serializer>()

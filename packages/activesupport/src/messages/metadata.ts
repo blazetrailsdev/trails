@@ -5,7 +5,7 @@ import { Encoding } from "../json/encoding.js";
 import { onLoad } from "../lazy-load-hooks.js";
 import { ActiveSupport } from "../namespaces.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { Rational, hasKey, hashAref } from "@blazetrails/ruby-compat";
+import { Rational, fetch, hasKey, hashAref } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
@@ -31,11 +31,11 @@ function isPresent(value: unknown): boolean {
 export abstract class Metadata {
   static useMessageSerializerForMetadata = false;
 
-  static readonly ENVELOPE_SERIALIZERS: unknown[] = [...Object.values(SERIALIZERS), coder];
+  static readonly ENVELOPE_SERIALIZERS: unknown[] = [...SERIALIZERS.values(), coder];
 
   static readonly TIMESTAMP_SERIALIZERS: unknown[] = [
-    SERIALIZERS.message_pack,
-    SERIALIZERS.message_pack_allow_marshal,
+    fetch(SERIALIZERS, "message_pack"),
+    fetch(SERIALIZERS, "message_pack_allow_marshal"),
   ];
 
   protected abstract readonly serializer: MessageSerializer;

@@ -1,5 +1,5 @@
 import { MessagePack, type Factory, type Packer, type Unpacker } from "@blazetrails/msgpack";
-import { extend, Module, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { extend, rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { ActiveSupport } from "../namespaces.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
@@ -86,7 +86,7 @@ function classOf(value: object): ObjectClass {
   return (value as { constructor: ObjectClass }).constructor;
 }
 
-const ExtensionsMethods = {
+export const Extensions = {
   /**
    * Mirrors `ActiveSupport::MessagePack::Extensions#install`
    * (`vendor/rails/v8.0.2/activesupport/lib/active_support/message_pack/extensions.rb:20-110`).
@@ -429,11 +429,9 @@ const ExtensionsMethods = {
   },
 };
 
-export const Extensions = new Module().include(ExtensionsMethods) as Module &
-  typeof ExtensionsMethods;
 extend(Extensions, Extensions);
 
-rbModConstSet(ActiveSupport, "MessagePack", new Module());
+rbModConstSet(ActiveSupport, "MessagePack", {});
 rbModConstSet(ActiveSupport.MessagePack!, "UnserializableObjectError", UnserializableObjectError);
 rbModConstSet(ActiveSupport.MessagePack!, "MissingClassError", MissingClassError);
 rbModConstSet(ActiveSupport.MessagePack!, "Extensions", Extensions);
