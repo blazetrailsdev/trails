@@ -4,10 +4,15 @@ import { RouteSet } from "@blazetrails/actionpack";
 import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
 import {
   BigDecimal,
+  Mock,
+  HashWithIndifferentAccess,
   I18n,
   assertEqual,
   assertPredicate,
+  assertMock,
+  assertNotIncludes,
   assertRaises,
+  expectCalledWith,
   extend,
   isBlank,
   htmlSafe,
@@ -15,9 +20,18 @@ import {
   isHtmlSafe,
   isPlainObject,
   isPresent,
+  stub,
 } from "@blazetrails/activesupport";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
-import { ArgumentError, Range, Struct, include } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Hash,
+  Range,
+  Struct,
+  include,
+  publicInstanceMethods,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
@@ -31,6 +45,7 @@ import {
 } from "../helpers/form-helper.js";
 import type { LabelBuilder } from "../helpers/tags/label.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
+import { Cpk } from "../test-helpers/fake-models.js";
 
 class Post {
   static {
@@ -141,6 +156,84 @@ class Tag {
   get value(): string {
     return this.id == null ? "new tag" : `tag #${String(this.id)}`;
   }
+
+  relevances: unknown = null;
+  set relevances_attributes(attributes: unknown) {}
+}
+
+class Relevance {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  constructor(public id: unknown = null) {}
+
+  toKey(): unknown[] | null {
+    return this.id != null && this.id !== false ? [this.id] : null;
+  }
+  isPersisted(): boolean {
+    return isPresent(this.id);
+  }
+  toParam(): unknown {
+    return this.id != null && this.id !== false ? String(this.id) : this.id;
+  }
+  get value(): string {
+    const name = this.constructor.name.toLowerCase();
+    return this.id == null ? `new ${name}` : `${name} #${String(this.id)}`;
+  }
+}
+
+class CommentRelevance extends Relevance {}
+class TagRelevance extends Relevance {}
+
+class HashBackedAuthor extends Hash<string, unknown> {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  isPersisted(): boolean {
+    return false;
+  }
+  get name(): string {
+    return "hash backed author";
+  }
+}
+
+class HashWithIndifferentAccessBackedAuthor extends HashWithIndifferentAccess {
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  isPersisted(): boolean {
+    return false;
+  }
+  get name(): string {
+    return "hash backed author";
+  }
+}
+
+class ArelLike {
+  toAry(): boolean {
+    return true;
+  }
+  each(block: (comment: Comment) => void): void {
+    const a = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    a.forEach(block);
+  }
+  *[Symbol.iterator](): Iterator<Comment> {
+    const a: Comment[] = [];
+    this.each((c) => a.push(c));
+    yield* a;
+  }
+}
+
+class FakeAssociationProxy {
+  toAry(): number[] {
+    return [1, 2, 3];
+  }
 }
 
 class Car {
@@ -152,6 +245,18 @@ Routes.draw(function () {
   this.resources("posts", () => {
     this.resources("comments");
   });
+
+  this.namespace("admin", () => {
+    this.resources("posts", () => {
+      this.resources("comments");
+    });
+  });
+
+  this.namespace("cpk", () => {
+    this.resources("books");
+  });
+
+  this.get("/foo", { to: "controller#action" });
   this.root({ to: "main#index" });
 });
 
@@ -167,6 +272,7 @@ describe("FormHelperTest", () => {
   let post: Post;
   let comment: Comment;
   let rendered: unknown;
+  let urlForOptions: Record<string, unknown>;
 
   function formFor(...args: Parameters<Base["formFor"]>): unknown {
     return (rendered = view.formFor(...args));
@@ -254,6 +360,8 @@ describe("FormHelperTest", () => {
     include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
     const urlFor = view.urlFor;
     view.urlFor = function (this: Base, object: unknown): string {
+      urlForOptions = object as Record<string, unknown>;
+
       if (isPlainObject(object) && isBlank(object["useRoute"]) && isBlank(object["controller"])) {
         object["controller"] = "main";
         object["action"] = "index";
@@ -1731,8 +1839,280 @@ describe("FormHelperTest", () => {
     }
   });
 
+  it("lazy loading default form builder", () => {
+    registerConstant("FormHelperTest", { LabelledFormBuilder });
+    const base = Base as unknown as { defaultFormBuilder: unknown };
+    const oldDefaultFormBuilder = base.defaultFormBuilder;
+    base.defaultFormBuilder = "FormHelperTest::LabelledFormBuilder";
+    try {
+      formFor(post, {}, (f) => {
+        concat(f.textField("title"));
+      });
+
+      const expected = editPost(
+        () =>
+          "<label for='title'>Title:</label> <input name='post[title]' type='text' id='post_title' value='Hello World' /><br/>",
+      );
+
+      assertDomEqual(expected, rendered);
+    } finally {
+      base.defaultFormBuilder = oldDefaultFormBuilder;
+    }
+  });
+
   it("form builder override", () => {
     view.defaultFormBuilder = LabelledFormBuilder;
+
+    rendered = view.fieldsFor("post", post, {}, (f) => {
+      concat(f.textField("title"));
+    });
+
+    const expected =
+      "<label for='title'>Title:</label> <input name='post[title]' type='text' id='post_title' value='Hello World' /><br/>";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with labelled builder", () => {
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = editPost(
+      () =>
+        "<label for='title'>Title:</label> <input name='post[title]' type='text' id='post_title' value='Hello World' /><br/>" +
+        "<label for='body'>Body:</label> <textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea><br/>" +
+        "<label for='secret'>Secret:</label> <input name='post[secret]' type='hidden' value='0' autocomplete='off' /><input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' /><br/>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for with labelled builder", () => {
+    rendered = view.fieldsFor("post", post, { builder: LabelledFormBuilder }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<label for='title'>Title:</label> <input name='post[title]' type='text' id='post_title' value='Hello World' /><br/>" +
+      "<label for='body'>Body:</label> <textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea><br/>" +
+      "<label for='secret'>Secret:</label> <input name='post[secret]' type='hidden' value='0' autocomplete='off' /><input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' /><br/>";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with labelled builder with nested fields for without options hash", () => {
+    let klass: unknown = null;
+
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      f.fieldsFor("comments", new Comment(), null, (nestedFields) => {
+        klass = nestedFields.constructor;
+        return "";
+      });
+    });
+
+    expect(klass).toBe(LabelledFormBuilder);
+  });
+
+  it("form for with labelled builder with nested fields for with options hash", () => {
+    let klass: unknown = null;
+
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      f.fieldsFor("comments", new Comment(), { index: "foo" }, (nestedFields) => {
+        klass = nestedFields.constructor;
+        return "";
+      });
+    });
+
+    expect(klass).toBe(LabelledFormBuilder);
+  });
+
+  it("form for with labelled builder path", () => {
+    let path: unknown = null;
+
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      path = f.toPartialPath();
+      return "";
+    });
+
+    expect(path).toBe("labelled_form");
+  });
+
+  class LabelledFormBuilderSubclass extends LabelledFormBuilder {}
+
+  it("form for with labelled builder with nested fields for with custom builder", () => {
+    let klass: unknown = null;
+
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      f.fieldsFor(
+        "comments",
+        new Comment(),
+        { builder: LabelledFormBuilderSubclass },
+        (nestedFields) => {
+          klass = nestedFields.constructor;
+          return "";
+        },
+      );
+    });
+
+    expect(klass).toBe(LabelledFormBuilderSubclass);
+  });
+
+  it("form for with html options adds options to form tag", () => {
+    formFor(post, { html: { id: "some_form", class: "some_class", multipart: true } }, () => {});
+    const expected = wholeForm("/posts/123", "some_form", "some_class", {
+      method: "patch",
+      multipart: "multipart/form-data",
+    });
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with string url option", () => {
+    formFor(post, { url: "http://www.otherdomain.com" }, () => {});
+
+    assertDomEqual(
+      wholeForm("http://www.otherdomain.com", "edit_post_123", "edit_post", { method: "patch" }),
+      rendered,
+    );
+  });
+
+  it("form for with record url option", () => {
+    formFor(post, { url: post }, () => {});
+
+    const expected = wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with existing object", () => {
+    formFor(post, {}, () => {});
+
+    const expected = wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with new object", () => {
+    const post = new Post();
+    post.persisted = false;
+    (post as unknown as { toKey(): null }).toKey = () => null;
+
+    formFor(post, {}, () => {});
+
+    const expected = wholeForm("/posts", "new_post", "new_post");
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with hash url option", () => {
+    formFor(post, { url: { controller: "controller", action: "action" } }, () => {});
+
+    expect(urlForOptions["controller"]).toBe("controller");
+    expect(urlForOptions["action"]).toBe("action");
+  });
+
+  it("form for with existing object in list", () => {
+    comment.save();
+    formFor([post, comment], {}, () => {});
+
+    const expected = wholeForm(
+      view.postCommentPath(post, comment) as string,
+      "edit_comment_1",
+      "edit_comment",
+      { method: "patch" },
+    );
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with new object in list", () => {
+    formFor([post, comment], {}, () => {});
+
+    const expected = wholeForm(view.postCommentsPath(post) as string, "new_comment", "new_comment");
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with existing object and namespace in list", () => {
+    comment.save();
+    formFor([":admin", post, comment], {}, () => {});
+
+    const expected = wholeForm(
+      view.adminPostCommentPath(post, comment) as string,
+      "edit_comment_1",
+      "edit_comment",
+      { method: "patch" },
+    );
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with new object and namespace in list", () => {
+    formFor([":admin", post, comment], {}, () => {});
+
+    const expected = wholeForm(
+      view.adminPostCommentsPath(post) as string,
+      "new_comment",
+      "new_comment",
+    );
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with new cpk model", () => {
+    formFor(new Cpk.Book(), {}, () => {});
+
+    const expected = wholeForm("/cpk/books", "new_cpk_book", "new_cpk_book", { method: "post" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with persisted cpk model", () => {
+    formFor(new Cpk.Book({ id: [1, 2], title: "Some book" }), {}, () => {});
+
+    const expected = wholeForm("/cpk/books/1-2", "edit_cpk_book_1_2", "edit_cpk_book", {
+      method: "patch",
+    });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with existing object and custom url", () => {
+    formFor(post, { url: "/super_posts" }, () => {});
+
+    const expected = wholeForm("/super_posts", "edit_post_123", "edit_post", { method: "patch" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with default method as patch", () => {
+    formFor(post, {}, () => {});
+    const expected = wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with data attributes", () => {
+    formFor(post, { data: { behavior: "stuff" }, remote: true }, () => {});
+    expect(String(rendered)).toMatch(/data-behavior="stuff"/);
+    expect(String(rendered)).toMatch(/data-remote="true"/);
+  });
+
+  it("fields for returns block result", () => {
+    const output = view.fieldsFor(new Post(), null, {}, () => "fields");
+    expect(String(output)).toBe("fields");
+  });
+
+  it("form for only instantiates builder once", () => {
+    let initializationCount = 0;
+    const builderClass = class extends FormBuilder {
+      constructor(...args: ConstructorParameters<typeof FormBuilder>) {
+        super(...args);
+        initializationCount += 1;
+      }
+    };
+
+    formFor(post, { builder: builderClass }, () => {});
+    expect(initializationCount, "form builder instantiated more than once").toBe(1);
+  });
+
+  it("lazy loading form builder override", () => {
+    registerConstant("FormHelperTest", { LabelledFormBuilder });
+    view.defaultFormBuilder = "FormHelperTest::LabelledFormBuilder";
 
     rendered = view.fieldsFor("post", post, {}, (f) => {
       concat(f.textField("title"));
@@ -1855,6 +2235,146 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
+  it("nested fields for with nested collections", () => {
+    formFor(post, { as: "post[]" }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comment[]", comment, null, (c) => {
+          concat(c.textField("name"));
+        }),
+      );
+      concat(f.textField("body"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<input name='post[123][title]' type='text' id='post_123_title' value='Hello World' />" +
+        "<input name='post[123][comment][][name]' type='text' id='post_123_comment__name' value='new comment' />" +
+        "<input name='post[123][body]' type='text' id='post_123_body' value='Back to the hill and over it again!' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with index on both", () => {
+    formFor(post, { index: 1 }, (f) => {
+      concat(
+        f.fieldsFor("comment", post, { index: 5 }, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        "<input name='post[1][comment][5][title]' type='text' id='post_1_comment_5_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with auto index", () => {
+    formFor(post, { as: "post[]" }, (f) => {
+      concat(
+        f.fieldsFor("comment", post, null, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<input name='post[123][comment][title]' type='text' id='post_123_comment_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with index radio button", () => {
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comment", post, { index: 5 }, (c) => {
+          concat(c.radioButton("title", "hello"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        "<input name='post[comment][5][title]' type='radio' id='post_comment_5_title_hello' value='hello' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with auto index on both", () => {
+    formFor(post, { as: "post[]" }, (f) => {
+      concat(
+        f.fieldsFor("comment[]", post, null, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<input name='post[123][comment][123][title]' type='text' id='post_123_comment_123_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with index and auto index", () => {
+    formFor(post, { as: "post[]" }, (f) => {
+      concat(
+        f.fieldsFor("comment", post, { index: 5 }, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    let expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<input name='post[123][comment][5][title]' type='text' id='post_123_comment_5_title' value='Hello World' />",
+    );
+    assertDomEqual(expected, rendered);
+
+    formFor(post, { as: "post", index: 1 }, (f) => {
+      concat(
+        f.fieldsFor("comment[]", post, null, (c) => {
+          concat(c.textField("title"));
+        }),
+      );
+    });
+
+    expected = wholeForm(
+      "/posts/123",
+      "edit_post",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<input name='post[1][comment][123][title]' type='text' id='post_1_comment_123_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
   it("nested fields for with a new record on a nested attributes one to one association", () => {
     post.author = new Author();
 
@@ -1901,6 +2421,869 @@ describe("FormHelperTest", () => {
       editPost(() => titleInput + authorName + authorId),
       rendered,
     );
+  });
+
+  it("nested fields for with an existing record on a nested attributes one to one association using erb and inline block", () => {
+    post.author = new Author(321);
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          return af.textField("name");
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorName + authorId),
+      rendered,
+    );
+  });
+
+  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id", () => {
+    post.author = new Author(321);
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, { includeId: false }, (af) => {
+          return af.textField("name");
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorName),
+      rendered,
+    );
+  });
+
+  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id inherited", () => {
+    post.author = new Author(321);
+
+    formFor(post, { includeId: false }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          return af.textField("name");
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorName),
+      rendered,
+    );
+  });
+
+  it("nested fields for with an existing record on a nested attributes one to one association with disabled hidden id override", () => {
+    post.author = new Author(321);
+
+    formFor(post, { includeId: false }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, { includeId: true }, (af) => {
+          return af.textField("name");
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorName + authorId),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes one to one association with explicit hidden field placement", () => {
+    post.author = new Author(321);
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          concat(af.hiddenField("id"));
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + authorId + authorName),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    post.author = new Author(321);
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, { includeId: false }, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          authorName +
+          authorId +
+          commentName(0, "comment #1") +
+          commentName(1, "comment #2"),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id inherited", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    post.author = new Author(321);
+    formFor(post, { includeId: false }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () => titleInput + authorName + commentName(0, "comment #1") + commentName(1, "comment #2"),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association with disabled hidden id override", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    post.author = new Author(321);
+    formFor(post, { includeId: false }, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("author", null, { includeId: true }, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          authorName +
+          authorId +
+          commentName(0, "comment #1") +
+          commentName(1, "comment #2"),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association using erb and inline block", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            return cf.textField("name");
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #1") +
+          commentId(0, 1) +
+          commentName(1, "comment #2") +
+          commentId(1, 2),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a nested attributes collection association with explicit hidden field placement", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.hiddenField("id"));
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentId(0, 1) +
+          commentName(0, "comment #1") +
+          commentId(1, 2) +
+          commentName(1, "comment #2"),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with new records on a nested attributes collection association", () => {
+    post.comments = [new Comment(), new Comment()];
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput + commentName(0, "new comment") + commentName(1, "new comment")),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing and new records on a nested attributes collection association", () => {
+    post.comments = [new Comment(321), new Comment()];
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      for (const comment of post.comments as Comment[]) {
+        concat(
+          f.fieldsFor("comments", comment, null, (cf) => {
+            concat(cf.textField("name"));
+          }),
+        );
+      }
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #321") +
+          commentId(0, 321) +
+          commentName(1, "new comment"),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with an empty supplied attributes collection", () => {
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      f.fieldsFor("comments", [], null, (cf) => {
+        concat(cf.textField("name"));
+      });
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a supplied nested attributes collection", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comments", post.comments, null, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #1") +
+          commentId(0, 1) +
+          commentName(1, "comment #2") +
+          commentId(1, 2),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields label translation with more than 10 records", () => {
+    post.comments = Array.from({ length: 11 }, (_, id) => new Comment(id + 1));
+
+    const mock = new Mock();
+    for (const _ of post.comments as Comment[]) {
+      expectCalledWith(
+        mock,
+        ["post.comments.body", { default: [":comment.body", ""], scope: "helpers.label" }],
+        { returns: "body" },
+      );
+    }
+
+    stub(I18n, "t", mock, [], () => {
+      formFor(post, {}, (f) => {
+        f.fieldsFor("comments", null, null, (cf) => {
+          concat(cf.label("body"));
+        });
+      });
+    });
+
+    assertMock(mock);
+  });
+
+  it("nested fields for with existing records on a supplied nested attributes collection different from record one", () => {
+    const comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    post.comments = [];
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comments", comments, null, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #1") +
+          commentId(0, 1) +
+          commentName(1, "comment #2") +
+          commentId(1, 2),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for on a nested attributes collection association yields only builder", () => {
+    post.comments = [new Comment(321), new Comment()];
+    const yieldedComments: unknown[] = [];
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comments", null, null, (cf) => {
+          concat(cf.textField("name"));
+          yieldedComments.push(cf.object);
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #321") +
+          commentId(0, 321) +
+          commentName(1, "new comment"),
+      ),
+      rendered,
+    );
+    expect(yieldedComments).toEqual(post.comments);
+  });
+
+  it("nested fields for with child index option override on a nested attributes collection association", () => {
+    post.comments = [];
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comments", new Comment(321), { childIndex: "abc" }, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_comments_attributes_abc_name" name="post[comments_attributes][abc][name]" type="text" value="comment #321" />' +
+          '<input id="post_comments_attributes_abc_id" name="post[comments_attributes][abc][id]" type="hidden" value="321" autocomplete="off" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with child index as lambda option override on a nested attributes collection association", () => {
+    post.comments = [];
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comments", new Comment(321), { childIndex: () => "abc" }, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_comments_attributes_abc_name" name="post[comments_attributes][abc][name]" type="text" value="comment #321" />' +
+          '<input id="post_comments_attributes_abc_id" name="post[comments_attributes][abc][id]" type="hidden" value="321" autocomplete="off" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for index method with existing records on a nested attributes collection association", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+
+    formFor(post, {}, (f) => {
+      let expected = 0;
+      for (const comment of post.comments as Comment[]) {
+        f.fieldsFor("comments", comment, null, (cf) => {
+          expect(cf.index).toBe(expected);
+          expected += 1;
+        });
+      }
+    });
+  });
+
+  it("nested fields for index method with existing and new records on a nested attributes collection association", () => {
+    post.comments = [new Comment(321), new Comment()];
+
+    formFor(post, {}, (f) => {
+      let expected = 0;
+      for (const comment of post.comments as Comment[]) {
+        f.fieldsFor("comments", comment, null, (cf) => {
+          expect(cf.index).toBe(expected);
+          expected += 1;
+        });
+      }
+    });
+  });
+
+  it("nested fields for index method with existing records on a supplied nested attributes collection", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+
+    formFor(post, {}, (f) => {
+      let expected = 0;
+      f.fieldsFor("comments", post.comments, null, (cf) => {
+        expect(cf.index).toBe(expected);
+        expected += 1;
+      });
+    });
+  });
+
+  it("nested fields for index method with child index option override on a nested attributes collection association", () => {
+    post.comments = [];
+
+    formFor(post, {}, (f) => {
+      f.fieldsFor("comments", new Comment(321), { childIndex: "abc" }, (cf) => {
+        expect(cf.index).toBe("abc");
+      });
+    });
+  });
+
+  it("nested fields for arel like", () => {
+    post.comments = new ArelLike();
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comments", post.comments, null, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #1") +
+          commentId(0, 1) +
+          commentName(1, "comment #2") +
+          commentId(1, 2),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with child index option override on a nested attributes collection association with proxy", () => {
+    post.comments = new FakeAssociationProxy();
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comments", new Comment(321), { childIndex: "abc" }, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_comments_attributes_abc_name" name="post[comments_attributes][abc][name]" type="text" value="comment #321" />' +
+          '<input id="post_comments_attributes_abc_id" name="post[comments_attributes][abc][id]" type="hidden" value="321" autocomplete="off" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields uses unique indices for different collection associations", () => {
+    post.comments = [new Comment(321)];
+    post.tags = [new Tag(123), new Tag(456)];
+    const comments = post.comments as Comment[];
+    const tags = post.tags as Tag[];
+    comments[0].relevances = [];
+    tags[0].relevances = [];
+    tags[1].relevances = [];
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comments", comments[0], null, (cf) => {
+          concat(cf.textField("name"));
+          concat(
+            cf.fieldsFor("relevances", new CommentRelevance(314), null, (crf) => {
+              concat(crf.textField("value"));
+            }),
+          );
+        }),
+      );
+      concat(
+        f.fieldsFor("tags", tags[0], null, (tf) => {
+          concat(tf.textField("value"));
+          concat(
+            tf.fieldsFor("relevances", new TagRelevance(3141), null, (trf) => {
+              concat(trf.textField("value"));
+            }),
+          );
+        }),
+      );
+      concat(
+        f.fieldsFor("tags", tags[1], null, (tf) => {
+          concat(tf.textField("value"));
+          concat(
+            tf.fieldsFor("relevances", new TagRelevance(31415), null, (trf) => {
+              concat(trf.textField("value"));
+            }),
+          );
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        '<input id="post_comments_attributes_0_name" name="post[comments_attributes][0][name]" type="text" value="comment #321" />' +
+        '<input id="post_comments_attributes_0_relevances_attributes_0_value" name="post[comments_attributes][0][relevances_attributes][0][value]" type="text" value="commentrelevance #314" />' +
+        '<input id="post_comments_attributes_0_relevances_attributes_0_id" name="post[comments_attributes][0][relevances_attributes][0][id]" type="hidden" value="314" autocomplete="off" />' +
+        '<input id="post_comments_attributes_0_id" name="post[comments_attributes][0][id]" type="hidden" value="321" autocomplete="off" />' +
+        '<input id="post_tags_attributes_0_value" name="post[tags_attributes][0][value]" type="text" value="tag #123" />' +
+        '<input id="post_tags_attributes_0_relevances_attributes_0_value" name="post[tags_attributes][0][relevances_attributes][0][value]" type="text" value="tagrelevance #3141" />' +
+        '<input id="post_tags_attributes_0_relevances_attributes_0_id" name="post[tags_attributes][0][relevances_attributes][0][id]" type="hidden" value="3141" autocomplete="off" />' +
+        '<input id="post_tags_attributes_0_id" name="post[tags_attributes][0][id]" type="hidden" value="123" autocomplete="off" />' +
+        '<input id="post_tags_attributes_1_value" name="post[tags_attributes][1][value]" type="text" value="tag #456" />' +
+        '<input id="post_tags_attributes_1_relevances_attributes_0_value" name="post[tags_attributes][1][relevances_attributes][0][value]" type="text" value="tagrelevance #31415" />' +
+        '<input id="post_tags_attributes_1_relevances_attributes_0_id" name="post[tags_attributes][1][relevances_attributes][0][id]" type="hidden" value="31415" autocomplete="off" />' +
+        '<input id="post_tags_attributes_1_id" name="post[tags_attributes][1][id]" type="hidden" value="456" autocomplete="off" />',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with hash like model", () => {
+    const author = new HashBackedAuthor();
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("author", author, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_author_attributes_name" name="post[author_attributes][name]" type="text" value="hash backed author" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with hash with indifferent access like model and options", () => {
+    const author = new HashWithIndifferentAccessBackedAuthor();
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("author", author, {}, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_author_attributes_name" name="post[author_attributes][name]" type="text" value="hash backed author" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with hash with indifferent access like model without options", () => {
+    const author = new HashWithIndifferentAccessBackedAuthor();
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("author", author, null, (af) => {
+          concat(af.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(() => ""),
+      rendered,
+    );
+  });
+
+  it("fields for", () => {
+    rendered = view.fieldsFor("post", post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+      "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for field id", () => {
+    view.fieldsFor("post", post, {}, (fields) => {
+      expect(fields.fieldId("title")).toBe("post_title");
+    });
+  });
+
+  it("fields for with index", () => {
+    rendered = view.fieldsFor("post[]", post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[123][title]' type='text' id='post_123_title' value='Hello World' />" +
+      "<textarea name='post[123][body]' id='post_123_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[123][secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[123][secret]' checked='checked' type='checkbox' id='post_123_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for field id with index option", () => {
+    view.fieldsFor("post", post, {}, (fields) => {
+      expect(fields.fieldId("title", { index: 5 })).toBe("post_5_title");
+    });
+  });
+
+  it("fields for with nil index option override", () => {
+    rendered = view.fieldsFor("post[]", post, { index: null }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[][title]' type='text' id='post__title' value='Hello World' />" +
+      "<textarea name='post[][body]' id='post__body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[][secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[][secret]' checked='checked' type='checkbox' id='post__secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for with index option override field id", () => {
+    view.fieldsFor("post", post, { index: 1 }, (fields) => {
+      expect(fields.fieldId("title")).toBe("post_1_title");
+    });
+  });
+
+  it("fields for with index option override", () => {
+    rendered = view.fieldsFor("post[]", post, { index: "abc" }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[abc][title]' type='text' id='post_abc_title' value='Hello World' />" +
+      "<textarea name='post[abc][body]' id='post_abc_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[abc][secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[abc][secret]' checked='checked' type='checkbox' id='post_abc_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for without object", () => {
+    rendered = view.fieldsFor("post", null, {}, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+      "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for with only object", () => {
+    rendered = view.fieldsFor(post, null, {}, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+      "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+      "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+      "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for object with bracketed name", () => {
+    rendered = view.fieldsFor("author[post]", post, {}, (f) => {
+      concat(f.label("title"));
+      concat(f.textField("title"));
+    });
+
+    assertDomEqual(
+      '<label for="author_post_title">Title</label>' +
+        "<input name='author[post][title]' type='text' id='author_post_title' value='Hello World' />",
+      rendered,
+    );
+  });
+
+  it("fields for object with bracketed name and index", () => {
+    rendered = view.fieldsFor("author[post]", post, { index: 1 }, (f) => {
+      concat(f.label("title"));
+      concat(f.textField("title"));
+    });
+
+    assertDomEqual(
+      '<label for="author_post_1_title">Title</label>' +
+        "<input name='author[post][1][title]' type='text' id='author_post_1_title' value='Hello World' />",
+      rendered,
+    );
+  });
+
+  it("form builder does not have form for method", () => {
+    assertNotIncludes(publicInstanceMethods(FormBuilder), "formFor");
+  });
+
+  it("form for and fields for", () => {
+    formFor(post, { as: "post", html: { id: "create-post" } }, (postForm) => {
+      concat(postForm.textField("title"));
+      concat(postForm.textarea("body"));
+
+      concat(
+        view.fieldsFor("parent_post", post, {}, (parentFields) => {
+          concat(parentFields.checkbox("secret"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "create-post",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='parent_post[secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='parent_post[secret]' checked='checked' type='checkbox' id='parent_post_secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for and fields for with object", () => {
+    formFor(post, { as: "post", html: { id: "create-post" } }, (postForm) => {
+      concat(postForm.textField("title"));
+      concat(postForm.textarea("body"));
+
+      concat(
+        postForm.fieldsFor(comment, null, null, (commentFields) => {
+          concat(commentFields.textField("name"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "create-post",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[comment][name]' type='text' id='post_comment_name' value='new comment' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for and fields for with non nested association and without object", () => {
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("category", null, null, (c) => {
+          concat(c.textField("name"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () => "<input name='post[category][name]' type='text' id='post_category_name' />",
+    );
+
+    assertDomEqual(expected, rendered);
   });
 
   it("nested fields for with existing records on a nested attributes collection association", () => {

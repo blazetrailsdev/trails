@@ -6,6 +6,7 @@ import { Searchable } from "./searchable.js";
 import { XmlNode } from "./node.js";
 import { type Readable, readSource } from "../readable.js";
 import { SyntaxError } from "./syntax-error.js";
+import { XPathVisitor } from "../css/xpath-visitor.js";
 
 export class XmlDocument {
   declare css: (...args: unknown[]) => NodeSet;
@@ -54,6 +55,10 @@ export class XmlDocument {
   get root(): XmlNode {
     if (this._root === null) throw new Error("Document has no root (parse failed or disposed)");
     return this._root;
+  }
+
+  xpathDoctype(): XPathVisitor["doctype"] {
+    return XPathVisitor.DoctypeConfig.XML;
   }
 
   dispose(): void {

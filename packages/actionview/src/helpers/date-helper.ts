@@ -25,6 +25,7 @@ import {
   rbModDefineMethod,
   rtest,
   type Block,
+  numStep,
   sprintf,
 } from "@blazetrails/ruby-compat";
 
@@ -607,14 +608,14 @@ export class DateTimeSelector {
     delete options.leadingZeros;
 
     const selectOptions: SafeBuffer[] = [];
-    for (let i = start; i <= stop; i += step) {
+    numStep(start, stop, step, (i) => {
       const value = isRubyTruthy(leadingZeros) ? sprintf("%02d", i) : i;
       const tagOptions: Record<string, unknown> = { value };
       if (selected === i) tagOptions.selected = "selected";
       let text: unknown = isRubyTruthy(options.useTwoDigitNumbers) ? sprintf("%02d", i) : value;
       text = isRubyTruthy(options.ampm) ? DateTimeSelector.AMPM_TRANSLATION[i] : text;
       selectOptions.push(this.contentTag("option", text, tagOptions));
-    }
+    });
 
     return htmlSafe(selectOptions.join("\n") + "\n");
   }
@@ -642,12 +643,12 @@ export class DateTimeSelector {
     delete options.step;
 
     const selectOptions: SafeBuffer[] = [];
-    for (let value = start; step > 0 ? value <= stop : value >= stop; value += step) {
+    numStep(start, stop, step, (value) => {
       const tagOptions: Record<string, unknown> = { value };
       if (selected === value) tagOptions.selected = "selected";
       const text = this.yearName(value);
       selectOptions.push(this.contentTag("option", text, tagOptions));
-    }
+    });
 
     return htmlSafe(selectOptions.join("\n") + "\n");
   }

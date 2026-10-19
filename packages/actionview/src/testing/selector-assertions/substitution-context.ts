@@ -1,5 +1,5 @@
 import { rbInspect, rbRegInitStr, rbRegToS } from "@blazetrails/ruby-compat";
-import type { Html5Node } from "@blazetrails/nokogiri";
+import type { Html5Node, NodeSet } from "@blazetrails/nokogiri";
 
 export class SubstitutionContext {
   private readonly _substitute: string;
@@ -15,8 +15,8 @@ export class SubstitutionContext {
     });
   }
 
-  match(matches: Html5Node[], attribute: string, matcher: string): Html5Node[] {
-    return matches.filter((node) => {
+  match(matches: NodeSet, attribute: string, matcher: string): Html5Node[] {
+    return matches.findAll((node: Html5Node) => {
       const value = node.get(attribute);
       return value != null && rbRegInitStr(matcher).test(value);
     });

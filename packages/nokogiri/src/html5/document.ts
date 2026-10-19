@@ -5,6 +5,7 @@ import { readSource, type Readable } from "../readable.js";
 import { childNodes, type Node } from "./node.js";
 import type { NodeSet } from "../xml/node-set.js";
 import { Searchable } from "../xml/searchable.js";
+import { XPathVisitor } from "../css/xpath-visitor.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 
@@ -77,6 +78,10 @@ export class Document {
   get root(): Node | null {
     const root = childNodes(this._node, this).find((node) => node.isElement());
     return root ?? null;
+  }
+
+  xpathDoctype(): XPathVisitor["doctype"] {
+    return XPathVisitor.DoctypeConfig.HTML5;
   }
 }
 

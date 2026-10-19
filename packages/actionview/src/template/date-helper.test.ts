@@ -3,11 +3,20 @@ import "../test-helpers/abstract-unit.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Struct, block, sprintf } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Time } from "@blazetrails/date";
-import { ordinalize, travelTo } from "@blazetrails/activesupport";
+import {
+  TimeZone,
+  assertPredicate,
+  isHtmlSafe,
+  ordinalize,
+  setZone,
+  travelTo,
+  zone,
+} from "@blazetrails/activesupport";
 import {
   distanceOfTimeInWords,
   selectDay,
   selectDate,
+  selectDatetime,
   selectHour,
   selectMinute,
   selectMonth,
@@ -21,6 +30,11 @@ import { LookupContext } from "../lookup-context.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
 const Post = Struct.new("id", "written_on", "updated_at");
+Object.defineProperties(Post.prototype, {
+  id: { get: () => 123, set: () => {}, configurable: true },
+  id_before_type_cast: { get: () => 123, configurable: true },
+});
+Object.assign(Post.prototype, { toParam: () => "123" });
 const ComposedDate = Struct.new("year", "month", "day");
 const MONTHS =
   "January February March April May June July August September October November December";
@@ -909,6 +923,2127 @@ describe("DateHelperTest", () => {
     expected += timeSelects("updated_at", 16, 35);
 
     assertDomEqual(expected, view.datetimeSelect("post", "updated_at"));
+  });
+
+  it("date select with selected", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option selected="selected" value="2004">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7" selected="selected">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10" selected="selected">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, { selected: new RubyDate(2004, 7, 10) }),
+    );
+  });
+
+  it("date select with selected in hash", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option selected="selected" value="2004">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7" selected="selected">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10" selected="selected">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, { selected: { day: 10, month: 7, year: 2004 } }),
+    );
+  });
+
+  it("date select with selected nil", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected =
+      '<input id="post_written_on_1i" name="post[written_on(1i)]" type="hidden" value="1" autocomplete="off"/>' +
+      `\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="" label=" "></option>\n<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="" label=" "></option>\n<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, {
+        includeBlank: true,
+        discardYear: true,
+        selected: null,
+      }),
+    );
+  });
+
+  it("date select without day", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="1" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`, { order: ["month", "year"] }));
+  });
+
+  it("date select without day and month", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 2, 29);
+
+    let expected = `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="2" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="1" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`, { order: ["year"] }));
+  });
+
+  it("date select without day with separator", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="1" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `/`;
+
+    expected += `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, { dateSeparator: `/`, order: ["month", "year"] }),
+    );
+  });
+
+  it("date select without day and with disabled html option", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<input type="hidden" id="post_written_on_3i" disabled="disabled" name="post[written_on(3i)]" value="1" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_2i" disabled="disabled" name="post[written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_1i" disabled="disabled" name="post[written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, { order: ["month", "year"] }, { disabled: true }),
+    );
+  });
+
+  it("date select within fields for with index", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+    const id = 27;
+
+    const outputBuffer = view.fieldsFor("post", view.post, { index: id }, (f: any) =>
+      (view as any).concat(f.dateSelect("written_on")),
+    );
+
+    let expected = `<select id="post_${id}_written_on_1i" name="post[${id}][written_on(1i)]">\n<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option selected="selected" value="2004">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n</select>\n`;
+    expected += `<select id="post_${id}_written_on_2i" name="post[${id}][written_on(2i)]">\n<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option selected="selected" value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n</select>\n`;
+    expected += `<select id="post_${id}_written_on_3i" name="post[${id}][written_on(3i)]">\n<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option selected="selected" value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n</select>\n`;
+
+    assertDomEqual(expected, outputBuffer);
+  });
+
+  it("date select within fields for with blank index", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+    const id = null;
+
+    const outputBuffer = view.fieldsFor("post", view.post, { index: id }, (f: any) =>
+      (view as any).concat(f.dateSelect("written_on")),
+    );
+
+    let expected = `<select id="post_${id}_written_on_1i" name="post[${id}][written_on(1i)]">\n<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option selected="selected" value="2004">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n</select>\n`;
+    expected += `<select id="post_${id}_written_on_2i" name="post[${id}][written_on(2i)]">\n<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option selected="selected" value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n</select>\n`;
+    expected += `<select id="post_${id}_written_on_3i" name="post[${id}][written_on(3i)]">\n<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option selected="selected" value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n</select>\n`;
+
+    assertDomEqual(expected, outputBuffer);
+  });
+
+  it("date select with index", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+    const id = 456;
+
+    let expected = `<select id="post_456_written_on_1i" name="post[${id}][written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_456_written_on_2i" name="post[${id}][written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_456_written_on_3i" name="post[${id}][written_on(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`, { index: id }));
+  });
+
+  it("date select with auto index", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+    const id = 123;
+
+    let expected = `<select id="post_123_written_on_1i" name="post[${id}][written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_123_written_on_2i" name="post[${id}][written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_123_written_on_3i" name="post[${id}][written_on(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post[]`, `written_on`));
+  });
+
+  it("date select with different order", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === 15 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 6 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    for (const i of upto(1999, 2009)) {
+      expected += `<option value="${i}"${i === 2004 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, { order: ["day", "month", "year"] }),
+    );
+  });
+
+  it("date select with nil and blank", () => {
+    view.post = new Post();
+
+    const startYear = Time.now().year - 5;
+    const endYear = Time.now().year + 5;
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(startYear, endYear)) {
+      expected += `<option value="${i}">${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}">${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}">${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`, { includeBlank: true }));
+  });
+
+  it("date select with nil and blank and order", () => {
+    view.post = new Post();
+
+    const startYear = Time.now().year - 5;
+    const endYear = Time.now().year + 5;
+
+    let expected =
+      '<input name="post[written_on(3i)]" type="hidden" id="post_written_on_3i" value="1" autocomplete="off"/>' +
+      `\n`;
+    expected += `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(startYear, endYear)) {
+      expected += `<option value="${i}">${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}">${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, { order: ["year", "month"], includeBlank: true }),
+    );
+  });
+
+  it("date select with nil and blank and discard year", () => {
+    view.post = new Post();
+
+    let expected =
+      '<input id="post_written_on_1i" name="post[written_on(1i)]" type="hidden" value="1" autocomplete="off" />' +
+      `\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}">${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}">${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, { discardYear: true, includeBlank: true }),
+    );
+  });
+
+  it("date select cant override discard hour", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`, { discardHour: false }));
+  });
+
+  it("date select with html options", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]" class="selector">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]" class="selector">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]" class="selector">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`, {}, { class: `selector` }));
+  });
+
+  it("date select with html options within fields for", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) =>
+      (view as any).concat(f.dateSelect("written_on", {}, { class: `selector` })),
+    );
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]" class="selector">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]" class="selector">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]" class="selector">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, outputBuffer);
+  });
+
+  it("date select with separator", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` / `;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` / `;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`, { dateSeparator: ` / ` }));
+  });
+
+  it("date select with separator and order", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` / `;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` / `;
+
+    expected += `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, {
+        order: ["day", "month", "year"],
+        dateSeparator: ` / `,
+      }),
+    );
+  });
+
+  it("date select with separator and order and year discarded", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` / `;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+    expected += `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, {
+        order: ["day", "month", "year"],
+        discardYear: true,
+        dateSeparator: ` / `,
+      }),
+    );
+  });
+
+  it("date select with default prompt", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="">Year</option>\n<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="">Month</option>\n<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="">Day</option>\n<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`, { prompt: true }));
+  });
+
+  it("date select with custom prompt", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="">Choose year</option>\n<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    expected += `<option value="">Choose month</option>\n<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    expected += `<option value="">Choose day</option>\n<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, {
+        prompt: { year: `Choose year`, month: `Choose month`, day: `Choose day` },
+      }),
+    );
+  });
+
+  it("date select with generic with css classes", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]" class="year">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]" class="month">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]" class="day">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`, { withCssClasses: true }));
+  });
+
+  it("date select with custom with css classes", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]" class="my-year">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]" class="my-month">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]" class="my-day">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, {
+        withCssClasses: { year: `my-year`, month: `my-month`, day: `my-day` },
+      }),
+    );
+  });
+
+  it("time select with selected", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 12 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 20 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.timeSelect(`post`, `written_on`, { selected: Time.local(2004, 6, 15, 12, 20, 30) }),
+    );
+  });
+
+  it("time select with selected nil", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="1" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="1" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="1" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}">${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}">${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.timeSelect(`post`, `written_on`, {
+        discardYear: true,
+        discardMonth: true,
+        discardDay: true,
+        selected: null,
+      }),
+    );
+  });
+
+  it("time select without date hidden fields", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_written_on_4i" name="post[written_on(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.timeSelect(`post`, `written_on`, { ignoreDate: true }));
+  });
+
+  it("time select with seconds", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_6i" name="post[written_on(6i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 35 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.timeSelect(`post`, `written_on`, { includeSeconds: true }));
+  });
+
+  it("time select with html options", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]" class="selector">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]" class="selector">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.timeSelect(`post`, `written_on`, {}, { class: `selector` }));
+  });
+
+  it("time select with html options within fields for", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) =>
+      (view as any).concat(f.timeSelect("written_on", {}, { class: `selector` })),
+    );
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]" class="selector">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]" class="selector">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, outputBuffer);
+  });
+
+  it("time select with separator", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` - `;
+
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` - `;
+
+    expected += `<select id="post_written_on_6i" name="post[written_on(6i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 35 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.timeSelect(`post`, `written_on`, { timeSeparator: ` - `, includeSeconds: true }),
+    );
+  });
+
+  it("time select with default prompt", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]">\n`;
+    expected += `<option value="">Hour</option>\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]">\n`;
+    expected += `<option value="">Minute</option>\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.timeSelect(`post`, `written_on`, { prompt: true }));
+  });
+
+  it("time select with custom prompt", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]">\n`;
+    expected += `<option value="">Choose hour</option>\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]">\n`;
+    expected += `<option value="">Choose minute</option>\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.timeSelect(`post`, `written_on`, {
+        prompt: { hour: `Choose hour`, minute: `Choose minute` },
+      }),
+    );
+  });
+
+  it("time select with generic with css classes", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]" class="hour">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` : `;
+
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]" class="minute">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.timeSelect(`post`, `written_on`, { withCssClasses: true }));
+  });
+
+  it("time select with custom with css classes", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]" class="my-hour">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` : `;
+
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]" class="my-minute">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.timeSelect(`post`, `written_on`, {
+        withCssClasses: { hour: `my-hour`, minute: `my-minute` },
+      }),
+    );
+  });
+
+  it("time select with disabled html option", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_written_on_1i" disabled="disabled" name="post[written_on(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_2i" disabled="disabled" name="post[written_on(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_written_on_3i" disabled="disabled" name="post[written_on(3i)]" value="15" autocomplete="off" />\n`;
+
+    expected += `<select id="post_written_on_4i" disabled="disabled" name="post[written_on(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" disabled="disabled" name="post[written_on(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.timeSelect(`post`, `written_on`, {}, { disabled: true }));
+  });
+
+  it("datetime select with selected", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 16, 35);
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3" selected="selected">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10" selected="selected">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12" selected="selected">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30" selected="selected">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, { selected: Time.local(2004, 3, 10, 12, 30) }),
+    );
+  });
+
+  it("datetime select with selected nil", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 16, 35);
+
+    let expected =
+      '<input id="post_updated_at_1i" name="post[updated_at(1i)]" type="hidden" value="1" autocomplete="off" />' +
+      `\n`;
+
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, { discardYear: true, selected: null }),
+    );
+  });
+
+  it("datetime select with html options within fields for", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 16, 35);
+
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) =>
+      (view as any).concat(f.datetimeSelect("updated_at", {}, { class: `selector` })),
+    );
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]" class="selector">\n<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option selected="selected" value="2004">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]" class="selector">\n<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option selected="selected" value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n</select>\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]" class="selector">\n<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option selected="selected" value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n</select>\n`;
+    expected += ` &mdash; <select id="post_updated_at_4i" name="post[updated_at(4i)]" class="selector">\n<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option selected="selected" value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n</select>\n`;
+    expected += ` : <select id="post_updated_at_5i" name="post[updated_at(5i)]" class="selector">\n<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option selected="selected" value="35">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n</select>\n`;
+
+    assertDomEqual(expected, outputBuffer);
+  });
+
+  it("datetime select with separators", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` / `;
+
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` / `;
+
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` , `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` - `;
+
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` - `;
+
+    expected += `<select id="post_updated_at_6i" name="post[updated_at(6i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 35 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, {
+        dateSeparator: ` / `,
+        datetimeSeparator: ` , `,
+        timeSeparator: ` - `,
+        includeSeconds: true,
+      }),
+    );
+  });
+
+  it("datetime select with default prompt", () => {
+    view.post = new Post();
+    view.post.updated_at = null;
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    expected += `<option value="">Year</option>\n<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    expected += `<option value="">Month</option>\n<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    expected += `<option value="">Day</option>\n<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    expected += `<option value="">Hour</option>\n<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    expected += `<option value="">Minute</option>\n<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, { startYear: 1999, endYear: 2009, prompt: true }),
+    );
+  });
+
+  it("datetime select with custom prompt", () => {
+    view.post = new Post();
+    view.post.updated_at = null;
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    expected += `<option value="">Choose year</option>\n<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    expected += `<option value="">Choose month</option>\n<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    expected += `<option value="">Choose day</option>\n<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    expected += `<option value="">Choose hour</option>\n<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    expected += `<option value="">Choose minute</option>\n<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, {
+        startYear: 1999,
+        endYear: 2009,
+        prompt: {
+          year: `Choose year`,
+          month: `Choose month`,
+          day: `Choose day`,
+          hour: `Choose hour`,
+          minute: `Choose minute`,
+        },
+      }),
+    );
+  });
+
+  it("datetime select with generic with css classes", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]" class="year">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]" class="month">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]" class="day">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]" class="hour">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]" class="minute">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16" selected="selected">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `written_on`, {
+        startYear: 1999,
+        endYear: 2009,
+        withCssClasses: true,
+      }),
+    );
+  });
+
+  it("datetime select with custom with css classes", () => {
+    view.post = new Post();
+    view.post.written_on = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]" class="my-year">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]" class="my-month">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]" class="my-day">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_written_on_4i" name="post[written_on(4i)]" class="my-hour">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_written_on_5i" name="post[written_on(5i)]" class="my-minute">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16" selected="selected">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `written_on`, {
+        startYear: 1999,
+        endYear: 2009,
+        withCssClasses: {
+          year: `my-year`,
+          month: `my-month`,
+          day: `my-day`,
+          hour: `my-hour`,
+          minute: `my-minute`,
+        },
+      }),
+    );
+  });
+
+  it("date select with zero value and no start year", () => {
+    let expected = `<select id="date_first_year" name="date[first][year]">\n`;
+    for (const y of upto(RubyDate.today().year - 5, RubyDate.today().year + 1)) {
+      expected += `<option value="${y}">${y}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_month" name="date[first][month]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_day" name="date[first][day]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.selectDate(0, { endYear: RubyDate.today().year + 1, prefix: `date[first]` }),
+    );
+  });
+
+  it("date select with zero value and no end year", () => {
+    let expected = `<select id="date_first_year" name="date[first][year]">\n`;
+    const lastYear = Time.now().year + 5;
+    for (const y of upto(2003, lastYear)) {
+      expected += `<option value="${y}">${y}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_month" name="date[first][month]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_day" name="date[first][day]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.selectDate(0, { startYear: 2003, prefix: `date[first]` }));
+  });
+
+  it("date select with zero value and no start and end year", () => {
+    let expected = `<select id="date_first_year" name="date[first][year]">\n`;
+    for (const y of upto(RubyDate.today().year - 5, RubyDate.today().year + 5)) {
+      expected += `<option value="${y}">${y}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_month" name="date[first][month]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_day" name="date[first][day]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.selectDate(0, { prefix: `date[first]` }));
+  });
+
+  it("date select with nil value and no start and end year", () => {
+    let expected = `<select id="date_first_year" name="date[first][year]">\n`;
+    for (const y of upto(RubyDate.today().year - 5, RubyDate.today().year + 5)) {
+      expected += `<option value="${y}">${y}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_month" name="date[first][month]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_day" name="date[first][day]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.selectDate(null, { prefix: `date[first]` }));
+  });
+
+  it("datetime select with nil value and no start and end year", () => {
+    let expected = `<select id="date_first_year" name="date[first][year]">\n`;
+    for (const y of upto(RubyDate.today().year - 5, RubyDate.today().year + 5)) {
+      expected += `<option value="${y}">${y}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_month" name="date[first][month]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="date_first_day" name="date[first][day]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="date_first_hour" name="date[first][hour]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` : `;
+
+    expected += `<select id="date_first_minute" name="date[first][minute]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.selectDatetime(null, { prefix: `date[first]` }));
+  });
+
+  it("datetime select with options index", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 16, 35);
+    const id = 456;
+
+    let expected = `<select id="post_456_updated_at_1i" name="post[${id}][updated_at(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_456_updated_at_2i" name="post[${id}][updated_at(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_456_updated_at_3i" name="post[${id}][updated_at(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_456_updated_at_4i" name="post[${id}][updated_at(4i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16" selected="selected">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_456_updated_at_5i" name="post[${id}][updated_at(5i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35" selected="selected">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.datetimeSelect(`post`, `updated_at`, { index: id }));
+  });
+
+  it("datetime select within fields for with options index", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 16, 35);
+    const id = 456;
+
+    const outputBuffer = view.fieldsFor("post", view.post, { index: id }, (f: any) =>
+      (view as any).concat(f.datetimeSelect("updated_at")),
+    );
+
+    let expected = `<select id="post_456_updated_at_1i" name="post[${id}][updated_at(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_456_updated_at_2i" name="post[${id}][updated_at(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_456_updated_at_3i" name="post[${id}][updated_at(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_456_updated_at_4i" name="post[${id}][updated_at(4i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16" selected="selected">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_456_updated_at_5i" name="post[${id}][updated_at(5i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35" selected="selected">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, outputBuffer);
+  });
+
+  it("datetime select with auto index", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 16, 35);
+    const id = view.post.id;
+
+    let expected = `<select id="post_123_updated_at_1i" name="post[${id}][updated_at(1i)]">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_123_updated_at_2i" name="post[${id}][updated_at(2i)]">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_123_updated_at_3i" name="post[${id}][updated_at(3i)]">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_123_updated_at_4i" name="post[${id}][updated_at(4i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16" selected="selected">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_123_updated_at_5i" name="post[${id}][updated_at(5i)]">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35" selected="selected">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.datetimeSelect(`post[]`, `updated_at`));
+  });
+
+  it("datetime select with seconds", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    for (const i of upto(1999, 2009)) {
+      expected += `<option value="${i}"${i === 2004 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 6 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === 15 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_6i" name="post[updated_at(6i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 35 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.datetimeSelect(`post`, `updated_at`, { includeSeconds: true }));
+  });
+
+  it("datetime select discard year", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_updated_at_1i" name="post[updated_at(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 6 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === 15 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.datetimeSelect(`post`, `updated_at`, { discardYear: true }));
+  });
+
+  it("datetime select discard month", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    for (const i of upto(1999, 2009)) {
+      expected += `<option value="${i}"${i === 2004 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<input type="hidden" id="post_updated_at_2i" name="post[updated_at(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_updated_at_3i" name="post[updated_at(3i)]" value="1" autocomplete="off" />\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.datetimeSelect(`post`, `updated_at`, { discardMonth: true }));
+  });
+
+  it("datetime select discard year and month", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_updated_at_1i" name="post[updated_at(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_updated_at_2i" name="post[updated_at(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_updated_at_3i" name="post[updated_at(3i)]" value="1" autocomplete="off" />\n`;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, { discardYear: true, discardMonth: true }),
+    );
+  });
+
+  it("datetime select discard year and month with disabled html option", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_updated_at_1i" disabled="disabled" name="post[updated_at(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_updated_at_2i" disabled="disabled" name="post[updated_at(2i)]" value="6" autocomplete="off" />\n`;
+    expected += `<input type="hidden" id="post_updated_at_3i" disabled="disabled" name="post[updated_at(3i)]" value="1" autocomplete="off" />\n`;
+
+    expected += `<select id="post_updated_at_4i" disabled="disabled" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" disabled="disabled" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(
+        `post`,
+        `updated_at`,
+        { discardYear: true, discardMonth: true },
+        { disabled: true },
+      ),
+    );
+  });
+
+  it("datetime select discard hour", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    for (const i of upto(1999, 2009)) {
+      expected += `<option value="${i}"${i === 2004 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 6 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === 15 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.datetimeSelect(`post`, `updated_at`, { discardHour: true }));
+  });
+
+  it("datetime select discard minute", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    for (const i of upto(1999, 2009)) {
+      expected += `<option value="${i}"${i === 2004 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 6 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === 15 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<input type="hidden" id="post_updated_at_5i" name="post[updated_at(5i)]" value="16" autocomplete="off" />\n`;
+
+    assertDomEqual(expected, view.datetimeSelect(`post`, `updated_at`, { discardMinute: true }));
+  });
+
+  it("datetime select disabled and discard minute", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_updated_at_1i" disabled="disabled" name="post[updated_at(1i)]">\n`;
+    for (const i of upto(1999, 2009)) {
+      expected += `<option value="${i}"${i === 2004 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" disabled="disabled" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 6 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_3i" disabled="disabled" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === 15 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" disabled="disabled" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<input type="hidden" id="post_updated_at_5i" disabled="disabled" name="post[updated_at(5i)]" value="16" autocomplete="off" />\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, { discardMinute: true, disabled: true }),
+    );
+  });
+
+  it("datetime select invalid order", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === 15 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 6 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    for (const i of upto(1999, 2009)) {
+      expected += `<option value="${i}"${i === 2004 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, {
+        order: ["minute", "day", "hour", "month", "year", "second"],
+      }),
+    );
+  });
+
+  it("datetime select discard with order", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 15, 16, 35);
+
+    let expected = `<input type="hidden" id="post_updated_at_1i" name="post[updated_at(1i)]" value="2004" autocomplete="off" />\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === 15 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 6 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, { order: ["day", "month"] }),
+    );
+  });
+
+  it("datetime select with default value as time", () => {
+    view.post = new Post();
+    view.post.updated_at = null;
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    for (const i of upto(2001, 2011)) {
+      expected += `<option value="${i}"${i === 2006 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 9 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === 19 ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 15 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 16 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, { default: Time.local(2006, 9, 19, 15, 16, 35) }),
+    );
+  });
+
+  it("include blank overrides default option", () => {
+    view.post = new Post();
+    view.post.updated_at = null;
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(Time.now().year - 5, Time.now().year + 5)) {
+      expected += `<option value="${i}">${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}">${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}">${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `updated_at`, {
+        default: Time.local(2006, 9, 19, 15, 16, 35),
+        includeBlank: true,
+      }),
+    );
+  });
+
+  it("datetime select with html options", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2004, 6, 15, 16, 35);
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]" class="selector">\n`;
+    expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]" class="selector">\n`;
+    expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+    expected += `</select>\n`;
+
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]" class="selector">\n`;
+    expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]" class="selector">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16" selected="selected">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]" class="selector">\n`;
+    expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35" selected="selected">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.datetimeSelect(`post`, `updated_at`, {}, { class: `selector` }));
+  });
+
+  it("date select with nil", () => {
+    view.post = new Post();
+
+    const startYear = Time.now().year - 5;
+    const endYear = Time.now().year + 5;
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    for (const i of upto(startYear, endYear)) {
+      expected += `<option value="${i}"${i === Time.now().year ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_2i" name="post[written_on(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === Time.now().month ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += `<select id="post_written_on_3i" name="post[written_on(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === Time.now().day ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(expected, view.dateSelect(`post`, `written_on`));
+  });
+
+  it("date select with nil and blank and discard month", () => {
+    view.post = new Post();
+
+    const startYear = Time.now().year - 5;
+    const endYear = Time.now().year + 5;
+
+    let expected = `<select id="post_written_on_1i" name="post[written_on(1i)]">\n`;
+    expected += `<option value="" label=" "></option>\n`;
+    for (const i of upto(startYear, endYear)) {
+      expected += `<option value="${i}">${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected +=
+      '<input name="post[written_on(2i)]" type="hidden" id="post_written_on_2i" value="1" autocomplete="off"/>' +
+      `\n`;
+    expected +=
+      '<input name="post[written_on(3i)]" type="hidden" id="post_written_on_3i" value="1" autocomplete="off"/>' +
+      `\n`;
+
+    assertDomEqual(
+      expected,
+      view.dateSelect(`post`, `written_on`, { discardMonth: true, includeBlank: true }),
+    );
+  });
+
+  it("datetime select with default value as hash", () => {
+    view.post = new Post();
+    view.post.updated_at = null;
+
+    let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+    for (const i of upto(Time.now().year - 5, Time.now().year + 5)) {
+      expected += `<option value="${i}"${i === Time.now().year ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+    for (const i of upto(1, 12)) {
+      expected += `<option value="${i}"${i === 10 ? ' selected="selected"' : ""}>${RubyDate.MONTHNAMES[i]}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+    for (const i of upto(1, 31)) {
+      expected += `<option value="${i}"${i === Time.now().day ? ' selected="selected"' : ""}>${i}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    expected += ` &mdash; `;
+
+    expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+    for (const i of upto(0, 23)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 9 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+    expected += ` : `;
+    expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+    for (const i of upto(0, 59)) {
+      expected += `<option value="${sprintf("%02d", i)}"${i === 42 ? ' selected="selected"' : ""}>${sprintf("%02d", i)}</option>\n`;
+    }
+    expected += `</select>\n`;
+
+    assertDomEqual(
+      expected,
+      view.datetimeSelect(`post`, `updated_at`, { default: { month: 10, minute: 42, hour: 9 } }),
+    );
+  });
+
+  it("datetime select defaults to time zone now when config time zone is set", () => {
+    const mytz = class extends TimeZone {
+      nowValue: unknown = null;
+      override now(): any {
+        return this.nowValue;
+      }
+    }.create("tenderlove", 0, TimeZone.findTzinfo("UTC"));
+
+    const now = Time.mktime(2004, 6, 15, 16, 35, 0);
+    mytz.nowValue = now;
+    setZone(mytz);
+    try {
+      expect(zone()).toBe(mytz);
+
+      view.post = new Post();
+
+      let expected = `<select id="post_updated_at_1i" name="post[updated_at(1i)]">\n`;
+      expected += `<option value="1999">1999</option>\n<option value="2000">2000</option>\n<option value="2001">2001</option>\n<option value="2002">2002</option>\n<option value="2003">2003</option>\n<option value="2004" selected="selected">2004</option>\n<option value="2005">2005</option>\n<option value="2006">2006</option>\n<option value="2007">2007</option>\n<option value="2008">2008</option>\n<option value="2009">2009</option>\n`;
+      expected += `</select>\n`;
+      expected += `<select id="post_updated_at_2i" name="post[updated_at(2i)]">\n`;
+      expected += `<option value="1">January</option>\n<option value="2">February</option>\n<option value="3">March</option>\n<option value="4">April</option>\n<option value="5">May</option>\n<option value="6" selected="selected">June</option>\n<option value="7">July</option>\n<option value="8">August</option>\n<option value="9">September</option>\n<option value="10">October</option>\n<option value="11">November</option>\n<option value="12">December</option>\n`;
+      expected += `</select>\n`;
+      expected += `<select id="post_updated_at_3i" name="post[updated_at(3i)]">\n`;
+      expected += `<option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option>\n<option value="4">4</option>\n<option value="5">5</option>\n<option value="6">6</option>\n<option value="7">7</option>\n<option value="8">8</option>\n<option value="9">9</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15" selected="selected">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n`;
+      expected += `</select>\n`;
+      expected += ` &mdash; `;
+      expected += `<select id="post_updated_at_4i" name="post[updated_at(4i)]">\n`;
+      expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16" selected="selected">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n`;
+      expected += `</select>\n`;
+      expected += ` : `;
+      expected += `<select id="post_updated_at_5i" name="post[updated_at(5i)]">\n`;
+      expected += `<option value="00">00</option>\n<option value="01">01</option>\n<option value="02">02</option>\n<option value="03">03</option>\n<option value="04">04</option>\n<option value="05">05</option>\n<option value="06">06</option>\n<option value="07">07</option>\n<option value="08">08</option>\n<option value="09">09</option>\n<option value="10">10</option>\n<option value="11">11</option>\n<option value="12">12</option>\n<option value="13">13</option>\n<option value="14">14</option>\n<option value="15">15</option>\n<option value="16">16</option>\n<option value="17">17</option>\n<option value="18">18</option>\n<option value="19">19</option>\n<option value="20">20</option>\n<option value="21">21</option>\n<option value="22">22</option>\n<option value="23">23</option>\n<option value="24">24</option>\n<option value="25">25</option>\n<option value="26">26</option>\n<option value="27">27</option>\n<option value="28">28</option>\n<option value="29">29</option>\n<option value="30">30</option>\n<option value="31">31</option>\n<option value="32">32</option>\n<option value="33">33</option>\n<option value="34">34</option>\n<option value="35" selected="selected">35</option>\n<option value="36">36</option>\n<option value="37">37</option>\n<option value="38">38</option>\n<option value="39">39</option>\n<option value="40">40</option>\n<option value="41">41</option>\n<option value="42">42</option>\n<option value="43">43</option>\n<option value="44">44</option>\n<option value="45">45</option>\n<option value="46">46</option>\n<option value="47">47</option>\n<option value="48">48</option>\n<option value="49">49</option>\n<option value="50">50</option>\n<option value="51">51</option>\n<option value="52">52</option>\n<option value="53">53</option>\n<option value="54">54</option>\n<option value="55">55</option>\n<option value="56">56</option>\n<option value="57">57</option>\n<option value="58">58</option>\n<option value="59">59</option>\n`;
+      expected += `</select>\n`;
+
+      assertDomEqual(expected, view.datetimeSelect("post", "updated_at"));
+    } finally {
+      setZone(null);
+    }
+  });
+
+  it("datetime select with integer", () => {
+    view.post = new Post();
+    view.post.updated_at = 3;
+    expect(() => view.datetimeSelect("post", "updated_at")).not.toThrow();
+  });
+
+  it("datetime select with infinity", () => {
+    view.post = new Post();
+    view.post.updated_at = -1.0 / 0;
+    expect(() => view.datetimeSelect("post", "updated_at")).not.toThrow();
+  });
+
+  it("date select should not change passed options hash", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2008, 7, 16, 23, 30);
+
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    view.dateSelect(view.post, "updated_at", options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("datetime select should not change passed options hash", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2008, 7, 16, 23, 30);
+
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    view.datetimeSelect(view.post, "updated_at", options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("time select should not change passed options hash", () => {
+    view.post = new Post();
+    view.post.updated_at = Time.local(2008, 7, 16, 23, 30);
+
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    view.timeSelect(view.post, "updated_at", options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("select date should not change passed options hash", () => {
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    selectDate.call(view, RubyDate.today(), options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("select datetime should not change passed options hash", () => {
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    selectDatetime.call(view, Time.now(), options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("select time should not change passed options hash", () => {
+    const options = {
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    };
+    selectTime.call(view, Time.now(), options);
+
+    expect(options).toEqual({
+      order: ["year", "month", "day"],
+      default: { year: 2008, month: 7, day: 16, hour: 23, minute: 30, second: 1 },
+      discardType: false,
+      includeBlank: false,
+      ignoreDate: false,
+      includeSeconds: true,
+    });
+  });
+
+  it("select html safety", () => {
+    assertPredicate(selectDay.call(view, 16), isHtmlSafe);
+    assertPredicate(selectMonth.call(view, 8), isHtmlSafe);
+    assertPredicate(selectYear.call(view, Time.mktime(2003, 8, 16, 8, 4, 18)), isHtmlSafe);
+    assertPredicate(selectMinute.call(view, Time.mktime(2003, 8, 16, 8, 4, 18)), isHtmlSafe);
+    assertPredicate(selectSecond.call(view, Time.mktime(2003, 8, 16, 8, 4, 18)), isHtmlSafe);
+
+    assertPredicate(selectMinute.call(view, 8, { useHidden: true }), isHtmlSafe);
+    assertPredicate(selectMonth.call(view, 8, { prompt: "Choose month" }), isHtmlSafe);
+
+    assertPredicate(
+      selectTime.call(view, Time.mktime(2003, 8, 16, 8, 4, 18), {}, { class: "selector" }),
+      isHtmlSafe,
+    );
+    assertPredicate(
+      selectDate.call(view, Time.mktime(2003, 8, 16), {
+        dateSeparator: " / ",
+        startYear: 2003,
+        endYear: 2005,
+        prefix: "date[first]",
+      }),
+      isHtmlSafe,
+    );
+  });
+
+  it("object select html safety", () => {
+    view.post = new Post();
+    view.post.written_on = new RubyDate(2004, 6, 15);
+
+    assertPredicate(
+      view.dateSelect("post", "written_on", {
+        default: Time.local(2006, 9, 19, 15, 16, 35),
+        includeBlank: true,
+      }),
+      isHtmlSafe,
+    );
   });
 
   it("time tag with date", () => {

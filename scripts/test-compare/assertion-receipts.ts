@@ -31,6 +31,15 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actionview:template/date_helper_test.rb › DateHelperTest › object select html safety": [
+    {
+      kind: "assert_predicate",
+      value: null,
+      as: null,
+      reason:
+        'template/date_helper_test.rb:3670 `time_select` over a Date reaches `Date#min` through `send`, a private method (`date_core.c:9774`); a JS method entry carries no visibility, so porting it would make every Date `respond_to?(:min)` (CLAUDE.md, "Method visibility is compile-time only")',
+    },
+  ],
   "actionview:template/template_test.rb › TestERBTemplate › no magic comment word with utf 8": [
     {
       kind: "assert_equal",
