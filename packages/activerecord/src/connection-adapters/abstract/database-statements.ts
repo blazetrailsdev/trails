@@ -8,6 +8,7 @@
  *   custom types and rejects them with a clear error (per PR 6).
  */
 
+import type { AbstractAdapter } from "../abstract-adapter.js";
 import {
   sql as arelSql,
   arelNode,
@@ -92,8 +93,8 @@ export function toSqlAndBinds(
       );
     }
 
-    const host = this as unknown as DatabaseStatementsHost | undefined;
-    const visitor = (host as any)?.visitor as Visitors.ToSql;
+    const host = this as DatabaseStatementsHost | undefined;
+    const visitor = host?.visitor as Visitors.ToSql;
 
     const collector = host!.collector!() as unknown as Collectors.Composite;
     collector.retryable = true;
@@ -103,7 +104,7 @@ export function toSqlAndBinds(
       collector.preparable = true;
       [sql, binds] = visitor.compile(arelOrSqlString, collector) as unknown as [string, unknown[]];
 
-      if (binds.length > (host as unknown as { bindParamsLength(): number }).bindParamsLength()) {
+      if (binds.length > host!.bindParamsLength!()) {
         return host!.unpreparedStatement!(() => toSqlAndBinds.call(host, arelOrSqlString)) as [
           string,
           unknown[],
@@ -192,6 +193,23 @@ export interface DatabaseStatementsHost {
     batch?: boolean,
   ): Promise<unknown>;
   /** @internal */
+  withRawConnection?<T>(
+    options: { allowRetry?: boolean; materializeTransactions?: boolean },
+    block: (raw: unknown) => Promise<T> | T,
+  ): Promise<T>;
+  /** @internal */
+  performQuery?(
+    rawConnection: unknown,
+    sql: string | null,
+    binds: unknown[],
+    typeCastedBinds: unknown[],
+    options: { prepare: boolean; notificationPayload?: unknown; batch?: boolean },
+  ): unknown;
+  /** @internal */
+  visitor?: Visitors.ToSql;
+  /** @internal */
+  bindParamsLength?(): number;
+  /** @internal */
   castResult(rawResult: unknown): Result;
   /** @internal */
   affectedRows(rawResult: unknown): number;
@@ -252,8 +270,8 @@ export function cacheableQuery(
   },
   arel: unknown,
 ): [unknown, unknown[]] {
-  const host = this as unknown as DatabaseStatementsHost;
-  const visitor = (host as any).visitor as Visitors.ToSql;
+  const host = this as DatabaseStatementsHost;
+  const visitor = host.visitor as Visitors.ToSql;
 
   const ast = (arel as { ast: Nodes.Node }).ast;
 
@@ -339,7 +357,7 @@ export function explain(
 }
 
 export async function insert(
-  this: any,
+  this: DatabaseStatementsHost & AbstractAdapter,
   arel: unknown,
   name: string | null = null,
   pk?: string | null,
@@ -351,9 +369,9 @@ export async function insert(
   let sql: string;
   [sql, binds] = toSqlAndBinds.call(this, arel, binds);
   const value = await this.execInsert(sql, name, binds, pk, sequenceName, opts?.returning ?? null);
-  if (opts?.returning != null) return this.returningColumnValues(value);
+  if (opts?.returning != null) return this.returningColumnValues!(value);
 
-  return rtest(idValue) ? idValue : this.lastInsertedId(value);
+  return rtest(idValue) ? idValue : this.lastInsertedId!(value);
 }
 
 /** @missingRailsName buildTruncateStatement — PERMANENT */
@@ -692,8 +710,8 @@ export async function rawExecute(
 ): Promise<unknown> {
   const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
   return this.log!(sql, name, binds ?? [], typeCastedBinds, async, (notificationPayload) =>
-    (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
-      (this as any).performQuery(conn, sql, binds ?? [], typeCastedBinds, {
+    this.withRawConnection!({ allowRetry, materializeTransactions }, (conn: unknown) =>
+      this.performQuery!(conn, sql, binds ?? [], typeCastedBinds, {
         prepare,
         notificationPayload,
         batch,
@@ -936,7 +954,7 @@ export const DatabaseStatements = new Module().include({
   create,
 
   async update(
-    this: any,
+    this: DatabaseStatementsHost & AbstractAdapter,
     arel: unknown,
     name: string | null = null,
     binds: unknown[] = [],
@@ -947,7 +965,7 @@ export const DatabaseStatements = new Module().include({
   },
 
   async delete(
-    this: any,
+    this: DatabaseStatementsHost & AbstractAdapter,
     arel: unknown,
     name: string | null = null,
     binds: unknown[] = [],
@@ -1063,8 +1081,8 @@ export function internalExecute(
   block?: (result: unknown) => unknown,
 ): Promise<unknown> {
   const processed = preprocessQuery.call(this, sql);
-  return (this as any).rawExecute(
-    processed,
+  return this.rawExecute(
+    processed!,
     name,
     binds,
     prepare,
@@ -1085,15 +1103,7 @@ export async function executeBatch(
   }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
   for (const statement of statements) {
-    await (this as any).rawExecute(
-      statement,
-      name,
-      [],
-      false,
-      false,
-      allowRetry,
-      materializeTransactions,
-    );
+    await this.rawExecute(statement, name, [], false, false, allowRetry, materializeTransactions);
   }
 }
 
