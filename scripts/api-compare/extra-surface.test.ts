@@ -4766,6 +4766,68 @@ describe("inlinedModuleMembers", () => {
       ]);
     });
   });
+
+  describe("a module `initialize` and a module name the includer's own `.rb` defines", () => {
+    const urlForModules = {
+      "ActionDispatch::Routing::UrlFor": rubyClass({
+        name: "UrlFor",
+        file: "routing/url_for.rb",
+        instance: [method("initialize"), method("default_url_options=")],
+      }),
+    };
+    const urlForShort = new Map([["UrlFor", ["ActionDispatch::Routing::UrlFor"]]]);
+
+    it("leaves the constructor of an includer that defines `initialize` alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "actiondispatch",
+          {
+            "ActionDispatch::Routing::RoutesProxy": rubyClass({
+              name: "RoutesProxy",
+              file: "routing/routes_proxy.rb",
+              includes: ["UrlFor"],
+              instance: [method("initialize")],
+            }),
+          },
+          urlForModules,
+          urlForShort,
+          new Map([
+            ["routing/routes-proxy.ts", new Set(["constructor"])],
+            ["routing/url-for.ts", new Set<string>()],
+          ]),
+        ),
+      ).toEqual([]);
+    });
+
+    it("leaves a body a sibling in the includer's `.rb` defines alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "actiondispatch",
+          {
+            "ActionDispatch::Integration::Session": rubyClass({
+              name: "Session",
+              file: "testing/integration.rb",
+              includes: ["UrlFor"],
+              instance: [],
+            }),
+          },
+          {
+            ...urlForModules,
+            "ActionDispatch::Integration::Runner": rubyClass({
+              name: "Runner",
+              file: "testing/integration.rb",
+              instance: [method("default_url_options=")],
+            }),
+          },
+          urlForShort,
+          new Map([
+            ["testing/integration.ts", new Set(["setDefaultUrlOptions"])],
+            ["routing/url-for.ts", new Set<string>()],
+          ]),
+        ),
+      ).toEqual([]);
+    });
+  });
 });
 
 describe("buildReport — members Ruby supplies without a def in the mapped file", () => {

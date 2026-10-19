@@ -21,6 +21,7 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
   private object: unknown = null;
   private localName: string | null = null;
 
+  /** @inlinedFrom ActionView::AbstractRenderer::ObjectRendering#initialize rails/v8.0.2/actionview/lib/action_view/renderer/abstract_renderer.rb:37-40 */
   constructor(lookupContext: LookupContext, options: RenderOptions = {}) {
     super(lookupContext, options);
     this.contextPrefix = lookupContext.prefixes[0] ?? "";
