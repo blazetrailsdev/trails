@@ -9,6 +9,7 @@ import {
   SecureRandom,
   StandardError,
   b,
+  forceEncoding,
   rbObjAsString,
   pack,
   sliceBang,
@@ -16,22 +17,18 @@ import {
   type Cipher,
 } from "@blazetrails/ruby-compat";
 
-export class Error extends StandardError {}
-
-export class InvalidSignature extends Error {}
-
-export class InvalidMessage extends Error {}
-
 export interface EncryptorOptions {
   serializeJson?: boolean;
   padSize?: unknown;
-  purpose?: string | null;
+  purpose?: string | false | null;
 }
 
 export class Encryptor {
-  static readonly Error = Error;
-  static readonly InvalidSignature = InvalidSignature;
-  static readonly InvalidMessage = InvalidMessage;
+  static readonly Error = class Error extends StandardError {};
+
+  static readonly InvalidSignature = class InvalidSignature extends Encryptor.Error {};
+
+  static readonly InvalidMessage = class InvalidMessage extends Encryptor.Error {};
 
   private options: Required<EncryptorOptions>;
   private hmacSecret: string;
@@ -97,7 +94,7 @@ export class Encryptor {
 
       return this.deserializedMessage(data);
     } catch (e) {
-      if (e instanceof ArgumentError) throw new InvalidSignature("Message invalid");
+      if (e instanceof ArgumentError) throw new Encryptor.InvalidSignature("Message invalid");
       throw e;
     }
   }
@@ -163,7 +160,9 @@ export class Encryptor {
   /** @internal */
   private computeSignature(data: string): string {
     let signingData = data;
-    if (this.options.purpose != null) signingData += b(this.options.purpose);
+    if (this.options.purpose != null && this.options.purpose !== false) {
+      signingData += b(this.options.purpose);
+    }
 
     return OpenSSL.HMAC.digest(
       OpenSSL.Digest.SHA256.new(),
@@ -174,10 +173,10 @@ export class Encryptor {
 
   /** @internal */
   private verifyAuthenticityBang(data: string | null, signature: string | null): void {
-    if (data == null || signature == null) throw new InvalidMessage("Message is invalid");
+    if (data == null || signature == null) throw new Encryptor.InvalidMessage("Message is invalid");
 
     if (!Utils.secureCompare(signature, this.computeSignature(data))) {
-      throw new InvalidSignature("HMAC is invalid");
+      throw new Encryptor.InvalidSignature("HMAC is invalid");
     }
   }
 
@@ -185,13 +184,14 @@ export class Encryptor {
   private serializePayload(message: unknown): string {
     const serializedData = this.serializer.dump(message);
 
-    if (this.options.padSize == null) return `${pack([0], "v")}${serializedData}`;
+    if (this.options.padSize == null)
+      return `${pack([0], "v")}${this.serializer === JSON ? b(serializedData) : serializedData}`;
 
     const padSize = this.options.padSize as number;
     const paddingBytes = padSize - ((2 + serializedData.length) % padSize);
     const paddingData = SecureRandom.randomBytes(paddingBytes).toString("latin1");
 
-    return `${pack([paddingBytes], "v")}${paddingData}${serializedData}`;
+    return `${pack([paddingBytes], "v")}${paddingData}${this.serializer === JSON ? b(serializedData) : serializedData}`;
   }
 
   /** @internal */
@@ -199,7 +199,10 @@ export class Encryptor {
     const [paddingBytes] = unpack(data, "v") as number[];
 
     const start = 2 + paddingBytes;
-    const serializedData = start > data.length ? null : data.slice(start, start + data.length);
+    let serializedData = start > data.length ? null : data.slice(start, start + data.length);
+    if (this.serializer === JSON && serializedData != null) {
+      serializedData = forceEncoding(serializedData, "UTF-8");
+    }
     return this.serializer.load(serializedData as string);
   }
 }
