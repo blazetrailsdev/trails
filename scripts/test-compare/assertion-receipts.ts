@@ -40,6 +40,24 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'template/template_test.rb:150 `render.encoding` is Encoding::UTF_8 — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
     },
   ],
+  "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › simple query string": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: "assert_nil",
+      reason:
+        'dispatch/param_builder_test.rb:15 `result` is a HashWithIndifferentAccess; trails params are a null-prototype plain object, so the port asserts the prototype is null (packages/actionpack/CLAUDE.md, "Request params are a null-prototype plain object")',
+    },
+  ],
+  "actiondispatch:dispatch/param_builder_test.rb › ParamBuilderTest › nested parameters": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: "assert_nil",
+      reason:
+        'dispatch/param_builder_test.rb:21 `result[:foo]` is a HashWithIndifferentAccess; trails params are a null-prototype plain object, so the port asserts the prototype is null (packages/actionpack/CLAUDE.md, "Request params are a null-prototype plain object")',
+    },
+  ],
   "actiondispatch:dispatch/system_testing/driver_test.rb › DriverTest › initializing the driver with a browser":
     [
       {

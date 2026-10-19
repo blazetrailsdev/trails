@@ -197,3 +197,19 @@ request that never touches the session never decrypts its cookie. A
 rejected `findSession` re-enters `staleSessionCheckBang`'s rescue, so an async
 `ArgumentError` is retried as a synchronous one is.
 Ruled by the repo owner on 2026-10-16 (trails#8997).
+
+## Request params are a null-prototype plain object (`ParamBuilder#make_params`)
+
+Rails' `make_params` answers `ActiveSupport::HashWithIndifferentAccess.new`
+(`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/http/param_builder.rb:162-164`).
+trails' `makeParams` answers `Object.create(null)`, and `paramsHashType`
+accepts a null-prototype or plain object. A params hash is keyed by the
+request's own strings, so the String/Symbol folding is the identity.
+A null prototype keeps a `__proto__` or `toString` param from reaching
+`Object.prototype`. The two `assert_instance_of` assertions in
+`dispatch/param_builder_test.rb:15,21` are re-scored as an assertion that the
+prototype is `null`, by rows in `scripts/test-compare/assertion-receipts.ts`
+citing this section. There is no story to make params a
+`HashWithIndifferentAccess`.
+Ruled by the repo owner on 2026-10-18, closing story
+`param-builder-make-params-is-hash-with-indifferent-access` as PERMANENT.
