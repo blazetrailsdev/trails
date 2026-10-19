@@ -10,6 +10,8 @@ import {
   rbFSend,
   rbObjClassname,
   KeyError,
+  registerConstant,
+  eachPair,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_ERRORS, RACK_SESSION, RACK_SESSION_OPTIONS, Request, Raw } from "@blazetrails/rack";
@@ -285,9 +287,9 @@ export class SessionHash implements PersistedSession {
       typeof candidate?.toHash === "function"
         ? candidate.toHash()
         : (other as Record<string, unknown>);
-    for (const key of Object.keys(source)) {
-      hash[String(key)] = source[key];
-    }
+    eachPair(source, (key, value) => {
+      hash[String(key)] = value;
+    });
     return hash;
   }
 }
@@ -329,7 +331,8 @@ export interface PersistedRequest {
   cookies: Record<string, unknown>;
   params: Record<string, unknown>;
   getHeader(key: string): PersistedSession;
-  setHeader(key: string, value: unknown): void;
+  setHeader(key: string, value: unknown): unknown;
+  fetchHeader<T>(key: string, block: (key: string) => T): T;
   sessionOptions: Record<string, unknown>;
   ssl?: unknown;
 }
@@ -691,3 +694,4 @@ Object.defineProperty(PersistedSecure, "name", {
   value: "Rack::Session::Abstract::PersistedSecure",
 });
 Object.defineProperty(ID, "name", { value: "Rack::Session::Abstract::ID" });
+registerConstant("Rack::Session::SessionId", SessionId);
