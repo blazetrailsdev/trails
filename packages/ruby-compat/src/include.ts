@@ -747,33 +747,34 @@ export class Module<I extends object = Record<never, never>> {
 
 function appendPlainFeatures(base: Module, mod: ModuleObject): void {
   const carrier = carrierOf(base);
-  if (isModuleMethodTablePresent({ prototype: carrier }, mod)) return;
-  if (Object.hasOwn(mod, moduleIncludesKey)) return recordPlainModule(base, mod);
-  trackIncludedModule(carrier, mod);
-  const installed = trackedKeys(carrier);
-  const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
-    string,
-    unknown
-  >;
-  const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
-  for (const key of typeof mod === "function"
-    ? Object.getOwnPropertyNames(members)
-    : Object.keys(members)) {
-    if (key === "constructor") continue;
-    const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
-    const accessor = !("value" in descriptor) && namespace !== "Module";
-    if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
-    if (Object.hasOwn(carrier, key) && !installed.has(key)) continue;
-    installed.add(key);
-    Object.defineProperty(
-      carrier,
-      key,
-      accessor
-        ? { get: descriptor.get, set: descriptor.set, configurable: true }
-        : { value: members[key], writable: true, configurable: true },
-    );
+  if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
+    if (Object.hasOwn(mod, moduleIncludesKey)) return recordPlainModule(base, mod);
+    trackIncludedModule(carrier, mod);
+    const installed = trackedKeys(carrier);
+    const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
+      string,
+      unknown
+    >;
+    const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
+    for (const key of typeof mod === "function"
+      ? Object.getOwnPropertyNames(members)
+      : Object.keys(members)) {
+      if (key === "constructor") continue;
+      const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
+      const accessor = !("value" in descriptor) && namespace !== "Module";
+      if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
+      if (Object.hasOwn(carrier, key) && !installed.has(key)) continue;
+      installed.add(key);
+      Object.defineProperty(
+        carrier,
+        key,
+        accessor
+          ? { get: descriptor.get, set: descriptor.set, configurable: true }
+          : { value: members[key], writable: true, configurable: true },
+      );
+    }
+    relinkIncluders(base);
   }
-  relinkIncluders(base);
 }
 
 function recordPlainModule(base: Module, mod: ModuleObject): void {

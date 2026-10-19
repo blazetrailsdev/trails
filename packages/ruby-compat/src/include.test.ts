@@ -2258,3 +2258,42 @@ describe("rbObjIsKindOf with a Symbol", () => {
     expect(rbObjIsKindOf("name", rbCString)).toBe(true);
   });
 });
+
+describe("Module#include of a plain module that includes modules", () => {
+  const leaf = {
+    root() {
+      return "leaf";
+    },
+  };
+  const composite = {};
+  include(composite, leaf);
+
+  it("keeps a Module's own method above the nested module in an includer", () => {
+    const inner = new Module((mod) => {
+      mod.include(composite);
+      mod.defineMethod("root", () => "inner");
+    });
+    const outer = new Module((mod) => mod.include(composite));
+    class Host {}
+    include(Host, inner);
+    include(Host, outer);
+    expect((new Host() as unknown as { root(): string }).root()).toBe("inner");
+  });
+
+  it("splices the nested module once, skipping it when the includer already has it", () => {
+    const mod = new Module((m) => m.include(composite));
+    class Host {}
+    include(Host, composite);
+    include(Host, mod);
+    expect(rbModAncestors(Host).filter((m) => m === leaf)).toHaveLength(1);
+    expect(mod.isInclude(leaf)).toBe(true);
+    expect(mod.ancestors()).toEqual([mod, composite, leaf]);
+  });
+
+  it("extends an object with the nested module", () => {
+    const mod = new Module((m) => m.include(composite));
+    const obj = {};
+    mod.extendObject(obj);
+    expect((obj as { root(): string }).root()).toBe("leaf");
+  });
+});
