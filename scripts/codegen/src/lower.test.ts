@@ -71,7 +71,7 @@ describe("lowering active_job/rules.rb", () => {
 
   it("emits a def overriding an inherited attr_accessor as a getter/setter pair", () => {
     expect(rules).toContain('get jobId(): any {\n    return "FIXED-ID";');
-    expect(rules).toContain("set jobId(value: any) {\n    this._jobId = value;");
+    expect(rules).toContain("set jobId(value) {\n    this._jobId = value;");
   });
 
   it("writes ExecutionContext[k] through its setKey", () => {
