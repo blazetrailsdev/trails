@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NameError } from "./name-error.js";
@@ -638,6 +639,9 @@ export function numStep(
   step: number,
   block: (i: number) => void,
 ): number {
+  if (step === 0) {
+    throw new ArgumentError("step can't be 0");
+  }
   const desc = step < 0;
   let inf: boolean;
   if (step === 0) {
@@ -656,31 +660,57 @@ export function numStep(
       for (; i <= to; i += step) block(i);
     }
   } else {
-    rubyFloatStep(from, to, step, block);
+    rubyFloatStep(from, to, step, false, block);
   }
   return from;
 }
 
-function rubyFloatStepSize(beg: number, end: number, unit: number): number {
+function rubyFloatStepSize(beg: number, end: number, unit: number, excl: boolean): number {
   const epsilon = Number.EPSILON;
-  if (unit === 0) return Infinity;
-  if (!Number.isFinite(unit)) return Number(unit > 0 ? beg <= end : beg >= end);
-  let n = (end - beg) / unit;
-  let err = ((Math.abs(beg) + Math.abs(end) + Math.abs(end - beg)) / Math.abs(unit)) * epsilon;
+  let d: number;
+  let n: number;
+  let err: number;
+
+  if (unit === 0) {
+    return Infinity;
+  }
+  if (!Number.isFinite(unit)) {
+    return Number(unit > 0 ? beg <= end : beg >= end);
+  }
+  n = (end - beg) / unit;
+  err = ((Math.abs(beg) + Math.abs(end) + Math.abs(end - beg)) / Math.abs(unit)) * epsilon;
   if (err > 0.5) err = 0.5;
-  if (n < 0) return 0;
-  n = Math.floor(n + err);
-  const d = (n + 1) * unit + beg;
-  if (beg < end) {
-    if (d <= end) n++;
-  } else if (beg > end) {
-    if (d >= end) n++;
+  if (excl) {
+    if (n <= 0) return 0;
+    if (n < 1) n = 0;
+    else n = Math.floor(n - err);
+    d = (n + 1) * unit + beg;
+    if (beg < end) {
+      if (d < end) n++;
+    } else if (beg > end) {
+      if (d > end) n++;
+    }
+  } else {
+    if (n < 0) return 0;
+    n = Math.floor(n + err);
+    d = (n + 1) * unit + beg;
+    if (beg < end) {
+      if (d <= end) n++;
+    } else if (beg > end) {
+      if (d >= end) n++;
+    }
   }
   return n + 1;
 }
 
-function rubyFloatStep(beg: number, end: number, unit: number, block: (i: number) => void): void {
-  const n = rubyFloatStepSize(beg, end, unit);
+function rubyFloatStep(
+  beg: number,
+  end: number,
+  unit: number,
+  excl: boolean,
+  block: (i: number) => void,
+): void {
+  const n = rubyFloatStepSize(beg, end, unit, excl);
   if (!Number.isFinite(unit)) {
     if (n) block(beg);
   } else if (unit === 0) {

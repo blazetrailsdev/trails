@@ -11,6 +11,7 @@ import {
   fixMod,
   isFinite,
   isNan,
+  numStep,
   numericMinus,
   numericUminus,
   numericModulo,
@@ -308,5 +309,48 @@ describe("intXor", () => {
       new TypeError("Operand can't be coerced into Integer"),
     );
     expect(() => intXor(3, new Operand(5))).toThrow(new TypeError("coerce must return [x, y]"));
+  });
+});
+
+describe("numStep", () => {
+  function steps(from: number, to: number, step: number): number[] {
+    const r: number[] = [];
+    const stop = new Error("break");
+    try {
+      numStep(from, to, step, (v) => {
+        r.push(v);
+        if (r.length > 5) throw stop;
+      });
+    } catch (e) {
+      if (e !== stop) throw e;
+    }
+    return r;
+  }
+
+  it("steps an Integer range up and down, inclusive", () => {
+    expect(steps(1, 5, 2)).toEqual([1, 3, 5]);
+    expect(steps(5, 1, -2)).toEqual([5, 3, 1]);
+  });
+
+  it("loops forever toward an infinite bound in the step's direction", () => {
+    expect(steps(1, Infinity, 1)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(steps(1, -Infinity, -1)).toEqual([1, 0, -1, -2, -3, -4]);
+    expect(steps(1, Infinity, -1)).toEqual([]);
+  });
+
+  it("takes ruby_float_step for a Float bound or step", () => {
+    expect(steps(1.5, 2.5, 0.5)).toEqual([1.5, 2, 2.5]);
+    expect(steps(1, 2, 0.3)).toEqual([1, 1.3, 1.6, 1 + 3 * 0.3]);
+    expect(steps(0.1, 0.3, 0.1)).toEqual([0.1, 0.2, 0.3]);
+    expect(steps(1, 3, Infinity)).toEqual([1]);
+  });
+
+  it("yields nothing for an infinite or NaN span", () => {
+    expect(steps(-Infinity, -Infinity, -1)).toEqual([]);
+    expect(steps(NaN, 3, 1)).toEqual([]);
+  });
+
+  it("raises for a zero step", () => {
+    expect(() => numStep(1, 3, 0, () => {})).toThrow("step can't be 0");
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Document } from "../html5/document.js";
 import { XmlDocument } from "./document.js";
 import type { NodeSet } from "./node-set.js";
+import type { Attr } from "./attr.js";
 import { XPathContext } from "./xpath-context.js";
 import { SyntaxError } from "./xpath/syntax-error.js";
 
@@ -69,5 +70,37 @@ describe("XPathContext", () => {
     expect((context.evaluate("/r/a[b]") as NodeSet).size).toBe(1);
     expect(context.evaluate("sum(//a/@k)")).toBe(3);
     doc.dispose();
+  });
+
+  it("answers attribute nodes as Attr", () => {
+    const doc = Document.parse(html, null, null, {});
+    const attrs = new XPathContext(doc).evaluate("//li/@class") as NodeSet;
+    expect(attrs.map((a) => (a as unknown as Attr).value)).toEqual(["a b", "b"]);
+    expect(attrs.map((a) => (a as unknown as Attr).name)).toEqual(["class", "class"]);
+  });
+
+  it("matches a multi-word css-class needle at a word start", () => {
+    const doc = Document.parse(html, null, null, {});
+    const context = new XPathContext(doc);
+    expect(
+      names(context.evaluate("//*[nokogiri-builtin:css-class(@class,'a b')]") as NodeSet),
+    ).toEqual(["one"]);
+    expect(
+      names(context.evaluate("//*[nokogiri-builtin:css-class(@class,'b c')]") as NodeSet),
+    ).toEqual([]);
+  });
+
+  it("raises when a handler answers nil, as libxml2's stack check does", () => {
+    const doc = Document.parse(html, null, null, {});
+    expect(() =>
+      new XPathContext(doc).evaluate("nokogiri:nothing()", { nothing: () => null }),
+    ).toThrow(SyntaxError);
+  });
+
+  it("raises TypeError for a non-String variable", () => {
+    const doc = Document.parse(html, null, null, {});
+    expect(() => new XPathContext(doc).registerVariable("n", 1)).toThrow(
+      "no implicit conversion of Integer into String",
+    );
   });
 });

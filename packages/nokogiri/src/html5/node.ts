@@ -1,6 +1,6 @@
 import { serializeOuter, type DefaultTreeAdapterMap } from "parse5";
 
-import type { Attr } from "../xml/attr.js";
+import { Attr } from "../xml/attr.js";
 import type { NodeSet } from "../xml/node-set.js";
 import { include, rbModConstSet } from "@blazetrails/ruby-compat";
 import { HTML5 } from "../namespaces.js";
@@ -9,6 +9,7 @@ import { Searchable } from "../xml/searchable.js";
 
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
+type Parse5Attr = DefaultTreeAdapterMap["element"]["attrs"][number];
 
 export class Node {
   declare css: (...args: unknown[]) => NodeSet;
@@ -76,13 +77,13 @@ export class Node {
   }
 
   get(name: string): string | null {
-    const attrs = (this._node as { attrs?: Attr[] }).attrs ?? [];
+    const attrs = (this._node as { attrs?: Parse5Attr[] }).attrs ?? [];
     return attrs.find((attr) => attr.name === name)?.value ?? null;
   }
 
   get attributeNodes(): Attr[] {
-    const attrs = (this._node as { attrs?: Attr[] }).attrs ?? [];
-    return attrs.map(({ name, value }) => ({ name, value }));
+    const attrs = (this._node as { attrs?: Parse5Attr[] }).attrs ?? [];
+    return attrs.map((attr) => new Attr(attr, this.document));
   }
 
   toString(): string {

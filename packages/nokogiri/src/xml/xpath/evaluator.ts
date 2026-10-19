@@ -1,4 +1,8 @@
+import { NotImplementedError } from "@blazetrails/ruby-compat";
+
 import { SyntaxError } from "./syntax-error.js";
+
+const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
 
 export type NodeKind =
   | "root"
@@ -618,7 +622,7 @@ class Evaluator<N> {
 
   private axis(axis: string, node: N): N[] {
     const t = this.tree;
-    const descendants = (n: N): N[] => t.children(n).flatMap((c) => [c, ...descendants(c)]);
+    const descendants = (n: N): N[] => this.descendants(n);
     const ancestors = (n: N): N[] => {
       const result: N[] = [];
       for (let p = t.parent(n); p !== null; p = t.parent(p)) result.push(p);
@@ -670,8 +674,24 @@ class Evaluator<N> {
         return this.sorted(result).reverse();
       }
       default:
-        return [];
+        throw new NotImplementedError(`the ${axis} axis is not supported`);
     }
+  }
+
+  descendants(node: N): N[] {
+    const result: N[] = [];
+    const stack = [...this.tree.children(node)].reverse();
+    while (stack.length > 0) {
+      const n = stack.pop()!;
+      result.push(n);
+      const children = this.tree.children(n);
+      for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+    }
+    return result;
+  }
+
+  rootOf(node: N): N {
+    return this.root(node);
   }
 
   private matches(step: Step, node: N): boolean {
@@ -723,7 +743,8 @@ class Evaluator<N> {
     const fn = this.ctx.lookupFunction(local, uri);
     if (fn === undefined) throw new SyntaxError(`ERROR: Unregistered function: ${ast.name}`);
     const result = fn({ tree: this.tree, node, position, size }, args);
-    return result ?? [];
+    if (result === null) throw new SyntaxError("ERROR: Stack usage error");
+    return result;
   }
 
   localName(nodes: Value<N>, context: N): string {
@@ -847,6 +868,40 @@ const CORE_FUNCTIONS: Record<string, CoreFunction<unknown>> = {
   },
   ceiling(_context, [a]) {
     return Math.ceil(this.toNum(a));
+  },
+  id(context, [a]) {
+    const tokens = (
+      Array.isArray(a) ? a.map((n) => this.tree.stringValue(n)).join(" ") : this.toStr(a)
+    )
+      .split(/[ \t\r\n]+/)
+      .filter((token) => token.length > 0);
+    return this.descendants(this.rootOf(context.node)).filter(
+      (n) =>
+        this.tree.kind(n) === "element" &&
+        this.tree
+          .attributes(n)
+          .some(
+            (attr) =>
+              this.tree.localName(attr) === "id" &&
+              [null, XML_NAMESPACE].includes(this.tree.namespaceUri(attr)) &&
+              tokens.includes(this.tree.stringValue(attr)),
+          ),
+    );
+  },
+  lang(context, [a]) {
+    const lang = this.toStr(a).toLowerCase();
+    for (let n: unknown = context.node; n !== null; n = this.tree.parent(n)) {
+      const attr = this.tree
+        .attributes(n)
+        .find(
+          (x) => this.tree.localName(x) === "lang" && this.tree.namespaceUri(x) === XML_NAMESPACE,
+        );
+      if (attr !== undefined) {
+        const value = this.tree.stringValue(attr).toLowerCase();
+        return value === lang || value.startsWith(`${lang}-`);
+      }
+    }
+    return false;
   },
   round(_context, [a]) {
     const n = this.toNum(a);

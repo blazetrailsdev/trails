@@ -4,10 +4,13 @@ import {
   XmlComment as LibXmlComment,
   XmlDocument as LibXmlDocument,
   XmlElement as LibXmlElement,
+  XmlNode,
   XmlTreeNode,
 } from "libxml2-wasm";
 import {
   RuntimeError,
+  stringValue,
+  toS,
   rbFSend,
   rbModConstSet,
   rbObjRespondTo,
@@ -38,9 +41,19 @@ const NOKOGIRI_BUILTIN_PREFIX = "nokogiri-builtin";
 const NOKOGIRI_BUILTIN_URI = "https://www.nokogiri.org/default_ns/ruby/builtins";
 const HTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
 
-interface Parse5AttrNode {
-  readonly owner: Parse5Element;
-  readonly attr: Parse5Attr;
+class Parse5AttrNode {
+  constructor(
+    readonly owner: Parse5Element,
+    readonly attr: Parse5Attr,
+  ) {}
+
+  get name(): string {
+    return this.attr.name;
+  }
+
+  get value(): string {
+    return this.attr.value;
+  }
 }
 
 type Parse5XPathNode = Parse5Node | Parse5AttrNode;
@@ -48,7 +61,7 @@ type Parse5XPathNode = Parse5Node | Parse5AttrNode;
 const parse5Attrs = new WeakMap<Parse5Element, Parse5AttrNode[]>();
 
 function isParse5Attr(node: Parse5XPathNode): node is Parse5AttrNode {
-  return "owner" in node;
+  return node instanceof Parse5AttrNode;
 }
 
 function parse5Children(node: Parse5Node): Parse5Node[] {
@@ -78,7 +91,7 @@ const PARSE5_TREE: Tree<Parse5XPathNode> = {
     if (isParse5Attr(node) || !("tagName" in node)) return [];
     let attrs = parse5Attrs.get(node);
     if (attrs === undefined || attrs.length !== node.attrs.length) {
-      attrs = node.attrs.map((attr) => ({ owner: node, attr }));
+      attrs = node.attrs.map((attr) => new Parse5AttrNode(node, attr));
       parse5Attrs.set(node, attrs);
     }
     return attrs;
@@ -114,7 +127,7 @@ class LibXmlRoot {
   constructor(readonly doc: LibXmlDocument) {}
 }
 
-type LibXmlXPathNode = XmlTreeNode | LibXmlAttribute | LibXmlRoot;
+type LibXmlXPathNode = XmlNode | LibXmlRoot;
 
 const libXmlRoots = new WeakMap<LibXmlDocument, LibXmlRoot>();
 
@@ -124,7 +137,7 @@ function libXmlRoot(doc: LibXmlDocument): LibXmlRoot {
   return root;
 }
 
-function libXmlPtr(node: XmlTreeNode | LibXmlAttribute): number {
+function libXmlPtr(node: XmlNode): number {
   return (node as unknown as { _nodePtr: number })._nodePtr;
 }
 
@@ -134,29 +147,27 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
     if (node instanceof LibXmlAttribute) return "attribute";
     if (node instanceof LibXmlElement) return "element";
     if (node instanceof LibXmlComment) return "comment";
+    if (node.eval("boolean(self::processing-instruction())") === true) {
+      return "processing-instruction";
+    }
     return "text";
   },
   parent(node) {
     if (node instanceof LibXmlRoot) return null;
-    const parent = node.parent;
-    if (parent !== null) return parent;
-    const doc = node.doc;
-    return node instanceof LibXmlElement && libXmlPtr(doc.root) === libXmlPtr(node)
-      ? libXmlRoot(doc)
-      : null;
+    return node.parent ?? libXmlRoot(node.doc);
   },
   children(node) {
-    if (node instanceof LibXmlRoot) return [node.doc.root];
+    if (node instanceof LibXmlRoot) return node.doc.find("/node()") as LibXmlXPathNode[];
     if (!(node instanceof LibXmlElement)) return [];
-    const children: XmlTreeNode[] = [];
-    for (let child = node.firstChild; child !== null; child = child.next) children.push(child);
-    return children;
+    return node.find("node()") as LibXmlXPathNode[];
   },
   attributes(node) {
     return node instanceof LibXmlElement ? node.attrs : [];
   },
   localName(node) {
-    return node instanceof LibXmlElement || node instanceof LibXmlAttribute ? node.name : "";
+    if (node instanceof LibXmlElement || node instanceof LibXmlAttribute) return node.name;
+    if (node instanceof LibXmlRoot) return "";
+    return node.eval("local-name()") as string;
   },
   qualifiedName(node) {
     if (!(node instanceof LibXmlElement || node instanceof LibXmlAttribute)) return "";
@@ -168,6 +179,7 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
   },
   stringValue(node) {
     if (node instanceof LibXmlRoot) return node.doc.root.content;
+    if (node instanceof LibXmlAttribute) return node.value;
     return node.content;
   },
   key(node) {
@@ -182,9 +194,34 @@ interface ContextHost {
 
 type XPathNode = Parse5XPathNode | LibXmlXPathNode;
 
-function cssClass(str: string, val: string): boolean {
-  if (val.length === 0) return true;
-  return str.split(/[ \t\n\r]+/).includes(val);
+function isBlankCh(c: string | undefined): boolean {
+  return c === " " || c === "\t" || c === "\n" || c === "\r";
+}
+
+function cssClass(str: string, val: string): string | null {
+  const valLen = val.length;
+  if (valLen === 0) return str;
+
+  let i = 0;
+  while (i < str.length) {
+    if (str[i] === val[0] && str.startsWith(val, i)) {
+      const nextByte = str[i + valLen];
+
+      if (nextByte === undefined || isBlankCh(nextByte)) {
+        return str.slice(i);
+      }
+    }
+
+    while (i < str.length && !isBlankCh(str[i])) {
+      i++;
+    }
+
+    while (i < str.length && isBlankCh(str[i])) {
+      i++;
+    }
+  }
+
+  return null;
 }
 
 export class XPathContext {
@@ -205,7 +242,7 @@ export class XPathContext {
     this._functions.set(`${NOKOGIRI_BUILTIN_URI} css-class`, (_context, args) => {
       if (args.length !== 2) return XPathContext.arityError();
       const [hay, needle] = args.map((a) => toXPathString(this._tree, a));
-      return cssClass(hay, needle);
+      return cssClass(hay, needle) !== null;
     });
     this._functions.set(`${NOKOGIRI_BUILTIN_URI} local-name-is`, (context, args) => {
       if (args.length !== 1) return XPathContext.arityError();
@@ -214,8 +251,10 @@ export class XPathContext {
   }
 
   registerNamespaces(namespaces: Record<string, string | null>): void {
-    for (const [rawKey, value] of Object.entries(namespaces)) {
-      const key = rawKey.replace(/.*:/, "");
+    for (const entry of Object.entries(namespaces)) {
+      let key = entry[0];
+      const value = entry[1];
+      key = key.replace(/.*:/, "");
 
       this.registerNs(key, value);
     }
@@ -224,8 +263,12 @@ export class XPathContext {
   registerVariables(binds: Record<string, unknown> | null | undefined): void {
     if (binds == null) return;
 
-    for (const [key, value] of Object.entries(binds)) {
-      this.registerVariable(key, value);
+    for (const entry of Object.entries(binds)) {
+      let key: unknown = entry[0];
+      const value = entry[1];
+      key = toS(key);
+
+      this.registerVariable(key as string, value);
     }
   }
 
@@ -238,7 +281,7 @@ export class XPathContext {
 
   registerVariable(name: string, value: unknown): this {
     if (value == null) this._variables.delete(name);
-    else this._variables.set(name, String(value));
+    else this._variables.set(name, stringValue(value));
 
     return this;
   }
@@ -260,7 +303,12 @@ export class XPathContext {
             );
           }
           return (context, args) =>
-            this.marshalFuncallAndReturnValues(context, args, handler, name);
+            this.marshalFuncallAndReturnValues(
+              { ...context, valueStack: [...args] },
+              args.length,
+              handler,
+              name,
+            );
         }
         return undefined;
       },
@@ -289,7 +337,11 @@ export class XPathContext {
 
   private wrap(node: XPathNode): Node {
     if (node instanceof LibXmlRoot) return this._document as Node;
-    if (node instanceof XmlTreeNode) return new XML.Node(node, this._document) as unknown as Node;
+    if (node instanceof LibXmlAttribute || node instanceof Parse5AttrNode) {
+      return new XML.Attr(node, this._document) as unknown as Node;
+    }
+    if (node instanceof XmlNode)
+      return new XML.Node(node as XmlTreeNode, this._document) as unknown as Node;
     if (this._tree.kind(node) === "root") return this._document as Node;
     return new HTML5.Node(node as DefaultTreeAdapterMap["childNode"], this._document);
   }
@@ -298,33 +350,37 @@ export class XPathContext {
     if (Array.isArray(value)) {
       return new XML.NodeSet(
         this._document,
-        value.filter((n) => this._tree.kind(n) !== "attribute").map((n) => this.wrap(n)),
+        value.map((n) => this.wrap(n)),
       );
     }
     return value;
   }
 
   private marshalFuncallAndReturnValues(
-    _context: FunctionContext<XPathNode>,
-    args: Value<XPathNode>[],
-    handler: unknown,
+    ctxt: FunctionContext<XPathNode> & { valueStack: Value<XPathNode>[] },
+    argc: number,
+    rbXpathHandler: unknown,
     methodName: string,
   ): Value<XPathNode> | null {
-    const argv = args.map((arg) => this.xpath2ruby(arg));
-
-    const retval = rbFSend(handler, methodName, ...argv);
-
-    if (typeof retval === "number") return retval;
-    if (typeof retval === "string") return retval;
-    if (retval === true || retval === false) return retval;
-    if (retval == null) return null;
-    if (Array.isArray(retval)) {
-      return new XML.NodeSet(this._document, retval as Node[]).map(
-        (n) => (n as unknown as { _node: XPathNode })._node,
-      );
+    const argv: unknown[] = new Array(argc);
+    for (let j = argc - 1; j >= 0; --j) {
+      argv[j] = this.xpath2ruby(ctxt.valueStack.pop()!);
     }
-    if (retval instanceof XML.NodeSet) {
-      return retval.map((n) => (n as unknown as { _node: XPathNode })._node);
+
+    const rbRetval = rbFSend(rbXpathHandler, methodName, ...argv);
+
+    if (typeof rbRetval === "number") return rbRetval;
+    if (typeof rbRetval === "bigint") return Number(rbRetval);
+    if (typeof rbRetval === "string") return rbRetval;
+    if (rbRetval === true) return true;
+    if (rbRetval === false) return false;
+    if (rbRetval == null) return null;
+    if (Array.isArray(rbRetval)) {
+      const rbNodeSet = new XML.NodeSet(this._document, rbRetval as Node[]);
+      return rbNodeSet.map((n) => (n as unknown as { _node: XPathNode })._node);
+    }
+    if (rbRetval instanceof XML.NodeSet) {
+      return rbRetval.map((n) => (n as unknown as { _node: XPathNode })._node);
     }
     throw new RuntimeError("Invalid return type");
   }

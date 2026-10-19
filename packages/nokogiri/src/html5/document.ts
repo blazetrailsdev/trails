@@ -5,9 +5,9 @@ import { readSource, type Readable } from "../readable.js";
 import { childNodes, type Node } from "./node.js";
 import type { NodeSet } from "../xml/node-set.js";
 import { Searchable } from "../xml/searchable.js";
+import { XPathVisitor } from "../css/xpath-visitor.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
-import { XPathVisitor } from "../css/xpath-visitor.js";
 
 export class Document {
   declare css: (...args: unknown[]) => NodeSet;

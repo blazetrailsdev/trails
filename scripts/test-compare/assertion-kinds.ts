@@ -293,8 +293,13 @@ const AREL_HELPER_ALIAS: Record<string, string> = {
  * This lives next to AREL_HELPER_ALIAS because it is the same fact about the
  * same Rails helper, read from the other side: the Ruby name maps to an
  * assertion, the TS name deliberately does not.
+ *
+ * `expectCalledWith` is ActiveSupport's `expect_called_with`
+ * (`activesupport/lib/active_support/testing/method_call_assertions.rb:33-35`),
+ * which only records a `Minitest::Mock#expect`; the `assert_mock` beside it is
+ * the assertion, and the Ruby side does not count the setup call either.
  */
-export const NON_ASSERTION_TRAILS_HELPERS = new Set(["mustBeLike"]);
+export const NON_ASSERTION_TRAILS_HELPERS = new Set(["mustBeLike", "expectCalledWith"]);
 
 // Minitest spec-form expectations whose builtin twin is NOT the bare
 // `assert_<suffix>`/`refute_<suffix>` the prefix rewrite in normalizeRailsKind

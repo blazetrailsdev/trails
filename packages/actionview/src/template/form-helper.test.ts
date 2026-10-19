@@ -10,6 +10,7 @@ import {
   assertEqual,
   assertPredicate,
   assertMock,
+  assertNotIncludes,
   assertRaises,
   expectCalledWith,
   extend,
@@ -28,6 +29,7 @@ import {
   Range,
   Struct,
   include,
+  publicInstanceMethods,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 
@@ -3212,7 +3214,7 @@ describe("FormHelperTest", () => {
   });
 
   it("form builder does not have form for method", () => {
-    expect("formFor" in FormBuilder.prototype).toBe(false);
+    assertNotIncludes(publicInstanceMethods(FormBuilder), "formFor");
   });
 
   it("form for and fields for", () => {
