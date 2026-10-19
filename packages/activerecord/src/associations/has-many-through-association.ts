@@ -16,7 +16,7 @@ import {
   rbDeclareIvar,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
-import { underscore, isBlank, wrap } from "@blazetrails/activesupport";
+import { exceptBang, underscore, isBlank, wrap } from "@blazetrails/activesupport";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import type { Association } from "./association.js";
@@ -291,12 +291,11 @@ function throughScopeAttributes(this: HasManyThroughAssociation): Record<string,
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
   const throughTable = throughAssoc.reflection.klass.tableName;
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
-  const throughFk = throughAssoc.reflection?.options?.foreignKey ?? "";
-  const inheritanceCol = throughAssoc.klass?.inheritanceColumn ?? "type";
-  for (const key of [String(throughFk), inheritanceCol]) {
-    if (key in attrs) delete attrs[key];
-  }
-  return attrs;
+  const exceptKeys = [
+    ...[throughAssoc.reflection.foreignKey()].flat(),
+    throughAssoc.reflection.klass.inheritanceColumn as string,
+  ];
+  return exceptBang(attrs, ...exceptKeys);
 }
 
 /** @internal */
