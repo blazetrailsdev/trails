@@ -1703,6 +1703,8 @@ export class Base extends Model {
 
   declare static destroyAssociationAsyncJob: any;
   declare destroyAssociationAsyncJob: any;
+  /** @internal */
+  declare _afterCommitJobs: Array<[unknown, Record<string, unknown>]>;
 
   declare static destroyAssociationAsyncBatchSize: number | null;
 

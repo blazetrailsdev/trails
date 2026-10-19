@@ -1,15 +1,15 @@
-import { block, fetch, rbFSend, rbModName } from "@blazetrails/ruby-compat";
+import { block, fetch, rbModName } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import { foreignKey, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../namespaces.js";
 import { HasMany } from "./has-many.js";
 
 export class HasAndBelongsToMany {
-  readonly lhsModel: any;
+  readonly lhsModel: typeof Base;
   readonly associationName: string;
   readonly options: Record<string, unknown>;
 
-  constructor(associationName: string, lhsModel: any, options: Record<string, unknown>) {
+  constructor(associationName: string, lhsModel: typeof Base, options: Record<string, unknown>) {
     this.associationName = associationName;
     this.lhsModel = lhsModel;
     this.options = options;
@@ -67,7 +67,7 @@ export class HasAndBelongsToMany {
     };
 
     Object.defineProperty(joinModel, "name", {
-      value: `HABTM_${camelize(this.associationName)}`,
+      value: `HABTM_${camelize(String(this.associationName))}`,
       writable: true,
       configurable: true,
     });
@@ -121,13 +121,13 @@ export class HasAndBelongsToMany {
       const className = fetch<unknown>(
         this.options,
         "className",
-        block(() => singularize(camelize(this.associationName))),
+        block(() => singularize(camelize(String(this.associationName)))),
       );
-      const klass = rbFSend(this.lhsModel, "computeType", String(className)) as typeof Base;
+      const klass = this.lhsModel.computeType(String(className));
       return [this.lhsModel.tableName, klass.tableName]
         .sort()
         .join("\0")
-        .replace(/^(.*[._])(.+)\0\1(.+)/m, "$1$2_$3")
+        .replace(/^(.*[._])(.+)\0\1(.+)/gm, "$1$2_$3")
         .replaceAll("\0", "_");
     }
   }
