@@ -7,7 +7,6 @@ import {
   eachPair,
   first,
   include,
-  initializeIncludedModules,
   isEmpty,
   mergeBang,
   puts,
@@ -29,8 +28,14 @@ import {
   uniq,
   rbGvGet,
   rbGvSet,
+  Hash,
+  hashDelete,
+  isModuleIncluded,
 } from "@blazetrails/ruby-compat";
-import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS } from "./base.js";
+import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, type Relations } from "./base.js";
+import type { Invocation } from "./invocation.js";
+import type { Shell } from "./shell.js";
+import { Actions, type ActionsHost } from "./actions.js";
 import { Command, DynamicCommand, HiddenCommand } from "./command.js";
 import { AmbiguousTaskError } from "./error.js";
 import { Group, type GroupClass } from "./group.js";
@@ -58,6 +63,8 @@ type Instance = Base & {
 };
 
 export type ThorClass = typeof Thor & Omit<BaseClass, keyof typeof Thor>;
+
+type Host = Base & Invocation & Shell & ActionsHost;
 
 export class Thor {
   static {
@@ -668,8 +675,102 @@ export class Thor {
     return list.sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]));
   }
 
-  constructor(...args: unknown[]) {
-    initializeIncludedModules(this, ...args);
+  /** @inventedArm if — PERMANENT */
+  constructor(
+    args: unknown[] = [],
+    localOptions: unknown = {},
+    config: BaseConfig & {
+      behavior?: string | null;
+      destinationRoot?: string | null;
+      shell?: Basic | null;
+    } = {},
+  ) {
+    const actions = isModuleIncluded(new.target, Actions);
+    if (actions) {
+      (this as unknown as Host).behavior = (() => {
+        switch (toS(config.behavior)) {
+          case "force":
+          case "skip":
+            (this as unknown as Host)._cleanupOptionsAndSet(
+              localOptions as Record<string, unknown>,
+              config.behavior!,
+            );
+            return "invoke";
+          case "revoke":
+            return "revoke";
+          default:
+            return "invoke";
+        }
+      })();
+    }
+
+    (this as unknown as Host)._invocations =
+      (config.invocations as Host["_invocations"] | undefined) ||
+      new Hash<unknown, string[]>((h, k) => {
+        const v: string[] = [];
+        h.set(k, v);
+        return v;
+      });
+    (this as unknown as Host)._initializer = [args, localOptions, config];
+
+    const klass = this.constructor as unknown as BaseClass;
+    let parseOptions = klass.classOptions();
+
+    const commandOptions = hashDelete(config, "commandOptions") as Record<string, Option> | null;
+    if (rtest(commandOptions)) parseOptions = { ...parseOptions, ...commandOptions };
+
+    let arrayOptions: unknown[];
+    let hashOptions: Record<string, unknown>;
+    if (Array.isArray(localOptions)) {
+      arrayOptions = localOptions;
+      hashOptions = {};
+    } else {
+      arrayOptions = [];
+      hashOptions = localOptions as Record<string, unknown>;
+    }
+
+    const currentCommand = config.currentCommand ?? null;
+    const stopOnUnknown = klass.isStopOnUnknownOption(currentCommand);
+
+    const relations: Relations =
+      currentCommand == null
+        ? { exclusiveOptionNames: [], atLeastOneOptionNames: [] }
+        : currentCommand.optionsRelation;
+
+    klass.classExclusiveOptionNames().map((n) => relations.exclusiveOptionNames!.push(n));
+    klass.classAtLeastOneOptionNames().map((n) => relations.atLeastOneOptionNames!.push(n));
+
+    const disableRequiredCheck = klass.isDisableRequiredCheck(currentCommand);
+
+    const opts = new Options(
+      parseOptions,
+      hashOptions,
+      stopOnUnknown,
+      disableRequiredCheck,
+      relations,
+    );
+
+    (this as unknown as Host).options = opts.parse(arrayOptions);
+    if (rtest(config.classOptions)) {
+      (this as unknown as Host).options = config.classOptions.merge(
+        (this as unknown as Host).options,
+      ) as Host["options"];
+    }
+
+    if (klass.isCheckUnknownOptions(config)) opts.checkUnknownBang();
+
+    let toParse = args;
+    if (!klass["strictArgsPosition?"](config)) toParse = toParse.concat(opts.remaining());
+
+    const thorArgs = new Arguments(klass.arguments());
+    for (const [k, v] of Object.entries(thorArgs.parse(toParse))) rbFSend(this, `${k}=`, v);
+    (this as unknown as Host).args = thorArgs.remaining();
+
+    (this as unknown as Host).shell = config.shell as Basic;
+    if (rbObjRespondTo((this as unknown as Host).shell, "base"))
+      (this as unknown as Host).shell.base ||= this as never;
+
+    if (actions) (this as unknown as Host).destinationRoot = config.destinationRoot as string;
   }
 
   help(command: string | null = null, subcommand: unknown = false): void {

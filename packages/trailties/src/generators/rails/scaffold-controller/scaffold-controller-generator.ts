@@ -1,5 +1,15 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ResourceHelpers` (`scaffold_controller_generator.rb:8`); the class/interface merge is how a mixin surfaces on the type side. */
-import { camelize, include, type Included } from "@blazetrails/activesupport";
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ResourceHelpers` (`scaffold_controller_generator.rb:8`); the class/interface merge is how a mixin surfaces on the type side. */
+import {
+  camelize,
+  include,
+  type Included,
+  pluralize,
+  singularize,
+  underscore,
+} from "@blazetrails/activesupport";
+import { GeneratorError } from "../../generated-attribute.js";
+import { ModelHelpers } from "../../model-helpers.js";
+import { format } from "@blazetrails/ruby-compat";
 import { dasherize, parseColumns, type GeneratorBase } from "../../base.js";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import type { ModelHelpersOptions } from "../../model-helpers.js";
@@ -18,7 +28,8 @@ export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, Mo
   orm?: string | false;
 }
 
-export interface ScaffoldControllerGenerator extends Included<typeof ResourceHelpers> {}
+export interface ScaffoldControllerGenerator
+  extends Included<typeof ResourceHelpers>, Included<typeof ModelHelpers> {}
 
 export class ScaffoldControllerGenerator extends NamedBase {
   /** @internal */
@@ -28,6 +39,38 @@ export class ScaffoldControllerGenerator extends NamedBase {
   /** @internal */
   declare _controllerClassPath: string[];
   declare options: ScaffoldControllerGeneratorOptions;
+
+  /** @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26 */
+  constructor(options: ScaffoldControllerGeneratorOptions) {
+    super(options);
+    const controllerName = this.name;
+    if (this.options.modelName != null) {
+      this.name = this.options.modelName;
+      this.assignNamesBang(this.name);
+    }
+
+    this.assignControllerNamesBang(pluralize(controllerName));
+
+    if (this.isPluralModelName(this.name) && !this.options.forcePlural) {
+      const singular = singularize(this.name);
+      if (!ModelHelpers.skipWarn) {
+        this.say(format(ModelHelpers.PLURAL_MODEL_NAME_WARN_MESSAGE, this.name, singular));
+      }
+      this.name = (this.options as { name?: string }).name = singular;
+      this.assignNamesBang(this.name);
+    }
+    if (this.isInflectionImpossible(this.name)) {
+      const option1 = underscore(singularize(this.name));
+      const option2 = singularize(underscore(pluralize(this.name)));
+      throw new GeneratorError(
+        format(ModelHelpers.INFLECTION_IMPOSSIBLE_ERROR_MESSAGE, this.name, option1, option2),
+      );
+    }
+    if (this.isIrregularModelName(this.name) && !ModelHelpers.skipWarn) {
+      this.say(format(ModelHelpers.IRREGULAR_MODEL_NAME_WARN_MESSAGE, pluralize(this.name)));
+    }
+    ModelHelpers.skipWarn = true;
+  }
 
   async run(): Promise<string[]> {
     const { api, test = true, helper } = this.options;

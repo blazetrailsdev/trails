@@ -1,0 +1,9 @@
+[
+  {
+    "package": "thor",
+    "tsFile": "group.ts",
+    "rubyName": "initialize",
+    "call": "order:constructor,classOptions",
+    "reason": "Group's constructor inlines Invocation#initialize (Hash.new) ahead of Base#initialize as Ruby's chain runs it; the comparer pairs only the tagged Base#initialize segment because Invocation arrives through Base.included, which the manifest does not record."
+  }
+]

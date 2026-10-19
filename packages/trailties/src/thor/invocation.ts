@@ -3,7 +3,6 @@ import {
   flatten,
   Hash,
   included,
-  initialize,
   isModuleIncluded,
   Module,
   rbFCaller,
@@ -172,23 +171,6 @@ function _parseInitializationOptions(
 export const Invocation = new Module((mod) => {
   (mod as unknown as Record<symbol, unknown>)[included] = function (base: object): void {
     extend(base, ClassMethods);
-  };
-
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function* (
-    this: Invocation,
-    args: unknown[] = [],
-    options: unknown = {},
-    config: BaseConfig = {},
-  ): Generator<void, void, void> {
-    this._invocations =
-      (config.invocations as Invocations | undefined) ||
-      new Hash<unknown, string[]>((h, k) => {
-        const v: string[] = [];
-        h.set(k, v);
-        return v;
-      });
-    this._initializer = [args, options, config];
-    yield;
   };
 
   mod.moduleEval((m) => {
