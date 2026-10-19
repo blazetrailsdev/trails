@@ -2745,9 +2745,9 @@ export function inventedArmTags(node: ts.Node): string[] | undefined {
 }
 
 /**
- * The Ruby bodies a constructor's JSDoc names as inlined into it
- * (`@inlinedFrom Module#initialize <citation>`, RFC 0188), in written order, or
- * undefined. compare.ts joins them to the constructor's Rails call set.
+ * The Ruby bodies a constructor's or method's JSDoc names as inlined into it
+ * (`@inlinedFrom Module#method <citation>`, RFC 0188 / RFC 0197), in written
+ * order, or undefined. compare.ts joins them to the member's Rails call set.
  */
 export function inlinedFromTags(node: ts.Node): InlinedFrom[] | undefined {
   const tags = taggedCommentOf(node, INLINED_FROM_TAG, fileHasInlinedFromTag, inlinedFromIn);
@@ -4474,6 +4474,7 @@ export function extractClass(
     const memberInventedArms = inventedArmTags(member);
     const memberMissingRailsCallReasons = missingRailsCallTagReasons(member);
     const memberMissingRailsArgsReasons = missingRailsArgsTagReasons(member);
+    const inlinedFrom = inlinedFromTags(member);
     const tagged = {
       ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
       ...(memberMissingRailsCalls !== undefined
@@ -4490,6 +4491,7 @@ export function extractClass(
       ...(memberMissingRailsArgsReasons !== undefined
         ? { missingRailsArgsReasons: memberMissingRailsArgsReasons }
         : {}),
+      ...(inlinedFrom !== undefined ? { inlinedFrom } : {}),
     };
     const isStatic = hasModifier(member, ts.SyntaxKind.StaticKeyword);
     const line = member.getSourceFile().getLineAndCharacterOfPosition(member.getStart()).line + 1;
@@ -4557,7 +4559,6 @@ export function extractClass(
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
       const shapeTokens = extractShapeTokens(member.body);
-      const inlinedFrom = inlinedFromTags(member);
       instanceMethods.push({
         name: "constructor",
         visibility,
@@ -4566,7 +4567,6 @@ export function extractClass(
         file,
         ...(internal ? { internal: true } : {}),
         ...tagged,
-        ...(inlinedFrom !== undefined ? { inlinedFrom } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),

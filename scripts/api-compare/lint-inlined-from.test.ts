@@ -81,13 +81,20 @@ const ruby = {
         }),
       },
       modules: {
-        "ActiveRecord::Core": entity("core.rb", [def("initialize", `${AR}/core.rb`, 471, 482)]),
-        "ActiveRecord::Inheritance": entity("inheritance.rb", [], CONCERN),
+        "ActiveRecord::Core": entity("core.rb", [
+          def("initialize", `${AR}/core.rb`, 471, 482),
+          def("save", `${AR}/core.rb`, 490, 492),
+        ]),
+        "ActiveRecord::Inheritance": entity(
+          "inheritance.rb",
+          [{ ...def("save", `${AR}/inheritance.rb`, 90, 92), calls: [] }],
+          CONCERN,
+        ),
         "ActiveRecord::First::ClassMethods": entity("first.rb", [
           def("new", `${AR}/first.rb`, 2, 4),
         ]),
         "ActiveRecord::Last::ClassMethods": entity("last.rb", [def("new", `${AR}/last.rb`, 2, 4)]),
-        "ActiveRecord::Plain": entity("plain.rb"),
+        "ActiveRecord::Plain": entity("plain.rb", [def("save", `${AR}/plain.rb`, 8, 10)]),
         "ActiveRecord::Plain::ClassMethods": entity("plain.rb", [
           def("new", `${AR}/plain.rb`, 2, 4),
         ]),
@@ -114,7 +121,7 @@ const tag = (name: string, citation: string): InlinedFrom => {
   )!;
   return {
     module,
-    hook: hook as InlinedFrom["hook"],
+    hook: hook,
     source,
     version,
     file,
@@ -152,6 +159,52 @@ function messages(
   const ts = { packages: { activerecord: { classes, modules: {} } } } as unknown as ApiManifest;
   return inlinedFromFindings(ruby, ts, enrolled, pairs).map((f) => `${f.hook} ${f.message}`);
 }
+
+function methodMessages(inlinedFrom: InlinedFrom[], owner = "Base"): string[] {
+  const file = `${owner.toLowerCase()}.ts`;
+  const save = { ...def("save", "", 1, 1), file, inlinedFrom };
+  const ts = {
+    packages: { activerecord: { classes: { [owner]: entity(file, [save]) }, modules: {} } },
+  } as unknown as ApiManifest;
+  return inlinedFromFindings(ruby, ts, []).map((f) => `${f.member} ${f.hook} ${f.message}`);
+}
+
+describe("inlinedFromFindings on a method inlining module super", () => {
+  const PLAIN_SAVE = tag("ActiveRecord::Plain#save", `${AR}/plain.rb:8-10`);
+  const CORE_SAVE = tag("ActiveRecord::Core#save", `${AR}/core.rb:490-492`);
+
+  it("passes tags for the module methods the class reaches, in ancestor order", () => {
+    expect(methodMessages([PLAIN_SAVE, CORE_SAVE])).toEqual([]);
+  });
+
+  it("flags a stale citation, out-of-order tags and a module the class does not include", () => {
+    expect(methodMessages([tag("ActiveRecord::Core#save", `${AR}/core.rb:491-492`)])).toEqual([
+      "save ActiveRecord::Core#save citation is stale: cited at rails/v8.0.2/activerecord/lib/active_record/core.rb:491-492, the manifest has rails/v8.0.2/activerecord/lib/active_record/core.rb:490-492",
+    ]);
+    expect(methodMessages([CORE_SAVE, PLAIN_SAVE])).toEqual([
+      "save ActiveRecord::Plain#save is out of chain order: Rails runs it before ActiveRecord::Core#save",
+    ]);
+    expect(methodMessages([CORE_SAVE], "Relation")).toEqual([
+      "save ActiveRecord::Core#save names a module ActiveRecord::Relation does not include or prepend",
+    ]);
+  });
+
+  it("flags a tag naming a different method from the member's other tags", () => {
+    expect(
+      methodMessages([PLAIN_SAVE, tag("ActiveRecord::Core#initialize", `${AR}/core.rb:471-482`)]),
+    ).toEqual([
+      "save ActiveRecord::Core#initialize names a method other than save, which the other tags name",
+    ]);
+  });
+
+  it("flags a module method whose Rails body calls no super", () => {
+    expect(
+      methodMessages([tag("ActiveRecord::Inheritance#save", `${AR}/inheritance.rb:90-92`)]),
+    ).toEqual([
+      "save ActiveRecord::Inheritance#save names a module method whose Rails body calls no `super`",
+    ]);
+  });
+});
 
 describe("inlinedFromFindings", () => {
   it("passes a constructor tagged for each cross-file hook its Rails class reaches", () => {

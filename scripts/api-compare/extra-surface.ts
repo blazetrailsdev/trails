@@ -2205,6 +2205,12 @@ export function inlinedModuleMembers(
         if (sameFileOwners !== undefined && [...sameFileOwners].some((o) => o !== host)) continue;
         if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
         if (m.name === "initialize" && taggedByTsFile.get(hostTs)?.has(fqn) === true) continue;
+        if (
+          (m.calls ?? []).includes("super") &&
+          taggedByTsFile.get(hostTs)?.has(`${fqn}#${m.name}`) === true
+        ) {
+          continue;
+        }
         if (m.name.endsWith("?") && candidates.some((c) => moduleBodies?.has(c) === true)) continue;
         const tsName = candidates.find(
           (c) =>
@@ -2350,14 +2356,16 @@ function buildPackageReport(
   const taggedByTsFile = new Map<string, Set<string>>();
   for (const c of Object.values(tsPkg.classes)) {
     if (c.reExportedFrom) continue;
-    const ctor = c.instanceMethods.find((m) => m.name === "constructor");
-    const file = ctor?.file ?? c.file;
-    if (!file) continue;
-    for (const tag of ctor?.inlinedFrom ?? []) {
-      if (tag.hook !== "initialize") continue;
-      const modules = taggedByTsFile.get(file) ?? new Set<string>();
-      modules.add(tag.module);
-      taggedByTsFile.set(file, modules);
+    for (const m of c.instanceMethods) {
+      const file = m.file ?? c.file;
+      if (!file) continue;
+      for (const tag of m.inlinedFrom ?? []) {
+        const isCtor = m.name === "constructor";
+        if (isCtor && tag.hook !== "initialize") continue;
+        const modules = taggedByTsFile.get(file) ?? new Set<string>();
+        modules.add(isCtor ? tag.module : `${tag.module}#${tag.hook}`);
+        taggedByTsFile.set(file, modules);
+      }
     }
   }
 

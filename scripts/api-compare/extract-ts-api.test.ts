@@ -8168,11 +8168,14 @@ describe("extractClass — @inlinedFrom on a constructor", () => {
     ]);
   });
 
-  it("records nothing on an untagged constructor or a tagged method", () => {
+  it("records nothing on an untagged constructor, and a tagged method's tags", () => {
     const got = extractFromSource(
       `class Foo {\n  constructor() {}\n  /** @inlinedFrom ${api} */\n  save() {}\n}`,
     ).instanceMethods;
-    expect(got.map((m) => m.inlinedFrom)).toEqual([undefined, undefined]);
+    expect(got.map((m) => m.inlinedFrom?.map((t) => t.module))).toEqual([
+      undefined,
+      ["ActiveModel::API"],
+    ]);
   });
 });
 

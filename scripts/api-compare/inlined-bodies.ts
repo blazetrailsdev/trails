@@ -107,11 +107,12 @@ export function moduleAncestors(
   return ancestors;
 }
 
-/** The ancestors that define `initialize` in the class's own Ruby file. */
+/** The ancestors that define `hook` in the class's own Ruby file. */
 export function sameFileInitializeModules(
   klass: ClassInfo,
   ancestors: ModuleAncestors,
   modules: Record<string, unknown>,
+  hook = "initialize",
 ): string[] {
   return [...ancestors.prepended, ...ancestors.included].filter((fqn) => {
     const mod = modules[fqn] as ClassInfo | undefined;
@@ -119,7 +120,7 @@ export function sameFileInitializeModules(
       mod !== undefined &&
       klass.file !== undefined &&
       mod.file === klass.file &&
-      mod.instanceMethods.some((m) => m.name === "initialize")
+      mod.instanceMethods.some((m) => m.name === hook)
     );
   });
 }
@@ -215,15 +216,29 @@ export function inlinedSegments(
   ];
 }
 
-/** Where a constructor carrying a tag sits. */
+/**
+ * The Rails chain a method that inlines module `super` targets answers to
+ * (RFC 0197): the includer's own `def`, when it has one, then each tagged
+ * module method in tag order. Empty when the method carries no tag.
+ */
+export function inlinedMethodSegments(
+  own: MethodInfo | undefined,
+  tagged: readonly ModuleBody[],
+): MethodInfo[] {
+  if (tagged.length === 0) return [];
+  return [...(own === undefined ? [] : [own]), ...tagged.map((m) => m.body)];
+}
+
+/** Where a constructor or method carrying a tag sits. */
 export interface TaggedConstructor {
   package: string;
   tsFile: string;
+  tsName: string;
 }
 
 /**
- * Every tagged constructor in the TS manifest, keyed by the `Module#hook` it
- * cites. Each tag is resolved through {@link inlinedHookBody} first, so one
+ * Every tagged constructor or method in the TS manifest, keyed by the
+ * `Module#hook` it cites. Each tag is resolved through {@link inlinedHookBody} first, so one
  * that names no `def`, or cites it at a stale span, throws here and credits
  * nothing.
  */
@@ -235,13 +250,15 @@ export function inlinedHookTags(
   for (const [name, pkg] of Object.entries(ts.packages)) {
     for (const [owner, klass] of Object.entries(pkg.classes) as unknown as [string, ClassInfo][]) {
       for (const member of klass.instanceMethods) {
-        if (member.name !== "constructor") continue;
         for (const tag of member.inlinedFrom ?? []) {
           const key = `${tag.module}#${tag.hook}`;
           const tsFile = member.file ?? klass.file;
           if (tsFile === undefined) continue;
-          inlinedHookBody(ruby, tag, `${name}/${tsFile} ${owner}#constructor`);
-          byHook.set(key, [...(byHook.get(key) ?? []), { package: name, tsFile }]);
+          inlinedHookBody(ruby, tag, `${name}/${tsFile} ${owner}#${member.name}`);
+          byHook.set(key, [
+            ...(byHook.get(key) ?? []),
+            { package: name, tsFile, tsName: member.name },
+          ]);
         }
       }
     }
@@ -250,10 +267,11 @@ export function inlinedHookTags(
 }
 
 /**
- * The crediting rule for a module's hook (RFC 0188): a module `initialize`, or
- * a `ClassMethods#new`, has no TS member of its own to pair with, and is
- * matched when a constructor carrying its tag sits in the mirror of a Rails
- * file that includes, prepends or extends the module. `includerFiles` are
+ * The crediting rule for a module's hook (RFC 0188): a module `initialize`, a
+ * `ClassMethods#new`, or a module method whose `super` an includer inlines
+ * (RFC 0197), has no TS member of its own to pair with, and is matched when a
+ * member carrying its tag sits in the mirror of a Rails file that includes,
+ * prepends or extends the module. `includerFiles` are
  * those mirrors within the module's own package. The include graph is built
  * per package, so a constructor in another package is credited on its tag,
  * which {@link inlinedHookTags} has already resolved to the module's `def`.

@@ -4569,6 +4569,28 @@ describe("inlinedModuleMembers", () => {
     expect(inlinedModuleMembers("arel", classes, modules, byShort, bodied, tagged)).toEqual([]);
   });
 
+  it("drops a module method whose super the host's tagged method inlines, and only that one", () => {
+    const modules = {
+      "Arel::Crud": rubyClass({
+        name: "Crud",
+        file: "crud.rb",
+        instance: [{ ...method("compile_insert"), calls: ["super"] }, method("compile_update")],
+      }),
+    };
+    const bodied = new Map([
+      ["select-manager.ts", new Set(["compileInsert", "compileUpdate"])],
+      ["crud.ts", new Set<string>()],
+    ]);
+    const tagged = new Map([
+      ["select-manager.ts", new Set(["Arel::Crud#compile_insert", "Arel::Crud#compile_update"])],
+    ]);
+    expect(
+      inlinedModuleMembers("arel", rubyClasses, modules, byShort, bodied, tagged).map(
+        (f) => f.tsName,
+      ),
+    ).toEqual(["compileUpdate"]);
+  });
+
   it("reports nothing when the module's own twin carries the body", () => {
     // The settled shape: the body stays in the file mirroring the mixin's own
     // Rails file, and the host keeps only the include seam.
