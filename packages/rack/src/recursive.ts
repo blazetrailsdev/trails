@@ -1,4 +1,4 @@
-import { ArgumentError, StringIO, rbFSend } from "@blazetrails/ruby-compat";
+import { ArgumentError, StringIO, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
 import {
   GET,
   PATH_INFO,
@@ -23,26 +23,25 @@ export class ForwardRequest extends Error {
 
 export class Recursive {
   private app: RackApp;
+  private scriptName: string = "";
 
   constructor(app: RackApp) {
     this.app = app;
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    return this._call(env);
+    return rbObjDup(this)._call(env);
   }
 
   /** @internal */
   async _call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     let currentEnv = env;
     while (true) {
-      const scriptName: string = currentEnv[SCRIPT_NAME] || "";
-      const include = (newEnv: Record<string, any>, path: string) =>
-        this.include(newEnv, path, scriptName);
+      this.scriptName = currentEnv[SCRIPT_NAME];
       try {
         return await (rbFSend(this.app, "call", {
           ...currentEnv,
-          [RACK_RECURSIVE_INCLUDE]: include,
+          [RACK_RECURSIVE_INCLUDE]: this.include.bind(this),
         }) as ReturnType<typeof this.app>);
       } catch (e) {
         if (e instanceof ForwardRequest) {
@@ -61,21 +60,20 @@ export class Recursive {
   async include(
     env: Record<string, any>,
     path: string,
-    scriptName = "",
   ): Promise<[number, Record<string, string | string[]>, any]> {
     if (
       !(
-        path.indexOf(scriptName) === 0 &&
-        (path[scriptName.length] === "/" || path[scriptName.length] === undefined)
+        path.indexOf(this.scriptName) === 0 &&
+        (path[this.scriptName.length] === "/" || path[this.scriptName.length] === undefined)
       )
     ) {
-      throw new ArgumentError(`can only include below ${scriptName}, not ${path}`);
+      throw new ArgumentError(`can only include below ${this.scriptName}, not ${path}`);
     }
 
     const newEnv = {
       ...env,
       [PATH_INFO]: path,
-      [SCRIPT_NAME]: scriptName,
+      [SCRIPT_NAME]: this.scriptName,
       [REQUEST_METHOD]: GET,
       CONTENT_LENGTH: "0",
       CONTENT_TYPE: "",
