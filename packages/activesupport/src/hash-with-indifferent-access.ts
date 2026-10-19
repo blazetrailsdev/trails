@@ -1,4 +1,4 @@
-import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
+import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang, toQuery } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import { DeepMergeable } from "./deep-mergeable.js";
 import { ActiveSupport } from "./namespaces.js";
@@ -537,17 +537,12 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return obj;
   }
 
-  toParam(): string {
-    const parts: string[] = [];
-    const sorted = [...this.entries()].sort(([a], [b]) => a.localeCompare(b));
-    for (const [k, v] of sorted) {
-      parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
-    }
-    return parts.join("&").replace(/%20/g, "+");
+  toQuery(namespace: string | null = null): string {
+    return toQuery(this, namespace ?? undefined);
   }
 
-  toQuery(): string {
-    return this.toParam();
+  toParam(namespace: string | null = null): string {
+    return this.toQuery(namespace);
   }
 
   withIndifferentAccess(): HashWithIndifferentAccess<V> {

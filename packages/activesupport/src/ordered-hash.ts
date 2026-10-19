@@ -1,4 +1,4 @@
-import { Hash, first } from "@blazetrails/ruby-compat";
+import { Hash, first, rbObjDup } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 
 YAML.addBuiltinType("omap", (_type, val) => {
@@ -52,17 +52,15 @@ export class OrderedHash<K, V> extends Hash<K, V> {
   }
 
   select(...args: [(key: K, value: V) => boolean]): OrderedHash<K, V> {
-    const block = args[args.length - 1];
-    const result = new OrderedHash<K, V>();
-    for (const [k, v] of this) {
-      if (block(k, v)) result.set(k, v);
-    }
-    return result;
+    const hash = rbObjDup(this);
+    hash.selectBang(...args);
+    return hash;
   }
 
   reject(...args: [(key: K, value: V) => boolean]): OrderedHash<K, V> {
-    const block = args[args.length - 1];
-    return this.select((k, v) => !block(k, v));
+    const hash = rbObjDup(this);
+    hash.rejectBang(...args);
+    return hash;
   }
 
   nestedUnderIndifferentAccess(): this {
@@ -74,6 +72,20 @@ export class OrderedHash<K, V> extends Hash<K, V> {
     const n = this.size;
     if (!n) return null;
     this.deleteIf(block);
+    if (n === this.size) return null;
+    return this;
+  }
+
+  /**
+   * Ruby core `Hash#select!` (`vendor/ruby/v3.3.11/hash.c:2813` `rb_hash_select_bang`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  selectBang(...args: [(key: K, value: V) => boolean]): this | null {
+    const block = args[args.length - 1];
+    const n = this.size;
+    if (!n) return null;
+    this.deleteIf((k, v) => !block(k, v));
     if (n === this.size) return null;
     return this;
   }

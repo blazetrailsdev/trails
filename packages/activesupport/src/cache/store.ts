@@ -481,7 +481,7 @@ export abstract class Store {
         return SerializerWithFallback.get("marshal_7_1");
       default:
         throw new ArgumentError(
-          `Unrecognized ActiveSupport::Cache.format_version: ${formatVersion()}`,
+          `Unrecognized ActiveSupport::Cache.format_version: ${rbInspect(formatVersion())}`,
         );
     }
   }

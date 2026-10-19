@@ -1,4 +1,4 @@
-import { ArgumentError, Fiber, Thread } from "@blazetrails/ruby-compat";
+import { ArgumentError, Fiber, Thread, rbObjDup } from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
 
@@ -106,9 +106,7 @@ export const IsolatedExecutionState = {
   },
   shareWith(other: Thread | Fiber): void {
     const otherState = other.activeSupportExecutionState();
-    IsolatedExecutionState.context().setActiveSupportExecutionState(
-      otherState ? new Map(otherState) : null,
-    );
+    IsolatedExecutionState.context().setActiveSupportExecutionState(rbObjDup(otherState));
   },
 };
 

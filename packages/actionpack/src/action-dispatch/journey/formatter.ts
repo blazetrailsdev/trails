@@ -1,5 +1,5 @@
-import { isPlainObject, isPresent, toParam } from "@blazetrails/activesupport";
-import { block, fetch } from "@blazetrails/ruby-compat";
+import { isPlainObject, isPresent, symbolizeKeys, toParam } from "@blazetrails/activesupport";
+import { block, fetch, rbInspect, toSym } from "@blazetrails/ruby-compat";
 import { UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import type { Route } from "./route.js";
 
@@ -43,12 +43,12 @@ export class MissingRoute {
     const sorted = Object.entries(this.constraints).sort(([a], [b]) =>
       a < b ? -1 : a > b ? 1 : 0,
     );
-    let msg = `No route matches ${rubyInspectHash(sorted)}`;
+    let msg = `No route matches ${rbInspect(symbolizeKeys(Object.fromEntries(sorted)))}`;
     if (this.missingKeys.length > 0) {
-      msg += `, missing required keys: ${rubyInspectSymbolArray([...this.missingKeys].sort())}`;
+      msg += `, missing required keys: ${rbInspect([...this.missingKeys].sort().map(toSym))}`;
     }
     if (this.unmatchedKeys.length > 0) {
-      msg += `, possible unmatched constraints: ${rubyInspectSymbolArray([...this.unmatchedKeys].sort())}`;
+      msg += `, possible unmatched constraints: ${rbInspect([...this.unmatchedKeys].sort().map(toSym))}`;
     }
     return msg;
   }
@@ -296,43 +296,4 @@ function pairKey(k: string, v: unknown): string {
 
 function toS(v: unknown): string {
   return v == null ? "" : String(v);
-}
-
-function rubyInspectHash(entries: [string, unknown][]): string {
-  const parts = entries.map(([k, v]) => `:${k}=>${rubyInspect(v)}`);
-  return `{${parts.join(", ")}}`;
-}
-
-function rubyInspectSymbolArray(names: readonly string[]): string {
-  return `[${names.map((name) => `:${name}`).join(", ")}]`;
-}
-
-function rubyInspectArray(arr: readonly unknown[]): string {
-  return `[${arr.map((x) => rubyInspect(x)).join(", ")}]`;
-}
-
-function rubyInspect(v: unknown): string {
-  if (v == null) return "nil";
-  if (typeof v === "string") return `"${escapeRubyString(v)}"`;
-  if (typeof v === "symbol") return `:${v.description ?? ""}`;
-  if (Array.isArray(v)) return rubyInspectArray(v);
-  if (typeof v === "object") {
-    return rubyInspectHash(Object.entries(v as Record<string, unknown>));
-  }
-  return String(v);
-}
-
-function escapeRubyString(s: string): string {
-  let out = "";
-  for (const ch of s) {
-    const code = ch.charCodeAt(0);
-    if (ch === "\\") out += "\\\\";
-    else if (ch === '"') out += '\\"';
-    else if (ch === "\n") out += "\\n";
-    else if (ch === "\r") out += "\\r";
-    else if (ch === "\t") out += "\\t";
-    else if (code < 0x20) out += `\\x${code.toString(16).padStart(2, "0").toUpperCase()}`;
-    else out += ch;
-  }
-  return out;
 }

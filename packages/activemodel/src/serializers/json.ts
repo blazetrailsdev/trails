@@ -35,9 +35,12 @@ export class JSON {
     classAttribute.call(base, "includeRootInJson", { instanceWriter: false, default: false });
   }
 
-  asJson(options?: SerializeOptions & { root?: boolean | string }): Record<string, unknown> {
+  asJson(
+    options: (SerializeOptions & { root?: boolean | string }) | null = null,
+  ): Record<string, unknown> {
     const ctor = this.constructor as typeof JSON;
-    let root = options && Object.hasOwn(options, "root") ? options.root : ctor.includeRootInJson;
+    let root =
+      options != null && Object.hasOwn(options, "root") ? options.root : ctor.includeRootInJson;
 
     return asJsonThenable(
       () => this.serializableHash(options),

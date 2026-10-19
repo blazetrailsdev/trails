@@ -332,7 +332,7 @@ export function isPlainObject(value: object): boolean {
   return proto === globalThis.Object.prototype || proto === null;
 }
 
-export function asJson(value: unknown, options: EncodeOptions | null = null): unknown {
+export function asJson(value: unknown, options?: EncodeOptions | null): unknown {
   if (value == null) return NilClass.asJson(value, options);
   if (typeof value === "boolean") return TrueClass.asJson(value, options);
   if (typeof value === "string") return String.asJson(value, options);
@@ -342,7 +342,7 @@ export function asJson(value: unknown, options: EncodeOptions | null = null): un
   if (typeof value === "bigint") return Numeric.asJson(value, options);
 
   const own = (value as { asJson?: (o?: unknown) => unknown }).asJson;
-  if (typeof own === "function") return own.call(value, options ?? undefined);
+  if (typeof own === "function") return own.call(value, options);
 
   if (typeof value === "function") return Module.asJson(value as { name: string }, options);
 
