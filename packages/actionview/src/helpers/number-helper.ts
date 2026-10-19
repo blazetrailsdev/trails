@@ -5,7 +5,6 @@ import {
   htmlSafe,
   isHtmlSafe,
 } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
 
 export class InvalidNumberError extends Error {
   number: unknown;
@@ -139,11 +138,18 @@ export function parseFloat(number: unknown, raiseError: boolean): number | null 
   return null;
 }
 
-export const NumberHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { numberToPhone, numberToCurrency, numberToPercentage, numberWithDelimiter });
-    Object.assign(m, { numberWithPrecision, numberToHumanSize, numberToHuman });
-    Object.assign(m, { delegateNumberHelperMethod, escapeUnsafeOptions, escapeUnits });
-    Object.assign(m, { wrapWithOutputSafetyHandling, validFloat, parseFloat });
-  });
-});
+export const NumberHelper = {
+  numberToPhone,
+  numberToCurrency,
+  numberToPercentage,
+  numberWithDelimiter,
+  numberWithPrecision,
+  numberToHumanSize,
+  numberToHuman,
+  delegateNumberHelperMethod,
+  escapeUnsafeOptions,
+  escapeUnits,
+  wrapWithOutputSafetyHandling,
+  validFloat,
+  parseFloat,
+};

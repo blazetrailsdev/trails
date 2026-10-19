@@ -1,5 +1,10 @@
-import { Module, extend, extended, include } from "@blazetrails/ruby-compat";
-import { isModuleIncluded, prepend } from "@blazetrails/ruby-compat/include";
+import { extend, extended, include } from "@blazetrails/ruby-compat";
+import {
+  isModuleIncluded,
+  prepend,
+  rbModAppendFeatures,
+  rbModPrependFeatures,
+} from "@blazetrails/ruby-compat/include";
 
 export class MultipleIncludedBlocks extends Error {
   static toString(): string {
@@ -25,7 +30,7 @@ export class MultiplePrependBlocks extends Error {
 
 type AnyClass = new (...args: never[]) => unknown;
 
-interface ConcernHost extends Module {
+interface ConcernHost {
   _dependencies?: ConcernHost[];
   _includedBlock?: (this: any) => void;
   _prependedBlock?: (this: any) => void;
@@ -45,7 +50,7 @@ function sourceLocation(block: object): string {
 
 export const Concern = {
   [extended](base: ConcernHost): void {
-    base._dependencies = [];
+    Object.defineProperty(base, "_dependencies", { value: [], writable: true, configurable: true });
   },
 
   appendFeatures(this: ConcernHost, base: AnyClass | ConcernHost): boolean | void {
@@ -55,7 +60,7 @@ export const Concern = {
     } else {
       if (isModuleIncluded(base as AnyClass, this)) return false;
       for (const dep of this._dependencies!) include(base as AnyClass, dep);
-      Module.prototype.appendFeatures.call(this, base as AnyClass);
+      rbModAppendFeatures(base as AnyClass, this);
       if (Object.prototype.hasOwnProperty.call(this, "ClassMethods")) {
         extend(base as AnyClass, this.ClassMethods!);
       }
@@ -72,7 +77,7 @@ export const Concern = {
     } else {
       if (isModuleIncluded(base as AnyClass, this)) return false;
       for (const dep of this._dependencies!) prepend(base as AnyClass, dep);
-      Module.prototype.prependFeatures.call(this, base as AnyClass);
+      rbModPrependFeatures(base as AnyClass, this);
       if (Object.prototype.hasOwnProperty.call(this, "ClassMethods")) {
         prepend({ prototype: base } as unknown as AnyClass, this.ClassMethods!);
       }
@@ -93,7 +98,11 @@ export const Concern = {
         }
       } else {
         sourceLocation(block!);
-        this._includedBlock = block;
+        Object.defineProperty(this, "_includedBlock", {
+          value: block,
+          writable: true,
+          configurable: true,
+        });
       }
     }
   },
@@ -109,7 +118,11 @@ export const Concern = {
         }
       } else {
         sourceLocation(block!);
-        this._prependedBlock = block;
+        Object.defineProperty(this, "_prependedBlock", {
+          value: block,
+          writable: true,
+          configurable: true,
+        });
       }
     }
   },

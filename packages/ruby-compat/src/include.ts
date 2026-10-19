@@ -294,34 +294,7 @@ export class Module<I extends object = Record<never, never>> {
       }
       return this;
     }
-    const carrier = carrierOf(this);
-    if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
-      trackIncludedModule(carrier, mod);
-      const installed = trackedKeys(carrier);
-      const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
-        string,
-        unknown
-      >;
-      const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
-      for (const key of typeof mod === "function"
-        ? Object.getOwnPropertyNames(members)
-        : Object.keys(members)) {
-        if (key === "constructor") continue;
-        const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
-        const accessor = !("value" in descriptor) && namespace !== "Module";
-        if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
-        if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
-        installed.add(key);
-        Object.defineProperty(
-          carrier,
-          key,
-          accessor
-            ? { get: descriptor.get, set: descriptor.set, configurable: true }
-            : { value: members[key], writable: true, configurable: true },
-        );
-      }
-      relinkIncluders(this);
-    }
+    appendPlainFeatures(this, mod);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(this);
     }
@@ -750,6 +723,42 @@ export class Module<I extends object = Record<never, never>> {
   }
 }
 
+function appendPlainFeatures(base: Module, mod: ModuleObject): void {
+  const carrier = carrierOf(base);
+  if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
+    if (typeof mod !== "function" && Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
+      for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
+        base.include(nested);
+      }
+    }
+    trackIncludedModule(carrier, mod);
+    const installed = trackedKeys(carrier);
+    const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
+      string,
+      unknown
+    >;
+    const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
+    for (const key of typeof mod === "function"
+      ? Object.getOwnPropertyNames(members)
+      : Object.keys(members)) {
+      if (key === "constructor") continue;
+      const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
+      const accessor = !("value" in descriptor) && namespace !== "Module";
+      if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
+      if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
+      installed.add(key);
+      Object.defineProperty(
+        carrier,
+        key,
+        accessor
+          ? { get: descriptor.get, set: descriptor.set, configurable: true }
+          : { value: members[key], writable: true, configurable: true },
+      );
+    }
+    relinkIncluders(base);
+  }
+}
+
 const modToS = Module.prototype.toS;
 
 const carriers = new WeakMap<Module, Record<string, unknown>>();
@@ -1015,6 +1024,7 @@ const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
 const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
 const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
+const moduleIncludesKey = Symbol.for("@blazetrails/ruby-compat:moduleIncludes");
 const extendedOwners = new WeakMap<object, Map<string, object>>();
 
 const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
@@ -1035,11 +1045,15 @@ function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string
   return set!;
 }
 
-function trackIncludedModule(proto: object, mod: unknown): void {
-  let set = (proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown> | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) {
+function trackIncludedModule(
+  proto: object,
+  mod: unknown,
+  registry: symbol = includedModulesKey,
+): void {
+  let set = (proto as Record<symbol, unknown>)[registry] as Set<unknown> | undefined;
+  if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
     set = new Set<unknown>();
-    Object.defineProperty(proto, includedModulesKey, {
+    Object.defineProperty(proto, registry, {
       value: set,
       writable: true,
       configurable: true,
@@ -1487,7 +1501,13 @@ function isClass(klass: object): klass is AnyClass {
 }
 
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
-  if (!(mod instanceof Module)) return undefined;
+  if (!(mod instanceof Module)) {
+    if (mod === null || typeof mod !== "object") return undefined;
+    const descriptor = Object.getOwnPropertyDescriptor(mod, name);
+    return descriptor && !descriptor.enumerable && typeof descriptor.value === "function"
+      ? (descriptor.value as (base: unknown) => void).bind(mod)
+      : undefined;
+  }
   const hook = (mod as unknown as Record<string, unknown>)[name];
   if (hook === (Module.prototype as unknown as Record<string, unknown>)[name]) return undefined;
   return typeof hook === "function" ? (hook as (base: unknown) => void).bind(mod) : undefined;
@@ -1512,6 +1532,7 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     return;
   }
   if (!isClass(klass)) {
+    if (!(klass instanceof Module)) trackIncludedModule(klass, mod, moduleIncludesKey);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(klass);
     }
@@ -1523,12 +1544,36 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     }
     return;
   }
-  if (mod instanceof Module) {
-    mod.appendFeatures(klass);
-    if (typeof (mod as ModuleHooks)[included] === "function") {
-      (mod as ModuleHooks)[included]!(klass);
+  rbModAppendFeatures(klass, mod);
+  if (typeof (mod as ModuleHooks)[included] === "function") {
+    (mod as ModuleHooks)[included]!(klass);
+  }
+}
+
+/**
+ * Mirrors: Ruby's Module#append_features — vendor/ruby/v3.3.11/eval.c:1110
+ * `rb_mod_append_features`, the step `include` runs before `included`, which a
+ * module overriding `append_features` (`ActiveSupport::Concern`) calls as
+ * `super`. A plain-object module's instance methods are its enumerable own
+ * members; the modules it included are appended first, as `include_modules_at`
+ * (vendor/ruby/v3.3.11/class.c:1253) walks the included module's ancestry and
+ * skips one `klass` already has, so the module's own methods outrank them.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModAppendFeatures(
+  klass: AnyClass | object,
+  mod: ModuleObject | AnyClass | Module,
+): void {
+  if (!isClass(klass) && !(klass instanceof Module)) {
+    return trackIncludedModule(klass, mod, moduleIncludesKey);
+  }
+  if (mod instanceof Module) return Module.prototype.appendFeatures.call(mod, klass);
+  if (klass instanceof Module) return appendPlainFeatures(klass, mod);
+  if (typeof mod !== "function" && Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
+    for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
+      if (!isModuleMethodTablePresent(klass, nested)) include(klass, nested);
     }
-    return;
   }
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
@@ -1577,10 +1622,7 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
       }
     }
   } else {
-    for (
-      let ancestor: object | null = mod as ModuleObject;
-      ancestor && ancestor !== Object.prototype;
-    ) {
+    for (let ancestor: object | null = mod; ancestor && ancestor !== Object.prototype; ) {
       const modDescs = Object.getOwnPropertyDescriptors(ancestor) as Record<
         string | symbol,
         PropertyDescriptor
@@ -1601,10 +1643,6 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
-
-  if (typeof (mod as ModuleHooks)[included] === "function") {
-    (mod as ModuleHooks)[included]!(klass);
-  }
 }
 
 export type Extended<M extends object> = CallableMethods<M>;
@@ -1862,7 +1900,20 @@ export function prepend(
   const prependFeatures = featureHook(mod, "prependFeatures");
   if (prependFeatures) return prependFeatures(klass);
   if (isModuleMethodTablePresent(klass, mod)) return;
-  if (mod instanceof Module) return mod.prependFeatures(klass);
+  rbModPrependFeatures(klass, mod);
+}
+
+/**
+ * Mirrors: Ruby's Module#prepend_features — vendor/ruby/v3.3.11/eval.c:1175
+ * `rb_mod_prepend_features`, the step `prepend` runs before `prepended`, which
+ * `ActiveSupport::Concern#prepend_features` calls as `super`. A plain-object
+ * module's non-enumerable members are its singleton methods, which `extend`
+ * installs, so only its enumerable members are prepended.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+  if (mod instanceof Module) return Module.prototype.prependFeatures.call(mod, klass);
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
@@ -1872,7 +1923,9 @@ export function prepend(
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
     const descriptor = Object.getOwnPropertyDescriptor(source, key);
-    if (descriptor) Object.defineProperty(klass.prototype, key, descriptor);
+    if (descriptor && (typeof mod === "function" || descriptor.enumerable)) {
+      Object.defineProperty(klass.prototype, key, descriptor);
+    }
   }
 }
 

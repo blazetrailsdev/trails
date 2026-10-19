@@ -16,7 +16,7 @@ import {
   rtest,
   stringToSym,
   symbolToS,
-  Module,
+  include,
 } from "@blazetrails/ruby-compat";
 import { Template } from "../template.js";
 import {
@@ -521,14 +521,23 @@ function deleteKey(hash: Record<string, unknown>, key: string): unknown {
   return value;
 }
 
-export const AssetTagHelper = new Module((mod) => {
-  mod.include(AssetUrlHelper);
-  mod.include(TagHelper);
+export const AssetTagHelper = {
+  javascriptIncludeTag,
+  stylesheetLinkTag,
+  autoDiscoveryLinkTag,
+  faviconLinkTag,
+  preloadLinkTag,
+  imageTag,
+  pictureTag,
+  videoTag,
+  audioTag,
+  multipleSourcesTagBuilder,
+  resolveAssetSource,
+  extractDimensions,
+  checkForImageTagErrors,
+  resolveLinkAs,
+  sendPreloadLinksHeader,
+};
 
-  mod.moduleEval((m) => {
-    Object.assign(m, { javascriptIncludeTag, stylesheetLinkTag, autoDiscoveryLinkTag });
-    Object.assign(m, { faviconLinkTag, preloadLinkTag, imageTag, pictureTag, videoTag, audioTag });
-    Object.assign(m, { multipleSourcesTagBuilder, resolveAssetSource, extractDimensions });
-    Object.assign(m, { checkForImageTagErrors, resolveLinkAs, sendPreloadLinksHeader });
-  });
-});
+include(AssetTagHelper, AssetUrlHelper);
+include(AssetTagHelper, TagHelper);
