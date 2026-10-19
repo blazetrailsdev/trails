@@ -7812,6 +7812,23 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     ]);
   });
 
+  it("seats a cattrAccessor inside an onLoad block on the hook's module", () => {
+    const info = extractFromFiles("/p", {
+      "form-helper.ts": `
+        import { cattrAccessor, onLoad } from "@blazetrails/activesupport";
+        onLoad("action_view", (base) => {
+          cattrAccessor.call(base, "defaultFormBuilder", { instanceReader: false, instanceWriter: false });
+        });
+      `,
+    });
+    const mod = info.modules["form-helper.ts:ActionView"];
+    expect(mod.classMethods.map((m) => `${m.name}${m.writer ? "=" : ""}`)).toEqual([
+      "defaultFormBuilder",
+      "defaultFormBuilder=",
+    ]);
+    expect(mod.instanceMethods).toEqual([]);
+  });
+
   it("credits a Module's attrReader / attrWriter with the instance half each installs", () => {
     const info = extractFromFiles("/p", {
       "base.ts": `

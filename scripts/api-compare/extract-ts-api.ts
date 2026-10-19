@@ -3635,11 +3635,30 @@ function enclosingEntity(node: ts.Node): { name: string; seatsModule: boolean } 
       return { name: cur.name.text, seatsModule };
     }
     if (ts.isExpressionStatement(cur) && ts.isSourceFile(cur.parent)) {
+      const hook = onLoadHookModule(cur.expression);
+      if (hook !== undefined) return { name: hook, seatsModule: true };
       const name = includedHookOwner(cur.expression);
       if (name !== undefined) return { name, seatsModule: isExportedModuleConst(cur.parent, name) };
     }
   }
   return undefined;
+}
+
+/**
+ * A top-level `ActiveSupport.on_load(:action_view) do ... end` sits lexically in
+ * Ruby's `module ActionView`, so the Ruby extractor seats its macros there. The
+ * TS `onLoad("action_view", (base) => …)` has no lexical module; its hook name
+ * camelized is the same constant.
+ */
+function onLoadHookModule(expr: ts.Expression): string | undefined {
+  if (!ts.isCallExpression(expr) || !ts.isIdentifier(expr.expression)) return undefined;
+  if (expr.expression.text !== "onLoad") return undefined;
+  const [hook] = expr.arguments;
+  if (hook === undefined || !ts.isStringLiteralLike(hook)) return undefined;
+  return hook.text
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
 }
 
 /**
