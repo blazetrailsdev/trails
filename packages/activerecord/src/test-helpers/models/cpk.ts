@@ -1,9 +1,9 @@
-import { kernelThrow, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { kernelThrow, rbModConstSet, Module, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 
-export const Cpk = {};
+export const Cpk = new Module();
 registerConstant("Cpk", Cpk);
 
 export class CpkAuthor extends Base {

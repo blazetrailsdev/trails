@@ -146,11 +146,7 @@ export function rbModConstSet<T>(
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstDefined(
-  mod:
-    | Module
-    | (abstract new (...args: never) => unknown)
-    | { readonly name: string }
-    | ModuleObject,
+  mod: Module | (abstract new (...args: never) => unknown) | { readonly name: string },
   name: string,
   recur: boolean = true,
 ): boolean {

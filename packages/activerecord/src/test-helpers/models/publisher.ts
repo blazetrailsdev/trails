@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { Module, registerConstant } from "@blazetrails/ruby-compat";
 
-export const Publisher = {};
+export const Publisher = new Module();
 registerConstant("Publisher", Publisher);

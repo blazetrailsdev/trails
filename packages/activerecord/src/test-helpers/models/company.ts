@@ -1,4 +1,10 @@
-import { Hash, kernelThrow, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  kernelThrow,
+  rbModConstSet,
+  Module,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Account } from "./account.js";
@@ -93,7 +99,7 @@ export interface Company {
 export class SpecialCo extends Company {}
 registerModel(SpecialCo);
 
-export const Namespaced = {};
+export const Namespaced = new Module();
 registerConstant("Namespaced", Namespaced);
 
 export class NamespacedCompany extends Company {

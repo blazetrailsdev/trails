@@ -1,4 +1,5 @@
 import {
+  Module,
   rbModConstSet,
   rbModName,
   registerConstant,
@@ -13,7 +14,7 @@ import type { ShardedBlogPostTag } from "./blog-post-tag.js";
 import type { ShardedComment } from "./comment.js";
 import type { ShardedTag } from "./tag.js";
 
-const Sharded = (registeredConstant("Sharded") as object | undefined) ?? {};
+const Sharded = (registeredConstant("Sharded") as Module | undefined) ?? new Module();
 registerConstant("Sharded", Sharded);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

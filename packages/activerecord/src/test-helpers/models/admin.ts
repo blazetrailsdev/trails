@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { Module, registerConstant } from "@blazetrails/ruby-compat";
 
-export const Admin = { tableNamePrefix: "admin_" };
+export const Admin = Object.assign(new Module(), { tableNamePrefix: "admin_" });
 registerConstant("Admin", Admin);

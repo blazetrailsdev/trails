@@ -1,11 +1,16 @@
-import { rbModConstSet, registerConstant, registeredConstant } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  rbModConstSet,
+  registerConstant,
+  registeredConstant,
+} from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../../associations/collection-proxy.js";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedComment } from "./comment.js";
 
-const Sharded = (registeredConstant("Sharded") as object | undefined) ?? {};
+const Sharded = (registeredConstant("Sharded") as Module | undefined) ?? new Module();
 registerConstant("Sharded", Sharded);
 
 export class ShardedBlogPostWithRevision extends Base {
