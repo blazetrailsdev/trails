@@ -1025,7 +1025,6 @@ const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
 const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
 const moduleIncludesKey = Symbol.for("@blazetrails/ruby-compat:moduleIncludes");
-const moduleSubclassesKey = Symbol.for("@blazetrails/ruby-compat:moduleSubclasses");
 const extendedOwners = new WeakMap<object, Map<string, object>>();
 
 const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
@@ -1523,9 +1522,7 @@ function featureHook(mod: unknown, name: string): ((base: unknown) => void) | un
 
 /**
  * Mirrors: Ruby's Module#include — vendor/ruby/v3.3.11/eval.c:1139 `rb_mod_include`,
- * backed by vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`. An include
- * into a plain-object module also reaches each class that already includes
- * it, as `rb_include_module` walks the module's subclass list (:1189-1215).
+ * backed by vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
@@ -1542,27 +1539,7 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     return;
   }
   if (!isClassReceiver(klass)) {
-    if (!(klass instanceof Module)) {
-      trackIncludedModule(klass, mod, moduleIncludesKey);
-      if (Object.prototype.hasOwnProperty.call(klass, moduleSubclassesKey)) {
-        const refs = (klass as Record<symbol, Set<WeakRef<AnyClass>>>)[moduleSubclassesKey];
-        for (const ref of refs) {
-          const subclass = ref.deref();
-          if (subclass === undefined) {
-            refs.delete(ref);
-            continue;
-          }
-          if (isModuleMethodTablePresent(subclass, mod)) continue;
-          const outranking = Object.keys(klass).flatMap((key) => {
-            const desc = Object.getOwnPropertyDescriptor(subclass.prototype, key);
-            return desc === undefined ? [] : [[key, desc] as const];
-          });
-          rbModAppendFeatures(subclass, mod);
-          for (const [key, desc] of outranking)
-            Object.defineProperty(subclass.prototype, key, desc);
-        }
-      }
-    }
+    if (!(klass instanceof Module)) trackIncludedModule(klass, mod, moduleIncludesKey);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(klass);
     }
@@ -1608,7 +1585,6 @@ export function rbModAppendFeatures(
     }
   }
   trackIncludedModule(klass.prototype, mod);
-  if (typeof mod !== "function") trackIncludedModule(mod, new WeakRef(klass), moduleSubclassesKey);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
     if (

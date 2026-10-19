@@ -711,14 +711,6 @@ carrier and a list of a module's includers. Each such site is ported so that
 its definitions exist before the include, or is left on a `Module` until its
 own story settles it.
 
-**A module included into a plain module after a class includes it** does reach
-that class, as `rb_include_module` walks the module's subclass list
-(`vendor/ruby/v3.3.11/class.c:1189-1215`). `rbModAppendFeatures` records each
-class a plain module is appended to, held weakly, and `include(mod, other)`
-appends `other` to them, keeping `mod`'s own methods ahead. That record serves
-this include only; it is not a way to reach includers with a method defined
-later.
-
 ## A module's `initialize` is inlined into the constructor (`@inlinedFrom`)
 
 Ruby lets a module define `initialize` and reach the next one up the ancestor
