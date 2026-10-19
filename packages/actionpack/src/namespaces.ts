@@ -12,6 +12,7 @@ import {
   RuntimeError,
   rbInspect,
   rbModConstGet,
+  rbModConstSet,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
@@ -112,7 +113,7 @@ export const Http = { name: "ActionDispatch::Http" } as {
   MimeNegotiation: typeof MimeNegotiation;
   Parameters: typeof HttpParameters;
 };
-ActionDispatch.Http = Http;
+rbModConstSet(ActionDispatch, "Http", Http);
 
 export const Session = { name: "ActionDispatch::Session", loadPath } as AutoloadModule & {
   AbstractStore: typeof AbstractStore;
