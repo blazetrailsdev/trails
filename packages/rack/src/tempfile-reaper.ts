@@ -1,5 +1,6 @@
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { RACK_TEMPFILES } from "./constants.js";
+import { BodyProxy } from "./body-proxy.js";
 import type { RackApp } from "./mock-request.js";
 
 export class TempfileReaper {
@@ -10,51 +11,21 @@ export class TempfileReaper {
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    env[RACK_TEMPFILES] = env[RACK_TEMPFILES] || [];
-
-    if (Array.isArray(env["rack.response_finished"])) {
-      env["rack.response_finished"].push((cbEnv: Record<string, any>) => {
-        this.closeTempfiles(cbEnv);
-      });
-    }
+    env[RACK_TEMPFILES] ||= [];
 
     let response: [number, Record<string, string | string[]>, any];
     try {
       response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     } catch (e) {
-      this.closeTempfiles(env);
+      env[RACK_TEMPFILES]?.forEach((tempfile: any) => tempfile.closeBang());
       throw e;
     }
+    const body = response[2];
 
-    const [status, headers, body] = response;
+    response[2] = new BodyProxy(body, () => {
+      env[RACK_TEMPFILES]?.forEach((tempfile: any) => tempfile.closeBang());
+    });
 
-    const wrappedBody = {
-      [Symbol.iterator]: body[Symbol.iterator]?.bind(body),
-      each: body.each?.bind(body),
-      close: () => {
-        if (body && typeof body.close === "function") body.close();
-        this.closeTempfiles(env);
-      },
-      forEach: body.forEach?.bind(body),
-      map: body.map?.bind(body),
-    };
-
-    if (Array.isArray(body)) {
-      Object.defineProperty(wrappedBody, "length", { get: () => body.length });
-      for (let i = 0; i < body.length; i++) {
-        (wrappedBody as any)[i] = body[i];
-      }
-    }
-
-    return [status, headers, wrappedBody];
-  }
-
-  private closeTempfiles(env: Record<string, any>): void {
-    const tempfiles = env[RACK_TEMPFILES];
-    if (!Array.isArray(tempfiles)) return;
-    for (const tf of tempfiles) {
-      if (typeof tf.close === "function") tf.close();
-      if (typeof tf["close!"] === "function") tf["close!"]();
-    }
+    return response;
   }
 }

@@ -60,7 +60,10 @@ describe("ruby-compat call ratchet", () => {
         },
         { ...row("rack", "utils.ts", "merge", "delete → delete"), receivers: { delete: ["hash"] } },
         row("rack", "utils.ts", "each", "each_pair → eachPair"),
-        row("rack", "utils.ts", "prune", "delete_if → deleteIf"),
+        {
+          ...row("rack", "utils.ts", "prune", "delete_if → deleteIf"),
+          receivers: { delete_if: ["hash"] },
+        },
       ],
     };
     expect(reverseRows(hash).map(renderKey)).toEqual([

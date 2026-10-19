@@ -916,6 +916,39 @@ export class IO {
   }
 
   /**
+   * `IO#each` (`vendor/ruby/v3.3.11/io.c:15462`), defined onto `rb_io_each_line`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#each`
+   * (`vendor/ruby/v3.3.11/io.c:15462`).
+   */
+  each(): Generator<string>;
+  each(block: (line: string) => void): this;
+  each(block?: (line: string) => void): this | Generator<string> {
+    return block ? this.eachLine(block) : this.eachLine();
+  }
+
+  /**
+   * `rb_io_gets_m` (`vendor/ruby/v3.3.11/io.c:4363`) with the default separator:
+   * the bytes up to and including the next `"\n"`, or the rest of the stream,
+   * in the external encoding as {@link readAll} answers it; `nil` at EOF.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`
+   * (`vendor/ruby/v3.3.11/io.c:4363`).
+   */
+  gets(): string | null {
+    const bytes: number[] = [];
+    let b: number | null;
+    while ((b = this.getbyte()) !== null) {
+      bytes.push(b);
+      if (b === 0x0a) break;
+    }
+    if (bytes.length === 0) return null;
+    const str = Uint8Array.from(bytes);
+    if (this.enc2 === null) return ioEncStr(str, str.length, this.ioReadEncoding());
+    return ioEncStr(str, str.length, this.enc2, this.ioReadEncoding());
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/io.c:3317` `read_all`, which `io_read` (`io.c:3774`) takes
    * when `length` is `nil`: the rest of the stream, and `""` rather than `nil`
    * at EOF. Ruby sizes the read from `remain_size(fptr)`, an `fstat` the

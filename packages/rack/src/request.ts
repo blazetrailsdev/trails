@@ -44,7 +44,7 @@ import {
 } from "./constants.js";
 import {
   forwardedValues,
-  getDefaultQueryParser,
+  defaultQueryParser,
   parseCookiesHeader,
   QueryParser,
   unescape,
@@ -488,29 +488,23 @@ export abstract class Helpers {
   }
 
   updateParam(k: string, v: any): void {
-    const get = this.GET;
-    const post = this.POST;
-    if (k in post) {
-      post[k] = v;
-    } else {
-      get[k] = v;
+    let found = false;
+    if (Object.hasOwn(this.GET, k)) {
+      found = true;
+      this.GET[k] = v;
+    }
+    if (Object.hasOwn(this.POST, k)) {
+      found = true;
+      this.POST[k] = v;
+    }
+    if (!found) {
+      this.GET[k] = v;
     }
   }
 
   deleteParam(k: string): any {
-    const post = this.POST;
-    if (k in post) {
-      const val = post[k];
-      delete post[k];
-      return val;
-    }
-    const get = this.GET;
-    if (k in get) {
-      const val = get[k];
-      delete get[k];
-      return val;
-    }
-    return undefined;
+    const [postValue, getValue] = [hashDelete(this.POST, k), hashDelete(this.GET, k)];
+    return postValue != null && postValue !== false ? postValue : getValue;
   }
 
   get baseUrl(): string {
@@ -588,7 +582,7 @@ export abstract class Helpers {
 
   /** @internal */
   queryParser(): QueryParser {
-    return getDefaultQueryParser();
+    return defaultQueryParser();
   }
 
   /** @internal */
@@ -688,8 +682,39 @@ export class Request {
   ];
   static xForwardedProtoPriority: Array<"proto" | "scheme" | null> = ["proto", "scheme"];
 
+  /** @internal */
+  private _params: Record<string, any> | null;
+
   constructor(env: Record<string, any>) {
     this.env = env;
+    this._params = null;
+  }
+
+  get params(): Record<string, any> {
+    return (this._params ||= { ...this.GET, ...this.POST });
+  }
+
+  updateParam(k: string, v: any): void {
+    let found = false;
+    if (Object.hasOwn(this.GET, k)) {
+      found = true;
+      this.GET[k] = v;
+    }
+    if (Object.hasOwn(this.POST, k)) {
+      found = true;
+      this.POST[k] = v;
+    }
+    if (!found) {
+      this.GET[k] = v;
+    }
+    this._params = null;
+  }
+
+  deleteParam(k: string): any {
+    const [postValue, getValue] = [hashDelete(this.POST, k), hashDelete(this.GET, k)];
+    const v = postValue != null && postValue !== false ? postValue : getValue;
+    this._params = null;
+    return v;
   }
 
   dup(): Request {

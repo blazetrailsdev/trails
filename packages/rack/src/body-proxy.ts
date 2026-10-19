@@ -1,3 +1,5 @@
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+
 export class BodyProxy {
   private body: any;
   private block: () => void;
@@ -26,7 +28,7 @@ export class BodyProxy {
     if (this._closed) return;
     this._closed = true;
     try {
-      if (this.body && typeof this.body.close === "function") {
+      if (rbObjRespondTo(this.body, "close")) {
         this.body.close();
       }
     } finally {

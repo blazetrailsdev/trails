@@ -1,88 +1,105 @@
-import { PATH_INFO, SCRIPT_NAME, SERVER_NAME, SERVER_PORT } from "./constants.js";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import {
+  CONTENT_TYPE,
+  HTTP_HOST,
+  PATH_INFO,
+  SCRIPT_NAME,
+  SERVER_NAME,
+  SERVER_PORT,
+} from "./constants.js";
+import { ArgumentError, rbFSend, regexpEscape } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
-interface Mapping {
-  host: string | null;
-  location: string;
-  matchPrefix: string;
-  app: RackApp | { call: RackApp };
-}
+type Mapping = [string | null, string, RegExp, RackApp | { call: RackApp }];
 
 export class URLMap {
-  private mappings: Mapping[];
+  private knownHosts!: Set<string>;
+  private mapping!: Mapping[];
 
   constructor(map: Record<string, RackApp | { call: RackApp }> = {}) {
-    this.mappings = [];
     this.remap(map);
   }
 
   remap(map: Record<string, RackApp | { call: RackApp }>): void {
-    this.mappings = [];
-    for (const [location, app] of Object.entries(map)) {
-      let host: string | null = null;
-      let path = location;
+    this.knownHosts = new Set();
+    this.mapping = Object.entries(map)
+      .map(([location, app]): Mapping => {
+        let host: string | null;
+        const m = /^https?:\/\/(.*?)(\/.*)/.exec(location);
+        if (m) {
+          [host, location] = [m[1], m[2]];
+          this.knownHosts.add(host);
+        } else {
+          host = null;
+        }
 
-      if (path.startsWith("http://") || path.startsWith("https://")) {
-        const url = new URL(path);
-        host = url.host.toLowerCase();
-        path = url.pathname;
-      } else if (!path.startsWith("/")) {
-        throw new Error(`paths need to start with /`);
-      }
+        if (location[0] !== "/") {
+          throw new ArgumentError("paths need to start with /");
+        }
 
-      path = path.replace(/\/+$/, "");
-      this.mappings.push({ host, location: path, matchPrefix: path.toLowerCase(), app });
-    }
-    this.mappings.sort((a, b) => {
-      const hostDiff = (b.host?.length || 0) - (a.host?.length || 0);
-      if (hostDiff !== 0) return hostDiff;
-      return b.location.length - a.location.length;
-    });
+        location = location.endsWith("/") ? location.slice(0, -1) : location;
+        const match = new RegExp(`^${regexpEscape(location).replace(/\//g, "/+")}(.*)`, "m");
+
+        return [host, location, match, app];
+      })
+      .sort(([hostA, locationA], [hostB, locationB]) => {
+        const a = hostA ? -hostA.length : Infinity;
+        const b = hostB ? -hostB.length : Infinity;
+        return a === b ? locationB.length - locationA.length : a < b ? -1 : 1;
+      });
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    const pathInfo = (env[PATH_INFO] || "").toString();
-    const scriptName = (env[SCRIPT_NAME] || "").toString();
-    const serverName = (env[SERVER_NAME] || "").toString();
-    const serverPort = (env[SERVER_PORT] || "").toString();
-    const httpHost = (env["HTTP_HOST"] || "").toString();
+    const path = env[PATH_INFO];
+    const scriptName = env[SCRIPT_NAME];
+    const httpHost = env[HTTP_HOST];
+    const serverName = env[SERVER_NAME];
+    const serverPort = env[SERVER_PORT];
 
-    for (const mapping of this.mappings) {
-      const path = pathInfo.toLowerCase();
-      const prefix = mapping.matchPrefix;
+    try {
+      const isSameServer =
+        this.isCasecmp(httpHost, serverName) ||
+        this.isCasecmp(httpHost, `${serverName}:${serverPort}`);
 
-      if (path === prefix || path.startsWith(prefix + "/") || prefix === "") {
-        if (mapping.host) {
-          const hostWithPort = httpHost || `${serverName}:${serverPort}`;
-          if (
-            !this.isCasecmp(hostWithPort, mapping.host) &&
-            !this.isCasecmp(serverName, mapping.host)
+      const isHostKnown = this.knownHosts.has(httpHost);
+
+      for (const [host, location, match, app] of this.mapping) {
+        if (
+          !(
+            this.isCasecmp(httpHost, host) ||
+            this.isCasecmp(serverName, host) ||
+            (!host && isSameServer) ||
+            (!host && !isHostKnown)
           )
-            continue;
+        ) {
+          continue;
         }
 
-        const rest = pathInfo.substring(mapping.location.length);
-        const newEnv = {
-          ...env,
-          [SCRIPT_NAME]: scriptName + mapping.location,
-          [PATH_INFO]: rest,
-        };
-        return rbFSend(mapping.app, "call", newEnv) as ReturnType<RackApp>;
-      }
-    }
+        const m = match.exec(path == null ? "" : String(path));
+        if (!m) continue;
 
-    return [
-      404,
-      { "content-type": "text/plain", "content-length": "9", "x-cascade": "pass" },
-      ["Not Found"],
-    ];
+        const rest = m[1];
+        if (!(!rest || rest.length === 0 || rest[0] === "/")) continue;
+
+        env[SCRIPT_NAME] = scriptName + location;
+        env[PATH_INFO] = rest;
+
+        return await (rbFSend(app, "call", env) as ReturnType<RackApp>);
+      }
+
+      return [404, { [CONTENT_TYPE]: "text/plain", "x-cascade": "pass" }, [`Not Found: ${path}`]];
+    } finally {
+      env[PATH_INFO] = path;
+      env[SCRIPT_NAME] = scriptName;
+    }
   }
 
   /** @internal */
   private isCasecmp(v1: string | null | undefined, v2: string | null | undefined): boolean {
     if (v1 === v2) return true;
-    if (v1 == null || v2 == null) return false;
+
+    if (v1 == null) return false;
+    if (v2 == null) return false;
+
     return v1.toLowerCase() === v2.toLowerCase();
   }
 }

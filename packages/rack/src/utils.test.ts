@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { stderr } from "@blazetrails/ruby-compat";
 import * as Utils from "./utils.js";
 import { MockRequest } from "./mock-request.js";
 
@@ -371,7 +372,7 @@ it("return status code and give deprecation warning for obsolete symbols", () =>
   };
   const droppedStatuses = { bandwidth_limit_exceeded: 509, not_extended: 510 };
 
-  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const warn = vi.spyOn(stderr, "write").mockImplementation(() => true);
   try {
     for (const [symbol, valueHash] of Object.entries(replacedStatuses)) {
       expect(Utils.statusCode(symbol)).toBe(valueHash.statusCode);
@@ -380,8 +381,8 @@ it("return status code and give deprecation warning for obsolete symbols", () =>
 
     for (const [symbol, code] of Object.entries(droppedStatuses)) {
       expect(Utils.statusCode(symbol)).toBe(code);
-      expect(warn).toHaveBeenLastCalledWith(
-        `Status code :${symbol} is deprecated and will be removed in a future version of Rack.`,
+      expect(warn.mock.lastCall![0]).toContain(
+        `warning: Status code :${symbol} is deprecated and will be removed in a future version of Rack.\n`,
       );
     }
   } finally {

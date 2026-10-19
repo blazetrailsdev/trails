@@ -2,7 +2,7 @@ import { Dir, File, Hash, rbObjIsKindOf, rbFSend } from "@blazetrails/ruby-compa
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
-import { cleanPathInfo, unescapePath } from "./utils.js";
+import { cleanPathInfo, unescape, unescapePath } from "./utils.js";
 
 export interface StaticOptions {
   urls?: string[] | Record<string, string>;
@@ -115,8 +115,8 @@ export class Static {
       if (rule === "all") return true;
       if (rule === "fonts") return /\.(?:ttf|otf|eot|woff2|woff|svg)$/.test(path);
       if (typeof rule === "string") {
-        const decoded = unescapePath(path);
-        return decoded.startsWith(rule) || decoded.startsWith("/" + rule);
+        path = unescape(path);
+        return path.startsWith(rule) || path.startsWith("/" + rule);
       }
       if (Array.isArray(rule)) return new RegExp(`\\.(${rule.join("|")})$`).test(path);
       if (rule instanceof RegExp) return rule.test(path);
