@@ -1,6 +1,6 @@
 import { afterAll, describe, it, expect, inject } from "vitest";
 import { assertEqual, TopLevel } from "@blazetrails/activesupport";
-import { getFs } from "@blazetrails/ruby-compat";
+import { Dir, getFs } from "@blazetrails/ruby-compat";
 import { SystemTestCase } from "./system-test-case.js";
 import { vite } from "./system-testing/server.js";
 import { imagePath } from "./system-testing/test-helpers/screenshot-helper.js";
@@ -8,6 +8,7 @@ import { imagePath } from "./system-testing/test-helpers/screenshot-helper.js";
 const trails = TopLevel.Trails;
 TopLevel.Trails = {
   ...trails,
+  root: () => Dir.pwd(),
   application: {
     call: async () => [
       200,
