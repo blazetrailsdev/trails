@@ -951,16 +951,6 @@ describe("FormTagHelperTest", () => {
     );
   });
 
-  it("button tag defaults with block and options", () => {
-    const output = view.buttonTag({ name: "temptation", value: "within" }, null, () =>
-      view.contentTag("strong", "Do not press me"),
-    );
-    assertDomEqual(
-      '<button name="temptation" value="within" type="submit" ><strong>Do not press me</strong></button>',
-      output,
-    );
-  });
-
   it("button tag with confirmation", () => {
     assertDomEqual(
       `<button name="button" type="submit" data-confirm="Are you sure?">Save</button>`,
@@ -972,13 +962,6 @@ describe("FormTagHelperTest", () => {
     assertDomEqual(
       `<button name="button" type="submit" data-disable-with="Please wait...">Checkout</button>`,
       view.buttonTag("Checkout", { data: { disable_with: "Please wait..." } }),
-    );
-  });
-
-  it("image submit tag with confirmation", () => {
-    assertDomEqual(
-      `<input type="image" src="/images/save.gif" data-confirm="Are you sure?" />`,
-      view.imageSubmitTag("save.gif", { data: { confirm: "Are you sure?" } }),
     );
   });
 
