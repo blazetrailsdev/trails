@@ -154,6 +154,17 @@ function helperCalleeArguments(call: ts.CallExpression): readonly ts.Expression[
   return isAssertionDotCall(call.expression) ? call.arguments.slice(1) : call.arguments;
 }
 
+/**
+ * `mustBe(obj, "isEmpty")` / `wontBe(obj, "isEmpty")` with no third operand are
+ * minitest's `assert_predicate` / `refute_predicate`, the twin of the Ruby
+ * extractor's PREDICATE_FORMS (`assert_operator`'s `UNDEFINED == o2` arm,
+ * vendor/minitest/v5.27.0/lib/minitest/assertions.rb:315-316).
+ */
+function predicateFormOf(name: string, args: readonly ts.Expression[]): string | null {
+  if (args.length !== 2) return null;
+  return name === "mustBe" ? "assertPredicate" : name === "wontBe" ? "refutePredicate" : null;
+}
+
 function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
   if (!ts.isPropertyAccessExpression(expression)) return null;
@@ -411,7 +422,7 @@ function collectAssertionKinds(
             // Bare `expect(...)` is recorded via its matcher chain above; a helper
             // callee (assertQueriesCount, expectQuotedColumnInSql, …) is its kind.
             if (name !== "expect") {
-              kinds.push(name);
+              kinds.push(predicateFormOf(name, helperCalleeArguments(n)) ?? name);
               values.push(helperCalleeValue(name, helperCalleeArguments(n), sourceFile));
             }
           } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {

@@ -1,4 +1,11 @@
-import { ArgumentError, hasKey, hashDelete, rbObjRespondTo, toS } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  hasKey,
+  hashDelete,
+  rbFSend,
+  rbObjRespondTo,
+  toS,
+} from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -102,7 +109,7 @@ export abstract class Helpers {
   }
 
   addHeader(key: string | null, value: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (typeof key !== "string") throw new ArgumentError();
     if (value === null || value === undefined) return this.getHeader(key) ?? null;
     const existing = this.getHeader(key);
     if (existing != null) {
@@ -332,13 +339,7 @@ export class Response {
   }
 
   each(callback: (chunk: string) => void): void {
-    if (Array.isArray(this._body)) {
-      for (const chunk of this._body) callback(chunk);
-    } else if (this._body && typeof this._body.each === "function") {
-      this._body.each(callback);
-    } else if (this._body && typeof this._body.forEach === "function") {
-      this._body.forEach(callback);
-    }
+    rbFSend(this._body, "each", callback);
     this._buffered = true;
     if (this._block) {
       this._writer = callback as any;
@@ -365,15 +366,15 @@ export class Response {
   }
 
   hasHeader(key: string | null): boolean {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (typeof key !== "string") throw new ArgumentError();
     return Object.hasOwn(this.headers, downcaseKey(key));
   }
   getHeader(key: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (typeof key !== "string") throw new ArgumentError();
     return this.headers[downcaseKey(key)];
   }
   setHeader(key: string | null, value: any): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (typeof key !== "string") throw new ArgumentError();
     this.headers[downcaseKey(key)] = value;
     return value;
   }
