@@ -1768,7 +1768,7 @@ jobs:
           test-names-manifest after ruby-tests: pnpm exec tsx scripts/build-rails-test-names-manifest.ts
           rails-private after privates-manifest: pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
           method-order after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/arel/src packages/activemodel/src
-          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/src packages/arel/src packages/date/src packages/did-you-mean/src packages/i18n/src --max-warnings 0
+          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/src packages/arel/src packages/date/src packages/did-you-mean/src packages/globalid/src packages/i18n/src --max-warnings 0
           dep-lint after ruby-api: pnpm exec tsx scripts/api-compare/lint-deps.ts
           detached-jsdoc: pnpm exec tsx scripts/api-compare/lint-detached-jsdoc-tags.ts
           test-compare after ruby-tests: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/compare.ts --gates --check
