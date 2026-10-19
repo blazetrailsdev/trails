@@ -18,6 +18,9 @@ describe("ActiveJob::QueueName", () => {
     PrefixedJob.queueNamePrefix = "aj";
     PrefixedJob.queueAs("high");
     expect(new PrefixedJob().queueName).toBe("aj_high");
+    PrefixedJob.queueNameDelimiter = ".";
+    PrefixedJob.queueAs("high");
+    expect(new PrefixedJob().queueName).toBe("aj.high");
     PrefixedJob.queueNamePrefix = " ";
     PrefixedJob.queueAs("high");
     expect(new PrefixedJob().queueName).toBe("high");
@@ -64,6 +67,12 @@ describe("ActiveJob scalar serializers", () => {
     expect([rng.begin, rng.end, rng.excludeEnd]).toEqual([1, null, true]);
     expect(dec.toString()).toBe(new BigDecimal("5").toString());
     expect((serialize([":foo"])[0] as Record<string, unknown>)["value"]).toBe("foo");
+  });
+
+  it("raises ArgumentError for an invalid BigDecimal string", async () => {
+    await expect(
+      deserialize([{ _aj_serialized: "ActiveJob::Serializers::BigDecimalSerializer", value: "x" }]),
+    ).rejects.toThrow('invalid value for BigDecimal(): "x"');
   });
 
   it("refuses an anonymous class", () => {

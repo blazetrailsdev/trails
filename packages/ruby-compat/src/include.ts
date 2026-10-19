@@ -1171,12 +1171,13 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
  * object is a module's seat, as `include()` takes one, and JS's own `Set` is
  * the seat of the `Set` that reopens it (`class Set extends JsSet`). A Symbol
  * is a colon-spelled string, whose class `rbObjClass` answers as `String`, so
- * `Symbol === obj` is answered by the spelling.
+ * `Symbol === obj` and `String === obj` are answered by the spelling.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
   if (c === rbCSymbol) return isSymbol(obj);
+  if (c === rbCString && isSymbol(obj)) return false;
   if (
     (typeof c === "function" || (typeof c === "object" && c !== null)) &&
     singletonSearchAncestor(obj, c)

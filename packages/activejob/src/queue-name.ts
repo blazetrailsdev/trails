@@ -5,8 +5,14 @@ import {
   mattrAccessor,
   presence,
 } from "@blazetrails/activesupport";
-import { aryJoin, compact, rbModConstSet, rbObjClass, rbObjIsProc } from "@blazetrails/ruby-compat";
-import { classModule } from "@blazetrails/ruby-compat";
+import {
+  aryJoin,
+  classModule,
+  compact,
+  rbModConstSet,
+  rbObjClass,
+  rbObjIsProc,
+} from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
 interface QueueNameClass {
@@ -63,18 +69,17 @@ export class QueueName {
 }
 extend(QueueName, Concern);
 Object.defineProperty(QueueName, "ClassMethods", { value: ClassMethods });
-(QueueName as unknown as { included(base: null, block: (this: object) => void): void }).included(
-  null,
-  function () {
-    classAttribute.call(this, "queueName", {
-      instanceAccessor: false,
-      default: function (this: QueueNameJob) {
-        return (rbObjClass(this) as unknown as QueueNameClass).defaultQueueName;
-      },
-    });
-    classAttribute.call(this, "queueNameDelimiter", { instanceAccessor: false, default: "_" });
-    classAttribute.call(this, "queueNamePrefix");
-  },
-);
+(
+  QueueName as unknown as { included(base: null, block: (this: QueueNameClass) => void): void }
+).included(null, function (this: QueueNameClass) {
+  classAttribute.call(this, "queueName", {
+    instanceAccessor: false,
+    default: function (this: QueueNameJob) {
+      return (rbObjClass(this) as unknown as QueueNameClass).defaultQueueName;
+    },
+  });
+  classAttribute.call(this, "queueNameDelimiter", { instanceAccessor: false, default: "_" });
+  classAttribute.call(this, "queueNamePrefix");
+});
 
 rbModConstSet(ActiveJob, "QueueName", QueueName);

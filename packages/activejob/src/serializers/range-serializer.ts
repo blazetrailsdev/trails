@@ -19,7 +19,9 @@ export class RangeSerializer extends ObjectSerializer {
   async deserialize(hash: Record<string, unknown> | Map<string, unknown>): Promise<Range> {
     return new (this.klass())(
       ...((await ActiveJob.Arguments.deserialize(
-        valuesAt(hash as Record<string, unknown>, ...RangeSerializer.KEYS),
+        hash instanceof Map
+          ? valuesAt(hash, ...RangeSerializer.KEYS)
+          : valuesAt(hash, ...RangeSerializer.KEYS),
       )) as [unknown, unknown, boolean]),
     );
   }

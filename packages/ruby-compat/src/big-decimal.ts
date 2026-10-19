@@ -58,6 +58,9 @@ export class BigDecimal {
       ? parseRational(value as RationalLike, ndigits)
       : parse(value.valueOf() as string | number | bigint, ndigits);
     if (parsed === null) {
+      if (typeof value === "string") {
+        throw new ArgumentError(`invalid value for BigDecimal(): ${JSON.stringify(value)}`);
+      }
       throw new TypeError(`BigDecimal: cannot parse ${String(value)}`);
     }
     this._sign = parsed.sign;

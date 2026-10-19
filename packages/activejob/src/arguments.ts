@@ -116,10 +116,7 @@ const RESERVED_KEYS = [
 
 type AnyHash = Record<string, unknown> | Map<string, unknown>;
 
-/**
- * @internal
- * @inventedArm isSymbol — PERMANENT
- */
+/** @internal */
 function serializeArgument(argument: unknown): unknown {
   if (
     argument == null ||
@@ -129,7 +126,7 @@ function serializeArgument(argument: unknown): unknown {
     rbObjIsKindOf(argument, rbCFloat)
   ) {
     return argument;
-  } else if (rbObjIsKindOf(argument, rbCString) && !isSymbol(argument)) {
+  } else if (rbObjIsKindOf(argument, rbCString)) {
     if (rbObjClass(argument) === rbCString) {
       return argument;
     } else {
