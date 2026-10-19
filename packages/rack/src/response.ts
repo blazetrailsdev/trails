@@ -1,4 +1,11 @@
-import { ArgumentError, hasKey, hashDelete, rbObjRespondTo, toS } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  hasKey,
+  hashDelete,
+  rbFSend,
+  rbObjRespondTo,
+  toS,
+} from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -339,13 +346,7 @@ export class Response {
   }
 
   each(callback: (chunk: string) => void): void {
-    if (Array.isArray(this._body)) {
-      for (const chunk of this._body) callback(chunk);
-    } else if (this._body && typeof this._body.each === "function") {
-      this._body.each(callback);
-    } else if (this._body && typeof this._body.forEach === "function") {
-      this._body.forEach(callback);
-    }
+    rbFSend(this._body, "each", callback);
     this._buffered = true;
     if (this._block) {
       this._writer = callback as any;

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ArgumentError, NoMethodError, StringIO } from "@blazetrails/ruby-compat";
 import { Response, ResponseRaw } from "./response.js";
 
 it("has standard constructor", () => {
@@ -39,10 +40,17 @@ it("have sensible default values", () => {
   const [status, header] = response.finish();
   expect(status).toBe(200);
   expect(header).toEqual({});
+  response.each((part) => {
+    expect(part).toBe("");
+  });
 
   response = new Response();
-  const [s2, _h2, _b2] = response.toArray();
+  const [s2, h2, b2] = response.toArray();
   expect(s2).toBe(200);
+  expect(h2).toEqual({});
+  for (const part of b2) {
+    expect(part).toBe("");
+  }
 });
 
 it("can be written to inside finish block and it does not generate a content-length header", () => {
@@ -78,10 +86,12 @@ it("can set and read headers", () => {
 
 it("doesn't mutate given headers", () => {
   const headers = Object.freeze({}) as Record<string, string>;
+
   const response = new Response([], 200, headers);
   response.headers["content-type"] = "text/plain";
   expect(response.headers["content-type"]).toBe("text/plain");
-  expect("content-type" in headers).toBe(false);
+
+  expect(Object.keys(headers)).not.toContain("content-type");
 });
 
 it("can override the initial content-type with a different case", () => {
@@ -211,9 +221,16 @@ it("can set same site cookies with string value 'Strict'", () => {
 
 it("validates the same site option value", () => {
   const response = new Response();
-  expect(() => response.setCookie("foo", { value: "bar", sameSite: "Foo" })).toThrow(
-    /Invalid :same_site value: "Foo"/,
-  );
+  let error: unknown;
+  expect(() => {
+    try {
+      response.setCookie("foo", { value: "bar", sameSite: "Foo" });
+    } catch (e) {
+      error = e;
+      throw e;
+    }
+  }).toThrow(ArgumentError);
+  expect((error as Error).message).toMatch(/Invalid :same_site value: "Foo"/);
 });
 
 it("can set same site cookies with symbol value", () => {
@@ -246,6 +263,10 @@ it("can delete cookies with the same name from multiple domains", () => {
   const response = new Response();
   response.setCookie("foo", { value: "bar", domain: "sample.example.com" });
   response.setCookie("foo", { value: "bar", domain: ".example.com" });
+  expect(response.get("set-cookie")).toEqual([
+    "foo=bar; domain=sample.example.com",
+    "foo=bar; domain=.example.com",
+  ]);
 
   response.deleteCookie("foo", { domain: ".example.com" });
   expect(response.headers["set-cookie"]).toEqual([
@@ -267,6 +288,10 @@ it("only deletes cookies for the domain specified", () => {
   const response = new Response();
   response.setCookie("foo", { value: "bar", domain: "example.com.example.com" });
   response.setCookie("foo", { value: "bar", domain: "example.com" });
+  expect(response.get("set-cookie")).toEqual([
+    "foo=bar; domain=example.com.example.com",
+    "foo=bar; domain=example.com",
+  ]);
 
   response.deleteCookie("foo", { domain: "example.com" });
   expect(response.headers["set-cookie"]).toEqual([
@@ -341,19 +366,32 @@ it("has a useful constructor", () => {
   let r = new Response("foo");
   let body = r.finish()[2];
   let str = "";
-  body.forEach((part: string) => (str += part));
+  for (const part of body) str += part;
   expect(str).toBe("foo");
 
   r = new Response(["foo", "bar"]);
   body = r.finish()[2];
   str = "";
-  body.forEach((part: string) => (str += part));
+  for (const part of body) str += part;
   expect(str).toBe("foobar");
+
+  const objectWithEach = {
+    each(block: (part: string) => void) {
+      block("foo");
+      block("bar");
+    },
+  };
+  r = new Response(objectWithEach);
+  r.write("foo");
+  body = r.finish()[2];
+  str = "";
+  for (const part of body) str += part;
+  expect(str).toBe("foobarfoo");
 
   r = new Response([], 500);
   expect(r.status).toBe(500);
 
-  r = new Response([], 200);
+  r = new Response([], "200 OK");
   expect(r.status).toBe(200);
 });
 
@@ -375,7 +413,7 @@ it("correctly updates content-length when writing when initialized without body"
   r.write("baz");
   const [, header, body] = r.finish();
   let str = "";
-  body.forEach((part: string) => (str += part));
+  for (const part of body) str += part;
   expect(str).toBe("foobarbaz");
   expect(header["content-length"]).toBe("9");
 });
@@ -386,7 +424,7 @@ it("correctly updates content-length when writing when initialized with Array bo
   r.write("baz");
   const [, header, body] = r.finish();
   let str = "";
-  body.forEach((part: string) => (str += part));
+  for (const part of body) str += part;
   expect(str).toBe("foobarbaz");
   expect(header["content-length"]).toBe("9");
 });
@@ -397,7 +435,7 @@ it("correctly updates content-length when writing when initialized with String b
   r.write("baz");
   const [, header, body] = r.finish();
   let str = "";
-  body.forEach((part: string) => (str += part));
+  for (const part of body) str += part;
   expect(str).toBe("foobarbaz");
   expect(header["content-length"]).toBe("9");
 });
@@ -414,7 +452,7 @@ it("correctly updates content-length when writing when initialized with object b
   r.write("baz");
   const [, header, body] = r.finish();
   let str = "";
-  body.forEach((part: string) => (str += part));
+  for (const part of body) str += part;
   expect(str).toBe("foobarbazbaz");
   expect(header["content-length"]).toBe("12");
 });
@@ -423,92 +461,125 @@ it("doesn't return invalid responses", () => {
   const r = new Response(["foo", "bar"], 204);
   const [, header, body] = r.finish();
   let str = "";
-  (Array.isArray(body) ? body : []).forEach((part: string) => (str += part));
-  expect(str).toBe("");
+  for (const part of body) str += part;
+  expect(str === "").toBeTruthy();
   expect(header["content-type"]).toBeUndefined();
   expect(header["content-length"]).toBeUndefined();
+
+  let error: unknown;
+  expect(() => {
+    try {
+      new Response(new (class {})()).each(() => {});
+    } catch (e) {
+      error = e;
+      throw e;
+    }
+  }).toThrow(NoMethodError);
+  expect((error as Error).message).toMatch(/undefined method .each. for/);
 });
 
 it("knows if it's empty", () => {
   let r = new Response();
-  expect(r.isEmpty()).toBe(true);
+  expect(r.isEmpty()).toBeTruthy();
   r.write("foo");
-  expect(r.isEmpty()).toBe(false);
+  expect(r.isEmpty()).toBeFalsy();
 
   r = new Response();
-  expect(r.isEmpty()).toBe(true);
+  expect(r.isEmpty()).toBeTruthy();
   r.finish();
-  expect(r.isEmpty()).toBe(true);
+  expect(r.isEmpty()).toBeTruthy();
 
   r = new Response();
-  expect(r.isEmpty()).toBe(true);
+  expect(r.isEmpty()).toBeTruthy();
   r.finish(() => {});
-  expect(r.isEmpty()).toBe(false);
+  expect(r.isEmpty()).toBeFalsy();
 });
 
 it("provide access to the HTTP status", () => {
   const res = new Response();
   res.status = 200;
-  expect(res.isSuccessful).toBe(true);
-  expect(res.isOk).toBe(true);
+  expect(res.isSuccessful).toBeTruthy();
+  expect(res.isOk).toBeTruthy();
 
   res.status = 201;
-  expect(res.isSuccessful).toBe(true);
-  expect(res.isCreated).toBe(true);
+  expect(res.isSuccessful).toBeTruthy();
+  expect(res.isCreated).toBeTruthy();
 
   res.status = 202;
-  expect(res.isSuccessful).toBe(true);
-  expect(res.isAccepted).toBe(true);
+  expect(res.isSuccessful).toBeTruthy();
+  expect(res.isAccepted).toBeTruthy();
 
   res.status = 204;
-  expect(res.isSuccessful).toBe(true);
-  expect(res.isNoContent).toBe(true);
+  expect(res.isSuccessful).toBeTruthy();
+  expect(res.isNoContent).toBeTruthy();
 
   res.status = 301;
-  expect(res.isRedirect).toBe(true);
-  expect(res.isMovedPermanently).toBe(true);
+  expect(res.isRedirect).toBeTruthy();
+  expect(res.isMovedPermanently).toBeTruthy();
+
+  res.status = 302;
+  expect(res.isRedirect).toBeTruthy();
+
+  res.status = 303;
+  expect(res.isRedirect).toBeTruthy();
+
+  res.status = 307;
+  expect(res.isRedirect).toBeTruthy();
+
+  res.status = 308;
+  expect(res.isRedirect).toBeTruthy();
 
   res.status = 400;
-  expect(res.isSuccessful).toBe(false);
-  expect(res.isClientError).toBe(true);
-  expect(res.isBadRequest).toBe(true);
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isClientError).toBeTruthy();
+  expect(res.isBadRequest).toBeTruthy();
 
   res.status = 401;
-  expect(res.isClientError).toBe(true);
-  expect(res.isUnauthorized).toBe(true);
-
-  res.status = 403;
-  expect(res.isClientError).toBe(true);
-  expect(res.isForbidden).toBe(true);
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isClientError).toBeTruthy();
+  expect(res.isUnauthorized).toBeTruthy();
 
   res.status = 404;
-  expect(res.isClientError).toBe(true);
-  expect(res.isNotFound).toBe(true);
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isClientError).toBeTruthy();
+  expect(res.isNotFound).toBeTruthy();
 
   res.status = 405;
-  expect(res.isMethodNotAllowed).toBe(true);
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isClientError).toBeTruthy();
+  expect(res.isMethodNotAllowed).toBeTruthy();
 
   res.status = 406;
-  expect(res.isNotAcceptable).toBe(true);
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isClientError).toBeTruthy();
+  expect(res.isNotAcceptable).toBeTruthy();
 
   res.status = 408;
-  expect(res.isRequestTimeout).toBe(true);
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isClientError).toBeTruthy();
+  expect(res.isRequestTimeout).toBeTruthy();
 
   res.status = 412;
-  expect(res.isPreconditionFailed).toBe(true);
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isClientError).toBeTruthy();
+  expect(res.isPreconditionFailed).toBeTruthy();
 
   res.status = 422;
-  expect(res.isUnprocessable).toBe(true);
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isClientError).toBeTruthy();
+  expect(res.isUnprocessable).toBeTruthy();
 
   res.status = 501;
-  expect(res.isServerError).toBe(true);
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isServerError).toBeTruthy();
 });
 
 it("provide access to the HTTP headers", () => {
   const res = new Response();
   res.headers["content-type"] = "text/yaml; charset=UTF-8";
-  expect(res.isInclude("content-type")).toBe(true);
+  expect(res.isInclude("content-type")).toBeTruthy();
   expect(res.headers["content-type"]).toBe("text/yaml; charset=UTF-8");
+  expect(res.get("content-type")).toBe("text/yaml; charset=UTF-8");
   expect(res.contentType).toBe("text/yaml; charset=UTF-8");
   expect(res.mediaType).toBe("text/yaml");
   expect(res.mediaTypeParams).toEqual({ charset: "UTF-8" });
@@ -564,59 +635,36 @@ it("handles string reuse in existing body when calling #write", () => {
 
 it("calls close on #body", () => {
   const res = new Response();
-  const body = {
-    closed: false,
-    close() {
-      this.closed = true;
-    },
-  };
-  res.body = body;
+  res.body = new StringIO();
   res.close();
-  expect(body.closed).toBe(true);
+  expect(res.body.closed).toBeTruthy();
 });
 
 it("calls close on #body when 204 or 304", () => {
   const res = new Response();
-  let body: any = {
-    closed: false,
-    close() {
-      this.closed = true;
-    },
-  };
-  res.body = body;
+  res.body = new StringIO();
   res.finish();
-  expect(body.closed).toBe(false);
+  expect(res.body.closed).toBeFalsy();
 
   res.status = 204;
-  const [, , b] = res.finish();
-  expect(body.closed).toBe(true);
-  expect(b).not.toBe(body);
+  let [, , b] = res.finish();
+  expect(res.body.closed).toBeTruthy();
+  expect(b).not.toEqual(res.body);
 
-  body = {
-    closed: false,
-    close() {
-      this.closed = true;
-    },
-  };
-  res.body = body;
+  res.body = new StringIO();
   res.status = 304;
-  const [, , b2] = res.finish();
-  expect(body.closed).toBe(true);
-  expect(b2).not.toBe(body);
+  [, , b] = res.finish();
+  expect(res.body.closed).toBeTruthy();
+  expect(b).not.toEqual(res.body);
 });
 
 it("doesn't call close on #body when 205", () => {
   const res = new Response();
-  const body = {
-    closed: false,
-    close() {
-      this.closed = true;
-    },
-  };
-  res.body = body;
+
+  res.body = new StringIO();
   res.status = 205;
   res.finish();
-  expect(body.closed).toBe(false);
+  expect(res.body.closed).toBeFalsy();
 });
 
 it("doesn't clear #body when 101 and streaming", () => {
@@ -630,8 +678,8 @@ it("doesn't clear #body when 101 and streaming", () => {
 
 it("flatten doesn't cause infinite loop", () => {
   const res = new Response("Hello World");
-  const result = res.finish();
-  expect(Array.isArray(result)).toBe(true);
+
+  expect(res.finish().flat()).toBeInstanceOf(Array);
 });
 
 it("should specify not to cache content", () => {
@@ -647,7 +695,9 @@ it("should not cache content if calling cache! after do_not_cache!", () => {
   const response = new Response();
   response.doNotCacheBang();
   response.cacheBang(1000);
-  expect(response.headers["cache-control"]).toBe("no-cache, must-revalidate");
+  expect(response.get("cache-control")).toBe("no-cache, must-revalidate");
+  const expires = new Date(response.get("expires") as string);
+  expect(expires.getTime()).toBeLessThanOrEqual(Date.now());
 });
 
 it("should specify to cache content", () => {
