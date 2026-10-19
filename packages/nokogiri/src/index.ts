@@ -17,7 +17,21 @@ import { DocumentFragment as Html5DocumentFragment } from "./html5/document-frag
 import type { Node as Html5Node } from "./html5/node.js";
 import { NodeSet } from "./xml/node-set.js";
 import { SyntaxError as CssSyntaxError } from "./css/syntax-error.js";
+import { Node as CssNode } from "./css/node.js";
+import { Parser as CssParser } from "./css/parser.js";
+import { SelectorCache } from "./css/selector-cache.js";
+import { Tokenizer as CssTokenizer } from "./css/tokenizer.js";
+import { XPathVisitor } from "./css/xpath-visitor.js";
+import { xpathFor } from "./css.js";
 export const HTML5 = { Document: Html5Document, DocumentFragment: Html5DocumentFragment };
 export type { Html5Document, Html5DocumentFragment, Html5Node };
 export type { NodeSet };
-export const CSS = { SyntaxError: CssSyntaxError };
+export const CSS = {
+  Node: CssNode,
+  Parser: CssParser,
+  SelectorCache,
+  SyntaxError: CssSyntaxError,
+  Tokenizer: CssTokenizer,
+  XPathVisitor,
+  xpathFor,
+};
