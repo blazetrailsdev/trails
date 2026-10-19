@@ -192,11 +192,11 @@ export function partialPath(this: ObjectRenderingHost, object: unknown, view: Vi
     );
   }
 
-  if (view.prefixPartialPathWithControllerNamespace && contextPrefix) {
-    const cached = getPrefixedName(contextPrefix, path);
+  if (view.prefixPartialPathWithControllerNamespace) {
+    const cached = getPrefixedName(contextPrefix!, path);
     if (cached !== undefined) return cached;
-    const merged = mergePrefixIntoObjectPath(contextPrefix, path);
-    setPrefixedName(contextPrefix, path, merged);
+    const merged = mergePrefixIntoObjectPath(contextPrefix!, path);
+    setPrefixedName(contextPrefix!, path, merged);
     return merged;
   }
   return path;
