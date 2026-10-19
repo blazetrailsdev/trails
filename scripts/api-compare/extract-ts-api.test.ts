@@ -7589,6 +7589,16 @@ describe("extractFromProgram — aliasMethod on another file's module", () => {
       ["originalNewControllerThread", "newControllerThread"],
     ]);
   });
+
+  it("does not credit an aliasMethod whose receiver is not an imported Module", () => {
+    const info = extractFromFiles("/p", {
+      "live.ts": `export const Live = { aliasMethod(a: string, b: string) {} };`,
+      "test-case.ts": `import { Live } from "./live.js";
+        Live.aliasMethod("originalNewControllerThread", "newControllerThread");
+        export function newControllerThread(block: () => void): void {}`,
+    });
+    expect(info.fileFunctions!["test-case.ts"].map((f) => f.name)).toEqual(["newControllerThread"]);
+  });
 });
 
 describe("extractFromProgram — configAccessor() generated accessors", () => {

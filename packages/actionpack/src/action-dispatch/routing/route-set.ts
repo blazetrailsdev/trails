@@ -729,10 +729,6 @@ export class RouteSet {
     return new this(routeSetConfig);
   }
 
-  inspect(): string {
-    return rbAnyToS(this);
-  }
-
   static Config = Config;
 
   static readonly DEFAULT_CONFIG: Config = new Config(null, false, null);
@@ -794,6 +790,10 @@ export class RouteSet {
     return this.routes.routes.find((r) =>
       shallowEqual(r.requirements, requirements as Record<string, string | RegExp>),
     );
+  }
+
+  inspect(): string {
+    return rbAnyToS(this);
   }
 
   urlHelpers(supportsPath = true): UrlHelpersModule {

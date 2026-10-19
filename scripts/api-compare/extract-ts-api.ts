@@ -1396,6 +1396,8 @@ export function extractFromProgram(
       if (call.expression.name.text !== "aliasMethod" || !alias || !original) continue;
       if (!ts.isStringLiteralLike(alias) || !ts.isStringLiteralLike(original)) continue;
       if (info.modules[`${relPath}:${call.expression.expression.getText(sourceFile)}`]) continue;
+      const receiver = call.expression.expression;
+      if (!ts.isIdentifier(receiver) || !importedModuleBinding(receiver, checker)) continue;
       const aliased = fileFunctions.find((f) => f.name === original.text);
       if (!aliased || fileFunctions.some((f) => f.name === alias.text)) continue;
       fileFunctions.push({ ...aliased, name: alias.text, aliasOf: original.text });
@@ -3808,6 +3810,18 @@ export function harvestModuleInstanceMethods(
   };
   visit(block.body);
   return out;
+}
+
+function importedModuleBinding(receiver: ts.Identifier, checker: ts.TypeChecker): boolean {
+  const symbol = checker.getSymbolAtLocation(receiver);
+  if (!symbol?.declarations?.some((d) => ts.isImportSpecifier(d))) return false;
+  const target = checker.getAliasedSymbol(symbol);
+  return (target.declarations ?? []).some(
+    (d) =>
+      ts.isVariableDeclaration(d) &&
+      d.initializer !== undefined &&
+      /^\(?new Module\b/.test(unwrapAssertions(d.initializer).getText()),
+  );
 }
 
 /**
