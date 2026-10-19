@@ -1,7 +1,14 @@
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { toSentence } from "@blazetrails/activesupport";
-import { StandardError, excBacktrace, excSetBacktrace, include } from "@blazetrails/ruby-compat";
+import {
+  StandardError,
+  excBacktrace,
+  excSetBacktrace,
+  include,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 
+import { ActionController } from "../../namespaces.js";
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 
 export class ActionControllerError extends StandardError {
@@ -137,3 +144,17 @@ export class MissingExactTemplate extends UnknownFormat {
     this.actionName = actionName;
   }
 }
+
+rbModConstSet(ActionController, "ActionControllerError", ActionControllerError);
+rbModConstSet(ActionController, "BadRequest", BadRequest);
+rbModConstSet(ActionController, "RenderError", RenderError);
+rbModConstSet(ActionController, "RoutingError", RoutingError);
+rbModConstSet(ActionController, "UrlGenerationError", UrlGenerationError);
+rbModConstSet(ActionController, "MethodNotAllowed", MethodNotAllowed);
+rbModConstSet(ActionController, "NotImplemented", NotImplemented);
+rbModConstSet(ActionController, "MissingFile", MissingFile);
+rbModConstSet(ActionController, "SessionOverflowError", SessionOverflowError);
+rbModConstSet(ActionController, "UnknownHttpMethod", UnknownHttpMethod);
+rbModConstSet(ActionController, "UnknownFormat", UnknownFormat);
+rbModConstSet(ActionController, "RespondToMismatchError", RespondToMismatchError);
+rbModConstSet(ActionController, "MissingExactTemplate", MissingExactTemplate);

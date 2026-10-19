@@ -450,3 +450,5 @@ rbModConstSet(ActiveRecord, "FixtureSet", FixtureSet);
 rbModConstSet(FixtureSet, "File", File);
 
 runLoadHooks("active_record_fixture_set", FixtureSet);
+
+rbModConstSet(ActiveRecord, "FixtureClassNotFound", FixtureClassNotFound);

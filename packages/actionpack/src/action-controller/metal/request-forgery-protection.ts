@@ -772,4 +772,6 @@ Object.defineProperty(NullSessionHash, "name", {
     "ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash",
 });
 
+rbModConstSet(ActionController, "InvalidAuthenticityToken", InvalidAuthenticityToken);
+rbModConstSet(ActionController, "InvalidCrossOriginRequest", InvalidCrossOriginRequest);
 rbModConstSet(ActionController, "RequestForgeryProtection", RequestForgeryProtection);
