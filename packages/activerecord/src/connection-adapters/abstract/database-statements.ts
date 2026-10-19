@@ -129,9 +129,10 @@ export function toSqlAndBinds(
 
 export type ExplainOption = string;
 
-export interface DatabaseStatementsHost extends Partial<
-  Pick<AbstractAdapter, "visitor" | "bindParamsLength" | "withRawConnection">
-> {
+export interface DatabaseStatementsHost {
+  visitor?: AbstractAdapter["visitor"];
+  bindParamsLength?: AbstractAdapter["bindParamsLength"];
+  withRawConnection?: AbstractAdapter["withRawConnection"];
   /** @internal */
   performQuery?: typeof performQuery;
   _transactionManager?: TransactionManager;

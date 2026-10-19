@@ -188,7 +188,7 @@ describe("HashWithIndifferentAccessTest", () => {
   it("indifferent assoc — returns [key, value] pair", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     expect(h.assoc("a")).toEqual(["a", 1]);
-    expect(h.assoc("z")).toBeUndefined();
+    expect(h.assoc("z")).toBeNull();
   });
 
   it("nested dig indifferent access", () => {

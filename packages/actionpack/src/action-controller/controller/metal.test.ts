@@ -25,7 +25,7 @@ describe("MetalControllerInstanceTests", () => {
         "X-XSS-Protection": "0",
       };
 
-      const responseHeaders = Headers.from(
+      const responseHeaders = Headers.get(
         (
           await (rbFSend(SimpleController.action("hello"), "call", {
             REQUEST_METHOD: "GET",

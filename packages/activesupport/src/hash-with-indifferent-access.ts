@@ -483,12 +483,8 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return result;
   }
 
-  assoc(key: string): [string, V] | undefined {
-    key = this.convertKey(key);
-    if (super.has(key)) {
-      return [key, super.get(key)!];
-    }
-    return undefined;
+  override assoc(key: string): [string, V] | null {
+    return super.assoc(this.convertKey(key));
   }
 
   invert(): HashWithIndifferentAccess<string> {

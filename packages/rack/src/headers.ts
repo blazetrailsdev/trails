@@ -1,298 +1,237 @@
-import { type DefaultProc, Hash } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  dup,
+  eachPair,
+  except,
+  fetch,
+  Hash,
+  isPlainHash,
+} from "@blazetrails/ruby-compat";
+
+type PairBlock = (key: string, value: string) => unknown;
+
+const KNOWN_HEADERS: Record<string, string> = {};
+for (const str of [
+  "Accept-CH",
+  "Accept-Patch",
+  "Accept-Ranges",
+  "Access-Control-Allow-Credentials",
+  "Access-Control-Allow-Headers",
+  "Access-Control-Allow-Methods",
+  "Access-Control-Allow-Origin",
+  "Access-Control-Expose-Headers",
+  "Access-Control-Max-Age",
+  "Age",
+  "Allow",
+  "Alt-Svc",
+  "Cache-Control",
+  "Connection",
+  "Content-Disposition",
+  "Content-Encoding",
+  "Content-Language",
+  "Content-Length",
+  "Content-Location",
+  "Content-MD5",
+  "Content-Range",
+  "Content-Security-Policy",
+  "Content-Security-Policy-Report-Only",
+  "Content-Type",
+  "Date",
+  "Delta-Base",
+  "ETag",
+  "Expect-CT",
+  "Expires",
+  "Feature-Policy",
+  "IM",
+  "Last-Modified",
+  "Link",
+  "Location",
+  "NEL",
+  "P3P",
+  "Permissions-Policy",
+  "Pragma",
+  "Preference-Applied",
+  "Proxy-Authenticate",
+  "Public-Key-Pins",
+  "Referrer-Policy",
+  "Refresh",
+  "Report-To",
+  "Retry-After",
+  "Server",
+  "Set-Cookie",
+  "Status",
+  "Strict-Transport-Security",
+  "Timing-Allow-Origin",
+  "Tk",
+  "Trailer",
+  "Transfer-Encoding",
+  "Upgrade",
+  "Vary",
+  "Via",
+  "WWW-Authenticate",
+  "Warning",
+  "X-Cascade",
+  "X-Content-Duration",
+  "X-Content-Security-Policy",
+  "X-Content-Type-Options",
+  "X-Correlation-ID",
+  "X-Correlation-Id",
+  "X-Download-Options",
+  "X-Frame-Options",
+  "X-Permitted-Cross-Domain-Policies",
+  "X-Powered-By",
+  "X-Redirect-By",
+  "X-Request-ID",
+  "X-Request-Id",
+  "X-Runtime",
+  "X-UA-Compatible",
+  "X-WebKit-CS",
+  "X-XSS-Protection",
+]) {
+  const downcased = str.toLowerCase();
+  KNOWN_HEADERS[str] = KNOWN_HEADERS[downcased] = downcased;
+}
 
 export class Headers extends Hash<string, string> {
-  constructor(defaultValue?: string | DefaultProc<string, string>) {
-    super(defaultValue);
-  }
+  static KNOWN_HEADERS = KNOWN_HEADERS;
 
-  static from(...args: any[]): Headers {
-    const h = new Headers();
-    if (args.length === 0) return h;
-    if (args.length === 1 && typeof args[0] === "object" && args[0] !== null) {
-      for (const [k, v] of Object.entries(args[0])) {
-        h.set(k, v as string);
+  static get(...items: any[]): Headers {
+    if (items.length % 2 !== 0) {
+      if (items.length === 1 && (items[0] instanceof Hash || isPlainHash(items[0]))) {
+        return new this().update(items[0] as Record<string, string> | Headers);
+      } else {
+        throw new ArgumentError("odd number of arguments for Rack::Headers");
       }
-      return h;
+    } else {
+      const hash = new this();
+      for (;;) {
+        if (items.length === 0) break;
+        const key = items.shift();
+        const value = items.shift();
+        hash.set(key, value);
+      }
+      return hash;
     }
-    if (args.length % 2 !== 0) {
-      throw new Error("ArgumentError: odd number of arguments for Headers");
-    }
-    for (let i = 0; i < args.length; i += 2) {
-      h.set(String(args[i]), args[i + 1]);
-    }
-    return h;
-  }
-
-  /** @internal */
-  private downcaseKey(key: string): string {
-    return typeof key === "string" ? key.toLowerCase() : String(key);
-  }
-
-  private _key(key: string): string {
-    return this.downcaseKey(key);
   }
 
   override get(key: string): string | undefined {
-    return super.get(this._key(key));
+    return super.get(this.downcaseKey(key));
   }
 
   override set(key: string, value: string): this {
-    super.set(this._key(key), value);
-    return this;
+    return super.set(
+      Object.hasOwn(KNOWN_HEADERS, key) ? KNOWN_HEADERS[key] : key.toLowerCase(),
+      value,
+    );
   }
 
   store(key: string, value: string): this {
     return this.set(key, value);
   }
 
-  override has(key: string): boolean {
-    return super.has(this._key(key));
+  override assoc(key: string): [string, string] | null {
+    return super.assoc(this.downcaseKey(key));
+  }
+
+  override compareByIdentity(): never {
+    throw new TypeError("Rack::Headers cannot compare by identity, use regular Hash");
+  }
+
+  override delete(key: string, block?: (key: string) => string) {
+    return super.delete(this.downcaseKey(key), block);
+  }
+
+  override dig(key: string, ...a: unknown[]): unknown {
+    return super.dig(this.downcaseKey(key), ...a);
+  }
+
+  fetch(key: string, ...defaultValue: any[]): string {
+    key = this.downcaseKey(key);
+    return fetch(this as Map<string, string>, key, ...defaultValue) as string;
+  }
+
+  override fetchValues(...a: string[]): string[] {
+    return super.fetchValues(...a.map((key) => this.downcaseKey(key)));
   }
 
   hasKey(key: string): boolean {
-    return this.has(key);
+    return super.has(this.downcaseKey(key));
   }
 
-  override delete(key: string): string | undefined {
-    return super.delete(this._key(key));
+  override isInclude(key: string): boolean {
+    return this.hasKey(key);
   }
 
-  get length(): number {
-    return this.size;
-  }
-
-  get empty(): boolean {
-    return this.size === 0;
-  }
-
-  each(fn: (key: string, value: string) => void): this {
-    for (const [k, v] of this) {
-      fn(k, v);
-    }
-    return this;
-  }
-
-  eachKey(fn: (key: string) => void): void {
-    for (const k of this.keys()) {
-      fn(k);
-    }
-  }
-
-  eachValue(fn: (value: string) => void): void {
-    for (const v of this.values()) {
-      fn(v);
-    }
-  }
-
-  valuesAt(...keys: string[]): (string | undefined | null)[] {
-    return keys.map((k) => this.get(k));
-  }
-
-  toArray(): [string, string][] {
-    return [...this.entries()];
-  }
-
-  toHash(): Record<string, string> {
-    const obj: Record<string, string> = {};
-    for (const [k, v] of this) {
-      obj[k] = v;
-    }
-    return obj;
-  }
-
-  fetch(key: string, ...args: any[]): string {
-    if (args.length > 1) throw new Error("ArgumentError: wrong number of arguments");
-    const k = this._key(key);
-    if (this.has(k)) return this.get(k)!;
-    if (args.length === 1) {
-      if (typeof args[0] === "function") return args[0](k);
-      return args[0];
-    }
-    throw new Error(`IndexError: key not found: ${key}`);
-  }
-
-  fetchValues(...a: string[]): string[] {
-    return a.map((k) => {
-      const lk = this._key(k);
-      if (!this.has(lk)) throw new Error(`KeyError: key not found: ${k}`);
-      return this.get(lk)!;
+  invert(): Headers {
+    const hash = new (this.constructor as typeof Headers)();
+    this.each((key, value) => {
+      hash.set(value, key);
     });
+    return hash;
   }
 
-  dig(key: string, ...rest: any[]): string | undefined | null {
-    const val = this.get(key);
-    if (rest.length === 0) return val;
-    if (val === undefined || val === null) return undefined;
-    throw new TypeError("String does not have #dig method");
-  }
-
-  assoc(key: string): [string, string] | undefined {
-    const k = this._key(key);
-    if (this.has(k)) return [k, this.get(k)!];
-    return undefined;
-  }
-
-  rassoc(value: string): [string, string] | undefined {
-    for (const [k, v] of this) {
-      if (v === value) return [k, v];
-    }
-    return undefined;
-  }
-
-  merge(
+  override merge(
     hash: Record<string, string> | Headers,
-    fn?: (key: string, oldVal: string, newVal: string) => string,
+    block?: (key: string, oldVal: string, newVal: string) => string,
   ): Headers {
-    const result = this.dup();
-    const entries = hash instanceof Headers ? hash.toArray() : Object.entries(hash);
-    for (const [k, v] of entries) {
-      const lk = result._key(k);
-      if (fn && result.has(lk)) {
-        result.set(lk, fn(lk, result.get(lk)!, v));
-      } else {
-        result.set(lk, v);
-      }
-    }
-    return result;
+    return (dup(this) as Headers).update(hash, block);
   }
 
-  mergeInPlace(
-    hash: Record<string, string> | Headers,
-    fn?: (key: string, oldVal: string, newVal: string) => string,
-  ): Headers {
-    const entries = hash instanceof Headers ? hash.toArray() : Object.entries(hash);
-    for (const [k, v] of entries) {
-      const lk = this._key(k);
-      if (fn && this.has(lk)) {
-        this.set(lk, fn(lk, this.get(lk)!, v));
-      } else {
-        this.set(lk, v);
-      }
-    }
-    return this;
-  }
-
-  update(
-    hash: Record<string, string> | Headers,
-    fn?: (key: string, oldVal: string, newVal: string) => string,
-  ): Headers {
-    return this.mergeInPlace(hash, fn);
+  reject(block: PairBlock): Headers {
+    const hash = dup(this) as Headers;
+    hash.rejectBang(block);
+    return hash;
   }
 
   override replace(hash: Record<string, string> | Headers): this {
     this.clear();
-    return this.update(hash) as this;
+    return this.update(hash);
   }
 
-  select(fn: (key: string, value: string) => boolean): Headers {
-    const result = new Headers();
-    for (const [k, v] of this) {
-      if (fn(k, v)) result.set(k, v);
-    }
-    return result;
+  select(block: PairBlock): Headers {
+    const hash = dup(this) as Headers;
+    hash.selectBang(block);
+    return hash;
   }
 
-  selectInPlace(fn: (key: string, value: string) => boolean): Headers | null {
-    let changed = false;
-    for (const [k, v] of [...this]) {
-      if (!fn(k, v)) {
-        this.delete(k);
-        changed = true;
-      }
-    }
-    return changed ? this : null;
+  toProc(): (x: string) => string | undefined | null {
+    return (x: string) => this.get(x);
   }
 
-  reject(fn: (key: string, value: string) => boolean): Headers {
-    const result = new Headers();
-    for (const [k, v] of this) {
-      if (!fn(k, v)) result.set(k, v);
-    }
-    return result;
+  transformValues(block: (value: string) => string): Headers {
+    return (dup(this) as Headers).transformValuesBang(block);
   }
 
-  rejectInPlace(fn: (key: string, value: string) => boolean): Headers | null {
-    let changed = false;
-    for (const [k, v] of [...this]) {
-      if (fn(k, v)) {
-        this.delete(k);
-        changed = true;
-      }
-    }
-    return changed ? this : null;
-  }
-
-  deleteIf(fn: (key: string, value: string) => boolean): Headers {
-    for (const [k, v] of [...this]) {
-      if (fn(k, v)) this.delete(k);
-    }
+  update(
+    hash: Record<string, string> | Headers,
+    block?: (key: string, oldVal: string, newVal: string) => string,
+  ): this {
+    eachPair(hash, (key, value) => {
+      this.set(
+        key,
+        block !== undefined && this.isInclude(key) ? block(key, this.get(key)!, value) : value,
+      );
+    });
     return this;
   }
 
-  keepIf(fn: (key: string, value: string) => boolean): Headers {
-    for (const [k, v] of [...this]) {
-      if (!fn(k, v)) this.delete(k);
-    }
-    return this;
-  }
-
-  compact(): Headers {
-    const result = new Headers();
-    for (const [k, v] of this) {
-      if (v != null) result.set(k, v);
-    }
-    return result;
-  }
-
-  compactInPlace(): Headers | null {
-    let changed = false;
-    for (const [k, v] of [...this]) {
-      if (v == null) {
-        this.delete(k);
-        changed = true;
-      }
-    }
-    return changed ? this : null;
+  valuesAt(...keys: string[]): (string | undefined | null)[] {
+    return keys.map((key) => this.get(key));
   }
 
   slice(...a: string[]): Headers {
-    const result = new Headers();
-    for (const key of a) {
-      const k = this._key(key);
-      if (this.has(k)) result.set(k, this.get(k)!);
-    }
-    return result;
-  }
-
-  except(...a: string[]): Headers {
-    const exclude = new Set(a.map((k) => this._key(k)));
-    const result = new Headers();
-    for (const [k, v] of this) {
-      if (!exclude.has(k)) result.set(k, v);
-    }
-    return result;
-  }
-
-  transformValues(fn: (value: string) => string): Headers {
-    const result = new Headers();
-    for (const [k, v] of this) {
-      result.set(k, fn(v));
-    }
-    return result;
-  }
-
-  transformValuesInPlace(fn: (value: string) => string): Headers {
-    for (const [k, v] of this) {
-      this.set(k, fn(v));
-    }
-    return this;
+    const h = new (this.constructor as typeof Headers)();
+    a.forEach((k) => {
+      if (this.hasKey(k)) h.set(k, this.get(k)!);
+    });
+    return h;
   }
 
   transformKeys(block: (key: string) => string): Headers {
-    return this.dup().transformKeysBang(block);
+    return (dup(this) as Headers).transformKeysBang(block);
   }
 
-  transformKeysBang(block: (key: string) => string): Headers {
+  transformKeysBang(block: (key: string) => string): this {
     const hash = new (this.constructor as typeof Headers)();
     this.each((k, v) => {
       hash.set(block(k), v);
@@ -300,68 +239,16 @@ export class Headers extends Hash<string, string> {
     return this.replace(hash);
   }
 
-  invert(): Headers {
-    const result = new Headers();
-    for (const [k, v] of this) {
-      result.set(result._key(v), k);
-    }
-    return result;
+  except(...a: string[]): Hash<string, string> {
+    return except(this as Map<string, string>, ...a.map((key) => this.downcaseKey(key)));
   }
 
-  flatten(_depth = 1): string[] {
-    const result: string[] = [];
-    for (const [k, v] of this) {
-      result.push(k, v);
-    }
-    return result;
-  }
-
-  sort(fn?: (a: [string, string], b: [string, string]) => number): [string, string][] {
-    const arr = this.toArray();
-    return fn ? arr.sort(fn) : arr.sort((a, b) => a[0].localeCompare(b[0]));
-  }
-
-  dup(): Headers {
-    const h = new Headers();
-    if (this.defaultProc()) h.setDefaultProc(this.defaultProc());
-    else h.setDefault(this.default());
-    for (const [k, v] of this) {
-      h.set(k, v);
-    }
-    return h;
-  }
-
-  equals(other: Headers | Record<string, string>): boolean {
-    const otherEntries = other instanceof Headers ? other.toHash() : other;
-    const thisHash = this.toHash();
-    const thisKeys = Object.keys(thisHash);
-    const otherKeys = Object.keys(otherEntries);
-    if (thisKeys.length !== otherKeys.length) return false;
-    for (const k of thisKeys) {
-      if (thisHash[k] !== otherEntries[k]) return false;
-    }
-    return true;
-  }
-
-  inspect(): string {
-    if (this.size === 0) return "{}";
-    const pairs = [...this].map(([k, v]) => `"${k}"=>"${v}"`);
-    return `{${pairs.join(", ")}}`;
-  }
-
-  toString(): string {
-    return this.inspect();
-  }
-
-  toProc(): (key: string) => string | undefined | null {
-    return (key: string) => this.get(key);
-  }
-
-  override compareByIdentity(): never {
-    throw new TypeError("Rack::Headers cannot compare by identity, use regular Hash");
-  }
-
-  deconstructKeys(): Headers {
-    return this.dup();
+  /** @internal */
+  private downcaseKey(key: string): string {
+    return typeof key === "string"
+      ? Object.hasOwn(KNOWN_HEADERS, key)
+        ? KNOWN_HEADERS[key]
+        : key.toLowerCase()
+      : key;
   }
 }

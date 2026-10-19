@@ -1,14 +1,22 @@
 import { RACK_INPUT } from "./constants.js";
-import {
-  Encoding,
-  RUBY_PLATFORM,
-  RuntimeError,
-  byteslice,
-  Tempfile,
-  rbFSend,
-} from "@blazetrails/ruby-compat";
+import { Encoding, RUBY_PLATFORM, RuntimeError, Tempfile } from "@blazetrails/ruby-compat";
+
+export class Middleware {
+  private app: any;
+
+  constructor(app: any) {
+    this.app = app;
+  }
+
+  async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
+    env[RACK_INPUT] = new RewindableInput(env[RACK_INPUT]);
+    return this.app.call(env);
+  }
+}
 
 export class RewindableInput {
+  static Middleware: typeof Middleware;
+
   private io: any;
   private rewindableIo: Tempfile | null;
   private unlinked: boolean;
@@ -24,12 +32,12 @@ export class RewindableInput {
     return this.rewindableIo!.gets();
   }
 
-  read(...args: [length?: number | null, buffer?: Uint8Array | null]): string | null {
+  read(...args: [] | [number | null] | [number | null, Uint8Array | null]): string | null {
     if (!this.rewindableIo) this.makeRewindable();
     return this.rewindableIo!.read(...(args as [number | null, Uint8Array | null]));
   }
 
-  each(block: (line: string) => void): unknown {
+  each(block: (line: string) => void): Tempfile {
     if (!this.rewindableIo) this.makeRewindable();
     return this.rewindableIo!.each(block);
   }
@@ -39,7 +47,7 @@ export class RewindableInput {
     return this.rewindableIo!.rewind();
   }
 
-  get size(): number {
+  size(): number {
     if (!this.rewindableIo) this.makeRewindable();
     return this.rewindableIo!.size();
   }
@@ -67,16 +75,19 @@ export class RewindableInput {
       this.unlinked = true;
     }
 
-    let buffer: string | null;
-    while ((buffer = this.io.read(1024 * 4)) != null) {
+    let buffer = new Uint8Array(1024 * 4);
+    let read: string | null;
+    while ((read = this.io.read(1024 * 4, buffer)) != null) {
+      buffer = buffer.subarray(0, read.length);
       let entireBufferWrittenOut = false;
       while (!entireBufferWrittenOut) {
-        const written = this.rewindableIo.write(Uint8Array.from(buffer, (c) => c.charCodeAt(0)));
-        entireBufferWrittenOut = written === buffer.length;
+        const written = this.rewindableIo.write(buffer);
+        entireBufferWrittenOut = written === buffer.byteLength;
         if (!entireBufferWrittenOut) {
-          buffer = byteslice(buffer, written, buffer.length - written)!;
+          buffer = buffer.subarray(written);
         }
       }
+      buffer = new Uint8Array(1024 * 4);
     }
     this.rewindableIo.rewind();
   }
@@ -87,15 +98,4 @@ export class RewindableInput {
   }
 }
 
-export class RewindableInputMiddleware {
-  private app: any;
-
-  constructor(app: any) {
-    this.app = app;
-  }
-
-  async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {
-    env[RACK_INPUT] = new RewindableInput(env[RACK_INPUT]);
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
-  }
-}
+RewindableInput.Middleware = Middleware;
