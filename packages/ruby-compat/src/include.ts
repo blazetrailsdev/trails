@@ -679,7 +679,7 @@ export class Module<I extends object = Record<never, never>> {
             ? (descriptor.value as (...args: unknown[]) => unknown).bind(receiver)
             : undefined;
         }
-        const root = writer || !Object.hasOwn(Kernel, key) ? undefined : Kernel[key];
+        const root = writer || !Object.hasOwn(Kernel, key) ? undefined : Reflect.get(Kernel, key);
         return typeof root === "function"
           ? (root as (...args: unknown[]) => unknown).bind(receiver)
           : undefined;
@@ -2003,7 +2003,6 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
 
 /** @noRailsEquivalent PERMANENT */
 export interface KernelModule {
-  [name: string]: unknown;
   dup(this: object): object;
   initializeDup(this: object, orig: unknown): object;
   initializeClone(this: object, orig: unknown): object;
