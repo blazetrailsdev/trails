@@ -3,6 +3,7 @@ import type { Tempfile } from "./tempfile.js";
 import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
 import { b } from "./string/b.js";
 import { StandardError } from "./standard-error.js";
+import { registerConstant } from "./variable.js";
 
 class ZError extends StandardError {}
 
@@ -211,6 +212,13 @@ export const Zlib = {
   GzipWriter,
 
   /**
+   * `Zlib::Error` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4646` `cZError`), a `StandardError`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Error`.
+   */
+  Error: ZError,
+
+  /**
    * `Zlib::Deflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4713`), whose one-shot
    * `deflate` (`rb_deflate_s_deflate`, `zlib.c:1730`) compresses the String's
    * bytes (a text String's UTF-8 bytes) at `Z_DEFAULT_COMPRESSION` and answers them
@@ -218,13 +226,6 @@ export const Zlib = {
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Deflate`.
    */
-  /**
-   * `Zlib::Error` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4646` `cZError`), a `StandardError`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Error`.
-   */
-  Error: ZError,
-
   Deflate: {
     deflate(src: string | Uint8Array): string {
       return b(getZlib().deflate(src instanceof Uint8Array ? src : new TextEncoder().encode(src)));
@@ -269,3 +270,5 @@ export const Zlib = {
     return (sum ^ 0xffffffff) >>> 0;
   },
 };
+
+registerConstant("Zlib::Error", ZError);
