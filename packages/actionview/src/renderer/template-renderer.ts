@@ -65,23 +65,22 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
         format,
       });
     }
-    if (Object.hasOwn(options, "renderable") && options.renderable) {
+    if (Object.hasOwn(options, "renderable")) {
       return new Renderable(options.renderable);
     }
-    if (Object.hasOwn(options, "template") && options.template != null) {
-      const tmpl = options.template;
-      if (typeof tmpl === "object" && typeof tmpl.render === "function") {
-        return tmpl;
+    if (Object.hasOwn(options, "template")) {
+      if (rbObjRespondTo(options.template, "render")) {
+        return options.template as RenderableTemplate;
       }
       return this.lookupContext.findTemplate(
-        tmpl as string,
+        options.template as string,
         options.prefixes,
         false,
         keys,
         this.details,
       ) as RenderableTemplate;
     }
-    throw new Error(
+    throw new ArgumentError(
       "You invoked render but did not give any of :body, :file, :html, :inline, :partial, :plain, :renderable, or :template option.",
     );
   }
