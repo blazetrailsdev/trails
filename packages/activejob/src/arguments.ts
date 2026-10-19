@@ -126,7 +126,7 @@ function serializeArgument(argument: unknown): unknown {
     rbObjIsKindOf(argument, rbCFloat)
   ) {
     return argument;
-  } else if (rbObjIsKindOf(argument, rbCString)) {
+  } else if (rbObjIsKindOf(argument, rbCString) && !isSymbol(argument)) {
     if (rbObjClass(argument) === rbCString) {
       return argument;
     } else {
