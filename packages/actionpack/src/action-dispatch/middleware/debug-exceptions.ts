@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/actionview";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString, HTTP_STATUS_CODES } from "@blazetrails/rack";
+import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";
 import { DebugView } from "./debug-view.js";
 import { X_CASCADE } from "../constants.js";
@@ -92,7 +92,7 @@ export class DebugExceptions {
         "content-type": `${format}; charset=${charset}`,
         "content-length": String(Buffer.byteLength(body, "utf8")),
       },
-      bodyFromString(body),
+      [body],
     ];
   }
 

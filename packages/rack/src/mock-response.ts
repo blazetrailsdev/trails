@@ -103,7 +103,7 @@ export class MockResponse extends Response {
         const [k, v] = bit.split("=", 2);
         attrs[k.trim().toLowerCase()] = v.trim();
       }
-      if (bit.toLowerCase().includes("secure")) {
+      if (bit.includes("secure")) {
         attrs.secure = true;
       }
     }

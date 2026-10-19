@@ -3,7 +3,6 @@ import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import { controllerConstants } from "@blazetrails/actionpack";
-import { bodyToString } from "@blazetrails/rack";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
@@ -42,7 +41,7 @@ describe("a generated app reloads its views in development", () => {
         PATH_INFO: "/posts/show",
         HTTP_ACCEPT: "*/*",
       }) as Promise<RackResponse>);
-      return bodyToString(body);
+      return Array.from(body as Iterable<string>).join("");
     };
 
     expect(await show()).toContain("<h1>Before edit</h1>");

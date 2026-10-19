@@ -2,7 +2,7 @@ import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "@blazetrails/activerecord";
-import { MockRequest, bodyToString } from "@blazetrails/rack";
+import { MockRequest } from "@blazetrails/rack";
 import { env, getFs, getOsAsync, getPath, setEnv, rbFLoad } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails, _resetTrailsEnv } from "./rails.js";
@@ -52,6 +52,6 @@ describe("a booted app's models are warm before user code runs", () => {
         HTTP_ACCEPT: "application/json",
       }),
     ) as Promise<RackResponse>);
-    expect([status, await bodyToString(body)]).toEqual([201, '{"title":"x"}']);
+    expect([status, Array.from(body as Iterable<string>).join("")]).toEqual([201, '{"title":"x"}']);
   }, 15_000);
 });

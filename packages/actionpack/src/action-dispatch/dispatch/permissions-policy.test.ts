@@ -9,7 +9,6 @@ import {
 import {
   CONTENT_TYPE,
   Lint,
-  bodyFromString,
   type RackApp,
   type RackEnv,
   type RackResponse,
@@ -94,7 +93,7 @@ describe("PermissionsPolicyMiddlewareTest", () => {
   });
 
   it("html requests will set a policy", async () => {
-    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "text/html" }, bodyFromString("")]);
+    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "text/html" }, [""]]);
 
     await t.get("/index");
 
@@ -102,7 +101,7 @@ describe("PermissionsPolicyMiddlewareTest", () => {
   });
 
   it("non-html requests will set a policy", async () => {
-    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "application/json" }, bodyFromString("")]);
+    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "application/json" }, [""]]);
 
     await t.get("/index");
 
@@ -110,11 +109,7 @@ describe("PermissionsPolicyMiddlewareTest", () => {
   });
 
   it("existing policies will not be overwritten", async () => {
-    t.app = buildApp(async () => [
-      200,
-      { [FEATURE_POLICY]: "gyroscope 'none'" },
-      bodyFromString(""),
-    ]);
+    t.app = buildApp(async () => [200, { [FEATURE_POLICY]: "gyroscope 'none'" }, [""]]);
 
     await t.get("/index");
 

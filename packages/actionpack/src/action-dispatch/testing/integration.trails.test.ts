@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyFromString, type RackEnv } from "@blazetrails/rack";
+import { type RackEnv } from "@blazetrails/rack";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { IntegrationTest, Session } from "./integration.js";
 import { RouteSet } from "../routing/route-set.js";
@@ -17,7 +17,7 @@ describe("Integration::Session delegated readers (allow_nil: true)", () => {
 
   it("delegate to the last response and request", async ({ task }) => {
     const session = new IntegrationTest(task.name);
-    session.app = async () => [302, { location: "/there" }, bodyFromString("moved")];
+    session.app = async () => [302, { location: "/there" }, ["moved"]];
     session.hostBang("rubyonrails.com");
     await session.get("/here");
     expect(session.statusMessage).toBe("Found");
@@ -34,8 +34,8 @@ describe("Integration::RequestHelpers#follow_redirect!", () => {
     const session = new IntegrationTest(expect.getState().currentTestName!);
     session.app = async (env: RackEnv) =>
       env.PATH_INFO === "/there"
-        ? [200, {}, bodyFromString(`${env.REQUEST_METHOD} ${env.HTTP_REFERER}`)]
-        : [status, { location: "http://www.example.com/there" }, bodyFromString("")];
+        ? [200, {}, [`${env.REQUEST_METHOD} ${env.HTTP_REFERER}`]]
+        : [status, { location: "http://www.example.com/there" }, [""]];
     return session;
   }
 
@@ -74,7 +74,7 @@ describe("Integration::RequestHelpers#follow_redirect!", () => {
     task,
   }) => {
     const session = new IntegrationTest(task.name);
-    session.app = async () => [200, {}, bodyFromString("ok")];
+    session.app = async () => [200, {}, ["ok"]];
     await session.get("/here");
     await expect(session.followRedirectBang()).rejects.toThrow(
       new RuntimeError("not a redirect! 200 OK"),
@@ -101,7 +101,7 @@ describe("RoutingAssertions#method_missing", () => {
 describe("Integration::Session includes TestProcess", () => {
   it("session, flash and redirect_to_url read the last request and response", async ({ task }) => {
     const session = new IntegrationTest(task.name);
-    session.app = async () => [302, { location: "/there" }, bodyFromString("moved")];
+    session.app = async () => [302, { location: "/there" }, ["moved"]];
     await session.get("/here");
     expect(session.session()).toBe(session.request.session);
     expect(session.flash()).toBe(session.request.flash);
@@ -124,7 +124,7 @@ describe("Integration::Runner#integration_session", () => {
 
     static {
       this.routes().draw(function () {
-        this.get("/widgets", { to: () => [200, {}, bodyFromString("")], as: "widgets" });
+        this.get("/widgets", { to: () => [200, {}, [""]], as: "widgets" });
       });
     }
 
@@ -170,7 +170,7 @@ describe("Integration::Runner#integration_session", () => {
 describe("IntegrationTest#app", () => {
   it("reads Runner's app reader before the class's app (integration.rb:693-695)", () => {
     const t = new IntegrationTest("app");
-    const app = () => [200, {}, bodyFromString("")];
+    const app = () => [200, {}, [""]];
     t.app = app;
     expect(t.app).toBe(app);
 

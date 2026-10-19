@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { Notifications, assertMatch, assertNoMatch } from "@blazetrails/activesupport";
-import { Lint, MockRequest, bodyFromString } from "@blazetrails/rack";
+import { Lint, MockRequest } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
@@ -94,7 +94,7 @@ describe("ServerTimingTest", () => {
 
     const stubApp = async (env: RackEnv): Promise<RackResponse> => {
       await (env["action_dispatch.test"] as () => Promise<void>)();
-      return [200, {}, bodyFromString("ok")];
+      return [200, {}, ["ok"]];
     };
     const app = new Lint(new ServerTiming(new Lint(stubApp as RackApp) as never) as never);
 

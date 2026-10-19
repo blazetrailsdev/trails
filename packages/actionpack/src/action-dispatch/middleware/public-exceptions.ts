@@ -10,10 +10,6 @@ import { Response } from "../http/response.js";
 
 async function* emptyBody(): RackBody {}
 
-async function* bodyFromBytes(bytes: Uint8Array): RackBody {
-  yield bytes;
-}
-
 const LOCALE_RE = /^[A-Za-z0-9_-]+$/;
 
 type ErrorBody = { status: number; error: string };
@@ -65,7 +61,7 @@ export class PublicExceptions {
         "content-type": `${contentType}; charset=${Response.defaultCharset ?? ""}`,
         "content-length": String(encoded.byteLength),
       },
-      bodyFromBytes(encoded),
+      [body],
     ];
   }
 

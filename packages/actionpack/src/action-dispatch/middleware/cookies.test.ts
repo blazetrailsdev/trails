@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyFromString, type RackEnv, type RackResponse } from "@blazetrails/rack";
+import { type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
   ChainedCookieJars,
   type CookieSerializer,
@@ -46,12 +46,12 @@ function cookieRequest(env: Record<string, unknown> = {}): RequestCookieMethodsH
 }
 
 function emptyResponse(): RackResponse {
-  return [200, {}, bodyFromString("")];
+  return [200, {}, [""]];
 }
 
 describe("Cookies middleware", () => {
   it("leaves headers untouched when downstream never builds a jar", async () => {
-    const cookies = new Cookies(async () => [200, { "x-foo": "bar" }, bodyFromString("ok")]);
+    const cookies = new Cookies(async () => [200, { "x-foo": "bar" }, ["ok"]]);
     const env: RackEnv = {};
     const [status, headers] = await cookies.call(env);
     expect(status).toBe(200);
@@ -96,7 +96,7 @@ describe("Cookies middleware", () => {
       const jar = new CookieJar(cookieRequest());
       jar.set("b", "2");
       env[COOKIES_KEY] = jar;
-      return [200, { "set-cookie": "a=1; path=/" }, bodyFromString("")];
+      return [200, { "set-cookie": "a=1; path=/" }, [""]];
     });
     const [, headers] = await cookies.call({});
     const lines = headers["set-cookie"] as string[];
@@ -109,11 +109,7 @@ describe("Cookies middleware", () => {
       const jar = new CookieJar(cookieRequest());
       jar.set("c", "3");
       env[COOKIES_KEY] = jar;
-      return [
-        200,
-        { "set-cookie": ["a=1; path=/", "b=2; path=/"] as unknown as string },
-        bodyFromString(""),
-      ];
+      return [200, { "set-cookie": ["a=1; path=/", "b=2; path=/"] as unknown as string }, [""]];
     });
     const [, headers] = await cookies.call({});
     const setCookie = headers["set-cookie"] as string[];
@@ -126,7 +122,7 @@ describe("Cookies middleware", () => {
       const jar = new CookieJar(cookieRequest());
       jar.set("b", "2");
       env[COOKIES_KEY] = jar;
-      return [200, { "Set-Cookie": "a=1; path=/" }, bodyFromString("")];
+      return [200, { "Set-Cookie": "a=1; path=/" }, [""]];
     });
     const [, headers] = await cookies.call({});
     expect(headers["Set-Cookie"]).toBeUndefined();

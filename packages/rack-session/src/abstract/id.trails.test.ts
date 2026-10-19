@@ -1,5 +1,4 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS, ResponseRaw } from "@blazetrails/rack";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { Request } from "@blazetrails/rack";
@@ -173,7 +172,7 @@ describe("Rack::Session::Abstract::Persisted#call", () => {
 
   const app = async (env: RackEnv): Promise<RackResponse> => {
     (env["rack.session"] as SessionHash).set("counter", 2);
-    return [200, {}, bodyFromString("")];
+    return [200, {}, [""]];
   };
 
   it("commits the session through the plain options hash the request seats", async () => {

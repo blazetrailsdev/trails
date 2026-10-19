@@ -1,5 +1,5 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString, CONTENT_TYPE, RELEASE, SET_COOKIE } from "@blazetrails/rack";
+import { CONTENT_TYPE, RELEASE, SET_COOKIE } from "@blazetrails/rack";
 import { fetch, Gem, merge, rbFSend, toI } from "@blazetrails/ruby-compat";
 import { LOCATION, STRICT_TRANSPORT_SECURITY } from "../constants.js";
 import { Request } from "../http/request.js";
@@ -152,7 +152,7 @@ export class SSL {
         [CONTENT_TYPE]: "text/html; charset=utf-8",
         [LOCATION]: this.httpsLocationFor(request),
       },
-      bodyFromString((redirect.body ?? []).join("")),
+      [(redirect.body ?? []).join("")],
     ];
   }
 

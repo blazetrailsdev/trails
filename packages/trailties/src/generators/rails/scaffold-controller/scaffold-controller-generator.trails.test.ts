@@ -9,7 +9,6 @@ import {
   type ScaffoldControllerGeneratorOptions,
 } from "./scaffold-controller-generator.js";
 import { ActionController, RouteSet, controllerConstants } from "@blazetrails/actionpack";
-import { bodyToString } from "@blazetrails/rack";
 
 afterEach(() => {
   controllerConstants.delete("posts");
@@ -32,7 +31,7 @@ describe("ScaffoldControllerGenerator (dispatch)", () => {
     const [status, , body] = await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/posts/new" });
 
     expect(status).toBe(200);
-    expect(await bodyToString(body)).toBe("new post");
+    expect(Array.from(body as Iterable<string>).join("")).toBe("new post");
   });
 
   it("redirects the emitted destroy action through the declared index path helper", async () => {

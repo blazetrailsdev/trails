@@ -1,7 +1,6 @@
 import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { bodyToString } from "@blazetrails/rack";
 import { Application } from "./application.js";
 import { HealthController } from "./health-controller.js";
 import { Trails } from "./rails.js";
@@ -12,7 +11,7 @@ async function requestUp(): Promise<[number, string]> {
     PATH_INFO: "/up",
     HTTP_ACCEPT: "*/*",
   }) as Promise<RackResponse>);
-  return [status, await bodyToString(body)];
+  return [status, Array.from(body as Iterable<string>).join("")];
 }
 
 describe("a generated app routes /up to Rails::HealthController", () => {

@@ -1,6 +1,6 @@
 import { Dependencies, type ShareLockThreadInfo } from "@blazetrails/activesupport";
 import { rbFSend, rbInspect } from "@blazetrails/ruby-compat";
-import { bodyFromString, CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
+import { CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
@@ -98,7 +98,7 @@ export class DebugLocks {
         [CONTENT_TYPE]: `text/plain; charset=${Response.defaultCharset}`,
         [CONTENT_LENGTH]: Buffer.byteLength(str, "utf-8").toString(),
       },
-      bodyFromString(str),
+      [str],
     ];
   }
 

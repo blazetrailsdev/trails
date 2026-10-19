@@ -41,13 +41,6 @@ export function setDefaultQueryParser(parser: QueryParser): void {
   _defaultQueryParser = parser;
 }
 
-export function paramDepthLimit(): number {
-  return defaultQueryParser().paramDepthLimit;
-}
-export function setParamDepthLimit(v: number): void {
-  setDefaultQueryParser(defaultQueryParser().newDepthLimit(v));
-}
-
 export function multipartTotalPartLimit(): number {
   return _multipartTotalPartLimit;
 }
@@ -60,6 +53,13 @@ export function multipartFileLimit(): number {
 }
 export function setMultipartFileLimit(v: number): void {
   _multipartFileLimit = v;
+}
+
+export function paramDepthLimit(): number {
+  return defaultQueryParser().paramDepthLimit;
+}
+export function setParamDepthLimit(v: number): void {
+  setDefaultQueryParser(defaultQueryParser().newDepthLimit(v));
 }
 
 export function clockTime(): number {

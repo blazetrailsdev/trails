@@ -5,7 +5,7 @@ import {
   type DrawCallback,
   type NamedRouteHelper,
 } from "../routing/route-set.js";
-import { bodyFromString, bodyToString, MockRequest, Utils as RackUtils } from "@blazetrails/rack";
+import { MockRequest, type RackBody, Utils as RackUtils } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import { controllerConstants, Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
@@ -150,10 +150,10 @@ class EchoParamsController {
   static async dispatch(
     action: string,
     req: Request,
-  ): Promise<[number, Record<string, string>, ReturnType<typeof bodyFromString>]> {
+  ): Promise<[number, Record<string, string>, RackBody]> {
     const { controller, action: _a, ...params } = req.pathParameters as Record<string, string>;
     const body = JSON.stringify({ controller, action, params });
-    return [200, { "content-type": "application/json" }, bodyFromString(body)];
+    return [200, { "content-type": "application/json" }, [body]];
   }
 }
 
@@ -411,7 +411,7 @@ describe("TestRoutingMapper", () => {
       PATH_INFO: "/nope",
     });
     expect(status).toBe(404);
-    expect(await bodyToString(body)).toContain("Not Found");
+    expect(Array.from(body as Iterable<string>).join("")).toContain("Not Found");
   });
 
   it("dispatches matched route", async () => {
@@ -428,7 +428,7 @@ describe("TestRoutingMapper", () => {
       PATH_INFO: "/posts/7",
     });
     expect(status).toBe(200);
-    const json = JSON.parse(await bodyToString(body));
+    const json = JSON.parse(Array.from(body as Iterable<string>).join(""));
     expect(json.controller).toBe("posts");
     expect(json.action).toBe("show");
     expect(json.params.id).toBe("7");
@@ -4581,9 +4581,9 @@ describe("TestDefaultScope", () => {
     static override async dispatch(
       action: string,
       req: Request,
-    ): Promise<[number, Record<string, string>, ReturnType<typeof bodyFromString>]> {
+    ): Promise<[number, Record<string, string>, RackBody]> {
       const body = `${req.pathParameters["controller"]}#${action}`;
-      return [200, { "content-type": "text/plain" }, bodyFromString(body)];
+      return [200, { "content-type": "text/plain" }, [body]];
     }
   }
 
@@ -4605,7 +4605,7 @@ describe("TestDefaultScope", () => {
 
   it("default scope", async () => {
     const [, , body] = await DefaultScopeRoutes.call(MockRequest.envFor("/posts"));
-    expect(await bodyToString(body)).toBe("blog/posts#index");
+    expect(Array.from(body as Iterable<string>).join("")).toBe("blog/posts#index");
   });
 });
 
@@ -4805,13 +4805,13 @@ describe("TestAltApp", () => {
 
   class XHeader {
     call(_env: Record<string, unknown>) {
-      return [200, { "Content-Type": "text/html" }, bodyFromString("XHeader")];
+      return [200, { "Content-Type": "text/html" }, ["XHeader"]];
     }
   }
 
   class AltApp {
     call(_env: Record<string, unknown>) {
-      return [200, { "Content-Type": "text/html" }, bodyFromString("Alternative App")];
+      return [200, { "Content-Type": "text/html" }, ["Alternative App"]];
     }
   }
 
@@ -4983,11 +4983,7 @@ describe("TestNamespaceWithControllerOption", () => {
 describe("TestGlobRoutingMapper", () => {
   const Routes = new RouteSet();
   Routes.draw(function () {
-    const ok = (_env: Record<string, unknown>) => [
-      200,
-      { "Content-Type": "text/plain" },
-      bodyFromString(""),
-    ];
+    const ok = (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [""]];
 
     this.get("/*id", { to: this.redirect("/not_cars"), constraints: { id: /dummy/ } });
     this.get("/cars", { to: ok });
@@ -5026,11 +5022,7 @@ describe("TestGlobRoutingMapper", () => {
 describe("TestOptimizedNamedRoutes", () => {
   const Routes = new RouteSet();
   Routes.draw(function () {
-    const ok = (_env: Record<string, unknown>) => [
-      200,
-      { "Content-Type": "text/plain" },
-      bodyFromString(""),
-    ];
+    const ok = (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [""]];
     this.get("/foo", { to: ok, as: "foo" });
     this.get("/post(/:action(/:id))", { to: ok, as: "posts" });
     this.get("/:foo/:foo_type/bars/:id", { to: ok, as: "bar" });
@@ -5153,11 +5145,7 @@ describe("TestNamedRouteUrlHelpers", () => {
 describe("TestUrlConstraints", () => {
   const Routes = new RouteSet();
   Routes.draw(function () {
-    const ok = (_env: Record<string, unknown>) => [
-      200,
-      { "Content-Type": "text/plain" },
-      bodyFromString(""),
-    ];
+    const ok = (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [""]];
 
     this.constraints({ subdomain: "admin" }, () => {
       this.get("/", { to: ok, as: "admin_root" });
@@ -5267,11 +5255,7 @@ describe("TestInvalidUrls", () => {
       set.draw(function () {
         this.get("/bar/:id", { to: this.redirect("/foo/show/%{id}") });
 
-        const ok = (_env: Record<string, unknown>) => [
-          200,
-          { "Content-Type": "text/plain" },
-          bodyFromString(""),
-        ];
+        const ok = (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [""]];
         this.get("/foobar/:id", { to: ok });
 
         deprecator().silence(() => {
@@ -5365,11 +5349,7 @@ describe("TestOptionalRootSegments", () => {
 describe("TestPortConstraints", () => {
   const Routes = new RouteSet();
   Routes.draw(function () {
-    const ok = (_env: Record<string, unknown>) => [
-      200,
-      { "Content-Type": "text/plain" },
-      bodyFromString(""),
-    ];
+    const ok = (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [""]];
 
     this.get("/integer", { to: ok, constraints: { port: 8080 } });
     this.get("/string", { to: ok, constraints: { port: "8080" } });
@@ -5431,11 +5411,7 @@ describe("TestPortConstraints", () => {
 describe("TestFormatConstraints", () => {
   const Routes = new RouteSet();
   Routes.draw(function () {
-    const ok = (_env: Record<string, unknown>) => [
-      200,
-      { "Content-Type": "text/plain" },
-      bodyFromString(""),
-    ];
+    const ok = (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [""]];
 
     this.get("/string", { to: ok, constraints: { format: "json" } });
     this.get("/regexp", { to: ok, constraints: { format: /json/ } });
@@ -5699,11 +5675,7 @@ describe("TestErrorsInController", () => {
 describe("TestPartialDynamicPathSegments", () => {
   const Routes = new RouteSet();
   Routes.draw(function () {
-    const ok = (_env: Record<string, unknown>) => [
-      200,
-      { "Content-Type": "text/plain" },
-      bodyFromString(""),
-    ];
+    const ok = (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [""]];
 
     this.get("/songs/song-:song", { to: ok });
     this.get("/songs/:song-song", { to: ok });
@@ -6055,11 +6027,7 @@ describe("TestHttpMethods", () => {
 
   class TestHttpMethods extends IntegrationTest {
     simpleApp(response: string) {
-      return (_env: Record<string, unknown>) => [
-        200,
-        { "Content-Type": "text/plain" },
-        bodyFromString(response),
-      ];
+      return (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [response]];
     }
   }
   registerConstant("TestHttpMethods", TestHttpMethods);
@@ -6184,11 +6152,7 @@ describe("TestMultipleNestedController", () => {
 describe("TestRedirectInterpolation", () => {
   const Routes = new RouteSet();
   Routes.draw(function () {
-    const ok = (_env: Record<string, unknown>) => [
-      200,
-      { "Content-Type": "text/plain" },
-      bodyFromString(""),
-    ];
+    const ok = (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [""]];
 
     this.get("/foo/:id", { to: this.redirect("/foo/bar/%{id}") });
     this.get("/bar/:id", { to: this.redirect({ path: "/foo/bar/%{id}" }) });
@@ -6238,11 +6202,7 @@ describe("TestRedirectInterpolation", () => {
 describe("TestConstraintsAccessingParameters", () => {
   const Routes = new RouteSet();
   Routes.draw(function () {
-    const ok = (_env: Record<string, unknown>) => [
-      200,
-      { "Content-Type": "text/plain" },
-      bodyFromString(""),
-    ];
+    const ok = (_env: Record<string, unknown>) => [200, { "Content-Type": "text/plain" }, [""]];
 
     this.get("/:foo", { to: ok, constraints: (r: Request) => r.params.foo === "foo" });
     this.get("/:bar", { to: ok });

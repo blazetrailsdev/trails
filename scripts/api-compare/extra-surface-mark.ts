@@ -121,7 +121,7 @@ export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
  * Gated packages whose `novel` is still a number to burn down rather than a
  * rule to hold, so the mark's value governs both dimensions.
  */
-export const COUNTED_PACKAGES = ["rack"] as const;
+export const COUNTED_PACKAGES = [] as const;
 
 /**
  * Gated packages whose `novel` is pinned at the constant 0 regardless of what
@@ -141,7 +141,7 @@ export const TAGGED_ONLY_PACKAGES = [
  * therefore carry no mark row — see ROWLESS MODE in the module comment.
  * Only-grow, like {@link TAGGED_ONLY_PACKAGES}.
  */
-export const ROWLESS_PACKAGES = ["activemodel", "activerecord", "arel"] as const;
+export const ROWLESS_PACKAGES = ["activemodel", "activerecord", "arel", "rack"] as const;
 
 /**
  * The packages this gate covers, in either mode. Everything else is measured

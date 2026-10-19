@@ -5,7 +5,6 @@ import { NotImplemented } from "../../action-controller/metal/exceptions.js";
 import { Request } from "../http/request.js";
 import { MimeType } from "../http/mime-type.js";
 import { HASH_CONVERSIONS, Logger, TaggedLogging } from "@blazetrails/activesupport";
-import { bodyToString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 const errorApp = async (_env: RackEnv): Promise<RackResponse> => {
@@ -92,7 +91,7 @@ describe("DebugExceptions API body conversions", () => {
         HTTP_ACCEPT: "text/wibble",
       });
       expect(String(headers["content-type"])).toContain("text/wibble");
-      expect(await bodyToString(body)).toBe("wibble:500");
+      expect(Array.from(body as Iterable<string>).join("")).toBe("wibble:500");
     } finally {
       delete HASH_CONVERSIONS.toWibble;
       MimeType.unregister(":wibble");

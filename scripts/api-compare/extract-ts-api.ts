@@ -851,6 +851,7 @@ export function extractFromProgram(
             instanceMethods: [],
             classMethods: [],
             declaredAsNamespace: true,
+            noRailsEquivalent: noRailsEquivalentReason(node),
           };
           fileHasClassOrModule = true;
         } else if (

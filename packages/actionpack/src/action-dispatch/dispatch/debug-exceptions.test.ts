@@ -27,7 +27,6 @@ import {
   excSetupMessage,
 } from "@blazetrails/ruby-compat";
 import { Lint } from "@blazetrails/rack";
-import { bodyToString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { ActionNotFound } from "../../abstract-controller/base.js";
 import { Base as ControllerBase } from "../../action-controller/base.js";
@@ -1045,7 +1044,7 @@ describe("DebugExceptions", () => {
     const [status, headers, raw] = await mw.call(env({ HTTP_ACCEPT: "application/json" }));
     expect(status).toBe(500);
     expect(headers["content-type"]).toContain("application/json");
-    const text = await bodyToString(raw);
+    const text = Array.from(raw as Iterable<string>).join("");
     const json = JSON.parse(text);
     expect(json.exception).toBeDefined();
     expect(json.traces["Application Trace"]).toBeDefined();
