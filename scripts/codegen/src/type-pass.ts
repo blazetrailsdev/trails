@@ -456,6 +456,7 @@ export class TypePass {
       ts.SyntaxKind.QuestionQuestionToken,
     ];
     const kinds = new Set<string>();
+    const members = new Set<string>();
     let other = false;
     const visit = (n: ts.Node): void => {
       if (other) return;
@@ -487,13 +488,12 @@ export class TypePass {
           kinds.add("array");
         else if (ts.isElementAccessExpression(parent) && parent.expression === ref)
           kinds.add("record");
-        else if (
-          ts.isPropertyAccessExpression(parent) &&
-          parent.expression === ref &&
-          !call(parent)
-        )
-          kinds.add("record");
-        else if (
+        else if (ts.isPropertyAccessExpression(parent) && parent.expression === ref) {
+          // `x.m()` or `x.attr`: a member of whatever class it is (duckClass),
+          // or a Hash's key when every use only reads.
+          members.add(parent.name.text);
+          kinds.add(call(parent) ? "object" : "record");
+        } else if (
           (ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
           parent.arguments?.includes(ref)
         ) {
@@ -512,7 +512,11 @@ export class TypePass {
       ts.forEachChild(n, visit);
     };
     for (const r of roots) visit(r);
-    if (other || kinds.size !== 1) return null;
+    if (other) return null;
+    // Sent methods (and perhaps read attributes): the class it duck-types as.
+    if (kinds.has("object") && [...kinds].every((k) => k === "object" || k === "record"))
+      return this.duckClass(members, decl);
+    if (kinds.size !== 1) return null;
     const k = [...kinds][0];
     return k === "fn"
       ? "(...args: unknown[]) => unknown"
@@ -737,6 +741,58 @@ export class TypePass {
       n += edits.length;
     }
     return n;
+  }
+
+  /**
+   * The most general generated class whose instances answer every name in
+   * `members` (a duck type, as Ruby's): among the classes that do, the one the
+   * others extend. Library code is not typed by a test's class. Null when none,
+   * or when no single one is the most general.
+   */
+  duckClass(members: Set<string>, at: ts.Node): string | null {
+    const program = this.program();
+    const c2 = program.getTypeChecker();
+    const atFile = at.getSourceFile().fileName;
+    const fits: ts.ClassDeclaration[] = [];
+    for (const f of this.files) {
+      const sf = program.getSourceFile(f);
+      if (!sf || (!isTestPath(atFile) && isTestPath(f))) continue;
+      for (const st of sf.statements) {
+        if (!ts.isClassDeclaration(st) || !st.name) continue;
+        const sym = c2.getSymbolAtLocation(st.name);
+        if (!sym) continue;
+        const names = new Set(
+          c2.getPropertiesOfType(c2.getDeclaredTypeOfSymbol(sym)).map((p) => p.name),
+        );
+        if ([...members].every((m) => names.has(m))) fits.push(st);
+      }
+    }
+    if (!fits.length) return null;
+    const ancestors = (c: ts.ClassDeclaration): ts.ClassDeclaration[] => {
+      const out: ts.ClassDeclaration[] = [];
+      let cur: ts.ClassDeclaration | undefined = c;
+      for (let i = 0; cur && i < 20; i++) {
+        const h = cur.heritageClauses?.find((x) => x.token === ts.SyntaxKind.ExtendsKeyword)
+          ?.types[0];
+        const d = h ? c2.getTypeAtLocation(h.expression).getSymbol()?.declarations?.[0] : undefined;
+        cur = d && ts.isClassDeclaration(d) ? d : undefined;
+        if (cur) out.push(cur);
+      }
+      return out;
+    };
+    const fitNames = new Set(fits.map((c) => `${c.getSourceFile().fileName}#${c.name!.text}`));
+    const top = fits.filter(
+      (c) =>
+        !ancestors(c).some((a) => fitNames.has(`${a.getSourceFile().fileName}#${a.name?.text}`)),
+    );
+    if (top.length !== 1) return null;
+    const decl = top[0];
+    if (decl.getSourceFile().fileName === atFile) return decl.name!.text;
+    let rel = path
+      .relative(path.dirname(atFile), decl.getSourceFile().fileName)
+      .replace(/\.ts$/, ".js");
+    if (!rel.startsWith(".")) rel = `./${rel}`;
+    return this.typeLocal(at.getSourceFile(), rel, decl.name!.text);
   }
 
   /** Fields still declared `unknown`: typed by how the tree uses them (`usageType`). */
