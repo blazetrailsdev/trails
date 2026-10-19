@@ -593,6 +593,69 @@ export class TypePass {
     return n;
   }
 
+  /**
+   * Where an `unknown` value meets a typed slot (TS2322 assigning, TS2345
+   * passing), the value is asserted to the slot's type: `jobData["job_id"] as
+   * string`, the hand port's spelling at the same boundary (activejob core.ts).
+   * Ruby checked nothing there either; the assertion says so where it happens.
+   */
+  assertBoundaries(): number {
+    const program = this.program();
+    const checker = program.getTypeChecker();
+    let n = 0;
+    for (const f of this.files) {
+      const sf = program.getSourceFile(f);
+      if (!sf) continue;
+      const edits: Edit[] = [];
+      for (const d of program.getSemanticDiagnostics(sf)) {
+        if ((d.code !== 2322 && d.code !== 2345) || d.start === undefined) continue;
+        let at: ts.Node | undefined;
+        const find = (node: ts.Node): void => {
+          if (d.start! < node.getStart(sf) || d.start! >= node.getEnd()) return;
+          if (node.getStart(sf) === d.start && ts.isExpression(node) && !at) at = node;
+          ts.forEachChild(node, find);
+        };
+        find(sf);
+        if (!at) continue;
+        // The value and the slot it meets.
+        let value: ts.Expression | undefined;
+        let slot: ts.Type | undefined;
+        const p = at.parent;
+        if (d.code === 2345) {
+          value = at as ts.Expression;
+          slot = checker.getContextualType(value);
+        } else if (
+          ts.isBinaryExpression(p) &&
+          p.left === at &&
+          p.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        ) {
+          value = p.right;
+          slot = checker.getTypeAtLocation(p.left);
+        } else if (ts.isVariableDeclaration(p) && p.name === at && p.initializer) {
+          value = p.initializer;
+          slot = checker.getTypeAtLocation(p.name);
+        } else if (ts.isReturnStatement(p) || ts.isExpression(at)) {
+          value = at as ts.Expression;
+          slot = checker.getContextualType(value);
+        }
+        if (!value || !slot || ts.isSpreadElement(value)) continue;
+        if (!(checker.getTypeAtLocation(value).flags & ts.TypeFlags.Unknown)) continue;
+        const t = this.typeText(checker, slot, value, f);
+        if (!t || t === "unknown") continue;
+        edits.push({
+          pos: value.getStart(sf),
+          end: value.getEnd(),
+          text: `(${value.getText(sf)} as ${t})`,
+        });
+      }
+      const ie = this.importEdit(sf);
+      if (ie) edits.push(ie);
+      applyEdits(f, edits);
+      n += edits.length;
+    }
+    return n;
+  }
+
   run(): Record<string, number> {
     const stats: Record<string, number> = { returns: 0, locals: 0, params: 0, uninferable: 0 };
     stats.returns += this.dropAnyReturns();
@@ -612,6 +675,12 @@ export class TypePass {
     for (let round = 0; round < 4; round++) {
       const k = this.sweepAny();
       stats.swept += k;
+      if (!k) break;
+    }
+    stats.asserted = 0;
+    for (let round = 0; round < 3; round++) {
+      const k = this.assertBoundaries();
+      stats.asserted += k;
       if (!k) break;
     }
     return stats;

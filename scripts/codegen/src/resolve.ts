@@ -9,7 +9,7 @@
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { GEM, ROOT, handNamespaceFqns } from "./gem.js";
+import { GEM, ROOT, handNamespaceFqns, handSeatMembers } from "./gem.js";
 import { TS_CLASS_RENAMES, rubyFileToTs } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES, tsConstantRenameKey } from "./constant-renames.js";
 import type { N, Param } from "./ir.js";
@@ -180,6 +180,28 @@ export class Resolver {
       const ownerScope = this.index.scopes.get(owner);
       // A class's constant, and a module's (a module is a class too, unless the
       // hand port seats it as a namespace object), is a static property.
+      // A constant another file defines, on a module the hand port's seat
+      // declares, is read through the seat at call time (`ActiveJob.Arguments.
+      // OBJECT_SERIALIZER_KEY`, the hand port's object-serializer.ts): no
+      // import edge into that file.
+      if (this.tsFileOf(c.file) !== ctx.f.tsFile && ctx.f.tsFile !== "namespaces.ts") {
+        const i = owner.lastIndexOf("::");
+        const seatName = i > 0 ? handNamespaceFqns().get(owner.slice(0, i)) : undefined;
+        if (
+          seatName &&
+          handSeatMembers()
+            .get(seatName)
+            ?.has(owner.slice(i + 2))
+        ) {
+          const seat = lw.imp(
+            ctx,
+            "@root/namespaces.js",
+            seatName,
+            ctx.f.usedLocalNames.has(seatName) ? `${seatName}Seat` : seatName,
+          );
+          return `${seat}.${owner.slice(i + 2)}.${constName}`;
+        }
+      }
       if (ownerScope?.kind === "class" || this.isClassModule(owner))
         return `${this.fqnRef(owner, ctx, lw)}.${constName}`;
       return this.importFrom(this.tsFileOf(c.file), constName, ctx, lw);
@@ -618,6 +640,15 @@ export class Resolver {
     }
     if (hit) return null;
     const segs = p[0] === "" ? p.slice(1) : p;
+    // Ruby's core Time / Date / DateTime are `@blazetrails/date`'s classes;
+    // activesupport only reopens them (core_ext).
+    const CORE: Record<string, string> = {
+      Time: "@date/time.ts#Time",
+      Date: "@date/date.ts#Date",
+      DateTime: "@date/date.ts#DateTime",
+    };
+    if (segs.length === 1 && CORE[segs[0]] && this.types.cls(CORE[segs[0]]))
+      return { k: "class", key: CORE[segs[0]], static: true };
     const k = this.types.depClass(segs);
     return k ? { k: "class", key: k, static: true } : null;
   }

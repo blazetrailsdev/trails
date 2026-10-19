@@ -1113,7 +1113,7 @@ export class Emitter {
     const twin = isCtor ? undefined : this.handTwin(u, d.name, opts);
     if (twin?.info.async) ctx.defAsync = true;
     if (twin?.info.params) ctx.paramTypes = twin.info.params.map((t) => this.lw.tsType(t, ctx));
-    const ps = this.lw.paramList(params, ctx, false);
+    let ps = this.lw.paramList(params, ctx, false);
     // Seed parameter types from the hand twin's declared parameter types.
     if (twin?.info.params) {
       const positional = params.filter((p) => p.kind === "req" || p.kind === "opt");
@@ -1342,6 +1342,19 @@ export class Emitter {
         `${doc}get ${propKey(tsName)}(): any {\n${indent(body).join("\n")}\n}`,
         `set ${propKey(tsName)}(value: any) {\n  this._${tsName} = value;\n}`,
       ].join("\n\n");
+    // A parameter the body never reads is `_name`, as the hand port writes an
+    // abstract method's (object-serializer.ts `deserialize(_json)`).
+    if (!isCtor) {
+      const text = body.join("\n");
+      for (const p of d.params as Param[]) {
+        if (!p.name || !["req", "opt", "rest", "key"].includes(p.kind) || p.kind === "key")
+          continue;
+        const id = jsIdent(p.name);
+        if (id.startsWith("_") || new RegExp(`\\b${id.replace(/\$/g, "\\$")}\\b`).test(text))
+          continue;
+        ps = ps.replace(new RegExp(`(^|, |\\.\\.\\.)${id}(?=\\??:| =|,|$)`), `$1_${id}`);
+      }
+    }
     const host = opts.module ? this.hostThis(u, f) : "";
     const thisParam = opts.module ? (ps ? `this: ${host}, ` : `this: ${host}`) : "";
     // The hand twin's declared return type where there is one; otherwise none,
@@ -2008,21 +2021,45 @@ export class Emitter {
         isModule: module,
         asyncBox: { awaits: false },
       });
-      ctx.scope.locals.add("args");
-      (ctx.scope.types ??= new Map()).set("args", { k: "array", el: null });
+      // The delegated method's own parameters where the gem defines it once
+      // (`delegate :serialize, to: :instance` takes `serialize(argument)`, the
+      // hand port's object-serializer.ts), else Ruby's `(*args)`.
+      const targetDefs = [...this.index.scopes.values()]
+        .map((sc) => sc.defs.get(m))
+        .filter((d): d is NonNullable<typeof d> => !!d);
+      const own = this.index.scopes.get(u.fqn)?.defs.get(m);
+      const tdef = own ?? (targetDefs.length === 1 ? targetDefs[0] : undefined);
+      const simple =
+        tdef?.params.every((p: Param) => ["req", "opt", "rest"].includes(p.kind) && p.name) ??
+        false;
+      const ps: Param[] = simple ? tdef!.params : [{ kind: "rest", name: "args" } as Param];
+      for (const p of ps) {
+        ctx.scope.locals.add(p.name!);
+        if (p.kind === "rest")
+          (ctx.scope.types ??= new Map()).set(p.name!, { k: "array", el: null });
+      }
       const call: N = {
         k: "call",
         recv: targetIr,
         name: m,
-        args: [{ k: "splat", value: { k: "lvar", name: "args" } }],
+        args: ps.map((p) =>
+          p.kind === "rest"
+            ? { k: "splat", value: { k: "lvar", name: p.name } }
+            : { k: "lvar", name: p.name },
+        ),
         block: null,
         safe: allowNil,
       };
       const e = this.lw.expr(call, ctx);
       const asy = ctx.asyncBox!.awaits ? "async " : "";
-      out.push(
-        `${asy}${nm}(${thisP}...args: any[]): ${asy ? "Promise<any>" : "any"} {\n  return ${e};\n}`,
-      );
+      const list = ps
+        .map((p) =>
+          p.kind === "rest"
+            ? `...${jsIdent(p.name!)}: any[]`
+            : `${jsIdent(p.name!)}${p.kind === "opt" ? "?" : ""}: any`,
+        )
+        .join(", ");
+      out.push(`${asy}${nm}(${thisP}${list}) {\n  return ${e};\n}`);
     }
     return out;
   }

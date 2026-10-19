@@ -80,14 +80,14 @@ describe("lowering active_job/rules.rb", () => {
 
   it("tallies by identity and splats each pair across a two-parameter block", () => {
     expect(rules).toContain(
-      ".map((x: any) => (x.constructor as any)).reduce((h: Map<any, number>, x: any) => h.set(x, (h.get(x) ?? 0) + 1), new Map())",
+      ".map((x: any) => rbObjClass(x)).reduce((h: Map<any, number>, x: any) => h.set(x, (h.get(x) ?? 0) + 1), new Map())",
     );
     expect(rules).toContain("([_klass, count]: any) => -count");
     expect(rules).toContain("counts.map(([klass, count]: any) =>");
   });
 
   it("reads a class_attribute predicate as a getter", () => {
-    expect(rules).toContain("if ((job.constructor as any).isLogArguments) {");
+    expect(rules).toContain("if (rbObjClass(job).isLogArguments) {");
   });
 
   it("dispatches a bare call to the class's own method before Kernel#format", () => {

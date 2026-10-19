@@ -61,6 +61,24 @@ export function handNamespaceFqns(): Map<string, string> {
   return seatFqnsMemo;
 }
 
+let seatMembersMemo: Map<string, Set<string>> | undefined;
+/**
+ * The members each seat's type declares in the hand port's `namespaces.ts`
+ * (`export const ActiveJob = { … } as AutoloadModule & { Arguments: …; … }`),
+ * by export name: a constant reached through the seat must be one of them.
+ */
+export function handSeatMembers(): Map<string, Set<string>> {
+  if (seatMembersMemo) return seatMembersMemo;
+  const f = path.join(PKG_DIR, "src/namespaces.ts");
+  const text = existsSync(f) ? readFileSync(f, "utf8") : "";
+  seatMembersMemo = new Map();
+  for (const m of text.matchAll(
+    /export const ([A-Z]\w*)\s*=\s*\{[^}]*\}\s*as[^{;]*&\s*\{([^}]*)\}/g,
+  ))
+    seatMembersMemo.set(m[1], new Set([...m[2].matchAll(/^\s*([\w$]+)\??:/gm)].map((x) => x[1])));
+  return seatMembersMemo;
+}
+
 let handAutoloadsMemo: Set<string> | undefined;
 /** `Seat.autoload("X")` calls in the hand port's `namespaces.ts`, as `Seat::X`. */
 export function handNamespaceAutoloads(): Set<string> {

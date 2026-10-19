@@ -3006,10 +3006,6 @@ export class Lowerer {
       case "instance_of?":
         if (n.args.length === 1 && n.args[0].k === "const")
           return `(${this.typeTest(n.args[0], R, ctx)})`;
-        // Where Symbols are colon strings, a class known only at run time
-        // (`argument.is_a?(klass)`) may be Symbol: `rbIsA` answers `isSymbol` for it.
-        if (ctx.f.symbolColon && GEM.gem === "activejob" && name !== "instance_of?")
-          return `((x, k) => k === ${rc("rbCSymbol")} ? ${rc("isSymbol")}(x) : k === ${rc("rbCString")} && typeof x === "string" ? !${rc("isSymbol")}(x) : ${rc("rbObjIsKindOf")}(x, k))(${R}, ${argList()})`;
         return `${rc("rbObjIsKindOf")}(${R}, ${argList()})`;
       case "respond_to?":
         // The name asked about is the TS member's (`:permitted?` is `isPermitted`).
@@ -3070,14 +3066,13 @@ export class Lowerer {
             (!recvNode || recvNode.k === "self") && ctx.selfKind === "instance" && ctx.owner
               ? this.resolver.exportNames.get(ctx.owner)
               : undefined;
+          // `self.class` is ruby-compat's `rbObjClass` (the hand port's spelling,
+          // activejob core.ts), typed as the class it is written in.
           if (own && this.index.scopes.get(ctx.owner!)?.kind === "class") {
             const ref = this.resolver.fqnRef(ctx.owner!, ctx, this);
-            return `(${R}.constructor as typeof ${ref})`;
+            return `(${rc("rbObjClass")}(${R}) as unknown as typeof ${ref})`;
           }
-          // In a ported test, `x.class` on any value (`nil.class`) is Ruby's class.
-          if (ctx.f.rubyFile.startsWith("test/") && recvNode && recvNode.k !== "self")
-            return `${rc("rbObjClass")}(${R})`;
-          return `(${R}.constructor as any)`;
+          return `${rc("rbObjClass")}(${R})`;
         }
         break;
       case "freeze":
@@ -3237,6 +3232,9 @@ export class Lowerer {
               `${rc("isSymbol")}(${x}) ? ${rc("symbolToS")}(${x}) : ${rc("rbObjAsString")}(${x})`;
             return v ? `(${body(v)})` : `((v) => ${body("v")})(${R})`;
           }
+          // A value known not to be nil, a String / Number / Boolean, is JS `String(x)`.
+          const t = this.typeOf(recvNode, ctx);
+          if (t?.k === "prim" && t.name !== "null" && !t.nullable) return `String(${r})`;
           return `${rc("rbObjAsString")}(${R})`;
         }
         break;

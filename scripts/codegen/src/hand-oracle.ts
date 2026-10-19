@@ -64,7 +64,7 @@ function main(): void {
   const roots = parsed.fileNames.filter((f) => !/\.test\.ts$|test-helpers\/|\/support\//.test(f));
   // Dependencies the generated code may call that the hand port never imports
   // (`GlobalID::Locator.locate`, async in trails): read their entry points too.
-  for (const dep of ["globalid", "i18n"]) {
+  for (const dep of ["globalid", "i18n", "date"]) {
     const entry = path.join(PKG_DIR, "..", dep, "dist/index.d.ts");
     if (existsSync(entry)) roots.push(entry);
   }
@@ -253,7 +253,7 @@ function main(): void {
   for (const sf of program.getSourceFiles()) {
     const fk = fileKey(sf);
     const ours = sf.fileName.startsWith(SRC + "/");
-    const dep = /packages\/(arel|activemodel|activesupport|ruby-compat|globalid|i18n)\//.test(
+    const dep = /packages\/(arel|activemodel|activesupport|ruby-compat|globalid|i18n|date)\//.test(
       sf.fileName,
     );
     if (!ours && !dep) continue;
