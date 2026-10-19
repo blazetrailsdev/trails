@@ -1,5 +1,5 @@
 import { attrInternal, delegate } from "@blazetrails/activesupport";
-import { basicObjRespondTo, rbObjRespondTo, Module } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export interface ControllerHelperHost {
   _controller: ControllerLike | null;
@@ -61,25 +61,23 @@ export function isRespondTo(
   return basicObjRespondTo(this, methodName, !includePrivate);
 }
 
-export const ControllerHelper = new Module((mod) => {
-  mod.moduleEval((m) => attrInternal.call(m, "controller", "request"));
+export class ControllerHelper {}
 
-  delegate.call(
-    mod,
-    "requestForgeryProtectionToken",
-    "params",
-    "session",
-    "cookies",
-    "response",
-    "headers",
-    "flash",
-    "actionName",
-    "controllerName",
-    "controllerPath",
-    { to: "controller" },
-  );
+attrInternal.call(ControllerHelper.prototype, "controller", "request");
 
-  mod.moduleEval((m) => {
-    Object.assign(m, { assignController, logger, isRespondTo });
-  });
-});
+delegate.call(
+  ControllerHelper.prototype,
+  "requestForgeryProtectionToken",
+  "params",
+  "session",
+  "cookies",
+  "response",
+  "headers",
+  "flash",
+  "actionName",
+  "controllerName",
+  "controllerPath",
+  { to: "controller" },
+);
+
+Object.assign(ControllerHelper.prototype, { assignController, logger, isRespondTo });

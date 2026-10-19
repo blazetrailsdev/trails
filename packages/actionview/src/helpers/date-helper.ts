@@ -11,7 +11,6 @@ import {
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import {
   ArgumentError,
-  Module,
   StandardError,
   format,
   hashDelete,
@@ -240,28 +239,24 @@ export function timeTag(
   );
 }
 
-export const DateHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      distanceOfTimeInWords,
-      distanceOfTimeInWordsToNow,
-      timeAgoInWords,
-      dateSelect,
-      timeSelect,
-      datetimeSelect,
-      selectDatetime,
-      selectDate,
-      selectTime,
-      selectSecond,
-      selectMinute,
-      selectHour,
-      selectDay,
-      selectMonth,
-      selectYear,
-      timeTag,
-    });
-  });
-});
+export const DateHelper = {
+  distanceOfTimeInWords,
+  distanceOfTimeInWordsToNow,
+  timeAgoInWords,
+  dateSelect,
+  timeSelect,
+  datetimeSelect,
+  selectDatetime,
+  selectDate,
+  selectTime,
+  selectSecond,
+  selectMinute,
+  selectHour,
+  selectDay,
+  selectMonth,
+  selectYear,
+  timeTag,
+};
 
 type DateType = "year" | "month" | "day" | "hour" | "minute" | "second";
 

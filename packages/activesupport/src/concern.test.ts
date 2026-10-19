@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { Module, extend, include } from "@blazetrails/ruby-compat";
+import { extend, include } from "@blazetrails/ruby-compat";
 import { includedModules, prepend } from "@blazetrails/ruby-compat/include";
 import { Concern, MultipleIncludedBlocks, MultiplePrependBlocks } from "./concern.js";
 import {
@@ -10,7 +10,7 @@ import {
 } from "./testing/assertions.js";
 
 function newConcern(): any {
-  const mod = new Module();
+  const mod = {};
   extend(mod, Concern);
   return mod;
 }
@@ -49,9 +49,9 @@ Baz.included(null, function (this: any) {
 Baz.prepended(null, function (this: any) {
   this.prependedRan = true;
 });
-Baz.defineMethod("baz", function () {
+Baz.baz = function () {
   return "baz";
-});
+};
 
 const Bar = newConcern();
 include(Bar, Baz);
@@ -60,12 +60,12 @@ Bar.ClassMethods = {
     return "bar's baz + " + Baz.ClassMethods.baz.call(this);
   },
 };
-Bar.defineMethod("bar", function () {
+Bar.bar = function () {
   return "bar";
-});
-Bar.defineMethod("baz", function (this: any) {
-  return "bar+" + Baz.instanceMethod("baz").value.call(this);
-});
+};
+Bar.baz = function (this: any) {
+  return "bar+" + Baz.baz.call(this);
+};
 
 const Foo = newConcern();
 include(Foo, Bar);
@@ -195,21 +195,21 @@ describe("ConcernTest", () => {
     klass = class {
       "@foo": unknown[] = [];
     };
-    includedMod.defineMethod("foo", function (this: any) {
+    includedMod.foo = function (this: any) {
       this["@foo"].push("included");
       return this["@foo"];
-    });
+    };
     const classFoo = function (this: any) {
-      includedMod.instanceMethod("foo").value.call(this);
+      includedMod.foo.call(this);
       this["@foo"].push("class");
       return this["@foo"];
     };
     klass.prototype.foo = classFoo;
-    prependedMod.defineMethod("foo", function (this: any) {
+    prependedMod.foo = function (this: any) {
       classFoo.call(this);
       this["@foo"].push("prepended");
       return this["@foo"];
-    });
+    };
 
     include(klass, includedMod);
     prepend(klass, prependedMod);

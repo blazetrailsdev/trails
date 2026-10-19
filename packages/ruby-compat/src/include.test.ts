@@ -36,6 +36,8 @@ import {
   defineModule,
   moduleVisibility,
   publicInstanceMethods,
+  rbModAppendFeatures,
+  rbModPrependFeatures,
   type ModuleVisibility,
   type Included,
   type Initialized,
@@ -2075,5 +2077,103 @@ describe("extend on an object", () => {
     class K {}
     Object.freeze(K);
     expect(() => extend(K, Mod)).toThrow(/^can't modify frozen Class: /);
+  });
+});
+
+describe("rbModAppendFeatures on a plain-object module", () => {
+  it("copies enumerable members and skips singleton methods extend installed", () => {
+    const mod = { greet: () => "hi" };
+    extend(mod, { helper: () => "singleton" });
+    class Host {}
+    rbModAppendFeatures(Host, mod);
+    expect((new Host() as unknown as DynMethods).greet()).toBe("hi");
+    expect("helper" in Host.prototype).toBe(false);
+    expect(isModuleIncluded(Host, mod)).toBe(true);
+  });
+
+  it("appends the modules a plain module included first, so its own methods win", () => {
+    const inner = { who: () => "inner", innerOnly: () => "inner only" };
+    const outer = { who: () => "outer" };
+    include(outer, inner);
+    class Host {}
+    include(Host, outer);
+    const host = new Host() as unknown as DynMethods;
+    expect(host.who()).toBe("outer");
+    expect(host.innerOnly()).toBe("inner only");
+    expect(isModuleIncluded(Host, inner)).toBe(true);
+  });
+
+  it("records an include into a plain module without copying onto it", () => {
+    const inner = { who: () => "inner" };
+    const outer = {};
+    include(outer, inner);
+    expect("who" in outer).toBe(false);
+  });
+
+  it("appends a plain module through Module#include, following its record", () => {
+    const inner = { innerOnly: () => "inner only" };
+    const outer = { who: () => "outer" };
+    include(outer, inner);
+    const mod = new Module();
+    mod.include(outer);
+    class Host {}
+    include(Host, mod);
+    const host = new Host() as unknown as DynMethods;
+    expect(host.who()).toBe("outer");
+    expect(host.innerOnly()).toBe("inner only");
+  });
+});
+
+describe("rbModPrependFeatures on a plain-object module", () => {
+  it("prepends enumerable members only", () => {
+    const mod = { greet: () => "mod" };
+    extend(mod, { helper: () => "singleton" });
+    class Host {
+      greet() {
+        return "host";
+      }
+    }
+    rbModPrependFeatures(Host, mod);
+    expect(new Host().greet()).toBe("mod");
+    expect("helper" in Host.prototype).toBe(false);
+  });
+});
+
+describe("include with a plain-object or class module's own hooks", () => {
+  it("calls a plain module's non-enumerable appendFeatures and included", () => {
+    const calls: string[] = [];
+    const mod = { greet: () => "hi" };
+    extend(mod, {
+      appendFeatures(this: object, base: new () => unknown) {
+        calls.push("appendFeatures");
+        rbModAppendFeatures(base, this);
+      },
+      included: () => calls.push("included"),
+    });
+    class Host {}
+    include(Host, mod);
+    expect(calls).toEqual(["appendFeatures", "included"]);
+    expect((new Host() as unknown as DynMethods).greet()).toBe("hi");
+  });
+
+  it("does not treat an enumerable member named included as a hook", () => {
+    const calls: string[] = [];
+    const mod = { included: () => calls.push("included") };
+    include(class {}, mod);
+    expect(calls).toEqual([]);
+  });
+
+  it("calls a class module's static hook that extend installed", () => {
+    const calls: string[] = [];
+    class Mod {
+      greet() {
+        return "hi";
+      }
+    }
+    extend(Mod, { included: () => calls.push("included") });
+    class Host {}
+    include(Host, Mod);
+    expect(calls).toEqual(["included"]);
+    expect((new Host() as unknown as Mod).greet()).toBe("hi");
   });
 });

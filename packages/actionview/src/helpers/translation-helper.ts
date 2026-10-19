@@ -10,12 +10,12 @@ import {
   titleize,
 } from "@blazetrails/activesupport";
 import {
-  Module,
   RuntimeError,
   hashDelete,
   isSymbol,
   rbInspect,
   symbolToS,
+  include,
 } from "@blazetrails/ruby-compat";
 import { ActionView } from "../namespaces.js";
 import { contentTag, TagHelper, type TagHelperHost } from "./tag-helper.js";
@@ -159,23 +159,20 @@ function missingTranslation(
   }
 }
 
-export const TranslationHelper = new Module((mod) => {
-  extend(mod, Concern);
-
-  mod.include(TagHelper);
-
-  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
-    null,
-    function () {
-      mattrAccessor.call(this, "debugMissingTranslation", { default: true });
-    },
-  );
-
-  mod.moduleEval((m) => {
-    Object.assign(m, { translate, t, localize, l });
-  });
-}) as Module & {
+export const TranslationHelper = { translate, t, localize, l } as {
+  translate: typeof translate;
+  t: typeof t;
+  localize: typeof localize;
+  l: typeof l;
   raiseOnMissingTranslations: typeof raiseOnMissingTranslations;
   setRaiseOnMissingTranslations: typeof setRaiseOnMissingTranslations;
 };
-Object.assign(TranslationHelper, { raiseOnMissingTranslations, setRaiseOnMissingTranslations });
+
+extend(TranslationHelper, Concern);
+include(TranslationHelper, TagHelper);
+extend(TranslationHelper, { raiseOnMissingTranslations, setRaiseOnMissingTranslations });
+(
+  TranslationHelper as unknown as { included(base: null, block: (this: object) => void): void }
+).included(null, function () {
+  mattrAccessor.call(this, "debugMissingTranslation", { default: true });
+});

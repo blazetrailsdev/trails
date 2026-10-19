@@ -16,13 +16,13 @@ import {
 import {
   ArgumentError,
   Hash,
-  Module,
   type Range,
   except,
   fetch,
   hashDelete,
   rbObjRespondTo,
   update,
+  include,
 } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
@@ -632,28 +632,51 @@ export function convertDirectUploadOptionToUrl(
   return options;
 }
 
-export const FormTagHelper = new Module((mod) => {
-  extend(mod, Concern);
+export const FormTagHelper = {
+  formTag,
+  fieldId,
+  fieldName,
+  selectTag,
+  textFieldTag,
+  labelTag,
+  hiddenFieldTag,
+  fileFieldTag,
+  passwordFieldTag,
+  textareaTag,
+  textAreaTag,
+  checkboxTag,
+  checkBoxTag,
+  radioButtonTag,
+  submitTag,
+  buttonTag,
+  imageSubmitTag,
+  fieldSetTag,
+  fieldsetTag,
+  colorFieldTag,
+  searchFieldTag,
+  telephoneFieldTag,
+  phoneFieldTag,
+  dateFieldTag,
+  timeFieldTag,
+  datetimeFieldTag,
+  datetimeLocalFieldTag,
+  monthFieldTag,
+  weekFieldTag,
+  urlFieldTag,
+  emailFieldTag,
+  numberFieldTag,
+  rangeFieldTag,
+  utf8EnforcerTag,
+  htmlOptionsForForm,
+  extraTagsForForm,
+  formTagHtml,
+  formTagWithBody,
+  sanitizeToId,
+  setDefaultDisableWith,
+  convertDirectUploadOptionToUrl,
+};
 
-  mod.include(UrlHelper);
-  mod.include(TextHelper);
-  mod.include(ContentExfiltrationPreventionHelper);
-
-  mod.moduleEval((m) => {
-    Object.assign(m, { formTag, fieldId, fieldName, selectTag, textFieldTag, labelTag });
-    Object.assign(m, { hiddenFieldTag, fileFieldTag, passwordFieldTag, textareaTag, textAreaTag });
-    Object.assign(m, { checkboxTag, checkBoxTag, radioButtonTag, submitTag, buttonTag });
-    Object.assign(m, { imageSubmitTag, fieldSetTag, fieldsetTag, colorFieldTag, searchFieldTag });
-    Object.assign(m, { telephoneFieldTag, phoneFieldTag, dateFieldTag, timeFieldTag });
-    Object.assign(m, { datetimeFieldTag, datetimeLocalFieldTag, monthFieldTag, weekFieldTag });
-    Object.assign(m, {
-      urlFieldTag,
-      emailFieldTag,
-      numberFieldTag,
-      rangeFieldTag,
-      utf8EnforcerTag,
-    });
-    Object.assign(m, { htmlOptionsForForm, extraTagsForForm, formTagHtml, formTagWithBody });
-    Object.assign(m, { sanitizeToId, setDefaultDisableWith, convertDirectUploadOptionToUrl });
-  });
-});
+extend(FormTagHelper, Concern);
+include(FormTagHelper, UrlHelper);
+include(FormTagHelper, TextHelper);
+include(FormTagHelper, ContentExfiltrationPreventionHelper);

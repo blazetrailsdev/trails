@@ -1,6 +1,5 @@
 import { SafeBuffer, htmlEscape, isPresent, presence } from "@blazetrails/activesupport";
 
-import { Module } from "@blazetrails/ruby-compat";
 import { OutputBuffer } from "../buffers.js";
 import { OutputFlow } from "../flows.js";
 
@@ -104,8 +103,10 @@ export function withOutputBuffer(
   }
 }
 
-export const CaptureHelper = new Module((mod) => {
-  mod.moduleEval((m) => {
-    Object.assign(m, { capture, contentFor, provide, isContentFor, withOutputBuffer });
-  });
-});
+export const CaptureHelper = {
+  capture,
+  contentFor,
+  provide,
+  isContentFor,
+  withOutputBuffer,
+};

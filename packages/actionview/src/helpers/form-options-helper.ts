@@ -14,7 +14,6 @@ import {
   fetch,
   first,
   last,
-  Module,
   rbModDefineMethod,
   rbFPublicSend,
   rbEql,
@@ -22,6 +21,7 @@ import {
   rbObjAsString,
   rbObjRespondTo,
   rtest,
+  include,
 } from "@blazetrails/ruby-compat";
 
 import { contentTag, tagBuilder, type TagHelperHost } from "./tag-helper.js";
@@ -402,20 +402,31 @@ export function promptText(prompt: unknown): unknown {
     : I18n.translate("helpers.select.prompt", { default: "Please select" });
 }
 
-export const FormOptionsHelper = new Module((mod) => {
-  mod.include(TextHelper);
+export const FormOptionsHelper = {
+  select,
+  collectionSelect,
+  groupedCollectionSelect,
+  timeZoneSelect,
+  weekdaySelect,
+  optionsForSelect,
+  optionsFromCollectionForSelect,
+  optionGroupsFromCollectionForSelect,
+  groupedOptionsForSelect,
+  timeZoneOptionsForSelect,
+  weekdayOptionsForSelect,
+  optionHtmlAttributes,
+  optionTextAndValue,
+  isOptionValueSelected,
+  extractSelectedAndDisabled,
+  extractValuesFromCollection,
+  collectionRadioButtons,
+  collectionCheckboxes,
+  collectionCheckBoxes,
+  valueForCollection,
+  promptText,
+};
 
-  mod.moduleEval((m) => {
-    Object.assign(m, { select, collectionSelect, groupedCollectionSelect, timeZoneSelect });
-    Object.assign(m, { weekdaySelect, optionsForSelect, optionsFromCollectionForSelect });
-    Object.assign(m, { optionGroupsFromCollectionForSelect, groupedOptionsForSelect });
-    Object.assign(m, { timeZoneOptionsForSelect, weekdayOptionsForSelect });
-    Object.assign(m, { optionHtmlAttributes, optionTextAndValue, isOptionValueSelected });
-    Object.assign(m, { extractSelectedAndDisabled, extractValuesFromCollection });
-    Object.assign(m, { collectionRadioButtons, collectionCheckboxes, collectionCheckBoxes });
-    Object.assign(m, { valueForCollection, promptText });
-  });
-});
+include(FormOptionsHelper, TextHelper);
 
 declare module "./form-helper.js" {
   interface FormBuilder {

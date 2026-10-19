@@ -1,6 +1,5 @@
 import { Concern, SafeBuffer, extend, htmlSafe, mattrAccessor } from "@blazetrails/activesupport";
 import { HTML4 } from "@blazetrails/html-sanitizer";
-import { Module } from "@blazetrails/ruby-compat";
 
 export interface Sanitizer {
   sanitize(
@@ -116,13 +115,11 @@ export const ClassMethods = {
   },
 };
 
-export const SanitizeHelper = new Module((mod) => {
-  extend(mod, Concern);
+export class SanitizeHelper {
+  static ClassMethods = ClassMethods;
+  declare static sanitizerVendor: SanitizerVendor;
+}
 
-  mod.moduleEval((m) => {
-    Object.assign(m, { sanitize, sanitizeCss, stripTags, stripLinks });
-  });
-
-  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
-}) as Module & { sanitizerVendor: SanitizerVendor };
 mattrAccessor.call(SanitizeHelper, "sanitizerVendor", { default: HTML4.Sanitizer });
+extend(SanitizeHelper, Concern);
+Object.assign(SanitizeHelper.prototype, { sanitize, sanitizeCss, stripTags, stripLinks });
