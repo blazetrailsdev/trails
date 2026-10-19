@@ -128,9 +128,6 @@ function isReceiverExpect(call: ts.CallExpression): boolean {
  */
 function isTestObject(owner: ts.Expression): boolean {
   if (ts.isCallExpression(owner)) owner = owner.arguments.length === 0 ? owner.expression : owner;
-  // A session the test opens answers its assertions too, and bumps the root's
-  // count (`@test.open_session.assert(true)`,
-  // `actionpack/test/controller/integration_test.rb:142-148`).
   if (ts.isPropertyAccessExpression(owner) && owner.name.text === "openSession") {
     owner = owner.expression;
   }
