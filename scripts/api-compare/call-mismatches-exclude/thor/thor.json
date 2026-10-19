@@ -1,0 +1,9 @@
+[
+  {
+    "package": "thor",
+    "tsFile": "thor.ts",
+    "rubyName": "initialize",
+    "call": "order:isStopOnUnknownOption,merge",
+    "reason": "Base#initialize's parse_options.merge(command_options) is a plain-object spread per CLAUDE.md's Hash table, so the comparer pairs Ruby's first merge with the later config.classOptions.merge."
+  }
+]

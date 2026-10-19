@@ -28,7 +28,10 @@ export class ScaffoldGenerator extends Base {
 
   declare options: GeneratorOptions & ModelHelpersOptions & { modelName?: string };
 
-  /** @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26 */
+  /**
+   * @inlinedFrom Rails::Generators::ModelHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/model_helpers.rb:26-45
+   * @inlinedFrom Rails::Generators::ResourceHelpers#initialize rails/v8.0.2/railties/lib/rails/generators/resource_helpers.rb:17-26
+   */
   constructor(options: ConstructorParameters<typeof Base>[0]) {
     super(options);
     const controllerName = this.name;

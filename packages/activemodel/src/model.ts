@@ -9,7 +9,7 @@ import {
   type Included,
   type Extended,
 } from "@blazetrails/activesupport";
-import { rbObjDup, type Hash } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, rbObjDup, type Hash } from "@blazetrails/ruby-compat";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
@@ -22,6 +22,8 @@ import type { ClassMethods as ConversionClassMethods } from "./conversion.js";
 import { Access } from "./access.js";
 import { Naming } from "./naming.js";
 import { API } from "./api.js";
+import { Attributes } from "./attributes.js";
+import type { AttributeSet } from "./attribute-set.js";
 
 type ValidatorLike = ValidatorBase | EachValidator | { validate(record: ValidatableRecord): void };
 
@@ -106,9 +108,6 @@ export class Model {
   declare errors: Errors<this>;
 
   /** @internal */
-  declare _initializingAttributes: boolean;
-
-  /** @internal */
   declare static predicateForValidationContext: Extended<
     typeof ValidationsClassMethods
   >["predicateForValidationContext"];
@@ -119,23 +118,16 @@ export class Model {
   /** @internal */
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
-  /** @missingRailsCall assign_attributes — CONVERGEABLE activemodel-api-initialize-concern-constructor */
-  constructor(attributes: Record<string, unknown> | Map<string, unknown> = {}) {
-    const ctor = this.constructor as typeof Model;
-
-    Object.defineProperty(this, "_initializingAttributes", {
-      value: false,
-      writable: true,
-      configurable: true,
-      enumerable: false,
-    });
-
-    this._initializingAttributes = true;
-    try {
-      this.initialize(attributes);
-    } finally {
-      this._initializingAttributes = false;
+  constructor(attributes: Record<string, unknown> | Map<string, unknown> | null = {}) {
+    if (isModuleIncluded(new.target, Attributes)) {
+      (this as unknown as { _attributes: AttributeSet })._attributes = (
+        new.target as unknown as { _defaultAttributes(): AttributeSet }
+      )
+        ._defaultAttributes()
+        .deepDup();
     }
+
+    if (attributes != null) this.assignAttributes(attributes);
   }
 
   /** @internal */

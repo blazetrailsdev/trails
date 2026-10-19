@@ -1,5 +1,4 @@
-import { extend, include, included, initializeIncludedModules } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
+import { extend, include, included } from "@blazetrails/activesupport";
 import {
   assignAttributes,
   setAttributes,
@@ -18,22 +17,9 @@ import { Translation } from "./translation.js";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
 type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 
-export function initialize(
-  this: APIHost,
-  attributes: Record<string, unknown> | Map<string, unknown> = {},
-): void {
-  if (attributes != null) this.assignAttributes(attributes);
-
-  initializeIncludedModules(this);
-}
-
-const SuperMethods = new Module((mod) => mod.defineMethod("initialize", initialize));
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
 export class API {
   static [included](base: IncludingClass): void {
-    include(base, SuperMethods);
-
     include(base, {
       assignAttributes,
       setAttributes,
@@ -59,8 +45,6 @@ export class API {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
 export interface API extends Conversion {
-  /** @internal */
-  initialize(attributes?: Record<string, unknown> | Map<string, unknown>): void;
   assignAttributes(newAttributes: unknown): void;
   setAttributes(newAttributes: unknown): Promise<void> | void;
   attributeWriterMissing(name: string, value: unknown): void;
@@ -108,8 +92,4 @@ export interface API extends Conversion {
   validatesAcceptanceOf(...attrNames: AttrNameArg[]): Promise<void>;
   validatesConfirmationOf(...attrNames: AttrNameArg[]): Promise<void>;
   validatesComparisonOf(...attrNames: AttrNameArg[]): Promise<void>;
-}
-
-interface APIHost {
-  assignAttributes(newAttributes: unknown): void;
 }

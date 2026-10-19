@@ -92,9 +92,9 @@ describe("a tagged constructor's Rails call set", () => {
     expect(inlinedRubyBody(segments).calls).toEqual([
       "init_internals",
       "initialize_internals_callback",
-      "run_callbacks",
       "assign_attributes",
       "super",
+      "run_callbacks",
     ]);
     expect(inlinedRubyCallArgs(segments).map((s) => s.name)).toEqual([
       "init_internals",
@@ -102,6 +102,20 @@ describe("a tagged constructor's Rails call set", () => {
       "run_callbacks",
       "assign_attributes",
       "super",
+    ]);
+  });
+
+  it("orders a super-first module's calls after the module its super reaches", () => {
+    const model = of("Rails::Generators::ModelHelpers", body(["super", "plural_model_name?"]));
+    const resource = of(
+      "Rails::Generators::ResourceHelpers",
+      body(["super", "assign_controller_names!"]),
+    );
+    const segments = inlinedSegments(undefined, none, [], [model, resource]);
+    expect(inlinedRubyBody(segments).calls).toEqual([
+      "super",
+      "assign_controller_names!",
+      "plural_model_name?",
     ]);
   });
 

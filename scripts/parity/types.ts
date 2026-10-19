@@ -452,6 +452,18 @@ export interface ClassInfo {
    * above lose how the statements interleave. Absent when there are none.
    */
   mixinOrder?: { kind: "include" | "prepend" | "extend"; names: string[] }[];
+  /**
+   * Ruby-side only: the `include` / `prepend` statements a module's
+   * `self.included(base)` runs on `base` (`thor/base.rb:116-121`). Kept apart
+   * from `includes` so no method is credited through them.
+   */
+  includedHookMixins?: { kind: "include" | "prepend"; names: string[] }[];
+  /**
+   * Ruby-side only: the `Const.include` / `Const.prepend` statements an
+   * `on_load` block runs on this entity at boot (`actionview/railtie.rb:98-102`).
+   * Kept apart from `includes` so no method is credited through them.
+   */
+  bootMixins?: { kind: "include" | "prepend"; names: string[] }[];
   extends: string[];
   /**
    * TS-side only: for each `include()`/`extend()` edge recorded on `extends` by

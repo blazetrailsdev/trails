@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, SubclassNotFound, UnknownPrimaryKey, registerModel } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
-import { include, initialize } from "@blazetrails/activesupport";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { loadSchema } from "./model-schema.js";
 import { Firm } from "./test-helpers/models/company.js";
@@ -422,25 +421,5 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     await dev.updateColumn("name", "name");
     await dev.reload();
     expect("name" in dev).toBe(true);
-  });
-});
-
-describe("ActiveRecord::Base#initialize seats included modules", () => {
-  it("runs an included module's initialize at the core.rb:477 super", () => {
-    class Topic extends Base {
-      static {
-        this._tableName = "topics";
-        this.attribute("id", "integer");
-      }
-    }
-    include(Topic, {
-      [initialize](this: Record<string, unknown>) {
-        this.dbRuntime = null;
-      },
-    });
-
-    const topic = new Topic();
-    expect(Object.hasOwn(topic, "dbRuntime")).toBe(true);
-    expect((topic as unknown as Record<string, unknown>).dbRuntime).toBe(null);
   });
 });

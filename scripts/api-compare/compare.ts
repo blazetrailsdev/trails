@@ -197,6 +197,7 @@ import {
   inlinedMethodSegments,
   portsSiblingClass,
   isInitializeLessTaggedClass,
+  inheritedModules,
   moduleAncestors,
   sameFileInitializeModules,
   taggedBodies,
@@ -5644,11 +5645,26 @@ export function main() {
           (rubyPkg.modules[fqn] as unknown as ClassInfo | undefined)?.instanceMethods.find(
             (m) => m.name === "initialize",
           );
+        const resolve = (incName: string, contextFqn: string) =>
+          resolveModuleName(incName, contextFqn, moduleFqnByShort);
+        const classFqnByShort = new Map<string, string[]>();
+        for (const fqn of Object.keys(rubyPkg.classes)) {
+          const short = fqn.split("::").pop()!;
+          classFqnByShort.set(short, [...(classFqnByShort.get(short) ?? []), fqn]);
+        }
         const ancestors = moduleAncestors(
           klass,
           rubyModule,
           rubyPkg.modules,
-          (incName, contextFqn) => resolveModuleName(incName, contextFqn, moduleFqnByShort),
+          resolve,
+          inheritedModules(
+            klass,
+            rubyModule,
+            rubyPkg.classes,
+            rubyPkg.modules,
+            resolve,
+            (name, ctx) => resolveModuleName(name, ctx, classFqnByShort),
+          ),
         );
         const sameFile = sameFileInitializeModules(klass, ancestors, rubyPkg.modules);
         const byOwner = tsInlinedFromByFileOwner.get(tsFile);

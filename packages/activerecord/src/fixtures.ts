@@ -404,6 +404,7 @@ export class Fixture {
   modelClass!: BaseClass | null;
   fixture!: FixtureAttrs;
 
+  /** @inlinedFrom ActiveRecord::Encryption::EncryptedFixtures#initialize rails/v8.0.2/activerecord/lib/active_record/encryption/encrypted_fixtures.rb:6-11 */
   constructor(fixture: FixtureAttrs, modelClass: BaseClass | null) {
     if (isModuleIncluded(new.target, Encryption.EncryptedFixtures)) {
       const encrypted = this as unknown as EncryptedFixtureHost;

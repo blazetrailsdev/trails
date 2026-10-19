@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect } from "vitest";
-import { include, initialize } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 
 import { isModuleIncluded } from "@blazetrails/ruby-compat";
 
@@ -18,23 +18,6 @@ import { Template } from "./template.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
-
-type DynProps = Record<string, unknown>;
-
-describe("ActionView::Base#initialize seats included modules", () => {
-  it("runs an included module's initialize at the base.rb:255 super", () => {
-    const View = Base.withEmptyTemplateCache();
-    include(View, {
-      [initialize](this: DynProps) {
-        this.dbRuntime = null;
-      },
-    });
-
-    const view = new View(null, {}, null);
-    expect(Object.hasOwn(view, "dbRuntime")).toBe(true);
-    expect((view as unknown as DynProps).dbRuntime).toBe(null);
-  });
-});
 
 describe("ActionView::Base include Helpers, Context (base.rb:158)", () => {
   it("includes the helper modules as live modules, with their own includes", () => {
