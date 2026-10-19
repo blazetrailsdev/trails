@@ -157,7 +157,7 @@ export class Association {
             this._recordsByOwner!.set(owner, entries);
           }
 
-          if (this.reflection.isCollection?.() || entries.length === 0) {
+          if (this.reflection.isCollection() || entries.length === 0) {
             entries.push(record);
             assignments = true;
           }
@@ -171,7 +171,7 @@ export class Association {
     if (!unscopedRecords || unscopedRecords.length === 0) return;
     if (!this.reflectionScope.isEmptyScope) return;
     if (this.preloadScope && !this.preloadScope.isEmptyScope) return;
-    if (this.reflection.isCollection?.()) return;
+    if (this.reflection.isCollection()) return;
 
     const associationKeyName = this.associationKeyName as string;
     for (const record of unscopedRecords.filter((r) =>
@@ -253,9 +253,9 @@ export class Association {
     let scope = this.klass.scopeForAssociation();
 
     const type = this.reflection.type;
-    if (type && !this.reflection.isThroughReflection?.()) {
+    if (type && !this.reflection.isThroughReflection()) {
       scope = scope.where({
-        [type]: this.model?.polymorphicName?.() ?? this.model?.name,
+        [type]: this.model!.polymorphicName(),
       });
     }
 

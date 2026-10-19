@@ -287,9 +287,9 @@ function throughScopeAttributes(this: HasManyThroughAssociation): Record<string,
   if (!throughName) return {};
   const throughAssoc = this.owner.association(throughName);
   if (!throughAssoc) return {};
-  const scope: any = this.throughScope() ?? this.scope() ?? throughAssoc.scope?.();
+  const scope: any = this.throughScope() ?? this.scope();
   if (!scope || typeof scope.whereValuesHash !== "function") return {};
-  const throughTable = throughAssoc.klass?.tableName ?? "";
+  const throughTable = throughAssoc.reflection.klass.tableName;
   const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
   const throughFk = throughAssoc.reflection?.options?.foreignKey ?? "";
   const inheritanceCol = throughAssoc.klass?.inheritanceColumn ?? "type";
@@ -322,7 +322,7 @@ function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation)
   if (!throughRefl) return false;
   const throughAssoc = assoc.owner.association(throughRefl);
   if (!throughAssoc) return false;
-  const fk = throughAssoc.reflection?.foreignKey();
+  const fk = throughAssoc.reflection.foreignKey();
   if (!fk) return true;
   return !!assoc.owner.readAttribute(fk as string);
 }
