@@ -6,6 +6,7 @@ import {
   assertEqual,
   assertNil,
   assertNotEqual,
+  assertOperator,
   assertRespondTo,
   camelize,
 } from "@blazetrails/activesupport";
@@ -255,8 +256,8 @@ describe("MimeTypeTest", () => {
   });
 
   it("type should be equal to symbol", () => {
-    expect(Mime.get(":html")!.equals("application/xhtml+xml")).toBe(true);
-    expect(Mime.get(":html")!.equals(":html")).toBe(true);
+    assertOperator(Mime.get(":html"), "==", "application/xhtml+xml");
+    assertOperator(Mime.get(":html"), "==", ":html");
   });
 
   it("type convenience methods", () => {
