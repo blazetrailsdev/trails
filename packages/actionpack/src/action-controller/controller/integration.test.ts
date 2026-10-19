@@ -5,6 +5,7 @@ import {
   assert,
   assertIncludes,
   assertInstanceOf,
+  assertKindOf,
   assertNot,
   assertNotIncludes,
   include,
@@ -417,7 +418,7 @@ describe("IntegrationProcessTest", () => {
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("OK");
       expect(t.response.body).toBe("OK");
-      expect(t.htmlDocument).toBeInstanceOf(HTML5.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
     });
   });
@@ -451,7 +452,7 @@ describe("IntegrationProcessTest", () => {
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("Created");
       expect(t.response.body).toBe("Created");
-      expect(t.htmlDocument).toBeInstanceOf(HTML5.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
     });
   });
@@ -518,7 +519,7 @@ describe("IntegrationProcessTest", () => {
       assertResponse("redirect");
       assertResponse("found");
       expect(t.response.body).toBe("");
-      expect(t.htmlDocument).toBeInstanceOf(HTML5.Document);
+      assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
 
       await t.followRedirectBang();
