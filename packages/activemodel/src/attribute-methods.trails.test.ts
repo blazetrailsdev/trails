@@ -201,7 +201,10 @@ describe("AttributeMethodsTest (trails)", () => {
     interface Person extends Attributes {}
 
     expect(seen).toEqual(["name"]);
-    expect(Object.getOwnPropertyDescriptor(Person.prototype, "name")).toBeUndefined();
+    const generated = (
+      Person as unknown as { generatedAttributeMethods(): object }
+    ).generatedAttributeMethods();
+    expect(Object.hasOwn(generated, "name")).toBe(true);
     const person = new Person({ name: "Alexander" });
     expect(person.name).toBe("Alexander");
     person.name = "Bob";

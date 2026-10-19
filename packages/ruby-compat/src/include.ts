@@ -726,7 +726,7 @@ export class Module<I extends object = Record<never, never>> {
 function appendPlainFeatures(base: Module, mod: ModuleObject): void {
   const carrier = carrierOf(base);
   if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
-    if (typeof mod !== "function" && Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
+    if (Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
       for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
         base.include(nested);
       }
@@ -1025,6 +1025,7 @@ const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
 const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
 const moduleIncludesKey = Symbol.for("@blazetrails/ruby-compat:moduleIncludes");
+const moduleSubclassesKey = Symbol.for("@blazetrails/ruby-compat:moduleSubclasses");
 const extendedOwners = new WeakMap<object, Map<string, object>>();
 
 const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
@@ -1457,7 +1458,10 @@ export function publicInstanceMethods(
   mod: ModuleObject | AnyClass | Module,
   includeSuper = true,
 ): string[] {
-  if (mod instanceof Module) return Object.getOwnPropertyNames(carrierOf(mod));
+  if (mod instanceof Module) {
+    const carrier = carrierOf(mod);
+    return Object.getOwnPropertyNames(carrier).filter((name) => !isUndefEntry(carrier, name));
+  }
   if (typeof mod === "function") {
     const names = new Set<string>();
     let proto: object | null = (mod as AnyClass).prototype as object;
@@ -1500,6 +1504,13 @@ function isClass(klass: object): klass is AnyClass {
   return typeof klass === "function";
 }
 
+/** @noRailsEquivalent PERMANENT */
+export const classModule = Symbol.for("@blazetrails/ruby-compat:classModule");
+
+function isClassReceiver(klass: object): klass is AnyClass {
+  return isClass(klass) && !Object.prototype.hasOwnProperty.call(klass, classModule);
+}
+
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
   if (!(mod instanceof Module)) {
     if (mod === null || (typeof mod !== "object" && typeof mod !== "function")) return undefined;
@@ -1531,7 +1542,7 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     }
     return;
   }
-  if (!isClass(klass)) {
+  if (!isClassReceiver(klass)) {
     if (!(klass instanceof Module)) trackIncludedModule(klass, mod, moduleIncludesKey);
     if (typeof (mod as ModuleHooks)[included] === "function") {
       (mod as ModuleHooks)[included]!(klass);
@@ -1567,17 +1578,18 @@ export function rbModAppendFeatures(
   klass: AnyClass | object,
   mod: ModuleObject | AnyClass | Module,
 ): void {
-  if (!isClass(klass) && !(klass instanceof Module)) {
+  if (!isClassReceiver(klass) && !(klass instanceof Module)) {
     return trackIncludedModule(klass, mod, moduleIncludesKey);
   }
   if (mod instanceof Module) return Module.prototype.appendFeatures.call(mod, klass);
   if (klass instanceof Module) return appendPlainFeatures(klass, mod);
-  if (typeof mod !== "function" && Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
+  if (Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
     for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
       if (!isModuleMethodTablePresent(klass, nested)) include(klass, nested);
     }
   }
   trackIncludedModule(klass.prototype, mod);
+  trackIncludedModule(mod, klass, moduleSubclassesKey);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
     if (
@@ -1645,6 +1657,35 @@ export function rbModAppendFeatures(
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
+}
+
+/**
+ * Mirrors: Ruby's Module#undef_method — vendor/ruby/v3.3.11/vm_method.c:1973
+ * `rb_mod_undef_method`, on a plain-object or class module: each name is
+ * removed from the module and from every class that took it from the module.
+ * A class has no undef entry of its own to hold, so a superclass's method of
+ * that name answers again where Ruby's `rb_undef` entry would stop the search.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+ */
+export function rbModUndefMethod(mod: object, ...names: string[]): object {
+  if (mod instanceof Module) return mod.undefMethod(...names);
+  const table = (isClass(mod) ? mod.prototype : mod) as Record<string, unknown>;
+  for (const name of names) {
+    if (!Object.prototype.hasOwnProperty.call(table, name)) {
+      throw new NameError(`undefined method '${name}' for module '#<Module>'`, name);
+    }
+    delete table[name];
+    for (const klass of (Object.prototype.hasOwnProperty.call(mod, moduleSubclassesKey)
+      ? (mod as Record<symbol, Set<AnyClass>>)[moduleSubclassesKey]
+      : []) as Iterable<AnyClass>) {
+      const installed = trackedKeys(klass.prototype);
+      if (!installed.has(name)) continue;
+      installed.delete(name);
+      delete (klass.prototype as Record<string, unknown>)[name];
+    }
+  }
+  return mod;
 }
 
 export type Extended<M extends object> = CallableMethods<M>;

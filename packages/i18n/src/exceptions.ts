@@ -2,12 +2,10 @@ import { EMPTY_HASH, normalizeKeys, toSym } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
 import {
   ArgumentError as RubyArgumentError,
-  Module,
   NoMethodError,
   include,
   isSymbol,
   rbInspect,
-  rbModConstSet,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 
@@ -87,7 +85,9 @@ export interface Base {
   toException(): MissingTranslationData;
 }
 
-export const Base = new Module().include({
+export const Base = {
+  PERMITTED_KEYS: Object.freeze(["scope", "default"]),
+
   keys(this: BaseHost): TranslationKey[] {
     if (!this._keys) {
       const keys = normalizeKeys(this.locale, this.key, this.options.scope);
@@ -116,11 +116,8 @@ export const Base = new Module().include({
   toException(this: Base): MissingTranslationData {
     return new MissingTranslationData(this.locale, this.key, this.options);
   },
-}) as Module & { PERMITTED_KEYS: readonly string[] };
-rbModConstSet(Base, "PERMITTED_KEYS", Object.freeze(["scope", "default"]));
-Base.moduleEval((mod) => {
-  mod.toString = Object.getOwnPropertyDescriptor(mod, "message")!.get as () => string;
-});
+};
+Base.toString = Object.getOwnPropertyDescriptor(Base, "message")!.get as () => string;
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is `include Base` on the type side.
 export interface MissingTranslation extends Base {}

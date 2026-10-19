@@ -1,18 +1,19 @@
 import { NameError } from "./core-ext/name-error.js";
 import { Module } from "@blazetrails/ruby-compat/include";
+import { rbModDefineMethod } from "@blazetrails/ruby-compat";
 
 export type MethodSource = (mod: Record<string, unknown>) => void;
 
-type Owner = Module | { prototype: object };
+type Owner = Module | { prototype: object } | Record<string, unknown>;
 
 export class MethodSet {
   static toString(): string {
     return "ActiveSupport::CodeGenerator::MethodSet";
   }
 
-  static METHOD_CACHES = new Map<string, Module>();
+  static METHOD_CACHES = new Map<string, Record<string, unknown>>();
 
-  private cache: Module;
+  private cache: Record<string, unknown>;
   private sources: MethodSource[] = [];
   private methods = new Map<string, string>();
   private canonicalMethods = new Map<string, boolean>();
@@ -20,7 +21,7 @@ export class MethodSet {
   constructor(namespace: string) {
     let cache = MethodSet.METHOD_CACHES.get(namespace);
     if (!cache) {
-      cache = new Module();
+      cache = {};
       MethodSet.METHOD_CACHES.set(namespace, cache);
     }
     this.cache = cache;
@@ -36,7 +37,7 @@ export class MethodSet {
     const already = this.methods.get(as);
     if (already !== undefined) return already;
 
-    if (!this.cache.isMethodDefined(canonicalName) && !this.canonicalMethods.get(canonicalName)) {
+    if (!Object.hasOwn(this.cache, canonicalName) && !this.canonicalMethods.get(canonicalName)) {
       block(this.sources);
     }
     this.canonicalMethods.set(canonicalName, true);
@@ -46,20 +47,18 @@ export class MethodSet {
 
   apply(owner: Owner, _path: string, _line: number): void {
     if (this.sources.length !== 0) {
-      this.cache.moduleEval((mod) => {
-        for (const source of this.sources) source(mod);
-      });
+      for (const source of this.sources) source(this.cache);
     }
     this.canonicalMethods.clear();
 
     for (const [as, canonicalName] of this.methods) {
-      const instanceMethod = this.cache.instanceMethod(canonicalName);
+      const instanceMethod = Object.getOwnPropertyDescriptor(this.cache, canonicalName);
       if (instanceMethod === undefined) {
         throw new NameError(`undefined method '${canonicalName}' for module`, canonicalName);
       }
       if (owner instanceof Module) {
         owner.moduleEval((mod) => Object.defineProperty(mod, as, instanceMethod));
-      } else Object.defineProperty(owner.prototype, as, instanceMethod);
+      } else rbModDefineMethod(owner, as, instanceMethod);
     }
   }
 }
@@ -124,8 +123,14 @@ export class CodeGenerator {
         this.owner.moduleEval((mod) => {
           for (const source of this.sources) source(mod);
         });
-      } else {
+      } else if ("prototype" in this.owner) {
         for (const source of this.sources) source(this.owner.prototype as Record<string, unknown>);
+      } else {
+        const mod: Record<string, unknown> = {};
+        for (const source of this.sources) source(mod);
+        for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(mod))) {
+          rbModDefineMethod(this.owner, name, descriptor);
+        }
       }
     }
   }

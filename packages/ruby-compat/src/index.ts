@@ -247,6 +247,8 @@ export {
   type UnboundMethod,
   moduleVisibility,
   publicInstanceMethods,
+  classModule,
+  rbModUndefMethod,
 } from "./include.js";
 export type { Extended, Included, Initialized, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";

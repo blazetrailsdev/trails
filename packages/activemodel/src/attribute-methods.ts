@@ -12,6 +12,9 @@ import {
   rbObjRespondTo,
   rbModConstDefined,
   rbModConstSet,
+  rbModMethodDefined,
+  rbModUndefMethod,
+  publicInstanceMethods,
   regexpEscape,
   unpack1,
 } from "@blazetrails/ruby-compat";
@@ -25,7 +28,6 @@ import {
   included,
   type Extended,
   type Included,
-  Module,
 } from "@blazetrails/activesupport";
 import { NoMethodError } from "./attribute-assignment.js";
 import { AttributeRegistration } from "./attribute-registration.js";
@@ -136,7 +138,7 @@ export interface AttributeMethodHost {
   attributeMethodPatterns: AttributeMethodPattern[];
   attributeAliases: Record<string, string>;
   _aliasesByAttributeName: Hash<string, string[]>;
-  _generatedAttributeMethods?: Module;
+  _generatedAttributeMethods?: Record<string, unknown>;
 }
 
 export interface ClassMethodsHost extends AttributeMethodHost, Extended<typeof ClassMethods> {}
@@ -273,7 +275,7 @@ export const ClassMethods = {
   defineAttributeMethod(
     this: ClassMethodsHost,
     attrName: string,
-    options: { _owner?: Module | CodeGenerator; as?: string } = {},
+    options: { _owner?: Record<string, unknown> | CodeGenerator; as?: string } = {},
   ): void {
     const { _owner = this.generatedAttributeMethods(), as = attrName } = options;
     CodeGenerator.batch(_owner, __FILE__, __LINE__, (owner) => {
@@ -326,7 +328,7 @@ export const ClassMethods = {
 
   undefineAttributeMethods(this: ClassMethodsHost): void {
     const mod = this.generatedAttributeMethods();
-    mod.undefMethod(...mod.instanceMethods());
+    rbModUndefMethod(mod, ...publicInstanceMethods(mod));
     this.attributeMethodPatternsCache().clear();
   },
 
@@ -355,9 +357,9 @@ export const ClassMethods = {
    * @internal
    * @inventedArm if — PERMANENT
    */
-  generatedAttributeMethods(this: ClassMethodsHost): Module {
+  generatedAttributeMethods(this: ClassMethodsHost): Record<string, unknown> {
     if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
-      const mod = new Module();
+      const mod = {};
       include(this as unknown as new (...args: unknown[]) => unknown, mod);
       this._generatedAttributeMethods = mod;
     }
@@ -366,7 +368,7 @@ export const ClassMethods = {
 
   /** @internal */
   isInstanceMethodAlreadyImplemented(this: ClassMethodsHost, methodName: string): boolean {
-    return this.generatedAttributeMethods().isMethodDefined(methodName);
+    return rbModMethodDefined(this.generatedAttributeMethods(), methodName);
   },
 
   /**

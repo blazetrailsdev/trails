@@ -13,6 +13,7 @@ import {
   rbModToS,
   rbObjSingletonClass,
   rbModMethodDefined,
+  rbModDefineMethod,
   rbObjRespondTo,
   rbFSend,
 } from "./object.js";
@@ -38,6 +39,8 @@ import {
   publicInstanceMethods,
   rbModAppendFeatures,
   rbModPrependFeatures,
+  rbModUndefMethod,
+  classModule,
   type ModuleVisibility,
   type Included,
   type Initialized,
@@ -2175,5 +2178,75 @@ describe("include with a plain-object or class module's own hooks", () => {
     include(Host, Mod);
     expect(calls).toEqual(["included"]);
     expect((new Host() as unknown as Mod).greet()).toBe("hi");
+  });
+});
+
+describe("include into a class module", () => {
+  it("records the included module instead of copying it onto the prototype", () => {
+    const inner = { who: () => "inner" };
+    class Outer {
+      static readonly [classModule] = true;
+    }
+    include(Outer, inner);
+    expect("who" in Outer.prototype).toBe(false);
+  });
+
+  it("appends the recorded modules first, so the class module's own methods win", () => {
+    const inner = { who: () => "inner", innerOnly: () => "inner only" };
+    class Outer {
+      static readonly [classModule] = true;
+      who() {
+        return "outer";
+      }
+    }
+    include(Outer, inner);
+    class Host {}
+    include(Host, Outer);
+    const host = new Host() as unknown as DynMethods;
+    expect(host.who()).toBe("outer");
+    expect(host.innerOnly()).toBe("inner only");
+    expect(isModuleIncluded(Host, inner)).toBe(true);
+  });
+
+  it("appends a class module through Module#include, following its record", () => {
+    const inner = { innerOnly: () => "inner only" };
+    class Outer {
+      static readonly [classModule] = true;
+    }
+    include(Outer, inner);
+    const mod = new Module();
+    mod.include(Outer);
+    class Host {}
+    include(Host, mod);
+    expect((new Host() as unknown as DynMethods).innerOnly()).toBe("inner only");
+  });
+});
+
+describe("rbModDefineMethod and rbModUndefMethod on a plain-object module", () => {
+  it("writes a method defined after the include to the includer, under its own methods", () => {
+    const mod: Record<string, unknown> = {};
+    class Host {
+      own() {
+        return "host";
+      }
+    }
+    include(Host, mod);
+    rbModDefineMethod(mod, "late", () => "late");
+    rbModDefineMethod(mod, "own", () => "mod");
+    const host = new Host() as unknown as DynMethods;
+    expect(host.late()).toBe("late");
+    expect(host.own()).toBe("host");
+    expect(Object.keys(mod)).toEqual(["late", "own"]);
+  });
+
+  it("removes an undefined method from the module and its includer", () => {
+    const mod: Record<string, unknown> = {};
+    class Host {}
+    include(Host, mod);
+    rbModDefineMethod(mod, "late", () => "late");
+    rbModUndefMethod(mod, "late");
+    expect("late" in mod).toBe(false);
+    expect("late" in Host.prototype).toBe(false);
+    expect(() => rbModUndefMethod(mod, "late")).toThrow(/undefined method 'late'/);
   });
 });
