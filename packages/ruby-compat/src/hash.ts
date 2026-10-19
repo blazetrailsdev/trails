@@ -1603,6 +1603,192 @@ export class Hash<K, V> extends Map<K, V> {
   override values(): MapBoundaryReturn {
     return [...super.values()];
   }
+
+  /**
+   * `Hash#length` (`vendor/ruby/v3.3.11/hash.c:3002` `rb_hash_size`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  length(): number {
+    return this.size;
+  }
+
+  /**
+   * `Hash#empty?` (`vendor/ruby/v3.3.11/hash.c:3023` `rb_hash_empty_p`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  isEmpty(): boolean {
+    return this.size === 0;
+  }
+
+  /**
+   * `Hash#delete_if` (`vendor/ruby/v3.3.11/hash.c:2564` `rb_hash_delete_if`):
+   * drops every pair the block answers truthily for, and returns the receiver.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  deleteIf(block: (key: K, value: V) => unknown): this {
+    this.modifyCheck();
+    for (const [key, value] of this) {
+      const ret = block(key, value);
+      if (ret != null && ret !== false) this.deleteEntry(key);
+    }
+    return this;
+  }
+
+  /**
+   * `Hash#reject!` (`vendor/ruby/v3.3.11/hash.c:2594` `rb_hash_reject_bang`):
+   * `delete_if`, answering `nil` when nothing was deleted.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  rejectBang(block: (key: K, value: V) => unknown): this | null {
+    this.modifyCheck();
+    const n = this.size;
+    if (!n) return null;
+    this.deleteIf(block);
+    if (n === this.size) return null;
+    return this;
+  }
+
+  /**
+   * `Hash#keep_if` (`vendor/ruby/v3.3.11/hash.c:2844` `rb_hash_keep_if`): drops
+   * every pair the block answers falsily for (`keep_if_i`, `:2757`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  keepIf(block: (key: K, value: V) => unknown): this {
+    this.modifyCheck();
+    for (const [key, value] of this) {
+      const ret = block(key, value);
+      if (ret == null || ret === false) this.deleteEntry(key);
+    }
+    return this;
+  }
+
+  /**
+   * `Hash#select!` (`vendor/ruby/v3.3.11/hash.c:2813` `rb_hash_select_bang`):
+   * `keep_if`, answering `nil` when nothing was deleted.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  selectBang(block: (key: K, value: V) => unknown): this | null {
+    this.modifyCheck();
+    const n = this.size;
+    if (!n) return null;
+    this.keepIf(block);
+    if (n === this.size) return null;
+    return this;
+  }
+
+  /**
+   * `Hash#transform_values!` (`vendor/ruby/v3.3.11/hash.c:3398`
+   * `rb_hash_transform_values_bang`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  transformValuesBang(block: (value: V) => V): this {
+    this.modifyCheck();
+    for (const [key, value] of [...super.entries()]) {
+      super.set(key, block(value));
+    }
+    return this;
+  }
+
+  /**
+   * `Hash#to_a` (`vendor/ruby/v3.3.11/hash.c:3428` `rb_hash_to_a`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toA(): [K, V][] {
+    return [...this];
+  }
+
+  /**
+   * `Hash#to_hash` (`vendor/ruby/v3.3.11/hash.c:3497` `rb_hash_to_hash`): the
+   * receiver itself.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toHash(): object {
+    return this;
+  }
+
+  /**
+   * `Hash#rassoc` (`vendor/ruby/v3.3.11/hash.c:4254` `rb_hash_rassoc`): the
+   * first pair whose value is `==` to `obj` (`rassoc_i`), else `nil`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  rassoc(obj: unknown): [K, V] | null {
+    for (const [key, value] of this) {
+      if (rbEqual(value, obj)) return [key, value];
+    }
+    return null;
+  }
+
+  /**
+   * `Hash#flatten` (`vendor/ruby/v3.3.11/hash.c:4308` `rb_hash_flatten`): the
+   * pairs spliced into one Array, then `flatten!(level - 1)` over it, or a
+   * recursive `flatten!` for a negative level.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  flatten(...argv: [] | [number]): unknown[] {
+    if (argv.length) {
+      const level = argv[0];
+      if (level === 0) return this.toA();
+      const ary: unknown[] = [];
+      for (const [key, value] of this) ary.push(key, value);
+      const rest = level - 1;
+      if (rest > 0) return ary.flat(rest);
+      else if (rest < 0) return ary.flat(Infinity);
+      return ary;
+    }
+    const ary: unknown[] = [];
+    for (const [key, value] of this) ary.push(key, value);
+    return ary;
+  }
+
+  /**
+   * `Hash#compact` (`vendor/ruby/v3.3.11/hash.c:4360` `rb_hash_compact`): a dup
+   * with every `nil` value dropped (`delete_if_nil`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  compact(): Hash<K, NonNullable<V>> {
+    const result = hashDup(this, this.constructor as new () => Hash<K, V>);
+    if (this.size) {
+      result.deleteIf((_key, value) => value == null);
+    }
+    return result as Hash<K, NonNullable<V>>;
+  }
+
+  /**
+   * `Hash#compact!` (`vendor/ruby/v3.3.11/hash.c:4385` `rb_hash_compact_bang`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  compactBang(): this | null {
+    this.modifyCheck();
+    const n = this.size;
+    if (n) {
+      this.deleteIf((_key, value) => value == null);
+      if (n !== this.size) return this;
+    }
+    return null;
+  }
+
+  /**
+   * `Hash#deconstruct_keys` (`vendor/ruby/v3.3.11/hash.c:4759`
+   * `rb_hash_deconstruct_keys`): the receiver itself.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  deconstructKeys(_keys: unknown): this {
+    return this;
+  }
 }
 
 function isObjectKey(key: unknown): key is object {

@@ -1,0 +1,37 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "utils.ts",
+    "rubyName": "build_nested_query",
+    "call": "delete_if",
+    "kind": "rubyCompat",
+    "tsExport": "deleteIf",
+    "reason": "Baseline (RFC 0129): the receiver is the Array `value.map { … }` returns (rack utils.rb:129), so this is `Array#delete_if`, not the `Hash#delete_if` the table maps."
+  },
+  {
+    "package": "rack",
+    "tsFile": "utils.ts",
+    "rubyName": "forwarded_values",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "utils.ts",
+    "rubyName": "status_code",
+    "call": "fetch",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "utils.ts",
+    "rubyName": "status_code",
+    "call": "warn",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:message",
+      "kwargs{uplevel=num:3}"
+    ],
+    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
+  }
+]

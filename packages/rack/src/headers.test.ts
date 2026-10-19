@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { dup, eachKey, eachValue, KeyError, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
 import { Headers } from "./headers.js";
 
 describe("RackHeadersTest", () => {
@@ -7,21 +8,21 @@ describe("RackHeadersTest", () => {
 
   beforeEach(() => {
     h = new Headers();
-    fh = Headers.from({ AB: "1", cd: "2", "3": "4" });
+    fh = Headers.get({ AB: "1", cd: "2", "3": "4" });
   });
 
   it("class aref", () => {
-    const empty = Headers.from();
+    const empty = Headers.get();
     expect(empty.size).toBe(0);
 
-    const h1 = Headers.from({ A: "2" });
+    const h1 = Headers.get({ A: "2" });
     expect(h1.get("a")).toBe("2");
 
-    const h2 = Headers.from({ A: "2", B: "4" });
+    const h2 = Headers.get({ A: "2", B: "4" });
     expect(h2.get("a")).toBe("2");
     expect(h2.get("b")).toBe("4");
 
-    expect(() => Headers.from("A")).toThrow(/odd number/);
+    expect(() => Headers.get("A")).toThrow(/odd number/);
   });
 
   it("default values", () => {
@@ -68,33 +69,33 @@ describe("RackHeadersTest", () => {
   });
 
   it("clear", () => {
-    expect(fh.length).toBe(3);
+    expect(fh.length()).toBe(3);
     fh.clear();
-    expect(fh.length).toBe(0);
+    expect(fh.length()).toBe(0);
   });
 
   it("delete", () => {
-    expect(fh.length).toBe(3);
+    expect(fh.length()).toBe(3);
     expect(fh.delete("aB")).toBe("1");
-    expect(fh.length).toBe(2);
+    expect(fh.length()).toBe(2);
     expect(fh.delete("Ab")).toBeUndefined();
-    expect(fh.length).toBe(2);
+    expect(fh.length()).toBe(2);
   });
 
   it("delete if and reject", () => {
     const rejected = fh.reject((k, _v) => k === "ab" || k === "cd");
-    expect(rejected.length).toBe(1);
+    expect(rejected.length()).toBe(1);
     expect(rejected.get("3")).toBe("4");
-    expect(fh.length).toBe(3);
+    expect(fh.length()).toBe(3);
 
     fh.deleteIf((k, _v) => k === "ab" || k === "cd");
-    expect(fh.length).toBe(1);
+    expect(fh.length()).toBe(1);
     expect(fh.get("3")).toBe("4");
 
-    expect(fh.rejectInPlace((k, _v) => k === "ab" || k === "cd")).toBeNull();
-    const result = fh.rejectInPlace((k, _v) => k === "3");
+    expect(fh.rejectBang((k, _v) => k === "ab" || k === "cd")).toBeNull();
+    const result = fh.rejectBang((k, _v) => k === "3");
     expect(result).not.toBeNull();
-    expect(fh.length).toBe(0);
+    expect(fh.length()).toBe(0);
   });
 
   it("each", () => {
@@ -121,13 +122,13 @@ describe("RackHeadersTest", () => {
 
   it("each key", () => {
     let i = 0;
-    h.eachKey(() => {
+    eachKey(h, () => {
       i++;
     });
     expect(i).toBe(0);
 
     const keys: string[] = [];
-    fh.eachKey((k) => {
+    eachKey(fh, (k) => {
       keys.push(k);
     });
     expect(keys.sort()).toEqual(["3", "ab", "cd"]);
@@ -135,27 +136,27 @@ describe("RackHeadersTest", () => {
 
   it("each value", () => {
     let i = 0;
-    h.eachValue(() => {
+    eachValue(h, () => {
       i++;
     });
     expect(i).toBe(0);
 
     const values: string[] = [];
-    fh.eachValue((v) => {
+    eachValue(fh, (v) => {
       values.push(v);
     });
     expect(values.sort()).toEqual(["1", "2", "4"]);
   });
 
   it("empty", () => {
-    expect(h.empty).toBe(true);
-    expect(fh.empty).toBe(false);
+    expect(h.isEmpty()).toBe(true);
+    expect(fh.isEmpty()).toBe(false);
   });
 
   it("fetch", () => {
-    expect(() => h.fetch("1")).toThrow(/IndexError/);
+    expect(() => h.fetch("1")).toThrow(KeyError);
     h.setDefault("33");
-    expect(() => h.fetch("1")).toThrow(/IndexError/);
+    expect(() => h.fetch("1")).toThrow(KeyError);
     h.set("1", "8");
     expect(h.fetch("1")).toBe("8");
     expect(h.fetch("2", "3")).toBe("3");
@@ -166,12 +167,12 @@ describe("RackHeadersTest", () => {
   });
 
   it("has key", () => {
-    expect(h.has("1")).toBe(false);
-    expect(fh.has("Ab")).toBe(true);
-    expect(fh.has("cD")).toBe(true);
-    expect(fh.has("3")).toBe(true);
-    expect(fh.has("ab")).toBe(true);
-    expect(fh.has("CD")).toBe(true);
+    expect(h.hasKey("1")).toBe(false);
+    expect(fh.hasKey("Ab")).toBe(true);
+    expect(fh.hasKey("cD")).toBe(true);
+    expect(fh.hasKey("3")).toBe(true);
+    expect(fh.hasKey("ab")).toBe(true);
+    expect(fh.hasKey("CD")).toBe(true);
   });
 
   it("has value", () => {
@@ -183,8 +184,8 @@ describe("RackHeadersTest", () => {
   });
 
   it("inspect", () => {
-    expect(h.inspect()).toBe("{}");
-    const str = fh.inspect();
+    expect(rbInspect(h)).toBe("{}");
+    const str = rbInspect(fh);
     expect(str).toContain('"ab"=>"1"');
     expect(str).toContain('"cd"=>"2"');
     expect(str).toContain('"3"=>"4"');
@@ -204,15 +205,15 @@ describe("RackHeadersTest", () => {
   });
 
   it("length", () => {
-    expect(h.length).toBe(0);
+    expect(h.length()).toBe(0);
     expect(h.size).toBe(0);
-    expect(fh.length).toBe(3);
+    expect(fh.length()).toBe(3);
     expect(fh.size).toBe(3);
   });
 
   it("merge and update", () => {
     expect(h.merge({}).size).toBe(0);
-    expect(fh.merge({}).equals(fh)).toBe(true);
+    expect(rbEqual(fh.merge({}), fh)).toBe(true);
 
     const merged = h.merge({ ab: "55" });
     expect(merged.get("ab")).toBe("55");
@@ -225,7 +226,7 @@ describe("RackHeadersTest", () => {
     expect(merged2.get("ab")).toBe("55");
     expect(fh.get("ab")).toBe("1");
 
-    fh.mergeInPlace({ ab: "55" });
+    fh.update({ ab: "55" });
     expect(fh.get("ab")).toBe("55");
 
     const merged3 = fh.merge({ ab: "ss" }, (k, ov, nv) => [k, nv, ov].join(""));
@@ -237,15 +238,15 @@ describe("RackHeadersTest", () => {
   });
 
   it("replace", () => {
-    const h1 = h.dup();
-    const fh1 = fh.dup();
+    const h1 = dup(h);
+    const fh1 = dup(fh);
     const result = fh1.replace(h1);
     expect(result).toBe(fh1);
     expect(fh1.size).toBe(0);
 
     const result2 = h1.replace(fh);
     expect(result2).toBe(h1);
-    expect(h1.equals(fh)).toBe(true);
+    expect(rbEqual(h1, fh)).toBe(true);
   });
 
   it("select", () => {
@@ -259,7 +260,7 @@ describe("RackHeadersTest", () => {
 
   it("shift", () => {
     expect(h.shift()).toBeUndefined();
-    const arr = fh.toArray();
+    const arr = fh.toA();
     let i = 3;
     while (i > 0) {
       const kv = fh.shift();
@@ -272,8 +273,8 @@ describe("RackHeadersTest", () => {
   });
 
   it("sort", () => {
-    expect(h.sort()).toEqual([]);
-    const sorted = Headers.from("CD", "4", "AB", "1", "EF", "2").sort();
+    expect(h.toA().sort()).toEqual([]);
+    const sorted = Headers.get("CD", "4", "AB", "1", "EF", "2").toA().sort();
     expect(sorted).toEqual([
       ["ab", "1"],
       ["cd", "4"],
@@ -282,24 +283,24 @@ describe("RackHeadersTest", () => {
   });
 
   it("to a", () => {
-    expect(h.toArray()).toEqual([]);
-    const arr = fh.toArray();
+    expect(h.toA()).toEqual([]);
+    const arr = fh.toA();
     expect(arr).toContainEqual(["ab", "1"]);
     expect(arr).toContainEqual(["cd", "2"]);
     expect(arr).toContainEqual(["3", "4"]);
   });
 
   it("to hash", () => {
-    expect(h.toHash()).toEqual({});
-    const hash = fh.toHash();
-    expect(hash["ab"]).toBe("1");
-    expect(hash["cd"]).toBe("2");
-    expect(hash["3"]).toBe("4");
+    expect(h.toHash()).toBe(h);
+    const hash = fh.toHash() as Headers;
+    expect(hash.get("ab")).toBe("1");
+    expect(hash.get("cd")).toBe("2");
+    expect(hash.get("3")).toBe("4");
   });
 
   it("values", () => {
     expect(h.values()).toEqual([]);
-    const vals = Headers.from({ aB: "f", "1": "c" }).values();
+    const vals = Headers.get({ aB: "f", "1": "c" }).values();
     expect(vals).toContain("f");
     expect(vals).toContain("c");
   });
@@ -336,7 +337,7 @@ describe("RackHeadersTest", () => {
   it("keep if", () => {
     expect(h.keepIf(() => true).size).toBe(0);
     expect(fh.keepIf(() => true).size).toBe(3);
-    const fhDup = fh.dup();
+    const fhDup = dup(fh);
     fhDup.keepIf(() => false);
     expect(fhDup.size).toBe(0);
     const result = fh.keepIf((k) => k === "ab");
@@ -353,20 +354,20 @@ describe("RackHeadersTest", () => {
   });
 
   it("rassoc", () => {
-    expect(h.rassoc("1")).toBeUndefined();
+    expect(h.rassoc("1")).toBeNull();
     expect(fh.rassoc("1")).toEqual(["ab", "1"]);
     expect(fh.rassoc("2")).toEqual(["cd", "2"]);
-    expect(fh.rassoc("3")).toBeUndefined();
+    expect(fh.rassoc("3")).toBeNull();
     expect(fh.rassoc("4")).toEqual(["3", "4"]);
   });
 
   it("select!", () => {
-    expect(h.selectInPlace(() => true)).toBeNull();
-    expect(fh.selectInPlace(() => true)).toBeNull();
-    const fhDup = fh.dup();
-    expect(fhDup.selectInPlace(() => false)).toBe(fhDup);
+    expect(h.selectBang(() => true)).toBeNull();
+    expect(fh.selectBang(() => true)).toBeNull();
+    const fhDup = dup(fh);
+    expect(fhDup.selectBang(() => false)).toBe(fhDup);
     expect(fhDup.size).toBe(0);
-    const result = fh.selectInPlace((k) => k === "ab");
+    const result = fh.selectBang((k) => k === "ab");
     expect(result).toBe(fh);
     expect(fh.size).toBe(1);
   });
@@ -395,7 +396,7 @@ describe("RackHeadersTest", () => {
   it("fetch values", () => {
     expect(fh.fetchValues("AB")).toEqual(["1"]);
     expect(fh.fetchValues("AB", "Cd", "3")).toEqual(["1", "2", "4"]);
-    expect(() => fh.fetchValues("AB", "cD", "4")).toThrow(/KeyError/);
+    expect(() => fh.fetchValues("AB", "cD", "4")).toThrow(KeyError);
   });
 
   it("to proc", () => {
@@ -407,12 +408,12 @@ describe("RackHeadersTest", () => {
   });
 
   it("compact", () => {
-    expect(fh.compact().equals(fh)).toBe(true);
+    expect(rbEqual(fh.compact(), fh)).toBe(true);
     expect(fh.compact()).not.toBe(fh);
   });
 
   it("compact!", () => {
-    expect(fh.compactInPlace()).toBeNull();
+    expect(fh.compactBang()).toBeNull();
   });
 
   it("transform values", () => {
@@ -424,7 +425,7 @@ describe("RackHeadersTest", () => {
   });
 
   it("transform values!", () => {
-    fh.transformValuesInPlace((v) => v.repeat(2));
+    fh.transformValuesBang((v) => v.repeat(2));
     expect(fh.get("AB")).toBe("11");
     expect(fh.get("aB")).toBe("11");
   });
@@ -444,9 +445,9 @@ describe("RackHeadersTest", () => {
 
   it("transform keys", () => {
     const map: Record<string, string> = { ab: "Xy", cd: "dC", "3": "5" };
-    const dhBefore = fh.dup();
+    const dhBefore = dup(fh);
     const tk = fh.transformKeys((k) => map[k]);
-    expect(fh.equals(dhBefore)).toBe(true);
+    expect(rbEqual(fh, dhBefore)).toBe(true);
     expect(tk.get("xY")).toBe("1");
     expect(tk.get("Dc")).toBe("2");
     expect(tk.get("5")).toBe("4");
@@ -461,21 +462,21 @@ describe("RackHeadersTest", () => {
   });
 
   it("filter!", () => {
-    expect(h.selectInPlace(() => true)).toBeNull();
-    expect(fh.selectInPlace(() => true)).toBeNull();
-    const fhDup = fh.dup();
-    fhDup.selectInPlace(() => false);
+    expect(h.selectBang(() => true)).toBeNull();
+    expect(fh.selectBang(() => true)).toBeNull();
+    const fhDup = dup(fh);
+    fhDup.selectBang(() => false);
     expect(fhDup.size).toBe(0);
-    const result = fh.selectInPlace((k) => k === "ab");
+    const result = fh.selectBang((k) => k === "ab");
     expect(result).toBe(fh);
     expect(fh.size).toBe(1);
   });
 
   it("except", () => {
-    expect(fh.except().equals(fh)).toBe(true);
+    expect(rbEqual(fh.except(), fh)).toBe(true);
     const ex1 = fh.except("AB");
     expect(ex1.size).toBe(2);
-    expect(ex1.has("ab")).toBe(false);
+    expect(ex1.hasKey("ab")).toBe(false);
 
     const ex2 = fh.except("cD", "3");
     expect(ex2.size).toBe(1);
@@ -483,10 +484,10 @@ describe("RackHeadersTest", () => {
   });
 
   it("dup and clone", () => {
-    const dup = h.dup();
-    dup.set("A", "2");
+    const d = dup(h);
+    d.set("A", "2");
     expect(h.size).toBe(0);
-    expect(dup.get("a")).toBe("2");
+    expect(d.get("a")).toBe("2");
   });
 
   it("public interface", () => {
@@ -494,7 +495,7 @@ describe("RackHeadersTest", () => {
     expect(typeof h.get).toBe("function");
     expect(typeof h.set).toBe("function");
     expect(typeof h.delete).toBe("function");
-    expect(typeof h.has).toBe("function");
+    expect(typeof h.hasKey).toBe("function");
     expect(typeof h.each).toBe("function");
     expect(typeof h.merge).toBe("function");
     expect(typeof h.keys).toBe("function");
@@ -503,14 +504,13 @@ describe("RackHeadersTest", () => {
   });
 
   it("deconstruct keys", () => {
-    const dk = fh.deconstructKeys();
-    expect(dk.get("ab")).toBe("1");
-    expect(dk).not.toBe(fh);
+    expect(rbEqual(fh.deconstructKeys([]), fh.toHash())).toBe(true);
+    expect(fh.deconstructKeys([]).constructor).toBe(Headers);
   });
 
   it("equals compares contents", () => {
-    const h1 = Headers.from({ a: "1", b: "2" });
-    const h2 = Headers.from({ A: "1", B: "2" });
-    expect(h1.equals(h2)).toBe(true);
+    const h1 = Headers.get({ a: "1", b: "2" });
+    const h2 = Headers.get({ A: "1", B: "2" });
+    expect(rbEqual(h1, h2)).toBe(true);
   });
 });
