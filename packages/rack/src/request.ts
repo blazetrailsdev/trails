@@ -42,7 +42,7 @@ import {
   unescape,
 } from "./utils.js";
 import { block as rbBlock, fetch, hashDelete, include, warn } from "@blazetrails/ruby-compat";
-import * as MediaTypeModule from "./media-type.js";
+import { MediaType } from "./media-type.js";
 import * as Multipart from "./multipart.js";
 
 const ipv6 = [
@@ -388,11 +388,11 @@ export abstract class Helpers {
   }
 
   get mediaType(): string | null {
-    return MediaTypeModule.type(this.contentType);
+    return MediaType.type(this.contentType);
   }
 
   get mediaTypeParams(): Record<string, string> {
-    return MediaTypeModule.params(this.contentType);
+    return MediaType.params(this.contentType);
   }
 
   get contentCharset(): string | null {
@@ -680,8 +680,14 @@ export abstract class Helpers {
 export class Request {
   env: Record<string, any>;
 
-  static ipFilter: (ip: string | undefined) => boolean = (ip: string | undefined) =>
+  static #ipFilter: (ip: string | undefined) => boolean = (ip: string | undefined) =>
     ip != null && trustedProxies.test(ip);
+  static get ipFilter(): (ip: string | undefined) => boolean {
+    return Request.#ipFilter;
+  }
+  static set ipFilter(ipFilter: (ip: string | undefined) => boolean) {
+    Request.#ipFilter = ipFilter;
+  }
   static forwardedPriority: Array<"forwarded" | "x_forwarded" | null> = [
     "forwarded",
     "x_forwarded",

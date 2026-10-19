@@ -17,7 +17,7 @@ import {
   ETAG,
 } from "./constants.js";
 import { STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
-import * as MediaTypeModule from "./media-type.js";
+import { MediaType } from "./media-type.js";
 import { setCookieHeader, deleteSetCookieHeaderBang } from "./utils.js";
 import { include } from "@blazetrails/ruby-compat";
 
@@ -137,11 +137,11 @@ export abstract class Helpers {
   }
 
   get mediaType(): string | null {
-    return MediaTypeModule.type(this.contentType ?? null);
+    return MediaType.type(this.contentType ?? null);
   }
 
   get mediaTypeParams(): Record<string, string> {
-    return MediaTypeModule.params(this.contentType ?? null);
+    return MediaType.params(this.contentType ?? null);
   }
 
   get contentLength(): number | null {
@@ -373,6 +373,9 @@ export class Response {
   getHeader(key: string): any {
     if (typeof key !== "string") throw new ArgumentError();
     return this.headers[downcaseKey(key)];
+  }
+  get(key: string): any {
+    return this.getHeader(key);
   }
   setHeader(key: string, value: any): any {
     if (typeof key !== "string") throw new ArgumentError();
