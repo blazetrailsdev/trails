@@ -213,7 +213,9 @@ describe("FormOptionsHelperTest", () => {
     view.post.author_name = "Babe";
 
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
+      (view as any).concat(
+        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
+      );
     });
 
     assertDomEqual(
@@ -227,7 +229,9 @@ describe("FormOptionsHelperTest", () => {
     view.post.author_name = "Babe";
 
     const outputBuffer = view.fieldsFor("post", view.post, { index: 815 }, (f: any) => {
-      view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
+      (view as any).concat(
+        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
+      );
     });
 
     assertDomEqual(
@@ -242,7 +246,9 @@ describe("FormOptionsHelperTest", () => {
     view.post.toParam = () => 815;
 
     const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: any) => {
-      view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
+      (view as any).concat(
+        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
+      );
     });
 
     assertDomEqual(
@@ -435,7 +441,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.origin = "dk";
 
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      view.concat(
+      (view as any).concat(
         f.groupedCollectionSelect(
           "origin",
           dummyContinents(),
@@ -522,7 +528,7 @@ describe("FormOptionsHelperTest", () => {
     view.digest = new Digest();
 
     const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
-      view.concat(f.weekdaySelect("send_day"));
+      (view as any).concat(f.weekdaySelect("send_day"));
     });
 
     assertDomEqual(
@@ -536,7 +542,7 @@ describe("FormOptionsHelperTest", () => {
     view.digest.send_day = "Monday";
 
     const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
-      view.concat(f.weekdaySelect("send_day"));
+      (view as any).concat(f.weekdaySelect("send_day"));
     });
 
     assertDomEqual(
@@ -619,7 +625,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm = new Firm("D");
 
     const outputBuffer = view.fieldsFor("firm", view.firm, {}, (f: any) => {
-      view.concat(f.timeZoneSelect("time_zone"));
+      (view as any).concat(f.timeZoneSelect("time_zone"));
     });
 
     assertDomEqual(
@@ -632,7 +638,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm = new Firm("D");
 
     const outputBuffer = view.fieldsFor("firm", view.firm, { index: 305 }, (f: any) => {
-      view.concat(f.timeZoneSelect("time_zone"));
+      (view as any).concat(f.timeZoneSelect("time_zone"));
     });
 
     assertDomEqual(
@@ -646,7 +652,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm.toParam = () => 305;
 
     const outputBuffer = view.fieldsFor("firm[]", view.firm, {}, (f: any) => {
-      view.concat(f.timeZoneSelect("time_zone"));
+      (view as any).concat(f.timeZoneSelect("time_zone"));
     });
 
     assertDomEqual(
