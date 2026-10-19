@@ -1,16 +1,17 @@
 import { runLoadHooks, zone } from "@blazetrails/activesupport";
 import {
+  extend,
   include,
   rbHashSRuby2KeywordsHash,
   rbModConstSet,
   rbObjClass,
   SecureRandom,
 } from "@blazetrails/ruby-compat";
-import { ClassMethods, Core, type CoreHost } from "./core.js";
+import { ClassMethods, Core } from "./core.js";
 import { ActiveJob } from "./namespaces.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Base extends CoreHost {}
+export interface Base extends Core {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
@@ -47,6 +48,7 @@ export class Base {
   }
 }
 include(Base, Core);
+extend(Base, ClassMethods);
 rbModConstSet(ActiveJob, "Base", Base);
 
 runLoadHooks("active_job", Base);
