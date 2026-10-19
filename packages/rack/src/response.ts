@@ -4,6 +4,7 @@ import {
   hashDelete,
   rbFSend,
   rbObjRespondTo,
+  toI,
   toS,
 } from "@blazetrails/ruby-compat";
 import {
@@ -108,7 +109,7 @@ export abstract class Helpers {
     return this.hasHeader(header);
   }
 
-  addHeader(key: string | null, value: string | null): any {
+  addHeader(key: string, value: string | null): any {
     if (typeof key !== "string") throw new ArgumentError();
     if (value === null || value === undefined) return this.getHeader(key) ?? null;
     const existing = this.getHeader(key);
@@ -258,7 +259,7 @@ export class Response {
     status: number | string = 200,
     headers: Record<string, string | string[]> = {},
   ) {
-    this.status = typeof status === "number" ? status : parseInt(String(status));
+    this.status = Number(toI(status));
 
     if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
       throw new ArgumentError("Headers must be a Hash!");
@@ -365,20 +366,20 @@ export class Response {
     return this._block === null && Array.isArray(this._body) && this._body.length === 0;
   }
 
-  hasHeader(key: string | null): boolean {
+  hasHeader(key: string): boolean {
     if (typeof key !== "string") throw new ArgumentError();
     return Object.hasOwn(this.headers, downcaseKey(key));
   }
-  getHeader(key: string | null): any {
+  getHeader(key: string): any {
     if (typeof key !== "string") throw new ArgumentError();
     return this.headers[downcaseKey(key)];
   }
-  setHeader(key: string | null, value: any): any {
+  setHeader(key: string, value: any): any {
     if (typeof key !== "string") throw new ArgumentError();
     this.headers[downcaseKey(key)] = value;
     return value;
   }
-  deleteHeader(key: string | null): any {
+  deleteHeader(key: string): any {
     if (typeof key !== "string") throw new ArgumentError();
     return hashDelete(this.headers, downcaseKey(key));
   }

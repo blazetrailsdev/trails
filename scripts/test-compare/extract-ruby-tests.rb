@@ -2454,7 +2454,7 @@ class TestExtractor
       # `:method_add_arg` parent (mirroring the self-call path).
       rname = ident_name(node[3])
       args = node[0] == :command_call ? node[4] : pending_args
-      rname = PREDICATE_FORMS.fetch(rname) if PREDICATE_FORMS.key?(rname) && positional_args(args)&.length == 1
+      rname = predicate_form(rname, positional_args(args)) if PREDICATE_FORMS.key?(rname)
       results << (pending_never ? "#{rname}_never" : rname)
       values << literal_token(expected_arg(args, rname))
     elsif (mname = mspec_should_kind(node))
@@ -2478,6 +2478,13 @@ class TestExtractor
   end
 
   PREDICATE_FORMS = { "must_be" => "assert_predicate", "wont_be" => "refute_predicate" }.freeze
+  NIL_PREDICATE_FORMS = { "must_be" => "assert_nil", "wont_be" => "refute_nil" }.freeze
+
+  def predicate_form(name, list)
+    return name unless list&.length == 1
+    nil_pred = list[0].is_a?(Array) && list[0][0] == :symbol_literal && list[0].flatten.include?("nil?")
+    (nil_pred ? NIL_PREDICATE_FORMS : PREDICATE_FORMS).fetch(name)
+  end
 
   # Assertion method names whose comparable expected value is NOT the first
   # positional argument. `assert_includes(collection, member)` /
