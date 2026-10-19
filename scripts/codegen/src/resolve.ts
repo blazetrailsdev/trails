@@ -121,6 +121,19 @@ export class Resolver {
     return null;
   }
 
+  /**
+   * A gem module emitted as a JS class (emit.ts emitModuleClass): a mixin. A
+   * module of functions (`module_function`, `extend self`), one that mixes
+   * into its own singleton class, and a namespace the hand port seats in
+   * `namespaces.ts` keep the object of functions.
+   */
+  isClassModule(fqn: string): boolean {
+    const s = this.index.scopes.get(fqn);
+    if (!s || s.kind !== "module" || s.moduleFunction || s.sclassMixin) return false;
+    const e = this.exportNames.get(fqn);
+    return !!e && handNamespaceFqns().get(fqn) !== e.name;
+  }
+
   pkgExports(spec: string): Set<string> {
     return this.exportsByPkg[spec] ?? new Set();
   }
@@ -165,7 +178,10 @@ export class Resolver {
       const owner = fqn.slice(0, fqn.lastIndexOf("::"));
       const constName = fqn.slice(fqn.lastIndexOf("::") + 2);
       const ownerScope = this.index.scopes.get(owner);
-      if (ownerScope?.kind === "class") return `${this.fqnRef(owner, ctx, lw)}.${constName}`;
+      // A class's constant, and a module's (a module is a class too, unless the
+      // hand port seats it as a namespace object), is a static property.
+      if (ownerScope?.kind === "class" || this.isClassModule(owner))
+        return `${this.fqnRef(owner, ctx, lw)}.${constName}`;
       return this.importFrom(this.tsFileOf(c.file), constName, ctx, lw);
     }
     // Namespace-only module: no emitted object.

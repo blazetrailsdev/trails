@@ -2296,7 +2296,15 @@ export class Lowerer {
         this.stat(ctx, "module-super-static");
         const fn = tsMethodName(ctx.defName ?? "", next.owner);
         let callee: string;
-        if (next.kind === "module") {
+        const nextExp = this.resolver.exportNames.get(next.owner);
+        if (next.kind === "module" && nextExp && this.resolver.isClassModule(next.owner)) {
+          // The next module is a class: its method on the prototype, or a
+          // `ClassMethods` method on the class itself.
+          const ref = this.resolver.importFrom(nextExp.tsFile, nextExp.name, ctx, this);
+          callee = next.owner.endsWith("::ClassMethods")
+            ? `${ref}.${fn}`
+            : `${ref}.prototype.${fn}`;
+        } else if (next.kind === "module") {
           callee = this.resolver.importFrom(this.resolver.tsFileOf(next.file), fn, ctx, this);
         } else {
           const exp = this.resolver.exportNames.get(next.owner)!;
@@ -2308,6 +2316,24 @@ export class Lowerer {
           return `(await ${call})`;
         }
         return call;
+      }
+      // A module that is a class has no run-time link to search from: `include()`
+      // copied its methods onto the includer. Its `super` past the gem is
+      // resolved here too (externalSuperTarget).
+      if (this.resolver.isClassModule(ctx.owner)) {
+        const ext =
+          this.classMethodsSuperTarget(ctx.owner, ctx.defName ?? "", ctx) ??
+          this.externalSuperTarget(ctx.owner, ctx.defName ?? "", ctx);
+        if (ext) {
+          this.stat(ctx, "module-super-external");
+          const call = ext(args);
+          if (ctx.defAsync && ctx.asyncBox) {
+            ctx.asyncBox.awaits = true;
+            return `(await ${call})`;
+          }
+          return call;
+        }
+        return this.decline(ctx, "unhandled-node", { k: "super" } as N, `super past ${ctx.owner}`);
       }
       // ruby-compat Module#superMethod: resume the lookup past this module's
       // link in the receiver's ancestry (vm_search_super_method).
@@ -2329,6 +2355,89 @@ export class Lowerer {
       return `${this.rc(ctx, "rbCallSuper")}(this, ${JSON.stringify(name)}, ${JSON.stringify(ctx.owner)}${args ? ", " + args : ""})`;
     }
     return `super.${this.defTsName(ctx)}(${args})`;
+  }
+
+  /**
+   * `super` from a Concern's `ClassMethods#name`: the next `ClassMethods` that
+   * defines it among the concerns after it in an includer's Ruby ancestors
+   * (`extend()` copied each onto the class, so the later one replaced the
+   * earlier), or a superclass's own singleton method; called directly.
+   */
+  classMethodsSuperTarget(
+    owner: string,
+    name: string,
+    ctx: Ctx,
+  ): ((args: string) => string) | undefined {
+    if (!owner.endsWith("::ClassMethods")) return undefined;
+    const concern = owner.slice(0, -"::ClassMethods".length);
+    const fn = this.defTsName(ctx);
+    for (const sc of this.index.scopes.values()) {
+      if (sc.kind !== "class") continue;
+      const anc = rubyAncestors(this.index, sc.fqn);
+      const at = anc.indexOf(concern);
+      if (at < 0) continue;
+      for (const f of anc.slice(at + 1)) {
+        const s = this.index.scopes.get(f)!;
+        const cm = this.index.scopes.get(`${f}::ClassMethods`);
+        const target = cm?.defs.has(name)
+          ? cm.fqn
+          : s.kind === "class" && s.sdefs.has(name)
+            ? f
+            : null;
+        if (!target) continue;
+        const e = this.resolver.exportNames.get(target);
+        if (!e) return undefined;
+        const ref = this.resolver.importFrom(e.tsFile, e.name, ctx, this);
+        return (args) => `${ref}.${fn}.call(${["this", args].filter(Boolean).join(", ")})`;
+      }
+      return undefined;
+    }
+    return undefined;
+  }
+
+  /**
+   * `super` from `mod#name` where the next definition is outside the gem, in
+   * the first library class that includes `mod`: Ruby's ancestors after `mod`
+   * reach a dependency module (an `include` the Rails manifest says defines
+   * `name`), called through ruby-compat `Module#instanceMethod`, or else the
+   * class's dependency superclass, whose prototype answers it (Minitest's
+   * `before_setup` through `ActiveSupport::TestCase`). A call builder, or
+   * undefined.
+   */
+  externalSuperTarget(mod: string, name: string, ctx: Ctx): ((args: string) => string) | undefined {
+    const fn = this.defTsName(ctx);
+    for (const sc of this.index.scopes.values()) {
+      if (sc.kind !== "class") continue;
+      const anc = rubyAncestors(this.index, sc.fqn);
+      const at = anc.indexOf(mod);
+      if (at < 0) continue;
+      if (sc.superclassFqn && rubyAncestors(this.index, sc.superclassFqn).includes(mod)) continue;
+      for (const f of anc.slice(at)) {
+        const s = this.index.scopes.get(f)!;
+        const chain = [...lexicalChain(this.index, s.lexicalParent), s.fqn];
+        for (const inc of [...s.includes].reverse()) {
+          if (this.index.resolveConst(inc, chain)) continue;
+          const written = inc.filter((x: string) => x).join("::");
+          if (!this.index.depMethods.get(written)?.has(name)) continue;
+          const ref = this.constRef({ k: "const", path: inc } as N, ctx);
+          return (args) =>
+            `${ref}.instanceMethod(${JSON.stringify(fn)})!.value.call(${["this", args].filter(Boolean).join(", ")})`;
+        }
+      }
+      // The first class in the chain with a superclass outside the gem (or one
+      // a test support file only reopens, `ActiveSupport::TestCase`).
+      for (const f of anc) {
+        const s = this.index.scopes.get(f)!;
+        if (s.kind !== "class" || !s.superclassPath) continue;
+        const sup = s.superclassFqn ? this.index.scopes.get(s.superclassFqn) : undefined;
+        if (sup && ![...sup.files].every((x) => x.startsWith("test/"))) continue;
+        const ref = this.constRef({ k: "const", path: s.superclassPath } as N, ctx);
+        return (args) =>
+          `${ref}.prototype.${fn}.call(${["this", args].filter(Boolean).join(", ")})`;
+      }
+      return undefined;
+    }
+    return undefined;
   }
 
   /**
@@ -3141,6 +3250,19 @@ export class Lowerer {
       const hit = this.index.resolveConst(recvNode.path, ctx.nesting);
       const s = hit?.kind === "scope" ? this.index.scopes.get(hit.fqn) : undefined;
       const exp = s ? this.resolver.exportNames.get(s.fqn) : undefined;
+      // A module is a class (emit.ts emitModuleClass): its singleton method is
+      // a static one, called on it as Ruby calls it.
+      if (
+        s?.kind === "module" &&
+        exp &&
+        s.sdefs.has(name) &&
+        !/=$/.test(name) &&
+        this.resolver.isClassModule(s.fqn) &&
+        this.resolver.tsFileOf(s.sdefs.get(name)!.file) === exp.tsFile
+      ) {
+        this.stat(ctx, "module-static-call");
+        return `${r}.${tsMethodName(name, s.fqn, true)}(${argList()})`;
+      }
       if (s?.kind === "module" && exp && s.sdefs.has(name) && !/=$/.test(name)) {
         this.stat(ctx, "module-function-call");
         // A reopened module's function lives in the reopening file's twin

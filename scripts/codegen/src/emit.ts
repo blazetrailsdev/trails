@@ -932,12 +932,6 @@ export class Emitter {
       }
     }
     for (const u of units) {
-      if (u.kind !== "module" || !this.index.scopes.get(u.fqn)?.concern) continue;
-      if (this.plainConcerns.has(u.fqn)) continue;
-      const cm = names.get(`${u.fqn}::ClassMethods`);
-      if (cm) chunks.push(`${names.get(u.fqn)}.ClassMethods = ${cm};`);
-    }
-    for (const u of units) {
       if (!u.late?.length) continue;
       const exp = this.resolver.exportNames.get(u.fqn);
       const name = exp && exp.tsFile === tsFile ? exp.name : u.fqn.split("::").join("");
@@ -1226,8 +1220,15 @@ export class Emitter {
     const awaits = ctx.asyncBox!.awaits;
     // Record an async gem method, so the next emission pass awaits its callers
     // (cli.ts runs passes until no new method turns async).
-    if (!isCtor && (awaits || twin?.info.async || body.some((l) => /^return .*, async \(/.test(l))))
+    if (
+      !isCtor &&
+      (awaits || twin?.info.async || body.some((l) => /^return .*, async \(/.test(l)))
+    ) {
       this.resolver.asyncDefs.add(`${u.fqn}${opts.static ? "." : "#"}${d.name}`);
+      // A `ClassMethods` module's method is static on its class, and is still
+      // the module's instance method to Ruby's lookup (`extend`).
+      if (opts.static && !d.singleton) this.resolver.asyncDefs.add(`${u.fqn}#${d.name}`);
+    }
     const asy = !isCtor && (awaits || twin?.info.async) ? "async " : "";
     if (twin) f.stats["hand-twin"] = (f.stats["hand-twin"] ?? 0) + 1;
     if (twin?.info.async) f.stats["async-def"] = (f.stats["async-def"] ?? 0) + 1;
@@ -1753,8 +1754,17 @@ export class Emitter {
     const bases: string[] = [];
     const statics: string[] = [];
     const attrs: string[] = [];
-    const Included = this.lw.imp(ctx, "@blazetrails/ruby-compat", "Included");
-    const Extended = this.lw.imp(ctx, "@blazetrails/ruby-compat", "Extended");
+    // A module is a class (emitModuleClass): its instance side is the class's
+    // instance type, imported as a type; a module the hand port seats as a
+    // namespace object keeps `Included<>`.
+    const typeRef = (fqn: string): string | null => {
+      const e = this.resolver.exportNames.get(fqn);
+      if (!e) return null;
+      if (!this.resolver.isClassModule(fqn)) return null;
+      return e.tsFile === f.tsFile
+        ? e.name
+        : this.lw.impType(ctx, `@root/${e.tsFile.replace(/\.ts$/, ".js")}`, e.name);
+    };
     const key = this.resolver.oracleKey(u.fqn);
     // A `class_attribute` / `mattr_accessor` an `included do` block declares on
     // the includer: activesupport's accessor property, typed by the hand twin.
@@ -1778,7 +1788,9 @@ export class Emitter {
     const methods: string[] = [];
     for (const m of mods) {
       const ms = this.index.scopes.get(m)!;
-      const t = `${Included}<typeof ${ref(m)}>`;
+      const t =
+        typeRef(m) ??
+        `${this.lw.imp(ctx, "@blazetrails/ruby-compat", "Included")}<typeof ${ref(m)}>`;
       const names: string[] = [];
       for (const [d, info] of ms.defs) {
         // A reader whose writer another scope declares is an accessor half: a property.
@@ -1812,7 +1824,12 @@ export class Emitter {
           const n = fnName(d, cm.fqn);
           if (own.stat.has(n)) continue;
           own.stat.add(n);
-          statics.push(`declare static ${n}: ${Extended}<typeof ${ref(cm.fqn)}>[${quote(n)}];`);
+          const cmRef = typeRef(cm.fqn);
+          statics.push(
+            cmRef
+              ? `declare static ${n}: typeof ${cmRef}.${n};`
+              : `declare static ${n}: ${this.lw.imp(ctx, "@blazetrails/ruby-compat", "Extended")}<typeof ${ref(cm.fqn)}>[${quote(n)}];`,
+          );
         }
       }
     }
@@ -1953,6 +1970,15 @@ export class Emitter {
         });
         const t = this.lw.expr(targetIr, rctx);
         const prop = propName(pre + m.replace(/=$/, ""));
+        // A module that is a class carries the pair as an accessor, as a class does.
+        if (module && this.resolver.isClassModule(u.fqn)) {
+          out.push(
+            m.endsWith("=")
+              ? `set ${prop}(value: any) {\n  ${t}.${prop} = value;\n}`
+              : `get ${prop}(): any {\n  return ${t}.${prop};\n}`,
+          );
+          continue;
+        }
         if (m.endsWith("="))
           out.push(
             `set${prop[0].toUpperCase()}${prop.slice(1)}(${thisP}value: any): any {\n  return (${t}.${prop} = value);\n}`,
@@ -2001,7 +2027,241 @@ export class Emitter {
     return out;
   }
 
+  /**
+   * A Ruby module as a JS class (the hand port's shape, activejob core.ts /
+   * queue-name.ts): its instance methods are methods (`this` its includer), its
+   * singleton methods and a `ClassMethods` module's methods are static, its
+   * constants static properties, and `static [classModule] = true` tells
+   * ruby-compat's `include()` it is a module, whose prototype is copied onto the
+   * includer. A Concern is `extend(M, Concern)`, its `included do` block
+   * `M.included(null, function () { … })`.
+   */
+  emitModuleClass(u: Unit, name: string, f: FileCtx): { text: string; defs: number } {
+    const members: string[] = [];
+    const after: string[] = [];
+    const staticStmts: N[] = [];
+    const sclassStmts: N[] = [];
+    let defs = 0;
+    const body = this.flattenDefs(u.body);
+    const vis = this.visibilityOf(body);
+    this.ivarTypes(u, f, body);
+    const ctxStatic = this.baseCtx(u, f, { selfKind: "static", selfExpr: name });
+    const parentFqn = u.fqn.endsWith("::ClassMethods")
+      ? u.fqn.slice(0, -"::ClassMethods".length)
+      : "";
+    // A Concern's `ClassMethods` is extended onto the includer: every method is static.
+    const isCm = !!parentFqn && !!this.index.scopes.get(parentFqn)?.concern;
+    const allStatic =
+      isCm ||
+      body.some(
+        (s) =>
+          s.k === "call" &&
+          s.recv === null &&
+          ((s.name === "module_function" && s.args.length === 0) ||
+            (s.name === "extend" && s.args[0]?.k === "self")),
+      );
+    const isConcern = !!this.index.scopes.get(u.fqn)?.concern;
+    let includedBlock: N | null = null;
+    const accessor = (js: string, kind: string, isStatic: boolean) => {
+      const st = isStatic ? "static " : "";
+      const field = `this._${js.replace(/^_/, "")}`;
+      if (kind !== "attr_writer") members.push(`${st}get ${js}(): any {\n  return ${field};\n}`);
+      if (kind !== "attr_reader" && kind !== "attr")
+        members.push(`${st}set ${js}(value: any) {\n  ${field} = value;\n}`);
+    };
+    for (const s of body) {
+      if (s.k === "def") {
+        if (s.name === "initialize" && !s.singleton && this.inlinedModules().has(u.fqn)) continue;
+        defs++;
+        const isStatic = s.singleton || allStatic;
+        members.push(
+          this.emitMethod(s, u, f, {
+            static: isStatic,
+            module: !s.singleton && !(allStatic && !isCm),
+            vis: vis.get(s) ?? "public",
+            ...(s.singleton || (allStatic && !isCm) ? { selfExpr: "this" } : {}),
+          }),
+        );
+      } else if (s.k === "casgn" && s.path?.length === 1) {
+        members.push(`static ${s.path[0]}: any = ${this.lw.expr(s.value, ctxStatic)};`);
+      } else if (
+        s.k === "call" &&
+        s.recv === null &&
+        /^attr_(reader|accessor|writer)$|^attr$/.test(s.name)
+      ) {
+        for (const a of s.args)
+          if (a.k === "sym") {
+            accessor(propName(a.value), s.name, allStatic);
+            defs++;
+          }
+      } else if (
+        s.k === "call" &&
+        s.recv === null &&
+        s.name === "included" &&
+        s.block?.k === "block"
+      ) {
+        includedBlock = s.block;
+      } else if (
+        s.k === "call" &&
+        s.recv === null &&
+        ["include", "extend", "prepend"].includes(s.name)
+      ) {
+        for (const a of s.args) {
+          if (a.k === "self") continue;
+          if (a.k === "const" && a.path.join("::").endsWith("ActiveSupport::Concern")) continue;
+          // activesupport ports its testing assertions as flat functions, which
+          // a helper module's `assert_*` calls reach by name: nothing to mix in.
+          if (
+            a.k === "const" &&
+            a.path.filter((x: string) => x).join("::") === "ActiveSupport::Testing::Assertions"
+          )
+            continue;
+          after.push(`${this.lw.rc(ctxStatic, s.name)}(${name}, ${this.lw.expr(a, ctxStatic)});`);
+        }
+      } else if (
+        s.k === "call" &&
+        s.recv === null &&
+        [
+          "private",
+          "protected",
+          "public",
+          "private_constant",
+          "module_function",
+          "private_class_method",
+          "public_class_method",
+          "require",
+          "require_relative",
+        ].includes(s.name)
+      ) {
+        continue;
+      } else if (s.k === "call" && s.recv === null && s.name === "delegate") {
+        members.push(...this.delegate(s, u, f, true).map((m) => (allStatic ? `static ${m}` : m)));
+      } else if (
+        s.k === "alias" ||
+        (s.k === "call" && s.recv === null && s.name === "alias_method" && s.args.length === 2)
+      ) {
+        const [nw, old] = s.k === "alias" ? [s.new, s.old] : [s.args[0].value, s.args[1].value];
+        if (typeof nw !== "string" || typeof old !== "string") continue;
+        const [ps, as] = this.aliasSignature(u.fqn, old, allStatic);
+        members.push(
+          `${allStatic ? "static " : ""}${propKey(tsMethodName(nw, u.fqn, allStatic))}(${ps}): any {\n  return this.${tsMethodName(old, u.fqn, allStatic)}(${as});\n}`,
+        );
+        defs++;
+      } else staticStmts.push(s);
+    }
+    for (const s of this.flattenDefs(u.sbody)) {
+      if (s.k === "def") {
+        defs++;
+        members.push(
+          this.emitMethod(s, u, f, {
+            static: true,
+            module: false,
+            vis: "public",
+            selfExpr: "this",
+          }),
+        );
+      } else if (
+        s.k === "call" &&
+        s.recv === null &&
+        /^attr_(reader|accessor|writer)$/.test(s.name)
+      ) {
+        for (const a of s.args)
+          if (a.k === "sym") {
+            accessor(propName(a.value), s.name, true);
+            defs++;
+          }
+      } else if (s.k === "call" && s.recv === null && s.name === "delegate") {
+        for (const d of delegateDefs(s)) {
+          defs++;
+          members.push(
+            this.emitMethod(d, u, f, {
+              static: true,
+              module: false,
+              vis: "public",
+              selfExpr: "this",
+            }),
+          );
+        }
+      } else if (
+        s.k === "call" &&
+        s.recv === null &&
+        ["private", "protected", "public"].includes(s.name)
+      ) {
+        continue;
+      } else sclassStmts.push(s);
+    }
+    // `extend ActiveSupport::Concern` first, so a concern this module includes
+    // records a dependency instead of running against the module itself.
+    if (isConcern)
+      after.unshift(
+        `${this.lw.rc(ctxStatic, "extend")}(${name}, ${this.lw.as(ctxStatic, "Concern")});`,
+      );
+    if (includedBlock) {
+      const host = this.hostThis({ ...u, fqn: `${u.fqn}::ClassMethods` } as Unit, f);
+      const ic = this.baseCtx(u, f, { selfKind: "static", selfExpr: "this" });
+      const lines = this.lw.block(this.lw.seqBody(includedBlock.body), ic, false);
+      const hoisted: Set<string> | undefined = ic.scope.hoisted;
+      if (hoisted?.size) lines.unshift(`let ${[...hoisted].map((h) => jsIdent(h)).join(", ")};`);
+      if (isConcern)
+        after.push(
+          `${name}.included(null, function (this: ${host}): void {\n${indent(lines).join("\n")}\n});`,
+        );
+      else
+        members.push(
+          `static [${this.lw.rc(ic, "included")}](base: ${host}): void {\n${indent(lines.map((l) => l.replace(/\bthis\b/g, "base"))).join("\n")}\n}`,
+        );
+    }
+    if (sclassStmts.length) {
+      const scVar = `${name}Singleton`;
+      const tc = this.baseCtx(u, f, { selfKind: "static", selfExpr: scVar });
+      const lines = this.lw.block(sclassStmts, tc, false);
+      const hoisted: Set<string> | undefined = tc.scope.hoisted;
+      if (hoisted?.size) lines.unshift(`let ${[...hoisted].map((h) => jsIdent(h)).join(", ")};`);
+      if (lines.some((l) => l.includes(scVar)))
+        after.push(`const ${scVar} = ${this.lw.rc(tc, "rbObjSingletonClass")}(${name});`);
+      after.push(...lines);
+    }
+    if (staticStmts.length) {
+      const sc = this.baseCtx(u, f, { selfKind: "static", selfExpr: name });
+      const lines = this.lw.block(staticStmts, sc, false);
+      const hoisted: Set<string> | undefined = sc.scope.hoisted;
+      if (hoisted?.size) lines.unshift(`let ${[...hoisted].map((h) => jsIdent(h)).join(", ")};`);
+      if (lines.length) after.push(`{\n${indent(lines).join("\n")}\n}`);
+    }
+    if (!members.some((m) => /^static toString\(/.test(m)))
+      members.unshift(`static toString(): string {\n  return ${JSON.stringify(u.fqn)};\n}`);
+    members.unshift(`static readonly [${this.lw.rc(ctxStatic, "classModule")}] = true;`);
+    const sig = this.ivarDecls(u, f, members);
+    // What `extend(M, Concern)` gives it, and the `ClassMethods` constant that
+    // `rbModConstSet` seats on it: declared, so they type-check.
+    if (isConcern) {
+      sig.push(
+        `declare static included: ${this.lw.imp(ctxStatic, "@blazetrails/ruby-compat", "Extended")}<typeof ${this.lw.as(ctxStatic, "Concern")}>["included"];`,
+      );
+      const cm = this.resolver.exportNames.get(`${u.fqn}::ClassMethods`);
+      if (cm)
+        sig.push(
+          `declare static ClassMethods: typeof ${cm.tsFile === f.tsFile ? cm.name : this.lw.impType(ctxStatic, `@root/${cm.tsFile.replace(/\.ts$/, ".js")}`, cm.name)};`,
+        );
+    }
+    const text = [
+      `export class ${name} {`,
+      ...indent([...sig, ...dedupeMembers(members).flatMap((m) => ["", m])]),
+      "}",
+      ...after,
+    ].join("\n");
+    return { text, defs };
+  }
+
   emitModule(u: Unit, name: string, f: FileCtx): { text: string; defs: number } {
+    // A namespace the hand port seats in `namespaces.ts` keeps the seat object;
+    // every other module is a class.
+    // A mixin is a class; a module of functions keeps the hand port's object
+    // of functions (activejob arguments.ts), as do a module that mixes into its
+    // own singleton class (a JS class has no singleton class apart from its
+    // statics) and a namespace seat.
+    if (this.resolver.isClassModule(u.fqn) && this.resolver.exportNames.get(u.fqn)?.name === name)
+      return this.emitModuleClass(u, name, f);
     const fileFns: Set<string> = (f.fileFns ??= new Set<string>());
     const members: string[] = [];
     const fns: string[] = [];

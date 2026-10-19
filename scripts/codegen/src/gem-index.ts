@@ -42,6 +42,10 @@ export interface ScopeInfo {
   extends: string[][];
   consts: Set<string>;
   concern: boolean;
+  /** `module_function` (no arguments) or `extend self`: a module of functions. */
+  moduleFunction?: boolean;
+  /** `class << self; include M`: needs a singleton class apart from the module. */
+  sclassMixin?: boolean;
   /** Short TS name it is exported as from `primaryFile`'s TS twin. */
   exportName?: string;
   lexicalParent?: string;
@@ -69,6 +73,8 @@ export class GemIndex {
    * constructor's `super`). A module the manifest does not know is absent.
    */
   depInits = new Map<string, DepInitHook | null>();
+  /** A dependency module (as written in an `include`) → the instance methods the Rails manifest gives it. */
+  depMethods = new Map<string, Set<string>>();
   /**
    * Methods of other gems (Rails manifest) that take `*rest` and a block, by
    * Ruby name: JS cannot tell a trailing block from one more rest element, so a
@@ -289,10 +295,12 @@ export class GemIndex {
             this.classAttrPredicates.add(`${a}?`);
         }
       } else if (name === "include" || name === "prepend") {
+        if (singleton) s.sclassMixin = true;
         for (const a of node.args) if (a.k === "const") s.includes.push(a.path);
         if (name === "prepend")
           for (const a of node.args) if (a.k === "const") s.prepends.push(a.path);
       } else if (name === "extend") {
+        if (!singleton && node.args.some((a: N) => a.k === "self")) s.moduleFunction = true;
         for (const a of node.args) {
           if (a.k !== "const") continue;
           if (a.path.join("::").endsWith("ActiveSupport::Concern")) s.concern = true;
@@ -304,6 +312,7 @@ export class GemIndex {
         name === "public" ||
         name === "module_function"
       ) {
+        if (name === "module_function" && !node.args.length && !singleton) s.moduleFunction = true;
         for (const a of node.args) if (a.k === "def") this.visit(a, nesting, file, singleton);
       } else if ((name === "included" || name === "prepended") && node.block?.k === "block") {
         // An `included do` block runs on the includer: its `class_attribute` /

@@ -192,6 +192,17 @@ index.finish((f) => resolver.tsFileOf(f));
     for (const inc of sc.includes) {
       if (index.resolveConst(inc, [...chain, sc.fqn])) continue;
       const written = inc.filter((x) => x).join("::");
+      // The instance methods a dependency module defines, for a gem module's
+      // `super` that reaches past the gem (lower.ts `externalSuperTarget`).
+      if (!index.depMethods.has(written)) {
+        const cands0 = [...[...chain, sc.fqn].map((s0) => `${s0}::${written}`).reverse(), written];
+        const fq0 = cands0.find((c) => modules.has(c));
+        if (fq0)
+          index.depMethods.set(
+            written,
+            new Set((modules.get(fq0).instanceMethods ?? []).map((m: any) => m.name as string)),
+          );
+      }
       if (index.depInits.has(written) || wanted.has(written)) continue;
       // Ruby's lexical lookup, innermost scope first, then the path as written.
       const scopes = [...chain, sc.fqn];
