@@ -739,9 +739,9 @@ export class Request {
   /** @internal */
   parseFormattedParameters(
     parsers: ParameterParsers,
-    fallback: () => Record<string, unknown>,
+    fn: () => Record<string, unknown>,
   ): ReturnType<ParameterParser> {
-    return _parseFormattedParameters.call(this, parsers, fallback);
+    return _parseFormattedParameters.call(this, parsers, fn);
   }
   /** @internal */
   logParseErrorOnce(): void {

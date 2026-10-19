@@ -2,7 +2,7 @@ import type { SafeBuffer } from "@blazetrails/activesupport";
 import { merge } from "@blazetrails/ruby-compat";
 import { X_CASCADE } from "../constants.js";
 import { Builder } from "./gtg/index.js";
-import { unescapeUri } from "./router/utils.js";
+import { Utils } from "./router/utils.js";
 import type { Route, VerbRequest } from "./route.js";
 import type { Routes } from "./routes.js";
 
@@ -160,7 +160,7 @@ export class Router {
       const pathParameters: Record<string, unknown> = {};
       matchData.names.forEach((name, i) => {
         const val = matchData.at(i + 1);
-        if (val != null) pathParameters[name] = unescapeUri(val);
+        if (val != null) pathParameters[name] = Utils.unescapeUri(val);
       });
       yield { match: matchData, parameters: pathParameters, route: r };
     }

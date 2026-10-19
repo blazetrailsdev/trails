@@ -1,5 +1,6 @@
-import { afterEach, describe, it, expect } from "vitest";
+import { afterEach, describe, it } from "vitest";
 import { Base } from "../base.js";
+import { assertResponse } from "../../action-dispatch/testing/assertions/response.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import {
@@ -92,7 +93,7 @@ describe("AllowBrowserTest", () => {
     );
     const c = new C();
     await c.dispatch("hello", makeRequest(FIREFOX_114), makeResponse());
-    expect(c.status).toBe(426);
+    assertResponse.call(c, "upgrade_required");
   });
 
   it("blocked browser below version limit with method name", async () => {
@@ -101,7 +102,7 @@ describe("AllowBrowserTest", () => {
     });
     const c = new C();
     await c.dispatch("helloMethodName", makeRequest(FIREFOX_114), makeResponse());
-    expect(c.status).toBe(426);
+    assertResponse.call(c, "upgrade_required");
   });
 
   it("blocked browser by name", async () => {
@@ -114,7 +115,7 @@ describe("AllowBrowserTest", () => {
     );
     const c = new C();
     await c.dispatch("hello", makeRequest(IE_11), makeResponse());
-    expect(c.status).toBe(426);
+    assertResponse.call(c, "upgrade_required");
   });
 
   it("allowed browsers above specific version limit", async () => {
@@ -126,11 +127,17 @@ describe("AllowBrowserTest", () => {
       { only: ["hello"] },
     );
 
-    for (const ua of [SAFARI_17_2_0, CHROME_120, OPERA_106]) {
-      const c = new C();
-      await c.dispatch("hello", makeRequest(ua), makeResponse());
-      expect(c.status).toBe(200);
-    }
+    let c = new C();
+    await c.dispatch("hello", makeRequest(SAFARI_17_2_0), makeResponse());
+    assertResponse.call(c, "ok");
+
+    c = new C();
+    await c.dispatch("hello", makeRequest(CHROME_120), makeResponse());
+    assertResponse.call(c, "ok");
+
+    c = new C();
+    await c.dispatch("hello", makeRequest(OPERA_106), makeResponse());
+    assertResponse.call(c, "ok");
   });
 
   it("browsers against modern limit", async () => {
@@ -142,19 +149,21 @@ describe("AllowBrowserTest", () => {
       { only: ["modern"] },
     );
 
-    const allowed = [SAFARI_17_2_0, CHROME_120, OPERA_106];
-    for (const ua of allowed) {
-      const c = new C();
-      await c.dispatch("modern", makeRequest(ua), makeResponse());
-      expect(c.status).toBe(200);
-    }
+    let c = new C();
+    await c.dispatch("modern", makeRequest(SAFARI_17_2_0), makeResponse());
+    assertResponse.call(c, "ok");
 
-    const blocked = [CHROME_118];
-    for (const ua of blocked) {
-      const c = new C();
-      await c.dispatch("modern", makeRequest(ua), makeResponse());
-      expect(c.status).toBe(426);
-    }
+    c = new C();
+    await c.dispatch("modern", makeRequest(CHROME_118), makeResponse());
+    assertResponse.call(c, "upgrade_required");
+
+    c = new C();
+    await c.dispatch("modern", makeRequest(CHROME_120), makeResponse());
+    assertResponse.call(c, "ok");
+
+    c = new C();
+    await c.dispatch("modern", makeRequest(OPERA_106), makeResponse());
+    assertResponse.call(c, "ok");
   });
 
   it("bots", async () => {
@@ -167,7 +176,7 @@ describe("AllowBrowserTest", () => {
     );
     const c = new C();
     await c.dispatch("hello", makeRequest(GOOGLE_BOT), makeResponse());
-    expect(c.status).toBe(200);
+    assertResponse.call(c, "ok");
 
     const C2 = createController(
       "modern",
@@ -178,7 +187,7 @@ describe("AllowBrowserTest", () => {
     );
     const c2 = new C2();
     await c2.dispatch("modern", makeRequest(GOOGLE_BOT), makeResponse());
-    expect(c2.status).toBe(200);
+    assertResponse.call(c2, "ok");
   });
 
   it("a blocked request instruments a browser_block.action_controller event", async () => {

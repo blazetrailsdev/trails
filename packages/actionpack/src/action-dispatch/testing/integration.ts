@@ -492,7 +492,7 @@ function openSession<T extends RunnerHost>(this: T, block?: (session: T) => void
   return session;
 }
 
-function getAssertions(this: RunnerHost): number {
+function assertions(this: RunnerHost): number {
   return this.rootSession
     ? this.rootSession.assertions
     : (Runner.superMethod(this, "assertions")!() as number);
@@ -639,7 +639,7 @@ export const Runner = new Module((mod) => {
   mod.moduleEval((m) => {
     Object.defineProperty(m, "integrationSession", { get: integrationSession, configurable: true });
     Object.defineProperty(m, "assertions", {
-      get: getAssertions,
+      get: assertions,
       set: setAssertions,
       configurable: true,
     });

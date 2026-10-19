@@ -2,10 +2,7 @@ import { extractOptionsBang, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 import { URL as UrlHelpers, type UrlOptions } from "../http/url.js";
-import {
-  escapeFragment as journeyEscapeFragment,
-  escapePath as journeyEscapePath,
-} from "../journey/router/utils.js";
+import { Utils } from "../journey/router/utils.js";
 import { Endpoint } from "./endpoint.js";
 import { Utils as RackUtils, type RackEnv } from "@blazetrails/rack";
 import {
@@ -115,12 +112,12 @@ export class Redirect<B = unknown> extends Endpoint {
 
   /** @internal */
   protected escapeFragment(params: Record<string, string>): Record<string, string> {
-    return transformValues(params, journeyEscapeFragment);
+    return transformValues(params, (v) => Utils.escapeFragment(v));
   }
 
   /** @internal */
   protected escapePath(params: Record<string, string>): Record<string, string> {
-    return transformValues(params, journeyEscapePath);
+    return transformValues(params, (v) => Utils.escapePath(v));
   }
 }
 

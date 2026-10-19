@@ -1,10 +1,4 @@
-export {
-  normalizePath,
-  escapePath,
-  escapeSegment,
-  escapeFragment,
-  unescapeUri,
-} from "./router/utils.js";
+export { Utils } from "./router/utils.js";
 
 export { Scanner, type Token } from "./scanner.js";
 

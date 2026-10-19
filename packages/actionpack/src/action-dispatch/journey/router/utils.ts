@@ -1,14 +1,5 @@
 import { format, strNew } from "@blazetrails/ruby-compat";
 
-export function normalizePath(path: string | null | undefined): string {
-  let p = `/${path ?? ""}`.replace(/\/+/g, "/");
-  if (p !== "/") {
-    if (p.endsWith("/")) p = p.slice(0, -1);
-    p = p.replace(/(%[a-f0-9]{2})/g, (m) => m.toUpperCase());
-  }
-  return p;
-}
-
 export class UriEncoder {
   static readonly ENCODE = "%%%02X";
   static readonly EMPTY = "";
@@ -70,20 +61,33 @@ export class UriEncoder {
   }
 }
 
-const ENCODER = new UriEncoder();
+export class Utils {
+  static normalizePath(path: string | null | undefined): string {
+    let p = `/${path ?? ""}`.replace(/\/+/g, "/");
+    if (p !== "/") {
+      if (p.endsWith("/")) p = p.slice(0, -1);
+      p = p.replace(/(%[a-f0-9]{2})/g, (m) => m.toUpperCase());
+    }
+    return p;
+  }
 
-export function escapePath(path: unknown): string {
-  return ENCODER.escapePath(String(path));
-}
+  static UriEncoder = UriEncoder;
 
-export function escapeSegment(segment: unknown): string {
-  return ENCODER.escapeSegment(String(segment));
-}
+  static readonly ENCODER = new UriEncoder();
 
-export function escapeFragment(fragment: unknown): string {
-  return ENCODER.escapeFragment(String(fragment));
-}
+  static escapePath(path: unknown): string {
+    return Utils.ENCODER.escapePath(String(path));
+  }
 
-export function unescapeUri(uri: string): string {
-  return ENCODER.unescapeUri(uri);
+  static escapeSegment(segment: unknown): string {
+    return Utils.ENCODER.escapeSegment(String(segment));
+  }
+
+  static escapeFragment(fragment: unknown): string {
+    return Utils.ENCODER.escapeFragment(String(fragment));
+  }
+
+  static unescapeUri(uri: string): string {
+    return Utils.ENCODER.unescapeUri(uri);
+  }
 }

@@ -2,14 +2,15 @@ import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
-import { assert, assertNot } from "@blazetrails/activesupport";
+import { Dir, File, FileUtils, Pathname } from "@blazetrails/ruby-compat";
+import { assert, assertEqual, assertNot } from "@blazetrails/activesupport";
 import {
   takeScreenshot,
   takeFailedScreenshot,
   imageName,
   imagePath,
   htmlPath,
+  relativeImagePath,
   screenshotsDir,
   ScreenshotHelper,
   outputType,
@@ -32,6 +33,8 @@ vi.spyOn(firefox, "executablePath").mockImplementation(() => foundExecutable);
 const { DrivenByRackTest, DrivenBySeleniumWithChrome } =
   await import("../../../test-helpers/abstract-unit.js");
 
+const root = (path: string): string => new Pathname(Dir.pwd()).join(path).toString();
+
 describe("ScreenshotHelperTest", () => {
   let host: InstanceType<typeof DrivenBySeleniumWithChrome>;
 
@@ -48,26 +51,26 @@ describe("ScreenshotHelperTest", () => {
   });
 
   it("image path is saved in tmp directory", () => {
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/0_x\.png$/);
+    assertEqual(root("tmp/screenshots/0_x.png"), imagePath.call(host));
   });
 
   it("image path unique counter is changed when incremented", () => {
     incrementUnique.call(host);
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/1_x\.png$/);
+    assertEqual(root("tmp/screenshots/1_x.png"), imagePath.call(host));
   });
 
   it("image path unique counter generates different path in same test", () => {
     incrementUnique.call(host);
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/1_x\.png$/);
+    assertEqual(root("tmp/screenshots/1_x.png"), imagePath.call(host));
     incrementUnique.call(host);
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/2_x\.png$/);
+    assertEqual(root("tmp/screenshots/2_x.png"), imagePath.call(host));
   });
 
   it("image path uses the Vitest.save_path to set a custom directory", () => {
     const originalSavePath = ScreenshotHelper.screenshotDirectory;
     ScreenshotHelper.screenshotDirectory = "custom_dir";
     try {
-      expect(imagePath.call(host)).toMatch(/custom_dir\/0_x\.png$/);
+      assertEqual(root("custom_dir/0_x.png"), imagePath.call(host));
     } finally {
       ScreenshotHelper.screenshotDirectory = originalSavePath;
     }
@@ -75,22 +78,21 @@ describe("ScreenshotHelperTest", () => {
 
   it("image path includes failures text if test did not pass", () => {
     vi.spyOn(host, "isPassed").mockReturnValue(false);
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/failures_x\.png$/);
-    expect(htmlPath.call(host)).toMatch(/tmp\/screenshots\/failures_x\.html$/);
+    assertEqual(root("tmp/screenshots/failures_x.png"), imagePath.call(host));
+    assertEqual(root("tmp/screenshots/failures_x.html"), htmlPath.call(host));
   });
 
   it("image path does not include failures text if test skipped", () => {
     vi.spyOn(host, "isPassed").mockReturnValue(false);
     vi.spyOn(host, "isSkipped").mockReturnValue(true);
-    expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/0_x\.png$/);
-    expect(htmlPath.call(host)).toMatch(/tmp\/screenshots\/0_x\.html$/);
+    assertEqual(root("tmp/screenshots/0_x.png"), imagePath.call(host));
+    assertEqual(root("tmp/screenshots/0_x.html"), htmlPath.call(host));
   });
 
   it("image name truncates names over 225 characters including counter", () => {
     const longHost = new DrivenBySeleniumWithChrome("x".repeat(400));
-    const name = imageName.call(longHost);
-    expect(name.length).toBeLessThanOrEqual(225);
-    expect(name).toMatch(/^0_x+$/);
+    assertEqual(root(`tmp/screenshots/0_${"x".repeat(223)}.png`), imagePath.call(longHost));
+    assertEqual(root(`tmp/screenshots/0_${"x".repeat(223)}.html`), htmlPath.call(longHost));
   });
 
   it("defaults to simple output for the screenshot", () => {
@@ -99,8 +101,8 @@ describe("ScreenshotHelperTest", () => {
 
   it("Non word characters are replaced with dashes in paths", () => {
     const h = new DrivenBySeleniumWithChrome("x/y\\z?<br>-span");
-    expect(imagePath.call(h)).toMatch(/tmp\/screenshots\/0_x-y-z-br-span\.png$/);
-    expect(htmlPath.call(h)).toMatch(/tmp\/screenshots\/0_x-y-z-br-span\.html$/);
+    assertEqual(root("tmp/screenshots/0_x-y-z-br-span.png"), imagePath.call(h));
+    assertEqual(root("tmp/screenshots/0_x-y-z-br-span.html"), htmlPath.call(h));
   });
 
   it("take_screenshot allows changing screenshot display format via screenshot: kwarg", () => {
@@ -141,14 +143,19 @@ describe("ScreenshotHelperTest", () => {
   it("take_screenshot saves HTML and shows link to it when using RAILS_SYSTEM_TESTING_SCREENSHOT_HTML env", () => {
     vi.stubEnv("RAILS_SYSTEM_TESTING_SCREENSHOT_HTML", "1");
     const msgs: string[] = [];
+    let calledSaveHtml = false;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation((m: string) => msgs.push(m));
     const page = {
       screenshot: vi.fn().mockResolvedValue(Buffer.alloc(0)),
-      content: vi.fn().mockResolvedValue("<html></html>"),
+      content: vi.fn(async () => {
+        calledSaveHtml = true;
+        return "<html></html>";
+      }),
     };
     host._page = page as unknown as typeof host._page;
     return takeScreenshot.call(host).then(() => {
       const out = msgs.join("\n");
+      assert(calledSaveHtml);
       expect(out).toMatch(/\[Screenshot HTML\]/);
       consoleSpy.mockRestore();
     });
@@ -178,17 +185,13 @@ describe("ScreenshotHelperTest", () => {
     host._page = page as unknown as typeof host._page;
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     return takeFailedScreenshot.call(host).then(() => {
-      expect(host.metadata["failure_screenshot_path"]).toMatch(
-        /tmp\/screenshots\/failures_x\.png$/,
-      );
+      assertEqual(relativeImagePath.call(host), host.metadata["failure_screenshot_path"]);
       consoleSpy.mockRestore();
     });
   });
 
   it("image path returns the absolute path from root", () => {
-    const path = imagePath.call(host);
-    expect(path).toContain("tmp/screenshots");
-    expect(path).toMatch(/tmp\/screenshots\/0_x\.png$/);
+    assertEqual(root("tmp/screenshots/0_x.png"), imagePath.call(host));
   });
 
   it("screenshotsDir defaults to tmp/screenshots", () => {

@@ -1,8 +1,4 @@
-/** @internal */
+import { StandardError } from "@blazetrails/ruby-compat";
 
-export class AbstractControllerError extends Error {
-  constructor(message?: string) {
-    super(message);
-    this.name = "AbstractControllerError";
-  }
-}
+/** @internal */
+export class Error extends StandardError {}

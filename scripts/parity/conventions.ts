@@ -655,6 +655,12 @@ export interface ScopedSkipGroup {
    * extra-surface allows every one of them.
    */
   tsMirrorName?: string | string[];
+  /**
+   * The packages whose `rubyFiles` the skip names, when a bare file path is
+   * not unique across packages: activemodel's `api.rb` and actioncontroller's
+   * `api.rb` are two files. Unset, the skip applies in every package.
+   */
+  packages?: string[];
 }
 
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
@@ -853,6 +859,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "map to a `constructor`.",
     names: ["initialize"],
     rubyFiles: ["api.rb"],
+    packages: ["activemodel"],
     tsMirrorName: "initialize",
   },
   {
@@ -1169,19 +1176,16 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
 ];
 
-/** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */
-const SCOPED_SKIP_FILES = new Map<string, Set<string>>();
-for (const g of SCOPED_SKIP_GROUPS) {
-  for (const name of g.names) {
-    const files = SCOPED_SKIP_FILES.get(name) ?? new Set<string>();
-    for (const f of g.rubyFiles) files.add(f);
-    SCOPED_SKIP_FILES.set(name, files);
-  }
+function scopedSkipAppliesIn(g: ScopedSkipGroup, pkg: string | undefined): boolean {
+  return pkg === undefined || g.packages === undefined || g.packages.includes(pkg);
 }
 
 /** True when `rubyName` should be skipped specifically within `rubyFile`. */
-export function isScopedSkip(rubyName: string, rubyFile: string): boolean {
-  return SCOPED_SKIP_FILES.get(rubyName)?.has(rubyFile) ?? false;
+export function isScopedSkip(rubyName: string, rubyFile: string, pkg?: string): boolean {
+  return SCOPED_SKIP_GROUPS.some(
+    (g) =>
+      g.names.includes(rubyName) && g.rubyFiles.includes(rubyFile) && scopedSkipAppliesIn(g, pkg),
+  );
 }
 
 /**
@@ -1189,9 +1193,13 @@ export function isScopedSkip(rubyName: string, rubyFile: string): boolean {
  * a list, or null when the scoped skip declares no faithful TS spelling (or
  * doesn't apply).
  */
-export function scopedSkipMirrorName(rubyName: string, rubyFile: string): string[] | null {
+export function scopedSkipMirrorName(
+  rubyName: string,
+  rubyFile: string,
+  pkg?: string,
+): string[] | null {
   for (const g of SCOPED_SKIP_GROUPS) {
-    if (g.tsMirrorName === undefined) continue;
+    if (g.tsMirrorName === undefined || !scopedSkipAppliesIn(g, pkg)) continue;
     if (g.names.includes(rubyName) && g.rubyFiles.includes(rubyFile)) {
       return typeof g.tsMirrorName === "string" ? [g.tsMirrorName] : g.tsMirrorName;
     }

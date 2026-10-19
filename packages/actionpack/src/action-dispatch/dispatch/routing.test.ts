@@ -5,11 +5,11 @@ import {
   type DrawCallback,
   type NamedRouteHelper,
 } from "../routing/route-set.js";
-import { bodyFromString, bodyToString, MockRequest } from "@blazetrails/rack";
+import { bodyFromString, bodyToString, MockRequest, Utils as RackUtils } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import { controllerConstants, Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
-import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
+import { Utils } from "../journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   pluralize,
@@ -1358,12 +1358,13 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("rooms#edit");
   });
 
-  it("resources controller name is not pluralized", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("resources controller name is not pluralized", async () => {
+    draw(function () {
       this.resources("content");
     });
-    expect(routes.recognizePath("/content").controller).toBe("content");
+
+    await t.get("/content");
+    expect(t.response.body).toBe("content#index");
   });
 
   it("resources are not pluralized", async () => {
@@ -1428,13 +1429,16 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("medical/taxis#destroy");
   });
 
-  it("router removes invalid conditions", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/tickets", { to: "tickets#index", as: "tickets" });
+  it("router removes invalid conditions", async () => {
+    draw(function () {
+      this.scope({ constraints: { id: /\d+/ } }, () => {
+        this.get("/tickets", { to: "tickets#index", as: "tickets" });
+      });
     });
-    expect(() => routes.recognizePath("/tickets")).not.toThrow();
-    expect(routes.pathFor({}, "tickets")).toBe("/tickets");
+
+    await t.get("/tickets");
+    expect(t.response.body).toBe("tickets#index");
+    expect(t.ticketsPath()).toBe("/tickets");
   });
 
   it("route defined in resources scope level", async () => {
@@ -1734,18 +1738,20 @@ describe("TestRoutingMapper", () => {
     expect(t.postPath({ id: "rails-rocks" })).toBe("/posts/rails-rocks");
   });
 
-  it("named character classes in regexp constraints", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
+  it("named character classes in regexp constraints", async () => {
+    draw(function () {
       this.get("/purchases/:token/:filename", {
         to: "purchases#fetch",
-        constraints: { token: /[a-zA-Z0-9]{10}/, filename: /(.+)/ },
+        token: /[a-zA-Z0-9]{10}/,
+        filename: /(.+)/,
         as: "purchase",
       });
     });
-    expect(() => routes.recognizePath("/purchases/315004be7e/Ruby_on_Rails.pdf")).not.toThrow();
-    expect(routes.pathFor({ token: "315004be7e", filename: "Ruby_on_Rails.pdf" }, "purchase")).toBe(
-      "/purchases/315004be7e/Ruby_on_Rails.pdf",
+
+    await t.get("/purchases/315004be7e/Ruby_on_Rails_3.pdf");
+    expect(t.response.body).toBe("purchases#fetch");
+    expect(t.purchasePath({ token: "315004be7e", filename: "Ruby_on_Rails_3.pdf" })).toBe(
+      "/purchases/315004be7e/Ruby_on_Rails_3.pdf",
     );
   });
 
@@ -2203,13 +2209,13 @@ describe("TestRoutingMapper", () => {
     expect(t.response.body).toBe("customers#secret");
   });
 
-  it("glob parameter accepts regexp", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/posts/*path", { to: "posts#show" });
+  it("glob parameter accepts regexp", async () => {
+    draw(function () {
+      this.get("/:locale/*file.:format", { to: "files#show", file: /path\/to\/existing\/file/ });
     });
-    const m = routes.recognizePath("/posts/2024/01/hello");
-    expect(m.path).toBe("2024/01/hello");
+
+    await t.get("/en/path/to/existing/file.html");
+    expect(t.response.status).toBe(200);
   });
 
   it("optional scoped root hierarchy", async () => {
@@ -4470,11 +4476,11 @@ describe("ActionController::Routing", () => {
   });
 
   it("route generation escapes unsafe path characters", () => {
-    expect(escapeSegment("a b/c")).toBe("a%20b%2Fc");
+    expect(Utils.escapeSegment("a b/c")).toBe("a%20b%2Fc");
   });
 
   it("route recognition unescapes path components", () => {
-    expect(unescapeUri("a%20b%2Fc")).toBe("a b/c");
+    expect(Utils.unescapeUri("a%20b%2Fc")).toBe("a b/c");
   });
 
   it("dash with custom regexp", () => {
@@ -4665,30 +4671,57 @@ describe("TestRecognizePath", () => {
 });
 
 describe("TestTildeAndMinusPaths", () => {
-  it("recognizes tilde path", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/~user", { to: "users#show" });
-    });
-    expect(() => routes.recognizePath("/~user")).not.toThrow();
+  class TestTildeAndMinusPaths extends IntegrationTest {}
+  registerConstant("TestTildeAndMinusPaths", TestTildeAndMinusPaths);
+
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    const ok = (_env: unknown) => [200, { "Content-Type": "text/plain" }, []];
+
+    this.get({ "/~user": ok });
+    this.get({ "/young-and-fine": ok });
+  });
+  const APP = IntegrationTest.buildApp(Routes);
+
+  let t: TestTildeAndMinusPaths;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestTildeAndMinusPaths;
+    t.app = APP;
   });
 
-  it("recognizes minus path", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/young-and-fine", { to: "pages#show" });
-    });
-    expect(() => routes.recognizePath("/young-and-fine")).not.toThrow();
+  it("recognizes tilde path", async () => {
+    await t.get("/~user");
+    assertEqual("200", t.response.code);
+  });
+
+  it("recognizes minus path", async () => {
+    await t.get("/young-and-fine");
+    assertEqual("200", t.response.code);
   });
 });
 
 describe("TestUnicodePaths", () => {
-  it("recognizes unicode path", () => {
-    const routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/ほげ", { to: "pages#show" });
+  class TestUnicodePaths extends IntegrationTest {}
+  registerConstant("TestUnicodePaths", TestUnicodePaths);
+
+  const Routes = new RouteSet();
+  Routes.draw(function () {
+    this.get({
+      "/ほげ": (_env: unknown) => [200, { "Content-Type": "text/plain" }, []],
+      as: "unicode_path",
     });
-    expect(() => routes.recognizePath("/%E3%81%BB%E3%81%92")).not.toThrow();
+  });
+  const APP = IntegrationTest.buildApp(Routes);
+
+  let t: TestUnicodePaths;
+  beforeEach(({ testCase }) => {
+    t = testCase as TestUnicodePaths;
+    t.app = APP;
+  });
+
+  it("recognizes unicode path", async () => {
+    await t.get(`/${RackUtils.escape("ほげ")}`);
+    assertEqual("200", t.response.code);
   });
 });
 
@@ -4717,8 +4750,9 @@ describe("TestUrlGenerationErrors", () => {
   });
 
   it("correct for empty UrlGenerationError", () => {
-    const routes = new RouteSet();
-    expect(() => routes.pathFor({}, "nonexistent")).toThrow(/No route matches/);
+    const err = new UrlGenerationError("oh no!");
+
+    expect(err.corrections).toEqual([]);
   });
 
   it("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", async () => {
@@ -5018,7 +5052,7 @@ describe("TestOptimizedNamedRoutes", () => {
     );
 
   it("enabled when not mounted and default_url_options is empty", () => {
-    expect(Routes.urlHelpers().optimizeRoutesGeneration()).toBe(true);
+    assertPredicate(Routes.urlHelpers(), (h) => h.optimizeRoutesGeneration());
   });
 
   it("named route called as singleton method", () => {

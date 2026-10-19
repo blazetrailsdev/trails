@@ -112,8 +112,11 @@ function absoluteImagePath(this: ScreenshotHelperHost): string {
   return `${absolutePath.call(this)}.png`;
 }
 
-/** @internal */
-function relativeImagePath(this: ScreenshotHelperHost): string {
+/**
+ * @internal
+ * @missingRailsCall root — CONVERGEABLE screenshot-helper-relative-image-path-uses-relative-path-from
+ */
+export function relativeImagePath(this: ScreenshotHelperHost): string {
   return `${File.join(screenshotsDir(), imageName.call(this))}.png`;
 }
 

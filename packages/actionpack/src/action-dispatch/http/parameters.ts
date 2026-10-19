@@ -145,10 +145,10 @@ export function pathParameters(this: ParametersHost): Record<string, unknown> {
 export function parseFormattedParameters(
   this: ParametersHost,
   parsers: ParameterParsers,
-  fallback: () => Record<string, unknown>,
+  fn: () => Record<string, unknown>,
 ): Record<string, unknown> | Hash<string, unknown> {
   if (this.contentLength === 0 || this.contentMimeType === null) {
-    return fallback();
+    return fn();
   }
   let yielded = false;
   const strategy = fetch<ParameterParser>(
@@ -159,7 +159,7 @@ export function parseFormattedParameters(
       return null as unknown as ParameterParser;
     }),
   );
-  if (yielded) return fallback();
+  if (yielded) return fn();
 
   try {
     return strategy(this.rawPost);

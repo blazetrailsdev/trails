@@ -5,7 +5,7 @@ export {
   type AroundCallback,
   type CallbackOptions,
 } from "./base.js";
-export { AbstractControllerError } from "./error.js";
+export { Error } from "./error.js";
 export {
   translate,
   t,

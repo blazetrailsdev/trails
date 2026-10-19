@@ -1,5 +1,5 @@
 import { isBlank, mattrAccessor, presence, toParam, toQuery } from "@blazetrails/activesupport";
-import { escapeFragment } from "../journey/router/utils.js";
+import { Utils } from "../journey/router/utils.js";
 import { Utils as RackUtils } from "@blazetrails/rack";
 import { ArgumentError, fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
 
@@ -61,7 +61,7 @@ function addParams(path: string[], params: unknown): void {
 function addAnchor(path: string[], anchor: unknown): void {
   if (anchor !== null && anchor !== undefined && anchor !== false) {
     const p = toParam(anchor);
-    path.push(`#${escapeFragment(String(p ?? ""))}`);
+    path.push(`#${Utils.escapeFragment(String(p ?? ""))}`);
   }
 }
 

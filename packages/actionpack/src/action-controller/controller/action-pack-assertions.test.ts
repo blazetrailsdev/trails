@@ -1,9 +1,10 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant, RuntimeError } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   assert,
   assertEmpty,
   assertEqual,
+  assertIncludes,
   Assertion,
   assertKindOf,
   assertNil,
@@ -105,7 +106,7 @@ class ActionPackAssertionsController extends Base {
 
 class AssertResponseWithUnexpectedErrorController extends Base {
   async index() {
-    throw new Error("FAIL");
+    throw new RuntimeError("FAIL");
   }
   async show() {
     await this.render({ plain: "Boom", status: 500 });
@@ -393,8 +394,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("assert redirection with extra controller option", async () => {
     await tc.get("redirectToAction");
-    expect(tc.response.isRedirection).toBe(true);
-    expect(tc.response.redirectUrl).toContain("flash_me");
+    assertRedirectedTo("http://test.host/action_pack_assertions/flash_me?id=1&panda=fun");
   });
 
   it("redirected to url leading slash", async () => {
@@ -408,8 +408,8 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("redirect invalid external route", async () => {
-    await tc.get("redirectInvalidExternalRoute");
-    expect(tc.response.redirectUrl).toBe("http://test.hostht_tp://www.rubyonrails.org");
+    await tc.process("redirectInvalidExternalRoute");
+    assertRedirectedTo("http://test.hostht_tp://www.rubyonrails.org");
   });
 
   it("redirected to url full url", async () => {
@@ -418,9 +418,14 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("assert redirection with symbol", async () => {
-    await tc.get("redirectToControllerWithSymbol");
-    expect(tc.response.isRedirection).toBe(true);
-    expect(tc.response.redirectUrl).toContain("elsewhere");
+    await tc.process("redirectToControllerWithSymbol");
+    await assertNothingRaised(() => {
+      assertRedirectedTo("http://test.host/elsewhere/flash_me");
+    });
+    await tc.process("redirectToControllerWithSymbol");
+    await assertNothingRaised(() => {
+      assertRedirectedTo("http://test.host/elsewhere/flash_me");
+    });
   });
 
   it("assert redirection with custom message", async () => {
@@ -432,12 +437,27 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("assert redirection with status", async () => {
-    await tc.get("redirectToPath");
-    expect(tc.response.status).toBe(302);
-    tc.assertRedirectedTo("http://test.host/some/path");
-    await tc.get("redirectPermanently");
-    expect(tc.response.status).toBe(301);
-    tc.assertRedirectedTo("http://test.host/some/path");
+    await tc.process("redirectToPath");
+    assertRedirectedTo("http://test.host/some/path", { status: "found" });
+    await assertRaise([Assertion], {}, () => {
+      assertRedirectedTo("http://test.host/some/path", { status: "moved_permanently" });
+    });
+    await assertRaise([Assertion], {}, () => {
+      assertRedirectedTo(
+        "http://test.host/some/path",
+        { status: "moved_permanently" },
+        "Custom message",
+      );
+    });
+
+    await tc.process("redirectPermanently");
+    assertRedirectedTo("http://test.host/some/path", { status: "moved_permanently" });
+    await assertRaise([Assertion], {}, () => {
+      assertRedirectedTo("http://test.host/some/path", { status: "found" });
+    });
+    await assertRaise([Assertion], {}, () => {
+      assertRedirectedTo("http://test.host/some/path", { status: "found" }, "Custom message");
+    });
   });
 
   it("redirected to with nested controller", async () => {
@@ -449,20 +469,18 @@ describe("ActionPackAssertionsControllerTest", () => {
     assertRedirectedTo({ controller: "admin/user" });
   });
 
-  it("assert response uses exception message", async ({ task }) => {
-    const tc2 = new TestCase(task.name);
-    tc2.controller = new AssertResponseWithUnexpectedErrorController();
-    await tc2.beforeSetup();
-    await expect(tc2.get("index")).rejects.toThrow("FAIL");
+  it("assert response uses exception message", async () => {
+    tc.controller = new AssertResponseWithUnexpectedErrorController();
+    const e = await assertRaise([RuntimeError], {}, () => tc.get("index"));
+    tc.assertResponse("success");
+    assertIncludes("FAIL", e.message);
   });
 
-  it("assert response failure response with no exception", async ({ task }) => {
-    const tc2 = new TestCase(task.name);
-    tc2.controller = new AssertResponseWithUnexpectedErrorController();
-    await tc2.beforeSetup();
-    await tc2.get("show");
-    tc2.assertResponse(500);
-    expect(tc2.response.body).toBe("Boom");
+  it("assert response failure response with no exception", async () => {
+    tc.controller = new AssertResponseWithUnexpectedErrorController();
+    await tc.get("show");
+    tc.assertResponse(500);
+    assertEqual("Boom", tc.response.body);
   });
 });
 
