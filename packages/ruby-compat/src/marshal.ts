@@ -3,8 +3,6 @@ import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
 import { Module, extend, moduleVisibility, prepend, rbGetAllocFunc } from "./include.js";
 
-const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
-const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
 import { Rational, nuratDumper, nuratLoader } from "./rational.js";
@@ -37,6 +35,9 @@ import { temporalTag } from "./temporal-tag.js";
 import { TypeError } from "./type-error.js";
 import { rbPathToClass, registeredConstant } from "./variable.js";
 import { verbose } from "./verbose.js";
+
+const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
+const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
 
 const MARSHAL_MAJOR = 4;
 const MARSHAL_MINOR = 8;

@@ -1505,6 +1505,7 @@ export function publicInstanceMethods(
   const names = sections.public.filter((name) => Object.hasOwn(mod, name));
   for (const name of Object.keys(mod)) {
     if (
+      !/^[A-Z]/.test(name) &&
       !names.includes(name) &&
       !sections.protected.includes(name) &&
       !sections.private.includes(name)

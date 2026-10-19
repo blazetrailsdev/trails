@@ -37,9 +37,10 @@ class Column {
 class Shape {
   constructor(public kind: string) {}
 }
-const Geo = { name: "Geo", Shape };
+const Geo = { name: "Geo", Shape } as { name: string; Shape: typeof Shape; Mark?: object };
 rbSetClassPathString(Shape, Geo, "Shape");
 const Kind = rbModConstSet(Geo, "Kind", defineModule({}));
+rbModConstSet(Geo, "Mark", defineModule({}));
 class Pair extends Struct.new("a", "b") {}
 rbModConstSet(Geo, "Pair", Pair);
 class Shadow extends Struct.new("a") {
@@ -247,6 +248,13 @@ describe("Marshal.dump", () => {
     extend(extended, Kind);
     expect(hex(Marshal.dump(extended))).toBe(
       "0408653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65",
+    );
+
+    const twice = new Shape(":circle");
+    extend(twice, Kind);
+    extend(twice, Geo.Mark!);
+    expect(hex(Marshal.dump(twice))).toBe(
+      "0408653a0e47656f3a3a4d61726b653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65",
     );
 
     const anonymous = new Shape(":circle");

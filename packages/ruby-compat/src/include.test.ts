@@ -1843,6 +1843,21 @@ describe("Module#const_set", () => {
     expect(rbInspect(mod)).toBe("Topic::Generated");
   });
 
+  it("orders a plain module's ancestors as include_modules_at does, and lists no constant as a method", () => {
+    const Y = defineModule({ y: () => "y" });
+    const Z = defineModule({ z: () => "z" });
+    include(Z, Y);
+    const W = defineModule({ w: () => "w" });
+    include(W, Y);
+    include(W, Z);
+    rbModConstSet(W, "Inner", defineModule({}));
+    expect(rbModAncestors(W)).toEqual([W, Z, Y]);
+    expect(isModuleIncluded(W, Y)).toBe(true);
+    expect(isModuleIncluded(W, W)).toBe(false);
+    expect(publicInstanceMethods(W)).toEqual(["w", "z", "y"]);
+    expect(publicInstanceMethods(W, false)).toEqual(["w"]);
+  });
+
   it("names a class after the constant it is bound to", () => {
     const Namespace = { name: "Namespace" };
     class Topic {}
