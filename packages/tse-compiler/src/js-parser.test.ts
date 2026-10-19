@@ -124,6 +124,26 @@ describe("parseScript", () => {
     expect(find(program, "MethodDefinition", "get id() { return this.#id }")).not.toBeNull();
     const afterStatement = parseScript("switch (x) { case 1: f(); default: g() }").value;
     expect(find(afterStatement, "SwitchCase", "default: g()")).not.toBeNull();
+    const members = parseScript(
+      "class A extends f(x) { async m() {} *g() {} async *ag() {} set v(x) {} [k]() {} 'str' = 1; 2() {} get() {} static = 1\n async\n x = 2\n static async s() {} }",
+    ).value;
+    for (const slice of [
+      "async m() {}",
+      "*g() {}",
+      "async *ag() {}",
+      "set v(x) {}",
+      "[k]() {}",
+      "2() {}",
+      "get() {}",
+      "static async s() {}",
+    ])
+      expect(find(members, "MethodDefinition", slice), slice).not.toBeNull();
+    for (const slice of ["'str' = 1;", "static = 1", "async", "x = 2"])
+      expect(find(members, "PropertyDefinition", slice), slice).not.toBeNull();
+    expect(find(members, "CallExpression", "f(x)")).not.toBeNull();
+    const nl = parseScript("outer: for (;;) { continue\nouter }").value;
+    expect(find(nl, "ContinueStatement", "continue")).not.toBeNull();
+    expect(find(nl, "ExpressionStatement", "outer")).not.toBeNull();
     expect(() => parseScript("switch (x) { case 1: f()")).toThrow(JsParseError);
     expect(() => parseScript("class A { m() {}")).toThrow(JsParseError);
   });

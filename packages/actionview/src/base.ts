@@ -244,16 +244,15 @@ export class Base {
     assigns: Record<string, unknown> = {},
     controller: unknown = null,
   ) {
+    if (isModuleIncluded(new.target, TopLevel.ActionDispatch?.Routing.UrlFor as never)) {
+      this._routes = null;
+    }
     this._config = new InheritableOptions();
     this._lookupContext = lookupContext;
     this._viewRenderer = new Renderer(this._lookupContext!);
     this.currentTemplate = null;
     this.assignController(controller as Parameters<typeof assignController>[0]);
     this._prepareContext();
-
-    if (isModuleIncluded(new.target, TopLevel.ActionDispatch?.Routing.UrlFor as never)) {
-      this._routes = null;
-    }
 
     this.assign(assigns);
   }
