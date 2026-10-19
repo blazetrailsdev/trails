@@ -1,4 +1,12 @@
-import { ArgumentError, hasKey, hashDelete, rbObjRespondTo, toS } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  hasKey,
+  hashDelete,
+  rbFSend,
+  rbObjRespondTo,
+  toI,
+  toS,
+} from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -101,8 +109,8 @@ export abstract class Helpers {
     return this.hasHeader(header);
   }
 
-  addHeader(key: string | null, value: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+  addHeader(key: string, value: string | null): any {
+    if (typeof key !== "string") throw new ArgumentError();
     if (value === null || value === undefined) return this.getHeader(key) ?? null;
     const existing = this.getHeader(key);
     if (existing != null) {
@@ -248,10 +256,10 @@ export class Response {
 
   constructor(
     body: any = null,
-    status: number = 200,
+    status: number | string = 200,
     headers: Record<string, string | string[]> = {},
   ) {
-    this.status = typeof status === "number" ? status : parseInt(String(status));
+    this.status = Number(toI(status));
 
     if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
       throw new ArgumentError("Headers must be a Hash!");
@@ -332,13 +340,7 @@ export class Response {
   }
 
   each(callback: (chunk: string) => void): void {
-    if (Array.isArray(this._body)) {
-      for (const chunk of this._body) callback(chunk);
-    } else if (this._body && typeof this._body.each === "function") {
-      this._body.each(callback);
-    } else if (this._body && typeof this._body.forEach === "function") {
-      this._body.forEach(callback);
-    }
+    rbFSend(this._body, "each", callback);
     this._buffered = true;
     if (this._block) {
       this._writer = callback as any;
@@ -364,20 +366,20 @@ export class Response {
     return this._block === null && Array.isArray(this._body) && this._body.length === 0;
   }
 
-  hasHeader(key: string | null): boolean {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+  hasHeader(key: string): boolean {
+    if (typeof key !== "string") throw new ArgumentError();
     return Object.hasOwn(this.headers, downcaseKey(key));
   }
-  getHeader(key: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+  getHeader(key: string): any {
+    if (typeof key !== "string") throw new ArgumentError();
     return this.headers[downcaseKey(key)];
   }
-  setHeader(key: string | null, value: any): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+  setHeader(key: string, value: any): any {
+    if (typeof key !== "string") throw new ArgumentError();
     this.headers[downcaseKey(key)] = value;
     return value;
   }
-  deleteHeader(key: string | null): any {
+  deleteHeader(key: string): any {
     if (typeof key !== "string") throw new ArgumentError();
     return hashDelete(this.headers, downcaseKey(key));
   }

@@ -12,6 +12,8 @@ import {
   ArgumentError,
   aryDeleteIf,
   block,
+  compact,
+  last,
   stringSplit,
   fetch,
   warn,
@@ -157,20 +159,22 @@ export function forwardedValues(
 
 export function bestQMatch(qValueHeader: string, availableMimes: string[]): string | null {
   const values = qValues(qValueHeader);
-  let bestMatch: string | null = null;
-  let bestScore = -Infinity;
 
-  for (const [reqMime, quality] of values) {
-    const match = availableMimes.find((am) => RackMime.match(am, reqMime));
-    if (!match) continue;
-    const wildcards = match.split("/", 2).filter((p) => p === "*").length * -10;
-    const score = wildcards + quality;
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = match;
-    }
-  }
-  return bestMatch;
+  const matches = last(
+    compact(
+      values.map(([reqMime, quality]): [string, number] | null => {
+        const match = availableMimes.find((am) => RackMime.match(am, reqMime));
+        if (!match) return null;
+        return [match, quality];
+      }),
+    ).sort(
+      ([aMatch, aQuality], [bMatch, bQuality]) =>
+        aMatch.split("/", 2).filter((part) => part === "*").length * -10 +
+        aQuality -
+        (bMatch.split("/", 2).filter((part) => part === "*").length * -10 + bQuality),
+    ),
+  );
+  return matches?.[0] ?? null;
 }
 
 export function escapeHtml(string: any): string {

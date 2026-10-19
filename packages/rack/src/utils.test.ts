@@ -1,12 +1,22 @@
 import { describe, it, expect, vi } from "vitest";
 import { stderr } from "@blazetrails/ruby-compat";
 import * as Utils from "./utils.js";
+import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
+import { Params, QueryParser } from "./query-parser.js";
 
 function assertSets(expected: string, actual: string) {
   const exp = new Set(expected.split("&"));
   const act = new Set(actual.split("&"));
   expect(act).toEqual(exp);
+}
+
+function assertEmpty(obj: ArrayLike<unknown>) {
+  expect(obj).toHaveLength(0);
+}
+
+function assertNestedQuery(exp: string, act: Record<string, unknown>) {
+  assertSets(exp, Utils.buildNestedQuery(act));
 }
 
 it("can be mixed in and used", () => {
@@ -113,30 +123,40 @@ it("parse nested query strings correctly", () => {
   expect(Utils.parseNestedQuery("my+weird+field=q1%212%22%27w%245%267%2Fz8%29%3F")).toEqual({
     "my weird field": "q1!2\"'w$5&7/z8)?",
   });
-
+  expect(Utils.parseNestedQuery("a=b&pid%3D1234=1023")).toEqual({ "pid=1234": "1023", a: "b" });
   expect(Utils.parseNestedQuery("foo[]")).toEqual({ foo: [null] });
   expect(Utils.parseNestedQuery("foo[]=")).toEqual({ foo: [""] });
   expect(Utils.parseNestedQuery("foo[]=bar")).toEqual({ foo: ["bar"] });
   expect(Utils.parseNestedQuery("foo[]=bar&foo")).toEqual({ foo: null });
+  expect(Utils.parseNestedQuery("foo[]=bar&foo[")).toEqual({ foo: ["bar"], "foo[": null });
+  expect(Utils.parseNestedQuery("foo[]=bar&foo[=baz")).toEqual({ foo: ["bar"], "foo[": "baz" });
+  expect(Utils.parseNestedQuery("foo[]=bar&foo[]")).toEqual({ foo: ["bar", null] });
+  expect(Utils.parseNestedQuery("foo[]=bar&foo[]=")).toEqual({ foo: ["bar", ""] });
   expect(Utils.parseNestedQuery("foo[]=1&foo[]=2")).toEqual({ foo: ["1", "2"] });
   expect(Utils.parseNestedQuery("foo=bar&baz[]=1&baz[]=2&baz[]=3")).toEqual({
     foo: "bar",
     baz: ["1", "2", "3"],
   });
-
+  expect(Utils.parseNestedQuery("foo[]=bar&baz[]=1&baz[]=2&baz[]=3")).toEqual({
+    foo: ["bar"],
+    baz: ["1", "2", "3"],
+  });
+  expect(Utils.parseNestedQuery("x[y][z]")).toEqual({ x: { y: { z: null } } });
   expect(Utils.parseNestedQuery("x[y][z]=1")).toEqual({ x: { y: { z: "1" } } });
   expect(Utils.parseNestedQuery("x[y][z][]=1")).toEqual({ x: { y: { z: ["1"] } } });
   expect(Utils.parseNestedQuery("x[y][z]=1&x[y][z]=2")).toEqual({ x: { y: { z: "2" } } });
   expect(Utils.parseNestedQuery("x[y][z][]=1&x[y][z][]=2")).toEqual({
     x: { y: { z: ["1", "2"] } },
   });
-
   expect(Utils.parseNestedQuery("x[y][][z]=1")).toEqual({ x: { y: [{ z: "1" }] } });
   expect(Utils.parseNestedQuery("x[y][][z][]=1")).toEqual({ x: { y: [{ z: ["1"] }] } });
   expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=2")).toEqual({
     x: { y: [{ z: "1", w: "2" }] },
   });
-
+  expect(Utils.parseNestedQuery("x[y][][v][w]=1")).toEqual({ x: { y: [{ v: { w: "1" } }] } });
+  expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][v][w]=2")).toEqual({
+    x: { y: [{ z: "1", v: { w: "2" } }] },
+  });
   expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][z]=2")).toEqual({
     x: { y: [{ z: "1" }, { z: "2" }] },
   });
@@ -148,9 +168,52 @@ it("parse nested query strings correctly", () => {
       ],
     },
   });
+  expect(Utils.parseNestedQuery("x[][y]=1&x[][z][w]=a&x[][y]=2&x[][z][w]=b")).toEqual({
+    x: [
+      { y: "1", z: { w: "a" } },
+      { y: "2", z: { w: "b" } },
+    ],
+  });
+  expect(Utils.parseNestedQuery("x[][z][w]=a&x[][y]=1&x[][z][w]=b&x[][y]=2")).toEqual({
+    x: [
+      { y: "1", z: { w: "a" } },
+      { y: "2", z: { w: "b" } },
+    ],
+  });
+  expect(Utils.parseNestedQuery("data[books][][data][page]=1&data[books][][data][page]=2")).toEqual(
+    { data: { books: [{ data: { page: "1" } }, { data: { page: "2" } }] } },
+  );
 
-  expect(() => Utils.parseNestedQuery("x[y]=1&x[]=1")).toThrow(Utils.ParameterTypeError);
-  expect(() => Utils.parseNestedQuery("x[y]=1&x[y][][w]=2")).toThrow(Utils.ParameterTypeError);
+  let error!: Error;
+  expect(() => {
+    try {
+      Utils.parseNestedQuery("x[y]=1&x[y]z=2");
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(Utils.ParameterTypeError);
+  expect(error.message).toBe("expected Hash (got String) for param `y'");
+
+  expect(() => {
+    try {
+      Utils.parseNestedQuery("x[y]=1&x[]=1");
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(Utils.ParameterTypeError);
+  expect(error.message).toMatch(/expected Array \(got [^)]*\) for param `x'/);
+
+  expect(() => {
+    try {
+      Utils.parseNestedQuery("x[y]=1&x[y][][w]=2");
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(Utils.ParameterTypeError);
+  expect(error.message).toBe("expected Array (got String) for param `y'");
 });
 
 it("can parse a query string with a key that has invalid UTF-8 encoded bytes", () => {
@@ -165,12 +228,19 @@ it("can parse a query string with a key that has invalid UTF-8 encoded bytes", (
 });
 
 it("only moves to a new array when the full key has been seen", () => {
-  const result1 = Utils.parseNestedQuery(
-    "x[][id]=1&x[][y][a]=5&x[][y][b]=7&x[][z][id]=3&x[][z][w]=0&x[][id]=2&x[][y][a]=6&x[][y][b]=8&x[][z][id]=4&x[][z][w]=0",
-  );
-  expect(result1.x).toHaveLength(2);
-  expect(result1.x[0].id).toBe("1");
-  expect(result1.x[1].id).toBe("2");
+  expect(Utils.parseNestedQuery("x[][y][][z]=1&x[][y][][w]=2")).toEqual({
+    x: [{ y: [{ z: "1", w: "2" }] }],
+  });
+  expect(
+    Utils.parseNestedQuery(
+      "x[][id]=1&x[][y][a]=5&x[][y][b]=7&x[][z][id]=3&x[][z][w]=0&x[][id]=2&x[][y][a]=6&x[][y][b]=8&x[][z][id]=4&x[][z][w]=0",
+    ),
+  ).toEqual({
+    x: [
+      { id: "1", y: { a: "5", b: "7" }, z: { id: "3", w: "0" } },
+      { id: "2", y: { a: "6", b: "8" }, z: { id: "4", w: "0" } },
+    ],
+  });
 });
 
 it("handles unexpected use of [ and ] in parameter keys as normal characters", () => {
@@ -180,14 +250,34 @@ it("handles unexpected use of [ and ] in parameter keys as normal characters", (
     "b[": "3",
     "c]": "4",
   });
-  const result = Utils.parseNestedQuery("g[h]=8");
-  expect(result.g.h).toBe("8");
+  expect(Utils.parseNestedQuery("d[[]=5&e][]=6&f[[]]=7")).toEqual({
+    d: { "[": "5" },
+    "e]": ["6"],
+    f: { "[": { "]": "7" } },
+  });
+  expect(Utils.parseNestedQuery("g[h]i=8&j[k]l[m]=9")).toEqual({
+    g: { h: { i: "8" } },
+    j: { k: { "l[m]": "9" } },
+  });
+  expect(Utils.parseNestedQuery("l[[[[[[[[]]]]]]]=10")).toEqual({
+    l: { "[[[[[[[": { "]]]]]]": "10" } },
+  });
 });
 
 it("allow setting the params hash class to use for parsing query strings", () => {
-  expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=2")).toEqual({
-    x: { y: [{ z: "1", w: "2" }] },
-  });
+  const defaultParser = Utils.defaultQueryParser();
+  try {
+    const paramParserClass = class extends Params {};
+    Utils.setDefaultQueryParser(new QueryParser(paramParserClass, 100));
+    const h1 = Utils.parseQuery(",foo=bar;,", ";,");
+    expect(h1.foo).toBe("bar");
+    const h2 = Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=2");
+    expect(h2.x.y[0].z).toBe("1");
+    const h3 = Utils.parseNestedQuery("");
+    expect({ ...h3, ...h1 }.foo).toBe("bar");
+  } finally {
+    Utils.setDefaultQueryParser(defaultParser);
+  }
 });
 
 it("build query strings correctly", () => {
@@ -204,6 +294,13 @@ it("build nested query strings correctly", () => {
   expect(Utils.buildNestedQuery({ foo: null })).toBe("foo");
   expect(Utils.buildNestedQuery({ foo: "" })).toBe("foo=");
   expect(Utils.buildNestedQuery({ foo: "bar" })).toBe("foo=bar");
+
+  assertNestedQuery("foo=1&bar=2", { foo: "1", bar: "2" });
+  assertNestedQuery("foo=1&bar=2", { foo: 1, bar: 2 });
+  assertNestedQuery("my+weird+field=q1%212%22%27w%245%267%2Fz8%29%3F", {
+    "my weird field": "q1!2\"'w$5&7/z8)?",
+  });
+
   expect(Utils.buildNestedQuery({ foo: [null] })).toBe("foo%5B%5D");
   expect(Utils.buildNestedQuery({ foo: [""] })).toBe("foo%5B%5D=");
   expect(Utils.buildNestedQuery({ foo: ["bar"] })).toBe("foo%5B%5D=bar");
@@ -211,35 +308,116 @@ it("build nested query strings correctly", () => {
   expect(Utils.buildNestedQuery({ foo: {} })).toBe("");
   expect(Utils.buildNestedQuery({ foo: "bar", baz: [] })).toBe("foo=bar");
   expect(Utils.buildNestedQuery({ foo: "bar", baz: {} })).toBe("foo=bar");
+  expect(Utils.buildNestedQuery({ foo: null, bar: "" })).toBe("foo&bar=");
+  expect(Utils.buildNestedQuery({ foo: "bar", baz: "" })).toBe("foo=bar&baz=");
   expect(Utils.buildNestedQuery({ foo: ["1", "2"] })).toBe("foo%5B%5D=1&foo%5B%5D=2");
+  expect(Utils.buildNestedQuery({ foo: "bar", baz: ["1", "2", "3"] })).toBe(
+    "foo=bar&baz%5B%5D=1&baz%5B%5D=2&baz%5B%5D=3",
+  );
+  expect(Utils.buildNestedQuery({ foo: ["bar"], baz: ["1", "2", "3"] })).toBe(
+    "foo%5B%5D=bar&baz%5B%5D=1&baz%5B%5D=2&baz%5B%5D=3",
+  );
+  expect(Utils.buildNestedQuery({ foo: ["bar"], baz: ["1", "2", "3"] })).toBe(
+    "foo%5B%5D=bar&baz%5B%5D=1&baz%5B%5D=2&baz%5B%5D=3",
+  );
   expect(Utils.buildNestedQuery({ x: { y: { z: "1" } } })).toBe("x%5By%5D%5Bz%5D=1");
-  expect(() => Utils.buildNestedQuery("foo=bar" as any)).toThrow(Utils.ArgumentError);
+  expect(Utils.buildNestedQuery({ x: { y: { z: ["1"] } } })).toBe("x%5By%5D%5Bz%5D%5B%5D=1");
+  expect(Utils.buildNestedQuery({ x: { y: { z: ["1", "2"] } } })).toBe(
+    "x%5By%5D%5Bz%5D%5B%5D=1&x%5By%5D%5Bz%5D%5B%5D=2",
+  );
+  expect(Utils.buildNestedQuery({ x: { y: [{ z: "1" }] } })).toBe("x%5By%5D%5B%5D%5Bz%5D=1");
+  expect(Utils.buildNestedQuery({ x: { y: [{ z: ["1"] }] } })).toBe(
+    "x%5By%5D%5B%5D%5Bz%5D%5B%5D=1",
+  );
+  expect(Utils.buildNestedQuery({ x: { y: [{ z: "1", w: "2" }] } })).toBe(
+    "x%5By%5D%5B%5D%5Bz%5D=1&x%5By%5D%5B%5D%5Bw%5D=2",
+  );
+  expect(Utils.buildNestedQuery({ x: { y: [{ v: { w: "1" } }] } })).toBe(
+    "x%5By%5D%5B%5D%5Bv%5D%5Bw%5D=1",
+  );
+  expect(Utils.buildNestedQuery({ x: { y: [{ z: "1", v: { w: "2" } }] } })).toBe(
+    "x%5By%5D%5B%5D%5Bz%5D=1&x%5By%5D%5B%5D%5Bv%5D%5Bw%5D=2",
+  );
+  expect(Utils.buildNestedQuery({ x: { y: [{ z: "1" }, { z: "2" }] } })).toBe(
+    "x%5By%5D%5B%5D%5Bz%5D=1&x%5By%5D%5B%5D%5Bz%5D=2",
+  );
+  expect(
+    Utils.buildNestedQuery({
+      x: {
+        y: [
+          { z: "1", w: "a" },
+          { z: "2", w: "3" },
+        ],
+      },
+    }),
+  ).toBe(
+    "x%5By%5D%5B%5D%5Bz%5D=1&x%5By%5D%5B%5D%5Bw%5D=a&x%5By%5D%5B%5D%5Bz%5D=2&x%5By%5D%5B%5D%5Bw%5D=3",
+  );
+  expect(Utils.buildNestedQuery({ foo: ["1", ["2"]] })).toBe("foo%5B%5D=1&foo%5B%5D%5B%5D=2");
+
+  expect(Utils.buildNestedQuery({ foo: { bar: "baz" } })).toBe(
+    Utils.buildNestedQuery({ "foo[bar]": "baz" }),
+  );
+
+  let error!: Error;
+  expect(() => {
+    try {
+      Utils.buildNestedQuery("foo=bar" as any);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(Utils.ArgumentError);
+  expect(error.message).toBe("value must be a Hash");
 });
 
 it("performs the inverse function of #parse_nested_query", () => {
-  const cases = [
+  for (const params of [
     { bar: "" },
     { foo: "bar", baz: "" },
+    { foo: ["1", "2"] },
+    { foo: "bar", baz: ["1", "2", "3"] },
+    { foo: ["bar"], baz: ["1", "2", "3"] },
     { foo: ["1", "2"] },
     { foo: "bar", baz: ["1", "2", "3"] },
     { x: { y: { z: "1" } } },
     { x: { y: { z: ["1"] } } },
     { x: { y: { z: ["1", "2"] } } },
     { x: { y: [{ z: "1" }] } },
+    { x: { y: [{ z: ["1"] }] } },
     { x: { y: [{ z: "1", w: "2" }] } },
+    { x: { y: [{ v: { w: "1" } }] } },
+    { x: { y: [{ z: "1", v: { w: "2" } }] } },
     { x: { y: [{ z: "1" }, { z: "2" }] } },
-  ];
-  for (const params of cases) {
+    {
+      x: {
+        y: [
+          { z: "1", w: "a" },
+          { z: "2", w: "3" },
+        ],
+      },
+    },
+    { foo: ["1", ["2"]] },
+  ]) {
     const qs = Utils.buildNestedQuery(params);
     expect(Utils.parseNestedQuery(qs)).toEqual(params);
   }
-  expect(() => Utils.buildNestedQuery("foo=bar" as any)).toThrow(Utils.ArgumentError);
+
+  let error!: Error;
+  expect(() => {
+    try {
+      Utils.buildNestedQuery("foo=bar" as any);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(Utils.ArgumentError);
+  expect(error.message).toBe("value must be a Hash");
 });
 
 it("parse query strings that have a non-existent value", () => {
   const key = "post/2011/08/27/Deux-%22rat%C3%A9s%22-de-l-Universit";
-  const result = Utils.parseQuery(key);
-  expect(result[Utils.unescape(key)]).toBeNull();
+  expect(Utils.parseQuery(key)).toEqual({ [Utils.unescape(key)]: null });
 });
 
 it("build query strings without = with non-existent values", () => {
@@ -259,6 +437,7 @@ it("parse q-values", () => {
 it("parses RFC 7239 Forwarded header", () => {
   expect(Utils.forwardedValues("for=3.4.5.6")).toEqual({ for: ["3.4.5.6"] });
   expect(Utils.forwardedValues(";;;for=3.4.5.6,,")).toEqual({ for: ["3.4.5.6"] });
+  expect(Utils.forwardedValues("for=3.4.5.6")).toEqual({ for: ["3.4.5.6"] });
   expect(Utils.forwardedValues("for =  3.4.5.6")).toEqual({ for: ["3.4.5.6"] });
   expect(Utils.forwardedValues('for="3.4.5.6"')).toEqual({ for: ["3.4.5.6"] });
   expect(Utils.forwardedValues("for=3.4.5.6;proto=https")).toEqual({
@@ -267,6 +446,10 @@ it("parses RFC 7239 Forwarded header", () => {
   });
   expect(Utils.forwardedValues("for=3.4.5.6; proto=http, proto=https")).toEqual({
     for: ["3.4.5.6"],
+    proto: ["http", "https"],
+  });
+  expect(Utils.forwardedValues("for=3.4.5.6; proto=http, proto=https; for=1.2.3.4")).toEqual({
+    for: ["3.4.5.6", "1.2.3.4"],
     proto: ["http", "https"],
   });
   expect(Utils.forwardedValues("for=3.4.5.6; foo=bar")).toBeNull();
@@ -282,6 +465,7 @@ it("select best quality match", () => {
     Utils.bestQMatch("application/json", ["application/vnd.lotus-1-2-3", "application/json"]),
   ).toBe("application/json");
   expect(Utils.bestQMatch("text/*", ["text/html", "text/plain"])).toBe("text/html");
+  expect(Utils.bestQMatch("text/plain,text/html", ["text/html", "text/plain"])).toBe("text/html");
   expect(Utils.bestQMatch("application/json", ["text/html", "text/plain"])).toBeNull();
 });
 
@@ -293,6 +477,7 @@ it("escape html entities [&><'\\\"/]", () => {
   expect(Utils.escapeHtml("f'o")).toBe("f&#39;o");
   expect(Utils.escapeHtml('f"o')).toBe("f&quot;o");
   expect(Utils.escapeHtml("<foo></foo>")).toBe("&lt;foo&gt;&lt;/foo&gt;");
+  expect(Utils.escapeHtml("\u00c0<")).toBe("\u00c0&lt;");
 });
 
 it("escape html entities in unicode strings", () => {
@@ -335,13 +520,42 @@ it("figure out which encodings are acceptable", () => {
       ],
     ),
   ).toBe("gzip");
+  expect(
+    Utils.selectBestEncoding(
+      ["compress", "gzip", "identity"],
+      [
+        ["gzip", 1.0],
+        ["compress", 1.0],
+      ],
+    ),
+  ).toBe("compress");
+
+  expect(Utils.selectBestEncoding(["foo", "bar", "identity"], [])).toBe("identity");
   expect(Utils.selectBestEncoding(["foo", "bar", "identity"], [["*", 1.0]])).toBe("foo");
+  expect(
+    Utils.selectBestEncoding(
+      ["foo", "bar", "identity"],
+      [
+        ["*", 1.0],
+        ["foo", 0.9],
+      ],
+    ),
+  ).toBe("bar");
   expect(
     Utils.selectBestEncoding(
       ["foo", "bar", "identity"],
       [
         ["foo", 0],
         ["bar", 0],
+      ],
+    ),
+  ).toBe("identity");
+  expect(
+    Utils.selectBestEncoding(
+      ["foo", "bar", "baz", "identity"],
+      [
+        ["*", 0],
+        ["identity", 0.1],
       ],
     ),
   ).toBe("identity");
@@ -376,7 +590,7 @@ it("return status code and give deprecation warning for obsolete symbols", () =>
   try {
     for (const [symbol, valueHash] of Object.entries(replacedStatuses)) {
       expect(Utils.statusCode(symbol)).toBe(valueHash.statusCode);
-      expect(warn).not.toHaveBeenCalled();
+      assertEmpty(warn.mock.calls);
     }
 
     for (const [symbol, code] of Object.entries(droppedStatuses)) {
@@ -391,7 +605,16 @@ it("return status code and give deprecation warning for obsolete symbols", () =>
 });
 
 it("raise an error for an invalid symbol", () => {
-  expect(() => Utils.statusCode("foobar" as any)).toThrow(Utils.ArgumentError);
+  let error!: Error;
+  expect(() => {
+    try {
+      Utils.statusCode("foobar" as any);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(Utils.ArgumentError);
+  expect(error.message).toBe("Unrecognized status code :foobar");
 });
 
 it("return rfc2822 format from rfc2822 helper", () => {
@@ -400,8 +623,8 @@ it("return rfc2822 format from rfc2822 helper", () => {
 
 it("clean directory traversal", () => {
   expect(Utils.cleanPathInfo("/cgi/../cgi/test")).toBe("/cgi/test");
-  expect(Utils.cleanPathInfo(".")).toBe("");
-  expect(Utils.cleanPathInfo("test/..")).toBe("");
+  assertEmpty(Utils.cleanPathInfo("."));
+  assertEmpty(Utils.cleanPathInfo("test/.."));
 });
 
 it("clean unsafe directory traversal to safe path", () => {
@@ -438,9 +661,13 @@ describe("cookies", () => {
     expect(
       Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar; quux=h&m" })),
     ).toEqual({ foo: "bar", quux: "h&m" });
-    expect(Utils.parseCookies(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar" }))).toEqual({
-      foo: "bar",
-    });
+    expect(
+      Utils.parseCookies(Object.freeze(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar" }))),
+    ).toEqual({ foo: "bar" });
+
+    const env = MockRequest.envFor("", { HTTP_COOKIE: "%66oo=baz;foo=bar" });
+    const cookies = Utils.parseCookies(env);
+    expect(cookies).toEqual({ "%66oo": "baz", foo: "bar" });
   });
 
   it("generates appropriate cookie header value", () => {
@@ -481,8 +708,15 @@ describe("cookies", () => {
 
   it("deletes cookies in header field", () => {
     const header: string[] = [];
-    const result = Utils.deleteSetCookieHeaderBang(header, "name2");
-    expect(result).toEqual(["name2=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT"]);
+
+    Utils.deleteSetCookieHeaderBang(header, "name2");
+    expect(header).toEqual(["name2=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT"]);
+
+    Utils.deleteSetCookieHeaderBang(header, "name");
+    expect(header).toEqual([
+      "name2=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT",
+      "name=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT",
+    ]);
   });
 
   it("deletes cookies in header field with domain", () => {
@@ -500,9 +734,12 @@ describe("cookies", () => {
   });
 
   it("sets and deletes cookies in header hash", () => {
-    const header: Record<string, any> = { "set-cookie": null };
-    const result = Utils.deleteCookieHeaderBang(header, "name");
-    expect(result).toBeNull();
+    let header: Record<string, any> = { "set-cookie": null };
+    expect(Utils.deleteCookieHeaderBang(header, "name")).toBeNull();
+    expect(header["set-cookie"]).toBe("name=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT");
+
+    header = { "set-cookie": null };
+    expect(Utils.deleteCookieHeaderBang(header, "name")).toBeNull();
     expect(header["set-cookie"]).toBe("name=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT");
   });
 });
@@ -604,14 +841,26 @@ it("alter app on recontexting", () => {
   expect(c3.app).toBe(testTarget3);
 });
 
-it("run different apps", () => {
+it("run different apps", async () => {
   const c1 = new Utils.Context(testApp, testTarget1);
   const c2 = c1.recontext(testTarget2);
   const c3 = c2.recontext(testTarget3);
-  expect(c1.call("hello")).toBe("hello world");
-  expect(c2.call(2)).toBe(4);
-  expect(c3.call("misc")).toBeNull();
-  expect(c2.context("misc", testTarget3)).toBeNull();
+  const c4 = c3.recontext(testTarget4);
+  const a4 = new Lint(c4);
+  const a5 = new Lint(testApp);
+  const r1 = c1.call("hello");
+  expect(r1).toBe("hello world");
+  const r2 = c2.call(2);
+  expect(r2).toBe(4);
+  let r3 = c3.call("misc_symbol");
+  expect(r3).toBeNull();
+  r3 = c2.context("misc_symbol", testTarget3);
+  expect(r3).toBeNull();
+  const r4 = await new MockRequest(a4).get("/");
+  expect(r4.status).toBe(200);
+  const r5 = await new MockRequest(a5).get("/");
+  expect(r5.status).toBe(200);
+  expect(r4.body).toBe(r5.body);
 });
 
 it("raises for invalid context", () => {
