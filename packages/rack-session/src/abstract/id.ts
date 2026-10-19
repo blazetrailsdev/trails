@@ -429,7 +429,7 @@ export class Persisted {
   loadSession(
     req: PersistedRequest,
   ): [unknown, Record<string, unknown>] | Promise<[unknown, Record<string, unknown>]> {
-    const sid = this.currentSessionId(req);
+    let sid = this.currentSessionId(req);
     const found = this.findSession(req, sid);
     if (found instanceof Promise) {
       return found.then(([sid, session]): [unknown, Record<string, unknown>] => [
@@ -437,8 +437,9 @@ export class Persisted {
         session ?? {},
       ]);
     }
-    const [foundSid, session] = found;
-    return [foundSid, session ?? {}];
+    sid = found[0];
+    const session = found[1];
+    return [sid, session ?? {}];
   }
 
   /** @internal */

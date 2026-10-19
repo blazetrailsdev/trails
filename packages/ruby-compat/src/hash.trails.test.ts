@@ -1339,3 +1339,28 @@ describe("Hash#merge (Hash receiver)", () => {
     ]);
   });
 });
+
+describe("Hash#fetch arity", () => {
+  it("raises ArgumentError for more than two arguments", () => {
+    expect(() => fetch({}, "k", 1, 2)).toThrow(
+      "wrong number of arguments (given 3, expected 1..2)",
+    );
+  });
+
+  it("lets a block supersede the default", () => {
+    expect(
+      fetch(
+        {},
+        "k",
+        1,
+        block((k: string) => `${k}!`),
+      ),
+    ).toBe("k!");
+  });
+});
+
+describe("Hash.new", () => {
+  it("raises ArgumentError for a default and a block", () => {
+    expect(() => new Hash("1", () => "2")).toThrow(ArgumentError);
+  });
+});

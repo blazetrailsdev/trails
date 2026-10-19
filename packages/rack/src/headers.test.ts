@@ -26,6 +26,7 @@ describe("RackHeadersTest", () => {
   });
 
   it.skip("public interface", () => {
+    // BLOCKED: ruby-compat-hash-answers-rack-headers-public-interface
     const headersMethods = publicInstanceMethods(Headers).sort();
     const hashMethods = publicInstanceMethods(Hash).sort();
     expect(headersMethods.filter((m) => !hashMethods.includes(m))).toHaveLength(0);
@@ -34,9 +35,14 @@ describe("RackHeadersTest", () => {
 
   it("class aref", () => {
     expect(rbEqual(new Hash(), Headers.get())).toBe(true);
-    expect(rbEqual(Headers.get("a", "2"), Headers.get({ A: "2" }))).toBe(true);
-    expect(rbEqual(Headers.get("a", "2", "b", "4"), Headers.get({ A: "2", B: "4" }))).toBe(true);
-    expect(rbEqual(Headers.get({ a: "2", b: "4" }), Headers.get("A", "2", "B", "4"))).toBe(true);
+    const a = new Hash<string, string>();
+    a.set("a", "2");
+    expect(rbEqual(a, Headers.get({ A: "2" }))).toBe(true);
+    const ab = new Hash<string, string>();
+    ab.set("a", "2");
+    ab.set("b", "4");
+    expect(rbEqual(ab, Headers.get({ A: "2", B: "4" }))).toBe(true);
+    expect(rbEqual(ab, Headers.get("A", "2", "B", "4"))).toBe(true);
     expect(() => Headers.get("A")).toThrow(ArgumentError);
     expect(() => Headers.get("A", 2, "B")).toThrow(ArgumentError);
   });
@@ -126,16 +132,18 @@ describe("RackHeadersTest", () => {
   });
 
   it("delete if and reject", () => {
+    const h34 = new Hash<string, string>();
+    h34.set("3", "4");
     expect(fh.length()).toBe(3);
     let hash: Headers | null = fh.reject((key, _value) => key === "ab" || key === "cd");
     expect(hash.length()).toBe(1);
-    expect(rbEqual(Headers.get("3", "4"), hash)).toBe(true);
+    expect(rbEqual(h34, hash)).toBe(true);
     expect(fh.length()).toBe(3);
     hash = fh.deleteIf((key, _value) => key === "ab" || key === "cd");
     expect(hash.length()).toBe(1);
-    expect(rbEqual(Headers.get("3", "4"), hash)).toBe(true);
+    expect(rbEqual(h34, hash)).toBe(true);
     expect(fh.length()).toBe(1);
-    expect(rbEqual(Headers.get("3", "4"), fh)).toBe(true);
+    expect(rbEqual(h34, fh)).toBe(true);
     expect(fh.rejectBang((key, _value) => key === "ab" || key === "cd")).toBeNull();
     hash = fh.rejectBang((key, _value) => key === "3")!;
     expect(hash.length()).toBe(0);
@@ -416,8 +424,15 @@ describe("RackHeadersTest", () => {
   });
 
   it("to hash", () => {
+    const expected = new Hash<string, string>();
+    for (const [k, v] of [
+      ["3", "4"],
+      ["ab", "1"],
+      ["cd", "2"],
+    ])
+      expected.set(k, v);
     expect(rbEqual(new Hash(), h.toHash())).toBe(true);
-    expect(rbEqual(Headers.get("3", "4", "ab", "1", "cd", "2"), fh.toHash())).toBe(true);
+    expect(rbEqual(expected, fh.toHash())).toBe(true);
   });
 
   it("values", () => {
@@ -529,8 +544,15 @@ describe("RackHeadersTest", () => {
   });
 
   it("to h", () => {
+    const expected = new Hash<string, string>();
+    for (const [k, v] of [
+      ["3", "4"],
+      ["ab", "1"],
+      ["cd", "2"],
+    ])
+      expected.set(k, v);
     expect(rbEqual(new Hash(), h.toH())).toBe(true);
-    expect(rbEqual(Headers.get("3", "4", "ab", "1", "cd", "2"), fh.toH())).toBe(true);
+    expect(rbEqual(expected, fh.toH())).toBe(true);
   });
 
   it("dig", () => {

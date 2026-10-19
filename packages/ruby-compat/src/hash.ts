@@ -154,17 +154,17 @@ export function fetch(
     const own = ownMethod(receiver, "fetch");
     if (own) return own.call(receiver, key, ...rest);
   }
-  const argc = 1 + rest.length - (rbBlockGivenP(rest[rest.length - 1]) ? 1 : 0);
+  const blockGiven = rbBlockGivenP(rest[rest.length - 1]);
+  const argc = 1 + rest.length - (blockGiven ? 1 : 0);
   if (argc > 2) {
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
   }
   const hash = receiver as Record<string, unknown> | Map<unknown, unknown>;
-  const blockGiven = rbBlockGivenP(rest[0]);
   const isMap = !plain && hash instanceof Map;
   if (!(isMap ? hash.has(key) : hasKey(hash, key as string))) {
     if (blockGiven) {
-      return (rest[0] as (key: unknown) => unknown)(key);
-    } else if (rest.length === 0) {
+      return (rest[rest.length - 1] as (key: unknown) => unknown)(key);
+    } else if (argc === 1) {
       throw new KeyError(`key not found: ${strEllipsize(rbInspect(key), 65)}`, {
         receiver: hash,
         key,
