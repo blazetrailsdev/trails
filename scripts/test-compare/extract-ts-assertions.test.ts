@@ -36,6 +36,22 @@ describe("TS extractor assertion-count collection", () => {
     expect(info.testCases[0].assertionKinds).toEqual(["expect", "expect", "assertEqual", "toBe"]);
   });
 
+  it("reads a two-argument mustBe / wontBe as assertPredicate / refutePredicate", () => {
+    const src = `
+      it("spec forms", () => {
+        mustBe(x, "isEmpty");
+        wontBe(x, "isEmpty");
+        mustBe(x, "<", 3);
+      });
+    `;
+    const info = extractTestsFromSource(src, "packages/rack-test/src/x.test.ts");
+    expect(info.testCases[0].assertionKinds).toEqual([
+      "assertPredicate",
+      "refutePredicate",
+      "mustBe",
+    ]);
+  });
+
   it("counts a helper declared inside the test body once, not per call site", () => {
     const src = `
       it("inline lambda", () => {

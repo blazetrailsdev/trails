@@ -243,7 +243,7 @@ describe("Rack::Session::Pool", () => {
     const res = await new MockRequest((env) => app.call(env)).get("/", {
       "rack.session": { not: "empty" },
     });
-    expect(res.headers["set-cookie"]).toBeDefined();
+    expect(res.headers["set-cookie"] ?? null).not.toBeNull();
   });
 
   it("returns no cookie if no data was written and no session was created previously, even if :expire_after is set", async () => {
