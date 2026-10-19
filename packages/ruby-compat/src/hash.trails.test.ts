@@ -1340,16 +1340,18 @@ describe("Hash#merge (Hash receiver)", () => {
   });
 });
 
+const fetchAny = fetch as (...args: unknown[]) => unknown;
+
 describe("Hash#fetch arity", () => {
   it("raises ArgumentError for more than two arguments", () => {
-    expect(() => fetch({}, "k", 1, 2)).toThrow(
+    expect(() => fetchAny({}, "k", 1, 2)).toThrow(
       "wrong number of arguments (given 3, expected 1..2)",
     );
   });
 
   it("lets a block supersede the default", () => {
     expect(
-      fetch(
+      fetchAny(
         {},
         "k",
         1,
