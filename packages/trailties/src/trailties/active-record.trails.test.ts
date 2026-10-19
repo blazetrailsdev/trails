@@ -26,8 +26,11 @@ import {
   Base,
   LogSubscriber,
   Migration,
+  RecordInvalid,
   RecordNotFound,
+  RecordNotSaved,
   RuntimeRegistry,
+  StaleObjectError,
   disablePreparedStatements,
   generateSecureTokenOn,
   QueryLogs,
@@ -315,6 +318,9 @@ describe("ActiveRecord::Railtie rescue_responses", () => {
     });
     await runTrailtieInitializers(ActionDispatchTrailtie, { deprecators: new Deprecators() });
     expect(new ExceptionWrapper(null, new RecordNotFound("gone")).statusCode).toBe(404);
+    expect(new ExceptionWrapper(null, new RecordInvalid(null)).statusCode).toBe(422);
+    expect(new ExceptionWrapper(null, new StaleObjectError()).statusCode).toBe(409);
+    expect(new ExceptionWrapper(null, new RecordNotSaved("unsaved")).statusCode).toBe(422);
   });
 });
 describe("ActiveRecord::ConnectionHandling::RAILS_ENV", () => {

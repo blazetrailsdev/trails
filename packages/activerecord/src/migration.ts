@@ -1,3 +1,4 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   getEnv,
   camelize,
@@ -2158,3 +2159,17 @@ Migration.CheckPending = CheckPending;
 Migration.delegate = new Migration();
 ActiveRecord.Migration = Migration;
 ActiveRecord.IrreversibleMigration = IrreversibleMigration;
+
+rbModConstSet(ActiveRecord, "MigrationError", MigrationError);
+rbModConstSet(ActiveRecord, "IrreversibleMigration", IrreversibleMigration);
+rbModConstSet(ActiveRecord, "DuplicateMigrationVersionError", DuplicateMigrationVersionError);
+rbModConstSet(ActiveRecord, "DuplicateMigrationNameError", DuplicateMigrationNameError);
+rbModConstSet(ActiveRecord, "UnknownMigrationVersionError", UnknownMigrationVersionError);
+rbModConstSet(ActiveRecord, "IllegalMigrationNameError", IllegalMigrationNameError);
+rbModConstSet(ActiveRecord, "InvalidMigrationTimestampError", InvalidMigrationTimestampError);
+rbModConstSet(ActiveRecord, "PendingMigrationError", PendingMigrationError);
+rbModConstSet(ActiveRecord, "ConcurrentMigrationError", ConcurrentMigrationError);
+rbModConstSet(ActiveRecord, "NoEnvironmentInSchemaError", NoEnvironmentInSchemaError);
+rbModConstSet(ActiveRecord, "ProtectedEnvironmentError", ProtectedEnvironmentError);
+rbModConstSet(ActiveRecord, "EnvironmentMismatchError", EnvironmentMismatchError);
+rbModConstSet(ActiveRecord, "EnvironmentStorageError", EnvironmentStorageError);
