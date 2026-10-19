@@ -1,7 +1,9 @@
 import { beforeEach, describe, it } from "vitest";
 import { assertEqual, assertMatch, assertPredicate, isHtmlSafe } from "@blazetrails/activesupport";
-import { Range } from "@blazetrails/ruby-compat";
+import { ActionController } from "@blazetrails/actionpack";
+import { CGI, include, Range, rbInspect, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 
+import "../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { Template } from "../template.js";
@@ -26,6 +28,17 @@ const renderErb = async (string: string): Promise<string> => {
 };
 
 describe("FormTagHelperTest", () => {
+  class WithActiveStorageRoutesControllers extends ActionController.Base {
+    static ROUTES = this.testRoutes(function () {
+      this.post("/rails/active_storage/direct_uploads", {
+        to: "active_storage/direct_uploads#create",
+        as: "rails_direct_uploads",
+      });
+    });
+
+    override urlOptions = (): Record<string, unknown> => ({ host: "testtwo.host" });
+  }
+
   const VALID_HTML_ID = /^[A-Za-z][-_:.A-Za-z0-9]*$/;
 
   let view: Base;
@@ -414,8 +427,16 @@ describe("FormTagHelperTest", () => {
     );
   });
 
-  // BLOCKED: actionview-tests-needing-actionpack-controller-and-parameters
-  it.skip("file field tag with direct upload when rails direct uploads url is defined", () => {});
+  it("file field tag with direct upload when rails direct uploads url is defined", () => {
+    const controller = new WithActiveStorageRoutesControllers();
+    view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, controller);
+    include(rbObjSingletonClass(view), WithActiveStorageRoutesControllers.ROUTES.urlHelpers());
+
+    assertDomEqual(
+      `<input name="picsplz" type="file" id="picsplz" class="pix" data-direct-upload-url="http://testtwo.host/rails/active_storage/direct_uploads"/>`,
+      view.fileFieldTag("picsplz", { class: "pix", directUpload: true }),
+    );
+  });
 
   it("file field tag with direct upload dont mutate arguments", () => {
     const originalOptions = { class: "pix", directUpload: true };
@@ -673,8 +694,12 @@ describe("FormTagHelperTest", () => {
     assertDomEqual(expected, actual);
   });
 
-  // BLOCKED: actionview-tests-needing-actionpack-controller-and-parameters
-  it.skip("text field tag with ac parameters", () => {});
+  it("text field tag with ac parameters", () => {
+    const actual = view.textFieldTag("title", new ActionController.Parameters({ key: "value" }));
+    const value = CGI.escapeHTML(rbInspect({ key: "value" }));
+    const expected = `<input id="title" name="title" type="text" value="${value}" />`;
+    assertDomEqual(expected, actual);
+  });
 
   it("text field tag size string", () => {
     const actual = view.textFieldTag("title", "Hello!", { size: "75" });

@@ -90,6 +90,14 @@ export const ClassMethods = {
     return this.sanitizerVendor.safeListSanitizer.allowedAttributes;
   },
 
+  setSanitizedAllowedTags(this: SanitizeHelperClass, tags: Iterable<string>): void {
+    this.sanitizerVendor.safeListSanitizer.allowedTags = tags;
+  },
+
+  setSanitizedAllowedAttributes(this: SanitizeHelperClass, attributes: Iterable<string>): void {
+    this.sanitizerVendor.safeListSanitizer.allowedAttributes = attributes;
+  },
+
   get fullSanitizer(): Sanitizer {
     const self = this as unknown as SanitizeHelperClass;
     if (!Object.hasOwn(self, "_fullSanitizer") || self._fullSanitizer == null) {
