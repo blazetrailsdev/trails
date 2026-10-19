@@ -1,5 +1,5 @@
 import { RuleTester } from "eslint";
-import rule from "./inlined-from-only-on-constructors.mjs";
+import rule from "./inlined-from-placement.mjs";
 
 const tester = new RuleTester({
   languageOptions: {
@@ -23,7 +23,7 @@ const onMethod = (name, ...tags) =>
 const onConstructor = (...tags) =>
   `class Base {\n  /**\n${tags.map((tag) => `   * @inlinedFrom ${tag}\n`).join("")}   */\n  constructor() {}\n}\n`;
 
-tester.run("inlined-from-only-on-constructors", rule, {
+tester.run("inlined-from-placement", rule, {
   valid: [
     { code: onMethod("contentTag", CONTENT_TAG), filename: TAGS_BASE },
     {
