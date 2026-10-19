@@ -26,7 +26,7 @@ export class HasAndBelongsToMany {
     const lhsModel = this.lhsModel;
 
     let tableName: string | null = null;
-    const joinModel: any = class extends (ActiveRecord.Base as any) {
+    const joinModel: any = class extends ActiveRecord.Base {
       static leftModel: any;
       static tableNameResolver: () => string;
       static leftReflection: any;

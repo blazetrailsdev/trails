@@ -233,10 +233,10 @@ export class JoinDependency {
         const tableName = this._references.get((reflection as any).name);
 
         table = this.aliasTracker.aliasedTableFor(
-          (reflection.klass as any).arelTable,
+          reflection.klass.arelTable,
           tableName ?? null,
           () => {
-            const name = (reflection as any).aliasCandidate(parent.tableName);
+            const name = reflection.aliasCandidate(parent.tableName!);
             return root ? name : `${name}_join`;
           },
         );
@@ -421,7 +421,7 @@ export class JoinDependency {
     const reflection = _reflectOnAssociation(klass as any, name);
     if (!rtest(reflection)) {
       throw new ConfigurationError(
-        `Can't join '${(klass as any).name}' to association named '${name}'; perhaps you misspelled it?`,
+        `Can't join '${klass.name}' to association named '${name}'; perhaps you misspelled it?`,
       );
     }
     return reflection;

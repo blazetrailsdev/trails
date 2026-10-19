@@ -110,7 +110,7 @@ export class BelongsToAssociation extends SingularAssociation {
     const scope = klass.unscoped().whereBang(new Map([[this.primaryKey(klass), foreignKey]]));
     await scope.updateCounters({
       [this.reflection.counterCacheColumn()!]: by,
-      touch: (this.reflection.options as any).touch,
+      touch: this.reflection.options.touch,
     });
   }
 

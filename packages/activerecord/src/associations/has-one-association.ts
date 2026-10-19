@@ -69,7 +69,7 @@ export class HasOneAssociation extends SingularAssociation {
 
           this.enqueueDestroyAssociation({
             ownerModelName: this.owner.constructor.name,
-            ownerId: (this.owner as any).id,
+            ownerId: this.owner.id,
             associationClass: String(this.reflection.klass.name),
             associationIds: [id],
             associationPrimaryKeyColumn: primaryKeyColumn,
@@ -118,7 +118,7 @@ export class HasOneAssociation extends SingularAssociation {
   protected override replace(record: Base | null, save = true): Base | null | Promise<Base | null> {
     if (save) {
       return (async () => {
-        if (record) (this as any).raiseOnTypeMismatchBang(record);
+        if (record) this.raiseOnTypeMismatchBang(record);
         if (!((await this.loadTarget()) || record)) return this.target;
         const assigningAnotherRecord = !rbEqual(this.target, record);
         if (assigningAnotherRecord || record!.hasChangesToSave) {
@@ -145,7 +145,7 @@ export class HasOneAssociation extends SingularAssociation {
       })();
     }
     {
-      if (record) (this as any).raiseOnTypeMismatchBang(record);
+      if (record) this.raiseOnTypeMismatchBang(record);
       const assigningAnotherRecord = !rbEqual(this.target, record);
       if (assigningAnotherRecord || record?.hasChangesToSave === true) {
         if (
@@ -272,7 +272,7 @@ function transactionIf(
   block: () => Promise<void>,
 ): Promise<void> {
   if (value) {
-    return (assoc.reflection.klass as any).transaction(block);
+    return assoc.reflection.klass.transaction(block);
   } else {
     return block();
   }
