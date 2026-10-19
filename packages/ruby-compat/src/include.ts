@@ -37,6 +37,7 @@ import {
   FL_SINGLETON,
   T_ICLASS,
   classpaths,
+  isPlainHash,
   rbSetClassPathString,
   rbAnyToS,
   rbCBasicObject,
@@ -77,7 +78,8 @@ type ModuleHooks = {
  * letter (`rb_sym_constant_char_p`, vendor/ruby/v3.3.11/symbol.c:218-250), then
  * identifier characters (`is_identchar`, symbol.c:54). It then calls `const_set`
  * (vendor/ruby/v3.3.11/variable.c:3607). Binding a module names it after the
- * owner (variable.c:3648-3668), as it does a class: permanently under a named
+ * owner (variable.c:3648-3668), as it does a class or a `defineModule` plain
+ * module: permanently under a named
  * owner, and under an anonymous one with the owner's temporary path, until a
  * named owner re-paths it. `Module#name` and `Module#inspect` read that path.
  * `rb_namespace_p` (variable.c:83) admits a class or a module: a class here is a function
@@ -88,7 +90,11 @@ type ModuleHooks = {
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
 export function rbModConstSet<T>(
-  mod: Module | (abstract new (...args: never) => unknown) | { readonly name: string },
+  mod:
+    | Module
+    | (abstract new (...args: never) => unknown)
+    | { readonly name: string }
+    | ModuleObject,
   id: string,
   value: T,
 ): T {
@@ -98,6 +104,7 @@ export function rbModConstSet<T>(
   Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
   if (
     value instanceof Module ||
+    isPlainHash(value) ||
     (typeof value === "function" &&
       Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false)
   ) {
@@ -108,7 +115,9 @@ export function rbModConstSet<T>(
       return value;
     }
     const parentalPathPermanent =
-      mod instanceof Module ? classpaths.get(mod)?.permanent === true : Boolean(mod.name);
+      mod instanceof Module || (isPlainHash(mod) && classpaths.has(mod))
+        ? classpaths.get(mod)?.permanent === true
+        : Boolean((mod as { readonly name?: string }).name);
     const parentalPath = parentalPathPermanent
       ? mod instanceof Module
         ? mod.name
@@ -1096,10 +1105,13 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
  * cannot define; the predicate carries the same question at a callable name.
  */
 export function isModuleIncluded(
-  klass: { prototype: object },
+  klass: { prototype: object } | ModuleObject,
   mod: ModuleObject | AnyClass | Module,
 ): boolean {
-  return isModuleMethodTablePresent(klass, mod);
+  if (isPlainHash(klass) && !Object.hasOwn(klass, "prototype")) {
+    return klass !== mod && rbModAncestors(klass as { prototype: object }).includes(mod);
+  }
+  return isModuleMethodTablePresent(klass as { prototype: object }, mod);
 }
 
 /**
@@ -1142,9 +1154,24 @@ export function includedModules(mod: { prototype: object }): unknown[] {
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
-export function rbModAncestors(mod: { prototype: object }): object[] {
+export function rbModAncestors(mod: { prototype: object } | ModuleObject): object[] {
+  if (isPlainHash(mod) && !Object.hasOwn(mod, "prototype")) {
+    const ary: object[] = [mod];
+    const mods = Object.hasOwn(mod, moduleIncludesKey)
+      ? [...(mod as Record<symbol, Set<object>>)[moduleIncludesKey]]
+      : [];
+    for (const m of mods.reverse()) {
+      const chain = m instanceof Module ? m.ancestors() : isPlainHash(m) ? rbModAncestors(m) : [m];
+      for (const a of chain) if (!ary.includes(a)) ary.push(a);
+    }
+    return ary;
+  }
   const ary: object[] = [];
-  for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
+  for (
+    let p: object | null = (mod as { prototype: object }).prototype;
+    p;
+    p = Object.getPrototypeOf(p) as object | null
+  ) {
     if (Object.hasOwn(p, "constructor")) {
       const klass = (p as { constructor: object }).constructor;
       if (!ary.includes(reopened(klass))) ary.push(klass);
@@ -1476,7 +1503,16 @@ export function publicInstanceMethods(
   const sections = (mod as Record<symbol, unknown>)[moduleVisibility] as
     | ModuleVisibility
     | undefined;
-  return sections ? [...sections.public] : Object.keys(mod);
+  const names = sections
+    ? [...sections.public]
+    : Object.keys(mod).filter((name) => !/^[A-Z]/.test(name));
+  if (!includeSuper) return names;
+  for (const m of rbModAncestors(mod).slice(1)) {
+    for (const name of publicInstanceMethods(m, false)) {
+      if (!names.includes(name)) names.push(name);
+    }
+  }
+  return names;
 }
 
 type CallableMethods<M extends object> = {
@@ -1996,6 +2032,23 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   if (mod instanceof Module) {
     mod.extendObject(klass);
     return;
+  }
+  if (Object.hasOwn(mod, moduleIncludesKey)) {
+    for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
+      if (singletonSearchAncestor(klass, nested)) continue;
+      if (typeof nested !== "function") {
+        extendObject(klass, nested);
+        continue;
+      }
+      const { constructor: _constructor, ...methods } = Object.getOwnPropertyDescriptors(
+        (nested as AnyClass).prototype,
+      );
+      for (const descriptor of Object.values(methods)) descriptor.enumerable = true;
+      const table = Object.defineProperties({}, methods);
+      extendObject(klass, table);
+      (klass as Record<symbol, Set<object>>)[includedModulesKey].delete(table);
+      trackIncludedModule(klass, nested);
+    }
   }
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
   const owners = new Map<string, object>();

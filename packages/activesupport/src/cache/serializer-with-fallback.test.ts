@@ -6,7 +6,7 @@ import { Entry } from "./entry.js";
 import { Store } from "./index.js";
 import { assertNotNil, assertNil } from "../testing/assertions.js";
 
-const FORMATS = Object.keys(SerializerWithFallback.SERIALIZERS);
+const FORMATS = [...SerializerWithFallback.SERIALIZERS.keys()];
 const LEGACY_FORMATS = ["passthrough", "marshal_7_0"];
 const NON_LEGACY_FORMATS = FORMATS.filter((f) => !LEGACY_FORMATS.includes(f));
 

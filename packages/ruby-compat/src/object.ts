@@ -433,6 +433,9 @@ export function rbClassAttachedObject(klass: abstract new (...args: never) => un
  * @noRailsEquivalent PERMANENT
  */
 export function rbModToS(klass: abstract new (...args: never) => unknown): string {
+  if (typeof klass !== "function") {
+    return classpaths.get(klass)?.path ?? `#<Module:${objAddress(klass)}>`;
+  }
   if (rbModSingletonP(klass)) {
     let s = "#<Class:";
     const v = (klass as unknown as { [FL_SINGLETON]: object })[FL_SINGLETON];
@@ -1451,6 +1454,9 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (isSymbol(value)) return symInspect(value);
   if (typeof value === "string") return stringInspect(value);
   if (Array.isArray(value)) return inspectAry(value, recursing);
+  if (isPlainHash(value) && classpaths.has(value)) {
+    return rbModToS(value as unknown as abstract new (...args: never) => unknown);
+  }
   if (isPlainHash(value) || value instanceof Map) return inspectHash(value, recursing);
   if (value instanceof RegExp) return regDesc(value);
   if (value instanceof Set) return setInspect(value, recursing);

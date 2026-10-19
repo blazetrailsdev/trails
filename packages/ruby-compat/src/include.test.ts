@@ -4,6 +4,7 @@ import { NameError } from "./name-error.js";
 import { rbModConstGet, registerConstant, unregisterConstant } from "./variable.js";
 import { Hash } from "./hash.js";
 import {
+  rbInspect,
   rbCBasicObject,
   rbClassSuperclass,
   rbObjClass,
@@ -1832,6 +1833,32 @@ describe("Module#const_set", () => {
     expect((Topic as unknown as { Generated: Module }).Generated).toBe(mod);
     expect(mod.name).toBe("Topic::Generated");
     expect(mod.inspect()).toBe("Topic::Generated");
+  });
+
+  it("names a plain-object module after the constant it is bound to", () => {
+    class Topic {}
+    const mod = {};
+    expect(rbModName(mod)).toBeNull();
+    expect(rbModToS(mod as never)).toMatch(/^#<Module:0x/);
+    rbModConstSet(Topic, "Generated", mod);
+    expect(rbModName(mod)).toBe("Topic::Generated");
+    expect(rbModToS(mod as never)).toBe("Topic::Generated");
+    expect(rbInspect(mod)).toBe("Topic::Generated");
+  });
+
+  it("orders a plain module's ancestors as include_modules_at does, and lists no constant as a method", () => {
+    const Y = { y: () => "y" };
+    const Z = { z: () => "z" };
+    include(Z, Y);
+    const W = { w: () => "w" };
+    include(W, Y);
+    include(W, Z);
+    rbModConstSet(W, "Inner", {});
+    expect(rbModAncestors(W)).toEqual([W, Z, Y]);
+    expect(isModuleIncluded(W, Y)).toBe(true);
+    expect(isModuleIncluded(W, W)).toBe(false);
+    expect(publicInstanceMethods(W)).toEqual(["w", "z", "y"]);
+    expect(publicInstanceMethods(W, false)).toEqual(["w"]);
   });
 
   it("names a class after the constant it is bound to", () => {

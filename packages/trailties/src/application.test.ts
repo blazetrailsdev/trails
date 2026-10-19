@@ -1,5 +1,10 @@
 import type { RackResponse } from "@blazetrails/rack";
-import { rbFSend, rbModConstSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import {
+  publicInstanceMethods,
+  rbFSend,
+  rbModConstSet,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, onTestFinished } from "vitest";
 import {
   NullLogger,
@@ -16,7 +21,6 @@ import {
   fsAdapterConfig,
   registerFsAdapter,
   type FsAdapter,
-  type Module,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
@@ -526,8 +530,8 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
     const { ApplicationController } =
       await import("./__fixtures__/boot-app/app/controllers/application-controller.js");
-    const helpers = (ApplicationController as unknown as { _helpers: Module })._helpers;
-    expect(helpers.instanceMethods()).toContain("statusBadge");
+    const helpers = (ApplicationController as unknown as { _helpers: object })._helpers;
+    expect(publicInstanceMethods(helpers)).toContain("statusBadge");
   });
 });
 
