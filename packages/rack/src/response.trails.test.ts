@@ -78,3 +78,11 @@ describe("Rack::Response with a byte part", () => {
     expect([...body]).toEqual([bytes]);
   });
 });
+
+describe("Rack::Response#[]", () => {
+  it("reads a header as get_header does", () => {
+    const response = new Response([], 200, { "Content-Type": "text/plain" });
+    expect(response.get("content-type")).toBe("text/plain");
+    expect(response.get("Content-Type")).toBe(response.getHeader("Content-Type"));
+  });
+});

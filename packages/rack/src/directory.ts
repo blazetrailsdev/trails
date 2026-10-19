@@ -62,21 +62,21 @@ export class DirectoryBody {
     cb(sprintf(DIR_PAGE_HEADER, showPath, showPath));
 
     if (this.path.replace(/\/$/, "") !== this.root) {
-      cb(sprintf(DIR_FILE, ...this.DIR_FILE_escape(this.files("..")!)));
+      cb(sprintf(DIR_FILE, ...this.DIRFILEEscape(this.files("..")!)));
     }
 
     Dir.foreach(this.path, (basename) => {
       if (basename.startsWith(".")) return;
       const f = this.files(basename);
       if (!f) return;
-      cb(sprintf(DIR_FILE, ...this.DIR_FILE_escape(f)));
+      cb(sprintf(DIR_FILE, ...this.DIRFILEEscape(f)));
     });
 
     cb(DIR_PAGE_FOOTER);
   }
 
   /** @internal */
-  private DIR_FILE_escape(htmls: string[]): string[] {
+  private DIRFILEEscape(htmls: string[]): string[] {
     return htmls.map((e) => escapeHtml(e));
   }
 }

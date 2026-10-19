@@ -5,12 +5,12 @@ import { escapePath } from "./utils.js";
 
 export class Sendfile {
   private app: RackApp;
-  private variation: string | null;
+  private _variation: string | null;
   private mappings: [string, string][];
 
   constructor(app: RackApp, variation?: string | null, mappings?: [string, string][]) {
     this.app = app;
-    this.variation = variation || null;
+    this._variation = variation ?? null;
     this.mappings = mappings || [];
   }
 
@@ -19,7 +19,7 @@ export class Sendfile {
     const [, headers, body] = response;
 
     if (body && typeof body.toPath === "function") {
-      const type = this.variation || env["sendfile.type"] || null;
+      const type = this.variation(env);
       if (type != null && /x-accel-redirect/i.test(type)) {
         const path = File.expandPath(body.toPath());
         const url = this.mapAccelPath(env, path);
@@ -47,6 +47,11 @@ export class Sendfile {
     }
 
     return response;
+  }
+
+  /** @internal */
+  private variation(env: Record<string, any>): string | null {
+    return this._variation ?? env["sendfile.type"] ?? null;
   }
 
   /** @internal */

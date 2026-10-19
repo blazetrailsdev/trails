@@ -98,7 +98,7 @@ export class Headers extends Hash<string, string> {
   static get(...items: any[]): Headers {
     if (items.length % 2 !== 0) {
       if (items.length === 1 && (items[0] instanceof Hash || isPlainHash(items[0]))) {
-        return new this().update(items[0] as Record<string, string> | Headers);
+        return new this().mergeBang(items[0] as Record<string, string> | Headers);
       } else {
         throw new ArgumentError("odd number of arguments for Rack::Headers");
       }
@@ -162,6 +162,10 @@ export class Headers extends Hash<string, string> {
     return this.hasKey(key);
   }
 
+  isMember(key: string): boolean {
+    return this.hasKey(key);
+  }
+
   invert(): Headers {
     const hash = new (this.constructor as typeof Headers)();
     this.each((key, value) => {
@@ -174,7 +178,7 @@ export class Headers extends Hash<string, string> {
     hash: Record<string, string> | Headers,
     block?: (key: string, oldVal: string, newVal: string) => string,
   ): Headers {
-    return (dup(this) as Headers).update(hash, block);
+    return (dup(this) as Headers).mergeBang(hash, block);
   }
 
   reject(block: PairBlock): Headers {
@@ -213,6 +217,13 @@ export class Headers extends Hash<string, string> {
       );
     });
     return this;
+  }
+
+  mergeBang(
+    hash: Record<string, string> | Headers,
+    block?: (key: string, oldVal: string, newVal: string) => string,
+  ): this {
+    return this.update(hash, block);
   }
 
   valuesAt(...keys: string[]): (string | undefined | null)[] {

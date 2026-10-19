@@ -57,6 +57,9 @@ export function setMultipartFileLimit(v: number): void {
   _multipartFileLimit = v;
 }
 
+export const multipartPartLimit = multipartFileLimit;
+export const setMultipartPartLimit = setMultipartFileLimit;
+
 export function paramDepthLimit(): number {
   return defaultQueryParser().paramDepthLimit;
 }
