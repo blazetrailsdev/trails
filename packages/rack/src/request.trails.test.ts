@@ -70,3 +70,17 @@ describe("RackRequestTrailsTest", () => {
     });
   }
 });
+
+describe("Rack::Request.ip_filter", () => {
+  it("is the filter trusted_proxy? calls", () => {
+    const old = Request.ipFilter;
+    try {
+      Request.ipFilter = (ip) => ip === "1.2.3.4";
+      expect(new Request({}).trustedProxy("1.2.3.4")).toBe(true);
+      expect(new Request({}).trustedProxy("127.0.0.1")).toBe(false);
+    } finally {
+      Request.ipFilter = old;
+    }
+    expect(new Request({}).trustedProxy("127.0.0.1")).toBe(true);
+  });
+});
