@@ -170,12 +170,12 @@ export const LocalTagStorage = {
 };
 
 export const TaggedLogging = {
-  logger(...args: ConstructorParameters<typeof Logger>): TaggedLogger {
+  logger(...args: ConstructorParameters<typeof Logger>): Logger & TaggedLogger {
     return TaggedLogging.new(new Logger(...args));
   },
 
-  new(logger: Logger): TaggedLogger {
-    logger = (logger as { dup?: () => Logger }).dup?.() ?? rbObjClone(logger);
+  new<L extends Logger>(logger: L): L & TaggedLogger {
+    logger = (logger as { dup?: () => L }).dup?.() ?? rbObjClone(logger);
 
     if (logger.formatter) {
       const formatter = logger.formatter;
@@ -189,7 +189,7 @@ export const TaggedLogging = {
 
     extend(logger.formatter, Formatter);
     extend(logger, TaggedLogging);
-    return logger as TaggedLogger;
+    return logger as L & TaggedLogger;
   },
 
   pushTags(this: TaggedLogger, ...tags: unknown[]): unknown[] {
