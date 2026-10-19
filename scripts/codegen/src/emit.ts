@@ -1682,7 +1682,7 @@ export class Emitter {
     const sig = [...this.ivarDecls(u, f, members), ...mix.statics];
     const text = [
       head,
-      ...indent([...sig, ...dedupeMembers(members).flatMap((m) => ["", m])]),
+      ...indent([...sig, ...pairSetters(dedupeMembers(members)).flatMap((m) => ["", m])]),
       "}",
       ...(mix.iface ? [mix.iface] : []),
       ...after,
@@ -1914,11 +1914,43 @@ export class Emitter {
   }
 
   /** `declare _x: T;` for each typed ivar; `declare` emits no field initializer. */
+  /**
+   * The instance fields the class's ancestors (superclasses and included
+   * modules, in the gem) already declare: each ivar their methods assign, and
+   * each `attr_*`'s storage. A subclass that declares one again with another
+   * type stops being assignable to the ancestor (TS2684 on a `this: Base`
+   * method), so it inherits the declaration instead.
+   */
+  inheritedFields(fqn: string): Set<string> {
+    const memo = (this.inheritedMemo ??= new Map<string, Set<string>>());
+    const hit = memo.get(fqn);
+    if (hit) return hit;
+    const out = new Set<string>();
+    for (const a of rubyAncestors(this.index, fqn)) {
+      if (a === fqn) continue;
+      const sc = this.index.scopes.get(a);
+      if (!sc) continue;
+      for (const at of sc.attrs) out.add(`_${propName(at).replace(/^_/, "")}`);
+      for (const d of sc.defs.values())
+        walk(d.node?.body ?? null, (n) => {
+          if (n.k === "def") return false;
+          if (n.k === "iasgn" || n.k === "ivar")
+            out.add(`_${propName(String(n.name).slice(1)).replace(/^_/, "")}`);
+        });
+    }
+    memo.set(fqn, out);
+    return out;
+  }
+
+  inheritedMemo?: Map<string, Set<string>>;
+
   ivarDecls(u: Unit, f: FileCtx, members: string[]): string[] {
     const ctx = this.baseCtx(u, f, { selfKind: "instance" });
     const out: string[] = [];
+    const inherited = this.inheritedFields(u.fqn);
     for (const [ivar, t] of f.ivarTypes?.get(u.fqn) ?? []) {
       const field = this.lw.ivar(ivar, ctx).replace(/^this\./, "");
+      if (inherited.has(field)) continue;
       if (members.some((m) => new RegExp(`^(?:get |set |static )?${field}\\b`).test(m))) continue;
       const ts = this.lw.tsType(t, ctx);
       out.push(`declare ${field}: ${ts === "any" ? "unknown" : ts};`);
@@ -1944,6 +1976,7 @@ export class Emitter {
         const key = `${isStatic ? "static " : ""}${field}`;
         if (declared.has(key) || (!isStatic && declared.has(field)) || definedBy(field, isStatic))
           continue;
+        if (!isStatic && inherited.has(field)) continue;
         declared.add(key);
         out.push(`declare ${isStatic ? "static " : ""}${field}: unknown;`);
       }
@@ -2283,7 +2316,7 @@ export class Emitter {
     }
     const text = [
       `export class ${name} {`,
-      ...indent([...sig, ...dedupeMembers(members).flatMap((m) => ["", m])]),
+      ...indent([...sig, ...pairSetters(dedupeMembers(members)).flatMap((m) => ["", m])]),
       "}",
       ...after,
     ].join("\n");
@@ -2752,6 +2785,32 @@ function toDefineMethod(m: string): string {
   const name = mm[3].startsWith('"') ? JSON.parse(mm[3]) : mm[3];
   const rest = body.slice(mm[0].length);
   return `${doc}mod.defineMethod(${JSON.stringify(name)}, ${mm[1] ?? ""}function (${rest});`;
+}
+
+/**
+ * A setter beside a getter of the same name takes the getter's type: its
+ * parameter is left unannotated, since TypeScript otherwise reads an
+ * unannotated getter's type off the setter's parameter (`unknown`), and the
+ * class stops being assignable to an ancestor that typed the property.
+ */
+function pairSetters(members: string[]): string[] {
+  const getters = new Set(
+    members
+      .map((m) => /^(?:\/\*\*[^]*?\*\/\n)?((?:static )?)get ([\w$]+)\(/.exec(m))
+      .filter((x): x is RegExpExecArray => !!x)
+      .map((x) => `${x[1]}${x[2]}`),
+  );
+  // A reader/writer pair emitted as one member (`get x() …\n\nset x(value: any) …`).
+  for (const m of members)
+    for (const g of m.matchAll(/(?:^|\n)((?:static )?)get ([\w$]+)\(/g))
+      getters.add(`${g[1]}${g[2]}`);
+  return members.map((m) =>
+    m.replace(
+      /(^|\n)((?:static )?)set ([\w$]+)\((\w+): any\)/g,
+      (all, pre: string, st: string, name: string, v: string) =>
+        getters.has(`${st}${name}`) ? `${pre}${st}set ${name}(${v})` : all,
+    ),
+  );
 }
 
 /** A JS class must be declared before a class that extends it in the same file. */
