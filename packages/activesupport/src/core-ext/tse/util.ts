@@ -179,5 +179,12 @@ export function tokenize(source: string): [string, string][] {
   return tokens;
 }
 
-export const Util = { htmlEscape, h, urlEncode, unwrappedHtmlEscape, htmlEscapeOnce };
-Object.assign(Util, { jsonEscape, xmlNameEscape });
+export const Util = {
+  htmlEscape,
+  h,
+  urlEncode,
+  unwrappedHtmlEscape,
+  htmlEscapeOnce,
+  jsonEscape,
+  xmlNameEscape,
+};

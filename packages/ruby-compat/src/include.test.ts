@@ -1036,12 +1036,17 @@ describe("extend", () => {
       own(): string {
         return "own";
       }
+
+      *[Symbol.iterator](): Generator<number> {
+        yield 1;
+      }
     }
     const mod = {};
     include(mod, Helper);
-    const obj = extend({}, mod) as { greet(): string; own(): string };
+    const obj = extend({}, mod) as { greet(): string; own(): string } & Iterable<number>;
     expect(obj.own()).toBe("own");
     expect(obj.greet()).toBe("inherited");
+    expect([...obj]).toEqual([1]);
   });
 });
 
