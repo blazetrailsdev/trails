@@ -298,8 +298,11 @@ describe("inlinedFromFindings", () => {
     expect(MISSING_TAG_PACKAGES).toEqual([
       "actioncontroller",
       "actiondispatch",
+      "actionview",
+      "activejob",
       "activesupport",
       "i18n",
+      "rack",
       "rack-test",
     ]);
   });

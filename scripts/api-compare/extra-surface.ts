@@ -2163,6 +2163,18 @@ export function inlinedModuleMembers(
 ): InlinedFromFinding[] {
   const out: InlinedFromFinding[] = [];
   const seen = new Set<string>();
+  const definedByRubyFile = new Map<string, Map<string, Set<ClassInfo>>>();
+  for (const info of [...Object.values(rubyClasses), ...Object.values(rubyModules)]) {
+    for (const m of [...info.instanceMethods, ...info.classMethods]) {
+      const file = m.file ?? info.file;
+      if (!file) continue;
+      let names = definedByRubyFile.get(file);
+      if (names === undefined) definedByRubyFile.set(file, (names = new Map()));
+      let owners = names.get(m.name);
+      if (owners === undefined) names.set(m.name, (owners = new Set()));
+      owners.add(info);
+    }
+  }
   for (const [hostFqn, host] of Object.entries(rubyClasses)) {
     if (!host.file) continue;
     const hostTs = rubyFileToTs(host.file, pkg);
@@ -2185,6 +2197,12 @@ export function inlinedModuleMembers(
         if (m.file !== undefined && m.file !== mod.file) continue;
         const candidates = operatorSpelling(fqn, m.name) ?? rubyMethodCandidates(m.name);
         if (!candidates) continue;
+        // The constructor ports the includer's own `initialize` (`RoutesProxy#initialize`,
+        // `routes_proxy.rb:15-19`), and a sibling in the includer's `.rb` defining the name owns
+        // the body there (`Runner#default_url_options=`, `testing/integration.rb:432-434`).
+        if (m.name === "initialize" && hostDefinesInitialize) continue;
+        const sameFileOwners = definedByRubyFile.get(host.file)?.get(m.name);
+        if (sameFileOwners !== undefined && [...sameFileOwners].some((o) => o !== host)) continue;
         if (m.name === "initialize" && moduleBodies?.has(CONCERN_HOOK_MEMBERS.initialize)) continue;
         if (m.name === "initialize" && taggedByTsFile.get(hostTs)?.has(fqn) === true) continue;
         if (m.name.endsWith("?") && candidates.some((c) => moduleBodies?.has(c) === true)) continue;

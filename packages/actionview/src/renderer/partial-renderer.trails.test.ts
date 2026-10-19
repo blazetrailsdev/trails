@@ -21,7 +21,7 @@ describe("PartialRenderer render blocks", () => {
       "admin/line-items/_line_item.html.tse": "item <%= line_item.name %>;",
       "test/_layout_for_partial.html.tse": "Before (<%= name %>)\n<%= yield %>\nAfter",
     });
-    lookupContext = new LookupContext(null, {}, []);
+    lookupContext = new LookupContext(null, {}, ["test"]);
     lookupContext.appendViewPaths([resolver]);
     const base = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
     renderer = base.viewRenderer;

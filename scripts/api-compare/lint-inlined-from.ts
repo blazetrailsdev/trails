@@ -49,8 +49,11 @@ import { TAG } from "./inlined-from-tags.js";
 export const MISSING_TAG_PACKAGES: readonly string[] = [
   "actioncontroller",
   "actiondispatch",
+  "actionview",
+  "activejob",
   "activesupport",
   "i18n",
+  "rack",
   "rack-test",
 ];
 

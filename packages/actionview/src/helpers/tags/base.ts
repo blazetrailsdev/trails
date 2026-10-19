@@ -6,7 +6,6 @@ import {
   hashDelete,
   include,
   type Included,
-  initializeIncludedModules,
   rbFPublicSend,
   rbInspect,
   rbObjRespondTo,
@@ -60,8 +59,6 @@ export class Base {
       this._generateIndexedNames = false;
       this._autoIndex = null;
     }
-
-    initializeIncludedModules(this);
   }
 
   render(): unknown {
