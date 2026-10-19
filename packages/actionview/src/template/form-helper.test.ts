@@ -2305,6 +2305,190 @@ describe("FormHelperTest", () => {
     );
   });
 
+  it("nested fields for with an empty supplied attributes collection", () => {
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      f.fieldsFor("comments", [], null, (cf) => {
+        concat(cf.textField("name"));
+      });
+    });
+
+    assertDomEqual(
+      editPost(() => titleInput),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a supplied nested attributes collection", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comments", post.comments, null, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #1") +
+          commentId(0, 1) +
+          commentName(1, "comment #2") +
+          commentId(1, 2),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with existing records on a supplied nested attributes collection different from record one", () => {
+    const comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+    post.comments = [];
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comments", comments, null, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #1") +
+          commentId(0, 1) +
+          commentName(1, "comment #2") +
+          commentId(1, 2),
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for on a nested attributes collection association yields only builder", () => {
+    post.comments = [new Comment(321), new Comment()];
+    const yieldedComments: unknown[] = [];
+
+    formFor(post, {}, (f) => {
+      concat(f.textField("title"));
+      concat(
+        f.fieldsFor("comments", null, null, (cf) => {
+          concat(cf.textField("name"));
+          yieldedComments.push(cf.object);
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          titleInput +
+          commentName(0, "comment #321") +
+          commentId(0, 321) +
+          commentName(1, "new comment"),
+      ),
+      rendered,
+    );
+    expect(yieldedComments).toEqual(post.comments);
+  });
+
+  it("nested fields for with child index option override on a nested attributes collection association", () => {
+    post.comments = [];
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comments", new Comment(321), { childIndex: "abc" }, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_comments_attributes_abc_name" name="post[comments_attributes][abc][name]" type="text" value="comment #321" />' +
+          '<input id="post_comments_attributes_abc_id" name="post[comments_attributes][abc][id]" type="hidden" value="321" autocomplete="off" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for with child index as lambda option override on a nested attributes collection association", () => {
+    post.comments = [];
+
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comments", new Comment(321), { childIndex: () => "abc" }, (cf) => {
+          concat(cf.textField("name"));
+        }),
+      );
+    });
+
+    assertDomEqual(
+      editPost(
+        () =>
+          '<input id="post_comments_attributes_abc_name" name="post[comments_attributes][abc][name]" type="text" value="comment #321" />' +
+          '<input id="post_comments_attributes_abc_id" name="post[comments_attributes][abc][id]" type="hidden" value="321" autocomplete="off" />',
+      ),
+      rendered,
+    );
+  });
+
+  it("nested fields for index method with existing records on a nested attributes collection association", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+
+    formFor(post, {}, (f) => {
+      let expected = 0;
+      for (const comment of post.comments as Comment[]) {
+        f.fieldsFor("comments", comment, null, (cf) => {
+          expect(cf.index).toBe(expected);
+          expected += 1;
+        });
+      }
+    });
+  });
+
+  it("nested fields for index method with existing and new records on a nested attributes collection association", () => {
+    post.comments = [new Comment(321), new Comment()];
+
+    formFor(post, {}, (f) => {
+      let expected = 0;
+      for (const comment of post.comments as Comment[]) {
+        f.fieldsFor("comments", comment, null, (cf) => {
+          expect(cf.index).toBe(expected);
+          expected += 1;
+        });
+      }
+    });
+  });
+
+  it("nested fields for index method with existing records on a supplied nested attributes collection", () => {
+    post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
+
+    formFor(post, {}, (f) => {
+      let expected = 0;
+      f.fieldsFor("comments", post.comments, null, (cf) => {
+        expect(cf.index).toBe(expected);
+        expected += 1;
+      });
+    });
+  });
+
+  it("nested fields for index method with child index option override on a nested attributes collection association", () => {
+    post.comments = [];
+
+    formFor(post, {}, (f) => {
+      f.fieldsFor("comments", new Comment(321), { childIndex: "abc" }, (cf) => {
+        expect(cf.index).toBe("abc");
+      });
+    });
+  });
+
   it("nested fields for with existing records on a nested attributes collection association", () => {
     post.comments = Array.from({ length: 2 }, (_, id) => new Comment(id + 1));
     formFor(post, {}, (f) => {
