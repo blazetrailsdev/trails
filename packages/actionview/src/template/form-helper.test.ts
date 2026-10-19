@@ -1823,6 +1823,176 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
+  it("form for with labelled builder", () => {
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = editPost(
+      () =>
+        "<label for='title'>Title:</label> <input name='post[title]' type='text' id='post_title' value='Hello World' /><br/>" +
+        "<label for='body'>Body:</label> <textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea><br/>" +
+        "<label for='secret'>Secret:</label> <input name='post[secret]' type='hidden' value='0' autocomplete='off' /><input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' /><br/>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for with labelled builder", () => {
+    rendered = view.fieldsFor("post", post, { builder: LabelledFormBuilder }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected =
+      "<label for='title'>Title:</label> <input name='post[title]' type='text' id='post_title' value='Hello World' /><br/>" +
+      "<label for='body'>Body:</label> <textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea><br/>" +
+      "<label for='secret'>Secret:</label> <input name='post[secret]' type='hidden' value='0' autocomplete='off' /><input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' /><br/>";
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with labelled builder with nested fields for without options hash", () => {
+    let klass: unknown = null;
+
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      f.fieldsFor("comments", new Comment(), null, (nestedFields) => {
+        klass = nestedFields.constructor;
+        return "";
+      });
+    });
+
+    expect(klass).toBe(LabelledFormBuilder);
+  });
+
+  it("form for with labelled builder with nested fields for with options hash", () => {
+    let klass: unknown = null;
+
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      f.fieldsFor("comments", new Comment(), { index: "foo" }, (nestedFields) => {
+        klass = nestedFields.constructor;
+        return "";
+      });
+    });
+
+    expect(klass).toBe(LabelledFormBuilder);
+  });
+
+  it("form for with labelled builder path", () => {
+    let path: unknown = null;
+
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      path = f.toPartialPath();
+      return "";
+    });
+
+    expect(path).toBe("labelled_form");
+  });
+
+  class LabelledFormBuilderSubclass extends LabelledFormBuilder {}
+
+  it("form for with labelled builder with nested fields for with custom builder", () => {
+    let klass: unknown = null;
+
+    formFor(post, { builder: LabelledFormBuilder }, (f) => {
+      f.fieldsFor(
+        "comments",
+        new Comment(),
+        { builder: LabelledFormBuilderSubclass },
+        (nestedFields) => {
+          klass = nestedFields.constructor;
+          return "";
+        },
+      );
+    });
+
+    expect(klass).toBe(LabelledFormBuilderSubclass);
+  });
+
+  it("form for with html options adds options to form tag", () => {
+    formFor(post, { html: { id: "some_form", class: "some_class", multipart: true } }, () => {});
+    const expected = wholeForm("/posts/123", "some_form", "some_class", {
+      method: "patch",
+      multipart: "multipart/form-data",
+    });
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with string url option", () => {
+    formFor(post, { url: "http://www.otherdomain.com" }, () => {});
+
+    assertDomEqual(
+      wholeForm("http://www.otherdomain.com", "edit_post_123", "edit_post", { method: "patch" }),
+      rendered,
+    );
+  });
+
+  it("form for with record url option", () => {
+    formFor(post, { url: post }, () => {});
+
+    const expected = wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with existing object", () => {
+    formFor(post, {}, () => {});
+
+    const expected = wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with new object", () => {
+    const post = new Post();
+    post.persisted = false;
+    (post as unknown as { toKey(): null }).toKey = () => null;
+
+    formFor(post, {}, () => {});
+
+    const expected = wholeForm("/posts", "new_post", "new_post");
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with existing object and custom url", () => {
+    formFor(post, { url: "/super_posts" }, () => {});
+
+    const expected = wholeForm("/super_posts", "edit_post_123", "edit_post", { method: "patch" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with default method as patch", () => {
+    formFor(post, {}, () => {});
+    const expected = wholeForm("/posts/123", "edit_post_123", "edit_post", { method: "patch" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with data attributes", () => {
+    formFor(post, { data: { behavior: "stuff" }, remote: true }, () => {});
+    expect(String(rendered)).toMatch(/data-behavior="stuff"/);
+    expect(String(rendered)).toMatch(/data-remote="true"/);
+  });
+
+  it("fields for returns block result", () => {
+    const output = view.fieldsFor(new Post(), null, {}, () => "fields");
+    expect(String(output)).toBe("fields");
+  });
+
+  it("form for only instantiates builder once", () => {
+    let initializationCount = 0;
+    const builderClass = class extends FormBuilder {
+      constructor(...args: ConstructorParameters<typeof FormBuilder>) {
+        super(...args);
+        initializationCount += 1;
+      }
+    };
+
+    formFor(post, { builder: builderClass }, () => {});
+    expect(initializationCount, "form builder instantiated more than once").toBe(1);
+  });
+
   it("nested fields for", () => {
     comment.body = "Hello World";
     formFor(post, {}, (f) => {
