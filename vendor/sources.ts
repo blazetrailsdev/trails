@@ -485,8 +485,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rails/rails-html-sanitizer.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:451; a read-anchor
-      // for packages/html-sanitizer, like nokogiri.
       ref: "v1.6.2",
     },
     packages: [
@@ -503,8 +501,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/flavorjones/loofah.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:336; the sanitizer
-      // rails-html-sanitizer drives; a read-anchor only.
       ref: "v2.24.0",
     },
     packages: [
@@ -521,8 +517,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rgrove/crass.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:178; the CSS parser
-      // loofah's scrub_css drives; a read-anchor only.
       ref: "v1.0.6",
     },
     packages: [
