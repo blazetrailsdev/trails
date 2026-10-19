@@ -1547,6 +1547,8 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
   rbModAppendFeatures(klass, mod);
   if (typeof (mod as ModuleHooks)[included] === "function") {
     (mod as ModuleHooks)[included]!(klass);
+  } else if (!(mod instanceof Module)) {
+    featureHook(mod, "included")?.(klass);
   }
 }
 
@@ -1629,7 +1631,7 @@ export function rbModAppendFeatures(
       >;
       for (const key of [...Object.keys(modDescs), Symbol.iterator, Symbol.asyncIterator]) {
         const modDesc = modDescs[key];
-        if (modDesc === undefined) continue;
+        if (modDesc === undefined || (typeof key === "string" && !modDesc.enumerable)) continue;
         if (key === "constructor" || (typeof key === "string" && /^[A-Z]/.test(key))) continue;
         if ("value" in modDesc && typeof modDesc.value !== "function") continue;
         if (Object.prototype.hasOwnProperty.call(descriptors, key)) continue;

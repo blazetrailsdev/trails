@@ -120,6 +120,6 @@ export class SanitizeHelper {
   declare static sanitizerVendor: SanitizerVendor;
 }
 
-Object.assign(SanitizeHelper.prototype, { sanitize, sanitizeCss, stripTags, stripLinks });
-extend(SanitizeHelper, Concern);
 mattrAccessor.call(SanitizeHelper, "sanitizerVendor", { default: HTML4.Sanitizer });
+extend(SanitizeHelper, Concern);
+Object.assign(SanitizeHelper.prototype, { sanitize, sanitizeCss, stripTags, stripLinks });

@@ -159,16 +159,18 @@ function missingTranslation(
   }
 }
 
-export const TranslationHelper = extend(
-  { translate, t, localize, l },
-  { raiseOnMissingTranslations, setRaiseOnMissingTranslations },
-) as { translate: typeof translate; t: typeof t; localize: typeof localize; l: typeof l } & {
+export const TranslationHelper = { translate, t, localize, l } as {
+  translate: typeof translate;
+  t: typeof t;
+  localize: typeof localize;
+  l: typeof l;
   raiseOnMissingTranslations: typeof raiseOnMissingTranslations;
   setRaiseOnMissingTranslations: typeof setRaiseOnMissingTranslations;
 };
 
 extend(TranslationHelper, Concern);
 include(TranslationHelper, TagHelper);
+extend(TranslationHelper, { raiseOnMissingTranslations, setRaiseOnMissingTranslations });
 (
   TranslationHelper as unknown as { included(base: null, block: (this: object) => void): void }
 ).included(null, function () {
