@@ -1,3 +1,4 @@
+import { Tags } from "../../namespaces.js";
 import {
   SafeBuffer,
   humanize,
@@ -5,7 +6,7 @@ import {
   isPresent,
   stringifyKeys,
 } from "@blazetrails/activesupport";
-import { dup, hashDelete } from "@blazetrails/ruby-compat";
+import { dup, hashDelete, rbModConstSet } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
 import { Translator } from "./translator.js";
@@ -117,3 +118,5 @@ export class Label extends Base {
     return builder.translation();
   }
 }
+
+rbModConstSet(Tags, "Label", Label);

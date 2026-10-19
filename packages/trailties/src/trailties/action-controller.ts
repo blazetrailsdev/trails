@@ -192,9 +192,9 @@ async function helperConstants(
 
       const exported = mod[demodulize(name)];
       if (rbObjIsKindOf(exported, Module)) {
-        constants.set(name, exported as Module);
+        constants.set(name, exported as AbstractController.HelperMethodsModule);
       } else if (exported && typeof exported === "object") {
-        constants.set(name, new Module().include(exported));
+        constants.set(name, exported);
       }
     }
   };
