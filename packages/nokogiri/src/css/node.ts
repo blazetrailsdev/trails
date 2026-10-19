@@ -3,7 +3,10 @@ import { rbFSend } from "@blazetrails/ruby-compat";
 
 import type { XPathVisitor } from "./xpath-visitor.js";
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 export function methodName(rubyName: string): string {
   return rubyName.replace(/_([a-z\d])/g, (_m, c: string) => c.toUpperCase());
 }
