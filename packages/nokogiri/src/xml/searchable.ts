@@ -1,4 +1,5 @@
 import type { DefaultTreeAdapterMap } from "parse5";
+import { XmlDocument as LibXmlDocument, XmlTreeNode } from "libxml2-wasm";
 
 import type { Node } from "../html5/node.js";
 import type { NodeSet } from "./node-set.js";
@@ -11,7 +12,7 @@ type Parse5Element = DefaultTreeAdapterMap["element"];
 
 export interface SearchableHost {
   readonly document: unknown;
-  readonly _node: Parse5Node;
+  readonly _node: Parse5Node | XmlTreeNode | LibXmlDocument | null;
   css(...args: unknown[]): NodeSet;
 }
 
@@ -112,24 +113,98 @@ function xpathImpl(
   node: SearchableHost,
   path: Path,
   handler: unknown,
-  _ns: Record<string, string>,
+  ns: Record<string, string>,
   _binds: Record<string, unknown> | null,
 ): NodeSet {
+  const host = node._node;
+  if (host instanceof XmlTreeNode || host instanceof LibXmlDocument) {
+    const xpath = path
+      .flatMap(({ prefix, groups }) => groups.map((steps) => prefix + xpathFromSteps(steps)))
+      .join(" | ");
+    return new XML.NodeSet(
+      node.document,
+      host
+        .find(xpath, ns)
+        .map((n) => new XML.Node(n as XmlTreeNode, node.document) as unknown as Node),
+    );
+  }
+  if (host === null) return new XML.NodeSet(node.document);
   const found = new Set<Parse5Node>();
   for (const { prefix, groups } of path) {
-    const start =
-      prefix === "self::"
-        ? [node._node]
-        : descendants(prefix === "//" ? rootOf(node._node) : node._node);
+    const start = prefix === "self::" ? [host] : descendants(prefix === "//" ? rootOf(host) : host);
     for (const steps of groups) {
       for (const el of evaluate(start, steps, handler)) found.add(el);
     }
   }
-  const ordered = descendants(rootOf(node._node), true).filter((n) => found.has(n));
+  const ordered = descendants(rootOf(host), true).filter((n) => found.has(n));
   return new XML.NodeSet(
     node.document,
     ordered.map((n) => new HTML5.Node(n as DefaultTreeAdapterMap["childNode"], node.document)),
   );
+}
+
+/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+function xpathFromSteps(steps: [string, Compound][]): string {
+  return steps
+    .map(([combinator, compound], i) => {
+      const axis =
+        i === 0
+          ? ""
+          : combinator === ">"
+            ? "/"
+            : combinator === "+"
+              ? "/following-sibling::*[1]/self::"
+              : combinator === "~"
+                ? "/following-sibling::"
+                : "//";
+      return axis + xpathFromCompound(compound);
+    })
+    .join("");
+}
+
+/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+function xpathFromCompound(c: Compound): string {
+  const literal = (value: string) => {
+    if (!value.includes("'")) return `'${value}'`;
+    if (!value.includes('"')) return `"${value}"`;
+    return `concat("${value.split('"').join(`",'"',"`)}","")`;
+  };
+  const cssClass = (hay: string, needle: string) =>
+    `contains(concat(' ',normalize-space(${hay}),' '),' ${needle} ')`;
+  const predicates = [
+    ...c.ids.map((id) => `@id=${literal(id)}`),
+    ...c.classes.map((klass) => cssClass("@class", klass)),
+    ...c.attrs.map(([name, op, value]) => {
+      const attribute = `@${name}`;
+      const v = literal(value);
+      if (op === null) return attribute;
+      if (op === "=") return `${attribute}=${v}`;
+      if (op === "!=") return `${attribute}!=${v}`;
+      if (op === "*=") return `contains(${attribute},${v})`;
+      if (op === "^=") return `starts-with(${attribute},${v})`;
+      if (op === "|=") return `${attribute}=${v} or starts-with(${attribute},concat(${v},'-'))`;
+      if (op === "~=") return cssClass(attribute, value);
+      return `substring(${attribute},string-length(${attribute})-string-length(${v})+1,string-length(${v}))=${v}`;
+    }),
+    ...c.pseudos.map(([name, args]) => {
+      if (name === "root") return "not(parent::*)";
+      if (name === "first-child") return "count(preceding-sibling::*)=0";
+      if (name === "last-child") return "count(following-sibling::*)=0";
+      if (name === "only-child")
+        return "count(preceding-sibling::*)=0 and count(following-sibling::*)=0";
+      if (name === "empty") return "not(node())";
+      if (name === "not") return `not(self::${xpathFromCompound(new Parser(args!).compound())})`;
+      if (name === "nth-child") {
+        const [a, b] = nthChild(args);
+        const index = "(count(preceding-sibling::*)+1)";
+        return a === 0
+          ? `${index}=${b}`
+          : `(${index}-${b}) mod ${a}=0 and (${index}-${b}) div ${a}>=0`;
+      }
+      throw new XPathSyntaxError(`Unregistered function: ${name}`);
+    }),
+  ];
+  return (c.tag ?? "*") + predicates.map((p) => `[${p}]`).join("");
 }
 
 /** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
@@ -186,19 +261,7 @@ function matches(n: Parse5Node, c: Compound, handler: unknown): boolean {
     } else if (name === "only-child") {
       if (siblings.length !== 1) return false;
     } else if (name === "nth-child") {
-      const nth = /^\s*(?:([+-]?\d*)n\s*(?:([+-])\s*(\d+))?|([+-]?\d+))\s*$/.exec(
-        args === "odd" ? "2n+1" : args === "even" ? "2n" : (args ?? ""),
-      );
-      if (nth === null) throw new SyntaxError(`unexpected '${args}' in nth-child`);
-      const a =
-        nth[4] !== undefined
-          ? 0
-          : nth[1] === "" || nth[1] === "+"
-            ? 1
-            : nth[1] === "-"
-              ? -1
-              : Number(nth[1]);
-      const b = nth[4] !== undefined ? Number(nth[4]) : Number(`${nth[2] ?? "+"}${nth[3] ?? "0"}`);
+      const [a, b] = nthChild(args);
       if (a === 0 ? index !== b : (index - b) / a < 0 || (index - b) % a !== 0) return false;
     } else if (name === "empty") {
       if (n.childNodes.length > 0) return false;
@@ -212,6 +275,24 @@ function matches(n: Parse5Node, c: Compound, handler: unknown): boolean {
     }
   }
   return true;
+}
+
+/** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */
+function nthChild(args: string | null): [number, number] {
+  const nth = /^\s*(?:([+-]?\d*)n\s*(?:([+-])\s*(\d+))?|([+-]?\d+))\s*$/.exec(
+    args === "odd" ? "2n+1" : args === "even" ? "2n" : (args ?? ""),
+  );
+  if (nth === null) throw new SyntaxError(`unexpected '${args}' in nth-child`);
+  const a =
+    nth[4] !== undefined
+      ? 0
+      : nth[1] === "" || nth[1] === "+"
+        ? 1
+        : nth[1] === "-"
+          ? -1
+          : Number(nth[1]);
+  const b = nth[4] !== undefined ? Number(nth[4]) : Number(`${nth[2] ?? "+"}${nth[3] ?? "0"}`);
+  return [a, b];
 }
 
 /** @noRailsEquivalent CONVERGEABLE port-nokogiri-css-xpath-visitor */

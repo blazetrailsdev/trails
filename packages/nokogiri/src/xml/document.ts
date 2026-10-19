@@ -1,9 +1,18 @@
 import { XmlDocument as LibXmlDocument, XmlParseError } from "libxml2-wasm";
+import { include } from "@blazetrails/ruby-compat";
+
+import type { NodeSet } from "./node-set.js";
+import { Searchable } from "./searchable.js";
 import { XmlNode } from "./node.js";
 import { type Readable, readSource } from "../readable.js";
 import { SyntaxError } from "./syntax-error.js";
 
 export class XmlDocument {
+  declare css: (...args: unknown[]) => NodeSet;
+  declare atCss: (...args: unknown[]) => XmlNode | undefined;
+
+  static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
+
   readonly errors: ReadonlyArray<SyntaxError>;
   private _doc: LibXmlDocument | null;
   private _root: XmlNode | null;
@@ -11,7 +20,7 @@ export class XmlDocument {
   private constructor(doc: LibXmlDocument | null, errors: SyntaxError[]) {
     this._doc = doc;
     this.errors = errors;
-    this._root = doc !== null ? new XmlNode(doc.root) : null;
+    this._root = doc !== null ? new XmlNode(doc.root, this) : null;
   }
 
   static parse(data: string | Readable): XmlDocument {
@@ -30,6 +39,18 @@ export class XmlDocument {
     }
   }
 
+  get document(): XmlDocument {
+    return this;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  get _node(): LibXmlDocument | null {
+    return this._doc;
+  }
+
   get root(): XmlNode {
     if (this._root === null) throw new Error("Document has no root (parse failed or disposed)");
     return this._root;
@@ -45,3 +66,5 @@ export class XmlDocument {
     this.dispose();
   }
 }
+
+include(XmlDocument, Searchable);
