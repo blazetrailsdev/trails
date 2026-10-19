@@ -8,6 +8,7 @@ import {
   InheritableOptions,
   jsonEscape,
   runLoadHooks,
+  TopLevel,
   TseUtil,
   xmlNameEscape,
   type SafeBuffer,
@@ -31,6 +32,7 @@ import {
   ArgumentError,
   excBacktraceLocations,
   include,
+  isModuleIncluded,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Resolver } from "./template/resolver.js";
@@ -236,19 +238,21 @@ export class Base {
     this._config = value;
   }
 
+  /** @inventedArm if — PERMANENT */
   constructor(
     lookupContext: LookupContext | null = null,
     assigns: Record<string, unknown> = {},
     controller: unknown = null,
   ) {
+    if (isModuleIncluded(new.target, TopLevel.ActionDispatch?.Routing.UrlFor as never)) {
+      this._routes = null;
+    }
     this._config = new InheritableOptions();
     this._lookupContext = lookupContext;
     this._viewRenderer = new Renderer(this._lookupContext!);
     this.currentTemplate = null;
     this.assignController(controller as Parameters<typeof assignController>[0]);
     this._prepareContext();
-
-    this._routes = null;
 
     this.assign(assigns);
   }

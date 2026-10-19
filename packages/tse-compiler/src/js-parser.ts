@@ -273,6 +273,12 @@ class Parser {
       return decl;
     }
     if (this.isFunctionStart()) return this.parseFunction("FunctionDeclaration");
+    if (kw === "class") return this.parseClass("ClassDeclaration");
+    if (kw !== null && this.peekIsLabel()) {
+      const label = this.parseIdentifier();
+      this.expect(":");
+      return this.finish("LabeledStatement", start, [label, this.parseStatement()]);
+    }
     switch (kw) {
       case "if": {
         this.next();
@@ -287,6 +293,33 @@ class Parser {
         const test = this.parseParenExpression();
         return this.finish("WhileStatement", start, [test, this.parseStatement()]);
       }
+      case "do": {
+        this.next();
+        const body = this.parseStatement();
+        this.expect("while");
+        const test = this.parseParenExpression();
+        this.eat(";");
+        return this.finish("DoWhileStatement", start, [body, test]);
+      }
+      case "switch": {
+        this.next();
+        const children = [this.parseParenExpression()];
+        this.expect("{");
+        while (!this.eat("}")) {
+          const caseStart = this.tok.start;
+          const clause: JsNode[] = [];
+          if (this.eat("case")) clause.push(this.parseExpression());
+          else if (!this.eat("default"))
+            this.raise(`Unexpected token ${JSON.stringify(this.tok.value)}`);
+          this.expect(":");
+          while (!this.is("case") && !this.is("default") && !this.is("}")) {
+            if (this.tok.type === "eof") this.raise("Unterminated switch", start);
+            clause.push(this.parseStatement());
+          }
+          children.push(this.finish("SwitchCase", caseStart, clause));
+        }
+        return this.finish("SwitchStatement", start, children);
+      }
       case "return":
       case "throw": {
         this.next();
@@ -299,8 +332,14 @@ class Parser {
       case "break":
       case "continue": {
         this.next();
+        const children: JsNode[] = [];
+        if (this.tok.type === "name" && !this.tok.nlBefore) children.push(this.parseIdentifier());
         this.semicolon();
-        return this.finish(kw === "break" ? "BreakStatement" : "ContinueStatement", start, []);
+        return this.finish(
+          kw === "break" ? "BreakStatement" : "ContinueStatement",
+          start,
+          children,
+        );
       }
       case "try": {
         this.next();
@@ -329,6 +368,14 @@ class Parser {
     const saved = this.save();
     this.next();
     const result = this.tok.type === "name" || this.is("[") || this.is("{");
+    this.restore(saved);
+    return result;
+  }
+
+  private peekIsLabel(): boolean {
+    const saved = this.save();
+    this.next();
+    const result = this.is(":");
     this.restore(saved);
     return result;
   }
@@ -410,6 +457,73 @@ class Parser {
     if (this.tok.type === "name") children.push(this.parseIdentifier());
     children.push(...this.parseParams(), this.parseBlock());
     return this.finish(type, start, children);
+  }
+
+  private parseClass(type: string): JsNode {
+    const start = this.tok.start;
+    this.expect("class");
+    const children: JsNode[] = [];
+    if (this.tok.type === "name" && !this.is("extends") && !this.is("{"))
+      children.push(this.parseIdentifier());
+    if (this.eat("extends")) children.push(this.parseCallOrMember());
+    const bodyStart = this.tok.start;
+    this.expect("{");
+    const members: JsNode[] = [];
+    while (!this.eat("}")) {
+      if (this.eat(";")) continue;
+      if (this.tok.type === "eof") this.raise("Unterminated class body", bodyStart);
+      members.push(this.parseClassMember());
+    }
+    children.push(this.finish("ClassBody", bodyStart, members));
+    return this.finish(type, start, children);
+  }
+
+  private parseClassMember(): JsNode {
+    const start = this.tok.start;
+    if (this.is("static")) {
+      const saved = this.save();
+      this.next();
+      if (this.is("{")) return this.finish("StaticBlock", start, [...this.parseBlock().children]);
+      if (this.is("(") || this.is("=") || this.is(";") || this.is("}")) this.restore(saved);
+    }
+    for (const modifier of ["async", "get", "set"]) {
+      if (this.is(modifier) && this.peekIsMemberKey()) this.next();
+    }
+    this.eat("*");
+    const parts: JsNode[] = [];
+    if (this.eat("[")) {
+      parts.push(this.parseAssignment());
+      this.expect("]");
+    } else if (this.is("#")) {
+      parts.push(this.parsePropertyName());
+    } else if (this.tok.type === "name" || this.tok.type === "string" || this.tok.type === "num") {
+      parts.push(this.parseKey());
+    } else this.raise(`Unexpected token ${JSON.stringify(this.tok.value)}`);
+    if (this.is("(")) {
+      const fnStart = this.tok.start;
+      parts.push(
+        this.finish("FunctionExpression", fnStart, [...this.parseParams(), this.parseBlock()]),
+      );
+      return this.finish("MethodDefinition", start, parts);
+    }
+    if (this.eat("=")) parts.push(this.parseAssignment());
+    this.semicolon();
+    return this.finish("PropertyDefinition", start, parts);
+  }
+
+  private peekIsMemberKey(): boolean {
+    const saved = this.save();
+    this.next();
+    const result =
+      !this.tok.nlBefore &&
+      (this.tok.type === "name" ||
+        this.tok.type === "string" ||
+        this.tok.type === "num" ||
+        this.is("[") ||
+        this.is("#") ||
+        this.is("*"));
+    this.restore(saved);
+    return result;
   }
 
   private parseParams(): JsNode[] {
@@ -601,6 +715,7 @@ class Parser {
       }
       case "name":
         if (this.isFunctionStart()) return this.parseFunction("FunctionExpression");
+        if (tok.value === "class") return this.parseClass("ClassExpression");
         if (tok.value === "this") {
           this.next();
           return this.finish("ThisExpression", start, []);

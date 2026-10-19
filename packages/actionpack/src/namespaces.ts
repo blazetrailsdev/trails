@@ -23,6 +23,7 @@ import type { MimeNegotiation } from "./action-dispatch/http/mime-negotiation.js
 import type { Parameters as HttpParameters } from "./action-dispatch/http/parameters.js";
 import type { TemplateAssertions } from "./action-controller/template-assertions.js";
 import type { Testing } from "./action-controller/metal/testing.js";
+import type { UrlFor } from "./action-dispatch/routing/url-for.js";
 import type { TestCase, TestRequest } from "./action-controller/test-case.js";
 import type { MissingController, Request } from "./action-dispatch/http/request.js";
 import type { Assertions } from "./action-dispatch/testing/assertions.js";
@@ -99,6 +100,7 @@ ActionDispatch.autoloadUnder("testing", () => {
 export const Routing = { name: "ActionDispatch::Routing", loadPath } as AutoloadModule & {
   PolymorphicRoutes: typeof PolymorphicRoutes;
   RoutesProxy: typeof RoutesProxy;
+  UrlFor: typeof UrlFor;
   HtmlTableFormatter: typeof HtmlTableFormatter;
 };
 extend(Routing, Autoload);

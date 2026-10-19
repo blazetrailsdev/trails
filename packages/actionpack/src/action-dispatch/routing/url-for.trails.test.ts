@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { initializeIncludedModules } from "@blazetrails/activesupport";
-import { include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { initializeIncludedModules, TopLevel } from "@blazetrails/activesupport";
+import { include, isModuleIncluded, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 
 import { RouteSet } from "./route-set.js";
 import { UrlFor } from "./url-for.js";
+import { Base as ViewBase } from "@blazetrails/actionview";
 
 describe("ActionDispatch::Routing::UrlFor included", () => {
   it("gives a class a default_url_options class attribute", () => {
@@ -75,5 +76,17 @@ describe("ActionDispatch::Routing::UrlFor included", () => {
     host._routes = other;
     expect(host._routes).toBe(other);
     expect(new Host()._routes).toBe(routes);
+  });
+});
+
+describe("ActionView::Base with Routing::UrlFor included", () => {
+  it("takes the _routes segment on a view class that includes the url helpers", () => {
+    const routes = new RouteSet();
+    const View = class extends ViewBase {};
+    include(View, routes.urlHelpers());
+    expect(TopLevel.ActionDispatch?.Routing.UrlFor).toBe(UrlFor);
+    expect(isModuleIncluded(View, UrlFor)).toBe(true);
+    expect(isModuleIncluded(ViewBase, UrlFor)).toBe(false);
+    expect((View.empty() as unknown as { _routes: unknown })._routes).toBe(routes);
   });
 });
