@@ -1,4 +1,4 @@
-import { Hash, rbClassInheritedP, rbModToS } from "@blazetrails/ruby-compat";
+import { Hash, rbClassInheritedP, rbModToS, toS, warn } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Correctable } from "./core-ext/name-error.js";
 import { Formatter } from "./formatter.js";
@@ -25,6 +25,31 @@ export function correctError(
     prepend(errorClass, Correctable);
   }
 }
+
+/** @internal */
+export class DeprecatedMapping {
+  set(key: abstract new (...args: never) => object, value: unknown): void {
+    warn(
+      `Calling \`DidYouMean::SPELL_CHECKERS[${toS(key)}] = ${toS(value)}' has been deprecated. ` +
+        `Please call \`DidYouMean.correct_error(${toS(key)}, ${toS(value)})' instead.`,
+    );
+
+    correctError(key, value);
+  }
+
+  mergeBang(hash: Map<abstract new (...args: never) => object, unknown>): void {
+    warn(
+      "Calling `DidYouMean::SPELL_CHECKERS.merge!(error_name => spell_checker)' has been deprecated. " +
+        "Please call `DidYouMean.correct_error(error_name, spell_checker)' instead.",
+    );
+
+    hash.forEach((spellChecker, errorClass) => {
+      correctError(errorClass, spellChecker);
+    });
+  }
+}
+
+export const SPELL_CHECKERS = new DeprecatedMapping();
 
 export interface FormatterLike {
   messageFor(corrections: string[]): string;

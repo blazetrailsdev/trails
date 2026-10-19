@@ -858,10 +858,13 @@ describe("RackRequestTest", () => {
   });
 
   it("not modify the params hash in place", () => {
-    const req = makeReq("/?foo=bar");
-    const p1 = req.params;
-    const p2 = req.params;
-    expect(p1).not.toBe(p2);
+    const e = MockRequest.envFor("");
+    const req1 = new Request(e);
+    expect(req1.params).toEqual({});
+    req1.params["foo"] = "bar";
+    expect(req1.params).toEqual({ foo: "bar" });
+    const req2 = new Request(e);
+    expect(req2.params).toEqual({});
   });
 
   it("modify params hash if param is in GET", () => {

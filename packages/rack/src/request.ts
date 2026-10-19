@@ -682,8 +682,39 @@ export class Request {
   ];
   static xForwardedProtoPriority: Array<"proto" | "scheme" | null> = ["proto", "scheme"];
 
+  /** @internal */
+  private _params: Record<string, any> | null;
+
   constructor(env: Record<string, any>) {
     this.env = env;
+    this._params = null;
+  }
+
+  get params(): Record<string, any> {
+    return (this._params ||= { ...this.GET, ...this.POST });
+  }
+
+  updateParam(k: string, v: any): void {
+    let found = false;
+    if (Object.hasOwn(this.GET, k)) {
+      found = true;
+      this.GET[k] = v;
+    }
+    if (Object.hasOwn(this.POST, k)) {
+      found = true;
+      this.POST[k] = v;
+    }
+    if (!found) {
+      this.GET[k] = v;
+    }
+    this._params = null;
+  }
+
+  deleteParam(k: string): any {
+    const [postValue, getValue] = [hashDelete(this.POST, k), hashDelete(this.GET, k)];
+    const v = postValue != null && postValue !== false ? postValue : getValue;
+    this._params = null;
+    return v;
   }
 
   dup(): Request {

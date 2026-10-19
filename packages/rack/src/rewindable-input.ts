@@ -1,5 +1,12 @@
 import { RACK_INPUT } from "./constants.js";
-import { Encoding, RUBY_PLATFORM, RuntimeError, Tempfile, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  Encoding,
+  RUBY_PLATFORM,
+  RuntimeError,
+  Tempfile,
+  rbFSend,
+  rbStrByteslice,
+} from "@blazetrails/ruby-compat";
 
 export class RewindableInput {
   private io: any;
@@ -60,15 +67,14 @@ export class RewindableInput {
       this.unlinked = true;
     }
 
-    const buffer = new Uint8Array(1024 * 4);
-    let chunk: string | null;
-    while ((chunk = this.io.read(1024 * 4, buffer)) != null) {
+    let buffer: string | null;
+    while ((buffer = this.io.read(1024 * 4)) != null) {
       let entireBufferWrittenOut = false;
       while (!entireBufferWrittenOut) {
-        const written = this.rewindableIo.write(chunk);
-        entireBufferWrittenOut = written === Buffer.byteLength(chunk, "latin1");
+        const written = this.rewindableIo.write(buffer);
+        entireBufferWrittenOut = written === Buffer.byteLength(buffer);
         if (!entireBufferWrittenOut) {
-          chunk = chunk.slice(written);
+          buffer = rbStrByteslice(buffer, written, Buffer.byteLength(buffer) - written)!;
         }
       }
     }

@@ -98,6 +98,7 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   assert_match: "match",
   assert_no_match: "noMatch",
   refute_match: "noMatch",
+  assert_not_match: "noMatch",
   assert_raises: "raises",
   assert_raise: "raises",
   assert_raise_with_message: "raises",

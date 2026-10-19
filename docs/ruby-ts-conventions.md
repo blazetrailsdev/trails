@@ -251,8 +251,6 @@ a genuine gap:
   - `to_ary` (only in: `core.rb`, `base.rb`)
 - `ActiveRecord::Relation#then` (relation.rb:1157-1165) chains a block onto the relation's `@future_result`, else falls to `Kernel#then`. A trails relation is evaluated by an async query, so `Relation.prototype` carries the `then` / `catch` / `finally` that `await rel` calls, installed by `applyThenable` and declared on the class without a body (packages/activerecord/CLAUDE.md § "`Relation` is evaluated by an async query"). Scoped to relation.rb so `FutureResult#then` and any other definition stay scored.
   - `then` (only in: `relation.rb`)
-- TODO: Remove on 3.3: `DidYouMean::DeprecatedMapping` (did_you_mean.rb:116-138) backs only the deprecated, private `SPELL_CHECKERS` constant. Scoped to did-you-mean's did_you_mean.rb.
-  - `merge!` (only in: `did_you_mean.rb`)
 
 ## Ruby-only classes
 

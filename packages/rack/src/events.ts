@@ -1,4 +1,4 @@
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { Exception, StandardError, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse, RackBody } from "./index.js";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
@@ -86,6 +86,7 @@ export class Events {
       response = this.makeResponse(status, headers, body);
       this.onCommit(request, response);
     } catch (e) {
+      if (e instanceof Exception && !(e instanceof StandardError)) throw e;
       this.onError(request, response, e);
       this.onFinish(request, response);
       throw e;

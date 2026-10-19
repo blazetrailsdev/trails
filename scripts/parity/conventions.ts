@@ -1174,15 +1174,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     names: ["then"],
     rubyFiles: ["relation.rb"],
   },
-  {
-    reason:
-      "TODO: Remove on 3.3: `DidYouMean::DeprecatedMapping` (did_you_mean.rb:116-138) " +
-      "backs only the deprecated, private `SPELL_CHECKERS` constant. Scoped to " +
-      "did-you-mean's did_you_mean.rb.",
-    names: ["merge!"],
-    rubyFiles: ["did_you_mean.rb"],
-    packages: ["did-you-mean"],
-  },
 ];
 
 function scopedSkipAppliesIn(g: ScopedSkipGroup, pkg: string | undefined): boolean {

@@ -24,7 +24,7 @@ export class URLMap {
     this.mapping = Object.entries(map)
       .map(([location, app]): Mapping => {
         let host: string | null;
-        const m = /^https?:\/\/(.*?)(\/.*)/s.exec(location);
+        const m = /^https?:\/\/(.*?)(\/.*)/.exec(location);
         if (m) {
           [host, location] = [m[1], m[2]];
           this.knownHosts.add(host);
@@ -37,7 +37,7 @@ export class URLMap {
         }
 
         location = location.endsWith("/") ? location.slice(0, -1) : location;
-        const match = new RegExp(`^${regexpEscape(location).replace(/\//g, "/+")}(.*)`, "s");
+        const match = new RegExp(`^${regexpEscape(location).replace(/\//g, "/+")}(.*)`, "m");
 
         return [host, location, match, app];
       })

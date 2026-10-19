@@ -12,6 +12,7 @@ import {
   ArgumentError,
   aryDeleteIf,
   block,
+  stringSplit,
   fetch,
   warn,
   Process,
@@ -169,14 +170,12 @@ export function forwardedValues(
   forwardedHeader = forwardedHeader.replace(/\n/g, ";");
   const result: Record<string, string[]> = {};
 
-  for (const field of forwardedHeader.split(";")) {
-    for (const pair of field.split(",")) {
-      if (!pair) continue;
-      const trimmed = pair
-        .split("=")
+  for (const field of stringSplit(forwardedHeader, ";")) {
+    for (let pair of stringSplit(field, ",")) {
+      pair = stringSplit(pair, "=")
         .map((s) => s.trim())
         .join("=");
-      const match = trimmed.match(/^(by|for|host|proto)="?([^"]+)"?$/i);
+      const match = pair.match(/^(by|for|host|proto)="?([^"]+)"?$/i);
       if (!match) return null;
       const key = match[1].toLowerCase();
       if (!result[key]) result[key] = [];
