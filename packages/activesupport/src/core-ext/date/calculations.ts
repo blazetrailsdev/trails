@@ -244,8 +244,13 @@ Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek, DAYS_INT
 
 Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { change });
 
-Object.assign(RubyDate.prototype, {
-  change(this: RubyDate, options: { year?: number; month?: number; day?: number }): RubyDate {
+Object.defineProperty(RubyDate.prototype, "change", {
+  value: function (
+    this: RubyDate,
+    options: { year?: number; month?: number; day?: number },
+  ): RubyDate {
     return change(this, options);
   },
+  writable: true,
+  configurable: true,
 });

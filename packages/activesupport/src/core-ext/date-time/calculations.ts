@@ -290,8 +290,10 @@ declare module "@blazetrails/date" {
   }
 }
 
-Object.assign(RubyDateTime.prototype, {
-  change(this: RubyDateTime, options: ChangeOptions): DateTime {
+Object.defineProperty(RubyDateTime.prototype, "change", {
+  value: function (this: RubyDateTime, options: ChangeOptions): DateTime {
     return change(this.toDatetime(), options);
   },
+  writable: true,
+  configurable: true,
 });
