@@ -106,7 +106,7 @@ export const IsolatedExecutionState = {
   },
   shareWith(other: Thread | Fiber): void {
     const otherState = other.activeSupportExecutionState();
-    IsolatedExecutionState.context().setActiveSupportExecutionState(rbObjDup(otherState ?? null));
+    IsolatedExecutionState.context().setActiveSupportExecutionState(rbObjDup(otherState));
   },
 };
 
