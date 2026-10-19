@@ -4,11 +4,14 @@ import { RouteSet } from "@blazetrails/actionpack";
 import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
 import {
   BigDecimal,
+  Mock,
   HashWithIndifferentAccess,
   I18n,
   assertEqual,
   assertPredicate,
+  assertMock,
   assertRaises,
+  expectCalledWith,
   extend,
   isBlank,
   htmlSafe,
@@ -16,9 +19,17 @@ import {
   isHtmlSafe,
   isPlainObject,
   isPresent,
+  stub,
 } from "@blazetrails/activesupport";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
-import { ArgumentError, Hash, Range, Struct, include } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Hash,
+  Range,
+  Struct,
+  include,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
@@ -32,6 +43,7 @@ import {
 } from "../helpers/form-helper.js";
 import type { LabelBuilder } from "../helpers/tags/label.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
+import { Cpk } from "../test-helpers/fake-models.js";
 
 class Post {
   static {
@@ -231,6 +243,18 @@ Routes.draw(function () {
   this.resources("posts", () => {
     this.resources("comments");
   });
+
+  this.namespace("admin", () => {
+    this.resources("posts", () => {
+      this.resources("comments");
+    });
+  });
+
+  this.namespace("cpk", () => {
+    this.resources("books");
+  });
+
+  this.get("/foo", { to: "controller#action" });
   this.root({ to: "main#index" });
 });
 
@@ -246,6 +270,7 @@ describe("FormHelperTest", () => {
   let post: Post;
   let comment: Comment;
   let rendered: unknown;
+  let urlForOptions: Record<string, unknown>;
 
   function formFor(...args: Parameters<Base["formFor"]>): unknown {
     return (rendered = view.formFor(...args));
@@ -333,6 +358,8 @@ describe("FormHelperTest", () => {
     include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
     const urlFor = view.urlFor;
     view.urlFor = function (this: Base, object: unknown): string {
+      urlForOptions = object as Record<string, unknown>;
+
       if (isPlainObject(object) && isBlank(object["useRoute"]) && isBlank(object["controller"])) {
         object["controller"] = "main";
         object["action"] = "index";
@@ -1810,6 +1837,27 @@ describe("FormHelperTest", () => {
     }
   });
 
+  it("lazy loading default form builder", () => {
+    registerConstant("FormHelperTest", { LabelledFormBuilder });
+    const base = Base as unknown as { defaultFormBuilder: unknown };
+    const oldDefaultFormBuilder = base.defaultFormBuilder;
+    base.defaultFormBuilder = "FormHelperTest::LabelledFormBuilder";
+    try {
+      formFor(post, {}, (f) => {
+        concat(f.textField("title"));
+      });
+
+      const expected = editPost(
+        () =>
+          "<label for='title'>Title:</label> <input name='post[title]' type='text' id='post_title' value='Hello World' /><br/>",
+      );
+
+      assertDomEqual(expected, rendered);
+    } finally {
+      base.defaultFormBuilder = oldDefaultFormBuilder;
+    }
+  });
+
   it("form builder override", () => {
     view.defaultFormBuilder = LabelledFormBuilder;
 
@@ -1956,6 +2004,73 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, rendered);
   });
 
+  it("form for with hash url option", () => {
+    formFor(post, { url: { controller: "controller", action: "action" } }, () => {});
+
+    expect(urlForOptions["controller"]).toBe("controller");
+    expect(urlForOptions["action"]).toBe("action");
+  });
+
+  it("form for with existing object in list", () => {
+    comment.save();
+    formFor([post, comment], {}, () => {});
+
+    const expected = wholeForm(
+      view.postCommentPath(post, comment) as string,
+      "edit_comment_1",
+      "edit_comment",
+      { method: "patch" },
+    );
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with new object in list", () => {
+    formFor([post, comment], {}, () => {});
+
+    const expected = wholeForm(view.postCommentsPath(post) as string, "new_comment", "new_comment");
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with existing object and namespace in list", () => {
+    comment.save();
+    formFor([":admin", post, comment], {}, () => {});
+
+    const expected = wholeForm(
+      view.adminPostCommentPath(post, comment) as string,
+      "edit_comment_1",
+      "edit_comment",
+      { method: "patch" },
+    );
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with new object and namespace in list", () => {
+    formFor([":admin", post, comment], {}, () => {});
+
+    const expected = wholeForm(
+      view.adminPostCommentsPath(post) as string,
+      "new_comment",
+      "new_comment",
+    );
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with new cpk model", () => {
+    formFor(new Cpk.Book(), {}, () => {});
+
+    const expected = wholeForm("/cpk/books", "new_cpk_book", "new_cpk_book", { method: "post" });
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with persisted cpk model", () => {
+    formFor(new Cpk.Book({ id: [1, 2], title: "Some book" }), {}, () => {});
+
+    const expected = wholeForm("/cpk/books/1-2", "edit_cpk_book_1_2", "edit_cpk_book", {
+      method: "patch",
+    });
+    assertDomEqual(expected, rendered);
+  });
+
   it("form for with existing object and custom url", () => {
     formFor(post, { url: "/super_posts" }, () => {});
 
@@ -1991,6 +2106,20 @@ describe("FormHelperTest", () => {
 
     formFor(post, { builder: builderClass }, () => {});
     expect(initializationCount, "form builder instantiated more than once").toBe(1);
+  });
+
+  it("lazy loading form builder override", () => {
+    registerConstant("FormHelperTest", { LabelledFormBuilder });
+    view.defaultFormBuilder = "FormHelperTest::LabelledFormBuilder";
+
+    rendered = view.fieldsFor("post", post, {}, (f) => {
+      concat(f.textField("title"));
+    });
+
+    const expected =
+      "<label for='title'>Title:</label> <input name='post[title]' type='text' id='post_title' value='Hello World' /><br/>";
+
+    assertDomEqual(expected, rendered);
   });
 
   it("nested fields for", () => {
@@ -2162,6 +2291,23 @@ describe("FormHelperTest", () => {
       { method: "patch" },
       () =>
         "<input name='post[123][comment][title]' type='text' id='post_123_comment_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("nested fields for with index radio button", () => {
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comment", post, { index: 5 }, (c) => {
+          concat(c.radioButton("title", "hello"));
+        }),
+      );
+    });
+
+    const expected = editPost(
+      () =>
+        "<input name='post[comment][5][title]' type='radio' id='post_comment_5_title_hello' value='hello' />",
     );
 
     assertDomEqual(expected, rendered);
@@ -2591,6 +2737,29 @@ describe("FormHelperTest", () => {
       ),
       rendered,
     );
+  });
+
+  it("nested fields label translation with more than 10 records", () => {
+    post.comments = Array.from({ length: 11 }, (_, id) => new Comment(id + 1));
+
+    const mock = new Mock();
+    for (const _ of post.comments as Comment[]) {
+      expectCalledWith(
+        mock,
+        ["post.comments.body", { default: [":comment.body", ""], scope: "helpers.label" }],
+        { returns: "body" },
+      );
+    }
+
+    stub(I18n, "t", mock, [], () => {
+      formFor(post, {}, (f) => {
+        f.fieldsFor("comments", null, null, (cf) => {
+          concat(cf.label("body"));
+        });
+      });
+    });
+
+    assertMock(mock);
   });
 
   it("nested fields for with existing records on a supplied nested attributes collection different from record one", () => {
