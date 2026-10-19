@@ -87,7 +87,11 @@ type ModuleHooks = {
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
 export function rbModConstSet<T>(
-  mod: Module | (abstract new (...args: never) => unknown) | { readonly name: string },
+  mod:
+    | Module
+    | (abstract new (...args: never) => unknown)
+    | { readonly name: string }
+    | ModuleObject,
   id: string,
   value: T,
 ): T {
@@ -110,7 +114,7 @@ export function rbModConstSet<T>(
     const parentalPathPermanent =
       mod instanceof Module || Object.hasOwn(mod, moduleVisibility)
         ? classpaths.get(mod)?.permanent === true
-        : Boolean(mod.name);
+        : Boolean((mod as { readonly name?: string }).name);
     const parentalPath = parentalPathPermanent
       ? mod instanceof Module
         ? mod.name
@@ -1098,10 +1102,13 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
  * cannot define; the predicate carries the same question at a callable name.
  */
 export function isModuleIncluded(
-  klass: { prototype: object },
+  klass: { prototype: object } | ModuleObject,
   mod: ModuleObject | AnyClass | Module,
 ): boolean {
-  return isModuleMethodTablePresent(klass, mod);
+  if (Object.hasOwn(klass, moduleVisibility)) {
+    return klass !== mod && rbModAncestors(klass as { prototype: object }).includes(mod);
+  }
+  return isModuleMethodTablePresent(klass as { prototype: object }, mod);
 }
 
 /**
@@ -1144,9 +1151,29 @@ export function includedModules(mod: { prototype: object }): unknown[] {
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
-export function rbModAncestors(mod: { prototype: object }): object[] {
+export function rbModAncestors(mod: { prototype: object } | ModuleObject): object[] {
+  if (Object.hasOwn(mod, moduleVisibility)) {
+    const ary: object[] = [mod];
+    const mods = Object.hasOwn(mod, moduleIncludesKey)
+      ? [...(mod as Record<symbol, Set<object>>)[moduleIncludesKey]]
+      : [];
+    for (const m of mods.reverse()) {
+      const chain =
+        m instanceof Module
+          ? m.ancestors()
+          : Object.hasOwn(m, moduleVisibility)
+            ? rbModAncestors(m)
+            : [m];
+      for (const a of chain) if (!ary.includes(a)) ary.push(a);
+    }
+    return ary;
+  }
   const ary: object[] = [];
-  for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
+  for (
+    let p: object | null = (mod as { prototype: object }).prototype;
+    p;
+    p = Object.getPrototypeOf(p) as object | null
+  ) {
     if (Object.hasOwn(p, "constructor")) {
       const klass = (p as { constructor: object }).constructor;
       if (!ary.includes(reopened(klass))) ary.push(klass);
@@ -1474,7 +1501,24 @@ export function publicInstanceMethods(
   const sections = (mod as Record<symbol, unknown>)[moduleVisibility] as
     | ModuleVisibility
     | undefined;
-  return sections ? [...sections.public] : Object.keys(mod);
+  if (!sections) return Object.keys(mod);
+  const names = sections.public.filter((name) => Object.hasOwn(mod, name));
+  for (const name of Object.keys(mod)) {
+    if (
+      !names.includes(name) &&
+      !sections.protected.includes(name) &&
+      !sections.private.includes(name)
+    ) {
+      names.push(name);
+    }
+  }
+  if (!includeSuper) return names;
+  for (const m of rbModAncestors(mod).slice(1)) {
+    for (const name of publicInstanceMethods(m, false)) {
+      if (!names.includes(name)) names.push(name);
+    }
+  }
+  return names;
 }
 
 type CallableMethods<M extends object> = {
@@ -1994,6 +2038,11 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   if (mod instanceof Module) {
     mod.extendObject(klass);
     return;
+  }
+  if (Object.hasOwn(mod, moduleIncludesKey)) {
+    for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
+      if (!singletonSearchAncestor(klass, nested)) extendObject(klass, nested);
+    }
   }
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
   const owners = new Map<string, object>();

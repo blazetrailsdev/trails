@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { extend, include, Module, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  include,
+  isModuleIncluded,
+  Module,
+  NoMethodError,
+  publicInstanceMethods,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 
 import { helperMethod, Helpers, type HelpersClass } from "./helpers.js";
 
@@ -66,7 +74,7 @@ describe("helperMethod", () => {
     expect(view.name).toBe("david");
     view.name = "jamis";
     expect(controller.name).toBe("jamis");
-    expect(Object.hasOwn(view, "name")).toBe(false);
+    expect("value" in Object.getOwnPropertyDescriptor(view, "name")!).toBe(false);
   });
 
   it("a lone name= entry defines the attribute with both halves", () => {
@@ -108,7 +116,7 @@ describe("helperMethod", () => {
 
     const controller = { equals: (other: unknown) => other === 1 };
     expect(view(cls, controller)["=="](1)).toBe(true);
-    expect(cls._helpers.instanceMethods()).toEqual(["=="]);
+    expect(publicInstanceMethods(cls._helpers)).toEqual(["=="]);
   });
 
   it("a name= entry survives clearHelpers' replay", () => {
@@ -127,7 +135,7 @@ describe("helperMethod", () => {
     const cls = makeBase();
     helperMethod.call(cls, "a", ["b", "c"]);
     expect(cls._helperMethods).toEqual(["a", "b", "c"]);
-    expect(cls._helpers.instanceMethods().sort()).toEqual(["a", "b", "c"]);
+    expect(publicInstanceMethods(cls._helpers).sort()).toEqual(["a", "b", "c"]);
   });
 
   it("throws when controller does not respond to the named method", () => {
@@ -143,9 +151,9 @@ describe("helperMethod", () => {
     const child = Object.create(parent) as HelpersClass;
     helperMethod.call(child, "fromChild");
 
-    expect(child._helpers.instanceMethods(false)).toEqual(["fromChild"]);
+    expect(publicInstanceMethods(child._helpers, false)).toEqual(["fromChild"]);
     expect("fromParent" in view(child)).toBe(true);
-    expect(parent._helpers.instanceMethods()).toEqual(["fromParent"]);
+    expect(publicInstanceMethods(parent._helpers)).toEqual(["fromParent"]);
     expect(parent._helperMethods).toEqual(["fromParent"]);
     expect(child._helperMethods).toEqual(["fromParent", "fromChild"]);
   });
@@ -306,7 +314,7 @@ describe("clearHelpers", () => {
     cls.clearHelpers();
 
     expect(cls._helperMethods).toEqual(["keep"]);
-    expect(cls._helpers.instanceMethods()).toEqual(["keep"]);
+    expect(publicInstanceMethods(cls._helpers)).toEqual(["keep"]);
     expect("keep" in view(cls)).toBe(true);
     expect(view(cls).extra).toBeUndefined();
   });
@@ -319,9 +327,9 @@ describe("_helpersForModification", () => {
     const child = Object.create(parent) as HelpersClass;
 
     const mod = child._helpersForModification();
-    expect(mod).not.toBe(parent._helpers);
-    expect(mod.isInclude(parent._helpers)).toBe(true);
-    expect(mod.instanceMethods(false)).toEqual([]);
+    expect(mod === parent._helpers).toBe(false);
+    expect(isModuleIncluded(mod, parent._helpers)).toBe(true);
+    expect(publicInstanceMethods(mod, false)).toEqual([]);
     expect("fromParent" in view(child)).toBe(true);
 
     expect(child._helpersForModification()).toBe(mod);
@@ -367,7 +375,7 @@ describe("defineHelpersModule", () => {
   it("names the module after the class it is seated on", () => {
     class WidgetsController {}
     include(WidgetsController, Helpers);
-    expect((WidgetsController as unknown as HelpersClass)._helpers.name).toBe(
+    expect(rbModName((WidgetsController as unknown as HelpersClass)._helpers)).toBe(
       "WidgetsController::HelperMethods",
     );
   });

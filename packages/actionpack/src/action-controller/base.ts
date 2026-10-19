@@ -5,7 +5,6 @@ import {
   type Configuration,
   type Included,
   type Rescuable,
-  type Module,
   runLoadHooks,
 } from "@blazetrails/activesupport";
 import type { StatusSymbol } from "@blazetrails/rack";
@@ -138,7 +137,11 @@ import {
   type currentContentSecurityPolicy,
   type isContentSecurityPolicy,
 } from "./metal/content-security-policy.js";
-import { type Resolution, type HelpersClass } from "../abstract-controller/helpers.js";
+import {
+  type HelperMethodsModule,
+  type Resolution,
+  type HelpersClass,
+} from "../abstract-controller/helpers.js";
 import { Helpers, type helperAttr, type modulesForHelpers } from "./metal/helpers.js";
 import { FormBuilder, type defaultFormBuilder } from "./form-builder.js";
 import { Caching, type instrumentPayload, type instrumentName } from "./caching.js";
@@ -400,8 +403,8 @@ export class Base extends Metal {
   declare static raiseOnOpenRedirects: boolean;
   declare static isIncludeAllHelpers: boolean;
 
-  declare static _helpers: Module;
-  declare readonly _helpers: Module;
+  declare static _helpers: HelperMethodsModule;
+  declare readonly _helpers: HelperMethodsModule;
   declare static _helperMethods: string[];
   declare static helperMethod: HelpersClass["helperMethod"];
   declare static helper: HelpersClass["helper"];

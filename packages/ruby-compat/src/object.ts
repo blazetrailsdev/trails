@@ -72,6 +72,8 @@ export function rbObjClass(obj: unknown): Klass {
   if (tag === "Temporal.PlainDate") return reopened(rbCDate) as Klass;
   if (tag === "Temporal.PlainDateTime") return reopened(rbCDateTime) as Klass;
   if (tag === "Temporal.PlainTime") return reopened(rbCTime) as Klass;
+  if (Object.hasOwn(obj as object, moduleVisibility))
+    return Object.getPrototypeOf(rbCClass) as Klass;
   if (isPlainHash(obj)) return Hash;
   const klass = (obj as object).constructor as Klass | undefined;
   if (klass === Date) return reopened(rbCTime) as Klass;

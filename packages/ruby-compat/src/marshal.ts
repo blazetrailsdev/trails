@@ -1083,7 +1083,7 @@ function mustBeModule(v: unknown, path: string): Module {
   ) {
     throw new ArgumentError(`${path} does not refer to module`);
   }
-  return v;
+  return v as Module;
 }
 
 /**
