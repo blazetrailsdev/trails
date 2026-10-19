@@ -9,6 +9,8 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ClassMethods, Core } from "./core.js";
 import { ActiveJob } from "./namespaces.js";
+import { ClassMethods as QueueNameClassMethods, QueueName } from "./queue-name.js";
+import { ClassMethods as QueuePriorityClassMethods, QueuePriority } from "./queue-priority.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
 export interface Base extends Core {}
@@ -21,6 +23,16 @@ export class Base {
 
   declare static deserialize: typeof ClassMethods.deserialize;
   declare static set: typeof ClassMethods.set;
+  declare static defaultQueueName: unknown;
+  declare static queueAs: typeof QueueNameClassMethods.queueAs;
+  declare static queueNameFromPart: typeof QueueNameClassMethods.queueNameFromPart;
+  declare static queueName: unknown;
+  declare static queueNameDelimiter: string;
+  declare static isQueueNameDelimiter: () => boolean;
+  declare static queueNamePrefix: unknown;
+  declare static defaultPriority: unknown;
+  declare static queueWithPriority: typeof QueuePriorityClassMethods.queueWithPriority;
+  declare static priority: unknown;
 
   /**
    * @inventedArm if — PERMANENT
@@ -48,6 +60,8 @@ export class Base {
   }
 }
 include(Base, Core);
+include(Base, QueueName);
+include(Base, QueuePriority);
 extend(Base, ClassMethods);
 rbModConstSet(ActiveJob, "Base", Base);
 

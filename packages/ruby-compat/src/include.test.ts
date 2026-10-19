@@ -15,9 +15,12 @@ import {
   rbModMethodDefined,
   rbObjRespondTo,
   rbFSend,
+  rbCString,
+  rbCSymbol,
 } from "./object.js";
 import {
   include,
+  rbObjIsKindOf,
   rbModConstDefined,
   rbModConstSet,
   prepend,
@@ -2217,5 +2220,14 @@ describe("include into a class module", () => {
     class Host {}
     include(Host, mod);
     expect((new Host() as unknown as DynMethods).innerOnly()).toBe("inner only");
+  });
+});
+
+describe("rbObjIsKindOf with a Symbol", () => {
+  it("answers Symbol === for a colon-spelled string and String === for a plain one", () => {
+    expect(rbObjIsKindOf(":name", rbCSymbol)).toBe(true);
+    expect(rbObjIsKindOf(":name", rbCString)).toBe(false);
+    expect(rbObjIsKindOf("name", rbCSymbol)).toBe(false);
+    expect(rbObjIsKindOf("name", rbCString)).toBe(true);
   });
 });

@@ -48,6 +48,7 @@ import {
   rbObjSingletonClass,
   rbInspect,
   rbCString,
+  rbCSymbol,
   rbCTime,
   rbModAttrReader,
   rbModAttrWriter,
@@ -58,6 +59,7 @@ import {
   UNDEF_METHOD_TABLES,
   reopened,
 } from "./object.js";
+import { isSymbol } from "./symbol.js";
 
 type AnyClass = new (...args: never[]) => unknown;
 type ModuleObject = object;
@@ -1164,11 +1166,15 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
  * `rb_obj_is_kind_of` (`vendor/ruby/v3.3.11/object.c:889`), `Object#kind_of?`
  * and `Module#===`: whether `c` is in the ancestry of `obj`'s class. A plain
  * object is a module's seat, as `include()` takes one, and JS's own `Set` is
- * the seat of the `Set` that reopens it (`class Set extends JsSet`).
+ * the seat of the `Set` that reopens it (`class Set extends JsSet`). A Symbol
+ * is a colon-spelled string, whose class `rbObjClass` answers as `String`, so
+ * `Symbol === obj` and `String === obj` are answered by the spelling.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
+  if (c === rbCSymbol) return isSymbol(obj);
+  if (c === rbCString && isSymbol(obj)) return false;
   if (
     (typeof c === "function" || (typeof c === "object" && c !== null)) &&
     singletonSearchAncestor(obj, c)
