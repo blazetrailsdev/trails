@@ -89,34 +89,29 @@ export class OutputBuffer {
   capture<TArgs extends unknown[]>(
     ...args: [...TArgs, (...args: TArgs) => PromiseLike<unknown>]
   ): Promise<SafeBuffer>;
-  capture<TArgs extends unknown[]>(...args: [...TArgs, (...args: TArgs) => void]): SafeBuffer;
+  capture<TArgs extends unknown[]>(...args: [...TArgs, (...args: TArgs) => unknown]): SafeBuffer;
   capture(...args: unknown[]): SafeBuffer | Promise<SafeBuffer> {
     const block = args.pop() as (...args: unknown[]) => unknown;
     const saved = this._raw;
     this._raw = "";
-    let result: unknown;
+    let pending = false;
     try {
-      result = block(...args);
-    } catch (error) {
-      this._raw = saved;
-      throw error;
+      const result = block(...args);
+      if (result != null && typeof (result as PromiseLike<unknown>).then === "function") {
+        pending = true;
+        return (async () => {
+          try {
+            await result;
+            return htmlSafe(this._raw);
+          } finally {
+            this._raw = saved;
+          }
+        })();
+      }
+      return htmlSafe(this._raw);
+    } finally {
+      if (!pending) this._raw = saved;
     }
-    if (result != null && typeof (result as PromiseLike<unknown>).then === "function") {
-      return Promise.resolve(result).then(
-        () => {
-          const captured = htmlSafe(this._raw);
-          this._raw = saved;
-          return captured;
-        },
-        (error: unknown) => {
-          this._raw = saved;
-          throw error;
-        },
-      );
-    }
-    const captured = htmlSafe(this._raw);
-    this._raw = saved;
-    return captured;
   }
 
   equals(other: unknown): boolean {

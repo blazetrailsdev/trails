@@ -822,20 +822,22 @@ export interface DateTimeSelector extends Omit<Included<typeof import("./tag-hel
 include(DateTimeSelector, TagHelper);
 
 for (const method of ["sec", "min", "hour", "day", "month", "year"]) {
-  (DateTimeSelector.prototype as unknown as Record<string, unknown>)[method] = function (this: {
-    _datetime: unknown;
-  }): unknown {
-    const datetime = this._datetime;
-    if (isPlainObject(datetime)) {
-      return (datetime as Record<string, unknown>)[method];
-    } else if (typeof datetime === "number") {
-      return datetime;
-    } else if (datetime == null) {
-      return null;
-    } else {
-      return rbFSend(datetime, method);
-    }
-  };
+  Object.defineProperty(DateTimeSelector.prototype, method, {
+    value: function (this: { _datetime: unknown }): unknown {
+      const datetime = this._datetime;
+      if (isPlainObject(datetime)) {
+        return (datetime as Record<string, unknown>)[method];
+      } else if (typeof datetime === "number") {
+        return datetime;
+      } else if (datetime == null) {
+        return null;
+      } else {
+        return rbFSend(datetime, method);
+      }
+    },
+    writable: true,
+    configurable: true,
+  });
 }
 
 declare module "./form-helper.js" {

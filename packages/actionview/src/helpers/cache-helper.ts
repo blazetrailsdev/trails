@@ -160,7 +160,7 @@ async function fragmentFor(
   } else {
     if (this.viewRenderer !== undefined)
       this.viewRenderer.cacheHits[this.currentTemplate?.virtualPath as string] = "miss";
-    return await writeFragmentFor.call(this, name, options, block);
+    return await writeFragmentFor.call(this, name, options, block!);
   }
 }
 
@@ -178,11 +178,9 @@ async function writeFragmentFor(
   this: CacheHelperHost,
   name: unknown,
   options: Record<string, unknown> | null | undefined,
-  block?: () => unknown,
+  block: () => unknown,
 ): Promise<unknown> {
-  const fragment: SafeBuffer = await this.outputBuffer.capture(async () => {
-    await block?.();
-  });
+  const fragment: SafeBuffer = await this.outputBuffer.capture(block);
   return await this.controller.writeFragment(name, fragment, options ?? undefined);
 }
 

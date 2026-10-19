@@ -82,7 +82,7 @@ export interface ViewContextRoutes {
   mountedHelpers(): object;
 }
 
-export async function process(
+async function process(
   this: { lookupContext: LookupContext },
   ...args: unknown[]
 ): Promise<unknown> {
