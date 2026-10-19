@@ -189,6 +189,14 @@ describe("inlinedFromFindings on a method inlining module super", () => {
     ]);
   });
 
+  it("flags a tag naming a different method from the member's other tags", () => {
+    expect(
+      methodMessages([PLAIN_SAVE, tag("ActiveRecord::Core#initialize", `${AR}/core.rb:471-482`)]),
+    ).toEqual([
+      "save ActiveRecord::Core#initialize names a method other than save, which the other tags name",
+    ]);
+  });
+
   it("flags a module method whose Rails body calls no super", () => {
     expect(
       methodMessages([tag("ActiveRecord::Inheritance#save", `${AR}/inheritance.rb:90-92`)]),

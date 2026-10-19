@@ -73,6 +73,7 @@ function memberOf(sourceCode, comment) {
   while (node?.parent && node.parent.range[0] === token.range[0]) node = node.parent;
   if (node?.type !== "MethodDefinition") return null;
   if (node.kind === "constructor") return "constructor";
+  if (node.static) return null;
   return node.key.type === "Identifier" ? node.key.name : null;
 }
 

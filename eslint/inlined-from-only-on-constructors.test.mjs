@@ -55,6 +55,11 @@ tester.run("inlined-from-only-on-constructors", rule, {
   ],
   invalid: [
     {
+      code: `class Base {\n  /** @inlinedFrom ${CONTENT_TAG} */\n  static contentTag() {}\n}\n`,
+      filename: TAGS_BASE,
+      errors: [{ messageId: "notConstructor" }],
+    },
+    {
       code: onMethod("tag", CONTENT_TAG),
       filename: TAGS_BASE,
       errors: [{ messageId: "notThisMethod" }],

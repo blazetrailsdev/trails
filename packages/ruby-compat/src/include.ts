@@ -1545,8 +1545,21 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
     if (!(klass instanceof Module)) {
       trackIncludedModule(klass, mod, moduleIncludesKey);
       if (Object.prototype.hasOwnProperty.call(klass, moduleSubclassesKey)) {
-        for (const subclass of (klass as Record<symbol, Set<AnyClass>>)[moduleSubclassesKey]) {
-          if (!isModuleMethodTablePresent(subclass, mod)) rbModAppendFeatures(subclass, mod);
+        const refs = (klass as Record<symbol, Set<WeakRef<AnyClass>>>)[moduleSubclassesKey];
+        for (const ref of refs) {
+          const subclass = ref.deref();
+          if (subclass === undefined) {
+            refs.delete(ref);
+            continue;
+          }
+          if (isModuleMethodTablePresent(subclass, mod)) continue;
+          const outranking = Object.keys(klass).flatMap((key) => {
+            const desc = Object.getOwnPropertyDescriptor(subclass.prototype, key);
+            return desc === undefined ? [] : [[key, desc] as const];
+          });
+          rbModAppendFeatures(subclass, mod);
+          for (const [key, desc] of outranking)
+            Object.defineProperty(subclass.prototype, key, desc);
         }
       }
     }
@@ -1595,7 +1608,7 @@ export function rbModAppendFeatures(
     }
   }
   trackIncludedModule(klass.prototype, mod);
-  if (typeof mod !== "function") trackIncludedModule(mod, klass, moduleSubclassesKey);
+  if (typeof mod !== "function") trackIncludedModule(mod, new WeakRef(klass), moduleSubclassesKey);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
     if (

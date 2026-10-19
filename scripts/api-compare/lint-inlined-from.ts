@@ -282,6 +282,10 @@ export function inlinedFromFindings(
         const chain = counterpart && methodChain(counterpart, written[0]?.hook ?? "", modules);
         for (const tag of written) {
           const hook = `${tag.module}#${tag.hook}`;
+          if (tag.hook !== written[0].hook) {
+            report(hook, `names a method other than ${written[0].hook}, which the other tags name`);
+            continue;
+          }
           const body = resolveBody(tag);
           if (body === undefined) continue;
           if (!(body.calls ?? []).includes("super")) {

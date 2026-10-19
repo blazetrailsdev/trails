@@ -2114,6 +2114,19 @@ describe("rbModAppendFeatures on a plain-object module", () => {
     expect(isModuleIncluded(C, N)).toBe(true);
   });
 
+  it("reaches a class through a chain of plain modules, and keeps the outer module's methods ahead", () => {
+    const M = { who: () => "M" };
+    class C {}
+    include(C, M);
+    const N = { who: () => "N", n: () => "n" };
+    include(M, N);
+    const P = { p: () => "p" };
+    include(N, P);
+    const c = new C() as unknown as DynMethods;
+    expect([c.who(), c.n(), c.p()]).toEqual(["M", "n", "p"]);
+    expect(isModuleIncluded(C, P)).toBe(true);
+  });
+
   it("records an include into a plain module without copying onto it", () => {
     const inner = { who: () => "inner" };
     const outer = {};
