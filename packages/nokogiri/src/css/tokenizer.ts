@@ -11,35 +11,6 @@ const ident = String.raw`-?([_A-Za-z]|${nonascii}|${escape})${nmchar}*`;
 const string = (q: string) =>
   String.raw`${q}([^\n\r\f${q}]|(\n|\r\n|\r|\f)|${nonascii}|${escape})*(?<!\\)(?:\\{2})*${q}`;
 
-const RULES: [RegExp, string | null][] = [
-  [/has\([\s]*/, "HAS"],
-  [new RegExp(String.raw`${ident}\([\s]*`), "FUNCTION"],
-  [new RegExp(ident), "IDENT"],
-  [new RegExp(String.raw`\#${nmchar}+`), "HASH"],
-  [/[\s]*~=[\s]*/, "INCLUDES"],
-  [/[\s]*\|=[\s]*/, "DASHMATCH"],
-  [/[\s]*\^=[\s]*/, "PREFIXMATCH"],
-  [/[\s]*\$=[\s]*/, "SUFFIXMATCH"],
-  [/[\s]*\*=[\s]*/, "SUBSTRINGMATCH"],
-  [/[\s]*!=[\s]*/, "NOT_EQUAL"],
-  [/[\s]*=[\s]*/, "EQUAL"],
-  [/[\s]*\)/, "RPAREN"],
-  [/\[[\s]*/, "LSQUARE"],
-  [/[\s]*\]/, "RSQUARE"],
-  [/[\s]*\+[\s]*/, "PLUS"],
-  [/[\s]*>[\s]*/, "GREATER"],
-  [/[\s]*,[\s]*/, "COMMA"],
-  [/[\s]*~[\s]*/, "TILDE"],
-  [/:not\([\s]*/, "NOT"],
-  [/-?([0-9]+|[0-9]*\.[0-9]+)/, "NUMBER"],
-  [/[\s]*\/\/[\s]*/, "DOUBLESLASH"],
-  [/[\s]*\/[\s]*/, "SLASH"],
-  [/U\+[0-9a-f?]{1,6}(-[0-9a-f]{1,6})?/, "UNICODE_RANGE"],
-  [/[\s]+/, "S"],
-  [new RegExp(`(${string('"')}|${string("'")})`), "STRING"],
-  [/./, null],
-];
-
 export class Tokenizer {
   lineno = 1;
   state: string | null = null;
@@ -50,6 +21,10 @@ export class Tokenizer {
     this._ss = new StringScanner(str);
     this.lineno = 1;
     this.state = null;
+  }
+
+  action<T>(block: () => T): T {
+    return block();
   }
 
   nextToken(): [string, string] | undefined {
@@ -65,8 +40,83 @@ export class Tokenizer {
     let text: string | null = this._ss.peek(1);
     if (text === "\n") this.lineno += 1;
     if (this.state != null) throw new ScanError(`undefined state: '${this.state}'`);
-    for (const [pattern, type] of RULES) {
-      if ((text = this._ss.scan(pattern)) != null) return [type ?? text, text];
+    if ((text = this._ss.scan(/has\([\s]*/)) != null) {
+      return this.action(() => ["HAS", text!]);
+    }
+    if ((text = this._ss.scan(new RegExp(String.raw`${ident}\([\s]*`))) != null) {
+      return this.action(() => ["FUNCTION", text!]);
+    }
+    if ((text = this._ss.scan(new RegExp(ident))) != null) {
+      return this.action(() => ["IDENT", text!]);
+    }
+    if ((text = this._ss.scan(new RegExp(String.raw`\#${nmchar}+`))) != null) {
+      return this.action(() => ["HASH", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*~=[\s]*/)) != null) {
+      return this.action(() => ["INCLUDES", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*\|=[\s]*/)) != null) {
+      return this.action(() => ["DASHMATCH", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*\^=[\s]*/)) != null) {
+      return this.action(() => ["PREFIXMATCH", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*\$=[\s]*/)) != null) {
+      return this.action(() => ["SUFFIXMATCH", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*\*=[\s]*/)) != null) {
+      return this.action(() => ["SUBSTRINGMATCH", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*!=[\s]*/)) != null) {
+      return this.action(() => ["NOT_EQUAL", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*=[\s]*/)) != null) {
+      return this.action(() => ["EQUAL", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*\)/)) != null) {
+      return this.action(() => ["RPAREN", text!]);
+    }
+    if ((text = this._ss.scan(/\[[\s]*/)) != null) {
+      return this.action(() => ["LSQUARE", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*\]/)) != null) {
+      return this.action(() => ["RSQUARE", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*\+[\s]*/)) != null) {
+      return this.action(() => ["PLUS", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*>[\s]*/)) != null) {
+      return this.action(() => ["GREATER", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*,[\s]*/)) != null) {
+      return this.action(() => ["COMMA", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*~[\s]*/)) != null) {
+      return this.action(() => ["TILDE", text!]);
+    }
+    if ((text = this._ss.scan(/:not\([\s]*/)) != null) {
+      return this.action(() => ["NOT", text!]);
+    }
+    if ((text = this._ss.scan(/-?([0-9]+|[0-9]*\.[0-9]+)/)) != null) {
+      return this.action(() => ["NUMBER", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*\/\/[\s]*/)) != null) {
+      return this.action(() => ["DOUBLESLASH", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]*\/[\s]*/)) != null) {
+      return this.action(() => ["SLASH", text!]);
+    }
+    if ((text = this._ss.scan(/U\+[0-9a-f?]{1,6}(-[0-9a-f]{1,6})?/)) != null) {
+      return this.action(() => ["UNICODE_RANGE", text!]);
+    }
+    if ((text = this._ss.scan(/[\s]+/)) != null) {
+      return this.action(() => ["S", text!]);
+    }
+    if ((text = this._ss.scan(new RegExp(`(${string('"')}|${string("'")})`))) != null) {
+      return this.action(() => ["STRING", text!]);
+    }
+    if ((text = this._ss.scan(/./)) != null) {
+      return this.action(() => [text!, text!]);
     }
     text = this._ss.string.slice(this._ss.pos);
     throw new ScanError(`can not match: '${text}'`);
