@@ -249,10 +249,7 @@ export function deferInherited(this: WrapperHostClass): void {
   Object.defineProperty(this, "_wrapperOptions", {
     ...wrapperOptions,
     get(this: WrapperHostClass) {
-      if (
-        !Object.prototype.hasOwnProperty.call(this, "_wrapperOptions") &&
-        !Object.prototype.hasOwnProperty.call(this, INHERITED)
-      ) {
+      if (!Object.hasOwn(this, "_wrapperOptions") && !Object.hasOwn(this, INHERITED)) {
         Object.defineProperty(this, INHERITED, { value: true });
         inheritedParamsWrapper.call(this);
       }

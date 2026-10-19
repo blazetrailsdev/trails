@@ -717,10 +717,10 @@ export function becomes<
     _suppressStiNewDispatch?: unknown;
     _suppressAbstractCheck?: boolean;
   };
-  const hadOwn = Object.prototype.hasOwnProperty.call(ctor, "_suppressStiNewDispatch");
+  const hadOwn = Object.hasOwn(ctor, "_suppressStiNewDispatch");
   const prev = ctor._suppressStiNewDispatch;
   ctor._suppressStiNewDispatch = klass;
-  const hadOwnAbstract = Object.prototype.hasOwnProperty.call(ctor, "_suppressAbstractCheck");
+  const hadOwnAbstract = Object.hasOwn(ctor, "_suppressAbstractCheck");
   const prevAbstract = ctor._suppressAbstractCheck;
   ctor._suppressAbstractCheck = true;
   let instance: InstanceType<K>;

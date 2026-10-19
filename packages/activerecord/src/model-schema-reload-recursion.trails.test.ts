@@ -30,7 +30,7 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
 }
 
 const own = <T>(host: object, key: string): T | undefined =>
-  Object.prototype.hasOwnProperty.call(host, key) ? (host as Record<string, T>)[key] : undefined;
+  Object.hasOwn(host, key) ? (host as Record<string, T>)[key] : undefined;
 
 describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () => {
   fixtures({}, { useTransactionalTests: false });

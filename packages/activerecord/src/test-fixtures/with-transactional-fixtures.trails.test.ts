@@ -175,7 +175,7 @@ describe("the DDL recording window leaves no own property behind", () => {
   beforeAll(async () => {
     const leased = await Base.leaseConnection();
     const conn = leased as unknown as Record<string, unknown>;
-    ownAddIndex = Object.prototype.hasOwnProperty.call(conn, "addIndex");
+    ownAddIndex = Object.hasOwn(conn, "addIndex");
 
     const proto = Object.getPrototypeOf(leased) as Record<string, unknown>;
     const original = proto.addIndex;

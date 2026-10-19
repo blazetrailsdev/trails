@@ -30,7 +30,7 @@ export function setBeginningOfWeek(weekStart: string): void {
 }
 
 export function findBeginningOfWeekBang(weekStart: string): string {
-  if (!Object.prototype.hasOwnProperty.call(DAYS_INTO_WEEK, weekStart)) {
+  if (!Object.hasOwn(DAYS_INTO_WEEK, weekStart)) {
     throw new ArgumentError(
       `Invalid beginning of week: ${isSymbol(weekStart) ? symbolToS(weekStart) : weekStart}`,
     );

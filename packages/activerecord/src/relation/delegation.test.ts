@@ -175,7 +175,7 @@ describe("DelegationCachingTest", () => {
 
     const ownerOf = (object: object, name: string): object | undefined => {
       for (let o: object | null = object; o; o = Object.getPrototypeOf(o)) {
-        if (Object.prototype.hasOwnProperty.call(o, name)) return o;
+        if (Object.hasOwn(o, name)) return o;
       }
       return undefined;
     };

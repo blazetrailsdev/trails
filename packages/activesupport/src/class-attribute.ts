@@ -96,7 +96,7 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
       Object.assign(methods, delegators);
     } else if (instanceReader) {
       methods.get = function (this: any) {
-        if (Object.prototype.hasOwnProperty.call(this, `@${name}`)) {
+        if (Object.hasOwn(this, `@${name}`)) {
           return this[`@${name}`];
         } else {
           return this.constructor[name];

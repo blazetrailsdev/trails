@@ -51,7 +51,7 @@ export class Method {
   private static _pattern?: RegExp;
 
   static pattern(): RegExp {
-    if (!Object.prototype.hasOwnProperty.call(this, "_pattern")) {
+    if (!Object.hasOwn(this, "_pattern")) {
       this._pattern = new RegExp(
         `^${this.prefix()}([_a-zA-Z]\\w*)${this.suffix() || "(?<!Bang)"}$`,
       );

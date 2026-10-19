@@ -65,9 +65,7 @@ function hashEqual(a: Record<string, unknown> | undefined, b: Record<string, unk
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
   if (aKeys.length !== bKeys.length) return false;
-  return aKeys.every(
-    (key) => Object.prototype.hasOwnProperty.call(b, key) && rbEqual(a[key], b[key]),
-  );
+  return aKeys.every((key) => Object.hasOwn(b, key) && rbEqual(a[key], b[key]));
 }
 
 export interface SetCookieOptions {

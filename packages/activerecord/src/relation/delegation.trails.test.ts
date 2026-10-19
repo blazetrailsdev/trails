@@ -79,9 +79,7 @@ describe("generated relation methods — per-model prototype carrier", () => {
       unknown
     >;
     for (const name of uncacheable) {
-      expect(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(carrier), name)).toBe(
-        false,
-      );
+      expect(Object.hasOwn(Object.getPrototypeOf(carrier), name)).toBe(false);
     }
   });
 });
@@ -172,9 +170,7 @@ describe("generated relation methods — remaining delegate-class carriers", () 
     for (const carrier of allCarriersFor(Post as never)) {
       const proto = carrier.prototype as Record<string, unknown>;
       for (const name of uncacheable) {
-        expect(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(proto), name)).toBe(
-          false,
-        );
+        expect(Object.hasOwn(Object.getPrototypeOf(proto), name)).toBe(false);
       }
     }
   });
@@ -385,7 +381,7 @@ describe("delegate_base_methods guard", () => {
     expect(() => (Post.all() as unknown as MethodMissing).methodMissing("belongsTo")).toThrow(
       NotImplementedError,
     );
-    expect(Object.prototype.hasOwnProperty.call(Post, "containingTheLetterA")).toBe(true);
+    expect(Object.hasOwn(Post, "containingTheLetterA")).toBe(true);
     expect(() =>
       (Post.all() as unknown as MethodMissing).methodMissing("containingTheLetterA"),
     ).not.toThrow();

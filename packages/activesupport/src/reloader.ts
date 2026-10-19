@@ -103,7 +103,7 @@ export class Reloader extends ExecutionWrapper {
   }
 
   static checkBang(): boolean {
-    if (!Object.prototype.hasOwnProperty.call(this, "_shouldReload")) {
+    if (!Object.hasOwn(this, "_shouldReload")) {
       this._shouldReload = false;
     }
     return (this._shouldReload ||= this.check());

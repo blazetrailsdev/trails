@@ -42,7 +42,7 @@ function ownSchemaMemo<K extends keyof SchemaHost>(
   host: SchemaHost,
   key: K,
 ): SchemaHost[K] | undefined {
-  return Object.prototype.hasOwnProperty.call(host, key) ? host[key] : undefined;
+  return Object.hasOwn(host, key) ? host[key] : undefined;
 }
 
 /** @internal */
@@ -642,7 +642,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   }
   if (currentAdapter !== startingAdapter) return;
 
-  if (!Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+  if (!Object.hasOwn(this, "_primaryKey")) {
     (this as unknown as typeof Base).resetPrimaryKey();
   }
   loadSchema.call(this);
@@ -665,14 +665,14 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
 }
 
 export function tableName(this: SchemaHost): string | null {
-  if (!Object.prototype.hasOwnProperty.call(this, "_tableName")) resetTableName.call(this);
+  if (!Object.hasOwn(this, "_tableName")) resetTableName.call(this);
   return this._tableName;
 }
 
 export function setTableName(this: SchemaHost, value: string | null): void {
   value = value == null ? null : String(value);
 
-  if (Object.prototype.hasOwnProperty.call(this, "_tableName")) {
+  if (Object.hasOwn(this, "_tableName")) {
     if (value === this._tableName) return;
     if (isConnected.call(this as unknown as typeof Base)) void resetColumnInformation.call(this);
   }

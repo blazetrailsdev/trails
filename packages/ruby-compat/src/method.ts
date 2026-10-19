@@ -158,7 +158,7 @@ function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
       const me = Object.getOwnPropertyDescriptor(mod, mid)!;
       if (mid !== "constructor" && typeof me.value === "function") list.add(mid);
     }
-    const particularClass = mod === obj || Object.prototype.hasOwnProperty.call(mod, FL_SINGLETON);
+    const particularClass = mod === obj || Object.hasOwn(mod, FL_SINGLETON);
     if (!recur && !particularClass) break;
   }
   return [...list];

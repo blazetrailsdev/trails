@@ -28,7 +28,7 @@ export function autoload(
   }
 
   const self = this as unknown as Record<string, unknown>;
-  if (Object.prototype.hasOwnProperty.call(this, constName)) {
+  if (Object.hasOwn(this, constName)) {
     if (this._autoloads?.[constName] && self[constName] === undefined) {
       this._autoloads[constName] = resolvePath;
     }

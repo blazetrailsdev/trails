@@ -173,7 +173,7 @@ describe("DateTimeType Helpers::TimeValue ancestry", () => {
       "newTime",
       "fastStringToTime",
     ]) {
-      expect(Object.prototype.hasOwnProperty.call(type, name)).toBe(false);
+      expect(Object.hasOwn(type, name)).toBe(false);
       expect(typeof (type as unknown as Record<string, unknown>)[name]).toBe("function");
     }
   });

@@ -142,7 +142,7 @@ export class Chain {
 for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
-    if (Object.prototype.hasOwnProperty.call(Chain.prototype, key)) continue;
+    if (Object.hasOwn(Chain.prototype, key)) continue;
     Object.defineProperty(
       Chain.prototype,
       key,

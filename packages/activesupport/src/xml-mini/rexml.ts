@@ -62,7 +62,7 @@ function mergeBang(
   key: string,
   value: unknown,
 ): Record<string, unknown> {
-  if (Object.prototype.hasOwnProperty.call(hash, key)) {
+  if (Object.hasOwn(hash, key)) {
     if (Array.isArray(hash[key])) {
       (hash[key] as unknown[]).push(value);
     } else {

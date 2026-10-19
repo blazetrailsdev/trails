@@ -179,7 +179,7 @@ export const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
 export function rbObjSingletonClass(obj: object): abstract new (...args: never) => object {
   if (typeof obj === "function") throw new TypeError("can't define singleton");
   const proto = Object.getPrototypeOf(obj);
-  if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+  if (proto !== null && Object.hasOwn(proto, FL_SINGLETON)) {
     return proto[FL_SINGLETON] as abstract new (...args: never) => object;
   }
   const superclass = obj.constructor as ObjectConstructor;
@@ -206,7 +206,7 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
 export function rbClassOf(obj: unknown): Klass {
   if (typeof obj === "object" && obj !== null) {
     const proto = Object.getPrototypeOf(obj);
-    if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+    if (proto !== null && Object.hasOwn(proto, FL_SINGLETON)) {
       return proto[FL_SINGLETON] as Klass;
     }
   }
@@ -231,7 +231,7 @@ export const T_ICLASS = Symbol.for("@blazetrails/ruby-compat:T_ICLASS");
  */
 export function rbClassSuperclass<T extends object>(klass: T): T | null {
   let superclass = Object.getPrototypeOf(klass) as object | null;
-  while (superclass && Object.prototype.hasOwnProperty.call(superclass, T_ICLASS)) {
+  while (superclass && Object.hasOwn(superclass, T_ICLASS)) {
     superclass = Object.getPrototypeOf(superclass) as object | null;
   }
   return superclass === Function.prototype ? null : (superclass as T | null);
@@ -404,7 +404,7 @@ function reopenedSeatMethod(
  * @noRailsEquivalent PERMANENT
  */
 export function rbModSingletonP(klass: unknown): boolean {
-  return typeof klass === "function" && Object.prototype.hasOwnProperty.call(klass, FL_SINGLETON);
+  return typeof klass === "function" && Object.hasOwn(klass, FL_SINGLETON);
 }
 
 /**

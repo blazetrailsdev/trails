@@ -60,8 +60,7 @@ describe("AggregationsTest (trails)", () => {
 });
 
 describe("lazy composed_of inclusion", () => {
-  const own = (klass: typeof Base, key: string): boolean =>
-    Object.prototype.hasOwnProperty.call(klass.prototype, key);
+  const own = (klass: typeof Base, key: string): boolean => Object.hasOwn(klass.prototype, key);
 
   it("does not mix Aggregations onto models without composed_of", () => {
     class Plain extends Base {}

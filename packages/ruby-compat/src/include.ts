@@ -146,7 +146,7 @@ export function rbModConstDefined(
       throw new NameError(`wrong constant name ${name}`, name);
     }
     if (c === null || (typeof c !== "object" && typeof c !== "function")) return false;
-    if (i === 0 && recur ? part in c : Object.prototype.hasOwnProperty.call(c, part)) {
+    if (i === 0 && recur ? part in c : Object.hasOwn(c, part)) {
       c = (c as Record<string, unknown>)[part];
     } else if (i === 0 && recur && isRegisteredConstant(part)) {
       c = registeredConstant(part);
@@ -354,7 +354,7 @@ export class Module<I extends object = Record<never, never>> {
   ancestors(): object[] {
     const ary: object[] = [this];
     const carrier = carrierOf(this) as Record<symbol, unknown>;
-    const mods = Object.prototype.hasOwnProperty.call(carrier, includedModulesKey)
+    const mods = Object.hasOwn(carrier, includedModulesKey)
       ? [...(carrier[includedModulesKey] as Set<object>)]
       : [];
     for (const mod of mods.reverse()) {
@@ -398,7 +398,7 @@ export class Module<I extends object = Record<never, never>> {
     const carrier = carrierOf(this);
     try {
       for (const name of names) {
-        if (!Object.prototype.hasOwnProperty.call(carrier, name)) {
+        if (!Object.hasOwn(carrier, name)) {
           throw new NameError(`method '${name}' not defined in #<Module>`, name);
         }
         delete carrier[name];
@@ -419,7 +419,7 @@ export class Module<I extends object = Record<never, never>> {
     const carrier = carrierOf(this);
     try {
       for (const name of names) {
-        if (!Object.prototype.hasOwnProperty.call(carrier, name) || isUndefEntry(carrier, name)) {
+        if (!Object.hasOwn(carrier, name) || isUndefEntry(carrier, name)) {
           throw new NameError(`undefined method '${name}' for module '#<Module>'`, name);
         }
         trackedKeys(carrier).delete(name);
@@ -691,7 +691,7 @@ export class Module<I extends object = Record<never, never>> {
   isMethodDefined(name: string): boolean {
     const carrier = carrierOf(this);
     return (
-      Object.prototype.hasOwnProperty.call(carrier, name) &&
+      Object.hasOwn(carrier, name) &&
       !isUndefEntry(carrier, name) &&
       !isAbsentHalf(Object.getOwnPropertyDescriptor(carrier, name)!.get)
     );
@@ -726,7 +726,7 @@ export class Module<I extends object = Record<never, never>> {
 function appendPlainFeatures(base: Module, mod: ModuleObject): void {
   const carrier = carrierOf(base);
   if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
-    if (Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
+    if (Object.hasOwn(mod, moduleIncludesKey)) {
       for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
         base.include(nested);
       }
@@ -745,7 +745,7 @@ function appendPlainFeatures(base: Module, mod: ModuleObject): void {
       const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
       const accessor = !("value" in descriptor) && namespace !== "Module";
       if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
-      if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
+      if (Object.hasOwn(carrier, key) && !installed.has(key)) continue;
       installed.add(key);
       Object.defineProperty(
         carrier,
@@ -818,10 +818,7 @@ function relinkIncluders(mod: Module): void {
   const table = carrierOf(mod);
   for (const link of linksOf(mod)) {
     for (const name of Object.getOwnPropertyNames(link)) {
-      if (
-        !Object.prototype.hasOwnProperty.call(table, name) &&
-        Object.getOwnPropertyDescriptor(link, name)!.configurable
-      )
+      if (!Object.hasOwn(table, name) && Object.getOwnPropertyDescriptor(link, name)!.configurable)
         delete (link as Record<string, unknown>)[name];
     }
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(table));
@@ -936,7 +933,7 @@ export function initializeIncludedModules(instance: object, ...args: unknown[]):
   ) {
     const level: Array<(this: object, ...args: unknown[]) => void> = [];
     for (const registry of [instanceInitializers, prependedInstanceInitializers]) {
-      if (!Object.prototype.hasOwnProperty.call(proto, registry)) continue;
+      if (!Object.hasOwn(proto, registry)) continue;
       level.push(
         ...((proto as Record<symbol, unknown>)[registry] as Array<
           (this: object, ...args: unknown[]) => void
@@ -944,7 +941,7 @@ export function initializeIncludedModules(instance: object, ...args: unknown[]):
       );
     }
     if (level.length !== 0) chain.unshift(level);
-    if (Object.prototype.hasOwnProperty.call(proto, delegateClass)) break;
+    if (Object.hasOwn(proto, delegateClass)) break;
   }
   const initializers = chain.flat();
   const unwind = (index: number): void => {
@@ -981,7 +978,7 @@ function trackInstanceInitializer(
   let list = (proto as Record<symbol, unknown>)[registry] as
     | Array<(this: object, ...args: never[]) => void>
     | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
+  if (!Object.hasOwn(proto, registry)) {
     list = [];
     Object.defineProperty(proto, registry, {
       value: list,
@@ -1033,7 +1030,7 @@ const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
 
 function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string | symbol> {
   let set = (proto as Record<symbol, unknown>)[registry] as Set<string | symbol> | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
+  if (!Object.hasOwn(proto, registry)) {
     set = new Set<string | symbol>();
     Object.defineProperty(proto, registry, {
       value: set,
@@ -1051,7 +1048,7 @@ function trackIncludedModule(
   registry: symbol = includedModulesKey,
 ): void {
   let set = (proto as Record<symbol, unknown>)[registry] as Set<unknown> | undefined;
-  if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
+  if (!Object.hasOwn(proto, registry)) {
     set = new Set<unknown>();
     Object.defineProperty(proto, registry, {
       value: set,
@@ -1070,12 +1067,12 @@ function isModuleMethodTablePresent(klass: { prototype: object }, mod: unknown):
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
     if (
-      Object.prototype.hasOwnProperty.call(proto, includedModulesKey) &&
+      Object.hasOwn(proto, includedModulesKey) &&
       ((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>).has(mod)
     ) {
       return true;
     }
-    if (Object.prototype.hasOwnProperty.call(proto, delegateClass)) break;
+    if (Object.hasOwn(proto, delegateClass)) break;
   }
   return false;
 }
@@ -1121,7 +1118,7 @@ export function includedModules(mod: { prototype: object }): unknown[] {
     proto;
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
-    if (!Object.prototype.hasOwnProperty.call(proto, includedModulesKey)) continue;
+    if (!Object.hasOwn(proto, includedModulesKey)) continue;
     const mods = [...((proto as Record<symbol, unknown>)[includedModulesKey] as Set<unknown>)];
     for (const m of mods.reverse()) if (!result.includes(m)) result.push(m);
   }
@@ -1146,11 +1143,11 @@ export function includedModules(mod: { prototype: object }): unknown[] {
 export function rbModAncestors(mod: { prototype: object }): object[] {
   const ary: object[] = [];
   for (let p: object | null = mod.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
-    if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
+    if (Object.hasOwn(p, "constructor")) {
       const klass = (p as { constructor: object }).constructor;
       if (!ary.includes(reopened(klass))) ary.push(klass);
     }
-    if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
+    if (Object.hasOwn(p, includedModulesKey)) {
       const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>)];
       for (const m of mods.reverse()) if (!ary.includes(m)) ary.push(m);
     }
@@ -1239,11 +1236,11 @@ export function rbClassInheritedP(mod: unknown, arg: unknown): boolean | null {
 /** `class_search_ancestor` (`vendor/ruby/v3.3.11/object.c:935`). */
 function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
   for (let p: object | null = cl.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
-    if (Object.prototype.hasOwnProperty.call(p, "constructor")) {
+    if (Object.hasOwn(p, "constructor")) {
       const klass = (p as { constructor: object }).constructor;
       if (klass === c || klass === reopened(c)) return true;
     }
-    if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
+    if (Object.hasOwn(p, includedModulesKey)) {
       if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
     }
     if (p === Uint8Array.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
@@ -1504,7 +1501,7 @@ function isClass(klass: object): klass is AnyClass {
 export const classModule = Symbol.for("@blazetrails/ruby-compat:classModule");
 
 function isClassReceiver(klass: object): klass is AnyClass {
-  return isClass(klass) && !Object.prototype.hasOwnProperty.call(klass, classModule);
+  return isClass(klass) && !Object.hasOwn(klass, classModule);
 }
 
 function featureHook(mod: unknown, name: string): ((base: unknown) => void) | undefined {
@@ -1579,7 +1576,7 @@ export function rbModAppendFeatures(
   }
   if (mod instanceof Module) return Module.prototype.appendFeatures.call(mod, klass);
   if (klass instanceof Module) return appendPlainFeatures(klass, mod);
-  if (Object.prototype.hasOwnProperty.call(mod, moduleIncludesKey)) {
+  if (Object.hasOwn(mod, moduleIncludesKey)) {
     for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
       if (!isModuleMethodTablePresent(klass, nested)) include(klass, nested);
     }
@@ -1641,8 +1638,8 @@ export function rbModAppendFeatures(
         if (modDesc === undefined || (typeof key === "string" && !modDesc.enumerable)) continue;
         if (key === "constructor" || (typeof key === "string" && /^[A-Z]/.test(key))) continue;
         if ("value" in modDesc && typeof modDesc.value !== "function") continue;
-        if (Object.prototype.hasOwnProperty.call(descriptors, key)) continue;
-        if (Object.prototype.hasOwnProperty.call(klass.prototype, key) && !installed.has(key)) {
+        if (Object.hasOwn(descriptors, key)) continue;
+        if (Object.hasOwn(klass.prototype, key) && !installed.has(key)) {
           continue;
         }
         installed.add(key);
@@ -1714,7 +1711,7 @@ export function rbObjDup<T>(obj: T): T {
   if (obj === null || (typeof obj !== "object" && typeof obj !== "function")) return obj;
   if (temporalTag(obj) !== null) return obj;
   const descriptors = copiedDescriptors(obj, true);
-  const singletonKeys = Object.prototype.hasOwnProperty.call(obj, extendedKeys)
+  const singletonKeys = Object.hasOwn(obj, extendedKeys)
     ? ((obj as Record<symbol, unknown>)[extendedKeys] as Set<string>)
     : undefined;
   if (!isClassConstructor(obj)) {
@@ -1723,7 +1720,7 @@ export function rbObjDup<T>(obj: T): T {
     }
   }
   let proto = Object.getPrototypeOf(obj) as object | null;
-  if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+  if (proto !== null && Object.hasOwn(proto, FL_SINGLETON)) {
     proto = Object.getPrototypeOf(proto) as object | null;
   }
   const alloc = rbObjAlloc(obj, proto);

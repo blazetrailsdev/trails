@@ -385,7 +385,7 @@ export class Request {
   }
 
   hasHeader(key: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.env, key);
+    return Object.hasOwn(this.env, key);
   }
 
   setHeader(key: string, value: unknown): unknown {
@@ -424,7 +424,7 @@ export class Request {
   fetchHeader(key: string): unknown;
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   fetchHeader<T>(key: string, fallback?: (key: string) => T): unknown | T {
-    if (Object.prototype.hasOwnProperty.call(this.env, key)) return this.env[key];
+    if (Object.hasOwn(this.env, key)) return this.env[key];
     if (fallback) return fallback(key);
     throw new Error(`key not found: ${key}`);
   }

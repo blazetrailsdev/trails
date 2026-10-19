@@ -23,7 +23,7 @@ export function deduplicated<T extends object>(this: T): T {
 
 export function registry(this: object): Hash<object, object> {
   const klass = this as { _registry?: Hash<object, object> };
-  if (!Object.prototype.hasOwnProperty.call(klass, "_registry")) klass._registry = new Hash();
+  if (!Object.hasOwn(klass, "_registry")) klass._registry = new Hash();
   return klass._registry!;
 }
 

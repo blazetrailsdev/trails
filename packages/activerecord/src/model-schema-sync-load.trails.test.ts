@@ -84,7 +84,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
+    expect(Object.hasOwn(Circle, "_columnsHash")).toBe(true);
     expect(Object.keys(Circle.columnsHash())).toContain("guid");
     expect(Object.keys(Shape.columnsHash())).toContain("guid");
   });
@@ -137,7 +137,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
+    expect(Object.hasOwn(Circle, "_schemaLoaded")).toBe(true);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
   });
 
@@ -193,7 +193,7 @@ describe("sync loadSchema / columnsHash", () => {
     await establishConnectionTo(Shape, makeAdapter(cols) as never);
 
     Circle.columnsHash();
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
+    expect(Object.hasOwn(Circle, "_schemaLoaded")).toBe(true);
 
     registerModel(Circle);
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Shape);
@@ -214,7 +214,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
+    expect(Object.hasOwn(Circle, "_columnsHash")).toBe(true);
     expect(
       Object.keys((Circle as unknown as { _columnsHash: Record<string, unknown> })._columnsHash),
     ).toEqual(["guid"]);

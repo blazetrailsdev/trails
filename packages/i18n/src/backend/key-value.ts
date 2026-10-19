@@ -185,7 +185,7 @@ export class KeyValue {
 for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
-    if (Object.prototype.hasOwnProperty.call(KeyValue.prototype, key)) continue;
+    if (Object.hasOwn(KeyValue.prototype, key)) continue;
     Object.defineProperty(
       KeyValue.prototype,
       key,

@@ -121,10 +121,7 @@ export class Metal extends AbstractController {
     Object.defineProperty(this, "middlewareStack", {
       ...reader,
       get(this: typeof Metal) {
-        if (
-          !Object.prototype.hasOwnProperty.call(this, "__class_attr_middlewareStack") &&
-          !rbModSingletonP(this)
-        ) {
+        if (!Object.hasOwn(this, "__class_attr_middlewareStack") && !rbModSingletonP(this)) {
           inherited.call(Object.getPrototypeOf(this), this);
         }
         return reader.get!.call(this);

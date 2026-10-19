@@ -99,8 +99,8 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     const hash = VipTicket.columnsHash();
 
     expect(Object.keys(hash).sort()).toEqual(["id", "subject"]);
-    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_schemaLoaded")).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_columnsHash")).toBe(true);
+    expect(Object.hasOwn(VipTicket, "_schemaLoaded")).toBe(true);
+    expect(Object.hasOwn(VipTicket, "_columnsHash")).toBe(true);
   });
 
   it("gives a genuine STI subclass the base's shared table", async () => {
@@ -111,7 +111,7 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
 
     expect(Object.keys(hash).sort()).toEqual(["id", "sides", "type"]);
     expect(asked).not.toContain("tickets");
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
+    expect(Object.hasOwn(Circle, "_schemaLoaded")).toBe(true);
+    expect(Object.hasOwn(Circle, "_columnsHash")).toBe(true);
   });
 });

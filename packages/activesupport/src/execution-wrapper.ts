@@ -184,7 +184,7 @@ export class ExecutionWrapper {
   }
 
   static activeKey(): symbol {
-    if (!Object.prototype.hasOwnProperty.call(this, "_activeKey")) {
+    if (!Object.hasOwn(this, "_activeKey")) {
       this._activeKey = Symbol("active_execution_wrapper");
     }
     return this._activeKey as symbol;

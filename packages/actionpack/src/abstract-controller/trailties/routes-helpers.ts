@@ -86,7 +86,7 @@ function includedMember(
   let current: object | null = mod;
   while (current && current !== Object.prototype) {
     const own = Object.getOwnPropertyDescriptor(current, key);
-    if (own && (own.enumerable || !Object.prototype.hasOwnProperty.call(current, "constructor"))) {
+    if (own && (own.enumerable || !Object.hasOwn(current, "constructor"))) {
       const value = (mod as Record<string, unknown>)[key];
       return typeof value === "function" || key === "_routes" ? value : undefined;
     }

@@ -690,10 +690,7 @@ export class Base extends Model {
 
   static async loadSchema(this: typeof Base): Promise<void> {
     const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
-    if (
-      !Object.prototype.hasOwnProperty.call(this, "_schemaLoadPromise") ||
-      !state._schemaLoadPromise
-    ) {
+    if (!Object.hasOwn(this, "_schemaLoadPromise") || !state._schemaLoadPromise) {
       state._schemaLoadPromise = (ModelSchema.loadSchemaFromAdapter as any).call(this);
     }
     const promise = state._schemaLoadPromise;

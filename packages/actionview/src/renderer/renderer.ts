@@ -36,7 +36,7 @@ export class Renderer {
     | RenderedCollection
     | EmptyCollection
     | Promise<RenderedTemplate | RenderedCollection | EmptyCollection> {
-    if (Object.prototype.hasOwnProperty.call(options, "partial")) {
+    if (Object.hasOwn(options, "partial")) {
       return this.renderPartialToObject(context, options);
     }
     return this.renderTemplateToObject(context, options);
@@ -46,7 +46,7 @@ export class Renderer {
     context: ViewContext,
     options: RenderOptions,
   ): Promise<Body | (string | SafeBuffer | null)[]> {
-    if (Object.prototype.hasOwnProperty.call(options, "partial")) {
+    if (Object.hasOwn(options, "partial")) {
       return [await this.renderPartial(context, options)];
     }
     return new StreamingTemplateRenderer(this.lookupContext).render(context, options);
@@ -94,7 +94,7 @@ export class Renderer {
         );
       }
 
-      if (Object.prototype.hasOwnProperty.call(options, "object")) {
+      if (Object.hasOwn(options, "object")) {
         return new ObjectRenderer(this.lookupContext, options).renderObjectWithPartial(
           options.object,
           partial,
@@ -127,7 +127,7 @@ function isThenable<T>(value: T | Promise<T>): value is Promise<T> {
 
 /** @internal */
 function collectionFromOptions(options: RenderOptions): readonly unknown[] | undefined {
-  if (!Object.prototype.hasOwnProperty.call(options, "collection")) return undefined;
+  if (!Object.hasOwn(options, "collection")) return undefined;
   return (options.collection as readonly unknown[] | null | undefined) ?? [];
 }
 

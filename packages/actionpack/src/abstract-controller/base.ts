@@ -126,7 +126,7 @@ export class AbstractController {
 
   /** @internal */
   static get abstract(): boolean {
-    return Object.prototype.hasOwnProperty.call(this, "_abstract")
+    return Object.hasOwn(this, "_abstract")
       ? (this as unknown as { _abstract: boolean })._abstract
       : false;
   }
@@ -149,7 +149,7 @@ export class AbstractController {
   protected static _controllerPath?: string;
 
   static controllerPath(): string {
-    if (Object.prototype.hasOwnProperty.call(this, "_controllerPath")) {
+    if (Object.hasOwn(this, "_controllerPath")) {
       return (this as unknown as { _controllerPath: string })._controllerPath;
     }
     const name = rbModName(this);
@@ -194,10 +194,7 @@ export class AbstractController {
   }
 
   static actionMethods(): string[] {
-    if (
-      !Object.prototype.hasOwnProperty.call(this, "_actionMethodCache") ||
-      !this._actionMethodCache
-    ) {
+    if (!Object.hasOwn(this, "_actionMethodCache") || !this._actionMethodCache) {
       const internalMethods = new Set(this.internalMethods());
       const methods = allPublicMethodNames(this.prototype).filter(
         (name) => !internalMethods.has(name),
