@@ -1,6 +1,5 @@
 import {
   type Hash,
-  type Included,
   block as rbBlock,
   fetch,
   hasKey,
@@ -1906,40 +1905,62 @@ rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
 rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base
-  extends
-    AutosaveAssociation,
-    JSONSerializer,
-    AMDirty,
-    Included<
-      Pick<
-        typeof _Persistence,
-        | "strictLoadedAssociations"
-        | "_findRecord"
-        | "_inMemoryQueryConstraintsHash"
-        | "isApplyScoping"
-        | "destroyAssociations"
-        | "destroyRow"
-        | "_deleteRow"
-        | "_touchRow"
-        | "_updateRow"
-        | "_queryConstraintsHash"
-        | "verifyReadonlyAttribute"
-        | "_raiseRecordNotDestroyed"
-        | "_raiseReadonlyRecordError"
-        | "_raiseRecordNotTouchedError"
-      >
-    >,
-    Included<Pick<typeof _Read, "attribute">>,
-    Included<
-      Pick<
-        typeof import("./attribute-methods.js"),
-        "attributesWithValues" | "attributesForCreate" | "attributesForUpdate" | "_hasAttribute"
-      >
-    >,
-    Pick<_PrimaryKey, "isPrimaryKeyValuesPresent"> {
+export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
   /** @internal */
-  _primaryKey?: string | string[];
+  strictLoadedAssociations: OmitThisParameter<typeof _Persistence.strictLoadedAssociations>;
+  /** @internal */
+  _findRecord: OmitThisParameter<typeof _Persistence._findRecord>;
+  /** @internal */
+  _inMemoryQueryConstraintsHash: OmitThisParameter<
+    typeof _Persistence._inMemoryQueryConstraintsHash
+  >;
+  /** @internal */
+  isApplyScoping: OmitThisParameter<typeof _Persistence.isApplyScoping>;
+  /** @internal */
+  destroyAssociations: OmitThisParameter<typeof _Persistence.destroyAssociations>;
+  /** @internal */
+  destroyRow: OmitThisParameter<typeof _Persistence.destroyRow>;
+  /** @internal */
+  _deleteRow: OmitThisParameter<typeof _Persistence._deleteRow>;
+  /** @internal */
+  _touchRow: OmitThisParameter<typeof _Persistence._touchRow>;
+  /** @internal */
+  _updateRow: OmitThisParameter<typeof _Persistence._updateRow>;
+  /** @internal */
+  _queryConstraintsHash: OmitThisParameter<typeof _Persistence._queryConstraintsHash>;
+  /** @internal */
+  verifyReadonlyAttribute: OmitThisParameter<typeof _Persistence.verifyReadonlyAttribute>;
+  /** @internal */
+  _raiseRecordNotDestroyed: OmitThisParameter<typeof _Persistence._raiseRecordNotDestroyed>;
+  /** @internal */
+  _raiseReadonlyRecordError: OmitThisParameter<typeof _Persistence._raiseReadonlyRecordError>;
+  /** @internal */
+  _raiseRecordNotTouchedError: OmitThisParameter<typeof _Persistence._raiseRecordNotTouchedError>;
+  /** @internal */
+  attribute: OmitThisParameter<typeof _Read.attribute>;
+  /** @internal */
+  attributesWithValues: OmitThisParameter<
+    typeof import("./attribute-methods.js").attributesWithValues
+  >;
+  /** @internal */
+  attributesForCreate: OmitThisParameter<
+    typeof import("./attribute-methods.js").attributesForCreate
+  >;
+  /** @internal */
+  attributesForUpdate: OmitThisParameter<
+    typeof import("./attribute-methods.js").attributesForUpdate
+  >;
+  /** @internal */
+  _hasAttribute: OmitThisParameter<typeof import("./attribute-methods.js")._hasAttribute>;
+  isPrimaryKeyValuesPresent: _PrimaryKey["isPrimaryKeyValuesPresent"];
+  /** @internal */
+  timestampAttributesForUpdateInModel: OmitThisParameter<
+    typeof Timestamp.timestampAttributesForUpdateInModel
+  >;
+  /** @internal */
+  currentTimeFromProperTimezone: OmitThisParameter<typeof Timestamp.currentTimeFromProperTimezone>;
+  /** @internal */
+  _primaryKey?: string | string[] | null;
   /** @internal */
   _triggerUpdateCallback: boolean | null;
   /** @internal */
@@ -2001,7 +2022,7 @@ export interface Base
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
   ): Promise<true | undefined>;
-  destroy(): Promise<this | boolean>;
+  destroy(): Promise<this | false>;
   destroyBang(): Promise<this>;
   update(attrs: Record<string, unknown> | PermittedAttributes): Promise<boolean | undefined>;
   updateBang(attrs: Record<string, unknown> | PermittedAttributes): Promise<true | undefined>;

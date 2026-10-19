@@ -281,19 +281,18 @@ export async function _insertRecord(
   values: Record<string, unknown>,
   returning?: string[] | null,
 ): Promise<unknown> {
-  const ctor = this;
-  const primaryKey = ctor.primaryKey as string;
+  const primaryKey = this.primaryKey as string;
   let primaryKeyValue: unknown = null;
-  if (ctor.isPrefetchPrimaryKey() && primaryKey) {
+  if (this.isPrefetchPrimaryKey() && primaryKey) {
     if (!rtest(values[primaryKey])) {
       values[primaryKey] = (() => {
-        primaryKeyValue = ctor.nextSequenceValue();
-        return ctor._defaultAttributes().getAttribute(primaryKey).withCastValue(primaryKeyValue);
+        primaryKeyValue = this.nextSequenceValue();
+        return this._defaultAttributes().getAttribute(primaryKey).withCastValue(primaryKeyValue);
       })();
     }
   }
 
-  const arelTable: ArelTable = ctor.arelTable;
+  const arelTable: ArelTable = this.arelTable;
   const im = new InsertManager(arelTable);
 
   if (isEmpty(values)) {
@@ -304,7 +303,7 @@ export async function _insertRecord(
 
   return connection.insert(
     im,
-    `${ctor.name} Create`,
+    `${this.name} Create`,
     primaryKey || false,
     primaryKeyValue,
     undefined,
@@ -320,16 +319,15 @@ export async function _updateRecord(
   values: Record<string, unknown>,
   constraints: Record<string, unknown>,
 ): Promise<number> {
-  const klass = this;
-  const arelTable: ArelTable = klass.arelTable;
+  const arelTable: ArelTable = this.arelTable;
   const wheres = Object.entries(constraints).map(([name, value]) =>
-    klass.predicateBuilder.get(name, value),
+    this.predicateBuilder.get(name, value),
   );
 
-  const defaultConstraint = buildDefaultConstraint.call(klass);
+  const defaultConstraint = buildDefaultConstraint.call(this);
   if (defaultConstraint != null) wheres.push(defaultConstraint as Nodes.Node);
 
-  const currentScope = klass.globalCurrentScope();
+  const currentScope = this.globalCurrentScope();
   if (currentScope) {
     wheres.push(currentScope.whereClause.ast);
   }
@@ -338,30 +336,29 @@ export async function _updateRecord(
   um.set(transformKeys(values, (name) => arelTable.get(name)));
   um.wheres = wheres;
 
-  return klass.withConnection((c) => c.update(um, `${klass.name} Update`));
+  return this.withConnection((c) => c.update(um, `${this.name} Update`));
 }
 
 export async function _deleteRecord(
   this: typeof Base,
   constraints: Record<string, unknown>,
 ): Promise<number> {
-  const klass = this;
   const wheres = Object.entries(constraints).map(([name, value]) =>
-    klass.predicateBuilder.get(name, value),
+    this.predicateBuilder.get(name, value),
   );
 
-  const defaultConstraint = buildDefaultConstraint.call(klass);
+  const defaultConstraint = buildDefaultConstraint.call(this);
   if (defaultConstraint != null) wheres.push(defaultConstraint as Nodes.Node);
 
-  const currentScope = klass.globalCurrentScope();
+  const currentScope = this.globalCurrentScope();
   if (currentScope) {
     wheres.push(currentScope.whereClause.ast);
   }
 
-  const dm = new DeleteManager(klass.arelTable);
+  const dm = new DeleteManager(this.arelTable);
   dm.wheres = wheres;
 
-  return klass.withConnection((c) => c.delete(dm, `${klass.name} Destroy`));
+  return this.withConnection((c) => c.delete(dm, `${this.name} Destroy`));
 }
 
 interface PersistenceRecordFields {
@@ -473,10 +470,9 @@ export async function update(
   this: Base,
   attributes: Record<string, unknown> | PermittedAttributes,
 ): Promise<boolean | undefined> {
-  const self = this;
-  return withTransactionReturningStatus.call(self, async () => {
-    await self.setAttributes(attributes);
-    return self.save();
+  return withTransactionReturningStatus.call(this, async () => {
+    await this.setAttributes(attributes);
+    return this.save();
   }) as Promise<boolean | undefined>;
 }
 
@@ -485,10 +481,9 @@ export async function updateBang(
   this: Base,
   attributes: Record<string, unknown> | PermittedAttributes,
 ): Promise<true | undefined> {
-  const self = this;
-  return withTransactionReturningStatus.call(self, async () => {
-    await self.setAttributes(attributes);
-    return self.saveBang();
+  return withTransactionReturningStatus.call(this, async () => {
+    await this.setAttributes(attributes);
+    return this.saveBang();
   }) as Promise<true | undefined>;
 }
 
@@ -527,17 +522,16 @@ export async function saveBang(
 }
 
 export async function destroy<T extends Base>(this: T): Promise<T> {
-  const self = this;
-  if (this.isReadonly()) self._raiseReadonlyRecordError();
-  await self.destroyAssociations();
-  self._triggerDestroyCallback ||= self.isPersisted() && (await self.destroyRow()) > 0;
-  self._destroyed = true;
-  self._previouslyNewRecord = false;
-  return self.freeze();
+  if (this.isReadonly()) this._raiseReadonlyRecordError();
+  await this.destroyAssociations();
+  this._triggerDestroyCallback ||= this.isPersisted() && (await this.destroyRow()) > 0;
+  this._destroyed = true;
+  this._previouslyNewRecord = false;
+  return this.freeze();
 }
 
 export async function destroyBang<T extends Base>(this: T): Promise<T> {
-  return ((await this.destroy()) as T) || this._raiseRecordNotDestroyed();
+  return (await this.destroy()) || this._raiseRecordNotDestroyed();
 }
 
 export async function updateAttribute(
@@ -795,7 +789,7 @@ export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   if (!this.isPersisted()) this._raiseRecordNotTouchedError();
   if (this.isReadonly()) this._raiseReadonlyRecordError();
 
-  let attributeNames: string[] = (this as any).timestampAttributesForUpdateInModel();
+  let attributeNames: readonly string[] = this.timestampAttributesForUpdateInModel();
   attributeNames = union(attributeNames, names as string[]).map((name) => {
     name = String(name);
     name = (this.constructor as typeof Base).attributeAliases[name] || name;
@@ -814,10 +808,10 @@ export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
 /** @internal */
 export async function _touchRow(
   this: Base,
-  attributeNames: string[],
+  attributeNames: readonly string[],
   time?: RubyTime | null,
 ): Promise<number> {
-  time ||= await (this as any).currentTimeFromProperTimezone();
+  time ||= await this.currentTimeFromProperTimezone();
 
   for (const attrName of attributeNames) {
     this._writeAttribute(attrName, time);
@@ -829,7 +823,7 @@ export async function _touchRow(
 /** @internal */
 export function _updateRow(
   this: Base,
-  attributeNames: string[],
+  attributeNames: readonly string[],
   _attemptedAction = "update",
 ): Promise<number> {
   return (this.constructor as typeof Base)._updateRecord(
