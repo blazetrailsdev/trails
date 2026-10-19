@@ -221,7 +221,7 @@ interface QueryMethodsHost {
   _isNone: boolean;
   _async?: boolean;
   readonly isLoaded: boolean;
-  records(): Promise<any[]>;
+  records(): Promise<import("../base.js").Base[]>;
   aliasTracker(joins?: Nodes.Node[], aliases?: Hash<string, number>): AliasTracker;
   clone(): any;
   spawn(): any;
@@ -342,7 +342,7 @@ function select(this: QueryMethodsHost, ...fields: any[]): any {
     if (fields.length > 1) {
       throw new ArgumentError("`select' with block doesn't take arguments.");
     }
-    return this.records().then((records: any[]) => records.filter(fields[0]));
+    return this.records().then((records) => records.filter(fields[0]));
   }
   checkIfMethodHasArgumentsBang.call(
     this,
