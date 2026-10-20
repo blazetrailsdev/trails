@@ -62,8 +62,12 @@ describe("PG::Connection#send_query and #get_last_result", () => {
     const client = pgConnection({ query });
     expect(client.sendQuery("SELECT 1")).toBeUndefined();
     expect(query).toHaveBeenCalledOnce();
+    expect(() => client.sendQuery("SELECT 2")).toThrow("another command is already in progress");
+    expect(query).toHaveBeenCalledOnce();
     expect(await client.getLastResult()).toBeInstanceOf(PG.Result);
     expect(await client.getLastResult()).toBeNull();
+    client.sendQuery("SELECT 2");
+    expect(query).toHaveBeenCalledTimes(2);
   });
 
   it("get_last_result raises the failure of the query send_query dispatched", async () => {

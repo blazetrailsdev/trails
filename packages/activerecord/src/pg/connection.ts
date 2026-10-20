@@ -63,7 +63,7 @@ export class Connection {
   prepared = new Map<string, string>();
   readyForQuery = "I";
   bad = false;
-  pendingResults: Promise<PG.Result>[] = [];
+  pendingResult: Promise<PG.Result> | null = null;
   typeMapForResults = new PGTypeMapByOid();
 
   constructor(client: object, connParams?: pg.ClientConfig) {
@@ -109,7 +109,7 @@ export class Connection {
     this.prepared.clear();
     this.readyForQuery = "I";
     this.bad = false;
-    this.pendingResults = [];
+    this.pendingResult = null;
     await client
       .end()
       .then(() => conn.connect())
@@ -177,13 +177,18 @@ export class Connection {
     if (this.bad) {
       throw new UnableToSend("no connection to the server\n", { connection: this });
     }
+    if (this.pendingResult != null) {
+      throw new UnableToSend("another command is already in progress\n", { connection: this });
+    }
     const pending = this.asyncExec(sql);
     pending.catch(() => undefined);
-    this.pendingResults.push(pending);
+    this.pendingResult = pending;
   }
 
   getLastResult(): Promise<PG.Result | null> {
-    return this.pendingResults.shift() ?? Promise.resolve(null);
+    const pending = this.pendingResult;
+    this.pendingResult = null;
+    return pending ?? Promise.resolve(null);
   }
 
   async execParams(sql: string | null, params: unknown[]): Promise<PG.Result> {
