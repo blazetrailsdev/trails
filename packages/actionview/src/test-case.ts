@@ -6,7 +6,6 @@ import {
   extend,
   HashWithIndifferentAccess,
   isBlank,
-  isPlainObject,
   runLoadHooks,
   safeConstantize,
   underscore,
@@ -15,18 +14,25 @@ import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/te
 import { AbstractController, ActionController, ActionDispatch } from "@blazetrails/actionpack";
 import {
   include,
+  isPlainHash,
   Module,
+  NoMethodError,
   rbClassSuperclass,
   rbDeclareIvar,
   rbFSend,
   rbModConstSet,
   rbModDefineMethod,
+  rbModMethodDefined,
+  rbObjClassname,
   rbObjInstanceVariables,
   rbObjIsKindOf,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
   rbObjSingletonClass,
+  rbStrSend,
+  StandardError,
+  stringSuperclass,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { OutputBuffer } from "./buffers.js";
@@ -76,101 +82,6 @@ export class TestController extends ActionController.Base {
 
 include(TestController, ActionDispatch.TestProcess);
 
-export class RenderedViewContent extends String {}
-
-export class RenderedViewsCollection {
-  /** @internal */
-  private _renderedViews: Map<unknown, Array<Record<string, unknown> | undefined>>;
-
-  constructor() {
-    this._renderedViews ??= new Map();
-  }
-
-  add(view: unknown, locals: Record<string, unknown> | undefined): void {
-    if (!this._renderedViews.has(view)) this._renderedViews.set(view, []);
-    this._renderedViews.get(view)!.push(locals);
-  }
-
-  localsFor(view: unknown): Array<Record<string, unknown> | undefined> {
-    if (!this._renderedViews.has(view)) this._renderedViews.set(view, []);
-    return this._renderedViews.get(view)!;
-  }
-
-  renderedViews(): unknown[] {
-    return [...this._renderedViews.keys()];
-  }
-
-  isViewRendered(view: unknown, expectedLocals: Record<string, unknown>): boolean {
-    return this.localsFor(view).some((actualLocals) =>
-      Object.entries(expectedLocals).every(([key, value]) => value === actualLocals?.[key]),
-    );
-  }
-}
-
-interface LocalsView extends Base {
-  renderedViews: RenderedViewsCollection;
-}
-
-export const Locals = {
-  renderedViews: undefined as RenderedViewsCollection | undefined,
-
-  render(
-    this: LocalsView,
-    options: Record<string, unknown> | string | object = {},
-    localAssigns: Record<string, unknown> = {},
-    block?: () => unknown,
-  ): ReturnType<Base["render"]> {
-    if (isPlainObject(options)) {
-      const opts = options as Record<string, unknown>;
-      if (block) {
-        this.renderedViews.add(opts["layout"], opts["locals"] as Record<string, unknown>);
-      } else if ("partial" in opts) {
-        this.renderedViews.add(opts["partial"], opts["locals"] as Record<string, unknown>);
-      }
-    } else {
-      this.renderedViews.add(options, localAssigns);
-    }
-
-    const superclass = rbClassSuperclass(rbObjSingletonClass(this)) as typeof Base;
-    return superclass.prototype.render.call(this, options, localAssigns, block);
-  },
-};
-
-export const INTERNAL_IVARS = [
-  "@NAME",
-  "@failures",
-  "@assertions",
-  "@__io__",
-  "@_assertion_wrapped",
-  "@_assertions",
-  "@_result",
-  "@_routes",
-  "@controller",
-  "@_controller",
-  "@_request",
-  "@_config",
-  "@_default_form_builder",
-  "@_layouts",
-  "@_files",
-  "@_rendered_views",
-  "@method_name",
-  "@output_buffer",
-  "@_partials",
-  "@passed",
-  "@rendered",
-  "@request",
-  "@routes",
-  "@tagged_logger",
-  "@_templates",
-  "@options",
-  "@test_passed",
-  "@view",
-  "@view_context_class",
-  "@view_flow",
-  "@_subscribers",
-  "@html_document",
-];
-
 export interface Behavior {
   controller: TestController;
   request: TestController["request"];
@@ -203,197 +114,14 @@ interface BehaviorClass {
   setup(...args: unknown[]): void;
 }
 
-export const ClassMethods = {
-  registerParser(
-    this: BehaviorClass,
-    format: string,
-    callable: Parser = null,
-    block: Parser = null,
-  ): void {
-    if (!Object.hasOwn(this, "__class_attr_contentClass")) {
-      this.contentClass = class extends this.contentClass {};
-    }
-    const parser = callable || block || ((itself: string) => itself);
-    rbModDefineMethod(this.contentClass, format, function (this: RenderedViewContent) {
-      return parser(this.toString());
-    });
-  },
-
-  tests(this: BehaviorClass, helperClass: string | HelperModule): void {
-    if (typeof helperClass === "string") {
-      this.helperClass = safeConstantize(
-        camelize(`${underscore(helperClass)}_helper`),
-      ) as HelperModule | null;
-    } else if (rbObjIsKindOf(helperClass, Module) || isPlainObject(helperClass)) {
-      this.helperClass = helperClass;
-    }
-  },
-
-  determineDefaultHelperClass(this: BehaviorClass, name: string): HelperModule | null {
-    return this.determineConstantFromTestName(
-      name,
-      (constant) =>
-        (rbObjIsKindOf(constant, Module) || isPlainObject(constant)) &&
-        !(typeof constant === "function"),
-    ) as HelperModule | null;
-  },
-
-  helperMethod(this: BehaviorClass, ...methods: Array<string | string[]>): void {
-    for (const method of methods.flat()) {
-      Object.defineProperty(this._helpersForModification(), method, {
-        value(this: { _testCase(): object }, ...args: unknown[]): unknown {
-          return rbFSend(this._testCase(), method, ...args);
-        },
-        writable: true,
-        enumerable: true,
-        configurable: true,
-      });
-    }
-  },
-
-  set helperClass(helperClass: HelperModule | null) {
-    (this as unknown as BehaviorClass)._helperClass = helperClass;
-  },
-
-  get helperClass(): HelperModule | null {
-    const klass = this as unknown as BehaviorClass;
-    return (
-      (Object.hasOwn(klass, "_helperClass") ? klass._helperClass : null) ||
-      (klass._helperClass = klass.determineDefaultHelperClass(klass.name))
-    );
-  },
-
-  /** @internal */
-  includeHelperModulesBang(this: BehaviorClass): void {
-    if (this.helperClass) this.helper(this.helperClass);
-    include(this as never, this._helpers);
-  },
-};
-
-/** @missingRailsArgs new — PERMANENT */
-function setupWithController(this: Behavior): void {
-  const controllerClass = (() => class extends TestController {})();
-  this.controller = new controllerClass();
-  this.request = this.controller.request;
-  this.viewFlow = new OutputFlow();
-  this.outputBuffer = new OutputBuffer();
-  this.rendered = new (this.constructor as unknown as BehaviorClass).contentClass("");
-
-  rbModDefineMethod(controllerClass, "_testCase", () => this);
-}
-
-function config(this: Behavior): unknown {
-  if (rbObjRespondTo(this.controller, "config")) {
-    return (this.controller as unknown as { config: unknown }).config;
-  }
-  return null;
-}
-
-function render(
-  this: Behavior,
-  options: Record<string, unknown> | string | object = {},
-  localAssigns: Record<string, unknown> = {},
-  block?: () => unknown,
-): ReturnType<Base["render"]> {
-  const view = this.view();
-  view.assign(this.viewAssigns());
-  const output = view.render(options, localAssigns, block);
-  const append = (value: unknown) => {
-    const contentClass = (this.constructor as unknown as BehaviorClass).contentClass;
-    this.rendered = new contentClass(`${this.rendered}${value ?? ""}`);
-    return value;
-  };
-  return (output instanceof Promise ? output.then(append) : append(output)) as typeof output;
-}
-
-function renderedViews(this: Behavior): RenderedViewsCollection {
-  return (this._renderedViews ??= new RenderedViewsCollection());
-}
-
-/** @internal */
-function documentRootElement(this: Behavior) {
-  return Testing.htmlDocument().parse(
-    isBlank(this.rendered.toString()) ? this.outputBuffer.toStr() : this.rendered.toString(),
-  ).root;
-}
-
-/** @internal */
-function view(this: Behavior): LocalsView {
-  return (this.__view ??= (() => {
-    const view = this.controller.viewContext() as unknown as LocalsView;
-    include(rbObjSingletonClass(view), this._helpers);
-    extend(view, Locals);
-    view.renderedViews = this.renderedViews();
-    view.outputBuffer = this.outputBuffer;
-    return view;
-  })());
-}
-
-/** @internal */
-function _userDefinedIvars(this: Behavior): string[] {
-  return rbObjInstanceVariables(this).filter((ivar) => !INTERNAL_IVARS.includes(ivar));
-}
-
-/** @internal */
-function viewAssigns(this: Behavior): Record<string, unknown> {
-  return Object.fromEntries(
-    _userDefinedIvars.call(this).map((ivar) => [ivar.slice(1), rbObjIvarGet(this, ivar)]),
-  );
-}
-
-interface RoutesHost {
-  namedRoutes: { isRouteDefined(name: string): boolean };
-  mountedHelpers: () => object;
-}
-
-/** @internal */
-function methodMissing(this: Behavior, selector: string, ...args: unknown[]): unknown {
-  let routes: RoutesHost | false | undefined;
-  try {
-    routes =
-      rbObjRespondTo(this.controller, "_routes") &&
-      (this.controller as unknown as { _routes: RoutesHost })._routes;
-  } catch {
-    /** @empty */
-  }
-
-  if (
-    routes &&
-    (routes.namedRoutes.isRouteDefined(selector) ||
-      selector in routes.mountedHelpers().constructor.prototype)
-  ) {
-    return rbFSend(this.controller, selector, ...args);
-  } else {
-    return rbFSend(ActiveSupportTestCase.prototype, "methodMissing", selector, ...args);
-  }
-}
-
-/** @internal */
-function respondToMissing(this: Behavior, name: string, _includePrivate = false): boolean {
-  let routes: RoutesHost | false | undefined;
-  try {
-    routes =
-      rbObjRespondTo(this.controller, "_routes") &&
-      (this.controller as unknown as { _routes: RoutesHost })._routes;
-  } catch {
-    /** @empty */
-  }
-
-  return Boolean(
-    routes &&
-    (routes.namedRoutes.isRouteDefined(name) ||
-      name in routes.mountedHelpers().constructor.prototype),
-  );
-}
-
 export const Behavior = {
+  get lookupContext(): unknown {
+    return (this as unknown as Behavior).controller.lookupContext;
+  },
   controller: undefined as TestController | undefined,
   request: undefined as TestController["request"] | undefined,
   outputBuffer: undefined as OutputBuffer | undefined,
   rendered: undefined as RenderedViewContent | undefined,
-  get lookupContext(): unknown {
-    return (this as unknown as Behavior).controller.lookupContext;
-  },
   get _routes(): unknown {
     const controller = (this as unknown as Behavior).controller;
     if (rbObjRespondTo(controller, "_routes")) {
@@ -430,6 +158,81 @@ include(Behavior, RoutingUrlFor);
 
 include(Behavior, ConstantLookup);
 
+export const ClassMethods = {
+  /** @internal */
+  inherited(this: BehaviorClass, descendant: BehaviorClass): void {
+    const descendantContentClass = class extends this.contentClass {};
+
+    if (rbObjRespondTo(descendantContentClass, "setTemporaryName")) {
+      rbFSend(descendantContentClass, "setTemporaryName", "rendered_content");
+    }
+
+    descendant.contentClass = descendantContentClass;
+  },
+
+  registerParser(
+    this: BehaviorClass,
+    format: string,
+    callable: Parser = null,
+    block: Parser = null,
+  ): void {
+    const parser = callable || block || ((itself: string) => itself);
+    rbModDefineMethod(this.contentClass, format, function (this: RenderedViewContent) {
+      return parser(this.toString());
+    });
+  },
+
+  tests(this: BehaviorClass, helperClass: string | HelperModule): void {
+    if (typeof helperClass === "string") {
+      this.helperClass = safeConstantize(
+        camelize(`${underscore(helperClass)}_helper`),
+      ) as HelperModule | null;
+    } else if (rbObjIsKindOf(helperClass, Module) || isPlainHash(helperClass)) {
+      this.helperClass = helperClass;
+    }
+  },
+
+  determineDefaultHelperClass(this: BehaviorClass, name: string): HelperModule | null {
+    return this.determineConstantFromTestName(
+      name,
+      (constant) =>
+        (rbObjIsKindOf(constant, Module) || isPlainHash(constant)) &&
+        !(typeof constant === "function"),
+    ) as HelperModule | null;
+  },
+
+  helperMethod(this: BehaviorClass, ...methods: Array<string | string[]>): void {
+    for (const method of methods.flat()) {
+      Object.defineProperty(this._helpersForModification(), method, {
+        value(this: { _testCase(): object }, ...args: unknown[]): unknown {
+          return rbFSend(this._testCase(), method, ...args);
+        },
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    }
+  },
+
+  set helperClass(helperClass: HelperModule | null) {
+    (this as unknown as BehaviorClass)._helperClass = helperClass;
+  },
+
+  get helperClass(): HelperModule | null {
+    const klass = this as unknown as BehaviorClass;
+    return (
+      (Object.hasOwn(klass, "_helperClass") ? klass._helperClass : null) ||
+      (klass._helperClass = klass.determineDefaultHelperClass(klass.name))
+    );
+  },
+
+  /** @internal */
+  includeHelperModulesBang(this: BehaviorClass): void {
+    if (this.helperClass) this.helper(this.helperClass);
+    include(this as never, this._helpers);
+  },
+};
+
 rbModConstSet(Behavior, "ClassMethods", ClassMethods);
 
 (
@@ -438,6 +241,19 @@ rbModConstSet(Behavior, "ClassMethods", ClassMethods);
   classAttribute.call(this, "contentClass", {
     instanceAccessor: false,
     default: RenderedViewContent,
+  });
+  const contentClassReader = Object.getOwnPropertyDescriptor(this, "contentClass")!;
+  Object.defineProperty(this, "contentClass", {
+    ...contentClassReader,
+    get(this: BehaviorClass) {
+      if (!Object.hasOwn(this, "__class_attr_contentClass")) {
+        ClassMethods.inherited.call(
+          rbClassSuperclass(this as never) as unknown as BehaviorClass,
+          this,
+        );
+      }
+      return contentClassReader.get!.call(this);
+    },
   });
 
   rbDeclareIvar(this as never, "@view", "__view");
@@ -461,6 +277,233 @@ rbModConstSet(Behavior, "ClassMethods", ClassMethods);
     });
   });
 });
+
+/** @missingRailsArgs new — PERMANENT */
+function setupWithController(this: Behavior): void {
+  const controllerClass = (() => class extends TestController {})();
+  this.controller = new controllerClass();
+  this.request = this.controller.request;
+  this.viewFlow = new OutputFlow();
+  this.outputBuffer = new OutputBuffer();
+  this.rendered = new (this.constructor as unknown as BehaviorClass).contentClass("");
+
+  rbModDefineMethod(controllerClass, "_testCase", () => this);
+}
+
+function config(this: Behavior): unknown {
+  if (rbObjRespondTo(this.controller, "config")) {
+    return (this.controller as unknown as { config: unknown }).config;
+  }
+  return null;
+}
+
+function render(
+  this: Behavior,
+  options: Record<string, unknown> | string | object = {},
+  localAssigns: Record<string, unknown> = {},
+  block?: () => unknown,
+): ReturnType<Base["render"]> {
+  const contentClass = (this.constructor as unknown as BehaviorClass).contentClass;
+  this.view().assign(this.viewAssigns());
+  const output = this.view().render(options, localAssigns, block);
+  if (output instanceof Promise) {
+    return output.then((value) => {
+      this.rendered = new contentClass(rbStrSend(String(this.rendered), "concat", value)[1]);
+      return value;
+    });
+  }
+  this.rendered = new contentClass(rbStrSend(String(this.rendered), "concat", output)[1]);
+  return output;
+}
+
+function renderedViews(this: Behavior): RenderedViewsCollection {
+  return (this._renderedViews ??= new RenderedViewsCollection());
+}
+
+export class RenderedViewContent extends stringSuperclass("isBlank") {}
+
+export class RenderedViewsCollection {
+  /** @internal */
+  private _renderedViews: Map<unknown, Array<Record<string, unknown> | undefined>>;
+
+  constructor() {
+    this._renderedViews ??= new Map();
+  }
+
+  add(view: unknown, locals: Record<string, unknown> | undefined): void {
+    if (!this._renderedViews.has(view)) this._renderedViews.set(view, []);
+    this._renderedViews.get(view)!.push(locals);
+  }
+
+  localsFor(view: unknown): Array<Record<string, unknown> | undefined> {
+    if (!this._renderedViews.has(view)) this._renderedViews.set(view, []);
+    return this._renderedViews.get(view)!;
+  }
+
+  renderedViews(): unknown[] {
+    return [...this._renderedViews.keys()];
+  }
+
+  isViewRendered(view: unknown, expectedLocals: Record<string, unknown>): boolean {
+    return this.localsFor(view).some((actualLocals) =>
+      Object.entries(expectedLocals).every(([key, value]) => value === actualLocals?.[key]),
+    );
+  }
+}
+
+/** @internal */
+function documentRootElement(this: Behavior) {
+  return Testing.htmlDocument().parse(
+    isBlank(this.rendered) ? this.outputBuffer.toStr() : String(this.rendered),
+  ).root;
+}
+
+interface LocalsView extends Base {
+  renderedViews: RenderedViewsCollection;
+}
+
+export const Locals = {
+  renderedViews: undefined as RenderedViewsCollection | undefined,
+
+  render(
+    this: LocalsView,
+    options: Record<string, unknown> | string | object = {},
+    localAssigns: Record<string, unknown> = {},
+    block?: () => unknown,
+  ): ReturnType<Base["render"]> {
+    if (isPlainHash(options)) {
+      const opts = options;
+      if (block) {
+        this.renderedViews.add(opts["layout"], opts["locals"] as Record<string, unknown>);
+      } else if ("partial" in opts) {
+        this.renderedViews.add(opts["partial"], opts["locals"] as Record<string, unknown>);
+      }
+    } else {
+      this.renderedViews.add(options, localAssigns);
+    }
+
+    const superclass = rbClassSuperclass(rbObjSingletonClass(this)) as typeof Base;
+    return superclass.prototype.render.call(this, options, localAssigns, block);
+  },
+};
+
+/** @internal */
+function view(this: Behavior): LocalsView {
+  return (this.__view ??= (() => {
+    const view = this.controller.viewContext() as unknown as LocalsView;
+    include(rbObjSingletonClass(view), this._helpers);
+    extend(view, Locals);
+    view.renderedViews = this.renderedViews();
+    view.outputBuffer = this.outputBuffer;
+    return view;
+  })());
+}
+
+export const INTERNAL_IVARS = [
+  "@NAME",
+  "@failures",
+  "@assertions",
+  "@__io__",
+  "@_assertion_wrapped",
+  "@_assertions",
+  "@_result",
+  "@_routes",
+  "@controller",
+  "@_controller",
+  "@_request",
+  "@_config",
+  "@_default_form_builder",
+  "@_layouts",
+  "@_files",
+  "@_rendered_views",
+  "@method_name",
+  "@output_buffer",
+  "@_partials",
+  "@passed",
+  "@rendered",
+  "@request",
+  "@routes",
+  "@tagged_logger",
+  "@_templates",
+  "@options",
+  "@test_passed",
+  "@view",
+  "@view_context_class",
+  "@view_flow",
+  "@_subscribers",
+  "@html_document",
+];
+
+/** @internal */
+function _userDefinedIvars(this: Behavior): string[] {
+  return rbObjInstanceVariables(this).filter((ivar) => !INTERNAL_IVARS.includes(ivar));
+}
+
+/** @internal */
+function viewAssigns(this: Behavior): Record<string, unknown> {
+  return Object.fromEntries(
+    _userDefinedIvars.call(this).map((ivar) => [ivar.slice(1), rbObjIvarGet(this, ivar)]),
+  );
+}
+
+interface RoutesHost {
+  namedRoutes: { isRouteDefined(name: string): boolean };
+  mountedHelpers: () => { isMethodDefined(mid: string): boolean };
+}
+
+/** @internal */
+function methodMissing(this: Behavior, selector: string, ...args: unknown[]): unknown {
+  let routes: RoutesHost | false | undefined;
+  try {
+    routes =
+      rbObjRespondTo(this.controller, "_routes") &&
+      (this.controller as unknown as { _routes: RoutesHost })._routes;
+  } catch (e) {
+    if (!(e instanceof StandardError)) throw e;
+  }
+
+  if (
+    routes &&
+    (routes.namedRoutes.isRouteDefined(selector) ||
+      rbModMethodDefined(routes.mountedHelpers(), selector))
+  ) {
+    return rbFSend(this.controller, selector, ...args);
+  } else {
+    const superMethodMissing = (
+      ActiveSupportTestCase.prototype as { methodMissing?: (...a: unknown[]) => unknown }
+    ).methodMissing;
+    if (superMethodMissing !== undefined) return superMethodMissing.call(this, selector, ...args);
+    throw new NoMethodError(
+      `undefined method '${selector}' for an instance of ${rbObjClassname(this)}`,
+      selector,
+      args,
+      false,
+      { receiver: this },
+    );
+  }
+}
+
+/** @internal */
+function respondToMissing(this: Behavior, name: string, _includePrivate = false): unknown {
+  let routes: RoutesHost | false | undefined;
+  try {
+    routes =
+      rbObjRespondTo(this.controller, "_routes") &&
+      (this.controller as unknown as { _routes: RoutesHost })._routes;
+  } catch (e) {
+    if (!(e instanceof StandardError)) throw e;
+  }
+
+  return (
+    routes &&
+    (routes.namedRoutes.isRouteDefined(name) || rbModMethodDefined(routes.mountedHelpers(), name))
+  );
+}
+
+rbModConstSet(Behavior, "RenderedViewContent", RenderedViewContent);
+rbModConstSet(Behavior, "RenderedViewsCollection", RenderedViewsCollection);
+rbModConstSet(Behavior, "Locals", Locals);
+rbModConstSet(Behavior, "INTERNAL_IVARS", INTERNAL_IVARS);
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Behavior` (`actionview/lib/action_view/test_case.rb:446`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TestCase extends Behavior {}

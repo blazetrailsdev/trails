@@ -685,10 +685,13 @@ export function assertIncludes(
   obj: unknown,
   message?: string,
 ): void | Promise<void> {
-  assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
+  assert(
+    respondsToInclude(collection),
+    () => `Expected ${inspect(collection)} to respond to include?`,
+  );
   const included = collectionIncludes(collection, obj);
   const check = (result: unknown): void => {
-    assert(result, message ?? `Expected ${inspect(collection)} to include ${inspect(obj)}`);
+    assert(result, message ?? (() => `Expected ${inspect(collection)} to include ${inspect(obj)}`));
   };
   return included instanceof Promise ? included.then(check) : check(included);
 }
@@ -704,10 +707,16 @@ export function assertNotIncludes(
   obj: unknown,
   message?: string,
 ): void | Promise<void> {
-  assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
+  assert(
+    respondsToInclude(collection),
+    () => `Expected ${inspect(collection)} to respond to include?`,
+  );
   const included = collectionIncludes(collection, obj);
   const check = (result: unknown): void => {
-    assertNot(result, message ?? `Expected ${inspect(collection)} to not include ${inspect(obj)}`);
+    assertNot(
+      result,
+      message ?? (() => `Expected ${inspect(collection)} to not include ${inspect(obj)}`),
+    );
   };
   return included instanceof Promise ? included.then(check) : check(included);
 }

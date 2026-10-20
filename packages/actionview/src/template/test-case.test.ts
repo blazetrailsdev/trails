@@ -19,8 +19,9 @@ import {
 import { HTML5 } from "@blazetrails/nokogiri";
 import {
   NoMethodError,
+  rbCString,
   rbFSend,
-  isModuleIncluded,
+  rbModAncestors,
   rbModConstSet,
   rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
@@ -85,7 +86,7 @@ describe("TestCase", () => {
   const tc = testCase(testCase_, sharedTestsSetup);
 
   it("helpers defined on ActionView::TestCase are available", () => {
-    assert(isModuleIncluded(testCase_, ASharedTestHelper));
+    assertIncludes(rbModAncestors(testCase_), ASharedTestHelper);
     assertEqual("Holla!", tc().fromSharedHelper());
   });
 });
@@ -139,7 +140,7 @@ describe("GeneralViewTest", () => {
   });
 
   it("additional helper classes can be specified as in a controller", () => {
-    assert(isModuleIncluded(testCase_, AnotherTestHelper));
+    assertIncludes(rbModAncestors(testCase_), AnotherTestHelper);
     assertEqual("Howdy!", tc().fromAnotherHelper());
   });
 
@@ -174,11 +175,11 @@ describe("ClassMethodsTest", () => {
 
   it("tests the specified helper module", () => {
     assertEqual(ATestHelper, testCase_.helperClass);
-    assert(isModuleIncluded(testCase_, ATestHelper));
+    assertIncludes(rbModAncestors(testCase_), ATestHelper);
   });
 
   it("additional helper classes can be specified as in a controller", async () => {
-    assert(isModuleIncluded(testCase_, AnotherTestHelper));
+    assertIncludes(rbModAncestors(testCase_), AnotherTestHelper);
     assertEqual("Howdy!", tc().fromAnotherHelper());
 
     testCase_.helperClass.renderFromHelper = function (this: Tc) {
@@ -331,7 +332,7 @@ describe("ATestHelperTest", () => {
 
   it("inflects the name of the helper module to test from the test case class", () => {
     assertEqual(ATestHelper, testCase_.helperClass);
-    assert(isModuleIncluded(testCase_, ATestHelper));
+    assertIncludes(rbModAncestors(testCase_), ATestHelper);
   });
 
   it("a configured test controller is available", () => {
@@ -340,7 +341,7 @@ describe("ATestHelperTest", () => {
   });
 
   it("no additional helpers should shared across test cases", async () => {
-    assert(!isModuleIncluded(testCase_, AnotherTestHelper));
+    assertNotIncludes(rbModAncestors(testCase_), AnotherTestHelper);
     await assertRaise([NoMethodError], {}, () => rbFSend(tc(), "fromAnotherHelper"));
   });
 
@@ -497,7 +498,7 @@ describe("RenderedViewContentTest", () => {
 
     await tc().render("developers/developer", { developer: developer });
 
-    assertKindOf(String, tc().rendered);
+    assertKindOf(rbCString as never, tc().rendered);
     assertKindOf(String, tc().rendered.toString());
     assertEqual(developer.name, tc().rendered.toString());
     assertMatch(new RegExp(developer.name), tc().rendered.toString());
