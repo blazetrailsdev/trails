@@ -3042,8 +3042,6 @@ export function buildReport(
   for (const pkg of [...Object.keys(ruby.packages), ...TS_ONLY_PACKAGES]) {
     if (!ts.packages[pkg]) continue;
     scannedPkgs.add(pkg);
-    // Every package is scored even under --package: a stale tag is a
-    // whole-repo invariant CI gates unfiltered, so only the totals are scoped.
     const report = buildPackageReport(
       pkg,
       ruby,

@@ -5034,8 +5034,6 @@ describe("buildReport — --package does not scope the stale-tag check", () => {
 
 describe("buildReport — prepended modules", () => {
   it("credits a lexically prepended module's methods to the host", () => {
-    // activesupport/lib/active_support/test_case.rb:145 — `prepend
-    // ActiveSupport::Testing::SetupAndTeardown`.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",

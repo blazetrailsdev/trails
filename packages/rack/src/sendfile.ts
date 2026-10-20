@@ -1,17 +1,21 @@
 import { File, rbFSend } from "@blazetrails/ruby-compat";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { BodyProxy } from "./body-proxy.js";
 import { escapePath } from "./utils.js";
 
 export class Sendfile {
   private app: RackApp;
   private _variation: string | null;
-  private mappings: [string, string][];
+  private mappings: [RegExp, string][];
 
   constructor(app: RackApp, variation?: string | null, mappings?: [string, string][]) {
     this.app = app;
     this._variation = variation ?? null;
-    this.mappings = mappings || [];
+    this.mappings = (mappings || []).map(([internal, external]) => [
+      new RegExp("^" + internal, "i"),
+      external,
+    ]);
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
@@ -27,8 +31,9 @@ export class Sendfile {
           headers["content-length"] = "0";
           headers[type.toLowerCase()] = escapePath(url).replace(/\?/g, "%3F");
           const obody = body;
-          if (typeof obody.close === "function") obody.close();
-          response[2] = [];
+          response[2] = new BodyProxy([], () => {
+            if (typeof obody.close === "function") obody.close();
+          });
         } else {
           env[RACK_ERRORS].puts("x-accel-mapping header missing");
         }
@@ -37,8 +42,9 @@ export class Sendfile {
         headers["content-length"] = "0";
         headers[type.toLowerCase()] = path;
         const obody = body;
-        if (typeof obody.close === "function") obody.close();
-        response[2] = [];
+        response[2] = new BodyProxy([], () => {
+          if (typeof obody.close === "function") obody.close();
+        });
       } else if (type === "" || type == null) {
         /** @empty */
       } else {
@@ -57,11 +63,9 @@ export class Sendfile {
   /** @internal */
   private mapAccelPath(env: Record<string, any>, path: string): string | undefined {
     const literal = (replacement: string) => () => replacement;
-    let mapping: any = this.mappings.find(([internal]) =>
-      new RegExp("^" + internal, "i").test(path),
-    );
+    let mapping: any = this.mappings.find(([internal]) => internal.test(path));
     if (mapping != null) {
-      return path.replace(new RegExp("^" + mapping[0], "i"), literal(mapping[1]));
+      return path.replace(mapping[0], literal(mapping[1]));
     } else if ((mapping = env["HTTP_X_ACCEL_MAPPING"]) != null) {
       for (const m of String(mapping)
         .split(",")
