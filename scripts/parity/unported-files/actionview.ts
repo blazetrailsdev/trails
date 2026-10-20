@@ -33,11 +33,4 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "`:builder` handler is unported above for want of XmlMarkup, and every test in " +
       "atom_feed_helper_test.rb renders a `.builder` template, so neither half has a caller.",
   },
-  {
-    pattern: "/test_case.rb",
-    package: "actionview",
-    reason:
-      "Minitest harness for rendering views (`ActionView::TestCase`) — a Rails test-suite " +
-      "support class for a layer trails does not port.",
-  },
 ];
