@@ -5,8 +5,7 @@ import { include, Module } from "@blazetrails/ruby-compat";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { UrlFor } from "../../action-dispatch/routing/url-for.js";
 type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown>;
-import { RoutesHelpers } from "./routes-helpers.js";
-import { type RoutesHelpersControllerClass } from "./routes-helpers.js";
+import { RoutesHelpers, type RoutesHelpersControllerClass } from "./routes-helpers.js";
 
 function makeClass(): RoutesHelpersControllerClass {
   return { prototype: {} } as RoutesHelpersControllerClass;
