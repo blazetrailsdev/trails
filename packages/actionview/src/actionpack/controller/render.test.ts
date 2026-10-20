@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
 import { Conversion, Naming } from "@blazetrails/activemodel";
-import { assert, isPresent, Logger } from "@blazetrails/activesupport";
+import { assert, assertNothingRaised, isPresent, Logger } from "@blazetrails/activesupport";
 import { Date } from "@blazetrails/date";
 import {
   ArgumentError,
@@ -293,7 +293,7 @@ class TestController extends ActionController.Base {
   }
 
   async accessingLoggerInTemplate(): Promise<void> {
-    await this.render({ inline: "<%= logger.constructor.name %>" });
+    await this.render({ inline: "<%= logger.constructor %>" });
   }
 
   async accessingControllerNameInTemplate(): Promise<void> {
@@ -905,7 +905,7 @@ describe("RenderTest", () => {
 
   test("access to logger in view", async () => {
     await testCase.get("accessingLoggerInTemplate");
-    expect(testCase.response.body).toBe("Logger");
+    expect(testCase.response.body).toBe("ActiveSupport::Logger");
   });
 
   test("access to action name in view", async () => {
@@ -1079,7 +1079,7 @@ describe("RenderTest", () => {
   });
 
   test("render to string that throws caught exception doesnt break assigns", async () => {
-    await testCase.get("renderToStringWithCaughtException");
+    await assertNothingRaised(() => testCase.get("renderToStringWithCaughtException"));
     expect((testCase.controller as TestController).before).toBe("i'm before the render");
     expect((testCase.controller as TestController).after).toBe("i'm after the render");
   });
