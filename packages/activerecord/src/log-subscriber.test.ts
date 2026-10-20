@@ -41,10 +41,6 @@ function escapeRegex(s: string): string {
 class TestDebugLogSubscriber extends LogSubscriber {
   debugs: (string | null)[] = [];
 
-  override get logger(): Logger | null {
-    return (this.constructor as typeof LogSubscriber).logger;
-  }
-
   protected override debug(progname: string | null = null, block?: () => string): boolean | null {
     this.debugs.push(progname);
     return super.debug(progname, block);
@@ -60,14 +56,15 @@ describe("LogSubscriberTest", () => {
     setLogger(logger: MockLogger | null): void {
       Base.logger = logger as unknown as Logger | null;
     },
-  } as unknown as ThisParameterType<typeof testHelperSetup> & { logger: MockLogger };
+  } as ThisParameterType<typeof testHelperSetup>;
 
   fixtures([]);
-  beforeEach(() => {
+  beforeEach(async () => {
     oldBaseLogger = Base.logger;
+    void Developer.primaryKey;
+    await (await Base.leaseConnection()).materializeTransactions();
     testHelperSetup.call(t);
     mockLogger = t.logger;
-    TestDebugLogSubscriber.logger = mockLogger as unknown as Logger;
     LogSubscriber.colorizeLogging = true;
     subscriber = new TestDebugLogSubscriber();
     LogSubscriber.attachTo("active_record");
@@ -99,7 +96,6 @@ describe("LogSubscriberTest", () => {
   });
 
   it("basic query logging", async () => {
-    Base.logger = mockLogger as unknown as Logger;
     await Developer.all().load();
     const debug = mockLogger.logged(":debug");
     expect(debug.length).toBe(1);
@@ -252,7 +248,6 @@ describe("LogSubscriberTest", () => {
   });
 
   it("exists query logging", async () => {
-    Base.logger = mockLogger as unknown as Logger;
     await Developer.isExists(1);
     const debug = mockLogger.logged(":debug");
     expect(debug.length).toBe(1);
