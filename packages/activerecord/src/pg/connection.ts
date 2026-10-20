@@ -14,6 +14,8 @@ export interface PGConnection extends pg.Client {
   prepare(stmtName: string, sql: string): Promise<void>;
   execPrepared(stmtName: string, params: unknown[]): Promise<PG.Result>;
   asyncExec(sql: string | null): Promise<PG.Result>;
+  sendQuery(sql: string): void;
+  getLastResult(): Promise<PG.Result | null>;
   execParams(sql: string | null, params: unknown[]): Promise<PG.Result>;
   unescapeBytea(value: string | Uint8Array): Buffer;
   transactionStatus(): number;
@@ -60,6 +62,9 @@ export class Connection {
   connParams: pg.ClientConfig | undefined;
   prepared = new Map<string, string>();
   readyForQuery = "I";
+  bad = false;
+  pendingResult: Promise<PG.Result> | null = null;
+  pendingResultTaken = false;
   typeMapForResults = new PGTypeMapByOid();
 
   constructor(client: object, connParams?: pg.ClientConfig) {
@@ -83,8 +88,10 @@ export class Connection {
   }
 
   status(): number {
-    const { _ending, _ended } = this.client;
-    return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
+    const { _ending, _ended, _queryable } = this.client;
+    return this.bad || _ending === true || _ended === true || _queryable === false
+      ? CONNECTION_BAD
+      : CONNECTION_OK;
   }
 
   async reset(): Promise<void> {
@@ -102,6 +109,9 @@ export class Connection {
     listen(this, conn);
     this.prepared.clear();
     this.readyForQuery = "I";
+    this.bad = false;
+    this.pendingResult = null;
+    this.pendingResultTaken = false;
     await client
       .end()
       .then(() => conn.connect())
@@ -160,6 +170,37 @@ export class Connection {
         sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
       ).catch((error: unknown) => raise(this, error)),
     );
+  }
+
+  sendQuery(sql: string): void {
+    if (this.client._ending === true) {
+      throw new ConnectionBad("connection is closed", { connection: this });
+    }
+    if (this.bad) {
+      throw new UnableToSend("no connection to the server\n", { connection: this });
+    }
+    if (this.pendingResult != null) {
+      throw new UnableToSend("another command is already in progress\n", { connection: this });
+    }
+    const pending = this.asyncExec(sql);
+    pending.catch(() => undefined);
+    this.pendingResult = pending;
+    this.pendingResultTaken = false;
+  }
+
+  async getLastResult(): Promise<PG.Result | null> {
+    const pending = this.pendingResult;
+    if (pending == null) return null;
+    if (this.pendingResultTaken) {
+      await pending.catch(() => undefined);
+      return null;
+    }
+    this.pendingResultTaken = true;
+    try {
+      return await pending;
+    } finally {
+      if (this.pendingResult === pending) this.pendingResult = null;
+    }
   }
 
   async execParams(sql: string | null, params: unknown[]): Promise<PG.Result> {
@@ -301,6 +342,8 @@ function pgError(conn: Connection, error: unknown, klass?: typeof PGError): unkn
       connection: conn,
       result: { errorField, resultErrorField: errorField },
     });
+  } else if (conn.bad) {
+    wrapped = new ConnectionBad("no connection to the server\n", { connection: conn });
   } else if (_ending === true) {
     wrapped = new ConnectionBad("connection is closed", { connection: conn });
   } else if (_ended === true || _queryable === false || _connectionError === true) {
@@ -309,6 +352,9 @@ function pgError(conn: Connection, error: unknown, klass?: typeof PGError): unkn
     wrapped = new UnableToSend(`${error.message}\n`, { connection: conn });
   }
   wrapped.cause = error;
+  if (wrapped instanceof ConnectionBad || (error as { severity?: string }).severity === "FATAL") {
+    conn.bad = true;
+  }
   return wrapped;
 }
 
