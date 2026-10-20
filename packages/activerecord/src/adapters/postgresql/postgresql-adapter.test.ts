@@ -594,7 +594,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
         await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
       });
-      await (adapter._rawConnection as PGConnection).sendQuery("SELECT 1");
+      (adapter._rawConnection as PGConnection).sendQuery("SELECT 1");
 
       await assertRaises([ConnectionNotEstablished], {}, () => adapter.execute("SELECT 1"));
     });

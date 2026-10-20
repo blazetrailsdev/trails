@@ -134,15 +134,24 @@ describe("PG::Error#result on every carrier path", () => {
   const terminated = () => new Error("Connection terminated unexpectedly");
 
   it("rewraps a rejection from async_exec, exec_params, exec_prepared and query", async () => {
-    const client = pgConnection({
-      _ended: true,
-      query: (_config: unknown) => Promise.reject(terminated()),
-    });
+    const client = () =>
+      pgConnection({
+        _ended: true,
+        query: (_config: unknown) => Promise.reject(terminated()),
+      });
     const errors = [
-      await client.asyncExec("SELECT 1").catch((e: unknown) => e),
-      await client.execParams("SELECT $1", [1]).catch((e: unknown) => e),
-      await client.execPrepared("a1", [1]).catch((e: unknown) => e),
-      await client.query("").catch((e: unknown) => e),
+      await client()
+        .asyncExec("SELECT 1")
+        .catch((e: unknown) => e),
+      await client()
+        .execParams("SELECT $1", [1])
+        .catch((e: unknown) => e),
+      await client()
+        .execPrepared("a1", [1])
+        .catch((e: unknown) => e),
+      await client()
+        .query("")
+        .catch((e: unknown) => e),
     ];
     for (const error of errors) {
       expect(error).toBeInstanceOf(PG.ConnectionBad);
