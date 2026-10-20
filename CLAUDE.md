@@ -1762,7 +1762,10 @@ environment, and shipped code has no eval pipeline.** The split is:
 with an awaited `import()` under a URL no earlier load used (the `rbFLoad`
 shape), names the method after `method_name`, and seats it on
 `mod._compiledMethods`; Rails' `SyntaxError` rescue and non-keyword strict
-locals check follow as written. A file-backed template with no emitted module
+locals check follow as written. A JS function has no keyword parameters, so
+the seated method raises Ruby's `missing keyword` / `unknown keyword` /
+`no keywords accepted` `ArgumentError`s itself before it calls the module's
+default export. A file-backed template with no emitted module
 raises `LoadError` ("cannot load such file -- <path>"), and a string-source
 template (`Template::Inline`, `render inline:`, a `Template` built from a
 string) raises `NotImplementedError` from the same loader in
