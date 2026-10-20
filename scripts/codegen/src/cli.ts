@@ -193,6 +193,31 @@ index.finish((f) => resolver.tsFileOf(f));
     for (const inc of sc.includes) {
       if (index.resolveConst(inc, [...chain, sc.fqn])) continue;
       const written = inc.filter((x) => x).join("::");
+      if (!index.depChains.has(written)) {
+        const start = [
+          ...[...chain, sc.fqn].map((s0) => `${s0}::${written}`).reverse(),
+          written,
+        ].find((c) => modules.has(c));
+        const out: { fqn: string; methods: Set<string>; classMethods: Set<string> }[] = [];
+        const seen = new Set<string>();
+        const visit = (fq: string) => {
+          if (seen.has(fq) || !modules.has(fq)) return;
+          seen.add(fq);
+          const m = modules.get(fq);
+          out.push({
+            fqn: fq,
+            methods: new Set((m.instanceMethods ?? []).map((x: any) => x.name as string)),
+            classMethods: new Set(
+              (modules.get(`${fq}::ClassMethods`)?.instanceMethods ?? []).map(
+                (x: any) => x.name as string,
+              ),
+            ),
+          });
+          for (const inc of [...(m.includes ?? [])].reverse()) visit(inc);
+        };
+        if (start) visit(start);
+        index.depChains.set(written, out);
+      }
       // The instance methods a dependency module defines, for a gem module's
       // `super` that reaches past the gem (lower.ts `externalSuperTarget`).
       if (!index.depMethods.has(written)) {

@@ -1,3 +1,4 @@
+import ts from "typescript-5";
 /**
  * Pass 3 + 5: constant resolution / import planning, and receiver-keyed member
  * resolution for self-calls and calls on gem constants.
@@ -145,7 +146,11 @@ export class Resolver {
     // A `super` this module's methods cannot resolve statically keeps the
     // Module, whose `superMethod` finds it at run time (the hand port's
     // aggregations.ts): `include()` flattens a class module's methods.
-    if (yes && this.superResolvable)
+    // RFC 0188's direction: a module's `super` is resolved when the code is
+    // generated, never by a run-time chain (a module that kept the Module
+    // for `superMethod` is a class too). Off: `superResolvable` stays only as
+    // the probe the lowering's own resolution uses.
+    if (yes && this.superResolvable && process.env.CODEGEN_KEEP_SUPER_MODULES)
       for (const [name, d] of s!.defs) {
         let calls = false;
         walk(d.node?.body ?? null, (n) => {
@@ -164,6 +169,36 @@ export class Resolver {
   classModuleMemo?: Map<string, boolean>;
   /** Set by the Lowerer: a module's `super` from `name` resolves statically. */
   superResolvable?: (mod: string, name: string) => boolean;
+
+  private shapeMemo = new Map<string, Map<string, "class" | "module" | "object">>();
+  /**
+   * How a dependency package exports `name`, read from its built `index.d.ts`:
+   * a class, a ruby-compat `Module` instance, or an object of functions.
+   */
+  depExportShape(spec: string, name: string): "class" | "module" | "object" | undefined {
+    let m = this.shapeMemo.get(spec);
+    if (!m) {
+      m = new Map();
+      this.shapeMemo.set(spec, m);
+      const dts = path.join(ROOT, "packages", spec.replace("@blazetrails/", ""), "dist/index.d.ts");
+      if (existsSync(dts)) {
+        const program = ts.createProgram([dts], { noEmit: true, skipLibCheck: true });
+        const checker = program.getTypeChecker();
+        const mod = checker.getSymbolAtLocation(program.getSourceFile(dts)!);
+        for (const sym0 of mod ? checker.getExportsOfModule(mod) : []) {
+          const sym = sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+          const d = sym.declarations?.[0];
+          if (!d) continue;
+          if (ts.isClassDeclaration(d)) m.set(sym0.name, "class");
+          else if (ts.isVariableDeclaration(d)) {
+            const t = checker.typeToString(checker.getTypeOfSymbolAtLocation(sym, d));
+            m.set(sym0.name, /^Module</.test(t) ? "module" : "object");
+          }
+        }
+      }
+    }
+    return m.get(name);
+  }
 
   pkgExports(spec: string): Set<string> {
     return this.exportsByPkg[spec] ?? new Set();

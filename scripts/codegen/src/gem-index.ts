@@ -76,6 +76,12 @@ export class GemIndex {
   /** A dependency module (as written in an `include`) → the instance methods the Rails manifest gives it. */
   depMethods = new Map<string, Set<string>>();
   /**
+   * A dependency module (as written in an `include`) → its Ruby ancestors from
+   * the Rails manifest: itself, then its includes (last first), each with the
+   * instance methods it defines and its `ClassMethods`' methods.
+   */
+  depChains = new Map<string, { fqn: string; methods: Set<string>; classMethods: Set<string> }[]>();
+  /**
    * Methods of other gems (Rails manifest) that take `*rest` and a block, by
    * Ruby name: JS cannot tell a trailing block from one more rest element, so a
    * call hands it branded with ruby-compat `block()`.
@@ -99,7 +105,15 @@ export class GemIndex {
   /** Constant aliases of classes/modules, resolved in finish(). */
   aliasPaths = new Map<string, { path: string[]; nesting: string[] }>();
   /** `Klass.include M` sent from anywhere (a railtie's `on_load`): M joins Klass's includes, last. */
-  sentIncludes: { recv: string[]; mod: string[]; nesting: string[] }[] = [];
+  sentIncludes: { recv: string[]; mod: string[]; nesting: string[]; prepend?: boolean }[] = [];
+  /**
+   * `include M` / `prepend M` run inside a method, with `self` the receiver
+   * (`include CompositePrimaryKey` in `PrimaryKey::ClassMethods#primary_key=`):
+   * M joins the classes that method runs on.
+   */
+  runtimeMixins: { owner: string; mod: string[]; prepend: boolean; nesting: string[] }[] = [];
+  /** `class << obj; prepend M` inside a method: M joins the class `obj` is an instance of. */
+  objectMixins: { mod: string[]; prepend: boolean; nesting: string[] }[] = [];
   aliases = new Map<string, string>();
 
   /** Every method name defined anywhere in the gem → whether it is only an attr. */
@@ -144,19 +158,46 @@ export class GemIndex {
 
   add(file: IrFile): void {
     this.visit(file.body, [], file.file, false);
-    const walk = (x: any, nesting: string[]): void => {
-      if (Array.isArray(x)) return x.forEach((y) => walk(y, nesting));
+    const walk = (x: any, nesting: string[], inDef: boolean, objSclass: boolean): void => {
+      if (Array.isArray(x)) return x.forEach((y) => walk(y, nesting, inDef, objSclass));
       if (!x || typeof x !== "object") return;
       if ((x.k === "module" || x.k === "class") && x.path) {
         const fqn = qualify(x.path, nesting[nesting.length - 1]);
-        return walk(x.body, [...nesting, fqn]);
+        return walk(x.body, [...nesting, fqn], false, false);
       }
-      if (x.k === "call" && x.name === "include" && x.recv?.k === "const")
+      if (x.k === "def" && !x.singleton) return walk(x.body, nesting, true, false);
+      if (x.k === "sclass" && inDef && x.target?.k !== "self")
+        return walk(x.body, nesting, inDef, true);
+      if (x.k === "call" && (x.name === "include" || x.name === "prepend") && x.recv?.k === "const")
         for (const a of x.args ?? [])
-          if (a.k === "const") this.sentIncludes.push({ recv: x.recv.path, mod: a.path, nesting });
-      for (const v of Object.values(x)) walk(v, nesting);
+          if (a.k === "const")
+            this.sentIncludes.push({
+              recv: x.recv.path,
+              mod: a.path,
+              nesting,
+              prepend: x.name === "prepend",
+            });
+      if (
+        x.k === "call" &&
+        (x.name === "include" || x.name === "prepend") &&
+        (x.recv === null || x.recv?.k === "self") &&
+        inDef
+      )
+        for (const a of x.args ?? []) {
+          if (a.k !== "const") continue;
+          const prepend = x.name === "prepend";
+          if (objSclass) this.objectMixins.push({ mod: a.path, prepend, nesting });
+          else if (nesting.length)
+            this.runtimeMixins.push({
+              owner: nesting[nesting.length - 1],
+              mod: a.path,
+              prepend,
+              nesting,
+            });
+        }
+      for (const v of Object.values(x)) walk(v, nesting, inDef, objSclass);
     };
-    walk(file.body, []);
+    walk(file.body, [], false, false);
   }
 
   private visit(node: N, nesting: string[], file: string, singleton: boolean): void {
@@ -343,8 +384,50 @@ export class GemIndex {
     for (const inc of this.sentIncludes) {
       const target = this.resolveConst(inc.recv, inc.nesting);
       const mod = this.resolveConst(inc.mod, inc.nesting);
-      if (target?.kind === "scope" && mod?.kind === "scope")
+      if (target?.kind === "scope" && mod?.kind === "scope") {
         this.scopes.get(target.fqn)!.includes.push(mod.fqn.split("::"));
+        if (inc.prepend) this.scopes.get(target.fqn)!.prepends.push(mod.fqn.split("::"));
+      }
+    }
+    const join = (target: string, mod: string, prepend: boolean) => {
+      const t = this.scopes.get(target);
+      if (!t || t.includes.some((p) => p.join("::") === mod)) return;
+      t.includes.push(mod.split("::"));
+      if (prepend) t.prepends.push(mod.split("::"));
+    };
+    // A method of a Concern's `ClassMethods` runs on each class including the
+    // Concern; one of a class runs on that class (and its subclasses, which
+    // inherit the module).
+    for (const m of this.runtimeMixins) {
+      const mod = this.resolveConst(m.mod, m.nesting);
+      if (mod?.kind !== "scope") continue;
+      const concern = m.owner.endsWith("::ClassMethods")
+        ? m.owner.slice(0, -"::ClassMethods".length)
+        : null;
+      if (concern) {
+        for (const sc of this.scopes.values()) {
+          if (sc.kind !== "class") continue;
+          // The class whose ancestors bring the Concern in first (not a subclass).
+          if (!rubyAncestors(this, sc.fqn).includes(concern)) continue;
+          if (sc.superclassFqn && rubyAncestors(this, sc.superclassFqn).includes(concern)) continue;
+          join(sc.fqn, mod.fqn, m.prepend);
+        }
+      } else if (this.scopes.get(m.owner)?.kind === "class") join(m.owner, mod.fqn, m.prepend);
+    }
+    // `class << t; prepend M`: `t`'s class is the one gem class defining every
+    // method M defines (the most general, when several do).
+    for (const m of this.objectMixins) {
+      const mod = this.resolveConst(m.mod, m.nesting);
+      const ms = mod?.kind === "scope" ? this.scopes.get(mod.fqn) : undefined;
+      if (!ms || !ms.defs.size) continue;
+      const fits = [...this.scopes.values()].filter(
+        (sc) =>
+          sc.kind === "class" &&
+          sc.fqn !== ms.fqn &&
+          [...ms.defs.keys()].every((d) => sc.defs.has(d)),
+      );
+      const top = fits.filter((c) => !fits.some((o) => o !== c && c.superclassFqn === o.fqn));
+      if (top.length === 1) join(top[0].fqn, ms.fqn, m.prepend);
     }
     for (const [fqn, a] of this.aliasPaths) {
       const hit = this.resolveConst(a.path, a.nesting);
@@ -455,6 +538,31 @@ export function rubyAncestors(index: GemIndex, fqn: string, seen = new Set<strin
   const prependKeys = new Set(s.prepends.map((p) => p.join("::")));
   const includes = mods(s.includes.filter((p) => !prependKeys.has(p.join("::"))));
   const sup = s.superclassFqn ? rubyAncestors(index, s.superclassFqn, inner) : [];
+  const all = [...prepends, fqn, ...includes, ...sup];
+  return all.filter((f, i) => all.lastIndexOf(f) === i);
+}
+
+/**
+ * Ruby's ancestors as `rubyAncestors`, with each module outside the gem kept
+ * in its place as `ext:<as written>` (`ActiveModel::API` included by
+ * `ActiveRecord::Base`), so a `super` past the gem finds the dependency module
+ * Ruby would.
+ */
+export function fullAncestors(index: GemIndex, fqn: string, seen = new Set<string>()): string[] {
+  const s = index.scopes.get(fqn);
+  if (!s || seen.has(fqn)) return [];
+  const inner = new Set([...seen, fqn]);
+  const chain = [...lexicalChain(index, s.lexicalParent), fqn];
+  const mods = (paths: string[][]) =>
+    [...paths].reverse().flatMap((p) => {
+      const hit = index.resolveConst(p, chain);
+      if (hit?.kind === "scope") return fullAncestors(index, hit.fqn, inner);
+      return [`ext:${p.filter((x) => x).join("::")}`];
+    });
+  const prependKeys = new Set(s.prepends.map((p) => p.join("::")));
+  const prepends = mods(s.prepends);
+  const includes = mods(s.includes.filter((p) => !prependKeys.has(p.join("::"))));
+  const sup = s.superclassFqn ? fullAncestors(index, s.superclassFqn, inner) : [];
   const all = [...prepends, fqn, ...includes, ...sup];
   return all.filter((f, i) => all.lastIndexOf(f) === i);
 }

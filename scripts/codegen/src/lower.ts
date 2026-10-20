@@ -22,7 +22,14 @@ import { RUBY_COMPAT_EXPORTS } from "../../parity/ruby-compat.js";
 import { operatorSpelling } from "../../api-compare/operator-order-spelling.js";
 import type { N, Param } from "./ir.js";
 import { walk } from "./ir.js";
-import { GemIndex, lexicalChain, qualify, rubyAncestors, type ScopeInfo } from "./gem-index.js";
+import {
+  GemIndex,
+  fullAncestors,
+  lexicalChain,
+  qualify,
+  rubyAncestors,
+  type ScopeInfo,
+} from "./gem-index.js";
 import { GEM, ROOT, coreExtSends, handNamespaceAutoloads, handNamespaceFqns } from "./gem.js";
 import type { Resolver } from "./resolve.js";
 import { isBool, isObjectLike, type TypeRef } from "./types.js";
@@ -2366,7 +2373,17 @@ export class Lowerer {
           }
           return call;
         }
-        return this.decline(ctx, "unhandled-node", { k: "super" } as N, `super past ${ctx.owner}`);
+        const core = this.coreSuperTarget(ctx.defName ?? "", args, ctx);
+        if (core !== null) {
+          this.stat(ctx, "module-super-core");
+          return core;
+        }
+        return this.decline(
+          ctx,
+          "unhandled-node",
+          { k: "super" } as N,
+          `super past ${ctx.owner}#${ctx.defName ?? ""}`,
+        );
       }
       // ruby-compat Module#superMethod: resume the lookup past this module's
       // link in the receiver's ancestry (vm_search_super_method).
@@ -2391,6 +2408,80 @@ export class Lowerer {
   }
 
   /**
+   * A call of a dependency module's method on `this`, written for how trails
+   * ports that module: a class (`ActiveModel::Validations`) through its
+   * prototype, an object of functions (`ActiveModel::AttributeMethods::ClassMethods`)
+   * directly, a ruby-compat Module through `instanceMethod`.
+   */
+  depSuperCall(fqn: string, fn: string, classSide: boolean, ctx: Ctx): (args: string) => string {
+    const path = ["", ...fqn.split("::")];
+    const ref = this.constRef({ k: "const", path } as N, ctx);
+    // The package export the reference was imported as, and its shape.
+    let shape: "class" | "module" | "object" | undefined;
+    if (/^[\w$]+$/.test(ref))
+      for (const [spec, names] of ctx.f.imports)
+        for (const [exp, local] of names)
+          if (local === ref && spec.startsWith("@blazetrails/"))
+            shape = this.resolver.depExportShape(spec, exp);
+    const rest = ["this", "ARGS"].join(", ");
+    const callee =
+      shape === "module"
+        ? `${ref}.instanceMethod(${JSON.stringify(fn)})!.value`
+        : shape === "class" && !classSide
+          ? `${ref}.prototype.${fn}`
+          : `${ref}.${fn}`;
+    return (args) => `${callee}.call(${rest.replace(", ARGS", args ? `, ${args}` : "")})`;
+  }
+
+  /**
+   * `super` that reaches past everything the gem and its dependencies define,
+   * into Ruby's own `Object` / `Module` / `Class` method: what that method
+   * does (object.c, class.c). Null for a name with no such method here.
+   */
+  coreSuperTarget(name: string, args: string, ctx: Ctx): string | null {
+    const first = args.split(",")[0]?.trim() || "undefined";
+    switch (name) {
+      // Class#inherited, BasicObject#singleton_method_added: no-ops (object.c rb_obj_dummy).
+      case "inherited":
+      case "singleton_method_added":
+      case "method_added":
+      case "included":
+      case "extended":
+        return "undefined";
+      // Object#respond_to_missing? (vm_method.c obj_respond_to_missing): false.
+      case "respond_to_missing?":
+        return "false";
+      // BasicObject#method_missing (vm_eval.c rb_method_missing): NoMethodError.
+      case "method_missing":
+        return `(() => { throw new ${this.rc(ctx, "NoMethodError")}(\`undefined method '\${String(${first})}' for \${${this.rc(ctx, "rbObjInspect")}(this)}\`); })()`;
+      // BasicObject#== / Object#<=> (object.c rb_obj_equal, rb_obj_cmp): identity.
+      case "==":
+      case "equal?":
+      case "eql?":
+        return `(this === ${first})`;
+      case "<=>":
+        return `(this === ${first} ? 0 : null)`;
+      case "hash":
+        return `${this.rc(ctx, "rbObjHash")}(this)`;
+      // Module#inspect is Module#to_s (class.c rb_mod_to_s); activesupport's
+      // Object#to_param is to_s (core_ext/object/to_query.rb).
+      case "inspect":
+      case "to_s":
+      case "to_param":
+        return ctx.selfKind === "static" || ctx.singleton
+          ? `${this.rc(ctx, "rbModToS")}(this)`
+          : `${this.rc(ctx, "rbAnyToS")}(this)`;
+      case "dup":
+        return `${this.rc(ctx, "rbObjDup")}(this)`;
+      // Object#initialize_dup / #initialize_clone (object.c) call initialize_copy.
+      case "initialize_dup":
+      case "initialize_clone":
+        return `(this as { initializeCopy?: (o: unknown) => unknown }).initializeCopy?.(${first})`;
+    }
+    return null;
+  }
+
+  /**
    * `super` from a Concern's `ClassMethods#name`: the next `ClassMethods` that
    * defines it among the concerns after it in an includer's Ruby ancestors
    * (`extend()` copied each onto the class, so the later one replaced the
@@ -2404,25 +2495,59 @@ export class Lowerer {
     if (!owner.endsWith("::ClassMethods")) return undefined;
     const concern = owner.slice(0, -"::ClassMethods".length);
     const fn = ctx ? this.defTsName(ctx) : "";
+    const call = (ref: string) => (args: string) =>
+      `${ref}.${fn}.call(${["this", args].filter(Boolean).join(", ")})`;
     for (const sc of this.index.scopes.values()) {
       if (sc.kind !== "class") continue;
-      const anc = rubyAncestors(this.index, sc.fqn);
-      const at = anc.indexOf(concern);
+      const full = fullAncestors(this.index, sc.fqn);
+      const at = full.indexOf(concern);
       if (at < 0) continue;
-      for (const f of anc.slice(at + 1)) {
-        const s = this.index.scopes.get(f)!;
-        const cm = this.index.scopes.get(`${f}::ClassMethods`);
+      // The class side follows the instance side's order: each Concern's
+      // `ClassMethods` (a dependency Concern's from the manifest), and a class's
+      // own singleton methods, after the Concern `super` starts from.
+      for (const entry of full.slice(at + 1)) {
+        if (entry.startsWith("ext:")) {
+          const owner = this.index.depChains
+            .get(entry.slice(4))
+            ?.find((e) => e.classMethods.has(name));
+          if (!owner) continue;
+          if (!ctx) return () => "";
+          return this.depSuperCall(`${owner.fqn}::ClassMethods`, fn, true, ctx);
+        }
+        const s = this.index.scopes.get(entry)!;
+        const cm = this.index.scopes.get(`${entry}::ClassMethods`);
         const target = cm?.defs.has(name)
           ? cm.fqn
           : s.kind === "class" && s.sdefs.has(name)
-            ? f
+            ? entry
             : null;
         if (!target) continue;
         const e = this.resolver.exportNames.get(target);
         if (!e) return undefined;
         if (!ctx) return () => "";
-        const ref = this.resolver.importFrom(e.tsFile, e.name, ctx, this);
-        return (args) => `${ref}.${fn}.call(${["this", args].filter(Boolean).join(", ")})`;
+        return call(this.resolver.importFrom(e.tsFile, e.name, ctx, this));
+      }
+      // Then the modules the class extends itself, written at the top of its
+      // body (`Base`'s `extend Querying`), behind every Concern's `ClassMethods`.
+      const chainH = [...lexicalChain(this.index, sc.lexicalParent), sc.fqn];
+      for (const p of [...sc.extends].reverse()) {
+        const hit = this.index.resolveConst(p, chainH);
+        if (hit?.kind === "scope") {
+          const ms = this.index.scopes.get(hit.fqn);
+          if (!ms?.defs.has(name)) continue;
+          const e = this.resolver.exportNames.get(hit.fqn);
+          if (!e) return undefined;
+          if (!ctx) return () => "";
+          const ref = this.resolver.importFrom(e.tsFile, e.name, ctx, this);
+          // A class module's method sits on its prototype; a ClassMethods' is static.
+          const proto = this.resolver.isClassModule(hit.fqn) && !hit.fqn.endsWith("::ClassMethods");
+          return call(proto ? `${ref}.prototype` : ref);
+        }
+        const written = p.filter((x: string) => x).join("::");
+        const owner = this.index.depChains.get(written)?.find((e) => e.methods.has(name));
+        if (!owner) continue;
+        if (!ctx) return () => "";
+        return this.depSuperCall(owner.fqn, fn, false, ctx);
       }
       return undefined;
     }
@@ -2450,17 +2575,19 @@ export class Lowerer {
       const at = anc.indexOf(mod);
       if (at < 0) continue;
       if (sc.superclassFqn && rubyAncestors(this.index, sc.superclassFqn).includes(mod)) continue;
-      for (const f of anc.slice(at)) {
-        const s = this.index.scopes.get(f)!;
-        const chain = [...lexicalChain(this.index, s.lexicalParent), s.fqn];
-        for (const inc of [...s.includes].reverse()) {
-          if (this.index.resolveConst(inc, chain)) continue;
-          const written = inc.filter((x: string) => x).join("::");
-          if (!this.index.depMethods.get(written)?.has(name)) continue;
+      // Ruby's ancestors of the host with the dependency modules in place:
+      // the first after `mod` that defines `name`.
+      const full = fullAncestors(this.index, sc.fqn);
+      const fat = full.indexOf(mod);
+      for (const entry of full.slice(fat + 1)) {
+        if (!entry.startsWith("ext:")) continue;
+        {
+          const written = entry.slice(4);
+          // The first module in the dependency's own ancestry that defines it.
+          const owner = this.index.depChains.get(written)?.find((e) => e.methods.has(name));
+          if (!owner) continue;
           if (!ctx) return () => "";
-          const ref = this.constRef({ k: "const", path: inc } as N, ctx);
-          return (args) =>
-            `${ref}.instanceMethod(${JSON.stringify(fn)})!.value.call(${["this", args].filter(Boolean).join(", ")})`;
+          return this.depSuperCall(owner.fqn, fn, false, ctx);
         }
       }
       // The first class in the chain with a superclass outside the gem (or one
