@@ -464,7 +464,7 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT
    */
   aliasMethod(newName: string, oldName: string): string {
-    const descriptor = Object.getOwnPropertyDescriptor(carrierOf(this), oldName);
+    const descriptor = methodEntryOf(this, oldName);
     if (!descriptor) {
       throw new NameError(`undefined method '${oldName}' for module '#<Module>'`, oldName);
     }
@@ -578,6 +578,9 @@ export class Module<I extends object = Record<never, never>> {
     UNDEF_METHOD_TABLES.add(link);
     Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(proto, link);
+    for (const mod of nestedModules.get(this) ?? []) {
+      if (!(mod instanceof Module)) splicePlainModule(link, mod);
+    }
   }
 
   /**
@@ -618,7 +621,6 @@ export class Module<I extends object = Record<never, never>> {
     }
     for (const mod of nestedModules.get(this) ?? []) {
       if (mod instanceof Module) Module.prototype.extendObject.call(mod, obj);
-      else extend(obj, mod);
     }
     const holder: object = typeof obj === "function" ? obj : rbObjSingletonClass(obj).prototype;
     trackIncludedModule(holder, this);
@@ -637,6 +639,9 @@ export class Module<I extends object = Record<never, never>> {
     singletonReaper.register(link, { mod: this, ref });
     Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(holder, link);
+    for (const mod of nestedModules.get(this) ?? []) {
+      if (!(mod instanceof Module)) splicePlainModule(link, mod);
+    }
   }
 
   /**
@@ -666,7 +671,16 @@ export class Module<I extends object = Record<never, never>> {
       if (isLinkOf(this, proto)) {
         const writer = name.endsWith("=");
         const key = writer ? name.slice(0, -1) : name;
-        for (let next = Object.getPrototypeOf(proto) as object | null; next; ) {
+        const nested = nestedModules.get(this) ?? [];
+        let start = Object.getPrototypeOf(proto) as object | null;
+        while (
+          start &&
+          !Object.hasOwn(carrierOf(this), key) &&
+          nested.includes((start as Record<symbol, ModuleObject>)[T_ICLASS])
+        ) {
+          start = Object.getPrototypeOf(start) as object | null;
+        }
+        for (let next = start; next; ) {
           const descriptor = Object.getOwnPropertyDescriptor(next, key);
           next = Object.getPrototypeOf(next) as object | null;
           if (descriptor === undefined) continue;
@@ -800,7 +814,8 @@ function recordPlainModule(base: Module, mod: ModuleObject): void {
 
 function splicePlainModule(proto: object, mod: ModuleObject): void {
   function iclass() {}
-  iclass.prototype = Object.create(Object.getPrototypeOf(proto)) as object;
+  iclass.prototype = iclassBeneath(proto, Object.getPrototypeOf(proto) as object | null);
+  Object.defineProperty(iclass.prototype, T_ICLASS, { value: mod });
   rbModAppendFeatures(iclass, mod);
   Object.setPrototypeOf(proto, iclass.prototype);
 }

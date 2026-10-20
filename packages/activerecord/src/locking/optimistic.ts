@@ -124,6 +124,8 @@ type InstanceLockingHost = {
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
   changes: Record<string, [unknown, unknown]>;
+  _touchAttrNames: Set<string>;
+  _queryConstraintsHash(): Record<string, unknown>;
 };
 
 /** @internal */
@@ -148,7 +150,7 @@ export function _touchRow(
 ): unknown {
   const ctor = this.constructor;
   if (ctor.lockingEnabled) {
-    (this as unknown as { _touchAttrNames: Set<string> })._touchAttrNames.add(ctor.lockingColumn);
+    this._touchAttrNames.add(ctor.lockingColumn);
   }
   return superFn(touchAttrNames, time);
 }
@@ -166,14 +168,14 @@ export async function _updateRow(
   const lockingColumn = ctor.lockingColumn;
   const lockAttributeWas = this._attributes.getAttribute(lockingColumn);
   try {
-    const updateConstraints = (this as any)._queryConstraintsHash();
+    const updateConstraints = this._queryConstraintsHash();
 
     if (Object.isFrozen(attributeNames)) attributeNames = [...attributeNames];
     attributeNames.push(lockingColumn);
 
     this.writeAttribute(lockingColumn, (Number(this.readAttribute(lockingColumn)) || 0) + 1);
 
-    const affectedRows = await (ctor as any)._updateRecord(
+    const affectedRows = await ctor._updateRecord(
       attributesWithValues.call(this as any, attributeNames),
       updateConstraints,
     );
