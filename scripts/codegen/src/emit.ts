@@ -1641,6 +1641,17 @@ export class Emitter {
           }
           const fn = this.lw.rc(ctxStatic, s.name === "prepend" ? "prepend" : s.name);
           after.push(`${fn}(${name}, ${this.lw.expr(a, ctxStatic)});`);
+          // The module's reopenings in other files, after it (path (a)).
+          const hitM = a.k === "const" ? this.index.resolveConst(a.path, u.nesting) : undefined;
+          if (hitM?.kind === "scope")
+            after.push(
+              ...this.reopeningLines(
+                name,
+                hitM.fqn,
+                s.name === "extend" ? "extend" : "include",
+                ctxStatic,
+              ),
+            );
         }
       } else if (
         s.k === "call" &&
@@ -1770,6 +1781,45 @@ export class Emitter {
       ...after,
     ].join("\n");
     return { text, defs };
+  }
+
+  /**
+   * A module's reopenings (path (a), the hand port's shape, activerecord
+   * validations/absence.ts): each Ruby file other than the module's own that
+   * defines methods on it, emitted there as a plain object of those methods
+   * under the module's joined name (`ActiveRecordValidationsClassMethods`).
+   */
+  reopenings(fqn: string): { tsFile: string; name: string; defs: string[] }[] {
+    const sc = this.index.scopes.get(fqn);
+    const own = this.resolver.exportNames.get(fqn)?.tsFile;
+    if (!sc || !own) return [];
+    const byFile = new Map<string, string[]>();
+    for (const [name, d] of sc.defs) {
+      const t = this.resolver.tsFileOf(d.file);
+      if (t === own || d.file.startsWith("test/")) continue;
+      (byFile.get(t) ?? byFile.set(t, []).get(t)!).push(name);
+    }
+    return [...byFile].map(([tsFile, defs]) => ({ tsFile, name: fqn.split("::").join(""), defs }));
+  }
+
+  /**
+   * The lines that bring a module's reopenings to an includer: `include(K, X)`
+   * for an included module's, `extend(K, X)` for an extended one's or a
+   * Concern's `ClassMethods`'.
+   */
+  reopeningLines(target: string, fqn: string, how: "include" | "extend", ctx: Ctx): string[] {
+    const out: string[] = [];
+    const add = (m: string, h: "include" | "extend") => {
+      for (const r of this.reopenings(m)) {
+        // Aliased per file: every reopening carries the module's joined name.
+        const ref = this.resolver.importFrom(r.tsFile, r.name, ctx, this.lw);
+        out.push(`${this.lw.rc(ctx, h)}(${target}, ${ref});`);
+      }
+    };
+    add(fqn, how);
+    if (how === "include" && this.index.scopes.get(fqn)?.concern)
+      add(`${fqn}::ClassMethods`, "extend");
+    return out;
   }
 
   /**
@@ -1932,6 +1982,31 @@ export class Emitter {
               ? `declare static ${n}: typeof ${cmRef}.${n};`
               : `declare static ${n}: ${this.lw.imp(ctx, "@blazetrails/ruby-compat", "Extended")}<typeof ${ref(cm.fqn)}>[${quote(n)}];`,
           );
+        }
+      }
+    }
+    // Each module's reopenings in other files (path (a)): their methods are
+    // the includer's too, typed from the plain object that carries them.
+    for (const m of mods) {
+      for (const [fq, side] of [
+        [m, "inst"],
+        [`${m}::ClassMethods`, "stat"],
+      ] as const) {
+        if (side === "stat" && !this.index.scopes.get(m)?.concern) continue;
+        for (const r of this.reopenings(fq)) {
+          const ref = this.lw.impType(ctx, `@root/${r.tsFile.replace(/\.ts$/, ".js")}`, r.name);
+          for (const d of r.defs) {
+            const n = fnName(d, fq);
+            if (side === "stat") {
+              if (own.stat.has(n)) continue;
+              own.stat.add(n);
+              statics.push(`declare static ${n}: (typeof ${ref})[${quote(n)}];`);
+            } else {
+              if (own.inst.has(n)) continue;
+              own.inst.add(n);
+              attrs.push(`${n}: (typeof ${ref})[${quote(n)}];`);
+            }
+          }
         }
       }
     }
@@ -2814,7 +2889,9 @@ export class Emitter {
     // carrying its Ruby `name`, as the hand port's namespace objects do
     // (`{ name: "ActiveJob", loadPath }`): nested constants seat on it and
     // `mattr_accessor` defines on it, so only `super` or `module_eval` need more.
-    const fnModule = !!this.index.scopes.get(u.fqn)?.moduleFunction;
+    const ownExp = this.resolver.exportNames.get(u.fqn);
+    const reopening = !!ownExp && ownExp.tsFile !== f.tsFile;
+    const fnModule = !!this.index.scopes.get(u.fqn)?.moduleFunction || reopening;
     const plain = fnModule
       ? !usesSuper && !defs2.some((l) => l.includes("moduleEval("))
       : !f.rubyFile.startsWith("test/") &&
@@ -2856,7 +2933,8 @@ export class Emitter {
       incl = "";
     }
     const plainMembers = [
-      ...(plain && fnModule ? [`name: ${JSON.stringify(u.fqn)}`] : []),
+      // Not on a reopening: an includer extended with it would take its `name`.
+      ...(plain && fnModule && !reopening ? [`name: ${JSON.stringify(u.fqn)}`] : []),
       ...consts.map((c: N) => c.path[0] as string),
       ...(plain ? seatNames : []),
       ...dedupeMembers(members),
