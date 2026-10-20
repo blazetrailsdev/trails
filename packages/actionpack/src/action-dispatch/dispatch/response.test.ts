@@ -646,7 +646,7 @@ describe("ResponseIntegrationTest", () => {
   it("response body with enumerator", async () => {
     testCase.app = rackishApp(
       { "Content-Type": "text/plain" },
-      (async function* () {
+      (function* () {
         for (let n = 0; n < 10; n++) yield String(n);
       })(),
     );
@@ -663,7 +663,7 @@ describe("ResponseIntegrationTest", () => {
   it("response body with lazy enumerator", async () => {
     testCase.app = rackishApp(
       { "Content-Type": "text/plain" },
-      (async function* () {
+      (function* () {
         for (let n = 0; n <= 10; n++) yield String(n);
       })(),
     );
