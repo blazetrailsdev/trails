@@ -112,7 +112,9 @@ export async function main(baseBranch = "origin/main", cwd = ROOT_DIR): Promise<
     throw new Error(
       `cast-count gate: ${grew.length} file(s) above their count at ${baseBranch} ` +
         `(${ref.slice(0, 10)}). Type the receiver instead of casting (RFC 0198):\n` +
-        grew.map((v) => `  ${v.file}: ${v.base} → ${v.current}`).join("\n"),
+        grew.map((v) => `  ${v.file}: ${v.base} → ${v.current}`).join("\n") +
+        "\nA file moved, renamed or split on this branch counts 0 at the base, " +
+        "so its existing casts count as new: type them in the same PR.",
     );
   }
   return `cast-count gate: OK (${total(current)}, ${total(base)} at ${ref.slice(0, 10)})`;
