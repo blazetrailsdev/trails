@@ -1719,9 +1719,14 @@ jobs:
       needs.changes.outputs.comparison_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 30
       - uses: ./.github/actions/setup-pnpm
       - uses: ruby/setup-ruby@v1
         with:
@@ -1770,6 +1775,7 @@ jobs:
       - name: Start background gates
         env:
           RUBY_EXTRACTION_HIT: ${{ steps.ruby-extraction.outputs.cache-hit }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           node scripts/ci/bg-gates.mjs start <<'SPEC'
           ts-api: pnpm exec tsx scripts/api-compare/extract-ts-api.ts
@@ -2106,9 +2112,22 @@ jobs:
         # Only-shrink gate on the assertion-count / kind / value totals inside
         # name-matched tests (RFC 0025). Reads output/convention-comparison.json
         # written by the step above — --no-regen because CI must not pay for the
-        # extraction twice. Reseed after convergence with
-        # `pnpm parity:test:assertions:reseed`.
+        # extraction twice.
         run: node scripts/ci/bg-gates.mjs wait assertions
+      - name: Stage parity outputs
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        run: |
+          set -euo pipefail
+          dir=$RUNNER_TEMP/parity-outputs
+          mkdir -p "$dir/scripts/test-compare/output"
+          cp scripts/test-compare/output/convention-comparison.json "$dir/scripts/test-compare/output/"
+      - name: Upload parity outputs
+        if: ${{ !cancelled() && github.event_name == 'push' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-outputs-${{ github.sha }}
+          path: ${{ runner.temp }}/parity-outputs/
+          retention-days: 90
       - name: AR-closure test manifest guard
         # Fails when a file under vendor/rails/v8.0.2/activesupport/test/ is neither
         # derived by R1/R2 nor aliased nor listed out-of-closure, so a vendor
@@ -2132,8 +2151,13 @@ jobs:
       needs.changes.outputs.thor_only == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 30
       - uses: ./.github/actions/setup-pnpm
       - uses: ruby/setup-ruby@v1
         with:
@@ -2149,6 +2173,8 @@ jobs:
       - name: Fetch the thor source
         run: pnpm vendor:fetch --source thor
       - name: Thor comparison
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash scripts/ci/thor-comparison.sh
 
   schema-parity-rails:

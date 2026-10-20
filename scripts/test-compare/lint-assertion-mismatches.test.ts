@@ -2,59 +2,41 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Counts } from "./assertion-ratchet.js";
 import {
   main,
   NO_REGEN_FLAG,
   REGEN_SKIP_ENV,
   shouldRegenerate,
-  shouldRegenerateForRun,
-  WRITE_FLAG,
 } from "./lint-assertion-mismatches.js";
 
 let dir: string;
-let paths: { artifact: string; mark: string; freeze: string };
+let paths: { artifact: string; base: string };
+
+function artifactJson(counts: Record<string, [number, number, number]>): string {
+  return JSON.stringify({
+    results: Object.entries(counts).map(([pkg, [count, kind, value]]) => ({
+      package: pkg,
+      totalAssertionMismatch: count,
+      totalKindMismatch: kind,
+      totalValueMismatch: value,
+    })),
+  });
+}
 
 async function writeFixtures(
   artifact: Record<string, [number, number, number]>,
-  mark: Record<string, [number, number, number]>,
+  base: Record<string, [number, number, number]>,
 ): Promise<void> {
-  await fs.writeFile(
-    paths.artifact,
-    JSON.stringify({
-      results: Object.entries(artifact).map(([pkg, [count, kind, value]]) => ({
-        package: pkg,
-        totalAssertionMismatch: count,
-        totalKindMismatch: kind,
-        totalValueMismatch: value,
-      })),
-    }),
-  );
-  await fs.writeFile(
-    paths.mark,
-    JSON.stringify({
-      packages: Object.fromEntries(
-        Object.entries(mark).map(([pkg, [assertionCount, kind, value]]) => [
-          pkg,
-          { assertionCount, kind, value },
-        ]),
-      ),
-    }),
-  );
-}
-
-async function readMark(): Promise<Record<string, Counts>> {
-  return (
-    JSON.parse(await fs.readFile(paths.mark, "utf-8")) as { packages: Record<string, Counts> }
-  ).packages;
+  await fs.writeFile(paths.artifact, artifactJson(artifact));
+  await fs.writeFile(paths.base, artifactJson(base));
 }
 
 beforeEach(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), "assertion-ratchet-"));
+  await fs.mkdir(path.join(dir, "base"));
   paths = {
-    artifact: path.join(dir, "artifact.json"),
-    mark: path.join(dir, "mark.json"),
-    freeze: path.join(dir, "mark.freeze"),
+    artifact: path.join(dir, "convention-comparison.json"),
+    base: path.join(dir, "base", "convention-comparison.json"),
   };
   vi.spyOn(console, "log").mockImplementation(() => {});
   vi.spyOn(console, "error").mockImplementation(() => {});
@@ -66,106 +48,40 @@ afterEach(async () => {
 });
 
 describe("main", () => {
-  it("passes when every counter sits at or under its mark", async () => {
+  it("passes when every counter sits at or under its base count", async () => {
     await writeFixtures({ activerecord: [9, 20, 3] }, { activerecord: [10, 20, 3] });
-    expect(await main(false, paths)).toBe(0);
+    expect(await main(paths)).toBe(0);
   });
 
-  it("fails when a counter grew past its mark", async () => {
+  it("fails when a counter grew past its base count", async () => {
     await writeFixtures({ activerecord: [10, 23, 3] }, { activerecord: [10, 20, 3] });
-    expect(await main(false, paths)).toBe(1);
+    expect(await main(paths)).toBe(1);
     expect(vi.mocked(console.error).mock.calls.join("\n")).toContain(
-      "assertion-kind-mismatch: 23 (mark 20, +3)",
+      "assertion-kind-mismatch: 23 (base 20, +3)",
     );
   });
 
-  it("fails when the artifact carries a package the mark does not", async () => {
+  it("fails when the artifact carries a package the base does not", async () => {
     await writeFixtures({ activerecord: [1, 1, 1], arel: [0, 0, 0] }, { activerecord: [1, 1, 1] });
-    expect(await main(false, paths)).toBe(1);
+    expect(await main(paths)).toBe(1);
     expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("absent from");
   });
 
-  it("lowers the mark to the shrunken counters under --write", async () => {
-    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
-    expect(await main(true, paths)).toBe(0);
-    expect(await readMark()).toEqual({ activerecord: { assertionCount: 4, kind: 20, value: 0 } });
-  });
-
-  it("never raises the mark under --write", async () => {
-    await writeFixtures({ activerecord: [99, 99, 99] }, { activerecord: [10, 20, 3] });
-    expect(await main(true, paths)).toBe(0);
-    expect(await readMark()).toEqual({ activerecord: { assertionCount: 10, kind: 20, value: 3 } });
-  });
-
-  it("refuses a partial-scope run rather than dropping a marked package", async () => {
+  it("refuses a partial-scope run rather than reading a base package as converged", async () => {
     await writeFixtures({ activerecord: [1, 1, 1] }, { activerecord: [1, 1, 1], arel: [0, 0, 0] });
-    expect(await main(true, paths)).toBe(1);
-    expect(await readMark()).toHaveProperty("arel");
+    expect(await main(paths)).toBe(1);
+    expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("partial-scope");
   });
 
-  it("refuses to reseed while the mark is frozen", async () => {
-    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
-    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
-    expect(await main(true, paths)).toBe(1);
-    expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("Frozen for RFC 0132.");
-    expect(await readMark()).toEqual({ activerecord: { assertionCount: 10, kind: 20, value: 3 } });
-  });
-
-  it("still gates a frozen mark, whose slack reads as green", async () => {
-    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
-    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
-    expect(await main(false, paths)).toBe(0);
-  });
-
-  it("still fails a frozen mark whose counters grew past it", async () => {
-    await writeFixtures({ activerecord: [10, 23, 3] }, { activerecord: [10, 20, 3] });
-    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
-    expect(await main(false, paths)).toBe(1);
-  });
-
-  it("reports the slack on a FAILING run too, where it matters most", async () => {
-    await writeFixtures({ activerecord: [10, 23, 0] }, { activerecord: [10, 20, 3] });
-    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
-    expect(await main(false, paths)).toBe(1);
-    expect(vi.mocked(console.log).mock.calls.join("\n")).toContain(
-      "assertion-value-mismatch: 0 (mark 3, 3 unguarded)",
-    );
-  });
-
-  it("reports no slack for a partial-scope run, which has none to report honestly", async () => {
-    await writeFixtures({ activerecord: [1, 1, 1] }, { activerecord: [1, 1, 1], arel: [0, 0, 0] });
-    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
-    expect(await main(false, paths)).toBe(1);
-    expect(vi.mocked(console.log).mock.calls.join("\n")).not.toContain("slack");
-  });
-
-  it("gates normally when the marker cannot be read, which the gate does not depend on", async () => {
-    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
-    await fs.writeFile(paths.freeze, "   \n");
-    expect(await main(false, paths)).toBe(0);
-  });
-
-  it("reports the slack a frozen mark is carrying, which is the suspended protection", async () => {
-    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
-    await fs.writeFile(paths.freeze, "Frozen for RFC 0132.\n");
-    expect(await main(false, paths)).toBe(0);
-    const out = vi.mocked(console.log).mock.calls.join("\n");
-    expect(out).toContain("assertion-count-mismatch: 4 (mark 10, 6 unguarded)");
-    expect(out).toContain("assertion-value-mismatch: 0 (mark 3, 3 unguarded)");
-    expect(out).not.toContain("assertion-kind-mismatch");
-    expect(out).toContain("Frozen for RFC 0132.");
-  });
-
-  it("reports no slack while the mark is live", async () => {
-    await writeFixtures({ activerecord: [4, 20, 0] }, { activerecord: [10, 20, 3] });
-    expect(await main(false, paths)).toBe(0);
-    expect(vi.mocked(console.log).mock.calls.join("\n")).not.toContain("slack");
+  it("gates a scoped run against the scope's own base counts", async () => {
+    await writeFixtures({ thor: [2, 0, 0] }, { activerecord: [9, 9, 9], thor: [2, 0, 0] });
+    expect(await main(paths, "thor")).toBe(0);
   });
 
   it("names the missing artifact rather than surfacing a bare ENOENT", async () => {
     await writeFixtures({}, {});
     await fs.rm(paths.artifact);
-    await expect(main(false, paths)).rejects.toThrow(/pnpm parity:test --json/);
+    await expect(main(paths)).rejects.toThrow(/pnpm parity:test --json/);
   });
 });
 
@@ -181,24 +97,5 @@ describe("shouldRegenerate", () => {
   it("does not regenerate under --no-regen or the skip env", () => {
     expect(shouldRegenerate([NO_REGEN_FLAG], {})).toBe(false);
     expect(shouldRegenerate([], { [REGEN_SKIP_ENV]: "1" })).toBe(false);
-  });
-});
-
-describe("shouldRegenerateForRun", () => {
-  it("skips the regeneration a frozen reseed would throw away", () => {
-    expect(shouldRegenerateForRun([WRITE_FLAG], {}, true)).toBe(false);
-  });
-
-  it("still regenerates for the gate arm while frozen, which reads the counters", () => {
-    expect(shouldRegenerateForRun([], {}, true)).toBe(true);
-  });
-
-  it("regenerates for a reseed once the mark is thawed", () => {
-    expect(shouldRegenerateForRun([WRITE_FLAG], {}, false)).toBe(true);
-  });
-
-  it("never overrides an explicit opt-out", () => {
-    expect(shouldRegenerateForRun([NO_REGEN_FLAG], {}, false)).toBe(false);
-    expect(shouldRegenerateForRun([], { CI: "true" }, false)).toBe(false);
   });
 });

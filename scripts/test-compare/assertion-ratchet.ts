@@ -8,17 +8,14 @@
  * literal EXPECTED VALUES). They were advisory, so a newly ported test could
  * assert less than its Rails counterpart and still count as matched.
  *
- * This pins them the way the wide call-mismatch ratchet pins its unreviewed
- * count (RFC 0083): a committed high-water mark per package per counter, which
- * `--write` lowers and never raises. The arm is AGGREGATE — the guarantee is
- * "assertion-level debt never grows", not "every remaining mismatch was
- * reviewed". See CONTRIBUTING.md "Measuring progress" for the full contract and
- * the stale-artifact trap.
+ * This pins them per package per counter against the same artifact as main's
+ * CI wrote it for the base commit (RFC 0127): nothing is committed, so there is
+ * no mark to reseed or tighten and no merge conflict on one. The arm is
+ * AGGREGATE — the guarantee is "assertion-level debt never grows", not "every
+ * remaining mismatch was reviewed". See CONTRIBUTING.md "Measuring progress".
  *
  * Hard rules: no node:* imports, no process.*, async fs.
  */
-import * as fs from "fs/promises";
-
 /** The three assertion-level counters, in report order. */
 export const COUNTERS = ["assertionCount", "kind", "value"] as const;
 
@@ -32,11 +29,6 @@ export const COUNTER_LABELS: Record<Counter, string> = {
 };
 
 export type Counts = Record<Counter, number>;
-
-/** The committed high-water mark: per package, one number per counter. */
-export interface AssertionMark {
-  packages: Record<string, Counts>;
-}
 
 /** The slice of convention-comparison.json this gate reads. */
 export interface ComparisonArtifact {
@@ -66,92 +58,22 @@ export function countsFromArtifact(artifact: ComparisonArtifact): Record<string,
   return out;
 }
 
-function parseCounts(pkg: string, raw: unknown): Counts {
-  const counts = {} as Counts;
-  for (const counter of COUNTERS) {
-    const value = (raw as Partial<Record<Counter, unknown>> | null)?.[counter];
-    if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
-      throw new Error(
-        `assertion high-water mark: ${pkg}.${counter} must be a non-negative integer, got ` +
-          `${JSON.stringify(value)}`,
-      );
-    }
-    counts[counter] = value;
-  }
-  return counts;
-}
-
-export function parseMark(text: string): AssertionMark {
-  const parsed = JSON.parse(text) as { packages?: unknown } | null;
-  const packages = parsed?.packages;
-  if (typeof packages !== "object" || packages === null || Array.isArray(packages)) {
-    throw new Error(
-      `assertion high-water mark: expected {"packages": {<pkg>: {…}}}, got ${text.trim()}`,
-    );
-  }
-  const out: Record<string, Counts> = {};
-  for (const [pkg, raw] of Object.entries(packages as Record<string, unknown>)) {
-    out[pkg] = parseCounts(pkg, raw);
-  }
-  return { packages: out };
-}
-
-/**
- * Read the committed mark. A missing file is reported as the disarmed ratchet
- * it is — deleting it is how the gate would be silently switched off — rather
- * than as a bare ENOENT.
- */
-export async function loadMark(file: string): Promise<AssertionMark> {
-  let text: string;
-  try {
-    text = await fs.readFile(file, "utf-8");
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-    throw new Error(
-      `assertion high-water mark: ${file} is missing. It is a committed ratchet file; ` +
-        "restore it from git rather than regenerating, or the mark is lost.",
-      { cause: e },
-    );
-  }
-  return parseMark(text);
-}
-
-export async function writeMark(file: string, mark: AssertionMark): Promise<void> {
-  const packages: Record<string, Counts> = {};
-  for (const pkg of Object.keys(mark.packages).sort()) packages[pkg] = mark.packages[pkg];
-  await fs.writeFile(file, `${JSON.stringify({ packages }, null, 2)}\n`);
-}
-
-/** Only-shrink: each counter takes the lower of current and mark. */
-export function nextMark(current: Record<string, Counts>, mark: AssertionMark): AssertionMark {
-  const packages: Record<string, Counts> = {};
-  for (const [pkg, counts] of Object.entries(current)) {
-    const prior = mark.packages[pkg];
-    const next = {} as Counts;
-    for (const counter of COUNTERS) {
-      next[counter] = prior ? Math.min(counts[counter], prior[counter]) : counts[counter];
-    }
-    packages[pkg] = next;
-  }
-  return { packages };
-}
-
 export interface Violation {
   package: string;
   counter: Counter;
   current: number;
-  mark: number;
+  base: number;
 }
 
-/** Counters that exceed their mark, plus packages the mark does not cover. */
+/** Counters above their base count, plus packages the base never measured. */
 export function violations(
   current: Record<string, Counts>,
-  mark: AssertionMark,
+  base: Record<string, Counts>,
 ): { exceeded: Violation[]; unmarked: string[] } {
   const exceeded: Violation[] = [];
   const unmarked: string[] = [];
   for (const pkg of Object.keys(current).sort()) {
-    const prior = mark.packages[pkg];
+    const prior = base[pkg];
     if (!prior) {
       unmarked.push(pkg);
       continue;
@@ -162,7 +84,7 @@ export function violations(
           package: pkg,
           counter,
           current: current[pkg][counter],
-          mark: prior[counter],
+          base: prior[counter],
         });
       }
     }
@@ -170,160 +92,50 @@ export function violations(
   return { exceeded, unmarked };
 }
 
-/** Marked packages that vanished from the artifact — a stale or misscoped run. */
+/** Base packages that vanished from the artifact — a stale or misscoped run. */
 export function missingFromArtifact(
   current: Record<string, Counts>,
-  mark: AssertionMark,
+  base: Record<string, Counts>,
 ): string[] {
-  return Object.keys(mark.packages)
+  return Object.keys(base)
     .filter((pkg) => !(pkg in current))
     .sort();
 }
 
-export function renderExceeded(exceeded: Violation[], markPath: string): string {
+export function renderExceeded(exceeded: Violation[], basePath: string): string {
   return [
     "",
     "assertion-mismatch ratchet: assertion-level debt GREW inside name-matched tests.",
     "",
     ...exceeded.map(
       (v) =>
-        `  ${v.package}  ${COUNTER_LABELS[v.counter]}: ${v.current} (mark ${v.mark}, ` +
-        `+${v.current - v.mark})`,
+        `  ${v.package}  ${COUNTER_LABELS[v.counter]}: ${v.current} (base ${v.base}, ` +
+        `+${v.current - v.base})`,
     ),
     "",
     "A matched test now asserts a different number of things, different kinds of things, or",
     "different literal values than its Rails counterpart. Read the Rails test and converge the",
     "port's assertions — `pnpm parity:test --assertions` has the per-test breakdown.",
-    `The mark in ${markPath} only shrinks; it is never raised to admit new debt.`,
+    `Each counter only shrinks against ${basePath}.`,
   ].join("\n");
 }
 
-export function renderUnmarked(unmarked: string[], markPath: string): string {
+export function renderUnmarked(unmarked: string[], basePath: string): string {
   return [
     "",
-    `assertion-mismatch ratchet: ${unmarked.length} package(s) are absent from ${markPath}:`,
+    `assertion-mismatch ratchet: ${unmarked.length} package(s) are absent from ${basePath}:`,
     ...unmarked.map((p) => `  ${p}`),
-    "An unmarked package would let its whole assertion debt in unmeasured. Seed it with",
-    "`pnpm parity:test:assertions:reseed`.",
+    "A package the base never measured would let its whole assertion debt in unmeasured.",
+    "Land its comparison wiring with no matched-test assertion debt first.",
   ].join("\n");
 }
 
-export function renderMissing(missing: string[], markPath: string): string {
+export function renderMissing(missing: string[], basePath: string): string {
   return [
     "",
-    `assertion-mismatch ratchet: ${missing.length} marked package(s) are absent from the artifact:`,
+    `assertion-mismatch ratchet: ${missing.length} base package(s) are absent from the artifact:`,
     ...missing.map((p) => `  ${p}`),
     "That is a partial-scope run (a `--package` filter, an unfetched vendor source), not",
-    `convergence. Re-run the full comparison before trusting ${markPath}.`,
-  ].join("\n");
-}
-
-export function renderWriteSummary(mark: AssertionMark, markPath: string): string {
-  return [
-    `Wrote ${markPath}:`,
-    ...Object.keys(mark.packages)
-      .sort()
-      .map(
-        (pkg) =>
-          `  ${pkg}  ` +
-          COUNTERS.map((c) => `${COUNTER_LABELS[c]}=${mark.packages[pkg][c]}`).join("  "),
-      ),
-  ].join("\n");
-}
-
-/**
- * Read the freeze marker that suspends reseeding, or `null` when the mark is
- * live. Its contents are the refusal's reason line, so the campaign that froze
- * the mark names itself rather than being hard-coded here.
- *
- * The marker exists because `--write` is not scoped: `nextMark` rewrites EVERY
- * package in the artifact, so one reflexive reseed during a convergence
- * campaign both re-serializes the stories onto this file and tightens unrelated
- * packages in a diff nobody reviewed.
- *
- * An EMPTY marker raises rather than freezing silently: a freeze nobody can
- * trace to a campaign is one nobody knows to lift.
- */
-export async function loadFreeze(file: string): Promise<string | null> {
-  let text: string;
-  try {
-    text = await fs.readFile(file, "utf-8");
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw e;
-  }
-  const reason = text.trim();
-  if (reason === "") {
-    throw new Error(
-      `the freeze marker ${file} is empty. Its contents ARE the refusal, so an empty one ` +
-        "suspends reseeding while naming no campaign and no story to lift it. Write why the " +
-        "mark is frozen, or delete the file to thaw it.",
-    );
-  }
-  return reason;
-}
-
-export function renderFrozen(reason: string, freezePath: string, markPath: string): string {
-  return [
-    "",
-    `assertion-mismatch ratchet: ${markPath} is FROZEN — refusing to reseed.`,
-    "",
-    ...reason.split("\n").map((line) => `  ${line}`),
-    "",
-    "Convergence still gates normally: the mark only shrinks, so a frozen mark sitting above",
-    "the measurement stays green and needs no write. Lower it in one pass when the campaign",
-    `closes, by deleting ${freezePath} in that same PR.`,
-  ].join("\n");
-}
-
-/** A counter sitting BELOW its mark, and by how much. */
-export interface Slack {
-  package: string;
-  counter: Counter;
-  current: number;
-  mark: number;
-}
-
-/**
- * Every counter the mark is holding above the measurement.
- *
- * Slack is what a frozen mark accumulates as a campaign converges, and it is
- * also exactly the room a regression can move in without failing the gate. The
- * gate reports it so the protection the freeze suspends is visible in the run
- * that is not enforcing it, rather than being inferable only by diffing two
- * artifacts.
- */
-export function slack(current: Record<string, Counts>, mark: AssertionMark): Slack[] {
-  const out: Slack[] = [];
-  for (const pkg of Object.keys(current).sort()) {
-    const prior = mark.packages[pkg];
-    if (!prior) continue;
-    for (const counter of COUNTERS) {
-      if (current[pkg][counter] < prior[counter]) {
-        out.push({ package: pkg, counter, current: current[pkg][counter], mark: prior[counter] });
-      }
-    }
-  }
-  return out;
-}
-
-export function renderFrozenSlack(entries: Slack[], reason: string, markPath: string): string {
-  const total = entries.reduce((sum, e) => sum + (e.mark - e.current), 0);
-  return [
-    "",
-    `assertion-mismatch ratchet: ${markPath} is FROZEN, and currently carries ${total} ` +
-      "counter(s) of slack:",
-    "",
-    ...entries.map(
-      (e) =>
-        `  ${e.package}  ${COUNTER_LABELS[e.counter]}: ${e.current} (mark ${e.mark}, ` +
-        `${e.mark - e.current} unguarded)`,
-    ),
-    "",
-    "A regression inside that slack does NOT fail this gate while the mark is frozen — the",
-    "numbers above are the protection currently suspended. Reviewers of a converging PR read",
-    "them; they should only ever fall.",
-    "",
-    ...reason.split("\n").map((line) => `  ${line}`),
+    `convergence. Re-run the full comparison before gating against ${basePath}.`,
   ].join("\n");
 }
