@@ -50,7 +50,7 @@ interface FinderRelation {
   /** @internal */
   isNullRelation(): boolean;
   limitValue: number | string | null;
-  offsetValue: number | null;
+  offsetValue: number | string | null;
   distinctValue: unknown;
   limitBang(value: unknown): FinderRelation;
   /** @internal */
@@ -231,7 +231,7 @@ export async function findNthWithLimit(
   }
   if (limit <= 0) return [];
   if (index > 0) {
-    relation = relation.offset((this.offsetValue ?? 0) + index);
+    relation = relation.offset(((this.offsetValue ?? 0) as number) + index);
   }
   return relation.limit(limit).toArray();
 }
