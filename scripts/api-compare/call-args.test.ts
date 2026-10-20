@@ -1290,6 +1290,13 @@ describe("comparableRubySites", () => {
     expect(comparableRubySites([stringNew, klassNew], ts, () => false)).toEqual([klassNew]);
   });
 
+  it("drops a String.new(x), the value itself, so klass.new pairs with new klass", () => {
+    const stringNew = { ...site("new", ["id:value"]), recv: "const:String" };
+    const klassNew = { ...site("new", ["id:body"]), recv: "id:klass" };
+    const ts = [site("constructor", ["id:body"])];
+    expect(comparableRubySites([stringNew, klassNew], ts, () => false)).toEqual([klassNew]);
+  });
+
   it("drops a weak site the TS body makes no such call for", () => {
     const kept = comparableRubySites(
       [site("map", ["id:x"], ["weak"])],

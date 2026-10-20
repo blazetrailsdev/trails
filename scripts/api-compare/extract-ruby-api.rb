@@ -4286,7 +4286,7 @@ class ApiExtractor
     no_args = args.all? { |arg| arg.nil? || arg == [:arg_paren, nil] }
     return "literal-new" if no_args && LITERAL_NEW_CONSTANTS.include?(const)
 
-    return "string-new" if const == "String"
+    return "string-new" if !no_args && const == "String"
 
     "hwia-new" if const.split("::").last == "HashWithIndifferentAccess" && positional_arg_count(args) <= 1
   end
@@ -4581,10 +4581,6 @@ class ApiExtractor
                   proc_new_receiver?(callee[1])
     name = nil if (callee[0] == :call || callee[0] == :command_call) &&
                   native_promise_call?(name, callee[1])
-    # A `String.new` ports as the JS string itself, no `new` expression, the
-    # verdict walk_for_calls gives it.
-    name = nil if name == "new" && (callee[0] == :call || callee[0] == :command_call) &&
-                  core_new_kind(callee[1], [args], flags.include?("block")) == "string-new"
     name = nil if name && attr_reader_read?(callee, args, flags)
     if name == "call" && (callee[0] == :call || callee[0] == :command_call)
       name = attr_reader_receiver_name(callee[1]) || name
