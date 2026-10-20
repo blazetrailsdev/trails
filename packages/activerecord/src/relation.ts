@@ -8,7 +8,6 @@ import {
   type Module,
   Range,
   rbEnsure,
-  rbFSend,
   rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
@@ -196,7 +195,7 @@ export class ExplainProxy<T extends Base> {
   }
 
   inspect(): Promise<string> {
-    return this.execExplain(() => rbFSend(this._relation, "execQueries") as Promise<T[]>);
+    return this.execExplain(() => this._relation.execQueries());
   }
 
   average(columnName: string | ArelNode): Promise<string> {
@@ -677,7 +676,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     return [...(await this.records())];
   }
 
-  protected async execQueries(block?: (record: T) => void): Promise<T[]> {
+  /** @internal */
+  async execQueries(block?: (record: T) => void): Promise<T[]> {
     return this.skipQueryCacheIfNecessary(async () => {
       await this._model.ensureSchemaLoaded();
 

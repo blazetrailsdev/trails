@@ -140,7 +140,7 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
 export class Associations {
   static belongsTo(
     name: string,
-    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
     options: AssociationOptions = {},
   ): void {
     if (typeof scope === "object" && scope !== null) {
@@ -158,7 +158,7 @@ export class Associations {
 
   static hasOne(
     name: string,
-    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
     options: AssociationOptions = {},
   ): void {
     if (typeof scope === "object" && scope !== null) {
@@ -171,7 +171,7 @@ export class Associations {
 
   static hasMany(
     name: string,
-    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
     options: AssociationOptions = {},
     extension?: (mod: Module) => void,
   ): void {
@@ -194,7 +194,7 @@ export class Associations {
     scope:
       | ((this: Relation<any>, ...args: any[]) => any)
       | (AssociationOptions & { joinTable?: string })
-      | null = {},
+      | null = null,
     options: AssociationOptions & { joinTable?: string } = {},
     extension?: (mod: Module) => void,
   ): void {
