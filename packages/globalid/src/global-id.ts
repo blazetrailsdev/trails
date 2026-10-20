@@ -153,10 +153,6 @@ export class GlobalID {
     return (_deprecator ??= new Deprecation("2.1", "GlobalID"));
   }
 
-  static validateApp(app: string | null | undefined): string {
-    return GID.validateApp(app);
-  }
-
   get modelClass(): LocatorModel {
     const klass = constantize(this.modelName) as LocatorModel;
     if (isOrExtends(klass, GlobalID)) {
