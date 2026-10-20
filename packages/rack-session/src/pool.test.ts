@@ -1,5 +1,12 @@
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { Lint, MockRequest, RACK_SESSION_OPTIONS, Response, Utils } from "@blazetrails/rack";
+import {
+  Lint,
+  MockRequest,
+  RACK_SESSION_OPTIONS,
+  Response,
+  Utils,
+  type MockResponse,
+} from "@blazetrails/rack";
 import { Thread, rbGvGet, rbObjDup, warn } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
@@ -254,9 +261,13 @@ describe("Rack::Session::Pool", () => {
     const tnum = Math.trunc(Math.random() * 7) + 5;
     const threads = Array.from(
       { length: tnum },
-      () => new Thread(treq, (run: MockRequest) => run.get("/", { HTTP_COOKIE: cookie })),
+      () =>
+        new Thread<Promise<MockResponse>>(treq, (run: MockRequest) =>
+          run.get("/", { HTTP_COOKIE: cookie }),
+        ),
     ).reverse();
-    const r = await Promise.all(threads.map(async (t) => (await t.join()).value()));
+    const r: MockResponse[] = [];
+    for (const t of threads) r.push(await (await (await t.run()).join()).value());
     for (const resp of r) {
       expect(resp.headers["set-cookie"]).toBe(cookie);
       expect(resp.body).toContain('"counter"=>2');

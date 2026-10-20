@@ -1,4 +1,5 @@
 import { excBacktraceLocations, type Location } from "./backtrace-location.js";
+import { ThreadError } from "./thread-error.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import {
   getAsyncContext,
@@ -75,12 +76,22 @@ export class Thread<R = unknown> {
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread.stop` (`vendor/ruby/v3.3.11/thread.c:2861`),
-   * which sleeps the current thread until another wakes or kills it. Nothing
-   * here wakes one, so the promise never settles and a killed thread's body
-   * stops at this call, as Ruby's does.
+   * which sleeps the current thread until another wakes or kills it. A thread
+   * woken by `wakeup` / `run` before it reaches this call does not sleep: MRI's
+   * GVL lets a new thread run to its first blocking point before its creator
+   * resumes, so Ruby's `t.run` always finds the thread asleep, and a JS body
+   * reaches this call only after awaits the creator does not wait for. A killed
+   * thread's body stops at this call, as Ruby's does.
    */
   static stop(): Promise<null> {
-    return new Promise(() => {});
+    const th = Thread.current();
+    if (!(#ready in th)) return new Promise(() => {});
+    if (th.#ready) {
+      th.#ready = false;
+      return Promise.resolve(null);
+    }
+    th.status = "sleep";
+    return new Promise((resolve) => (th.#wake = () => resolve(null)));
   }
 
   /**
@@ -137,7 +148,7 @@ export class Thread<R = unknown> {
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#status` (`vendor/ruby/v3.3.11/thread.c:3480`).
    */
-  status: "run" | "dead";
+  status: "run" | "sleep" | "dead";
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#name` (`vendor/ruby/v3.3.11/thread.c:3396`).
    */
@@ -151,6 +162,8 @@ export class Thread<R = unknown> {
   #value!: R;
   #error: { raised: unknown } | null = null;
   #kill!: () => void;
+  #wake: (() => void) | null = null;
+  #ready = false;
   readonly #killed = new Promise<void>((resolve) => (this.#kill = resolve));
 
   /**
@@ -228,6 +241,34 @@ export class Thread<R = unknown> {
       });
       return Promise.race([joined, expired]).finally(() => clearTimeout(timer));
     }
+    return this;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#wakeup` (`vendor/ruby/v3.3.11/thread.c:2805-2827`),
+   * which raises `ThreadError` for a killed thread and otherwise marks it
+   * eligible for scheduling, ending a `Thread.stop`.
+   */
+  wakeup(): this {
+    if (this.status === "dead") throw new ThreadError("killed thread");
+    const wake = this.#wake;
+    if (wake == null) {
+      this.#ready = true;
+      return this;
+    }
+    this.#wake = null;
+    this.status = "run";
+    wake();
+    return this;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#run` (`vendor/ruby/v3.3.11/thread.c:2852-2857`):
+   * `wakeup`, then `rb_thread_schedule`, which here is `Thread.pass`.
+   */
+  async run(): Promise<this> {
+    this.wakeup();
+    await Thread.pass();
     return this;
   }
 
