@@ -224,7 +224,13 @@ export class TypePass {
     for (const t of types) for (const p of splitUnion(t)) set.add(p);
     if (!set.size) return "unknown";
     if (set.has("unknown")) return "unknown";
-    return [...set].sort((a, b) => (a === "null" ? 1 : b === "null" ? -1 : 0)).join(" | ");
+    // A function type in a union is parenthesized (TS1385).
+    const wrap = (x: string) =>
+      set.size > 1 && /=>/.test(x) && !/^\(.*\)$/.test(x) ? `(${x})` : x;
+    return [...set]
+      .sort((a, b) => (a === "null" ? 1 : b === "null" ? -1 : 0))
+      .map(wrap)
+      .join(" | ");
   }
 
   /**
@@ -563,6 +569,7 @@ export class TypePass {
    */
   dropAnyLocals(): number {
     const program = this.program();
+    const checker = program.getTypeChecker();
     let n = 0;
     for (const f of this.files) {
       const sf = program.getSourceFile(f);
@@ -583,7 +590,20 @@ export class TypePass {
           // `this: any` on a function handed to a call goes whole (with its
           // comma): `this` is then the callee's (`onLoad`'s block type).
           if (ts.isIdentifier(node.name) && node.name.text === "this") {
-            const params = (node.parent as ts.FunctionExpression).parameters;
+            const fnExpr = node.parent as ts.FunctionExpression;
+            const ctxType = checker.getContextualType(fnExpr);
+            const ctxThis = ctxType
+              ?.getCallSignatures()
+              .some((sg) => sg.getDeclaration() && sg.thisParameter);
+            // No `this` from the callee (an `rbBlock(…)` wrapper): Ruby runs the
+            // block on an instance of the class around it (`rescue_from`, a
+            // callback macro), so `this` is that class's instance type.
+            const inst = ctxThis ? null : this.enclosingInstance(fnExpr, sf);
+            if (inst) {
+              edits.push({ pos: node.type!.getStart(sf), end: node.type!.getEnd(), text: inst });
+              return;
+            }
+            const params = fnExpr.parameters;
             const end = params.length > 1 ? params[1].getStart(sf) : node.getEnd();
             edits.push({ pos: node.getStart(sf), end, text: "" });
             return;
@@ -604,6 +624,29 @@ export class TypePass {
       n += edits.length;
     }
     return n;
+  }
+
+  /**
+   * The instance type of the code around `fn`: the class of the static (or
+   * instance) method it sits in, or `X` where that method declares
+   * `this: typeof X` / `this: X`. Null when there is none.
+   */
+  enclosingInstance(fn: ts.Node, sf: ts.SourceFile): string | null {
+    for (let p = fn.parent; p; p = p.parent) {
+      if (ts.isMethodDeclaration(p) || ts.isFunctionDeclaration(p) || ts.isFunctionExpression(p)) {
+        const thisP = p.parameters.find((x) => ts.isIdentifier(x.name) && x.name.text === "this");
+        if (thisP?.type) {
+          const t = thisP.type.getText(sf);
+          if (/\bany\b|\bunknown\b/.test(t)) return null;
+          return t.startsWith("typeof ") ? t.slice("typeof ".length) : t;
+        }
+        if (ts.isMethodDeclaration(p) && ts.isClassDeclaration(p.parent) && p.parent.name)
+          return p.parent.name.text;
+        if (!ts.isFunctionExpression(p)) return null;
+      }
+      if (ts.isArrowFunction(p)) continue;
+    }
+    return null;
   }
 
   /**
