@@ -409,6 +409,7 @@ declare module "@blazetrails/date" {
     plus(other: Duration): Time;
     plus(offset: number | bigint | Rational | Time): Time;
     minus(other: Duration): Time;
+    minus(other: TimeWithZone): number;
     minus(offset: number | bigint | Rational | Time): Time | number;
     plusWithDuration(other: unknown): Time;
     minusWithDuration(other: unknown): Time | number;

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import { Duration } from "../../duration.js";
+import { TimeWithZone } from "../../time-with-zone.js";
+import { TimeZone } from "../../values/time-zone.js";
 import "./calculations.js";
 
 function withEnvTz<T>(tz: string, fn: () => T): T {
@@ -20,6 +22,12 @@ function withEnvTz<T>(tz: string, fn: () => T): T {
 }
 
 describe("TimeExtCalculationsTest (trails)", () => {
+  it("minus accepts a TimeWithZone without a cast", () => {
+    const time = RubyTime.utc(2005, 2, 22, 10, 10, 10);
+    const twz = new TimeWithZone(RubyTime.utc(2005, 2, 22, 10, 10, 7), TimeZone.find("UTC")!);
+    expect(time.minus(twz)).toBe(3);
+  });
+
   it("plus and minus accept a Duration without a cast", () => {
     const time = RubyTime.utc(2005, 2, 22, 10, 10, 10);
     expect(time.plus(Duration.seconds(3)).strftime("%Y-%m-%d %H:%M:%S")).toBe(
