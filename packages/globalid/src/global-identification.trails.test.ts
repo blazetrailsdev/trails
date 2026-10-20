@@ -50,12 +50,15 @@ describe("GlobalIdentificationTest", () => {
 });
 
 describe("Locator.locateSigned + locateManySigned", () => {
+  let previousVerifier: MessageVerifier | undefined;
   beforeEach(() => {
     GlobalID.setApp("bcx");
     registerConstant("Person", Person);
+    previousVerifier = SignedGlobalID.verifier;
   });
   afterEach(() => {
     GlobalID["_app"] = undefined;
+    SignedGlobalID.verifier = previousVerifier;
     resetConstants();
   });
 
@@ -88,6 +91,7 @@ describe("Locator.locateSigned + locateManySigned", () => {
 
   it("locate_many_signed filters by for: purpose", async () => {
     const verifier = makeVerifier();
+    SignedGlobalID.verifier = verifier;
     const matching = SignedGlobalID.create(new Person("1"), { verifier, for: "login" });
     const mismatched = SignedGlobalID.create(new Person("2"), { verifier, for: "signup" });
     const found = await Locator.locateManySigned([matching.toString(), mismatched.toString()], {
@@ -100,6 +104,7 @@ describe("Locator.locateSigned + locateManySigned", () => {
 
   it("accepts SignedGlobalID instances directly (no toString needed)", async () => {
     const verifier = makeVerifier();
+    SignedGlobalID.verifier = verifier;
     const sgid = SignedGlobalID.create(new Person("4"), { verifier });
     const sgid2 = SignedGlobalID.create(new Person("5"), { verifier });
     const found = (await Locator.locateSigned(sgid, { verifier })) as Person;
@@ -112,6 +117,7 @@ describe("Locator.locateSigned + locateManySigned", () => {
 
   it("locate_many_signed locates the valid subset", async () => {
     const verifier = makeVerifier();
+    SignedGlobalID.verifier = verifier;
     const wrongVerifier = new MessageVerifier("other", { digest: "sha256", url_safe: true });
     const validSgid = SignedGlobalID.create(new Person("1"), { verifier });
     const invalidSgid = SignedGlobalID.create(new Person("2"), { verifier: wrongVerifier });
