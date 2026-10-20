@@ -24,7 +24,22 @@ export function artifactName(sha: string): string {
   return `parity-outputs-${sha}`;
 }
 
-function run(cmd: string, args: string[], cwd: string, env: Env, inherit = false): Promise<string> {
+/** Runs a command and resolves its trimmed stdout; injectable so tests can fake `git` and `gh`. */
+export type Runner = (
+  cmd: string,
+  args: string[],
+  cwd: string,
+  env: Env,
+  inherit?: boolean,
+) => Promise<string>;
+
+export function run(
+  cmd: string,
+  args: string[],
+  cwd: string,
+  env: Env,
+  inherit = false,
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, args, {
       cwd,
@@ -41,8 +56,8 @@ function run(cmd: string, args: string[], cwd: string, env: Env, inherit = false
   });
 }
 
-export function baseSha(rootDir: string, env: Env): Promise<string> {
-  return run("git", ["rev-parse", env.CI ? "HEAD^1" : "origin/main"], rootDir, env);
+export function baseSha(rootDir: string, env: Env, runner: Runner = run): Promise<string> {
+  return runner("git", ["rev-parse", env.CI ? "HEAD^1" : "origin/main"], rootDir, env);
 }
 
 /** Download main's artifact for `sha` into `dir`; false when there is none. */
@@ -51,23 +66,24 @@ export async function downloadArtifact(
   dir: string,
   rootDir: string,
   env: Env,
+  runner: Runner = run,
 ): Promise<boolean> {
   const name = artifactName(sha);
   let runId: string;
   try {
-    runId = await run(
+    runId = await runner(
       "gh",
       [
         "api",
-        `repos/{owner}/{repo}/actions/artifacts?name=${name}&per_page=1`,
+        `repos/{owner}/{repo}/actions/artifacts?name=${name}&per_page=100`,
         "--jq",
-        ".artifacts[] | select(.expired | not) | .workflow_run.id",
+        "first(.artifacts[] | select(.expired | not) | .workflow_run.id) // empty",
       ],
       rootDir,
       env,
     );
     if (runId === "") return false;
-    await run("gh", ["run", "download", runId.split("\n")[0], "-n", name, "-D", dir], rootDir, env);
+    await runner("gh", ["run", "download", runId, "-n", name, "-D", dir], rootDir, env);
   } catch (e) {
     console.error(`main-artifact: no ${name} (${(e as Error).message})`);
     return false;
@@ -87,8 +103,10 @@ export async function recomputeOnWorktree(
   command: string[],
   rootDir: string,
   env: Env,
+  runner: Runner = run,
 ): Promise<void> {
-  await run("git", ["worktree", "add", "--detach", dir, sha], rootDir, env);
+  await runner("git", ["worktree", "prune"], rootDir, env);
+  await runner("git", ["worktree", "add", "--detach", dir, sha], rootDir, env);
   const shared = ["node_modules"];
   for (const source of await fs.readdir(path.join(rootDir, "vendor"), { withFileTypes: true })) {
     if (!source.isDirectory()) continue;
@@ -98,41 +116,48 @@ export async function recomputeOnWorktree(
   }
   for (const rel of shared) {
     const target = path.join(dir, rel);
-    if (
-      await fs.stat(target).then(
-        () => true,
-        () => false,
-      )
-    )
-      continue;
+    const exists = await fs.lstat(target).then(
+      () => true,
+      () => false,
+    );
+    if (exists) continue;
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.symlink(path.join(rootDir, rel), target);
   }
   const [cmd, ...args] = command;
-  await run(cmd, args, dir, env, true);
+  await runner(cmd, args, dir, env, true);
 }
 
 /**
  * The directory holding main's outputs for the base commit, at their repo
- * paths, and a `dispose` that removes it.
+ * paths, and a `dispose` that removes it. A failed recompute disposes before
+ * rethrowing, so no temp dir or registered worktree outlives it.
  */
 export async function baseOutputs(
   command: string[],
   rootDir: string,
   env: Env,
+  runner: Runner = run,
 ): Promise<{ sha: string; dir: string; dispose: () => Promise<void> }> {
-  const sha = await baseSha(rootDir, env);
+  const sha = await baseSha(rootDir, env, runner);
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "parity-base-"));
   let worktree = false;
-  if (!(await downloadArtifact(sha, dir, rootDir, env))) {
-    console.log(`main-artifact: recomputing the outputs for ${sha} on a base worktree…`);
-    await fs.rm(dir, { recursive: true, force: true });
-    worktree = true;
-    await recomputeOnWorktree(sha, dir, command, rootDir, env);
-  }
   const dispose = async (): Promise<void> => {
-    if (worktree) await run("git", ["worktree", "remove", "--force", dir], rootDir, env);
+    if (worktree) {
+      await runner("git", ["worktree", "remove", "--force", dir], rootDir, env).catch(() => "");
+    }
     await fs.rm(dir, { recursive: true, force: true });
   };
+  try {
+    if (!(await downloadArtifact(sha, dir, rootDir, env, runner))) {
+      console.log(`main-artifact: recomputing the outputs for ${sha} on a base worktree…`);
+      await fs.rm(dir, { recursive: true, force: true });
+      worktree = true;
+      await recomputeOnWorktree(sha, dir, command, rootDir, env, runner);
+    }
+  } catch (e) {
+    await dispose();
+    throw e;
+  }
   return { sha, dir, dispose };
 }

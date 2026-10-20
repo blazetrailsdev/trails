@@ -315,6 +315,39 @@ not that every remaining mismatch has been reviewed. Converging one test while
 porting another that asserts less is a neutral trade the gate lets through; the
 reviewer of the diff enforces the stronger rule.
 
+**The stale-artifact trap**: the counts are read from
+`scripts/test-compare/output/convention-comparison.json` — no second extractor.
+Gating a file written before a sibling PR's tests landed reports movement that
+never happened, so a plain local run regenerates the artifact itself
+(`pnpm parity:test --json`) before gating. `--no-regen` (what CI uses, since it
+writes the artifact in the preceding step) gates whatever is on disk. Locally
+the base is your `origin/main` ref, so `git fetch` first or the gate compares
+against an old base. A partial-scope run is caught separately: if a package in
+the base is missing from the artifact — a `--package` filter, an unfetched
+vendor source — the lint fails rather than reading it as converged.
+
+Once the counters are pinned their burn rate is measurable, which is what the
+ActiveRecord release estimate needs to price promoting this from a ratchet to a
+hard release gate (the path `gates.ts` already took: advisory → ratchet → zero).
+
+"Misplaced" means tests exist but are in
+the wrong file per Rails layout — they need to be moved, not rewritten. The
+per-file "Extra" column counts TS tests in the convention file that matched no
+Rails test — a large value flags a file that has ballooned with bespoke/non-Rails
+tests (a fidelity smell). Use `parity:test --sort-extra` (sort the table by
+Extra descending) and `--min-extra=N` (hide files under N extra) to triage the
+worst offenders. `--extra` lists each file's extra tests under its row, as
+`describe > path > name`.
+
+The exact Ruby→TypeScript naming rules `parity:api` matches on — predicate/bang/
+setter forms, token renames, file-path aliases, and the skip list with reasons —
+are catalogued in [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md).
+That file is **generated** from `explainConventions()` in
+`scripts/parity/conventions.ts` (regenerate with `pnpm parity:api:conventions`);
+CI runs `tsx scripts/parity/conventions-doc.ts --check` and fails if it
+drifts, so it is always current — never hand-edit it, change the rule in
+`conventions.ts` instead.
+
 ### Body pins (source-hash pinning)
 
 `scripts/api-compare/body-pins.json` records, per name-matched pair, the

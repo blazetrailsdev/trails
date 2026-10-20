@@ -1720,7 +1720,7 @@ jobs:
       needs.changes.outputs.comparison_affected == 'true' &&
       needs.changes.outputs.thor_only != 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
       actions: read
@@ -2116,14 +2116,14 @@ jobs:
         # extraction twice.
         run: node scripts/ci/bg-gates.mjs wait assertions
       - name: Stage parity outputs
-        if: github.event_name == 'push'
+        if: ${{ !cancelled() && github.event_name == 'push' }}
         run: |
           set -euo pipefail
           dir=$RUNNER_TEMP/parity-outputs
           mkdir -p "$dir/scripts/test-compare/output"
           cp scripts/test-compare/output/convention-comparison.json "$dir/scripts/test-compare/output/"
       - name: Upload parity outputs
-        if: github.event_name == 'push'
+        if: ${{ !cancelled() && github.event_name == 'push' }}
         uses: actions/upload-artifact@v4
         with:
           name: parity-outputs-${{ github.sha }}
