@@ -1312,6 +1312,56 @@ backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
 `NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
 the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
 
+## A dispatch by name goes through an explicit registry (`send`, `public_send`)
+
+`rbFSend` / `rbFPublicSend` are the ports of `Kernel#send` / `#public_send`, and
+they stay — but they are the **last** shape to reach for, not the first. A
+string-keyed send hides the call graph: neither call gate can see through it,
+no TS type checks the target, the name has to be guessed into a TS spelling
+(`sendInternal`'s camelizer), and every one of them costs a prototype walk on a
+path that was a direct property read. By repo-owner ruling on 2026-10-20, a
+dispatch by name is written in this order:
+
+1. **The direct member call**, wherever the name is known where the call is
+   written. A literal `rbFSend(app, "call", env)`, `rbFSend(this, "groupBy")` or
+   an `rbFSend` standing in for a cast is a direct call with the type thrown
+   away: write `app.call(env)` and type `app`. This is the case the ruling is
+   about, and it is most of the repo's sends.
+2. **An explicit registry** where the name genuinely varies at run time but its
+   set is closed — a format, a pragma, a config option, an association's writer,
+   a visitor's node kind, a Thor instruction. A registry is a declared map from
+   the Ruby-visible name to a real, typed function, read at the call site:
+
+   ```ts
+   const RENDERERS = { json: renderJson, xml: renderXml } as const;
+   ```
+
+   It is the same mechanism as `ruby-compat`'s own method tables
+   (`ARRAY_METHOD_TABLE`, `TEMPORAL_METHOD_TABLE`) and as `defineModule`'s
+   section record — a table read once, not a lookup guessed per call.
+
+3. **`rbFSend` / `rbFPublicSend`**, only where the Rails body dispatches a name
+   that is genuinely caller-supplied and open-ended: `Object#try`,
+   `MimeResponds::Collector#any`, `ActionCable::Channel::Base`'s
+   `public_send action`. There the send IS the ported method, and it stays.
+
+Two corollaries:
+
+- **Do not widen the send machinery's name guessing** to make a new call site
+  work. A snake_case Ruby name, an `is…`-spelled predicate, a writer spelling,
+  a Ruby operator name — each is a reason to write the registry at the call
+  site, not to teach `sendInternal` another heuristic.
+- **A story does not propose a send.** When filing or sizing work, name the
+  registry or the typed call in the acceptance criteria. Finding `rbFSend` in
+  neighbouring code is a reason to converge it (§ "A documented deviation is
+  debt, not permission"), not to match it.
+
+This is a fidelity rule, not a licence to drop a call: § "Method visibility is
+compile-time only" still holds, so a `public_send` that survives rule 3 keeps
+its `rbFPublicSend` spelling and its rescue, and a send replaced under rule 1 or
+2 is a converged call the gates still compare — baseline or receipt it like any
+other omission.
+
 ## Ruby protocol methods with a different JS mechanism
 
 Five Ruby protocol names are neither portable by name nor meaningless: JS has
