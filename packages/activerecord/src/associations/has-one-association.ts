@@ -66,11 +66,12 @@ export class HasOneAssociation extends SingularAssociation {
         case "destroyAsync": {
           let primaryKeyColumn: string | string[];
           let id: unknown;
-          if (queryConstraintsList.call(target.constructor as typeof Base)) {
-            primaryKeyColumn = queryConstraintsList.call(target.constructor as typeof Base)!;
+          const klass = target.constructor as typeof Base;
+          if (queryConstraintsList.call(klass)) {
+            primaryKeyColumn = queryConstraintsList.call(klass)!;
             id = primaryKeyColumn.map((col) => rbFPublicSend(target, col));
           } else {
-            primaryKeyColumn = (target.constructor as typeof Base).primaryKey as string;
+            primaryKeyColumn = klass.primaryKey as string;
             id = rbFPublicSend(target, primaryKeyColumn);
           }
 
