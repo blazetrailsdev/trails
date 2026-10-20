@@ -8,7 +8,7 @@ LABEL="${1:-unlabeled}"
 GEM="${CODEGEN_GEM:-activerecord}"
 GEN=packages/$GEM/codegen-out
 mkdir -p "$GEN"
-pnpm tsx scripts/codegen/src/cli.ts > "$GEN/cli.log" 2>&1 || { tail -20 "$GEN/cli.log"; exit 1; }
+pnpm tsx scripts/codegen/src/cli.ts ${CODEGEN_ARGS:-} > "$GEN/cli.log" 2>&1 || { tail -20 "$GEN/cli.log"; exit 1; }
 scripts/codegen/measure-tsc.sh > "$GEN/tsc-summary.txt"
 scripts/codegen/measure-parity.sh gen > /dev/null
 node -e '

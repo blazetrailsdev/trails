@@ -1875,9 +1875,12 @@ export class Emitter {
     const methods: string[] = [];
     for (const m of mods) {
       const ms = this.index.scopes.get(m)!;
+      // A module reached only through a cast (a namespace seat read as
+      // `(X as any)`) has no type to name: skipped.
+      const r = typeRef(m) ? null : ref(m);
+      if (r !== null && !/^[\w$.]+$/.test(r)) continue;
       const t =
-        typeRef(m) ??
-        `${this.lw.imp(ctx, "@blazetrails/ruby-compat", "Included")}<typeof ${ref(m)}>`;
+        typeRef(m) ?? `${this.lw.imp(ctx, "@blazetrails/ruby-compat", "Included")}<typeof ${r}>`;
       const names: string[] = [];
       for (const [d, info] of ms.defs) {
         // A reader whose writer another scope declares is an accessor half: a property.
@@ -1909,9 +1912,13 @@ export class Emitter {
       if (ms.concern && cm) {
         for (const d of cm.defs.keys()) {
           const n = fnName(d, cm.fqn);
+          // A `ClassMethods#new` is inlined into the constructor (CLAUDE.md, "A
+          // module's `initialize` is inlined"), not a static member.
+          if (d === "new" || d === "initialize" || n === "constructor") continue;
           if (own.stat.has(n)) continue;
           own.stat.add(n);
           const cmRef = typeRef(cm.fqn);
+          if (!cmRef && !/^[\w$.]+$/.test(ref(cm.fqn))) continue;
           statics.push(
             cmRef
               ? `declare static ${n}: typeof ${cmRef}.${n};`

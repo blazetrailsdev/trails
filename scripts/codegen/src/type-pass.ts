@@ -145,28 +145,44 @@ export class TypePass {
    * file's relative path or the dependency package's root; null when it cannot
    * be named from `file`.
    */
-  typeText(checker: ts.TypeChecker, t: ts.Type, at: ts.Node, file: string): string | null {
+  typeText(
+    checker: ts.TypeChecker,
+    t: ts.Type,
+    at: ts.Node,
+    file: string,
+    depth = 0,
+  ): string | null {
     if (t.flags & (ts.TypeFlags.Any | ts.TypeFlags.Never)) return null;
+    // A recursive type (an array of arrays of itself) is not walked forever.
+    if (depth > 8) return null;
     // Library code never names a test's class: a test job reaching a library
     // parameter is typed by its nearest library superclass (`HelloJob` → `Base`).
     if (!isTestPath(file)) {
       // An array's element type, a union's members, each in turn.
       if (checker.isArrayType(t)) {
         const el = checker.getTypeArguments(t as ts.TypeReference)[0];
-        const inner = el ? this.typeText(checker, el, at, file) : null;
+        const inner = el ? this.typeText(checker, el, at, file, depth + 1) : null;
         return inner === null ? null : /[|&\s]/.test(inner) ? `(${inner})[]` : `${inner}[]`;
       }
       if (t.isUnion()) {
-        const parts = t.types.map((u) => this.typeText(checker, u, at, file));
+        const parts = t.types.map((u) => this.typeText(checker, u, at, file, depth + 1));
         return parts.some((x) => x === null) ? null : TypePass.union(parts as string[]);
       }
       t = this.libraryType(checker, t);
     }
-    const node = checker.typeToTypeNode(
-      checker.getBaseTypeOfLiteralType(t),
-      at,
-      ts.NodeBuilderFlags.NoTruncation | ts.NodeBuilderFlags.IgnoreErrors,
-    );
+    // A type whose symbol chain the checker cannot walk (a deep or cyclic
+    // one; activerecord's overflows its stack) is one this pass cannot write.
+    let node: ts.TypeNode | undefined;
+    try {
+      node = checker.typeToTypeNode(
+        checker.getBaseTypeOfLiteralType(t),
+        at,
+        ts.NodeBuilderFlags.NoTruncation | ts.NodeBuilderFlags.IgnoreErrors,
+      );
+    } catch (e) {
+      if (e instanceof RangeError) return null;
+      throw e;
+    }
     if (!node) return null;
     let text = ts
       .createPrinter({ removeComments: true })
@@ -980,39 +996,28 @@ export class TypePass {
   }
 
   run(): Record<string, number> {
-    const stats: Record<string, number> = { returns: 0, locals: 0, params: 0, uninferable: 0 };
-    stats.returns += this.dropAnyReturns();
-    stats.locals += this.dropAnyLocals();
-    for (let round = 0; round < 6; round++) {
-      const k = this.paramRound(false);
-      stats.params += k;
-      if (!k) break;
-    }
-    stats.params += this.paramRound(true);
-    for (let round = 0; round < 3; round++) {
-      const k = this.annotateUninferable();
-      stats.uninferable += k;
-      if (!k) break;
-    }
-    stats.fieldsByUse = this.typeFieldsByUse();
-    stats.returnsByUse = 0;
-    for (let round = 0; round < 3; round++) {
-      const k = this.typeReturnsByUse();
-      stats.returnsByUse += k;
-      if (!k) break;
-    }
-    stats.swept = 0;
-    for (let round = 0; round < 4; round++) {
-      const k = this.sweepAny();
-      stats.swept += k;
-      if (!k) break;
-    }
-    stats.asserted = 0;
-    for (let round = 0; round < 3; round++) {
-      const k = this.assertBoundaries();
-      stats.asserted += k;
-      if (!k) break;
-    }
+    const stats: Record<string, number> = {};
+    // `CODEGEN_TIMING=1`: each step's time and edit count, to stderr.
+    const timed = (name: string, f: () => number): number => {
+      const t0 = Date.now();
+      const k = f();
+      if (process.env.CODEGEN_TIMING)
+        console.error(`type-pass ${name}: ${k} edits in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+      stats[name] = (stats[name] ?? 0) + k;
+      return k;
+    };
+    const rounds = (name: string, max: number, f: () => number) => {
+      for (let round = 0; round < max; round++) if (!timed(name, f)) break;
+    };
+    timed("returns", () => this.dropAnyReturns());
+    timed("locals", () => this.dropAnyLocals());
+    rounds("params", 6, () => this.paramRound(false));
+    timed("params", () => this.paramRound(true));
+    rounds("uninferable", 3, () => this.annotateUninferable());
+    timed("fieldsByUse", () => this.typeFieldsByUse());
+    rounds("returnsByUse", 3, () => this.typeReturnsByUse());
+    rounds("swept", 4, () => this.sweepAny());
+    rounds("asserted", 3, () => this.assertBoundaries());
     return stats;
   }
 }
