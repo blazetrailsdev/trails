@@ -163,6 +163,7 @@ export const ROWLESS_PACKAGES = [
   "did-you-mean",
   "globalid",
   "rack",
+  "rack-session",
 ] as const;
 
 /**

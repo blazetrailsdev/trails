@@ -29,37 +29,35 @@ describe("Rack::Session::Cookie", () => {
     session.set("counter", (session.get("counter") as number) + 1);
     const hash = rbObjDup(session);
     hash.delete("session_id");
-    return new Response(hash.inspect()).toArray();
+    return new Response(hash.inspect()).toA();
   };
 
   const sessionId = async (env: RackEnv): Promise<RackResponse> =>
-    new Response(rbInspect((env["rack.session"] as SessionHash).toHash())).toArray();
+    new Response(rbInspect((env["rack.session"] as SessionHash).toHash())).toA();
 
   const sessionOption =
     (opt: string) =>
     async (env: RackEnv): Promise<RackResponse> =>
-      new Response(
-        rbInspect((env["rack.session.options"] as Record<string, unknown>)[opt]),
-      ).toArray();
+      new Response(rbInspect((env["rack.session.options"] as Record<string, unknown>)[opt])).toA();
 
-  const nothing = async (_env: RackEnv): Promise<RackResponse> => new Response("Nothing").toArray();
+  const nothing = async (_env: RackEnv): Promise<RackResponse> => new Response("Nothing").toA();
 
   const renewer = async (env: RackEnv): Promise<RackResponse> => {
     (env["rack.session.options"] as Record<string, unknown>)["renew"] = true;
-    return new Response("Nothing").toArray();
+    return new Response("Nothing").toA();
   };
 
   const onlySessionId = async (env: RackEnv): Promise<RackResponse> =>
-    new Response(rbObjAsString((env["rack.session"] as SessionHash).get("session_id"))).toArray();
+    new Response(rbObjAsString((env["rack.session"] as SessionHash).get("session_id"))).toA();
 
   const bigcookie = async (env: RackEnv): Promise<RackResponse> => {
     (env["rack.session"] as SessionHash).set("cookie", "big".repeat(3000));
-    return new Response((env["rack.session"] as SessionHash).inspect()).toArray();
+    return new Response((env["rack.session"] as SessionHash).inspect()).toA();
   };
 
   const destroySession = async (env: RackEnv): Promise<RackResponse> => {
     await (env["rack.session"] as SessionHash).destroy();
-    return new Response("Nothing").toArray();
+    return new Response("Nothing").toA();
   };
 
   const responseFor = (options: Record<string, unknown> = {}) => {
@@ -404,7 +402,7 @@ describe("Rack::Session::Cookie", () => {
       const errors = env[RACK_ERRORS] as StringIO;
       errors.flush();
       errors.rewind();
-      return new Response(errors.read()).toArray();
+      return new Response(errors.read()).toA();
     };
 
     const app = [incrementor, { secrets: secret }];
@@ -572,7 +570,7 @@ describe("Rack::Session::Cookie", () => {
       session.set("message", `${session.get("message")}${String((counter += 1))}--`);
       const hash = rbObjDup(session);
       hash.delete("session_id");
-      return new Response(hash.get("message") as string).toArray();
+      return new Response(hash.get("message") as string).toA();
     };
 
     const unsafeCoder = new (class {
@@ -612,7 +610,7 @@ describe("Rack::Session::Cookie", () => {
       session.set("counter", 1);
       const hash = rbObjDup(session);
       hash.delete("session_id");
-      return new Response(hash.inspect()).toArray();
+      return new Response(hash.inspect()).toA();
     };
 
     const nonStrictCoder = new (class {

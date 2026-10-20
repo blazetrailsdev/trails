@@ -61,7 +61,8 @@ export class Encryptor {
 
     this.options = Object.assign({ serializeJson: false, padSize: 32, purpose: null }, opts);
 
-    [this.cipherSecret, this.hmacSecret] = sliceBang(b(secret), 0, 32) as [string, string];
+    this.hmacSecret = b(secret);
+    [this.cipherSecret, this.hmacSecret] = sliceBang(this.hmacSecret, 0, 32) as [string, string];
 
     Object.freeze(this.hmacSecret);
     Object.freeze(this.cipherSecret);

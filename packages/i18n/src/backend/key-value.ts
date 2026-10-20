@@ -1,4 +1,4 @@
-import { Hash, hashAref, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, isSymbol, rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { deepMergeBang, deepSymbolizeKeys, type TranslationData } from "../utils.js";
@@ -38,7 +38,7 @@ const JSON = {
   },
 };
 
-const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "isNil"]);
+const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "isNil", "inspect"]);
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
 export interface KeyValue extends Base {}
@@ -234,5 +234,9 @@ export class SubtreeProxy {
 
   isNil(): boolean {
     return this.#subtree == null;
+  }
+
+  inspect(): string {
+    return rbInspect(this.#subtree);
   }
 }

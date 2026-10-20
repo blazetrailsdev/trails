@@ -734,7 +734,7 @@ export class Request {
   }
 
   hasHeader(name: string): boolean {
-    return name in this.env;
+    return Object.hasOwn(this.env, name);
   }
 
   getHeader(name: string): any {

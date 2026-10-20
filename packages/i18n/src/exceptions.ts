@@ -113,17 +113,22 @@ export const Base = {
     return normalizeKeys(this.locale, key, this.options.scope).join(".");
   },
 
+  toString(this: Base): string {
+    return this.message;
+  },
+
   toException(this: Base): MissingTranslationData {
     return new MissingTranslationData(this.locale, this.key, this.options);
   },
 };
-Base.toString = Object.getOwnPropertyDescriptor(Base, "message")!.get as () => string;
 
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is `include Base` on the type side.
 export interface MissingTranslation extends Base {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class MissingTranslation extends ArgumentError {
+  declare options: MissingTranslationOptions;
+
   static readonly Base = Base;
 
   constructor(
@@ -152,6 +157,8 @@ export interface MissingTranslationData extends Base {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class MissingTranslationData extends ArgumentError {
+  declare options: MissingTranslationOptions;
+
   constructor(
     locale: Locale,
     key: TranslationKey,

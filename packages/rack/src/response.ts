@@ -329,14 +329,14 @@ export class Response {
       return [this.status, this.headers, this];
     }
 
-    if (this.length !== null && !this.isChunked() && !this.headers[CONTENT_LENGTH]) {
+    if (this.length != null && !this.isChunked()) {
       this.headers[CONTENT_LENGTH] = String(this.length);
     }
     return [this.status, this.headers, this._body];
   }
 
-  toArray(): [number, Record<string, any>, any] {
-    return this.finish();
+  toA(block?: (self: Response) => void): [number, Record<string, any>, any] {
+    return this.finish(block);
   }
 
   each(callback: (chunk: string) => void): void {

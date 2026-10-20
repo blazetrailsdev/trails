@@ -15,7 +15,7 @@ it("has cache-control methods", () => {
   const response = new Response();
   response.cacheControl = "foo";
   expect(response.cacheControl).toBe("foo");
-  const [, h] = response.toArray();
+  const [, h] = response.toA();
   expect(h["cache-control"]).toBe("foo");
 });
 
@@ -23,7 +23,7 @@ it("has an etag method", () => {
   const response = new Response();
   response.etag = "foo";
   expect(response.etag).toBe("foo");
-  const [, h] = response.toArray();
+  const [, h] = response.toA();
   expect(h["etag"]).toBe("foo");
 });
 
@@ -31,7 +31,7 @@ it("has a content-type method", () => {
   const response = new Response();
   response.contentType = "foo";
   expect(response.contentType).toBe("foo");
-  const [, h] = response.toArray();
+  const [, h] = response.toA();
   expect(h["content-type"]).toBe("foo");
 });
 
@@ -45,7 +45,7 @@ it("have sensible default values", () => {
   });
 
   response = new Response();
-  const [s2, h2, b2] = response.toArray();
+  const [s2, h2, b2] = response.toA();
   expect(s2).toBe(200);
   expect(h2).toEqual({});
   for (const part of b2) {

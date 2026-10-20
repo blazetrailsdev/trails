@@ -10,6 +10,7 @@
   "globalid": 37,
   "i18n": 102,
   "rack": 219,
+  "rack-session": 60,
   "ruby-compat": 933,
   "thor": 176
 }

@@ -67239,6 +67239,20 @@
   {
     "package": "did-you-mean",
     "rubyFile": "did_you_mean.rb",
+    "rubyName": "[]=",
+    "digest": "23ca3d1732dae8b8",
+    "ref": "v1.6.3"
+  },
+  {
+    "package": "did-you-mean",
+    "rubyFile": "did_you_mean.rb",
+    "rubyName": "correct_error",
+    "digest": "4c5751c7b08cab4d",
+    "ref": "v1.6.3"
+  },
+  {
+    "package": "did-you-mean",
+    "rubyFile": "did_you_mean.rb",
     "rubyName": "formatter",
     "digest": "2caa99ff485b2ae4",
     "ref": "v1.6.3"
@@ -67248,6 +67262,20 @@
     "rubyFile": "did_you_mean.rb",
     "rubyName": "formatter=",
     "digest": "1cafa7a2f82010d9",
+    "ref": "v1.6.3"
+  },
+  {
+    "package": "did-you-mean",
+    "rubyFile": "did_you_mean.rb",
+    "rubyName": "merge!",
+    "digest": "01c45289ca19565c",
+    "ref": "v1.6.3"
+  },
+  {
+    "package": "did-you-mean",
+    "rubyFile": "did_you_mean.rb",
+    "rubyName": "spell_checkers",
+    "digest": "116ae8c7cc618438",
     "ref": "v1.6.3"
   },
   {
@@ -67297,6 +67325,20 @@
     "rubyFile": "spell_checker.rb",
     "rubyName": "normalize",
     "digest": "33d9fc51c894a452",
+    "ref": "v1.6.3"
+  },
+  {
+    "package": "did-you-mean",
+    "rubyFile": "spell_checkers/null_checker.rb",
+    "rubyName": "corrections",
+    "digest": "f49f8cbb9e96d0da",
+    "ref": "v1.6.3"
+  },
+  {
+    "package": "did-you-mean",
+    "rubyFile": "spell_checkers/null_checker.rb",
+    "rubyName": "initialize",
+    "digest": "c379738c3a38aa9c",
     "ref": "v1.6.3"
   },
   {
@@ -68158,6 +68200,13 @@
     "rubyFile": "backend/key_value.rb",
     "rubyName": "initialized?",
     "digest": "c9dc09961dc8d350",
+    "ref": "v1.14.8"
+  },
+  {
+    "package": "i18n",
+    "rubyFile": "backend/key_value.rb",
+    "rubyName": "inspect",
+    "digest": "9d0754f2295a4784",
     "ref": "v1.14.8"
   },
   {
@@ -69508,6 +69557,13 @@
   {
     "package": "rack",
     "rubyFile": "directory.rb",
+    "rubyName": "DIR_FILE_escape",
+    "digest": "b9bdf36f0b3660bc",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "directory.rb",
     "rubyName": "call",
     "digest": "5c8ec0ac23b480b0",
     "ref": "v3.1.14"
@@ -69627,6 +69683,13 @@
   {
     "package": "rack",
     "rubyFile": "events.rb",
+    "rubyName": "each",
+    "digest": "a9a473a36a3a4a21",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "events.rb",
     "rubyName": "initialize",
     "digest": "a890c5dccb0b05b1",
     "ref": "v3.1.14"
@@ -69643,6 +69706,48 @@
     "rubyFile": "events.rb",
     "rubyName": "make_response",
     "digest": "fc5d13840df1a2c4",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "events.rb",
+    "rubyName": "on_commit",
+    "digest": "0f8f40cdf305c754",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "events.rb",
+    "rubyName": "on_error",
+    "digest": "4d139d83dc091417",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "events.rb",
+    "rubyName": "on_finish",
+    "digest": "2b0b99f3b605333e",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "events.rb",
+    "rubyName": "on_send",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "events.rb",
+    "rubyName": "on_start",
+    "digest": "32dfbf619449224b",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "events.rb",
+    "rubyName": "to_a",
+    "digest": "2a665e8ff7358391",
     "ref": "v3.1.14"
   },
   {
@@ -69748,6 +69853,20 @@
     "rubyFile": "head.rb",
     "rubyName": "initialize",
     "digest": "906bc9f4b7510ad3",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "headers.rb",
+    "rubyName": "[]",
+    "digest": "b28716d68ab97647",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "headers.rb",
+    "rubyName": "[]=",
+    "digest": "207656c353879374",
     "ref": "v3.1.14"
   },
   {
@@ -70201,6 +70320,13 @@
   {
     "package": "rack",
     "rubyFile": "multipart.rb",
+    "rubyName": "<<",
+    "digest": "5588cadeb9fd13d9",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "multipart.rb",
     "rubyName": "build_multipart",
     "digest": "e4859f6162cd3d84",
     "ref": "v3.1.14"
@@ -70469,6 +70595,13 @@
     "rubyFile": "multipart/uploaded_file.rb",
     "rubyName": "path",
     "digest": "6da1fc75281a4ab9",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "null_logger.rb",
+    "rubyName": "<<",
+    "digest": "c379738c3a38aa9c",
     "ref": "v3.1.14"
   },
   {
@@ -70802,6 +70935,55 @@
   },
   {
     "package": "rack",
+    "rubyFile": "reloader.rb",
+    "rubyName": "call",
+    "digest": "a3c8e87411f3dc95",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "reloader.rb",
+    "rubyName": "figure_path",
+    "digest": "0e9eebbad83f3bae",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "reloader.rb",
+    "rubyName": "initialize",
+    "digest": "08680eac36caaa81",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "reloader.rb",
+    "rubyName": "reload!",
+    "digest": "9606c4346942e11f",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "reloader.rb",
+    "rubyName": "rotation",
+    "digest": "5bd9f162e68e126b",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "reloader.rb",
+    "rubyName": "safe_load",
+    "digest": "1a5fd61de2fd1a0b",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "reloader.rb",
+    "rubyName": "safe_stat",
+    "digest": "f26818dab1088cbd",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
     "rubyFile": "request.rb",
     "rubyName": "GET",
     "digest": "bcc8e84a85aedd63",
@@ -71008,6 +71190,13 @@
     "rubyFile": "request.rb",
     "rubyName": "get_http_forwarded",
     "digest": "0dffd0b18b94dace",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "request.rb",
+    "rubyName": "has_header?",
+    "digest": "3cb844ae4298eddd",
     "ref": "v3.1.14"
   },
   {
@@ -71377,6 +71566,13 @@
   {
     "package": "rack",
     "rubyFile": "response.rb",
+    "rubyName": "[]",
+    "digest": "d4e52f6aeb14c81a",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "response.rb",
     "rubyName": "accepted?",
     "digest": "747db937b4035d14",
     "ref": "v3.1.14"
@@ -71526,6 +71722,13 @@
     "rubyFile": "response.rb",
     "rubyName": "etag=",
     "digest": "33068f6beafbc027",
+    "ref": "v3.1.14"
+  },
+  {
+    "package": "rack",
+    "rubyFile": "response.rb",
+    "rubyName": "finish",
+    "digest": "86697318151e195f",
     "ref": "v3.1.14"
   },
   {
@@ -72271,6 +72474,13 @@
     "ref": "v3.1.14"
   },
   {
+    "package": "rack",
+    "rubyFile": "version.rb",
+    "rubyName": "release",
+    "digest": "b02bc368aeede1f2",
+    "ref": "v3.1.14"
+  },
+  {
     "package": "rack-session",
     "rubyFile": "abstract/id.rb",
     "rubyName": "[]",
@@ -72625,6 +72835,153 @@
     "rubyFile": "abstract/id.rb",
     "rubyName": "write_session",
     "digest": "b19977cf26edff17",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "decode",
+    "digest": "0925f0ab9623bf3f",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "delete_session",
+    "digest": "b8d6446111858b1e",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "encode",
+    "digest": "fbce4f66ec48a5b9",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "encode_session_data",
+    "digest": "ecbe590c806d838f",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "extract_session_id",
+    "digest": "9ae290aa882637a0",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "find_session",
+    "digest": "75af84f08a3ad96e",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "initialize",
+    "digest": "f3f3ec6561fb208a",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "legacy_digest_match?",
+    "digest": "fb8b69598551d756",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "legacy_generate_hmac",
+    "digest": "97e1b725ab30293a",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "persistent_session_id!",
+    "digest": "6d5ed6ced8649d19",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "secure?",
+    "digest": "600222dd7c3377b4",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "unpacked_cookie_data",
+    "digest": "7fc411af2e97b934",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "cookie.rb",
+    "rubyName": "write_session",
+    "digest": "1049cfe5d7f95dac",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "decrypt",
+    "digest": "b282276ffadb7299",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "encrypt",
+    "digest": "0bbdc269fbc33609",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "initialize",
+    "digest": "c2d18958e48a3d71",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "new_cipher",
+    "digest": "4a30c42db44f4fcc",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "new_message_and_cipher_secret",
+    "digest": "330c5a704500ae67",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "serializer",
+    "digest": "037fe683f2d10bf4",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "set_cipher_key",
+    "digest": "cb4396f059d399ba",
+    "ref": "v2.1.0"
+  },
+  {
+    "package": "rack-session",
+    "rubyFile": "encryptor.rb",
+    "rubyName": "verify_authenticity!",
+    "digest": "cfb6ab4221f27185",
     "ref": "v2.1.0"
   },
   {
