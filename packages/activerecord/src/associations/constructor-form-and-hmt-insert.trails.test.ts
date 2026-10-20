@@ -47,10 +47,11 @@ describe("constructor-form association writer", () => {
 
   it("assigns a belongsTo key and its foreign key in hash order", async () => {
     const author = await Author.create({ name: "a" });
-    const post = new Post({ author_id: author.id + 1, author, title: "t" });
-    expect((post as any).author_id).toBe(author.id);
-    const other = new Post({ author, author_id: author.id + 1, title: "t" });
-    expect((other as any).author_id).toBe(author.id + 1);
+    const otherId = (author.id as number) + 1;
+    const post = new Post({ author_id: otherId, author, title: "t" });
+    expect((post as any).author_id).toBe(author.id as number);
+    const other = new Post({ author, author_id: otherId, title: "t" });
+    expect((other as any).author_id).toBe(otherId);
   });
 
   it("restores the sync assignment mark after a nested assignAttributes", () => {
