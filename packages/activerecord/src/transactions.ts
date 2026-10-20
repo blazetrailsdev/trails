@@ -201,17 +201,16 @@ export async function committedBang(
   this: TransactionsRecord,
   { shouldRunCallbacks = true }: { shouldRunCallbacks?: boolean } = {},
 ): Promise<void> {
-  const r = this;
-  r._startTransactionState = null;
+  this._startTransactionState = null;
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
-      r._committedAlreadyCalled = true;
+      this._committedAlreadyCalled = true;
       await this._runCommitCallbacks();
     }
   } finally {
-    r._committedAlreadyCalled = false;
-    r._triggerUpdateCallback = false;
-    r._triggerDestroyCallback = false;
+    this._committedAlreadyCalled = false;
+    this._triggerUpdateCallback = false;
+    this._triggerDestroyCallback = false;
   }
 }
 
@@ -239,22 +238,21 @@ export async function rolledbackBang(
 
 /** @internal */
 export function rememberTransactionRecordState(this: TransactionsRecord): void {
-  const r = this;
-  r._startTransactionState ||= {
+  this._startTransactionState ||= {
     id: this.id,
-    newRecord: r._newRecord,
-    previouslyNewRecord: r._previouslyNewRecord,
-    destroyed: r._destroyed,
-    attributes: r._attributes,
+    newRecord: this._newRecord,
+    previouslyNewRecord: this._previouslyNewRecord,
+    destroyed: this._destroyed,
+    attributes: this._attributes,
     frozen: this.isFrozen(),
     level: 0,
   };
-  r._startTransactionState.level += 1;
+  this._startTransactionState.level += 1;
 
-  if (r._committedAlreadyCalled) {
-    r._newRecordBeforeLastCommit = false;
+  if (this._committedAlreadyCalled) {
+    this._newRecordBeforeLastCommit = false;
   } else {
-    r._newRecordBeforeLastCommit = r._startTransactionState.newRecord;
+    this._newRecordBeforeLastCommit = this._startTransactionState.newRecord;
   }
 }
 
@@ -263,37 +261,36 @@ export function restoreTransactionRecordState(
   this: TransactionsRecord,
   forceRestoreState = false,
 ): void {
-  const r = this;
-  const restoreState = r._startTransactionState;
+  const restoreState = this._startTransactionState;
   if (restoreState) {
     if (forceRestoreState || restoreState.level <= 1) {
-      r._newRecord = restoreState.newRecord;
-      r._previouslyNewRecord = restoreState.previouslyNewRecord;
-      r._destroyed = restoreState.destroyed;
-      r._attributes = restoreState.attributes.map((attr) => {
-        const value = r._attributes.fetchValue(attr.name!);
+      this._newRecord = restoreState.newRecord;
+      this._previouslyNewRecord = restoreState.previouslyNewRecord;
+      this._destroyed = restoreState.destroyed;
+      this._attributes = restoreState.attributes.map((attr) => {
+        const value = this._attributes.fetchValue(attr.name!);
         if (attr.value() !== value) attr = attr.withValueFromUser(value);
         return attr;
       });
-      r._mutationsFromDatabase = null;
-      r._mutationsBeforeLastSave = null;
+      this._mutationsFromDatabase = null;
+      this._mutationsBeforeLastSave = null;
       const ctor = this.constructor as typeof Base;
       const primaryKey = ctor.primaryKey;
       if (ctor.isCompositePrimaryKey()) {
         const cols = primaryKey as string[];
         const savedId = restoreState.id as unknown[];
-        if (cols.some((col, i) => r._attributes.fetchValue(col) !== savedId[i])) {
+        if (cols.some((col, i) => this._attributes.fetchValue(col) !== savedId[i])) {
           cols.forEach((col, i) => {
-            r._attributes.writeFromUser(col, savedId[i]);
+            this._attributes.writeFromUser(col, savedId[i]);
           });
         }
       } else {
-        if (r._attributes.fetchValue(primaryKey as string) !== restoreState.id) {
-          r._attributes.writeFromUser(primaryKey as string, restoreState.id);
+        if (this._attributes.fetchValue(primaryKey as string) !== restoreState.id) {
+          this._attributes.writeFromUser(primaryKey as string, restoreState.id);
         }
       }
 
-      if (restoreState.frozen) r._attributes.freeze();
+      if (restoreState.frozen) this._attributes.freeze();
     }
   }
 }
@@ -325,8 +322,6 @@ export async function withTransactionReturningStatus<T>(
 ): Promise<T> {
   const modelClass = this.constructor as typeof Base;
 
-  const r = this;
-
   let status: T;
 
   await modelClass.withConnection(async (connection) => {
@@ -352,10 +347,9 @@ export function _newRecordBeforeLastCommit(this: TransactionsRecord): boolean {
 }
 
 export function isTriggerTransactionalCallbacks(this: TransactionsRecord): boolean {
-  const r = this;
-  const newBeforeLastCommit = r._newRecordBeforeLastCommit === true;
-  const triggerUpdate = r._triggerUpdateCallback === true;
-  const triggerDestroy = r._triggerDestroyCallback === true;
+  const newBeforeLastCommit = this._newRecordBeforeLastCommit === true;
+  const triggerUpdate = this._triggerUpdateCallback === true;
+  const triggerDestroy = this._triggerDestroyCallback === true;
   return (
     ((newBeforeLastCommit || triggerUpdate) && this.isPersisted()) ||
     (triggerDestroy && this.isDestroyed())
@@ -382,18 +376,16 @@ export function _triggerDestroyCallback(this: TransactionsRecord): boolean | nul
 /** @internal */
 export function initInternals(this: TransactionsRecord): void {
   Transactions.superMethod(this, "initInternals")!();
-  const r = this;
-  r._startTransactionState = null;
-  r._committedAlreadyCalled = null;
-  r._newRecordBeforeLastCommit = null;
+  this._startTransactionState = null;
+  this._committedAlreadyCalled = null;
+  this._newRecordBeforeLastCommit = null;
 }
 
 /** @internal */
 export function clearTransactionRecordState(this: TransactionsRecord): void {
-  const r = this;
-  if (!r._startTransactionState) return;
-  r._startTransactionState.level -= 1;
-  if (r._startTransactionState.level < 1) r._startTransactionState = null;
+  if (!this._startTransactionState) return;
+  this._startTransactionState.level -= 1;
+  if (this._startTransactionState.level < 1) this._startTransactionState = null;
 }
 
 /** @internal */
@@ -401,17 +393,17 @@ export function isTransactionIncludeAnyAction(
   this: TransactionsRecord,
   actions: string[],
 ): boolean {
-  const r = this;
   return actions.some((action) => {
     switch (action) {
       case "create":
-        return this.isPersisted() && r._newRecordBeforeLastCommit === true;
+        return this.isPersisted() && this._newRecordBeforeLastCommit === true;
       case "update":
         return (
-          !(r._newRecordBeforeLastCommit || this.isDestroyed()) && r._triggerUpdateCallback === true
+          !(this._newRecordBeforeLastCommit || this.isDestroyed()) &&
+          this._triggerUpdateCallback === true
         );
       case "destroy":
-        return r._triggerDestroyCallback === true;
+        return this._triggerDestroyCallback === true;
       default:
         return false;
     }

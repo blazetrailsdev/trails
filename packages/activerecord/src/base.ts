@@ -888,6 +888,8 @@ export class Base extends Model {
   }
 
   declare static encryptedAttributes: Set<string> | undefined;
+  /** @internal */
+  declare static _deterministicEncryptedAttributes: string[] | undefined;
   declare static readonly isEncryptedAttributes: boolean;
   declare static _attrReadonly: string[];
   declare static is_attrReadonly: boolean;
@@ -1528,6 +1530,7 @@ export class Base extends Model {
   declare hasAttribute: (attrName: string) => boolean;
   declare attributePresent: (attrName: string) => boolean;
   declare readAttributeBeforeTypeCast: (attrName: string) => unknown;
+  declare readAttributeForDatabase: (attrName: string) => unknown;
   declare attributes: Record<string, unknown>;
   declare attributesBeforeTypeCast: () => Record<string, unknown> | Hash<string, unknown>;
   declare attributesForDatabase: () => Record<string, unknown> | Hash<string, unknown>;

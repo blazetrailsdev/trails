@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Encryption } from "../encryption.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
-import { encrypts } from "./encryptable-record.js";
-import { AttributeRegistration, Model } from "@blazetrails/activemodel";
-import { include } from "@blazetrails/activesupport";
+import { Book } from "../test-helpers/models/book.js";
+import { Pirate } from "../test-helpers/models/pirate.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 import { AutoFilteredParameters } from "./auto-filtered-parameters.js";
 import type { SchemeOptions } from "./scheme.js";
 
 describe("ActiveRecord::Encryption::ConfigurableTest", () => {
+  fixtures({});
   let savedConfig: ReturnType<typeof snapshotConfig>;
 
   function snapshotConfig() {
@@ -69,9 +70,8 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      const modelClass = class extends Model {};
-      include(modelClass, AttributeRegistration);
-      encrypts.call(modelClass, "isbn");
+      const modelClass = class extends Book {};
+      modelClass.encrypts("isbn");
 
       expect(capturedKlass).toBe(modelClass);
       expect(capturedName).toBe("isbn");
@@ -90,10 +90,8 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      class NamedPirate extends Model {}
-      const modelClass = NamedPirate;
-      include(modelClass, AttributeRegistration);
-      encrypts.call(modelClass, "catchphrase");
+      class NamedPirate extends Pirate {}
+      NamedPirate.encrypts("catchphrase");
 
       expect(filterParameters).toContain("named_pirate.catchphrase");
     } finally {
@@ -111,9 +109,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      const modelClass = (() => class extends Model {})();
-      include(modelClass, AttributeRegistration);
-      encrypts.call(modelClass, "catchphrase");
+      (() => class extends Pirate {})().encrypts("catchphrase");
 
       expect(filterParameters).toContain("catchphrase");
     } finally {
@@ -133,9 +129,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      const modelClass = class extends Model {};
-      include(modelClass, AttributeRegistration);
-      encrypts.call(modelClass, "catchphrase");
+      (class extends Pirate {}).encrypts("catchphrase");
 
       expect(filterParameters).toEqual([]);
     } finally {
