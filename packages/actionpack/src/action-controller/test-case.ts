@@ -25,7 +25,6 @@ import {
   b,
   KeyError,
   merge,
-  Module,
   rbModConstSet,
   rbObjIvarSet,
   RuntimeError,
@@ -493,53 +492,56 @@ function checkRequiredIvars(this: Behavior): void {
   }
 }
 
-export const Behavior = new Module((mod) => {
-  extend(mod, Concern);
-  mod.include(TestProcess);
-  mod.include(ConstantLookup);
-  mod.include(DomTestingAssertions);
+export const Behavior = { ClassMethods } as Record<string, unknown> & {
+  ClassMethods: typeof ClassMethods;
+};
+extend(Behavior, Concern);
+include(Behavior, TestProcess);
+include(Behavior, ConstantLookup);
+include(Behavior, DomTestingAssertions);
 
-  mod.attrReader("response", "request");
-
-  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
-
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      get,
-      post,
-      patch,
-      put,
-      delete: deleteRequest,
-      head,
-      process,
-      controllerClassName,
-      generatedPath,
-      queryParameterNames,
-      setupControllerRequestAndResponse,
-      buildResponse,
-    });
+for (const id of ["response", "request"]) {
+  Object.defineProperty(Behavior, id, {
+    get(this: Record<string, unknown>) {
+      return this[`_${id}`] ?? null;
+    },
+    enumerable: true,
+    configurable: true,
   });
+}
 
-  (
-    mod as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
-  ).included(null, function (this: typeof TestCase) {
-    include(this, TemplateAssertions);
-    include(this, Assertions);
-    classAttribute.call(this, "_controllerClass");
-    this.setup(":setupControllerRequestAndResponse");
-    runLoadHooks("action_controller_test_case", this);
-  });
+Object.assign(Behavior, {
+  get,
+  post,
+  patch,
+  put,
+  delete: deleteRequest,
+  head,
+  process,
+  controllerClassName,
+  generatedPath,
+  queryParameterNames,
+  setupControllerRequestAndResponse,
+  buildResponse,
+});
 
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      setupRequest,
-      wrapExecution,
-      processControllerResponse,
-      scrubEnvBang,
-      checkRequiredIvars,
-      documentRootElement,
-    });
-  });
+(
+  Behavior as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
+).included(null, function (this: typeof TestCase) {
+  include(this, TemplateAssertions);
+  include(this, Assertions);
+  classAttribute.call(this, "_controllerClass");
+  this.setup(":setupControllerRequestAndResponse");
+  runLoadHooks("action_controller_test_case", this);
+});
+
+Object.assign(Behavior, {
+  setupRequest,
+  wrapExecution,
+  processControllerResponse,
+  scrubEnvBang,
+  checkRequiredIvars,
+  documentRootElement,
 });
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Behavior` (`actionpack/lib/action_controller/test_case.rb:696`) and the two `include`s of its `included do` block (`:597-598`); the class/interface merge is how a mixin surfaces on the type side. */

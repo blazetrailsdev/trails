@@ -113,7 +113,7 @@ export class InsertAll {
     inserts: Record<string, unknown>[],
     options: InsertAllOptions = {},
   ): Promise<Result> {
-    const model = (relation as any)._model as ModelClass;
+    const model = relation.model as ModelClass;
     return withConnection.call(model as any, async (c: any) =>
       new InsertAll(
         relation,
@@ -133,7 +133,7 @@ export class InsertAll {
     facts: ResolvedConnectionFacts,
   ) {
     this._facts = facts;
-    this.model = (relation as any)._model as ModelClass;
+    this.model = relation.model as ModelClass;
     this.connection = connection;
     this.inserts = inserts.map((r) => ({ ...r }));
     this.updateOnly = options.updateOnly;
@@ -162,7 +162,7 @@ export class InsertAll {
     }
 
     this.scopeAttributes = except(
-      (relation as any).scopeForCreate() as Record<string, unknown>,
+      relation.scopeForCreate(),
       this.model.inheritanceColumn as string,
     );
     for (const key of Object.keys(this.scopeAttributes)) {
@@ -283,27 +283,21 @@ export class InsertAll {
   /** @internal */
   private ensureValidOptionsForConnectionBang(): void {
     if (this.returning && !this._facts.supportsInsertReturning) {
-      throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support :returning`,
-      );
+      throw new ArgumentError(`${this.connection.constructor.name} does not support :returning`);
     }
 
     if (this.skipDuplicates() && !this._facts.supportsInsertOnDuplicateSkip) {
       throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support skipping duplicates`,
+        `${this.connection.constructor.name} does not support skipping duplicates`,
       );
     }
 
     if (this.updateDuplicates() && !this._facts.supportsInsertOnDuplicateUpdate) {
-      throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support upsert`,
-      );
+      throw new ArgumentError(`${this.connection.constructor.name} does not support upsert`);
     }
 
     if (this.uniqueBy && !this._facts.supportsInsertConflictTarget) {
-      throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support :unique_by`,
-      );
+      throw new ArgumentError(`${this.connection.constructor.name} does not support :unique_by`);
     }
   }
 
@@ -351,9 +345,7 @@ export class InsertAll {
     if (!this._facts.supportsInsertConflictTarget) {
       if (uniqueBy == null) return undefined;
 
-      throw new ArgumentError(
-        `${(this.connection as any).constructor?.name ?? "Adapter"} does not support :unique_by`,
-      );
+      throw new ArgumentError(`${this.connection.constructor.name} does not support :unique_by`);
     }
 
     const nameOrColumns = rtest(uniqueBy) ? uniqueBy : this.model.primaryKey;

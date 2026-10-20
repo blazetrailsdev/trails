@@ -124,6 +124,7 @@ interface CalculationRelation {
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
     ensureSchemaLoaded(): Promise<void>;
+    _reflectOnAssociation?(name: string): any;
     disallowRawSqlBang(args: (string | symbol | ArelNode)[], options?: { permit?: RegExp }): void;
     attributeNames(): string[];
     attributeAliases: Record<string, string>;
@@ -430,7 +431,7 @@ export async function pluck(
 ): Promise<unknown[]> {
   if (this.isNullRelation()) return [];
 
-  if (this.loaded && isAllAttributes.call(this, columnNames as unknown as string[])) {
+  if (this.loaded && isAllAttributes.call(this, columnNames)) {
     const records = await this.records();
     return records.map((record) =>
       columnNames.length > 1
@@ -482,7 +483,7 @@ export async function pick(
     | Record<string, string | string[]>
   >
 ): Promise<unknown> {
-  if (this.loaded && isAllAttributes.call(this, columnNames as unknown as string[])) {
+  if (this.loaded && isAllAttributes.call(this, columnNames)) {
     return enumerablePick(await this.records(), ...(columnNames as never[])) ?? null;
   }
 
@@ -713,7 +714,10 @@ export function aggregateColumn(
 }
 
 /** @internal */
-export function isAllAttributes(this: CalculationRelation, columnNames: string[]): boolean {
+export function isAllAttributes(
+  this: CalculationRelation,
+  columnNames: readonly unknown[],
+): boolean {
   const attributeNames: string[] = this.model.attributeNames();
   const attributeAliases = Object.keys(this.model.attributeAliases);
   return isEmpty(
@@ -898,7 +902,7 @@ export async function executeGroupedCalculation(
   let association: any = null;
   let associated = false;
   if (groupFields.length === 1 && typeof groupFields[0] === "string") {
-    association = (this.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
+    association = this.model._reflectOnAssociation?.(groupFields[0]) ?? null;
     associated = association != null && association.belongsTo?.() === true;
     if (associated) groupFields = kernelArray(association.foreignKey());
   }

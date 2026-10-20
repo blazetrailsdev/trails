@@ -11,6 +11,9 @@ interface SpawnRelation<T = unknown> {
   /** @internal */
   relationWith(values: Record<string, unknown>): T;
   _model: { all(): T; scopeRegistry(): unknown };
+  spawn(): T;
+  mergeBang(other: unknown, ...rest: unknown[]): T;
+  _values: Record<string, unknown>;
 }
 
 export function spawn<T extends SpawnRelation<T>>(this: T): T {
@@ -21,7 +24,7 @@ export function merge<T extends SpawnRelation<T>>(this: T, other: any, ...rest: 
   if (Array.isArray(other)) {
     return recordsIntersection(this, other) as unknown as T;
   } else if (rtest(other)) {
-    return (this as any).spawn().mergeBang(other, ...rest) as T;
+    return this.spawn().mergeBang(other, ...rest);
   } else {
     throw new ArgumentError(`invalid argument: ${rbInspect(other)}.`);
   }
@@ -86,7 +89,7 @@ export function relationWith<T extends SpawnRelation<T>>(
   this: T,
   values: Record<string, unknown>,
 ): T {
-  const result = (this as any).spawn();
+  const result = this.spawn();
   result._values = values;
   return result;
 }
