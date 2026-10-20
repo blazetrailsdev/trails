@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { assigningSynchronously } from "@blazetrails/activemodel";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -42,6 +43,28 @@ describe("constructor-form association writer", () => {
     const post = new Post({ title: "a" });
     await author.setAttributes({ posts: [post] });
     expect((author as any).association("posts").target).toContain(post);
+  });
+
+  it("assigns a belongsTo key and its foreign key in hash order", async () => {
+    const author = await Author.create({ name: "a" });
+    const otherId = (author.id as number) + 1;
+    const post = new Post({ author_id: otherId, author, title: "t" });
+    expect(post.readAttribute("author_id")).toBe(author.id as number);
+    const other = new Post({ author, author_id: otherId, title: "t" });
+    expect(other.readAttribute("author_id")).toBe(otherId);
+  });
+
+  it("restores the sync assignment mark after a nested assignAttributes", () => {
+    const post = new Post({ title: "p" });
+    const author = new Author({ name: "x" }) as Author & Record<symbol, boolean | undefined>;
+    expect(author[assigningSynchronously]).toBeUndefined();
+    author[assigningSynchronously] = true;
+    author.assignAttributes({ name: "y" });
+    expect(author[assigningSynchronously]).toBe(true);
+    author[assigningSynchronously] = undefined;
+    author.assignAttributes({ post });
+    expect(author[assigningSynchronously]).toBeUndefined();
+    expect(author.association("post").target).toBe(post);
   });
 
   it("dispatches single record to hasOne association on construction", () => {

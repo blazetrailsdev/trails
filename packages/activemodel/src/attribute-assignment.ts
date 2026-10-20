@@ -21,11 +21,22 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
   }
   if (isEmpty(newAttributes)) return;
 
-  assertAssignedSynchronously(
-    this._assignAttributes(this.sanitizeForMassAssignment(newAttributes)),
-    "assignAttributes",
-  );
+  const host = this as unknown as Record<symbol, boolean | undefined>;
+  const outer = host[assigningSynchronously];
+  host[assigningSynchronously] = true;
+  try {
+    assertAssignedSynchronously(
+      this._assignAttributes(this.sanitizeForMassAssignment(newAttributes)),
+      "assignAttributes",
+    );
+  } finally {
+    host[assigningSynchronously] = outer;
+  }
 }
+
+export const assigningSynchronously: unique symbol = Symbol.for(
+  "@blazetrails/activemodel:assigningSynchronously",
+);
 
 /** @internal */
 export function _assignAttributes(
