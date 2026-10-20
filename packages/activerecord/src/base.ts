@@ -1690,8 +1690,11 @@ export class Base extends Model {
   declare static _destroyAssociationAsyncJob: unknown;
   declare static is_destroyAssociationAsyncJob: boolean;
 
-  declare static destroyAssociationAsyncJob: any;
-  declare destroyAssociationAsyncJob: any;
+  declare static destroyAssociationAsyncJob:
+    | string
+    | (abstract new (...args: never[]) => unknown)
+    | null;
+  declare destroyAssociationAsyncJob: string | (abstract new (...args: never[]) => unknown) | null;
   /** @internal */
   declare _afterCommitJobs: Array<[unknown, Record<string, unknown>]>;
 

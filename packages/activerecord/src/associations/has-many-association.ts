@@ -183,10 +183,7 @@ export class HasManyAssociation extends CollectionAssociation {
 
   /** @internal */
   async countRecords(): Promise<number> {
-    const reflection = this.reflection as unknown as {
-      hasActiveCachedCounter(): boolean;
-      counterCacheColumn(): string | null;
-    };
+    const reflection = this.reflection;
     let count: number;
     if (reflection.hasActiveCachedCounter()) {
       const counterCacheColumn = reflection.counterCacheColumn();
