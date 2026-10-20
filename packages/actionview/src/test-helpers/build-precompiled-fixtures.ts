@@ -1,9 +1,6 @@
 import { buildViews } from "@blazetrails/trails-tsc";
 
-const roots = [
-  "../../../actionview/src/test-helpers/precompiled",
-  "../../../actionpack/src/test-helpers/precompiled",
-];
+const roots = ["../../test-fixtures/precompiled", "../../../actionpack/test-fixtures/precompiled"];
 
 export default async function setup(): Promise<void> {
   for (const root of roots) {

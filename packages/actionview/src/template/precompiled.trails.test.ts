@@ -7,7 +7,7 @@ import { Tse } from "./handlers/tse.js";
 import { shippedTemplateCompiler } from "../test-helpers/setup-compile-template.js";
 
 const fixture = (name: string): string =>
-  decodeURIComponent(new URL(`../test-helpers/${name}`, import.meta.url).pathname);
+  decodeURIComponent(new URL(`../../test-fixtures/${name}`, import.meta.url).pathname);
 const view = (): Base => new (Base.withEmptyTemplateCache())(null, {}, null);
 const greeting = (root: string): Template =>
   new LookupContext([`${root}/app/views`]).findTemplate(
