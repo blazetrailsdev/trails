@@ -5,8 +5,8 @@ export class Project extends Base {
   declare name: string;
 
   static {
-    this.hasAndBelongsToMany("developers", function (this: { uniq(): Relation<Base> }) {
-      return this.uniq();
+    this.hasAndBelongsToMany("developers", function (this: Relation<Base>) {
+      return (this as Relation<Base> & { uniq(): Relation<Base> }).uniq();
     });
   }
 

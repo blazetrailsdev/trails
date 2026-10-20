@@ -21,7 +21,7 @@ export class Sponsor extends Base {
     });
     this.belongsTo(
       "sponsorableWithConditions",
-      function (this: any) {
+      function () {
         return this.where({ name: "Ernie" });
       },
       {

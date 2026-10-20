@@ -18,11 +18,11 @@ export class Bulb extends Base {
   declare countAfterCreate: number | undefined;
 
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ name: "defaulty" });
     });
     this.belongsTo("car", { touch: true, counterCache: { active: false } as any });
-    this.scope("awesome", function (this: any) {
+    this.scope("awesome", function () {
       return this.where({ frickinawesome: true });
     });
 

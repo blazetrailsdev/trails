@@ -166,7 +166,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return new Ctor(targetModel, association) as CollectionProxy<T>;
   }
 
-  constructor(klass: typeof Base, association: CollectionAssociation) {
+  constructor(klass: Relation<T>["model"], association: CollectionAssociation) {
     super(klass);
     this._association = association;
     this._assocName = association.reflection.name;

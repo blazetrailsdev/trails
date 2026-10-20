@@ -45,7 +45,7 @@ export class Member extends Base {
     this.hasOne("selectedClub", { through: "selectedMembership", source: "club" });
     this.hasOne(
       "favoriteClub",
-      function (this: any) {
+      function () {
         return this.where("memberships.favorite = ?", true);
       },
       {
@@ -55,7 +55,7 @@ export class Member extends Base {
     );
     this.hasOne(
       "hairyClub",
-      function (this: any) {
+      function () {
         return this.where({ clubs: { name: "Moustache and Eyebrow Fancier Club" } });
       },
       { through: "membership", source: "club" },
@@ -98,7 +98,7 @@ export class Member extends Base {
     this.hasMany("superMemberships");
     this.hasMany(
       "favoriteMemberships",
-      function (this: any) {
+      function () {
         return this.where({ favorite: true });
       },
       {
@@ -119,10 +119,10 @@ export class Member extends Base {
     this.belongsTo("admittable", { polymorphic: true });
     this.hasOne("premiumClub", { through: "admittable" });
 
-    this.scope("unnamed", function (this: any) {
+    this.scope("unnamed", function () {
       return this.where({ name: null });
     });
-    this.scope("withMemberTypeId", function (this: any, id: number) {
+    this.scope("withMemberTypeId", function (id: number) {
       return this.where({ member_type_id: id });
     });
   }

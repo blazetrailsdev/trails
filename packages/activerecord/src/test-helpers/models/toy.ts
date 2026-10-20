@@ -23,7 +23,7 @@ export class Toy extends Base {
   static {
     this.belongsTo("pet");
     this.hasMany("sponsors", { as: "sponsorable", inverseOf: "sponsorable" });
-    this.scope("withPet", function (this: any) {
+    this.scope("withPet", function () {
       return this.joins(":pet");
     });
   }

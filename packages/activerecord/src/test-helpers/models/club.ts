@@ -33,7 +33,7 @@ export class Club extends Base {
 
     this.hasMany(
       "favorites",
-      function (this: any) {
+      function () {
         return this.where({ memberships: { favorite: true } });
       },
       {
@@ -45,7 +45,7 @@ export class Club extends Base {
     this.hasMany("customMemberships", { className: "Membership" });
     this.hasMany(
       "customFavorites",
-      function (this: any) {
+      function () {
         return this.where({ memberships: { favorite: true } });
       },
       {
@@ -54,7 +54,7 @@ export class Club extends Base {
       },
     );
 
-    this.scope("general", function (this: any) {
+    this.scope("general", function () {
       return this.leftJoins(":category")
         .where({ categories: { name: "General" } })
         .unscope(":limit");

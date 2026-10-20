@@ -46,21 +46,21 @@ export class Car extends Base {
     this.hasMany("bulbs");
     this.hasMany(
       "allBulbs",
-      function (this: any) {
+      function () {
         return this.unscope({ ":where": "name" });
       },
       { className: "Bulb" },
     );
     this.hasMany(
       "allBulbs2",
-      function (this: any) {
+      function () {
         return this.unscope(":where");
       },
       { className: "Bulb" },
     );
     this.hasMany(
       "otherBulbs",
-      function (this: any) {
+      function () {
         return this.unscope({ ":where": "name" }).where({ name: "other" });
       },
       {
@@ -69,7 +69,7 @@ export class Car extends Base {
     );
     this.hasMany(
       "oldBulbs",
-      function (this: any) {
+      function () {
         return this.rewhere({ name: "old" });
       },
       { className: "Bulb" },
@@ -78,7 +78,7 @@ export class Car extends Base {
     this.hasMany("failedBulbs", { className: "FailedBulb", dependent: "destroy" });
     this.hasMany(
       "fooBulbs",
-      function (this: any) {
+      function () {
         return this.where({ name: "foo" });
       },
       { className: "Bulb" },
@@ -99,13 +99,13 @@ export class Car extends Base {
 
     this.hasMany("priceEstimates", { as: "estimateOf" });
 
-    this.scope("inclTyres", function (this: any) {
+    this.scope("inclTyres", function () {
       return this.includes(":tyres");
     });
-    this.scope("inclEngines", function (this: any) {
+    this.scope("inclEngines", function () {
       return this.includes(":engines");
     });
-    this.scope("orderUsingNewStyle", function (this: any) {
+    this.scope("orderUsingNewStyle", function () {
       return this.order("name asc");
     });
 
@@ -123,7 +123,7 @@ export interface Car {
 
 export class CoolCar extends Car {
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.order("name desc");
     });
   }
@@ -132,7 +132,7 @@ registerModel(CoolCar);
 
 export class FastCar extends Car {
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.order("name desc");
     });
   }
