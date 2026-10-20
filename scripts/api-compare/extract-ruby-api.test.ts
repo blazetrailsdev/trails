@@ -3811,6 +3811,10 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
           def empty_string
             String.new
           end
+
+          def top_level(order)
+            ::String.new(order)
+          end
         end
       `,
     });
@@ -3823,6 +3827,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     expect(c["Core#other"]).toEqual({ new: ["const"] });
     expect(c["Core#conversion"]).toEqual({ new: ["string-new"] });
     expect(c["Core#empty_string"]).toBeNull();
+    expect(c["Core#top_level"]).toEqual({ new: ["string-new"] });
   });
 
   it("proves a Hash local from a hash-literal default, a `**` param and an assignment", () => {

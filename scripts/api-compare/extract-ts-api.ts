@@ -7160,9 +7160,6 @@ function collectCalls(
         }
         const kernel = KERNEL_CALLEES.get(resolve(callee.text));
         if (kernel !== undefined) called.push(kernel);
-        if (!skipHoistedClosures && callee.text === "String" && n.arguments.length > 0) {
-          names.add(`${NATIVE_FORM_PREFIX}String`);
-        }
         if (!skipHoistedClosures && isSuspensionTimer(callee.text, n, promiseSettlers)) {
           names.add(`${NATIVE_FORM_PREFIX}timer`);
         }

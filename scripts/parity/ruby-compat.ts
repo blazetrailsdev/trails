@@ -135,7 +135,6 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Hash#update", { tsExport: "update", receiver: "hash" }],
   ["String#delete", { tsExport: "stringDelete", receiver: "string" }],
   ["String#dump", { tsExport: "rbStrDump", receiver: "string" }],
-  ["String.new", { tsExport: "rbStrSNew", receiver: "string" }],
   ["String#split", { tsExport: "stringSplit", receiver: "string" }],
   ["String#succ", { tsExport: "succ", receiver: "string" }],
   ["Symbol#to_s", { tsExport: "symbolToS", receiver: "symbol" }],
@@ -176,7 +175,7 @@ type Claim = { tsExport: string; receiver?: ReceiverKind };
 
 const BY_BARE_NAME = byBareName();
 
-/** `string-new` is `core_new_kind`'s record of a `String.new(x)` site
+/** `string-new` is `core_new_kind`'s record of a `String.new` site
  *  (extract-ruby-api.rb), whose receiver is proven to be the String class. */
 function provenClass(kind: string): string {
   return kind === "string-new" ? "string" : kind;

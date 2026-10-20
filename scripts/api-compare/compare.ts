@@ -835,8 +835,11 @@ export function invokeForms(calls: Iterable<string>): string[] {
  * - `literal-new`: an argument-less, block-less `Hash.new` / `Array.new` /
  *   `Concurrent::Array.new` / `String.new`, the literal `{}` / `[]` / `""`
  *   (`associations/foreign_association.rb:14`, `core.rb:220`).
- * - `string-new`: `String.new(x)`, credited only against a TS body that makes
- *   the `String(x)` conversion call (`relation/query_methods.rb:2047`).
+ * - `string-new`: `String.new(x)`, whose faithful port is the JS string `x`
+ *   itself, a Ruby String being a JS string primitive (CLAUDE.md, "Ruby
+ *   Strings are JS string primitives"), so no native form is required
+ *   (`relation/query_methods.rb:2047`). An argument-less `String.new` is a
+ *   `literal-new`, the literal `""`.
  * - `hwia-new`: `HashWithIndifferentAccess.new` with at most one argument,
  *   credited against a TS body that builds a plain object (the `object` native
  *   form: `{}` or `Object.create(null)`), the shape RFC 0190 settles for a hash
@@ -854,7 +857,7 @@ function isCoreNewWithNoNewExpression(
   return kinds.every(
     (k) =>
       k === "literal-new" ||
-      (k === "string-new" && tsNativeForms.has("String")) ||
+      k === "string-new" ||
       (k === "hwia-new" && tsNativeForms.has("object")),
   );
 }

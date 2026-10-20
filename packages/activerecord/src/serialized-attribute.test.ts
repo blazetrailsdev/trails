@@ -15,7 +15,6 @@ import {
   rbObjClass,
   rbObjDup,
   rbObjFrozenP,
-  rbStrSNew,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
@@ -687,7 +686,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   it("serialized attribute", async () => {
     Topic.serialize("content", { type: rbCString });
 
-    const myobj = rbStrSNew("value1");
+    const myobj = "value1";
     const topic = await Topic.create({ content: myobj });
     expect(topic.content).toEqual(myobj);
 

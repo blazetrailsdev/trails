@@ -1319,10 +1319,11 @@ export function comparableRubySites(
   );
 }
 
-/** An argument-less Ruby `String.new` (`parser.rb:161`), which ports as the
- *  JS literal `""`: no TS call answers it, so it takes no `new` from the body. */
+/** A Ruby `String.new` (`parser.rb:161`, `type/string.rb:35`), which ports as
+ *  the JS string itself, `""` or the value: no TS call answers it, so it takes
+ *  no `new` from the body. */
 function isStringNew(ruby: CallSite): boolean {
-  return ruby.name === "new" && ruby.recv === STRING_RECEIVER && ruby.args.length === 0;
+  return ruby.name === "new" && ruby.recv === STRING_RECEIVER;
 }
 
 const STRING_RECEIVER = "const:String";
