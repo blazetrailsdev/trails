@@ -11,6 +11,7 @@ import {
 import { Module, include } from "@blazetrails/ruby-compat";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Encryption } from "../encryption.js";
+import type { Base } from "../base.js";
 
 /**
  * Mirrors Rails' EncryptableRecord#global_previous_schemes_for.
@@ -140,10 +141,11 @@ export function sourceAttributeFromPreservedAttribute(
 }
 
 /** @internal */
-export function isEncryptedAttribute(this: any, attributeName: string): boolean {
-  const name = this.constructor.attributeAliases?.[attributeName] ?? attributeName;
-  if (!(this.constructor.encryptedAttributes ?? new Set<string>()).has(name)) return false;
-  const type = this.constructor.typeForAttribute(name) as EncryptedAttributeType;
+export function isEncryptedAttribute(this: Base, attributeName: string): boolean {
+  const name = (this.constructor as typeof Base).attributeAliases?.[attributeName] ?? attributeName;
+  if (!((this.constructor as typeof Base).encryptedAttributes ?? new Set<string>()).has(name))
+    return false;
+  const type = (this.constructor as typeof Base).typeForAttribute(name) as EncryptedAttributeType;
   return type.isEncrypted(this.readAttributeBeforeTypeCast?.(name));
 }
 
@@ -157,28 +159,28 @@ export function ciphertextFor(this: any, attributeName: string): unknown {
 }
 
 /** @internal */
-export async function encrypt(this: any): Promise<boolean | undefined> {
+export async function encrypt(this: Base): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
     return await encryptAttributes.call(this);
   }
 }
 
 /** @internal */
-export async function decrypt(this: any): Promise<boolean | undefined> {
+export async function decrypt(this: Base): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
     return await decryptAttributes.call(this);
   }
 }
 
 /** @internal */
-export async function encryptAttributes(this: any): Promise<boolean> {
+export async function encryptAttributes(this: Base): Promise<boolean> {
   validateEncryptionAllowed.call(this);
 
   return await this.updateColumns(buildEncryptAttributeAssignments.call(this));
 }
 
 /** @internal */
-export async function decryptAttributes(this: any): Promise<boolean> {
+export async function decryptAttributes(this: Base): Promise<boolean> {
   validateEncryptionAllowed.call(this);
 
   const decryptAttributeAssignments = buildDecryptAttributeAssignments.call(this);
@@ -186,30 +188,33 @@ export async function decryptAttributes(this: any): Promise<boolean> {
 }
 
 /** @internal */
-export function validateEncryptionAllowed(this: any): void {
+export function validateEncryptionAllowed(this: unknown): void {
   if (Encryption.context.frozenEncryption) {
     throw new Configuration("can't be modified because it is encrypted");
   }
 }
 
 /** @internal */
-export function hasEncryptedAttributes(this: any): boolean {
-  return (this.constructor.encryptedAttributes ?? new Set<string>()).size > 0;
+export function hasEncryptedAttributes(this: Base): boolean {
+  return ((this.constructor as typeof Base).encryptedAttributes ?? new Set<string>()).size > 0;
 }
 
 /** @internal */
 export async function _createRecord(
-  this: any,
+  this: Base,
   attributeNames: string[] | undefined,
   superFn: (attributeNames: string[]) => Promise<unknown>,
 ): Promise<unknown> {
   attributeNames ??= this.attributeNames();
   if (hasEncryptedAttributes.call(this)) {
     attributeNames = [
-      ...new Set([...attributeNames!, ...[...this.constructor.encryptedAttributes].map(String)]),
+      ...new Set([
+        ...attributeNames,
+        ...[...(this.constructor as typeof Base).encryptedAttributes!].map(String),
+      ]),
     ];
   }
-  return superFn(attributeNames!);
+  return superFn(attributeNames);
 }
 
 /** @internal */
@@ -277,8 +282,8 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
 }
 
 /** @internal */
-export function cantModifyEncryptedAttributesWhenFrozen(this: any): void {
-  for (const attribute of this.constructor.encryptedAttributes) {
+export function cantModifyEncryptedAttributesWhenFrozen(this: Base): void {
+  for (const attribute of (this.constructor as typeof Base).encryptedAttributes!) {
     if (this.changedAttributes.include(attribute)) {
       this.errors.add(attribute, "can't be modified because it is encrypted");
     }
