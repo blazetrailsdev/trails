@@ -2177,6 +2177,16 @@ describe("extend on an object", () => {
     expect(obj.inherited()).toBe(2);
   });
 
+  it("extends a null-prototype object, a Hash, through a Hash singleton class", async () => {
+    const { defineModule, extend, rbClassInheritedP } = await import("./include.js");
+    const { rbClassOf, rbObjClass } = await import("./object.js");
+    const { Hash } = await import("./hash.js");
+    const Mod = defineModule({ m: () => 1 });
+    const obj = extend(Object.create(null) as object, Mod);
+    expect(rbClassInheritedP(rbClassOf(obj), Mod)).toBe(true);
+    expect(rbObjClass(obj)).toBe(Hash);
+  });
+
   it("puts a class module a plain module includes on the singleton class", async () => {
     const { classModule, defineModule, extend, include, rbClassInheritedP, rbModAncestors } =
       await import("./include.js");
