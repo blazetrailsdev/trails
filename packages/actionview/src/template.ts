@@ -224,7 +224,7 @@ export class Template {
    * @missingRailsCall parse — PERMANENT
    */
   spot(location: BacktraceLocation): Spot | null {
-    const scriptLines = rbStrEnumerateLines(this.compiledSource(), []);
+    const scriptLines = rbStrEnumerateLines(this.compiledSource().source, []);
     const found = scriptLines[location.lineno - 1];
     if (found === undefined) return null;
 
@@ -384,25 +384,38 @@ export class Template {
    * @internal
    * @missingRailsCall call — PERMANENT
    */
-  private compiledSource(): string {
-    this.strictLocalsBang();
+  private compiledSource(): { source: string; methodArguments: string } {
+    const setStrictLocals = this.strictLocalsBang();
     const source = this.encodeBang();
+
+    let methodArguments: string;
+    if (setStrictLocals != null) {
+      if (setStrictLocals.includes("&")) {
+        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}`;
+      } else {
+        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}, &_`;
+      }
+    } else {
+      methodArguments = "local_assigns, output_buffer, &_";
+    }
 
     if (/\p{Surrogate}/u.test(source)) {
       throw new WrongEncodingError(source, Encoding.defaultInternal);
     }
 
-    return source;
+    return { source, methodArguments };
   }
 
   /** @internal */
   protected async compile(mod: CompiledMethodContainer, streaming = false): Promise<void> {
     const methodName = streaming ? this.streamingMethodName() : this.methodName();
-    const compiledSource = this.compiledSource();
-    const setStrictLocals = this.strictLocalsBang();
+    const { source: compiledSource, methodArguments } = this.compiledSource();
+    const strictLocals = this.isStrictLocals();
 
     let render: StandIn;
+    let signature: Parameter[];
     try {
+      signature = methodParameters(methodArguments);
       ({ default: render } = await templateCompiler(
         this,
         methodName,
@@ -416,17 +429,6 @@ export class Template {
     Object.defineProperty(render, "name", { value: methodName });
 
     const virtualPath = this.virtualPath;
-    let methodArguments: string;
-    if (setStrictLocals != null) {
-      if (setStrictLocals.includes("&")) {
-        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}`;
-      } else {
-        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}, &_`;
-      }
-    } else {
-      methodArguments = "local_assigns, output_buffer, &_";
-    }
-    const signature = methodParameters(methodArguments);
     const keyreq = signature.filter(([type]) => type === "keyreq").map(([, name]) => name!);
     const keywords = signature
       .filter(([type]) => type === "keyreq" || type === "key")
@@ -440,7 +442,7 @@ export class Template {
       kwargs = {},
       _,
     ) {
-      if (setStrictLocals != null) {
+      if (strictLocals) {
         const missing = keyreq.filter((k) => !Object.hasOwn(kwargs, k));
         if (missing.length > 0) {
           throw new ArgumentError(
@@ -459,7 +461,7 @@ export class Template {
         }
       }
       this.virtualPath = virtualPath;
-      return render.call(this, this, setStrictLocals != null ? kwargs : localAssigns, _);
+      return render.call(this, this, strictLocals ? kwargs : localAssigns, _);
     };
     method.parameters = signature.map(([type, name]) =>
       name === undefined ? [type] : [type, name],
