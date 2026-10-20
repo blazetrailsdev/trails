@@ -77,7 +77,6 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // `def [](key)` → `get`, and :114 `def []=(key, value)` → `set`.
   "Rack::Headers": { "self.[]": ["get"], "[]": ["get"], "[]=": ["set"] },
   "Rack::Response": { "self.[]": ["get"] },
-  // did_you_mean.rb:118 DeprecatedMapping `def []=(key, value)` → did-you-mean.ts `set`.
   "DidYouMean::DeprecatedMapping": { "[]=": ["set"] },
   "Rack::Multipart::ParamList": { "<<": ["push"] },
   "Rack::NullLogger": { "<<": ["append"] },
