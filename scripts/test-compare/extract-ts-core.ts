@@ -790,9 +790,11 @@ export function extractTestsFromSource(
     if (sites.some((outer) => sites.some((inner) => extendsSuite(inner, outer)))) {
       sites.forEach((site, i) => {
         const siteGate = callSiteGates.get(name)![i];
+        const seen = new Set(dynamicSites);
         currentAncestors.push(...site);
         if (siteGate) gateStack.push(siteGate);
         visit(body);
+        for (const node of dynamicSites) if (!seen.has(node)) dynamicSites.delete(node);
         if (siteGate) gateStack.pop();
         currentAncestors.length -= site.length;
       });

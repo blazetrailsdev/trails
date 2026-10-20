@@ -20,74 +20,6 @@ class MyRequest extends Request {
   }
 }
 
-class NonDelegate extends Request {
-  isDelegate(): boolean {
-    return false;
-  }
-
-  override queryParser = (): QueryParser =>
-    QueryParser.makeDefault(paramDepthLimit(), { bytesizeLimit: 2 ** 30 });
-}
-
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`spec_request.rb:1924`). */
-class DelegateRequest {
-  req: Request;
-
-  constructor(req: Request) {
-    this.req = req;
-  }
-
-  get env(): Record<string, any> {
-    return this.req.env;
-  }
-
-  hasHeader(name: string): boolean {
-    return this.req.hasHeader(name);
-  }
-
-  getHeader(name: string): any {
-    return this.req.getHeader(name);
-  }
-
-  fetchHeader(name: string, block?: (key: string) => any): any {
-    return block ? this.req.fetchHeader(name, block) : this.req.fetchHeader(name);
-  }
-
-  eachHeader(callback: (key: string, value: any) => void): void {
-    this.req.eachHeader(callback);
-  }
-
-  setHeader(name: string, v: any): any {
-    return this.req.setHeader(name, v);
-  }
-
-  addHeader(key: string, v: string | null): any {
-    return this.req.addHeader(key, v);
-  }
-
-  deleteHeader(name: string): any {
-    return this.req.deleteHeader(name);
-  }
-
-  valuesAt(...keys: string[]): any[] {
-    return this.req.valuesAt(...keys);
-  }
-
-  isDelegate(): boolean {
-    return true;
-  }
-
-  queryParser(): QueryParser {
-    return QueryParser.makeDefault(paramDepthLimit(), { bytesizeLimit: 2 ** 30 });
-  }
-}
-include(DelegateRequest, Helpers);
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- see above. */
-interface DelegateRequest extends Omit<
-  Helpers,
-  "env" | "getHeader" | "setHeader" | "fetchHeader"
-> {}
-
 function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void {
   function makeReq(uri = "/", overrides: Record<string, any> = {}): Request {
     return makeRequest(MockRequest.envFor(uri, overrides));
@@ -196,7 +128,7 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
   it("wrap the rack variables", () => {
     const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
 
-    expect(req.body).toBeUndefined();
+    expect(req.body).toBeNull();
     expect(req.scheme).toBe("http");
     expect(req.requestMethod).toBe("GET");
 
@@ -979,7 +911,7 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
 
   it("provide the original env", () => {
     const env = makeEnv();
-    const req = makeRequest(env);
+    const req = new Request(env);
     expect(req.env).toBe(env);
   });
 
@@ -1559,7 +1491,7 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
 
   it("Env sets @env on initialization", () => {
     const env = makeEnv();
-    const req = makeRequest(env);
+    const req = new Request(env);
     expect(req.env).toBe(env);
   });
 
@@ -1633,6 +1565,15 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
   });
 }
 describe("RackRequestTest", () => {
+  class NonDelegate extends Request {
+    isDelegate(): boolean {
+      return false;
+    }
+
+    override queryParser = (): QueryParser =>
+      QueryParser.makeDefault(paramDepthLimit(), { bytesizeLimit: 2 ** 30 });
+  }
+
   rackRequestTests((env) => new NonDelegate(env));
 
   it("return form_pairs for url-encoded POST data", () => {
@@ -1768,6 +1709,65 @@ describe("RackRequestTest", () => {
   });
 
   describe("TestProxyRequest", () => {
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`spec_request.rb:1924`). */
+    class DelegateRequest {
+      req: Request;
+
+      constructor(req: Request) {
+        this.req = req;
+      }
+
+      get env(): Record<string, any> {
+        return this.req.env;
+      }
+
+      hasHeader(name: string): boolean {
+        return this.req.hasHeader(name);
+      }
+
+      getHeader(name: string): any {
+        return this.req.getHeader(name);
+      }
+
+      fetchHeader(name: string, block?: (key: string) => any): any {
+        return block ? this.req.fetchHeader(name, block) : this.req.fetchHeader(name);
+      }
+
+      eachHeader(callback: (key: string, value: any) => void): void {
+        this.req.eachHeader(callback);
+      }
+
+      setHeader(name: string, v: any): any {
+        return this.req.setHeader(name, v);
+      }
+
+      addHeader(key: string, v: string | null): any {
+        return this.req.addHeader(key, v);
+      }
+
+      deleteHeader(name: string): any {
+        return this.req.deleteHeader(name);
+      }
+
+      valuesAt(...keys: string[]): any[] {
+        return this.req.valuesAt(...keys);
+      }
+
+      isDelegate(): boolean {
+        return true;
+      }
+
+      queryParser(): QueryParser {
+        return QueryParser.makeDefault(paramDepthLimit(), { bytesizeLimit: 2 ** 30 });
+      }
+    }
+    include(DelegateRequest, Helpers);
+    /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- see above. */
+    interface DelegateRequest extends Omit<
+      Helpers,
+      "env" | "getHeader" | "setHeader" | "fetchHeader"
+    > {}
+
     rackRequestTests((env) => new DelegateRequest(new NonDelegate(env)));
   });
 });

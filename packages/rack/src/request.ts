@@ -123,7 +123,7 @@ export interface Helpers {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
 export abstract class Helpers {
   get body(): any {
-    return this.getHeader(RACK_INPUT);
+    return this.getHeader(RACK_INPUT) ?? null;
   }
 
   get scriptName(): string {

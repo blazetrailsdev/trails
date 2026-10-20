@@ -23,6 +23,22 @@ describe("an example function called from a suite and a suite nested in it", () 
     ).toEqual(["RackRequestTest > one", "RackRequestTest > TestProxyRequest > one"]);
   });
 
+  it("replays a dynamically titled example under each suite", () => {
+    expect(
+      paths(`
+        function rackRequestTests(): void {
+          it(\`handles ASCII NUL input of \${length} bytes\`, () => {});
+        }
+        describe("RackRequestTest", () => {
+          rackRequestTests();
+          describe("TestProxyRequest", () => {
+            rackRequestTests();
+          });
+        });
+      `),
+    ).toHaveLength(2);
+  });
+
   it("visits the examples once when no call site is nested in another", () => {
     expect(
       paths(`
