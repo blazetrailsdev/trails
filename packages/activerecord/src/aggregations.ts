@@ -18,22 +18,16 @@ function clearAggregationCache(this: AggregationsHost): void {
   }
 }
 
-interface ComposedOfOptions {
+type ComposedOfOptions = {
   className?: string;
   mapping?: [string, string][] | [string, string];
   constructorFn?: ((...args: any[]) => any) | string;
   converter?: (value: unknown) => unknown;
   allowNil?: boolean;
-}
+};
 
 export function composedOf(this: typeof Base, partId: string, options: ComposedOfOptions): void {
-  assertValidKeys(options as unknown as Record<string, unknown>, [
-    "className",
-    "mapping",
-    "allowNil",
-    "constructorFn",
-    "converter",
-  ]);
+  assertValidKeys(options, ["className", "mapping", "allowNil", "constructorFn", "converter"]);
 
   if (!isModuleIncluded(this, Aggregations)) include(this, Aggregations);
 
@@ -48,13 +42,7 @@ export function composedOf(this: typeof Base, partId: string, options: ComposedO
   readerMethod.call(this, name, className, mapping as [string, string][], allowNil, constructor);
   writerMethod.call(this, name, className, mapping as [string, string][], allowNil, converter);
 
-  const reflection = create(
-    "composedOf",
-    partId,
-    null,
-    options as unknown as Record<string, unknown>,
-    this,
-  );
+  const reflection = create("composedOf", partId, null, options, this);
   addAggregateReflection(this, partId, reflection);
 }
 
