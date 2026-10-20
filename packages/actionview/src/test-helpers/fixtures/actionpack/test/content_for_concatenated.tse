@@ -1,0 +1,3 @@
+<% contentFor("title", "Putting stuff ");
+   contentFor("title", "in the title!") -%>
+Great stuff!
