@@ -457,7 +457,12 @@ export class TypePass {
    * kinds, answers null. `decl` is a parameter (uses in its function) or a
    * field (uses as `x.field` anywhere in `scope`).
    */
-  usageType(checker: ts.TypeChecker, decl: ts.Declaration, scope?: ts.Node[]): string | null {
+  usageType(
+    checker: ts.TypeChecker,
+    decl: ts.Declaration,
+    scope?: ts.Node[],
+    refIndex?: Map<ts.Symbol, ts.Expression[]>,
+  ): string | null {
     const name = (decl as ts.NamedDeclaration).name;
     if (!name || !ts.isIdentifier(name)) return null;
     const sym = checker.getSymbolAtLocation(name);
@@ -549,7 +554,10 @@ export class TypePass {
       }
       ts.forEachChild(n, visit);
     };
-    for (const r of roots) visit(r);
+    // With an index of the tree's property reads (typeFieldsByUse), each read
+    // of the field is visited directly rather than found by a walk.
+    if (refIndex) for (const r of refIndex.get(sym) ?? []) visit(r);
+    else for (const r of roots) visit(r);
     if (other) return null;
     // Sent methods (and perhaps read attributes): the class it duck-types as.
     if (kinds.has("object") && [...kinds].every((k) => k === "object" || k === "record"))
@@ -991,6 +999,16 @@ export class TypePass {
     const program = this.program();
     const checker = program.getTypeChecker();
     const sfs = this.files.map((f) => program.getSourceFile(f)).filter(Boolean) as ts.SourceFile[];
+    // One walk: every `x.field` read, by the field's symbol.
+    const refIndex = new Map<ts.Symbol, ts.Expression[]>();
+    const index = (node: ts.Node): void => {
+      if (ts.isPropertyAccessExpression(node)) {
+        const sym = checker.getSymbolAtLocation(node.name);
+        if (sym) (refIndex.get(sym) ?? refIndex.set(sym, []).get(sym)!).push(node);
+      }
+      ts.forEachChild(node, index);
+    };
+    for (const sf of sfs) index(sf);
     let n = 0;
     for (const sf of sfs) {
       const edits: Edit[] = [];
@@ -999,7 +1017,7 @@ export class TypePass {
           (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) &&
           node.type?.kind === ts.SyntaxKind.UnknownKeyword
         ) {
-          const t = this.usageType(checker, node, sfs);
+          const t = this.usageType(checker, node, sfs, refIndex);
           if (t) edits.push({ pos: node.type.getStart(sf), end: node.type.getEnd(), text: t });
         }
         ts.forEachChild(node, visit);
