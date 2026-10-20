@@ -47,7 +47,7 @@ export const EOL = "\r\n";
 export const MULTIPART = /^multipart\/.*boundary="?([^";,]+)"?/i;
 export const MULTIPART_CONTENT_TYPE = new RegExp(`Content-Type: (.*)${EOL}`, "i");
 export const MULTIPART_CONTENT_DISPOSITION = new RegExp(
-  `Content-Disposition:(.*)(?=${EOL}(\\S|$))`,
+  `Content-Disposition:([^\\n]*)(?=${EOL}(\\S|$))`,
   "i",
 );
 export const MULTIPART_CONTENT_ID = new RegExp(`Content-ID:\\s*([^${EOL}]*)`, "i");
