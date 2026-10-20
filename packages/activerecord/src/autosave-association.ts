@@ -402,11 +402,10 @@ export async function isAssociationValid(
   association: any,
   record: any,
 ): Promise<boolean> {
-  const owner = this;
   if (record.isDestroyed() || (association.options.autosave && record.markedForDestruction()))
     return true;
 
-  const context = owner.customValidationContext() ? owner._validationContext : undefined;
+  const context = this.customValidationContext() ? this._validationContext : undefined;
   if (await record.isValid(context)) return true;
 
   let associatedErrors: any[];
@@ -419,15 +418,15 @@ export async function isAssociationValid(
   }
 
   if (association.options.autosave) {
-    if (owner === record) return false;
+    if (this === record) return false;
     for (const error of associatedErrors) {
-      owner.errors.objects.push(new AssociationsNestedError(association, error));
+      this.errors.objects.push(new AssociationsNestedError(association, error));
     }
   } else if (associatedErrors.length > 0) {
-    owner.errors.add(association.reflection.name);
+    this.errors.add(association.reflection.name);
   }
 
-  return owner.errors.isAny();
+  return this.errors.isAny();
 }
 
 /** @internal */
