@@ -154,6 +154,10 @@ export abstract class Env {
   deleteHeader(name: string): any {
     return hashDelete(this.env, name);
   }
+
+  initializeCopy(other: Env): void {
+    this.env = { ...other.env };
+  }
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers`; the class/interface merge is how the module's host state surfaces on the type side. */
