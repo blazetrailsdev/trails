@@ -7,15 +7,13 @@
  * `missingClass` is ever emitted because there is no file to lint. This test
  * closes that blind spot by walking the manifest directly:
  *
- *   - every manifest error class whose mapped home file is absent (and whose
- *     home file isn't already grandfathered in `rails-error-parity-exclude.json`)
- *     must be listed in `rails-error-parity-unported.json` with a reason; and
+ *   - every manifest error class whose mapped home file is absent must be listed in `rails-error-parity-unported.json` with a reason; and
  *   - the allowlist is a ratchet — every entry must still be genuinely unported,
  *     so once a subsystem lands the entry has to be removed (the list only
  *     shrinks).
  *
  * Mapping mirrors the rule's `PKG_NS` + `rubyToSrcRel` (snake_case→kebab-case)
- * and its exclude semantics exactly. No node:* imports; async fs only.
+ * exactly. No node:* imports; async fs only.
  */
 import { readFile, stat } from "fs/promises";
 import * as path from "path";
@@ -47,10 +45,10 @@ async function readJson(absPath) {
 
 /**
  * Walk the manifest and return the manifest error classes whose mapped home
- * file is absent and not grandfathered in the exclude baseline. `exists` is
+ * file is absent. `exists` is
  * injectable so the comparison logic can be unit-tested without the real tree.
  */
-async function findUnported(manifest, excludeSet, exists) {
+async function findUnported(manifest, exists) {
   const out = [];
   for (const [pkg, classes] of Object.entries(manifest.packages ?? {})) {
     const ns = PKG_NS[pkg];
@@ -58,7 +56,6 @@ async function findUnported(manifest, excludeSet, exists) {
     for (const e of classes) {
       if (!e.rubyFile.startsWith(ns)) continue;
       const rel = `packages/${pkg}/src/${rubyToSrcRel(e.rubyFile)}`;
-      if (excludeSet.has(rel)) continue;
       if (await exists(rel)) continue;
       out.push({ package: pkg, name: e.name, rubyFile: e.rubyFile });
     }
@@ -68,9 +65,6 @@ async function findUnported(manifest, excludeSet, exists) {
 
 const manifestPath =
   process.env.RAILS_ERROR_CLASSES_PATH ?? path.join(__dirname, "rails-error-classes.json");
-const excludePath =
-  process.env.RAILS_ERROR_PARITY_EXCLUDE_PATH ??
-  path.join(__dirname, "rails-error-parity-exclude.json");
 const allowlistPath =
   process.env.RAILS_ERROR_PARITY_UNPORTED_PATH ??
   path.join(__dirname, "rails-error-parity-unported.json");
@@ -78,13 +72,10 @@ const allowlistPath =
 describe("rails-error-parity unported allowlist", () => {
   it("every manifest error class with an absent home file is in the allowlist", async () => {
     const manifest = await readJson(manifestPath);
-    const excludeSet = new Set(await readJson(excludePath));
     const allowlist = await readJson(allowlistPath);
     const allowKeys = new Set(allowlist.map(entryKey));
 
-    const unported = await findUnported(manifest, excludeSet, (rel) =>
-      fileExists(path.join(ROOT, rel)),
-    );
+    const unported = await findUnported(manifest, (rel) => fileExists(path.join(ROOT, rel)));
 
     const unflagged = unported.filter((e) => !allowKeys.has(entryKey(e)));
     expect(
@@ -96,7 +87,6 @@ describe("rails-error-parity unported allowlist", () => {
   });
 
   it("every allowlist entry is still genuinely unported (ratchet only shrinks)", async () => {
-    const excludeSet = new Set(await readJson(excludePath));
     const allowlist = await readJson(allowlistPath);
 
     const stale = [];
@@ -107,7 +97,7 @@ describe("rails-error-parity unported allowlist", () => {
       // malformed (caught below) rather than silently path-mapped.
       const inNs = ns && e.rubyFile.startsWith(ns);
       const rel = `packages/${e.package}/src/${rubyToSrcRel(e.rubyFile)}`;
-      const ported = inNs && !excludeSet.has(rel) && (await fileExists(path.join(ROOT, rel)));
+      const ported = inNs && (await fileExists(path.join(ROOT, rel)));
       if (ported) stale.push(entryKey(e));
     }
     expect(
@@ -149,13 +139,12 @@ describe("rails-error-parity unported allowlist", () => {
     ).toEqual([]);
   });
 
-  it("findUnported honors the exclude baseline and the path mapping", async () => {
+  it("findUnported honors the path mapping", async () => {
     const manifest = {
       packages: {
         activesupport: [
           { name: "Missing", parent: "StandardError", rubyFile: "active_support/foo_bar.rb" },
           { name: "Present", parent: "StandardError", rubyFile: "active_support/baz.rb" },
-          { name: "Excluded", parent: "StandardError", rubyFile: "active_support/qux.rb" },
         ],
         unknownpkg: [
           { name: "OutOfScope", parent: "StandardError", rubyFile: "active_support/foo_bar.rb" },
@@ -164,9 +153,8 @@ describe("rails-error-parity unported allowlist", () => {
     };
     // baz.ts "exists"; foo_bar.rb maps to foo-bar.ts (snake→kebab) and is absent.
     const exists = async (rel) => rel === "packages/activesupport/src/baz.ts";
-    const excludeSet = new Set(["packages/activesupport/src/qux.ts"]);
 
-    const result = await findUnported(manifest, excludeSet, exists);
+    const result = await findUnported(manifest, exists);
     expect(result).toEqual([
       { package: "activesupport", name: "Missing", rubyFile: "active_support/foo_bar.rb" },
     ]);
