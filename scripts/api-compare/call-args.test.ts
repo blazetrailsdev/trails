@@ -1283,6 +1283,16 @@ describe("compareCallArgs Symbol-discriminated arguments", () => {
 });
 
 describe("comparableRubySites", () => {
+  it("drops a String.new the port spells rbStrSNew, so klass.new pairs with new klass", () => {
+    const stringNew = { ...site("new", []), recv: "const:String" };
+    const klassNew = { ...site("new", ["id:body"]), recv: "id:klass" };
+    const ts = [site("rbStrSNew", []), site("constructor", ["id:body"])];
+    expect(comparableRubySites([stringNew, klassNew], ts, () => false)).toEqual([klassNew]);
+    expect(comparableRubySites([stringNew], [site("constructor", [])], () => false)).toEqual([
+      stringNew,
+    ]);
+  });
+
   it("drops a weak site the TS body makes no such call for", () => {
     const kept = comparableRubySites(
       [site("map", ["id:x"], ["weak"])],
