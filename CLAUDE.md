@@ -1340,12 +1340,12 @@ Two fallbacks exist, and both are last resorts:
   set is closed — a format, a pragma, a config option, an association's writer,
   a visitor's node kind, a Thor instruction. A registry is a declared map from
   the Ruby-visible name to a real, typed function, read at the call site;
-  ruby-compat's own `OBJECT_METHOD_TABLE` (`object.ts:480`) and
-  `TEMPORAL_METHOD_TABLE` (`:556`) are that shape. Reach for it only once the
+  ruby-compat's own `OBJECT_METHOD_TABLE` and `TEMPORAL_METHOD_TABLE`
+  (`packages/ruby-compat/src/object.ts`) are that shape. Reach for it only once the
   direct spelling is genuinely impossible, and keep it module-private where
   nothing outside the file reads it — a table is extra surface like any other
   name, and a registry written where a direct call would have done is its own
-  invented indirection (§ "No extra abstraction").
+  invented indirection (§ "Fidelity is the job").
 - **`rbFSend` / `rbFPublicSend`**, where the dispatched name is both
   caller-supplied and open-ended, so no table can enumerate it. `Object#try`'s
   `public_send(*args, &block)`
@@ -1372,7 +1372,7 @@ to settle rather than a ratchet. `extract-ts-api.ts` credits
 `rbFSend(recv, "literalName")` as a call to `literalName` itself, so spelling
 one out under the main rule is call-set- and argument-neutral; a computed name
 is credited as Ruby's own `send` / `publicSend`, and both sit in `SKIP_CALLS`
-(`scripts/api-compare/lint-calls.ts:189`), so a send converged onto a direct
+(`scripts/api-compare/lint-calls.ts`), so a send converged onto a direct
 call or a registry needs no baseline row and no `@missingRailsCall` receipt.
 
 ## Ruby protocol methods with a different JS mechanism
