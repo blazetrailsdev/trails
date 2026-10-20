@@ -123,7 +123,10 @@ export class Column {
     return false;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable#deduplicated rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:24-26
+   */
   deduplicated(): this {
     this.name = strUminus(this.name);
     if (this.sqlTypeMetadata) this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();

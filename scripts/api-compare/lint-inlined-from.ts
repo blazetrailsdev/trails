@@ -8,7 +8,8 @@
  * `def` in the Ruby file the constructor's own file mirrors, or sits twice or
  * out of Ruby's chain order. A tag on a method (RFC 0197) is held to the same
  * checks against the class's ancestors that define the method, and is red too
- * when the module method's Rails body calls no `super`. `--fix` rewrites
+ * when a module method's Rails body calls no `super` and a later tag follows it:
+ * the body that makes no `super` call ends the chain and is its last segment. `--fix` rewrites
  * a stale citation from the manifest, which is the only place one comes from.
  *
  * The reverse arm, a Rails class that reaches a module `initialize` or a
@@ -324,7 +325,7 @@ export function inlinedFromFindings(
         const written = tagged.inlinedFrom ?? [];
         const chain =
           counterpart && methodChain(counterpart, written[0]?.hook ?? "", modules, rubyClasses);
-        for (const tag of written) {
+        for (const [index, tag] of written.entries()) {
           const hook = `${tag.module}#${tag.hook}`;
           if (tag.hook !== written[0].hook) {
             report(hook, `names a method other than ${written[0].hook}, which the other tags name`);
@@ -332,8 +333,11 @@ export function inlinedFromFindings(
           }
           const body = resolveBody(tag);
           if (body === undefined) continue;
-          if (!(body.calls ?? []).includes("super")) {
-            report(hook, "names a module method whose Rails body calls no `super`");
+          if (index < written.length - 1 && !(body.calls ?? []).includes("super")) {
+            report(
+              hook,
+              "names a module method whose Rails body calls no `super`, ending the chain",
+            );
           }
           if (chain === undefined) {
             report(hook, "sits on a method whose file and name mirror no Rails class or module");

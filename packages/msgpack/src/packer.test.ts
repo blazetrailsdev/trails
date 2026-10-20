@@ -293,7 +293,7 @@ describe("MessagePack::Packer", () => {
     });
 
     describe("when it has no ext type but it was extended by a module which has one", () => {
-      it.skip('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
+      it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked"', () => {
         const Mod = defineModule({
           toMsgpackExt(): string {
             return "value_msgpacked";

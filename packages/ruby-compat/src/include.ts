@@ -2176,6 +2176,7 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   }
 
   trackIncludedModule(klass, mod);
+  if (typeof klass !== "function") trackIncludedModule(rbObjSingletonClass(klass).prototype, mod);
   if (typeof (mod as ModuleHooks)[extended] === "function") {
     (mod as ModuleHooks)[extended]!(klass);
   }

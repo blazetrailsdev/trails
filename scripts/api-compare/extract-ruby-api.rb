@@ -911,7 +911,7 @@ class ApiExtractor
     }
     record_body_facts(method_info, node[3], find_params(node), fqn)
     record_included_hook_mixins(target, node[3], find_params(node)) if @in_sclass && name == "included"
-    if INLINED_HOOKS.include?(name) || (@modules[fqn] && !@in_sclass && method_info[:calls]&.include?("super"))
+    if INLINED_HOOKS.include?(name) || (@modules[fqn] && !@in_sclass)
       @def_end_lines ||= DefEndLines.new(@source).tap(&:parse).ends
       end_line = @def_end_lines[method_info[:line]]
       method_info[:endLine] = end_line if end_line
