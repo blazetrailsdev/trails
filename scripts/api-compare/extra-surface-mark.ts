@@ -145,6 +145,7 @@ export const TAGGED_ONLY_PACKAGES = [
   "actioncontroller",
   "actiondispatch",
   "globalid",
+  "i18n",
   "ruby-compat",
   "thor",
 ] as const;

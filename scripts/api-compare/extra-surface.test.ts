@@ -2427,6 +2427,46 @@ describe("buildReport — reopened modules", () => {
     expect(report.packages[0].extraFiles).toEqual([]);
   });
 
+  it("allows a reopening file's methods when the file also declares constants", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        i18n: {
+          classes: {},
+          modules: {
+            I18n: {
+              ...rubyClass({ name: "I18n", file: "i18n.rb" }),
+              instanceMethods: [],
+              classMethods: [{ ...method("interpolate"), file: "interpolate/ruby.rb" }],
+            },
+          },
+          fileConstants: {
+            "interpolate/ruby.rb": { DEFAULT_INTERPOLATION_PATTERNS: { kind: "array", value: "" } },
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        i18n: {
+          classes: {},
+          modules: {},
+          fileFunctions: { "interpolate/ruby.ts": [method("interpolate")] },
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+
   it("does not widen the allow-set beyond the methods the reopening file declares", () => {
     const ruby: ApiManifest = {
       source: "ruby",

@@ -133,6 +133,7 @@ describe("extra-surface mark", () => {
       "actioncontroller",
       "actiondispatch",
       "globalid",
+      "i18n",
       "ruby-compat",
       "thor",
     ]);
@@ -140,7 +141,7 @@ describe("extra-surface mark", () => {
       unmarkedPackages({
         "ruby-compat": { novel: 0, total: 0, noCounterpartFiles: 0, allowed: 0 },
       }),
-    ).toEqual(["actioncontroller", "actiondispatch", "globalid", "thor"]);
+    ).toEqual(["actioncontroller", "actiondispatch", "globalid", "i18n", "thor"]);
   });
 
   it("demands a mark from a tagged-only package too, because total stays gated", () => {
