@@ -6715,8 +6715,16 @@ export class DateTime extends DateWithoutParseStatics {
     return dfToTime(this.mLocalDf())[1];
   }
 
+  get minute(): number {
+    return this.min;
+  }
+
   get sec(): number {
     return dfToTime(this.mLocalDf())[2];
+  }
+
+  get second(): number {
+    return this.sec;
   }
 
   get secFraction(): Rational {
@@ -6795,7 +6803,10 @@ rbDefineAllocFunc(
 );
 
 /** @internal */
-function dLiteZero(): number {
+function dLiteZero(_self: unknown, ...argv: unknown[]): number {
+  if (argv.length !== 0) {
+    throw new ArgumentError(`wrong number of arguments (given ${argv.length}, expected 0)`);
+  }
   return 0;
 }
 

@@ -2025,6 +2025,12 @@ describe("Date#hour, #min, #sec (d_lite_zero, private)", () => {
 
   it("leave DateTime's public readers in place", () => {
     const dt = new RubyDateTime(2013, 2, 20, 7, 8, 9);
-    expect([rbFSend(dt, "hour"), rbFSend(dt, "min"), rbFSend(dt, "sec")]).toEqual([7, 8, 9]);
+    expect(["hour", "min", "minute", "sec", "second"].map((m) => rbFSend(dt, m))).toEqual([
+      7, 8, 8, 9, 9,
+    ]);
+  });
+
+  it("raise ArgumentError on an argument, as the arity-0 private readers do", () => {
+    expect(() => rbFSend(new RubyDate(2013, 2, 20), "hour", 1)).toThrow(ArgumentError);
   });
 });
