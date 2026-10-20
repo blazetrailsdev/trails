@@ -22,6 +22,7 @@ import {
   rbModConstSet,
   rbModName,
   registerConstant,
+  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 
 export type CollectionCallback<K extends string> =
@@ -224,16 +225,13 @@ export class Associations {
     Reflection.addReflection(this, middleReflection.name, middleReflection);
     middleReflection.parentReflection = habtmReflection;
 
-    include(
-      this,
-      new Module((mod) => {
-        mod.defineMethod("destroyAssociations", async function (this: any): Promise<void> {
-          await this.association(middleReflection.name).deleteAll("deleteAll");
-          this.association(name).reset();
-          await mod.superMethod(this, "destroyAssociations")!();
-        });
-      }),
-    );
+    include(this, {
+      destroyAssociations: async function destroyAssociations(this: any): Promise<void> {
+        await this.association(middleReflection.name).deleteAll("deleteAll");
+        this.association(name).reset();
+        await rbCallSuper(this, destroyAssociations);
+      },
+    });
 
     const hmOptions: Record<string, unknown> = {};
     hmOptions.through = middleReflection.name;
@@ -319,17 +317,19 @@ export function association(this: Base, name: string): AssociationInstance {
 
 /** @internal */
 export function initInternals(this: Base): void {
-  AssociationsNamespace.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._associationCache = new Map();
 }
 
 export function initializeDup(this: Base, other: unknown): void {
   this._associationCache = new Map();
-  AssociationsNamespace.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
-AssociationsNamespace.defineMethod("initInternals", initInternals);
-AssociationsNamespace.defineMethod("initializeDup", initializeDup);
+Object.assign(AssociationsNamespace, {
+  initInternals,
+  initializeDup,
+});
 
 /** @internal */
 export function associationInstanceGet(

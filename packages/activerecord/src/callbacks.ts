@@ -3,7 +3,7 @@ import type { CallbackConditions, CallbackObject } from "@blazetrails/activemode
 import { RecordNotDestroyed } from "./errors.js";
 import { include, included } from "@blazetrails/activesupport";
 import { ValidationsCallbacks } from "@blazetrails/activemodel";
-import { Module, rtest } from "@blazetrails/ruby-compat";
+import { rtest, rbCallSuper } from "@blazetrails/ruby-compat";
 import type { TouchArgs } from "./timestamp.js";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import { _createRecord as lockingCreateRecord } from "./locking/optimistic.js";
@@ -17,7 +17,7 @@ import {
 
 type ModelCtor = typeof Base;
 
-export const Callbacks = Object.assign(new Module(), {
+export const Callbacks = {
   [included](base: ModelCtor): void {
     include(base, ValidationsCallbacks);
 
@@ -25,7 +25,7 @@ export const Callbacks = Object.assign(new Module(), {
     base.defineModelCallbacks("touch", { only: "after" });
     base.defineModelCallbacks("save", "create", "update", "destroy");
   },
-});
+};
 
 export declare class ClassMethods {
   afterInitialize: <T extends typeof Base>(
@@ -181,7 +181,7 @@ export async function destroy<T>(this: any, superFn: () => Promise<T>): Promise<
 
 export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   return this._runTouchCallbacks(
-    () => Callbacks.superMethod(this, "touch")!(...names) as Promise<boolean>,
+    () => rbCallSuper(this, touch, ...names) as Promise<boolean>,
   ) as Promise<boolean>;
 }
 
@@ -193,9 +193,9 @@ export function incrementBang<T>(
 ): Promise<T> {
   return rtest(options.touch)
     ? (this._runTouchCallbacks(
-        () => Callbacks.superMethod(this, "incrementBang")!(attribute, by, options) as Promise<T>,
+        () => rbCallSuper(this, incrementBang, attribute, by, options) as Promise<T>,
       ) as Promise<T>)
-    : (Callbacks.superMethod(this, "incrementBang")!(attribute, by, options) as Promise<T>);
+    : (rbCallSuper(this, incrementBang, attribute, by, options) as Promise<T>);
 }
 
 /** @internal */
@@ -234,11 +234,13 @@ export async function _updateRecord(
   return await this._runUpdateCallbacks(() =>
     recordUpdateTimestamps.call(this, () =>
       dirtyUpdateRecord.call(this, attributeNames, (names: string[]) =>
-        Persistence.instanceMethod("_updateRecord")!.value.call(this, names, block),
+        Persistence._updateRecord.call(this, names, block),
       ),
     ),
   );
 }
 
-Callbacks.defineMethod("touch", touch);
-Callbacks.defineMethod("incrementBang", incrementBang);
+Object.assign(Callbacks, {
+  touch,
+  incrementBang,
+});

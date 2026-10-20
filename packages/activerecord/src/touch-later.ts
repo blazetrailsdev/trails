@@ -2,12 +2,12 @@ import type { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
 import type { TouchArgs, TouchOptions } from "./timestamp.js";
 import { extractOptionsBang } from "@blazetrails/activesupport";
-import { Module, union } from "@blazetrails/ruby-compat";
+import { union, rbCallSuper } from "@blazetrails/ruby-compat";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { addToTransaction } from "./transactions.js";
 
-export const TouchLater = new Module();
+export const TouchLater = {};
 
 type TouchLaterHost = Base & {
   _deferTouchAttrs?: readonly string[] | null;
@@ -69,12 +69,12 @@ export async function touch(this: TouchLaterHost, ...names: TouchArgs): Promise<
   if (hasDeferTouchAttrs(this)) {
     const { time = null } = extractOptionsBang(names as unknown[]) as TouchOptions;
     names = union(names as string[], [...this._deferTouchAttrs!]);
-    const result = await TouchLater.superMethod(this, "touch")!(...names, { time });
+    const result = await rbCallSuper(this, touch, ...names, { time });
     this._deferTouchAttrs = null;
     this._touchTime = null;
     return result as boolean;
   } else {
-    return TouchLater.superMethod(this, "touch")!(...names) as Promise<boolean>;
+    return rbCallSuper(this, touch, ...names) as Promise<boolean>;
   }
 }
 
@@ -82,7 +82,7 @@ export async function beforeCommittedBang(this: TouchLaterHost): Promise<void> {
   if (hasDeferTouchAttrs(this) && this.isPersisted()) {
     await touchDeferredAttributes.call(this);
   }
-  await TouchLater.superMethod(this, "beforeCommittedBang")!();
+  await rbCallSuper(this, beforeCommittedBang);
 }
 
 /** @internal */
@@ -101,7 +101,7 @@ export async function touchDeferredAttributes(this: TouchLaterHost): Promise<voi
 
 /** @internal */
 export function initInternals(this: TouchLaterHost): void {
-  TouchLater.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._deferTouchAttrs = null;
   this._touchTime = null;
 }
@@ -112,7 +112,9 @@ export function hasDeferTouchAttrs(record: TouchLaterHost): boolean {
   return Array.isArray(attrs) && attrs.length > 0;
 }
 
-TouchLater.defineMethod("beforeCommittedBang", beforeCommittedBang);
-TouchLater.defineMethod("touchLater", touchLater);
-TouchLater.defineMethod("touch", touch);
-TouchLater.defineMethod("initInternals", initInternals);
+Object.assign(TouchLater, {
+  beforeCommittedBang,
+  touchLater,
+  touch,
+  initInternals,
+});

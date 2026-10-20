@@ -17,6 +17,7 @@ import {
   rbClassSuperclass,
   rbModName,
   rbObjRespondTo,
+  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import { demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
@@ -26,14 +27,14 @@ export interface Inheritance {
   readonly storeFullStiClass: boolean;
 }
 
-export const Inheritance = Object.assign(new Module(), {
+export const Inheritance = {
   [included](base: object): void {
     classAttribute.call(base, "storeFullClassName", { instanceWriter: false, default: true });
     classAttribute.call(base, "storeFullStiClass", { instanceWriter: false, default: true });
 
     setBaseClass(base as typeof Base);
   },
-});
+};
 
 /**
  * @internal
@@ -244,19 +245,17 @@ export function initializeClone(this: typeof Base, other: unknown): void {
 ClassMethods.defineMethod("initializeClone", initializeClone);
 
 export function initializeDup(this: Base, other: unknown): void {
-  Inheritance.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
   ensureProperType.call(this);
 }
-
-Inheritance.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function initializeInternalsCallback(this: Base): void {
-  Inheritance.superMethod(this, "initializeInternalsCallback")!();
+  rbCallSuper(this, initializeInternalsCallback);
   ensureProperType.call(this);
 }
 
-Inheritance.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
+Object.assign(Inheritance, { initializeDup, initializeInternalsCallback });
 
 /** @internal */
 export function ensureProperType(this: Base): void {

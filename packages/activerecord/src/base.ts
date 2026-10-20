@@ -2250,7 +2250,7 @@ include(Base, _Query);
 include(Base, _PrimaryKey);
 include(Base, ModelSchema.ModelSchema);
 include(Base, _TimeZoneConversion);
-include(Base, new Module((mod) => mod.defineMethod("initAttributes", _Core.initAttributes)));
+include(Base, { initAttributes: _Core.initAttributes });
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);

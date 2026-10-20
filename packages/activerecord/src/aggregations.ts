@@ -2,9 +2,9 @@ import type { Base } from "./base.js";
 import { addAggregateReflection, create } from "./reflection.js";
 import { assertValidKeys, camelize, constantize, isPlainObject } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { include, isModuleIncluded, Module, NoMethodError } from "@blazetrails/ruby-compat";
+import { include, isModuleIncluded, NoMethodError, rbCallSuper } from "@blazetrails/ruby-compat";
 
-export const Aggregations = new Module();
+export const Aggregations = {};
 
 type AggregationsHost = Base & {
   _aggregationCache: Map<string, unknown>;
@@ -141,21 +141,23 @@ type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
 
 export function initializeDup(this: AggregationsHost, other: unknown): void {
   this._aggregationCache = new Map(this._aggregationCache);
-  Aggregations.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
 export function reload(this: AggregationsHost, options?: ReloadOptions): Promise<Base> {
   this.clearAggregationCache();
-  return Aggregations.superMethod(this, "reload")!(options) as Promise<Base>;
+  return rbCallSuper(this, reload, options) as Promise<Base>;
 }
 
 /** @internal */
 function initInternals(this: AggregationsHost): void {
-  Aggregations.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._aggregationCache = new Map<string, unknown>();
 }
 
-Aggregations.defineMethod("initializeDup", initializeDup);
-Aggregations.defineMethod("reload", reload);
-Aggregations.defineMethod("clearAggregationCache", clearAggregationCache);
-Aggregations.defineMethod("initInternals", initInternals);
+Object.assign(Aggregations, {
+  initializeDup,
+  reload,
+  clearAggregationCache,
+  initInternals,
+});

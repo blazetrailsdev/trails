@@ -1,5 +1,5 @@
 import { HashWithIndifferentAccess, included, kernelArray } from "@blazetrails/activesupport";
-import { include, Module, rbObjAsString } from "@blazetrails/ruby-compat";
+import { include, rbCallSuper, rbObjAsString } from "@blazetrails/ruby-compat";
 
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -160,7 +160,7 @@ export class Dirty {
 }
 
 export function initializeDup(this: DirtyDupHost, other: unknown): void {
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
   this._mutationsFromDatabase = null;
 }
 
@@ -168,7 +168,7 @@ export function initAttributes(
   this: { constructor: { _defaultAttributes?: () => AttributeSet } },
   other: unknown,
 ): AttributeSet {
-  const attrs = SuperMethods.superMethod(this, "initAttributes")!(other) as AttributeSet;
+  const attrs = rbCallSuper(this, initAttributes, other) as AttributeSet;
   const klass = this.constructor;
   if ((other as { isPersisted(): boolean }).isPersisted() && klass._defaultAttributes) {
     return klass
@@ -194,19 +194,14 @@ export function asJson(this: object, options: Record<string, unknown> = {}): unk
     "_mutationsBeforeLastSave",
   ];
   options = { ...options, except };
-  return SuperMethods.superMethod(this, "asJson")!(options);
+  return rbCallSuper(this, asJson, options);
 }
 
 /** @internal */
 export function initInternals(this: DirtyInternalsHost): void {
-  SuperMethods.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initializeDup", initializeDup);
-  mod.defineMethod("initAttributes", initAttributes);
-  mod.defineMethod("asJson", asJson);
-  mod.defineMethod("initInternals", initInternals);
-});
+const SuperMethods = { initializeDup, initAttributes, asJson, initInternals };

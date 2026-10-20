@@ -24,6 +24,7 @@ import { ArgumentError } from "./argument-error.js";
 import type { abort } from "./process-adapter.js";
 import type { kernelRand } from "./kernel-rand.js";
 import { NameError } from "./name-error.js";
+import { NoMethodError } from "./no-method-error.js";
 import { isRegisteredConstant, registeredConstant } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
 import { Enumerable } from "./enumerable.js";
@@ -1752,11 +1753,48 @@ export function rbModAppendFeatures(
         }
         installed.add(key);
         descriptors[key] = { ...modDesc, configurable: true, enumerable: false };
+        if (typeof key === "string" && "value" in modDesc) {
+          const shadowed = Reflect.get(klass.prototype, key) as unknown;
+          if (typeof shadowed === "function" && shadowed !== modDesc.value) {
+            let slot = superSlots.get(modDesc.value as AnyFunction);
+            if (slot === undefined) {
+              superSlots.set(modDesc.value as AnyFunction, (slot = Symbol(`super:${key}`)));
+            }
+            descriptors[slot] = { value: shadowed, configurable: true };
+          }
+        }
       }
       ancestor = Object.getPrototypeOf(ancestor) as object | null;
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
+}
+
+const superSlots = new WeakMap<AnyFunction, symbol>();
+
+/**
+ * Mirrors: Ruby's `super` — vendor/ruby/v3.3.11/vm_eval.c:366 `rb_call_super`.
+ * A plain-object module's method reaches the next method of its name in the
+ * includer's ancestry: the one `include()` found on the includer's prototype
+ * when it copied `method` there, seated under `method`'s own slot. With none
+ * seated, the search ends in `Kernel`, where every Ruby ancestry ends.
+ *
+ * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
+ * uses but does not define.
+ */
+export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unknown[]): unknown {
+  const slot = superSlots.get(method);
+  let next = slot === undefined ? undefined : (Reflect.get(receiver, slot) as unknown);
+  if (next === undefined && Object.hasOwn(Kernel, method.name)) {
+    next = Reflect.get(Kernel, method.name);
+  }
+  if (typeof next !== "function") {
+    throw new NoMethodError(
+      `super: no superclass method '${method.name}' for an instance of ${receiver.constructor.name}`,
+      method.name,
+    );
+  }
+  return (next as (...a: unknown[]) => unknown).apply(receiver, args);
 }
 
 export type Extended<M extends object> = CallableMethods<M>;

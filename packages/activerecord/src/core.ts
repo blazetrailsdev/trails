@@ -20,6 +20,7 @@ import {
   basicObjRespondTo,
   rbFPublicSend,
   rbObjSingletonClass,
+  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import {
   NameError,
@@ -794,11 +795,11 @@ export function initInternals(
   klass.defineAttributeMethods();
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initInternals", initInternals);
-  mod.defineMethod("initializeDup", initializeDup);
-  mod.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
-});
+const SuperMethods = {
+  initInternals,
+  initializeDup,
+  initializeInternalsCallback,
+};
 
 export function initializeDup(
   this: Base & {
@@ -821,7 +822,7 @@ export function initializeDup(
   this._destroyed = false;
   this._startTransactionState = null;
 
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
 interface CloneRecord {

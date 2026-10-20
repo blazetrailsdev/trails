@@ -1,12 +1,12 @@
 import {
   kernelThrow,
-  Module,
   rbEnsure,
   rbEqual,
   rbFSend,
   rbModDefineMethod,
   rbModMethodDefined,
   zip,
+  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { Association } from "./associations/association.js";
@@ -58,7 +58,7 @@ export function reload<T extends Base>(this: T, options: ReloadOptions | null = 
   const record = this as unknown as AutosaveAssociationHost;
   record._markedForDestruction = false;
   record.destroyedByAssociation = null;
-  return AutosaveAssociation.superMethod(this, "reload")!(options) as Promise<T>;
+  return rbCallSuper(this, reload, options) as Promise<T>;
 }
 
 export interface AutosaveAssociation {
@@ -86,7 +86,7 @@ export interface AutosaveAssociation {
   _alreadyCalled?: Record<string, boolean> | null;
 }
 
-export const AutosaveAssociation = new Module().include({
+export const AutosaveAssociation = {
   markForDestruction(this: AutosaveAssociationHost): void {
     this._markedForDestruction = true;
   },
@@ -135,7 +135,7 @@ export const AutosaveAssociation = new Module().include({
   isAssociationForeignKeyChanged,
   isInversePolymorphicAssociationChanged,
   saveBelongsToAssociation,
-});
+};
 
 export function build(model: typeof Base, reflection: unknown): unknown {
   return addAutosaveAssociationCallbacks.call(model, reflection);
@@ -312,12 +312,14 @@ export async function saveBelongsToAssociation(this: AutosaveAssociationHost, re
 
 /** @internal */
 export function initInternals(this: AutosaveAssociationHost): void {
-  AutosaveAssociation.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._alreadyCalled = null;
 }
 
-AutosaveAssociation.defineMethod("initInternals", initInternals);
-AutosaveAssociation.defineMethod("reload", reload);
+Object.assign(AutosaveAssociation, {
+  initInternals,
+  reload,
+});
 
 /** @internal */
 export function associatedRecordsToValidateOrSave(

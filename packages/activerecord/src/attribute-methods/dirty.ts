@@ -1,4 +1,4 @@
-import { Module, RuntimeError, rbObjAsString } from "@blazetrails/ruby-compat";
+import { RuntimeError, rbObjAsString, rbCallSuper } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   type HashWithIndifferentAccess,
@@ -69,32 +69,33 @@ interface DirtyIncludeHost {
   ): void;
 }
 
-export const Dirty: Module & { [included]?: (base: DirtyIncludeHost) => void } =
-  new Module().include({
-    get savedChanges():
-      | HashWithIndifferentAccess<[unknown, unknown]>
-      | Record<string, [unknown, unknown]> {
-      return (this as unknown as DirtyRecord).mutationsBeforeLastSave.changes();
-    },
+export const Dirty = {
+  get savedChanges():
+    | HashWithIndifferentAccess<[unknown, unknown]>
+    | Record<string, [unknown, unknown]> {
+    return (this as unknown as DirtyRecord).mutationsBeforeLastSave.changes();
+  },
 
-    get hasChangesToSave(): boolean {
-      return (this as unknown as DirtyRecord).mutationsFromDatabase.anyChanges();
-    },
+  get hasChangesToSave(): boolean {
+    return (this as unknown as DirtyRecord).mutationsFromDatabase.anyChanges();
+  },
 
-    get changesToSave(): HashWithIndifferentAccess<[unknown, unknown]> {
-      return (this as unknown as DirtyRecord).mutationsFromDatabase.changes();
-    },
+  get changesToSave(): HashWithIndifferentAccess<[unknown, unknown]> {
+    return (this as unknown as DirtyRecord).mutationsFromDatabase.changes();
+  },
 
-    get changedAttributeNamesToSave(): string[] {
-      return (this as unknown as DirtyRecord).mutationsFromDatabase.changedAttributeNames();
-    },
+  get changedAttributeNamesToSave(): string[] {
+    return (this as unknown as DirtyRecord).mutationsFromDatabase.changedAttributeNames();
+  },
 
-    get attributesInDatabase(): HashWithIndifferentAccess<unknown> {
-      return (this as unknown as DirtyRecord).mutationsFromDatabase.changedValues();
-    },
-  });
+  get attributesInDatabase(): HashWithIndifferentAccess<unknown> {
+    return (this as unknown as DirtyRecord).mutationsFromDatabase.changedValues();
+  },
+};
 
-Dirty[included] = function (base: DirtyIncludeHost): void {
+(Dirty as { [included]?: (base: DirtyIncludeHost) => void })[included] = function (
+  base: DirtyIncludeHost,
+): void {
   if (isModuleIncluded(base, Timestamp.Timestamp)) {
     throw new RuntimeError("You cannot include Dirty after Timestamp");
   }
@@ -135,7 +136,7 @@ interface DirtyPrivateHost {
 }
 
 export async function reload<T extends DirtyPrivateHost>(this: T, ...args: unknown[]): Promise<T> {
-  const record = (await Dirty.superMethod(this, "reload")!(...args)) as T;
+  const record = (await rbCallSuper(this, reload, ...args)) as T;
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
   return record;
@@ -143,7 +144,7 @@ export async function reload<T extends DirtyPrivateHost>(this: T, ...args: unkno
 
 /** @internal */
 export function initInternals(this: DirtyPrivateHost): void {
-  Dirty.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
   this._touchAttrNames = null;
@@ -236,7 +237,9 @@ export function attributeNamesForPartialInserts(this: DirtyPrivateHost): string[
   });
 }
 
-Dirty.defineMethod("initInternals", initInternals);
-Dirty.defineMethod("reload", reload);
+Object.assign(Dirty, {
+  initInternals,
+  reload,
+});
 
 AttributeMethods.Dirty = Dirty;

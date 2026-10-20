@@ -21,6 +21,7 @@ import {
 } from "./object.js";
 import {
   include,
+  rbCallSuper,
   rbObjIsKindOf,
   rbModConstDefined,
   rbModConstSet,
@@ -1303,6 +1304,70 @@ describe("publicInstanceMethods", () => {
     }
     expect(publicInstanceMethods(Sub, false)).toEqual(["own"]);
     expect(publicInstanceMethods(Sub).sort()).toEqual(["inherited", "own"]);
+  });
+});
+
+describe("rbCallSuper", () => {
+  it("reaches the superclass method a plain module's copy shadows", () => {
+    class Parent {
+      greet(): string {
+        return "parent";
+      }
+    }
+    class Child extends Parent {}
+    function greet(this: Child): string {
+      return `mod+${rbCallSuper(this, greet) as string}`;
+    }
+    include(Child, { greet });
+    expect(new Child().greet()).toBe("mod+parent");
+  });
+
+  it("reaches the module included before, as a later include sits above it", () => {
+    class Host {}
+    function first(this: Host): string[] {
+      return ["first"];
+    }
+    function second(this: Host): string[] {
+      return ["second", ...(rbCallSuper(this, second) as string[])];
+    }
+    const first_ = { chain: first };
+    const second_ = { chain: second };
+    include(Host, first_);
+    include(Host, second_);
+    expect((new Host() as { chain(): string[] }).chain()).toEqual(["second", "first"]);
+  });
+
+  it("binds each includer's super separately", () => {
+    class A {
+      tag(): string {
+        return "A";
+      }
+    }
+    class B {
+      tag(): string {
+        return "B";
+      }
+    }
+    function tag(this: object): string {
+      return `m(${rbCallSuper(this, tag) as string})`;
+    }
+    class SubA extends A {}
+    class SubB extends B {}
+    include(SubA, { tag });
+    include(SubB, { tag });
+    expect(new SubA().tag()).toBe("m(A)");
+    expect(new SubB().tag()).toBe("m(B)");
+  });
+
+  it("falls through to Kernel, else raises NoMethodError", () => {
+    class Host {}
+    function nothingAbove(this: Host): unknown {
+      return rbCallSuper(this, nothingAbove);
+    }
+    include(Host, { nothingAbove });
+    expect(() => (new Host() as { nothingAbove(): unknown }).nothingAbove()).toThrow(
+      "super: no superclass method 'nothingAbove' for an instance of Host",
+    );
   });
 });
 
