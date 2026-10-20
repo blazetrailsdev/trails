@@ -1318,7 +1318,8 @@ the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 pa
 ## A dispatch by name is spelled directly (`send`, `public_send`)
 
 `rbFSend` / `rbFPublicSend` are the ports of `Kernel#send` / `#public_send`
-(`vendor/ruby/v3.3.11/vm_eval.c:1330`), and they stay — but they are the last
+(`rb_f_send`, `vendor/ruby/v3.3.11/vm_eval.c:1330`; `rb_f_public_send`,
+`:1350`), and they stay — but they are the last
 shape to reach for, not the first. A string-keyed send throws away everything
 the call site knew: no TS type checks the receiver or the target, the Ruby name
 has to be guessed into a TS spelling (`camelized`, `writerSpelling` and
@@ -1346,15 +1347,25 @@ Two fallbacks exist, and both are last resorts:
   nothing outside the file reads it — a table is extra surface like any other
   name, and a registry written where a direct call would have done is its own
   invented indirection (§ "Fidelity is the job").
-- **`rbFSend` / `rbFPublicSend`**, where the dispatched name is both
-  caller-supplied and open-ended, so no table can enumerate it. `Object#try`'s
+- **`rbFSend` / `rbFPublicSend`**, where the dispatched name is
+  caller-supplied and the set it comes from is open — extended by application
+  code, so no table the framework writes can enumerate it. `Object#try`'s
   `public_send(*args, &block)`
-  (`vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/object/try.rb:14-15`),
-  `MimeResponds::Collector#any`'s `args.each { |type| send(type, &block) }`
+  (`vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/object/try.rb:14-15`)
+  takes any name its caller passes. `MimeResponds::Collector#any`'s
+  `args.each { |type| send(type, &block) }`
   (`vendor/rails/v8.0.2/actionpack/lib/action_controller/metal/mime_responds.rb:262-264`)
-  and `Channel::Base`'s `public_send action, data`
-  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/channel/base.rb:284-286`)
-  are that: the send IS the ported method, and it stays.
+  dispatches a registered Mime symbol, and `Mime::Type.register` appends to
+  `SET` at run time
+  (`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/http/mime_type.rb:186-193`),
+  which is why the collector is a Proxy in the first place (§ "Ruby protocol
+  methods with a different JS mechanism"). `Channel::Base#dispatch_action`'s
+  `public_send action, data`
+  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/channel/base.rb:280-286`)
+  dispatches a client-supplied string gated by `action_methods`, which is the
+  USER subclass's public instance methods less `Base`'s (`:128-134`) — a set
+  the framework cannot see. A gate on a set application code supplies is not a
+  table trails can write, so the send IS the ported method, and it stays.
 
 Two corollaries:
 
@@ -1368,12 +1379,16 @@ Two corollaries:
   permission"), not to match it.
 
 Neither gate stands in the way, which is why this is a judgement the rule has
-to settle rather than a ratchet. `extract-ts-api.ts` credits
-`rbFSend(recv, "literalName")` as a call to `literalName` itself, so spelling
-one out under the main rule is call-set- and argument-neutral; a computed name
-is credited as Ruby's own `send` / `publicSend`, and both sit in `SKIP_CALLS`
-(`scripts/api-compare/lint-calls.ts`), so a send converged onto a direct
-call or a registry needs no baseline row and no `@missingRailsCall` receipt.
+to settle rather than a ratchet. For the call SET, `extract-ts-api.ts` credits
+`rbFSend(recv, "literalName")` as a call to `literalName` itself
+(`collectCalls`), so spelling one out changes nothing there. The ARGUMENT
+stream does not follow it: `callSiteName` has no send arm, so the site is
+recorded under `rbFSend` with the receiver and the name occupying argument
+slots — it can never pair with Rails' own `literalName(…)` site, and
+converging it can only improve that pairing. A computed name is credited as
+Ruby's own `send` / `publicSend`, and both sit in `SKIP_CALLS`
+(`scripts/api-compare/lint-calls.ts`), so a send converged onto a direct call
+or a registry needs no baseline row and no `@missingRailsCall` receipt.
 
 ## Ruby protocol methods with a different JS mechanism
 
