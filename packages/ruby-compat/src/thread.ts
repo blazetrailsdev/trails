@@ -77,10 +77,12 @@ export class Thread<R = unknown> {
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread.stop` (`vendor/ruby/v3.3.11/thread.c:2861`),
    * which sleeps the current thread until another wakes or kills it. A thread
-   * woken by `wakeup` / `run` before it reaches this call does not sleep: MRI's
-   * GVL lets a new thread run to its first blocking point before its creator
-   * resumes, so Ruby's `t.run` always finds the thread asleep, and a JS body
-   * reaches this call only after awaits the creator does not wait for. A killed
+   * woken by `wakeup` / `run` before it reaches this call does not sleep. This
+   * latch departs from MRI, where `rb_thread_wakeup_alive` changes the status
+   * only of a thread already stopped (`thread.c:2821-2824`), so an early wakeup
+   * is lost. MRI's GVL lets a new thread run to its first blocking point before
+   * its creator resumes, so Ruby's `t.run` finds it asleep; a JS body reaches
+   * this call only after awaits its creator does not wait for. A killed
    * thread's body stops at this call, as Ruby's does.
    */
   static stop(): Promise<null> {
