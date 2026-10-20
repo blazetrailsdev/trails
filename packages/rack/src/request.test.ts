@@ -1846,7 +1846,7 @@ content-transfer-encoding: base64\r
   });
 
   it("handles ASCII NUL input of  bytes", () => {
-    const length = 2 ** 16;
+    const length = 2 ** 24;
     const mr = MockRequest.envFor("/", {
       REQUEST_METHOD: "POST",
       ":input": "\0".repeat(length),
@@ -1858,7 +1858,7 @@ content-transfer-encoding: base64\r
     expect(keys.length).toBe(1);
     expect(keys[0].length).toBe(length - 1);
     expect(keys[0]).toBe("\0".repeat(length - 1));
-  });
+  }, 60_000);
 
   it("Env sets @env on initialization", () => {
     const c = class {
