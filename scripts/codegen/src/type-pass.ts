@@ -818,7 +818,6 @@ export class TypePass {
         if ([...members].every((m) => names.has(m))) fits.push(st);
       }
     }
-    if (!fits.length) return null;
     const ancestors = (c: ts.ClassDeclaration): ts.ClassDeclaration[] => {
       const out: ts.ClassDeclaration[] = [];
       let cur: ts.ClassDeclaration | undefined = c;
@@ -831,7 +830,35 @@ export class TypePass {
       }
       return out;
     };
-    const fitNames = new Set(fits.map((c) => `${c.getSourceFile().fileName}#${c.name!.text}`));
+    const key = (c: ts.ClassDeclaration) => `${c.getSourceFile().fileName}#${c.name?.text}`;
+    if (!fits.length) {
+      // No class answers every name (Ruby's duck type spans subclasses: every
+      // adapter answers `enqueue`, only the test adapter `perform_enqueued_jobs`):
+      // the nearest class all the classes answering any of them descend from.
+      const some: ts.ClassDeclaration[] = [];
+      for (const f of this.files) {
+        const sf = program.getSourceFile(f);
+        if (!sf || (!isTestPath(atFile) && isTestPath(f))) continue;
+        for (const st of sf.statements) {
+          if (!ts.isClassDeclaration(st) || !st.name) continue;
+          const sym = c2.getSymbolAtLocation(st.name);
+          if (!sym) continue;
+          const own = new Set(
+            (st.members ?? []).map((m) => (m.name && ts.isIdentifier(m.name) ? m.name.text : "")),
+          );
+          if ([...members].some((m) => own.has(m))) some.push(st);
+        }
+      }
+      if (some.length < 2) return null;
+      const chains = some.map((c) => [c, ...ancestors(c)].map(key));
+      const common = chains[0].find((k) => chains.every((ch) => ch.includes(k)));
+      const decl = common
+        ? [some[0], ...ancestors(some[0])].find((c) => key(c) === common)
+        : undefined;
+      if (!decl) return null;
+      fits.push(decl);
+    }
+    const fitNames = new Set(fits.map(key));
     const top = fits.filter(
       (c) =>
         !ancestors(c).some((a) => fitNames.has(`${a.getSourceFile().fileName}#${a.name?.text}`)),
@@ -844,6 +871,84 @@ export class TypePass {
       .replace(/\.ts$/, ".js");
     if (!rel.startsWith(".")) rel = `./${rel}`;
     return this.typeLocal(at.getSourceFile(), rel, decl.name!.text);
+  }
+
+  /**
+   * A method whose return TypeScript infers as `unknown` (it returns an
+   * untyped field: `Base.queue_adapter` answers `_queue_adapter`), typed by how
+   * its callers use what it returns: the members sent to the results duck-type
+   * the most general generated class that answers them all (duckClass). A
+   * library method counts only library callers. Its return gets that type, and
+   * the boundary assertions then assert the returned value to it.
+   */
+  typeReturnsByUse(): number {
+    const program = this.program();
+    const checker = program.getTypeChecker();
+    const sfs = this.files.map((f) => program.getSourceFile(f)).filter(Boolean) as ts.SourceFile[];
+    const decls = new Map<ts.FunctionLikeDeclaration, ts.Expression[]>();
+    const collect = (n: ts.Node): void => {
+      if (ts.isCallExpression(n)) {
+        const d = checker.getResolvedSignature(n)?.declaration;
+        if (
+          d &&
+          !ts.isJSDocSignature(d) &&
+          (ts.isMethodDeclaration(d) || ts.isFunctionDeclaration(d)) &&
+          !d.type &&
+          d.getSourceFile().fileName.startsWith(this.srcDir)
+        ) {
+          const sig = checker.getSignatureFromDeclaration(d);
+          const ret = sig ? checker.getReturnTypeOfSignature(sig) : undefined;
+          const awaited = ret ? (checker.getAwaitedType(ret) ?? ret) : undefined;
+          const parts = awaited ? (awaited.isUnion() ? awaited.types : [awaited]) : [];
+          // `unknown`, or only `null` (TypeScript's narrowing of an untyped
+          // field across `if (x == null) setX(…)`, which it cannot see assign).
+          const unknownRet =
+            parts.length > 0 &&
+            parts.every(
+              (p) => p.flags & (ts.TypeFlags.Unknown | ts.TypeFlags.Null | ts.TypeFlags.Undefined),
+            );
+          if (
+            unknownRet &&
+            (isTestPath(d.getSourceFile().fileName) || !isTestPath(n.getSourceFile().fileName))
+          ) {
+            // `(await x.m())`: the use is of the awaited value.
+            let use: ts.Expression = n;
+            while (ts.isAwaitExpression(use.parent) || ts.isParenthesizedExpression(use.parent))
+              use = use.parent as ts.Expression;
+            (decls.get(d) ?? decls.set(d, []).get(d)!).push(use);
+          }
+        }
+      }
+      ts.forEachChild(n, collect);
+    };
+    for (const sf of sfs) collect(sf);
+    let n = 0;
+    const edits = new Map<string, Edit[]>();
+    for (const [d, uses] of decls) {
+      const members = new Set<string>();
+      for (const u of uses) {
+        const p = u.parent;
+        if (ts.isPropertyAccessExpression(p) && p.expression === u) members.add(p.name.text);
+      }
+      if (!members.size) continue;
+      const t = this.duckClass(members, d);
+      if (!t) continue;
+      const sf = d.getSourceFile();
+      const close = sf.text.indexOf(")", d.parameters.end);
+      const asy = (ts.getCombinedModifierFlags(d) & ts.ModifierFlags.Async) !== 0;
+      (edits.get(sf.fileName) ?? edits.set(sf.fileName, []).get(sf.fileName)!).push({
+        pos: close + 1,
+        end: close + 1,
+        text: asy ? `: Promise<${t}>` : `: ${t}`,
+      });
+      n++;
+    }
+    for (const sf of sfs) {
+      const ie = this.importEdit(sf);
+      if (ie) (edits.get(sf.fileName) ?? edits.set(sf.fileName, []).get(sf.fileName)!).push(ie);
+    }
+    for (const [f, es] of edits) applyEdits(f, es);
+    return n;
   }
 
   /** Fields still declared `unknown`: typed by how the tree uses them (`usageType`). */
@@ -887,6 +992,12 @@ export class TypePass {
       if (!k) break;
     }
     stats.fieldsByUse = this.typeFieldsByUse();
+    stats.returnsByUse = 0;
+    for (let round = 0; round < 3; round++) {
+      const k = this.typeReturnsByUse();
+      stats.returnsByUse += k;
+      if (!k) break;
+    }
     stats.swept = 0;
     for (let round = 0; round < 4; round++) {
       const k = this.sweepAny();
