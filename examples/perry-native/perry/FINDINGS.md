@@ -26,14 +26,14 @@ See [the correction](#correction-the-32gb-wall-is-resolution-not-module-count).
 
 Status of each wall after re-verification:
 
-| Wall                               | Status                                                                                                                               |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 1 — codegen memory                 | 362 modules fit in 20GB. **Still the live blocker**, and the only one: the app's 32GB exhaustion was misattributed to it — see the correction. |
+| Wall                               | Status                                                                                                                                                                          |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — codegen memory                 | 362 modules fit in 20GB. **Still the live blocker**, and the only one: the app's 32GB exhaustion was misattributed to it — see the correction.                                  |
 | 1b — resolver symlink cycle        | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased. |
-| 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                                               |
-| 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                                      |
-| 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship.                      |
-| 3c — init-time hang at 362 modules | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).     |
+| 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                          |
+| 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                                                                                 |
+| 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship.                                                                 |
+| 3c — init-time hang at 362 modules | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
@@ -52,6 +52,7 @@ rows are that build's behaviour; each wall's own section says what changed.
 | `05-model` — an `ActiveRecord` model class, no connection         | ok   | **MEM**     | killed at 12GB after 261s                      |
 | `06-sqlite` — `better-sqlite3`                                    | ok   | **ok\***    | 8s, 30MB — shimmed, see below                  |
 | `06b-crud` — one model, real connection, full CRUD                | ok   | **MEM**     | 891 modules; killed in codegen at 61/891       |
+| `06d-adapter-read` — adapter reads rows, no model layer           | ok   | _not run_   | 1133 modules collected; see below              |
 | `07-boot` — full framework boot                                   | ok   | **MEM**     | killed at 12GB after 689s                      |
 
 Every rung runs correctly under Node, so no failure here is a broken program.
@@ -372,7 +373,7 @@ one. **Filed and fixed upstream**: [issue 12822](https://github.com/PerryTS/perr
 with no visited set and never canonicalized the symlinked spelling, so a cycle
 re-entered the same physical directory forever. The fix threads a set of
 canonical paths through the recursion. A two-package reproducer is enough when
-the back-pointer is the scope *directory*, which is the shape pnpm produces:
+the back-pointer is the scope _directory_, which is the shape pnpm produces:
 before the fix it issued 73,578 `openat` calls in 25s and never terminated;
 after it, the same tree resolves in under a second.
 
@@ -413,21 +414,21 @@ one-module binary, with no framework in it. `06b-crud` asks the real question �
 `create`, `find`, `update`, `destroy` on a model, over a connection the adapter
 opened — and the answer is that it cannot be compiled.
 
-| Attempt            | Collected | Codegen reached | Outcome                 |
-| ------------------ | --------- | --------------- | ----------------------- |
-| `MemoryMax=12G`    | 891       | 44/891 (5%)     | killed after 157s       |
-| `MemoryMax=28G`    | 891       | 61/891 (7%)     | killed after 243s       |
+| Attempt         | Collected | Codegen reached | Outcome           |
+| --------------- | --------- | --------------- | ----------------- |
+| `MemoryMax=12G` | 891       | 44/891 (5%)     | killed after 157s |
+| `MemoryMax=28G` | 891       | 61/891 (7%)     | killed after 243s |
 
 Three things that result does establish:
 
 - **Collection is not this rung's wall.** All 891 modules collect, with the
-  `node_modules` symlink cycle fully intact. The cycle stops the *whole app* in
+  `node_modules` symlink cycle fully intact. The cycle stops the _whole app_ in
   resolution; a single-model rung never reaches it. Two different walls, and
   both print plausible-looking progress before dying.
 - **2.3x the memory cap bought 17 more modules.** That is item 5 above
   confirmed rather than re-opened, so the knobs were not pursued further.
 - **Adapter parity remains untested, and is still the open question.** Perry
-  reports serving *both* `better-sqlite3` and `mysql2` from bundled partial
+  reports serving _both_ `better-sqlite3` and `mysql2` from bundled partial
   drop-ins for this rung. If the rung ever links, the CRUD it performs runs
   against `perry-ext-better-sqlite3`, which is exactly the comparison wanted —
   prepared-statement semantics, type coercion, `lastInsertRowid`, transactions.
@@ -436,7 +437,7 @@ Three things that result does establish:
 Two incidental findings from the same logs, neither chased:
 
 - ActiveRecord trips a Perry type-constraint check: `Constraint violation in
-  function 'inQueryConnection': TypeMismatch { type_param: "F", ... }`. It is a
+function 'inQueryConnection': TypeMismatch { type_param: "F", ... }`. It is a
   warning, not a failure, and the compile continued past it.
 - The 891 modules include `libxml2-wasm`, `libsql`, `mysql2`, `pg` and the
   Temporal polyfill, reached through the `activerecord` barrel — so the rung
@@ -502,4 +503,58 @@ Treat only `perry compile` — and then running the binary — as a result.
    no filing.** Narrowed in [upstream/SHAPE-MINT.md](upstream/SHAPE-MINT.md)
    and re-verified on from-source `main` (0.5.1662); still unfiled.
 10. **Nothing here asks trails to change for Perry's sake.** Every wall is
-   Perry's and no change in this repo moves them.
+    Perry's and no change in this repo moves them.
+
+## Dropping the model layer is not a smaller graph
+
+`06d-adapter-read` is the narrowest useful ActiveRecord program: it constructs
+`BetterSQLite3Adapter` directly and reads rows with `execute`, `selectRows` and
+`selectValue`. No `Base`, no model class, no `Relation`, no scoping, no
+delegation, no connection pool. Under Node it is green:
+
+```
+[06d] rows=[["Saddle",8],["Ridge",12]] count=2
+```
+
+It collects **1133 modules, against 1146 for the full model CRUD of `06b`** —
+dropping the entire model layer saves 13 modules, about 1%. Where those 1133
+live:
+
+| Package       | Modules |
+| ------------- | ------- |
+| activerecord  | 316     |
+| activesupport | 175     |
+| ruby-compat   | 147     |
+| arel          | 84      |
+| mysql2        | 83      |
+| activemodel   | 73      |
+| yaml          | 72      |
+| iconv-lite    | 22      |
+| i18n          | 19      |
+| pg            | 19      |
+| msgpack       | 14      |
+| libxml2-wasm  | 14      |
+| @msgpack      | 12      |
+| globalid      | 10      |
+
+Two things follow. The foundation — activesupport, ruby-compat, arel and
+activemodel, **479 modules** — arrives with any ActiveRecord entry point at all,
+so narrowing the API surface cannot shrink it. And a sqlite-only read still
+pays for **83 mysql2 modules, 19 pg, 72 yaml and 14 libxml2-wasm**: 188 modules
+of drivers and serializers the program never calls, pulled in by the
+constant-specifier `loadPath` table (see the dynamic-import measurement above).
+
+The codegen attempt was **not run**, deliberately. The ladder already brackets
+the ceiling: `04d-ruby-compat-barrel` links at 139 modules, `04b-deep-import`
+dies at 364 and `04-activesupport` at 429. Every ActiveRecord entry point is
+3x past the smallest known failure, so a 28GB, four-minute confirmation would
+buy no information that the three cheaper rungs do not already give.
+
+**The conclusion for the prototype**: there is no "just load some data"
+shortcut. Wall 1 is per-module codegen cost in the foundation layer, and the
+foundation is not optional. Three narrowing attempts have now failed in three
+different ways — full CRUD (1146 modules), barrel bypass (not a valid program
+at all, `Class extends value undefined`), and adapter-only (1133). The open
+question is where between 139 and 364 modules the ceiling actually sits, and
+that is a Perry-internal threshold to bisect against a synthetic graph, not
+something a different trails entry point can route around.
