@@ -17,7 +17,7 @@ export class HasOne extends SingularAssociation {
 
   /**
    * @noRailsEquivalent CONVERGEABLE converge-has-one-builder-define-writers
-   * @inventedArm if — CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace
+   * @inventedArm if — CONVERGEABLE has-one-mass-assignment-refuses-rails-replace
    */
   static override defineWriters(mixin: Module, name: string): void {
     const cap = name.charAt(0).toUpperCase() + name.slice(1);

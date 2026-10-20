@@ -44,6 +44,22 @@ describe("constructor-form association writer", () => {
     expect((author as any).association("posts").target).toContain(post);
   });
 
+  it("assigns a belongsTo key and its foreign key in hash order", async () => {
+    const author = await Author.create({ name: "a" });
+    const post = new Post({ author_id: author.id + 1, author, title: "t" });
+    expect((post as any).author_id).toBe(author.id);
+    const other = new Post({ author, author_id: author.id + 1, title: "t" });
+    expect((other as any).author_id).toBe(author.id + 1);
+  });
+
+  it("restores the sync assignment mark after a nested assignAttributes", () => {
+    const post = new Post({ title: "p" });
+    const author = new Author({ name: "x" });
+    author.assignAttributes({ name: "y" });
+    expect(() => author.assignAttributes({ post })).not.toThrow();
+    expect((author as any).association("post").target).toBe(post);
+  });
+
   it("dispatches single record to hasOne association on construction", () => {
     const p = new Post({ title: "p" });
     const author = new Author({ name: "x", post: p });
