@@ -1,7 +1,7 @@
 import { buildViews } from "@blazetrails/trails-tsc";
 
 const roots = [
-  "../../../actionview/src/test-helpers/fixtures/precompiled",
+  "../../../actionview/src/test-helpers/precompiled",
   "../../../actionpack/src/test-helpers/precompiled",
 ];
 
