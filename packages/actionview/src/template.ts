@@ -45,6 +45,7 @@ const VARIABLE_FROM_BASENAME = /^_?(.*?)(?:\.\w+)*$/;
 const NONE = Symbol("Template::NONE");
 
 let nextObjectId = 0;
+let loads = 0;
 
 type StandIn = (
   this: Base,
@@ -74,11 +75,16 @@ let templateCompiler: TemplateCompiler = async (template, methodName, _source, f
       ? `${identifier}.js`
       : `${identifier.slice(0, at)}/.trails/views/${identifier.slice(at + "/app/views/".length)}.js`;
   const url = new URL(compiled, "file:///");
-  url.search = `?${methodName}`;
+  url.search = `?${methodName}-${(loads += 1)}`;
   try {
     return (await import(url.href)) as { default: StandIn };
   } catch (error) {
-    if ((error as { code?: string }).code !== "ERR_MODULE_NOT_FOUND") throw error;
+    if (
+      (error as { code?: string }).code !== "ERR_MODULE_NOT_FOUND" ||
+      !(error as Error).message.includes(compiled)
+    ) {
+      throw error;
+    }
     throw new LoadError(`cannot load such file -- ${compiled}`);
   }
 };
@@ -410,7 +416,17 @@ export class Template {
     Object.defineProperty(render, "name", { value: methodName });
 
     const virtualPath = this.virtualPath;
-    const signature = methodParameters(setStrictLocals ?? "");
+    let methodArguments: string;
+    if (setStrictLocals != null) {
+      if (setStrictLocals.includes("&")) {
+        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}`;
+      } else {
+        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}, &_`;
+      }
+    } else {
+      methodArguments = "local_assigns, output_buffer, &_";
+    }
+    const signature = methodParameters(methodArguments);
     const keyreq = signature.filter(([type]) => type === "keyreq").map(([, name]) => name!);
     const keywords = signature
       .filter(([type]) => type === "keyreq" || type === "key")
