@@ -171,11 +171,9 @@ export class Locator {
     options: LocateOptions = {},
   ): Promise<unknown | null> {
     gid = GlobalID.parse(gid) as GlobalID;
-    if (!gid) return null;
-    const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
-    if (!klass) return null;
-    if (!Locator.findAllowed(klass, options.only)) return null;
-    if (!modelIdArityMatches(klass, gid.modelId)) return null;
+
+    if (!(gid && Locator.findAllowed(gid.modelClass, options.only))) return null;
+
     const locator = Locator.locatorFor(gid);
 
     if (rbObjMethod(locator, "locate").arity() === 1) {
