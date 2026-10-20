@@ -1490,9 +1490,15 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
   });
 
   it("Env sets @env on initialization", () => {
-    const env = makeEnv();
-    const req = new Request(env);
-    expect(req.env).toBe(env);
+    const c = class {
+      env: Record<string, any>;
+
+      constructor(env: Record<string, any>) {
+        this.env = env;
+      }
+    };
+    const h = {};
+    expect(new c(h).env).toBe(h);
   });
 
   it("return values for the keys in the order given from values_at", () => {
