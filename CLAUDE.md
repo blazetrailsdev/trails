@@ -1040,7 +1040,10 @@ As a consequence:
   (`attribute_methods.rb:528-533`) are still ported as two calls.
 - `rbFPublicSend` dispatches a defined method exactly as `rbFSend` does. It still
   raises `NoMethodError` for an undefined name and still goes to `methodMissing`,
-  so a Rails `public_send` keeps its `rbFPublicSend` spelling and its rescue.
+  so a Rails `public_send` that survives § "A dispatch by name is spelled
+  directly" keeps its `rbFPublicSend` spelling and its rescue — visibility is
+  not what decides between the two spellings, and neither spelling is a reason
+  to keep a send where the name is a literal.
   `rbModPublicMethodDefined` (`Module#public_method_defined?`) answers "defined".
 - A Rails test whose assertions turn on private / protected visibility at run
   time is permanently unportable for that arm: `assert_not_respond_to` on a
