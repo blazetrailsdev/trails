@@ -49,9 +49,9 @@ describe("constructor-form association writer", () => {
     const author = await Author.create({ name: "a" });
     const otherId = (author.id as number) + 1;
     const post = new Post({ author_id: otherId, author, title: "t" });
-    expect((post as any).author_id).toBe(author.id as number);
+    expect(post.readAttribute("author_id")).toBe(author.id as number);
     const other = new Post({ author, author_id: otherId, title: "t" });
-    expect((other as any).author_id).toBe(otherId);
+    expect(other.readAttribute("author_id")).toBe(otherId);
   });
 
   it("restores the sync assignment mark after a nested assignAttributes", () => {
@@ -64,7 +64,7 @@ describe("constructor-form association writer", () => {
     author[assigningSynchronously] = undefined;
     author.assignAttributes({ post });
     expect(author[assigningSynchronously]).toBeUndefined();
-    expect((author as any).association("post").target).toBe(post);
+    expect(author.association("post").target).toBe(post);
   });
 
   it("dispatches single record to hasOne association on construction", () => {
