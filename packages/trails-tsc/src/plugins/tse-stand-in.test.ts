@@ -80,12 +80,39 @@ const SCENARIOS: Record<string, (view: Base) => unknown> = {
       partial: "test/cached_nested_cached_customer",
       locals: { cached_customer: customer("d") },
     }),
+  "developers/_developer": (view) =>
+    view.render({ partial: "developers/developer", locals: { developer: { name: "Eloy" } } }),
+  "developers/_developer.json": (view) =>
+    view.render({
+      partial: "developers/developer",
+      formats: ":json",
+      locals: { developer: { name: "Eloy" } },
+    }),
+  "developers/_developer_with_h1": (view) =>
+    view.render({
+      partial: "developers/developer_with_h1",
+      locals: { developer: { name: "Eloy" } },
+    }),
+  "test/_from_helper": (view) => {
+    Object.assign(view, { renderFromHelper: () => "from helper" });
+    return view.render({ partial: "test/from_helper" });
+  },
+  "test/_layout_for_partial": (view) =>
+    view.viewRenderer.renderPartial(
+      view,
+      { partial: "test/layout_for_partial", locals: { name: "Josh" } },
+      () => "from block",
+    ),
+  "test/list": (view) => {
+    Object.assign(view, { customers: [customer("david"), customer("mary")] });
+    return view.render({ template: "test/list" });
+  },
 };
 
 async function renderAll(): Promise<Record<string, string>> {
   const lookupContext = new LookupContext(null, {}, ["test"]);
   const formatted = Object.entries(fixtures).map(([file, src]) => [
-    file.replace(/(?<!\.html)\.tse$/, ".html.tse"),
+    file.replace(/(?<!\.(?:html|json))\.tse$/, ".html.tse"),
     src,
   ]);
   lookupContext.appendViewPaths([new FixtureResolver(Object.fromEntries(formatted))]);
@@ -140,6 +167,11 @@ describe("TSE stand-in scope", () => {
       );
     });
     expect(await renderAll()).toEqual(evaluated);
-    expect(compile).toHaveBeenCalledTimes(Object.keys(fixtures).length);
+    const compiled = new Set(
+      compile.mock.contexts.map((t) => `${(t as Template).virtualPath}${(t as Template).format}`),
+    );
+    expect(compiled.size).toBe(Object.keys(fixtures).length);
+    const methods = new Set(compile.mock.contexts.map((t) => (t as Template).methodName()));
+    expect(methods.size).toBe(compile.mock.calls.length);
   });
 });
