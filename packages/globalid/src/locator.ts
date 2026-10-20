@@ -5,6 +5,7 @@ import {
   ArgumentError,
   compact,
   except,
+  rbFArray,
   rbModConstSet,
   rbObjMethod,
   slice,
@@ -101,7 +102,7 @@ export class BaseLocator {
 
   /** @internal */
   protected modelIdIsValid(gid: GlobalID): boolean {
-    const pk = this.primaryKey(gid.modelClass);
+    return rbFArray(gid.modelId).length === rbFArray(this.primaryKey(gid.modelClass)).length;
     return (
       (Array.isArray(gid.modelId) ? gid.modelId.length : 1) === (Array.isArray(pk) ? pk.length : 1)
     );
