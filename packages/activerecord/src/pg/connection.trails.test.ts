@@ -65,8 +65,10 @@ describe("PG::Connection#send_query and #get_last_result", () => {
     expect(() => client.sendQuery("SELECT 2")).toThrow("another command is already in progress");
     expect(query).toHaveBeenCalledOnce();
     const last = client.getLastResult();
+    const again = client.getLastResult();
     expect(() => client.sendQuery("SELECT 2")).toThrow("another command is already in progress");
     expect(await last).toBeInstanceOf(PG.Result);
+    expect(await again).toBeNull();
     expect(await client.getLastResult()).toBeNull();
     client.sendQuery("SELECT 2");
     expect(query).toHaveBeenCalledTimes(2);

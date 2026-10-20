@@ -64,6 +64,7 @@ export class Connection {
   readyForQuery = "I";
   bad = false;
   pendingResult: Promise<PG.Result> | null = null;
+  pendingResultTaken = false;
   typeMapForResults = new PGTypeMapByOid();
 
   constructor(client: object, connParams?: pg.ClientConfig) {
@@ -110,6 +111,7 @@ export class Connection {
     this.readyForQuery = "I";
     this.bad = false;
     this.pendingResult = null;
+    this.pendingResultTaken = false;
     await client
       .end()
       .then(() => conn.connect())
@@ -183,11 +185,17 @@ export class Connection {
     const pending = this.asyncExec(sql);
     pending.catch(() => undefined);
     this.pendingResult = pending;
+    this.pendingResultTaken = false;
   }
 
   async getLastResult(): Promise<PG.Result | null> {
     const pending = this.pendingResult;
     if (pending == null) return null;
+    if (this.pendingResultTaken) {
+      await pending.catch(() => undefined);
+      return null;
+    }
+    this.pendingResultTaken = true;
     try {
       return await pending;
     } finally {
