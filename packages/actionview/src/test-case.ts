@@ -12,12 +12,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
-import {
-  AbstractController,
-  ActionController,
-  ActionDispatch,
-  type RouteSet,
-} from "@blazetrails/actionpack";
+import { AbstractController, ActionController, ActionDispatch } from "@blazetrails/actionpack";
 import {
   include,
   Module,
@@ -182,7 +177,6 @@ export interface Behavior {
   outputBuffer: OutputBuffer;
   rendered: RenderedViewContent;
   viewFlow: OutputFlow;
-  routes?: RouteSet;
   /** @internal */
   _renderedViews?: RenderedViewsCollection;
   /** @internal */
