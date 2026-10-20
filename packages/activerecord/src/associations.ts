@@ -140,7 +140,7 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
 export class Associations {
   static belongsTo(
     name: string,
-    scope: ((...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
     options: AssociationOptions = {},
   ): void {
     const reflection = BelongsToBuilder.build(
@@ -154,7 +154,7 @@ export class Associations {
 
   static hasOne(
     name: string,
-    scope: ((...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
     options: AssociationOptions = {},
   ): void {
     const reflection = HasOneBuilder.build(
@@ -168,7 +168,7 @@ export class Associations {
 
   static hasMany(
     name: string,
-    scope: ((...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
     options: AssociationOptions = {},
     extension?: (mod: Module) => void,
   ): void {
@@ -184,7 +184,10 @@ export class Associations {
 
   static hasAndBelongsToMany(
     name: string,
-    scope: ((...args: any[]) => any) | (AssociationOptions & { joinTable?: string }) | null = {},
+    scope:
+      | ((this: Relation<any>, ...args: any[]) => any)
+      | (AssociationOptions & { joinTable?: string })
+      | null = {},
     options: AssociationOptions & { joinTable?: string } = {},
     extension?: (mod: Module) => void,
   ): void {

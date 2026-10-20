@@ -31,7 +31,7 @@ export class Account extends Base {
 
     this.aliasAttribute("available_credit", "credit_limit");
 
-    this.scope("open", function (this: any) {
+    this.scope("open", function () {
       return this.where("firm_name = ?", "37signals");
     });
     this.scope("available", function (this: any) {

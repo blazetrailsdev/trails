@@ -76,7 +76,7 @@ export class Person extends Base {
     this.hasMany("securePosts", { through: "secureReaders" });
     this.hasMany(
       "postsWithNoComments",
-      function (this: any) {
+      function () {
         return this.includes(":comments").where("comments.id is null").references(":comments");
       },
       { through: "readers", source: "post" },
@@ -90,7 +90,7 @@ export class Person extends Base {
     this.hasMany("badReferences");
     this.hasMany(
       "fixedBadReferences",
-      function (this: any) {
+      function () {
         return this.where({ favorite: true });
       },
       {
@@ -99,7 +99,7 @@ export class Person extends Base {
     );
     this.hasOne(
       "favoriteReference",
-      function (this: any) {
+      function () {
         return this.where({ favorite: true });
       },
       {
@@ -109,14 +109,14 @@ export class Person extends Base {
     this.hasOne("favoriteReferenceJob", { through: "favoriteReference", source: "job" });
     this.hasMany(
       "postsWithCommentsSortedByCommentId",
-      function (this: any) {
+      function () {
         return this.includes(":comments").order("comments.id");
       },
       { through: "readers", source: "post" },
     );
     this.hasMany(
       "firstPosts",
-      function (this: any) {
+      function () {
         return this.where({ id: [1, 2] });
       },
       { through: "readers" },
@@ -150,7 +150,7 @@ export class Person extends Base {
     this.hasMany("agentsPostsAuthors", { through: "agentsPosts", source: "author" });
     this.hasMany("essays", { primaryKey: "first_name", foreignKey: "writer_id" });
 
-    this.scope("males", function (this: any) {
+    this.scope("males", function () {
       return this.where({ gender: "M" });
     });
 

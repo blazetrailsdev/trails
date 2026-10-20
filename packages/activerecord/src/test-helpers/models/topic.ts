@@ -58,42 +58,42 @@ export class Topic extends Base {
   declare written_on: RubyTime | Temporal.PlainDateTime;
 
   static {
-    this.scope("base", function (this: any) {
+    this.scope("base", function () {
       return this.all();
     });
-    this.scope("writtenBefore", function (this: any, time: any) {
+    this.scope("writtenBefore", function (time: any) {
       if (time) {
         return this.where("written_on < ?", time);
       }
     });
-    this.scope("approved", function (this: any) {
+    this.scope("approved", function () {
       return this.where({ approved: true });
     });
-    this.scope("rejected", function (this: any) {
+    this.scope("rejected", function () {
       return this.where({ approved: false });
     });
-    this.scope("children", function (this: any) {
+    this.scope("children", function () {
       return this.where().not({ parent_id: null });
     });
     this.scope("hasChildren", function (this: any) {
       return this.where({ id: this.model.children().select("parent_id") });
     });
-    this.scope("byLifo", function (this: any) {
+    this.scope("byLifo", function () {
       return this.where({ author_name: "lifo" });
     });
-    this.scope("replied", function (this: any) {
+    this.scope("replied", function () {
       return this.where("replies_count > 0");
     });
-    this.scope("true", function (this: any) {
+    this.scope("true", function () {
       return this.where({ approved: true });
     });
-    this.scope("false", function (this: any) {
+    this.scope("false", function () {
       return this.where({ approved: false });
     });
-    this.scope("scopeWithLambda", function (this: any) {
+    this.scope("scopeWithLambda", function () {
       return this.all();
     });
-    this.scope("approvedAsString", function (this: any) {
+    this.scope("approvedAsString", function () {
       return this.where({ approved: true });
     });
     this.scope(
@@ -115,14 +115,14 @@ export class Topic extends Base {
         return klass.where({ approved: true });
       },
     });
-    this.scope("withKwargs", function (this: any, approved = false) {
+    this.scope("withKwargs", function (approved = false) {
       return this.where({ approved });
     });
 
     this.hasMany("replies", { dependent: "destroy", autosave: true, inverseOf: "topic" });
     this.hasMany(
       "approvedReplies",
-      function (this: any) {
+      function () {
         return this.approved();
       },
       {
@@ -257,7 +257,7 @@ registerModel(Topic);
 
 export class DefaultRejectedTopic extends Topic {
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ approved: false });
     });
   }

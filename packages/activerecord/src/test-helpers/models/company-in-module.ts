@@ -39,28 +39,28 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
   static {
     this.hasMany(
       "clients",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       { dependent: "destroy" },
     );
     this.hasMany(
       "clientsSortedDesc",
-      function (this: any) {
+      function () {
         return this.order("id DESC");
       },
       { className: "Client" },
     );
     this.hasMany(
       "clientsOfFirm",
-      function (this: any) {
+      function () {
         return this.order("id");
       },
       { foreignKey: "client_of", className: "Client" },
     );
     this.hasMany(
       "clientsLikeMs",
-      function (this: any) {
+      function () {
         return this.where("name = 'Microsoft'").order("id");
       },
       { className: "Client" },

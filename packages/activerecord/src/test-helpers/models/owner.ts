@@ -23,13 +23,13 @@ export class Owner extends Base {
 
   static {
     this.primaryKey = "owner_id";
-    this.hasMany("pets", function (this: any) {
+    this.hasMany("pets", function () {
       return this.order("pets.name desc");
     });
     this.hasMany("toys", { through: "pets" });
     this.hasMany("persons", { through: "pets" });
     this.belongsTo("lastPet", { className: "Pet" });
-    this.scope("includingLastPet", function (this: any) {
+    this.scope("includingLastPet", function () {
       return this.select(
         `
           owners.*, (
