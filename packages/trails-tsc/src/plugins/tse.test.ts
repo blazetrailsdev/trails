@@ -148,6 +148,18 @@ describe("virtualizeTse", () => {
     expect(lines.filter((l) => l === "  })));")).toHaveLength(1);
   });
 
+  it("ignores braces inside strings when tracking block and function depth", () => {
+    const inBlock = virtualizeTse('<%= f((x) => { %><% const s = "{"; %><%= x %><% }) %>');
+    expect(inBlock.split("\n")).toContain("  })));");
+    const inFn = virtualizeTse('<% items.forEach((i) => { %><% const s = "}"; %><%= i %><% }) %>');
+    expect(inFn).toContain("  _ob.append(i);");
+  });
+
+  it("closes a blockExpr on a })) closer as compileJs does", () => {
+    const out = virtualizeTse("<%= f(g((x) => { %>y<% })) %>").split("\n");
+    expect(out).toContain("  }))));");
+  });
+
   it("rejects a function-form blockExpr as compileJs does", () => {
     expect(() => virtualizeTse("<%= each(items, function (item) { %>x<% }) %>")).toThrow(
       /must use arrow syntax/,

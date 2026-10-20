@@ -34,7 +34,7 @@ export function compileJs(source: string, options: EmitJsOptions = {}): EmitResu
   };
 }
 
-const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
+export const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
 
 export const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
@@ -118,7 +118,7 @@ function isRegexStart(code: string, i: number, prev: string): boolean {
   return REGEX_PRECEDING_KEYWORD_RE.test(code.slice(0, i).trimEnd());
 }
 
-function netBraceDepth(code: string): number {
+export function netBraceDepth(code: string): number {
   const mask = codeMask(code);
   let depth = 0;
   for (let i = 0; i < code.length; i++) {

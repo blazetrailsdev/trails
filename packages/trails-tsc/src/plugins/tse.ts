@@ -2,7 +2,9 @@ import ts from "typescript-5";
 import {
   ARROW_BLOCK_RE,
   awaitFlowReads,
+  BLOCK_CLOSE_RE,
   FUNCTION_BLOCK_RE,
+  netBraceDepth,
   netUnclosedParens,
   parse,
   parseLocalsSignature,
@@ -32,17 +34,6 @@ function destructureLines(locals: LocalEntry[]): string[] {
   );
   const voids = `  ${locals.map((l) => `void ${l.name};`).join(" ")}`;
   return [`  const { ${pieces.join(", ")} } = locals;`, voids];
-}
-
-const BLOCK_CLOSE_RE = /^\s*\}\s*\)?\s*;?\s*$/;
-
-function netBraceDepth(code: string): number {
-  let depth = 0;
-  for (const ch of code) {
-    if (ch === "{") depth++;
-    else if (ch === "}") depth--;
-  }
-  return depth;
 }
 
 type EmittedLine = [code: string, node: TseAst["nodes"][number]];

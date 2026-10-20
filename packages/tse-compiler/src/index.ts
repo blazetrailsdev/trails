@@ -3,8 +3,10 @@ export { parse, type TseAst, type TseNode } from "./parser.js";
 export {
   compileJs,
   ARROW_BLOCK_RE,
+  BLOCK_CLOSE_RE,
   awaitFlowReads,
   FUNCTION_BLOCK_RE,
+  netBraceDepth,
   netUnclosedParens,
   YIELD_EXPR_RE,
   type EmitJsOptions,
