@@ -19,6 +19,7 @@ import {
   NoMethodError,
   rbClassSuperclass,
   rbDeclareIvar,
+  rbEqual,
   rbFSend,
   rbModConstSet,
   rbModDefineMethod,
@@ -122,6 +123,10 @@ export const Behavior = {
   request: undefined as TestController["request"] | undefined,
   outputBuffer: undefined as OutputBuffer | undefined,
   rendered: undefined as RenderedViewContent | undefined,
+  setupWithController,
+  config,
+  render,
+  renderedViews,
   get _routes(): unknown {
     const controller = (this as unknown as Behavior).controller;
     if (rbObjRespondTo(controller, "_routes")) {
@@ -129,10 +134,6 @@ export const Behavior = {
     }
     return null;
   },
-  setupWithController,
-  config,
-  render,
-  renderedViews,
   documentRootElement,
   view,
   _view: view,
@@ -297,6 +298,7 @@ function config(this: Behavior): unknown {
   return null;
 }
 
+/** @inventedArm if — CONVERGEABLE actionview-render-plain-is-async-inside-capture-block */
 function render(
   this: Behavior,
   options: Record<string, unknown> | string | object = {},
@@ -346,7 +348,7 @@ export class RenderedViewsCollection {
 
   isViewRendered(view: unknown, expectedLocals: Record<string, unknown>): boolean {
     return this.localsFor(view).some((actualLocals) =>
-      Object.entries(expectedLocals).every(([key, value]) => value === actualLocals?.[key]),
+      Object.entries(expectedLocals).every(([key, value]) => rbEqual(value, actualLocals![key])),
     );
   }
 }
@@ -363,8 +365,6 @@ interface LocalsView extends Base {
 }
 
 export const Locals = {
-  renderedViews: undefined as RenderedViewsCollection | undefined,
-
   render(
     this: LocalsView,
     options: Record<string, unknown> | string | object = {},
