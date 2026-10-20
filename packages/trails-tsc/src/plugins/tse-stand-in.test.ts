@@ -171,5 +171,7 @@ describe("TSE stand-in scope", () => {
       compile.mock.contexts.map((t) => `${(t as Template).virtualPath}${(t as Template).format}`),
     );
     expect(compiled.size).toBe(Object.keys(fixtures).length);
+    const methods = new Set(compile.mock.contexts.map((t) => (t as Template).methodName()));
+    expect(methods.size).toBe(compile.mock.calls.length);
   });
 });
