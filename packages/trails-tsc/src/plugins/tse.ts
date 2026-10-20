@@ -2,6 +2,7 @@ import ts from "typescript-5";
 import {
   awaitFlowReads,
   FUNCTION_BLOCK_RE,
+  netUnclosedParens,
   parse,
   parseLocalsSignature,
   LocalsSignatureError,
@@ -48,7 +49,7 @@ type EmittedLine = [code: string, node: TseAst["nodes"][number]];
 function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
   const lines: EmittedLine[] = [];
   const innerDepths: number[] = [];
-  const innerAwaits: boolean[] = [];
+  const innerCallExprParens: number[] = [];
   let braceDepth = 0;
   const functionDepths: number[] = [];
   for (const node of nodes) {
@@ -57,15 +58,17 @@ function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
     const awaits = !insideBlock && functionDepths.length === 0;
     if (node.kind === "blockExpr") {
       innerDepths.push(0);
-      innerAwaits.push(awaits);
+      innerCallExprParens.push(netUnclosedParens(node.value) + (awaits ? 1 : 0));
       lines.push([`  ${bufRef}.append(${awaits ? "await (" : ""}${node.value.trim()}`, node]);
     } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
         innerDepths.pop();
-        const close = innerAwaits.pop() ? "))" : ")";
-        const t = node.value.trim();
-        lines.push([`  ${t.endsWith(";") ? t.slice(0, -1) : t}${close};`, node]);
+        const callExprParens = innerCallExprParens.pop()!;
+        const closer = node.value.trim().replace(/;\s*$/, "");
+        const closingParens = (closer.match(/\)/g) ?? []).length;
+        const suffix = ")".repeat(Math.max(0, 1 + callExprParens - closingParens)) + ";";
+        lines.push([`  ${closer}${suffix}`, node]);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
         lines.push([emitNode(node, bufRef, false), node]);

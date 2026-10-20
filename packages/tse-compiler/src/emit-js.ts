@@ -189,7 +189,7 @@ export function awaitFlowReads(
   return out;
 }
 
-function netUnclosedParens(code: string): number {
+export function netUnclosedParens(code: string): number {
   let depth = 0;
   for (const ch of code) {
     if (ch === "(") depth++;

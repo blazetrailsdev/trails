@@ -4,6 +4,7 @@ export {
   compileJs,
   awaitFlowReads,
   FUNCTION_BLOCK_RE,
+  netUnclosedParens,
   YIELD_EXPR_RE,
   type EmitJsOptions,
   type EmitResult,
