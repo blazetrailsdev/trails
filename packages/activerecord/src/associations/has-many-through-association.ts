@@ -47,7 +47,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   declare throughReflection: () => unknown;
   /** @internal */
-  declare throughAssociation: () => unknown;
+  declare throughAssociation: () => Association;
   /** @internal */
   declare constructJoinAttributes: (...records: Base[]) => Record<string, unknown>;
   /** @internal */
@@ -70,7 +70,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   protected targetReflectionHasAssociatedRecord(): boolean {
     const throughAssoc = (this.owner.constructor as typeof Base)._reflectOnAssociation(
       this.reflection.options.through!,
-    ) as unknown as AssociationDefinition | null;
+    ) as AssociationDefinition | null;
     if (!throughAssoc) return true;
     return targetReflectionHasAssociatedRecord(this.owner, throughAssoc);
   }
@@ -197,7 +197,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   protected override async deleteRecords(records: Base[], method: string): Promise<number> {
     this.ensureNotNested();
 
-    let scope = (this.throughAssociation() as any).scope();
+    let scope = this.throughAssociation().scope();
     scope.whereBang(this.constructJoinAttributes(...records));
     scope = scope.where(this.throughScopeAttributes());
 
@@ -222,8 +222,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
     if (this.sourceReflection().options.counterCache && method !== "destroy") {
       const counter = this.sourceReflection().counterCacheColumn();
-      await (this.klass as any).decrementCounter(
-        counter,
+      await this.klass.decrementCounter(
+        counter!,
         records.map((record) => record.id),
       );
     }
@@ -345,7 +345,7 @@ function updateThroughCounter(this: HasManyThroughAssociation, method: string): 
 /** @internal */
 async function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Promise<Base[]> {
   const attributes = this.constructJoinAttributes(record);
-  const candidates = wrap((this.throughAssociation() as Association).target);
+  const candidates = wrap(this.throughAssociation().target);
   const found: Base[] = [];
   for (const c of candidates) {
     let all = true;
@@ -365,7 +365,7 @@ async function deleteThroughRecords(
   this: HasManyThroughAssociation,
   records: Base[],
 ): Promise<void> {
-  const throughAssociation = this.throughAssociation() as Association;
+  const throughAssociation = this.throughAssociation();
   for (const record of records) {
     const throughRecords = await this.throughRecordsFor(record);
 

@@ -151,7 +151,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     association: CollectionAssociation,
   ): AssociationProxy<T> {
     const Ctor = relationClassFor.call(CollectionProxy, model);
-    return new Ctor(model, association) as unknown as AssociationProxy<T>;
+    return new Ctor(model, association) as AssociationProxy<T>;
   }
 
   /** @internal */
@@ -162,7 +162,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   ): CollectionProxy<T> {
     const targetModel = this._targetModelFor(record, assocName, assocDef);
     const Ctor = relationClassFor.call(CollectionProxy, targetModel);
-    const association = record.association(assocName) as unknown as CollectionAssociation;
+    const association = record.association(assocName) as CollectionAssociation;
     return new Ctor(targetModel, association) as CollectionProxy<T>;
   }
 
@@ -235,7 +235,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
       return stripThenable(this);
     }
 
-    const concatResult = await this._association.concat(...(records as unknown as Base[]));
+    const concatResult = await this._association.concat(...records);
     if (!concatResult) return false;
     return stripThenable(this);
   }

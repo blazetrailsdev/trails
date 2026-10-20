@@ -145,7 +145,7 @@ export abstract class CollectionAssociation extends Association {
   /** @missingRailsName size — PERMANENT */
   async find(...args: unknown[]): Promise<Base | Base[] | null> {
     if (this.options.inverseOf && this.isLoaded()) {
-      const argsFlatten = (args as any[]).flat(Infinity);
+      const argsFlatten = args.flat(Infinity);
       const model = this.scope().model;
 
       if (isBlank(argsFlatten)) {
@@ -212,7 +212,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected transaction<R>(block: () => Promise<R> | R): Promise<R | undefined> {
-    return (this.reflection.klass as any).transaction(block);
+    return this.reflection.klass.transaction(async () => block());
   }
 
   /** @internal */
@@ -428,15 +428,9 @@ export abstract class CollectionAssociation extends Association {
   }
 
   private async isIncludeInMemory(record: Base): Promise<boolean> {
-    const reflection = this.reflection as unknown as {
-      isThroughReflection?: () => boolean;
-      throughReflection?: { name: string } | null;
-      sourceReflection?: { name: string } | null;
-    };
+    const reflection = this.reflection;
     if (reflection.isThroughReflection?.()) {
-      const assoc = (
-        this.owner as unknown as { association: (n: string) => Association }
-      ).association(reflection.throughReflection!.name);
+      const assoc = this.owner.association(reflection.throughReflection!.name);
       const sourceName = reflection.sourceReflection!.name;
       const reader = (await (assoc as unknown as { reader: unknown }).reader) as Base[];
       for (const source of reader) {
@@ -552,7 +546,7 @@ export abstract class CollectionAssociation extends Association {
     if (records.length === 0) return undefined;
     const coerced = this.coerceToRecords(records);
     const remove = (coerced: Base[]): Promise<Base[] | undefined> | Base[] | undefined => {
-      const resolved = (coerced as unknown[]).flat(Infinity) as Base[];
+      const resolved = coerced.flat(Infinity);
       for (const record of resolved) this.raiseOnTypeMismatchBang(record);
       const existingRecords = resolved.filter((r) => !r.isNewRecord());
       if (existingRecords.length === 0) {
@@ -628,8 +622,7 @@ export abstract class CollectionAssociation extends Association {
       if (memRecord != null) {
         const memAttributeNames = new Set(memRecord.attributeNames());
         const changedAttributeNamesToSave = new Set(memRecord.changedAttributeNamesToSave);
-        const attrReadonly = (memRecord.constructor as unknown as { _attrReadonly: string[] })
-          ._attrReadonly;
+        const attrReadonly = (memRecord.constructor as typeof Base)._attrReadonly;
         for (const name of record
           .attributeNames()
           .filter((name) => memAttributeNames.has(name))
