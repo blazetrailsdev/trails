@@ -911,9 +911,6 @@ class ApiExtractor
     }
     record_body_facts(method_info, node[3], find_params(node), fqn)
     record_included_hook_mixins(target, node[3], find_params(node)) if @in_sclass && name == "included"
-    # A module method whose body calls `super` is inlined into each includer
-    # (CLAUDE.md, "A module method's `super` is inlined the same way"), so its
-    # `@inlinedFrom` citation needs the span as much as a hook's does.
     if INLINED_HOOKS.include?(name) || (@modules[fqn] && !@in_sclass && method_info[:calls]&.include?("super"))
       @def_end_lines ||= DefEndLines.new(@source).tap(&:parse).ends
       end_line = @def_end_lines[method_info[:line]]

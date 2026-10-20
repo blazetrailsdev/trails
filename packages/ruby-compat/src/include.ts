@@ -583,7 +583,17 @@ export class Module<I extends object = Record<never, never>> {
       prependOrigins.set(proto, origin);
       Object.setPrototypeOf(proto, origin);
     }
-    for (const key of Object.getOwnPropertyNames(source)) {
+    const keys = new Set(Object.getOwnPropertyNames(source));
+    for (const mod of nestedModules.get(this) ?? []) {
+      if (!(mod instanceof Module)) {
+        for (const key of typeof mod === "function"
+          ? Object.getOwnPropertyNames((mod as AnyClass).prototype)
+          : Object.keys(mod)) {
+          if (key !== "constructor") keys.add(key);
+        }
+      }
+    }
+    for (const key of keys) {
       const descriptor = Object.getOwnPropertyDescriptor(proto, key);
       if (descriptor === undefined) continue;
       if (!descriptor.configurable) {

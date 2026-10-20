@@ -1746,6 +1746,49 @@ describe("Module#include of an accessor", () => {
   });
 });
 
+describe("Module#include of a plain module", () => {
+  it("keeps a prepended Module's plain module between the Module and the class", () => {
+    class Host {
+      who() {
+        return "host";
+      }
+    }
+    const plain = { who: () => "plain", only: () => "only" };
+    const mod = new Module((m) => m.include(plain));
+    prepend(Host, mod);
+    const host = new Host() as DynMethods;
+    expect(host.who()).toBe("plain");
+    expect(host.only()).toBe("only");
+  });
+
+  it("lets an object extended later outrank a Module's plain module on extend", () => {
+    const base = new Module((m) => m.include({ greet: () => "base" }));
+    const later = new Module((m) => m.defineMethod("greet", () => "later"));
+    class Klass {}
+    extend(Klass, base);
+    extend(Klass, later);
+    expect((Klass as unknown as DynMethods).greet()).toBe("later");
+  });
+
+  it("resumes super past the plain module that defines the calling method", () => {
+    class Parent {
+      greet() {
+        return "parent";
+      }
+    }
+    const mod: Module = new Module((m) =>
+      m.include({
+        greet(this: object) {
+          return `plain>${mod.superMethod(this, "greet")!() as string}`;
+        },
+      }),
+    );
+    class Child extends Parent {}
+    include(Child, mod);
+    expect(new Child().greet()).toBe("plain>parent");
+  });
+});
+
 describe("Module#include of a Module", () => {
   it("splices the included module beneath the includer, live", () => {
     const inner = new Module();
