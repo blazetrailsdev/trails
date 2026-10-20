@@ -589,6 +589,26 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           "library/yaml/to_yaml_spec.rb:105 `(0.0).to_yaml` is `--- 0.0` — `0.0` and `0` are one JS number, so no Float exists to dump with a fraction",
       },
     ],
+  "rack:spec_request.rb › RackRequestTest › return values for the keys in the order given from values_at":
+    [
+      {
+        kind: "assert_output",
+        value: "x:nil",
+        as: "assert_match",
+        reason:
+          "spec_request.rb:802 `assert_output(nil, /deprecated/)` swaps `$stderr` for a StringIO; Node's stderr is a stream with no reassignable global, so the port captures the `Kernel#warn` call that writes it and matches its message",
+      },
+    ],
+  "rack:spec_request.rb › RackRequestTest › TestProxyRequest › return values for the keys in the order given from values_at":
+    [
+      {
+        kind: "assert_output",
+        value: "x:nil",
+        as: "assert_match",
+        reason:
+          "spec_request.rb:802 `assert_output(nil, /deprecated/)` swaps `$stderr` for a StringIO; Node's stderr is a stream with no reassignable global, so the port captures the `Kernel#warn` call that writes it and matches its message",
+      },
+    ],
   "rack:spec_multipart.rb › parses multipart/mixed": [
     {
       kind: "must_be_instance_of",

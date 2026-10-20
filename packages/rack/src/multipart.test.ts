@@ -335,6 +335,28 @@ contents\r
   expect(params["file"].filename).toBe(`"${"long".repeat(100)}"`);
 });
 
+it("parses very long quoted multipart file names", () => {
+  for (const quoteChar of ["", '"']) {
+    const data = `--AaB03x\r
+content-type: text/plain\r
+content-disposition: attachment; name=file; filename=${quoteChar}${"long".repeat(100)}${quoteChar}\r
+\r
+contents\r
+--AaB03x--\r
+`;
+
+    const options = {
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+      CONTENT_LENGTH: String(data.length),
+      ":input": new StringIO(data),
+    };
+    const env = MockRequest.envFor("/", options);
+    const params = parseMultipart(env)!;
+
+    expect(params["file"].filename).toBe("long".repeat(100));
+  }
+});
+
 it("limits very long file name extensions in multipart tempfiles", () => {
   const data = `--AaB03x\r
 content-type: text/plain\r

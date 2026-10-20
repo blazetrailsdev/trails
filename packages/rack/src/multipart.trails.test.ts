@@ -33,22 +33,6 @@ function parseFixture(name: string, boundary = "AaB03x"): Record<string, any> | 
   return parseMultipart(env);
 }
 
-it("parses very long quoted multipart file names", () => {
-  const longName = "long".repeat(100);
-  const boundary = "AaB03x";
-  const body = `--${boundary}\r\ncontent-type: text/plain\r\ncontent-disposition: attachment; name=file; filename="${longName}"\r\n\r\ncontents\r\n--${boundary}--\r\n`;
-  const params = parseMultipart(envFor(body, `multipart/form-data; boundary=${boundary}`))!;
-  expect(params["file"].filename).toBe(longName);
-});
-
-it("parses very long unquoted multipart file names", () => {
-  const longName = "long".repeat(100);
-  const boundary = "AaB03x";
-  const body = `--${boundary}\r\ncontent-type: text/plain\r\ncontent-disposition: attachment; name=file; filename=${longName}\r\n\r\ncontents\r\n--${boundary}--\r\n`;
-  const params = parseMultipart(envFor(body, `multipart/form-data; boundary=${boundary}`))!;
-  expect(params["file"].filename).toBe(longName);
-});
-
 it("supports ISO-2022-JP-encoded part", () => {
   const params = parseFixture("multiple_encodings")!;
   expect(params["us-ascii"]).toBe("Alice");
