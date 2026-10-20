@@ -1756,7 +1756,7 @@ describe("Module#include of a plain module", () => {
     const plain = { who: () => "plain", only: () => "only" };
     const mod = new Module((m) => m.include(plain));
     prepend(Host, mod);
-    const host = new Host() as DynMethods;
+    const host = new Host() as unknown as DynMethods;
     expect(host.who()).toBe("plain");
     expect(host.only()).toBe("only");
   });
