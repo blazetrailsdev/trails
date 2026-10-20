@@ -395,6 +395,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       # Lints only the changed files. `__ALL__` is the fallback sentinel from
@@ -416,10 +418,7 @@ jobs:
           fi
       - name: ESLint violation counts
         if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main
-          pnpm parity:lint:counts
+        run: pnpm parity:lint:counts:ci
   # Consolidated sub-minute PR/push preflight checks. Each of prettier,
   # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
   # work; GitHub bills every job rounded UP to a whole minute, so running them

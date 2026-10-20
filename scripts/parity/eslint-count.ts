@@ -33,6 +33,12 @@ export const RULES = [
   "blazetrails/no-standalone-associations",
 ];
 
+/**
+ * Arms held at zero whatever the base says: `rails-error-parity`'s
+ * `inventedMessage` was never grandfathered, so its base count is always 0.
+ */
+export const ZERO_BASELINE = new Set(["blazetrails/rails-error-parity::inventedMessage"]);
+
 /** Violations per `<file>::<rule>` with a non-zero count. */
 export type RuleCounts = Record<string, number>;
 
@@ -41,9 +47,15 @@ async function git(args: string[], cwd: string): Promise<string> {
   return stdout;
 }
 
-function tally(counts: RuleCounts, file: string, messages: ESLint.LintResult["messages"]): void {
+function tally(
+  counts: RuleCounts,
+  file: string,
+  messages: ESLint.LintResult["messages"],
+  atBase = false,
+): void {
   for (const m of messages) {
     if (!m.ruleId || !RULES.includes(m.ruleId)) continue;
+    if (atBase && ZERO_BASELINE.has(`${m.ruleId}::${m.messageId}`)) continue;
     const key = `${file}::${m.ruleId}`;
     counts[key] = (counts[key] ?? 0) + 1;
   }
@@ -74,7 +86,7 @@ export async function measure(files: string[], cwd = ROOT_DIR): Promise<RuleCoun
 export async function measureAt(ref: string, files: string[], cwd = ROOT_DIR): Promise<RuleCounts> {
   const eslint = linter(cwd);
   const present = new Set(
-    (await git(["ls-tree", "-r", "--name-only", ref, "--", ...files], cwd)).split("\n"),
+    (await git(["ls-tree", "-r", "--name-only", ref, "--", "packages"], cwd)).split("\n"),
   );
   const counts: RuleCounts = {};
   for (const file of files) {
@@ -82,7 +94,8 @@ export async function measureAt(ref: string, files: string[], cwd = ROOT_DIR): P
     const text = await git(["show", `${ref}:${file}`], cwd);
     const filePath = path.join(cwd, file);
     if (await eslint.isPathIgnored(filePath)) continue;
-    for (const r of await eslint.lintText(text, { filePath })) tally(counts, file, r.messages);
+    for (const r of await eslint.lintText(text, { filePath }))
+      tally(counts, file, r.messages, true);
   }
   return counts;
 }

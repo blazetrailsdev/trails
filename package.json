@@ -54,6 +54,7 @@
     "parity:api:parents": "pnpm tsx scripts/api-compare/lint-ambiguous-parents.ts",
     "parity:api:parents:tighten": "pnpm tsx scripts/api-compare/lint-ambiguous-parents.ts --tighten",
     "parity:lint:counts": "tsx -e \"import('./scripts/parity/eslint-count.ts').then((m) => m.main()).then(console.log)\"",
+    "parity:lint:counts:ci": "tsx -e \"import('./scripts/parity/eslint-count.ts').then((m) => m.main('HEAD^1')).then(console.log)\"",
     "parity:api:predicates": "pnpm tsx scripts/api-compare/lint-predicate-kinds.ts",
     "parity:api:predicates:tighten": "pnpm tsx scripts/api-compare/lint-predicate-kinds.ts --tighten",
     "parity:api:params:tighten": "pnpm tsx scripts/api-compare/lint-param-names.ts --tighten",
