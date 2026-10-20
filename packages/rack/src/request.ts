@@ -597,8 +597,9 @@ export abstract class Helpers {
   }
 
   valuesAt(...keys: string[]): any[] {
-    console.warn(
+    warn(
       "Request#values_at is deprecated and will be removed in a future version of Rack. Please use request.params.values_at instead",
+      { uplevel: 1 },
     );
 
     return keys.map((key) => this.params[key]);
