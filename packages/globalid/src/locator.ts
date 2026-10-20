@@ -1,14 +1,14 @@
 import { GlobalID } from "./global-id.js";
-import { SignedGlobalID } from "./signed-global-id.js";
+import { SignedGlobalID, type ParseOptions } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
-import { safeConstantize } from "@blazetrails/activesupport";
-import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
   ArgumentError,
   compact,
   except,
+  rbFArray,
   rbModConstSet,
   rbObjMethod,
+  slice,
   StandardError,
 } from "@blazetrails/ruby-compat";
 
@@ -20,6 +20,7 @@ export interface LocatorModel {
   where?(conditions: Record<string, unknown>): {
     toArray?(): Promise<unknown[]> | unknown[];
   };
+  includes?(includes: unknown): LocatorModel;
   /** @internal */
   unscoped?<R>(block: () => R | Promise<R>): R | Promise<R>;
 }
@@ -29,12 +30,10 @@ export class InvalidModelIdError extends StandardError {}
 export interface LocateOptions {
   only?: LocatorModel | LocatorModel[];
   ignoreMissing?: boolean;
+  includes?: unknown;
 }
 
-export interface LocateSignedOptions extends LocateOptions {
-  for?: string;
-  verifier: MessageVerifier;
-}
+export type LocateSignedOptions = LocateOptions & ParseOptions;
 
 export type LocatorBlock = (gid: GlobalID, options?: LocateOptions) => Promise<unknown> | unknown;
 
@@ -44,12 +43,12 @@ export interface LocatorLike {
 }
 
 export class BaseLocator {
-  async locate(gid: GlobalID, _options: LocateOptions = {}): Promise<unknown | null> {
+  async locate(gid: GlobalID, options: LocateOptions = {}): Promise<unknown | null> {
     if (!this.modelIdIsValid(gid)) return null;
-    const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
-    if (!klass) return null;
-    const record = await klass.find(gid.modelId);
-    return record ?? null;
+    let modelClass = gid.modelClass;
+    if (options.includes) modelClass = modelClass.includes!(options.includes);
+
+    return modelClass.find(gid.modelId);
   }
 
   async locateMany(gids: GlobalID[], options: LocateOptions = {}): Promise<unknown[]> {
@@ -57,7 +56,7 @@ export class BaseLocator {
     const allowed: Array<{ gid: GlobalID; klass: LocatorModel }> = [];
     for (const gid of gids) {
       if (!this.modelIdIsValid(gid)) continue;
-      const klass = safeConstantize(gid.modelName) as LocatorModel;
+      const klass = gid.modelClass;
       allowed.push({ gid, klass });
       const ids = idsByClass.get(klass) ?? [];
       ids.push(gid.modelId);
@@ -106,9 +105,7 @@ export class BaseLocator {
 
   /** @internal */
   protected modelIdIsValid(gid: GlobalID): boolean {
-    const modelClass = safeConstantize(gid.modelName) as LocatorModel | undefined;
-    if (!modelClass) return false;
-    return modelIdArityMatches(modelClass, gid.modelId, this.primaryKey(modelClass));
+    return rbFArray(gid.modelId).length === rbFArray(this.primaryKey(gid.modelClass)).length;
   }
 
   /** @internal */
@@ -119,8 +116,7 @@ export class BaseLocator {
 
 export class UnscopedLocator extends BaseLocator {
   async locate(gid: GlobalID, options: LocateOptions = {}): Promise<unknown | null> {
-    const modelClass = safeConstantize(gid.modelName) as LocatorModel | undefined;
-    return this.unscoped(modelClass, () => super.locate(gid, options));
+    return this.unscoped(gid.modelClass, () => super.locate(gid, options));
   }
 
   /** @internal */
@@ -133,11 +129,8 @@ export class UnscopedLocator extends BaseLocator {
   }
 
   /** @internal */
-  protected unscoped<R>(
-    modelClass: LocatorModel | undefined,
-    block: () => R | Promise<R>,
-  ): R | Promise<R> {
-    return modelClass?.unscoped ? modelClass.unscoped(block) : block();
+  protected unscoped<R>(modelClass: LocatorModel, block: () => R | Promise<R>): R | Promise<R> {
+    return modelClass.unscoped ? modelClass.unscoped(block) : block();
   }
 }
 
@@ -202,26 +195,17 @@ export class Locator {
 
   static async locateSigned(
     sgid: string | SignedGlobalID,
-    options: LocateSignedOptions,
+    options: LocateSignedOptions = {},
   ): Promise<unknown | null> {
-    const parsed = SignedGlobalID.parse(String(sgid), {
-      for: options.for,
-      verifier: options.verifier,
-    });
-    if (!parsed) return null;
-    return Locator.locate(parsed.uri.toString(), options);
+    return SignedGlobalID.find(sgid, options);
   }
 
   static async locateManySigned(
     sgids: Array<string | SignedGlobalID>,
-    options: LocateSignedOptions,
+    options: LocateSignedOptions = {},
   ): Promise<unknown[]> {
     return Locator.locateMany(
-      compact(
-        sgids.map((sgid) =>
-          SignedGlobalID.parse(String(sgid), { for: options.for, verifier: options.verifier }),
-        ),
-      ),
+      compact(sgids.map((sgid) => SignedGlobalID.parse(String(sgid), slice(options, "for")))),
       options,
     );
   }
@@ -267,17 +251,9 @@ export class Locator {
 
   /** @internal */
   static parseAllowed(gids: Array<string | GlobalID>, only?: LocateOptions["only"]): GlobalID[] {
-    const result: GlobalID[] = [];
-    for (const gid of gids) {
-      const parsed = GlobalID.parse(gid);
-      if (!parsed) continue;
-      const modelClass = safeConstantize(parsed.modelName) as LocatorModel | undefined;
-      if (!modelClass) continue;
-      if (!Locator.findAllowed(modelClass, only)) continue;
-      if (!modelIdArityMatches(modelClass, parsed.modelId)) continue;
-      result.push(parsed);
-    }
-    return result;
+    return compact(gids.map((gid) => GlobalID.parse(gid))).filter((gid) =>
+      Locator.findAllowed(gid.modelClass, only),
+    );
   }
 
   /** @internal */
@@ -296,17 +272,6 @@ type Ctor = new (...args: never[]) => unknown;
 
 function recordIdProp(pk: string | string[]): string {
   return Array.isArray(pk) ? "id" : pk;
-}
-
-/** @internal */
-function modelIdArityMatches(
-  klass: LocatorModel,
-  modelId: unknown,
-  pk: string | string[] = klass.primaryKey ?? "id",
-): boolean {
-  const pkArity = Array.isArray(pk) ? pk.length : 1;
-  const idArity = Array.isArray(modelId) ? modelId.length : 1;
-  return idArity === pkArity;
 }
 
 function idKey(id: unknown): string {

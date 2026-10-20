@@ -53,8 +53,8 @@ export class SignedGlobalID extends GlobalID {
     this._objectId = (_nextObjectId++).toString(16).padStart(12, "0");
   }
 
-  static parse(sgid: string, options: ParseOptions = {}): SignedGlobalID | null {
-    const verified = SignedGlobalID.verify(sgid, options);
+  static parse(sgid: string | GlobalID, options: ParseOptions = {}): SignedGlobalID | null {
+    const verified = SignedGlobalID.verify(String(sgid), options);
     if (verified === null) return null;
     return new this(verified.uri, { ...options, expiresAt: verified.expiresAt ?? null });
   }

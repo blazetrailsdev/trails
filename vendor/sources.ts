@@ -250,6 +250,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         // global_id/*.rb together; pointing at `lib/global_id` matches the
         // pattern used for activerecord (lib/active_record/).
         libPath: "lib/global_id",
+        libEntryFile: "lib/global_id.rb",
         // Globalid puts *_test.rb under test/cases/ (not test/ directly).
         testPath: "test/cases",
       },

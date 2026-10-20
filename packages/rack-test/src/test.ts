@@ -1,24 +1,16 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import {
-  Generic,
-  HTTPS,
-  URI,
-  b,
-  hashDelete,
-  pack,
-  rbObjDup,
-  rbObjRespondTo,
-} from "@blazetrails/ruby-compat";
+import { Generic, HTTPS, URI, b, hashDelete, pack, rbObjDup, toA } from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
   Request,
-  Response,
+  type Response,
   parseNestedQuery,
   release,
   type RackApp,
   type RackEnv,
   type RackMiddleware,
+  type RackResponse,
 } from "@blazetrails/rack";
 import { CookieJar } from "./cookie-jar.js";
 import type { Utils } from "./utils.js";
@@ -365,17 +357,13 @@ export class Session {
     env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
     this._lastRequest = new Request(env);
     const app = this.app;
-    const result = await (typeof app === "function" &&
+    const response = await (typeof app === "function" &&
     Object.getOwnPropertyDescriptor(app, "prototype")?.writable !== false
       ? app(env)
       : (app as RackMiddleware).call(env));
-    const [status, headers, rackBody] = result instanceof Response ? result.toArray() : result;
-    let body = rackBody;
-    if (Symbol.asyncIterator in Object(rackBody)) {
-      body = [];
-      for await (const chunk of rackBody as AsyncIterable<string | Uint8Array>) body.push(chunk);
-      if (rbObjRespondTo(rackBody, "close")) (rackBody as { close(): void }).close();
-    }
+    const [status, headers, body] = (
+      Array.isArray(response) ? toA(response) : (response as Response).toArray()
+    ) as RackResponse;
 
     this._lastResponse = new MockResponse(
       status,

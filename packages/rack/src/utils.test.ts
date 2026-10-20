@@ -1,9 +1,26 @@
 import { describe, it, expect, vi } from "vitest";
-import { stderr } from "@blazetrails/ruby-compat";
+import { warn } from "@blazetrails/ruby-compat";
 import * as Utils from "./utils.js";
 import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
 import { Params, QueryParser } from "./query-parser.js";
+
+vi.mock("@blazetrails/ruby-compat", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@blazetrails/ruby-compat")>();
+  return { ...actual, warn: vi.fn(actual.warn) };
+});
+
+function captureWarnings(yieldBlock: (warnings: unknown[][]) => void): void {
+  const warnings: unknown[][] = [];
+  vi.mocked(warn).mockImplementation((...args: unknown[]) => {
+    warnings.push(args);
+  });
+  try {
+    yieldBlock(warnings);
+  } finally {
+    vi.mocked(warn).mockReset();
+  }
+}
 
 function assertSets(expected: string, actual: string) {
   const exp = new Set(expected.split("&"));
@@ -586,22 +603,20 @@ it("return status code and give deprecation warning for obsolete symbols", () =>
   };
   const droppedStatuses = { bandwidth_limit_exceeded: 509, not_extended: 510 };
 
-  const warn = vi.spyOn(stderr, "write").mockImplementation(() => true);
-  try {
+  captureWarnings((warnings) => {
     for (const [symbol, valueHash] of Object.entries(replacedStatuses)) {
       expect(Utils.statusCode(symbol)).toBe(valueHash.statusCode);
-      assertEmpty(warn.mock.calls);
+      assertEmpty(warnings);
     }
 
     for (const [symbol, code] of Object.entries(droppedStatuses)) {
       expect(Utils.statusCode(symbol)).toBe(code);
-      expect(warn.mock.lastCall![0]).toContain(
-        `warning: Status code :${symbol} is deprecated and will be removed in a future version of Rack.\n`,
-      );
+      expect(warnings.pop()).toEqual([
+        `Status code :${symbol} is deprecated and will be removed in a future version of Rack.`,
+        { uplevel: 3 },
+      ]);
     }
-  } finally {
-    warn.mockRestore();
-  }
+  });
 });
 
 it("raise an error for an invalid symbol", () => {
