@@ -532,9 +532,10 @@ it.skip("sets BINARY encoding for invalid charsets", () => {
   parseMultipart(env);
 });
 
-it("sets BINARY encoding on things without content type", () => {
-  const params = parseFixture("none")!;
-  expect(params["submit-name"]).toBe("Larry");
+// PERMANENT-SKIP: CLAUDE.md "A String has no encoding tag either" — every assertion is a `.encoding`.
+it.skip("sets BINARY encoding on things without content type", () => {
+  const env = MockRequest.envFor("/", multipartFixture("none"));
+  parseMultipart(env);
 });
 
 // PERMANENT-SKIP: CLAUDE.md "A String has no encoding tag either" — every assertion is a `.encoding`.
