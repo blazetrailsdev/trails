@@ -358,7 +358,7 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   instanceMethod(name: string): PropertyDescriptor | undefined {
-    return Object.getOwnPropertyDescriptor(carrierOf(this), name);
+    return methodEntryOf(this, name);
   }
 
   /**
@@ -440,7 +440,8 @@ export class Module<I extends object = Record<never, never>> {
     const carrier = carrierOf(this);
     try {
       for (const name of names) {
-        if (!Object.hasOwn(carrier, name) || isUndefEntry(carrier, name)) {
+        const entry = methodEntryOf(this, name);
+        if (entry === undefined || ("value" in entry && entry.value === undefined)) {
           throw new NameError(`undefined method '${name}' for module '#<Module>'`, name);
         }
         trackedKeys(carrier).delete(name);
@@ -750,35 +751,38 @@ export class Module<I extends object = Record<never, never>> {
 }
 
 function appendPlainFeatures(base: Module, mod: ModuleObject): void {
-  const carrier = carrierOf(base);
-  if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
-    if (Object.hasOwn(mod, moduleIncludesKey)) return recordPlainModule(base, mod);
-    trackIncludedModule(carrier, mod);
-    const installed = trackedKeys(carrier);
-    const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
-      string,
-      unknown
-    >;
-    const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
-    for (const key of typeof mod === "function"
-      ? Object.getOwnPropertyNames(members)
-      : Object.keys(members)) {
-      if (key === "constructor") continue;
-      const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
-      const accessor = !("value" in descriptor) && namespace !== "Module";
-      if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
-      if (Object.hasOwn(carrier, key) && !installed.has(key)) continue;
-      installed.add(key);
-      Object.defineProperty(
-        carrier,
-        key,
-        accessor
-          ? { get: descriptor.get, set: descriptor.set, configurable: true }
-          : { value: members[key], writable: true, configurable: true },
-      );
-    }
-    relinkIncluders(base);
+  if (!isModuleMethodTablePresent({ prototype: carrierOf(base) }, mod))
+    recordPlainModule(base, mod);
+}
+
+function plainMethodEntry(mod: object, key: string): PropertyDescriptor | undefined {
+  if (key === "constructor" || /^[A-Z]/.test(key)) return undefined;
+  const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
+    string,
+    unknown
+  >;
+  const descriptor = Object.getOwnPropertyDescriptor(members, key);
+  if (descriptor === undefined || (typeof mod !== "function" && !descriptor.enumerable)) {
+    return undefined;
   }
+  const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
+  if (!("value" in descriptor) && namespace !== "Module") {
+    return { get: descriptor.get, set: descriptor.set, configurable: true };
+  }
+  return typeof members[key] === "function"
+    ? { value: members[key], writable: true, configurable: true }
+    : undefined;
+}
+
+function methodEntryOf(mod: Module, name: string): PropertyDescriptor | undefined {
+  for (const ancestor of mod.ancestors()) {
+    const entry =
+      ancestor instanceof Module
+        ? Object.getOwnPropertyDescriptor(carrierOf(ancestor), name)
+        : plainMethodEntry(ancestor, name);
+    if (entry !== undefined) return entry;
+  }
+  return undefined;
 }
 
 function recordPlainModule(base: Module, mod: ModuleObject): void {
