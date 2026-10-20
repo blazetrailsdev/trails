@@ -4,6 +4,7 @@ import {
   MockRequest,
   MockResponse,
   Request,
+  Response,
   parseNestedQuery,
   release,
   type RackApp,
@@ -355,12 +356,11 @@ export class Session {
     env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
     this._lastRequest = new Request(env);
     const app = this.app;
-    const [status, headers, rackBody] = await (typeof app === "function" &&
+    const result = await (typeof app === "function" &&
     Object.getOwnPropertyDescriptor(app, "prototype")?.writable !== false
       ? app(env)
       : (app as RackMiddleware).call(env));
-    const body: string[] = [];
-    for await (const chunk of rackBody) body.push(String(chunk));
+    const [status, headers, body] = result instanceof Response ? result.toArray() : result;
 
     this._lastResponse = new MockResponse(
       status,
@@ -368,7 +368,7 @@ export class Session {
       body,
       (env["rack.errors"] as { flush(): unknown }).flush(),
     );
-    this.closeBody(rackBody);
+    this.closeBody(body);
     this.cookieJar.merge(this.lastResponse().headers["set-cookie"], uri);
     this._afterRequest.forEach((hook) => hook());
     this._lastResponse.finish();

@@ -1,6 +1,12 @@
 import { assertEmpty } from "@blazetrails/activesupport";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { MockResponse, Request } from "@blazetrails/rack";
+import {
+  Response,
+  type MockResponse,
+  type RackApp,
+  type RackEnv,
+  type Request,
+} from "@blazetrails/rack";
 import { FAKE_APP } from "./fixtures/fake-app.js";
 import { Error as RackTestError, MockSession, Session } from "./index.js";
 import { mustBe, wontBe } from "./test-helpers/assertions.js";
@@ -233,6 +239,59 @@ describe("Rack::Test::Session#request", () => {
   it("accepts raw input in params for POST requests", async () => {
     await request("/foo", { ":method": "post", ":params": "foo[bar]=1" });
     expect(lastRequest().env["rack.input"].read()).toBe("foo[bar]=1");
+  });
+
+  it("supports a Rack::Response", async () => {
+    const app = (_env: RackEnv) => new Response("", 200, {});
+
+    const session = new Session(new MockSession(app as unknown as RackApp));
+    mustBe(await session.request("/"), "isOk");
+  });
+
+  class CloseableBody {
+    private closed = false;
+
+    each(block: (chunk: string) => void): void {
+      if (this.closed) return;
+      block("Hello, World!");
+    }
+
+    close(): void {
+      this.closed = true;
+    }
+
+    isClosed(): boolean {
+      return this.closed;
+    }
+  }
+
+  it("closes response's body when body responds_to?(:close)", async () => {
+    const body = new CloseableBody();
+
+    const app = (_env: RackEnv) => [
+      200,
+      { "content-type": "text/html", "content-length": "13" },
+      body,
+    ];
+
+    const session = new Session(new MockSession(app as unknown as RackApp));
+    expect(body.isClosed()).toBe(false);
+    await session.request("/");
+    expect(body.isClosed()).toBe(true);
+  });
+
+  it("closes response's body after iteration when body responds_to?(:close)", async () => {
+    let body: CloseableBody | null = null;
+    const app = (_env: RackEnv) => [
+      200,
+      { "content-type": "text/html", "content-length": "13" },
+      (body = new CloseableBody()),
+    ];
+
+    const session = new Session(new MockSession(app as unknown as RackApp));
+    await session.request("/");
+    expect(session.lastResponse().body).toBe("Hello, World!");
+    expect(body!.isClosed()).toBe(true);
   });
 
   it("sends the input when input is given", async () => {

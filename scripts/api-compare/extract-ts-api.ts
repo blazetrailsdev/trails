@@ -986,10 +986,7 @@ export function extractFromProgram(
           const methods = ts.isObjectLiteralExpression(decl.initializer)
             ? harvestObjectLiteralMethods(decl.initializer, checker, relPath)
             : isDefineModuleCall(decl.initializer)
-              ? // Section entries are credited through the same-file function
-                // they name; only an accessor written inline in a section
-                // (Ruby's `attr_accessor :x`) is harvested here.
-                decl.initializer.arguments
+              ? decl.initializer.arguments
                   .map(unwrapAssertions)
                   .filter(ts.isObjectLiteralExpression)
                   .map((o) =>
@@ -4315,8 +4312,6 @@ export function extractFileLocalHelpers(
     const init = decl.initializer;
     if (!init) continue;
     if (ts.isIdentifier(init)) {
-      // `const rackMockSession = rackTestSession` — Ruby's `alias new old`
-      // (rack-test/methods.rb:37) over a same-file function declaration.
       const target = node
         .getSourceFile()
         .statements.find(
