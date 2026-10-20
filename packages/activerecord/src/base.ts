@@ -1810,10 +1810,13 @@ rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
 rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
+export interface Base
+  extends
+    AutosaveAssociation,
+    JSONSerializer,
+    AMDirty,
+    Pick<ThisParameterType<typeof Timestamp.initInternals>, "allTimestampAttributesInModel"> {
   constructor: typeof Base;
-  /** @internal */
-  allTimestampAttributesInModel(): readonly string[];
   _touchAttrNames: Set<string> | null;
   _skipDirtyTracking: boolean | null;
   /** @internal */
