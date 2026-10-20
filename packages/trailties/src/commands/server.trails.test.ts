@@ -6,6 +6,7 @@ import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Handler, MockRequest, type RackApp, type RackEnv } from "@blazetrails/rack";
 import { Trails, _resetTrailsEnv } from "../rails.js";
 import { Application } from "../application.js";
+import { DetailsKey } from "@blazetrails/actionview";
 
 const devServerStarts = vi.hoisted(() => [] as unknown[]);
 
@@ -21,17 +22,22 @@ vi.mock(
           devServerStarts.push(options);
         }
         async start(): Promise<void> {}
-        async stop(): Promise<void> {}
       },
     }
   ),
 );
 
-const viewWatches = vi.hoisted(() => [] as Array<Record<string, unknown>>);
+const viewWatches = vi.hoisted(() => [] as Array<Record<string, any>>);
+const watchState = vi.hoisted(() => ({ initialError: null as Error | null, closed: 0 }));
 vi.mock("@blazetrails/trails-tsc", () => ({
-  watchViews: async (opts: Record<string, unknown>) => {
+  watchViews: async (opts: Record<string, any>) => {
     viewWatches.push(opts);
-    return { close() {} };
+    if (watchState.initialError) opts.onError(watchState.initialError);
+    return {
+      close() {
+        watchState.closed++;
+      },
+    };
   },
 }));
 
@@ -57,6 +63,8 @@ describe("trails server environment (trails)", () => {
     _resetTrailsEnv();
     devServerStarts.length = 0;
     viewWatches.length = 0;
+    watchState.initialError = null;
+    watchState.closed = 0;
     runOptions = [];
     runApps = [];
     vi.spyOn(Trails, "initialize").mockResolvedValue({ app: () => () => [200, {}, []] } as never);
@@ -181,5 +189,28 @@ describe("trails server environment (trails)", () => {
     await serverCommand().parseAsync(["-e", "development"], { from: "user" });
 
     expect(viewWatches).toEqual([]);
+  });
+
+  it("refuses to boot when the initial view build fails", async () => {
+    initializeWith({ cacheTemplateLoading: null }, true);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    watchState.initialError = new Error("bad view");
+
+    await expect(
+      serverCommand().parseAsync(["-e", "development"], { from: "user" }),
+    ).rejects.toThrow("bad view");
+    expect(watchState.closed).toBe(1);
+    expect(devServerStarts).toEqual([]);
+  });
+
+  it("clears the template caches on a rebuild, not on the initial build", async () => {
+    initializeWith({ cacheTemplateLoading: null }, true);
+    await serverCommand().parseAsync(["-e", "development"], { from: "user" });
+    const clear = vi.spyOn(DetailsKey, "clear");
+
+    viewWatches[0].onRebuild({ kind: "initial", result: { count: 0 } });
+    expect(clear).not.toHaveBeenCalled();
+    viewWatches[0].onRebuild({ kind: "change", trigger: "a.html.tse", result: { count: 1 } });
+    expect(clear).toHaveBeenCalledTimes(1);
   });
 });

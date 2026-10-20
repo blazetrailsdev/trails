@@ -30,7 +30,7 @@ export function serverCommand(): Command {
       const root = Dir.pwd();
       await requireApplicationBang();
       const app = await Trails.initialize();
-      const views = await watchViews(app, root);
+      await watchViews(app, root);
       const port = parseInt(options.port, 10);
       const railsApp = (env: RackEnv) => app.call(env);
       if (options.environment !== "development" || !(await hasViteConfig(root))) {
@@ -52,11 +52,6 @@ export function serverCommand(): Command {
         app: railsApp,
       });
       await server.start();
-      const stop = server.stop.bind(server);
-      server.stop = async () => {
-        views?.close();
-        await stop();
-      };
     });
 
   return cmd;
