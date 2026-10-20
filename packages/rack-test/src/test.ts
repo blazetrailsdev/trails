@@ -1,9 +1,19 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import { Generic, HTTPS, URI, b, hashDelete, pack } from "@blazetrails/ruby-compat";
+import {
+  Generic,
+  HTTPS,
+  URI,
+  b,
+  hashDelete,
+  pack,
+  rbObjDup,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
   Request,
+  Response,
   parseNestedQuery,
   release,
   type RackApp,
@@ -226,10 +236,8 @@ export class Session {
   async restoreState<T>(block: () => T | Promise<T>): Promise<T> {
     const request = this._lastRequest;
     const response = this._lastResponse;
-    const cookieJar = (Object.create(CookieJar.prototype) as CookieJar).initializeCopy(
-      this.cookieJar,
-    );
-    const afterRequest = this._afterRequest.slice();
+    const cookieJar = rbObjDup(this.cookieJar);
+    const afterRequest = rbObjDup(this._afterRequest);
 
     try {
       return await block();
@@ -357,12 +365,17 @@ export class Session {
     env["HTTP_COOKIE"] ??= this.cookieJar.for(uri);
     this._lastRequest = new Request(env);
     const app = this.app;
-    const [status, headers, rackBody] = await (typeof app === "function" &&
+    const result = await (typeof app === "function" &&
     Object.getOwnPropertyDescriptor(app, "prototype")?.writable !== false
       ? app(env)
       : (app as RackMiddleware).call(env));
-    const body: string[] = [];
-    for await (const chunk of rackBody) body.push(String(chunk));
+    const [status, headers, rackBody] = result instanceof Response ? result.toArray() : result;
+    let body = rackBody;
+    if (Symbol.asyncIterator in Object(rackBody)) {
+      body = [];
+      for await (const chunk of rackBody as AsyncIterable<string | Uint8Array>) body.push(chunk);
+      if (rbObjRespondTo(rackBody, "close")) (rackBody as { close(): void }).close();
+    }
 
     this._lastResponse = new MockResponse(
       status,
@@ -370,7 +383,7 @@ export class Session {
       body,
       (env["rack.errors"] as { flush(): unknown }).flush(),
     );
-    this.closeBody(rackBody);
+    this.closeBody(body);
     this.cookieJar.merge(this.lastResponse().headers["set-cookie"], uri);
     this._afterRequest.forEach((hook) => hook());
     this._lastResponse.finish();
@@ -384,3 +397,5 @@ export class Session {
 export function encodingAwareStrings(): boolean {
   return release() >= "1.6";
 }
+
+export const MockSession = Session;
