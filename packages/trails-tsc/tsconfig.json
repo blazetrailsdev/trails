@@ -6,5 +6,9 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../activesupport" }, { "path": "../tse-compiler" }]
+  "references": [
+    { "path": "../activesupport" },
+    { "path": "../tse-compiler" },
+    { "path": "../actionview" }
+  ]
 }

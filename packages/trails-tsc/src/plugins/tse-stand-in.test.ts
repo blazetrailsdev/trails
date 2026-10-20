@@ -13,7 +13,10 @@ import { virtualizeTse } from "./tse.js";
 
 // @ts-expect-error -- Property 'glob' does not exist on type 'ImportMeta'
 const globbed: Record<string, string> = import.meta.glob(
-  "../../../actionview/src/test-helpers/fixtures/**/*.tse",
+  [
+    "../../../actionview/src/test-helpers/fixtures/**/*.tse",
+    "!../../../actionview/src/test-helpers/fixtures/actionpack/**",
+  ],
   { query: "?raw", import: "default", eager: true },
 );
 const fixtures = Object.fromEntries(
