@@ -80,13 +80,12 @@ code, or to add a sibling row for code you are writing right now. Converging a
 divergence makes its row stale and turns the gate red — delete that one row by
 hand.
 
-| Path                                        | Kind              | Enforced by                    |
-| ------------------------------------------- | ----------------- | ------------------------------ |
-| `api-compare/call-mismatches-exclude/`      | exclude (sharded) | `lint-call-mismatches.ts`      |
-| `api-compare/call-mismatches-unreviewed/`   | mark (sharded)    | `lint-call-mismatches.ts`      |
-| `api-compare/body-pins.json`                | pin               | `lint-body-pins.ts`            |
-| `test-compare/assertion-mismatch-mark.json` | mark              | `lint-assertion-mismatches.ts` |
-| `schema-compare/invented-baseline.json`     | baseline          | `schema-compare/compare.ts`    |
+| Path                                      | Kind              | Enforced by                 |
+| ----------------------------------------- | ----------------- | --------------------------- |
+| `api-compare/call-mismatches-exclude/`    | exclude (sharded) | `lint-call-mismatches.ts`   |
+| `api-compare/call-mismatches-unreviewed/` | mark (sharded)    | `lint-call-mismatches.ts`   |
+| `api-compare/body-pins.json`              | pin               | `lint-body-pins.ts`         |
+| `schema-compare/invented-baseline.json`   | baseline          | `schema-compare/compare.ts` |
 
 **Do not move these files.** They are referenced by path from CI workflow steps
 and from the lint tooling, and the sharded ones (`call-mismatches-*`) are split

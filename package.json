@@ -72,7 +72,6 @@
     "parity:api:deps": "pnpm vendor:fetch && LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths) LOCKFILE_PATH=$PWD/vendor/sources.lock.json ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/lint-deps.ts",
     "parity:test": "bash scripts/test-compare/run.sh",
     "parity:test:assertions": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts",
-    "parity:test:assertions:reseed": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts --write",
     "parity:test:names:tighten": "pnpm tsx scripts/tighten-rails-test-name-parity.ts",
     "parity:test:closure": "pnpm tsx scripts/test-compare/closure-cli.ts",
     "parity:test:stubs": "pnpm parity:test -- --missing --json && pnpm tsx scripts/test-compare/generate-stubs.ts",
@@ -118,7 +117,6 @@
     "lint:deps": "pnpm parity:api:deps",
     "test:compare": "pnpm parity:test",
     "test:assertions:ratchet": "pnpm parity:test:assertions",
-    "test:assertions:ratchet:reseed": "pnpm parity:test:assertions:reseed",
     "test:stubs": "pnpm parity:test:stubs",
     "vendor:fetch": "pnpm tsx vendor/fetch.ts",
     "vendor:recite": "pnpm tsx scripts/vendor-recite.ts"
