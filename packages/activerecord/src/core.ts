@@ -138,6 +138,7 @@ export const Core = {
 
 import { ActiveRecord } from "./namespaces.js";
 import type { Base } from "./base.js";
+import type { Relation } from "./relation.js";
 import {
   actionOnStrictLoadingViolation,
   applicationRecordClass,
@@ -490,6 +491,7 @@ interface CoreHost {
   ensureSchemaLoaded(): Promise<void>;
   generatedAttributeMethods(): Module;
   attributeAliases?: Record<string, string>;
+  where(...args: unknown[]): Relation<Base>;
 }
 
 function parentClass(klass: CoreHost): CoreHost | null {
@@ -991,7 +993,7 @@ async function cachedFindBy(
           wheres.set(key, params.bind());
         }
       }
-      return (this as any).where(wheres).limit(1);
+      return this.where(wheres).limit(1);
     });
     try {
       const records = await statement.execute(values.flat(), connection, { allowRetry: true });
