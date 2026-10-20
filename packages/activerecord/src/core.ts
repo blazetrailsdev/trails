@@ -476,7 +476,7 @@ interface CoreHost {
   inspectionFilter(): ParameterFilter;
   _connectionClass?: boolean;
   _destroyAssociationAsyncJob?: any;
-  destroyAssociationAsyncJob?: any;
+  destroyAssociationAsyncJob?: string | (abstract new (...args: never[]) => unknown) | null;
   _findByStatementCache?: FindByStatementCache;
   initializeFindByCache(): FindByStatementCache;
   _generatedAssociationMethods?: Module;
@@ -496,12 +496,14 @@ function parentClass(klass: CoreHost): CoreHost | null {
   return typeof proto === "function" ? (proto as CoreHost) : null;
 }
 
-export function destroyAssociationAsyncJob(this: typeof Base): any {
+export function destroyAssociationAsyncJob(
+  this: typeof Base,
+): (abstract new (...args: never[]) => unknown) | null {
   try {
     if (typeof this._destroyAssociationAsyncJob === "string") {
       this._destroyAssociationAsyncJob = constantize(this._destroyAssociationAsyncJob);
     }
-    return this._destroyAssociationAsyncJob;
+    return this._destroyAssociationAsyncJob as (abstract new (...args: never[]) => unknown) | null;
   } catch (error) {
     if (!(error instanceof NameError)) throw error;
     throw new NameError(`Unable to load destroy_association_async_job: ${error.message}`);
