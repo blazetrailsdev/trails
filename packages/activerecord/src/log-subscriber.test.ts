@@ -54,7 +54,7 @@ describe("LogSubscriberTest", () => {
 
   const t = {
     setLogger(logger: MockLogger | null): void {
-      Base.logger = logger as unknown as Logger | null;
+      Base.logger = logger as Logger | null;
     },
   } as ThisParameterType<typeof testHelperSetup>;
 
