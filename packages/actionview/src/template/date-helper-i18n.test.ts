@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import "../test-helpers/abstract-unit.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
@@ -13,7 +12,12 @@ import {
 } from "@blazetrails/activesupport";
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import { StandardError } from "@blazetrails/ruby-compat";
-import { distanceOfTimeInWords, selectMonth, timeAgoInWords } from "../helpers/date-helper.js";
+import {
+  datetimeSelect,
+  distanceOfTimeInWords,
+  selectMonth,
+  timeAgoInWords,
+} from "../helpers/date-helper.js";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 
@@ -178,11 +182,10 @@ describe("DateHelperDistanceOfTimeInWordsI18nTests", () => {
 });
 
 describe("DateHelperSelectTagsI18nTests", () => {
-  let view: Base & Record<string, any>;
+  let view: Base;
 
   beforeEach(() => {
-    view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null) as Base &
-      Record<string, any>;
+    view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
   });
 
   it("select month given use month names option does not translate monthnames", () => {
@@ -255,7 +258,7 @@ describe("DateHelperSelectTagsI18nTests", () => {
     };
 
     stub(I18n, "translate", promptsCheck, [], () => {
-      view.datetimeSelect("post", "updated_at", {
+      datetimeSelect.call(view, "post", "updated_at", {
         locale: "en",
         includeSeconds: true,
         prompt: true,
@@ -267,7 +270,7 @@ describe("DateHelperSelectTagsI18nTests", () => {
 
   it("date or time select given an order options does not translate order", () => {
     assertNotCalled(I18n, "translate", null, () => {
-      view.datetimeSelect("post", "updated_at", {
+      datetimeSelect.call(view, "post", "updated_at", {
         order: ["year", "month", "day"],
         locale: "en",
         useMonthNames: RubyDate.MONTHNAMES,
@@ -283,7 +286,7 @@ describe("DateHelperSelectTagsI18nTests", () => {
     expectCalledWith(mock, ["date.month_names", { locale: "en" }], { returns: [] });
 
     stub(I18n, "translate", mock, [], () => {
-      view.datetimeSelect("post", "updated_at", { locale: "en" });
+      datetimeSelect.call(view, "post", "updated_at", { locale: "en" });
     });
 
     assertMock(mock);
@@ -296,7 +299,7 @@ describe("DateHelperSelectTagsI18nTests", () => {
       ["date.order", { locale: "en", default: [] }],
       { returns: ["invalid", "month", "day"] },
       () => {
-        expect(() => view.datetimeSelect("post", "updated_at", { locale: "en" })).toThrow(
+        expect(() => datetimeSelect.call(view, "post", "updated_at", { locale: "en" })).toThrow(
           StandardError,
         );
       },
@@ -311,7 +314,7 @@ describe("DateHelperSelectTagsI18nTests", () => {
     expectCalledWith(mock, ["date.month_names", { locale: "en" }], { returns: [] });
 
     stub(I18n, "translate", mock, [], () => {
-      view.datetimeSelect("post", "updated_at", { locale: "en" });
+      datetimeSelect.call(view, "post", "updated_at", { locale: "en" });
     });
 
     assertMock(mock);
