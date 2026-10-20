@@ -90,6 +90,13 @@ export class GlobalID {
     return new this(GID.create(app, model, params), options);
   }
 
+  static async find(
+    gid: string | GlobalID,
+    options: LocateOptions & GlobalIDOptions = {},
+  ): Promise<unknown | null> {
+    return (await this.parse(gid, options)?.find(options)) ?? null;
+  }
+
   static parse(gid: string | GlobalID, options: GlobalIDOptions = {}): GlobalID | null {
     if (gid instanceof this) return gid;
     try {

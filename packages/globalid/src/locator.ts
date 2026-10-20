@@ -3,7 +3,13 @@ import { SignedGlobalID } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError, except, rbObjMethod } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  compact,
+  except,
+  rbObjMethod,
+  StandardError,
+} from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export interface LocatorModel {
@@ -16,6 +22,8 @@ export interface LocatorModel {
   /** @internal */
   unscoped?<R>(block: () => R | Promise<R>): R | Promise<R>;
 }
+
+export class InvalidModelIdError extends StandardError {}
 
 export interface LocateOptions {
   only?: LocatorModel | LocatorModel[];
@@ -205,17 +213,16 @@ export class Locator {
     return Locator.locate(parsed.uri.toString(), options);
   }
 
-  /** @missingRailsName compact — PERMANENT */
   static async locateManySigned(
     sgids: Array<string | SignedGlobalID>,
     options: LocateSignedOptions,
   ): Promise<unknown[]> {
     return Locator.locateMany(
-      sgids
-        .map((sgid) =>
+      compact(
+        sgids.map((sgid) =>
           SignedGlobalID.parse(String(sgid), { for: options.for, verifier: options.verifier }),
-        )
-        .filter((sgid) => sgid != null),
+        ),
+      ),
       options,
     );
   }
