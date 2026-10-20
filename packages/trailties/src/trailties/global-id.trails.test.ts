@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { ArgumentError, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  Deprecators,
+  resetLoadHooks,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { GlobalID } from "@blazetrails/globalid";
 import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "@blazetrails/globalid";
@@ -9,6 +14,7 @@ import type { Configuration } from "../trailtie/configuration.js";
 interface TrailtieApp {
   railtieName: string;
   config: Pick<Configuration, "get" | "set">;
+  deprecators: Deprecators;
   keyGenerator(): KeyGenerator;
 }
 import { Application } from "../application.js";
@@ -35,6 +41,7 @@ describe("GlobalID::Railtie verifier derivation", () => {
     const options: Record<string, unknown> = { globalId: {} as GlobalIdConfig };
     return {
       railtieName: "blog_app_application",
+      deprecators: new Deprecators(),
       config: {
         get: (key) => options[key],
         set: (key, value) => {
@@ -83,6 +90,7 @@ describe("GlobalID::Railtie against a real Application", () => {
     try {
       await runTrailtieInitializers(Trailtie, {
         railtieName: "blog_app_application",
+        deprecators: new Deprecators(),
         config: app.config,
         keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
       } as TrailtieApp);
@@ -103,6 +111,7 @@ describe("GlobalID::Railtie Active Record identification", () => {
   it("includes GlobalID::Identification into the class the active_record hook runs on", async () => {
     const app: TrailtieApp = {
       railtieName: "blog_app_application",
+      deprecators: new Deprecators(),
       config: { get: () => ({}) as GlobalIdConfig, set: () => {} },
       keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
     };

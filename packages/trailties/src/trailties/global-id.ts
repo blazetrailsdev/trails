@@ -65,7 +65,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("web_console.deprecator", (app) => {
-      app.deprecators?.set("globalId", GlobalID.deprecator());
+      app.deprecators.set("globalId", GlobalID.deprecator());
     });
   }
 }

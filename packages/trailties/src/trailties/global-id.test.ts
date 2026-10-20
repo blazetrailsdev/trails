@@ -1,6 +1,12 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
-import { ArgumentError, months, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  Deprecators,
+  months,
+  resetLoadHooks,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Trailtie, type GlobalIdConfig } from "./global-id.js";
@@ -9,6 +15,7 @@ import type { Configuration } from "../trailtie/configuration.js";
 interface TrailtieApp {
   railtieName: string;
   config: Pick<Configuration, "get" | "set">;
+  deprecators: Deprecators;
   keyGenerator(): KeyGenerator;
 }
 import { GlobalID } from "@blazetrails/globalid";
@@ -21,6 +28,7 @@ function blogApp(secretKeyBase: string | null = SECRET_KEY_BASE): TrailtieApp {
   const options: Record<string, unknown> = { globalId: {} as GlobalIdConfig };
   return {
     railtieName: "blog_app_application",
+    deprecators: new Deprecators(),
     config: {
       get: (key) => options[key],
       set: (key, value) => {
