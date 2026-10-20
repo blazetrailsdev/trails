@@ -34,9 +34,9 @@ describe("lspPluginInit", () => {
     init({ typescript: ts }).create(baseInfo(host));
 
     const read = host.readFile("/views/home.html.tse")!;
-    expect(read).toContain("_ob.append(name)");
+    expect(read).toContain("_ob.append(await (name))");
     const snap = host.getScriptSnapshot("/views/home.html.tse")!;
-    expect(snap.getText(0, snap.getLength())).toContain("_ob.append(name)");
+    expect(snap.getText(0, snap.getLength())).toContain("_ob.append(await (name))");
     expect(host.getScriptKind!("/views/home.html.tse")).toBe(ts.ScriptKind.TS);
     expect(host.readFile("/x.ts")).toBe("export const x=1;");
   });
@@ -90,7 +90,7 @@ describe("lspPluginInit", () => {
     );
     write(
       "node_modules/@blazetrails/actionview/index.d.ts",
-      "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}",
+      "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}\nexport declare const TopLevel: {};",
     );
     write("app/models/post.ts", "export class Post { title = 0; }");
     write(

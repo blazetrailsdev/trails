@@ -115,27 +115,28 @@ describe("virtualizeTse", () => {
   it("dispatches expression sites and preserves code chunks raw", () => {
     const out = virtualizeTse("<% if (n > 0) { %><%= n %><%== raw %><% } %>");
     expect(out).toContain("if (n > 0) {");
-    expect(out).toContain("_ob.append(n);");
-    expect(out).toContain("_ob.safeExprAppend(raw);");
+    expect(out).toContain("_ob.append(await (n));");
+    expect(out).toContain("_ob.safeExprAppend(await (raw));");
     expect(out).toContain("}");
   });
 
   it("virtualizes a blockExpr with deferred append close", () => {
     const out = virtualizeTse("<%= forEach(items, (item) => { %><li><%= item %></li><% }) %>");
     const lines = out.split("\n");
-    expect(lines).toContain("  _ob.append(forEach(items, (item) => {");
-    expect(lines).toContain('  _ob.safeAppend("<li>");');
-    expect(lines).toContain("  _ob.append(item);");
-    expect(lines).toContain('  _ob.safeAppend("</li>");');
-    expect(lines).toContain("  }));");
+    expect(lines).toContain("  _ob.append(await (forEach(items, (item) => {");
+    expect(lines).toContain('  context.outputBuffer.safeAppend("<li>");');
+    expect(lines).toContain("  context.outputBuffer.append(item);");
+    expect(lines).toContain('  context.outputBuffer.safeAppend("</li>");');
+    expect(lines).toContain("  })));");
   });
 
   it("virtualizes nested blockExprs and closes each in order", () => {
     const out = virtualizeTse("<%= outer((x) => { %><%= inner((y) => { %><% }) %><% }) %>");
     const lines = out.split("\n");
-    expect(lines).toContain("  _ob.append(outer((x) => {");
-    expect(lines).toContain("  _ob.append(inner((y) => {");
-    expect(lines.filter((l) => l === "  }));")).toHaveLength(2);
+    expect(lines).toContain("  _ob.append(await (outer((x) => {");
+    expect(lines).toContain("  context.outputBuffer.append(inner((y) => {");
+    expect(lines.filter((l) => l === "  }));")).toHaveLength(1);
+    expect(lines.filter((l) => l === "  })));")).toHaveLength(1);
   });
 
   it("does not consume a blockExpr closer on inner code braces including } else {", () => {
@@ -143,8 +144,26 @@ describe("virtualizeTse", () => {
       "<%= forEach(items, (item) => { %><% if (x) { %><%= item %><% } else { %><%= other %><% } %><% }) %>",
     );
     const lines = out.split("\n");
-    expect(lines).toContain("  _ob.append(forEach(items, (item) => {");
-    expect(lines.filter((l) => l === "  }));")).toHaveLength(1);
+    expect(lines).toContain("  _ob.append(await (forEach(items, (item) => {");
+    expect(lines.filter((l) => l === "  })));")).toHaveLength(1);
+  });
+
+  it("ignores braces inside strings when tracking block and function depth", () => {
+    const inBlock = virtualizeTse('<%= f((x) => { %><% const s = "{"; %><%= x %><% }) %>');
+    expect(inBlock.split("\n")).toContain("  })));");
+    const inFn = virtualizeTse('<% items.forEach((i) => { %><% const s = "}"; %><%= i %><% }) %>');
+    expect(inFn).toContain("  _ob.append(i);");
+  });
+
+  it("closes a blockExpr on a })) closer as compileJs does", () => {
+    const out = virtualizeTse("<%= f(g((x) => { %>y<% })) %>").split("\n");
+    expect(out).toContain("  }))));");
+  });
+
+  it("rejects a function-form blockExpr as compileJs does", () => {
+    expect(() => virtualizeTse("<%= each(items, function (item) { %>x<% }) %>")).toThrow(
+      /must use arrow syntax/,
+    );
   });
 
   it("throws a clear error when a blockExpr is never closed in virtualization", () => {
@@ -260,10 +279,10 @@ describe("virtualizeTse", () => {
       const out = virtualizeTse(
         '<main><%= yield %></main><%= yield "sidebar" %><%= yield("footer") %><%== yield %>',
       );
-      expect(out).toContain("_ob.append(context.yield());");
-      expect(out).toContain('_ob.append(context.yield("sidebar"));');
-      expect(out).toContain('_ob.append(context.yield("footer"));');
-      expect(out).toContain("_ob.safeExprAppend(context.yield());");
+      expect(out).toContain("_ob.append(await (context.yield()));");
+      expect(out).toContain('_ob.append(await (context.yield("sidebar")));');
+      expect(out).toContain('_ob.append(await (context.yield("footer")));');
+      expect(out).toContain("_ob.safeExprAppend(await (context.yield()));");
       expect(diagnose(out)).toEqual([]);
     });
 
@@ -292,8 +311,8 @@ describe("virtualizeTse", () => {
         scope,
       );
       expect(out).toContain("  this: View,");
-      expect(out).toContain('  let readingTime!: Scope<"readingTime">;');
-      expect(out).toContain('  let post!: Scope<"post">;');
+      expect(out).toContain('  let readingTime = __lookup("readingTime") as Scope<"readingTime">;');
+      expect(out).toContain('  let post = __lookup("post") as Scope<"post">;');
       expect(out).not.toContain('Scope<"n">');
       expect(out).not.toContain('Scope<"model">');
       expect(out).not.toContain('Scope<"x">');
@@ -340,8 +359,8 @@ describe("virtualizeTse", () => {
       const lines = ts.split("\n");
       const srcLineOf = (needle: string): number | undefined =>
         mappings.find((m) => lines[m.genLine].includes(needle))?.srcLine;
-      expect(srcLineOf("_ob.append(a)")).toBe(0);
-      expect(srcLineOf("_ob.append(b)")).toBe(2);
+      expect(srcLineOf("_ob.append(await (a))")).toBe(0);
+      expect(srcLineOf("_ob.append(await (b))")).toBe(2);
       expect(srcLineOf("if (c)")).toBe(4);
       expect(srcLineOf("d();")).toBe(5);
     });
@@ -351,8 +370,8 @@ describe("virtualizeTse", () => {
       const { ts, mappings } = virtualizeTseWithDeltas(src, scope);
       const lines = ts.split("\n");
       for (const name of ["a", "b", "o"]) {
-        const m = mappings.find((x) => lines[x.genLine].includes(`_ob.append(${name})`))!;
-        expect(lines[m.genLine].slice(m.genCol)).toBe(`${name});`);
+        const m = mappings.find((x) => lines[x.genLine].includes(`_ob.append(await (${name}))`))!;
+        expect(lines[m.genLine].slice(m.genCol)).toBe(`${name}));`);
         expect(src[m.srcCol!]).toBe(name);
       }
     });
