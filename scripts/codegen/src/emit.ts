@@ -1288,8 +1288,16 @@ export class Emitter {
     const awaits = ctx.asyncBox!.awaits;
     // Record an async gem method, so the next emission pass awaits its callers
     // (cli.ts runs passes until no new method turns async).
+    // The hand twin decides async-ness where it has one: a twin the hand port
+    // keeps synchronous (it reads a prewarmed fact, activerecord CLAUDE.md
+    // "Adapter facts are prewarmed and peeked") is not recorded async, so its
+    // callers stop awaiting it and their bodies follow on the next pass. A
+    // body that still awaits (a truly async call below) stays async, counted.
+    const twinSync = twin?.info.kind === "method" && twin.info.async === false;
+    if (twinSync && awaits) f.stats["twin-sync-awaits"] = (f.stats["twin-sync-awaits"] ?? 0) + 1;
     if (
       !isCtor &&
+      !(twinSync && !awaits) &&
       (awaits || twin?.info.async || body.some((l) => /^return .*, async \(/.test(l)))
     ) {
       this.resolver.asyncDefs.add(`${u.fqn}${opts.static ? "." : "#"}${d.name}`);

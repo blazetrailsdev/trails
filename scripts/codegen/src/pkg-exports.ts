@@ -29,7 +29,7 @@ for (const spec of Object.keys(prev)) {
         .sort()
     : prev[spec];
 }
-writeFileSync(out, JSON.stringify(next));
+writeFileSync(out, `${JSON.stringify(next, null, 2)}\n`);
 console.log(
   Object.entries(next)
     .map(([k, v]) => `${k}: ${v.length}`)

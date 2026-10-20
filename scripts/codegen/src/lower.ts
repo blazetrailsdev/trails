@@ -4283,7 +4283,19 @@ export class Lowerer {
       ctx.f.declines.push({ reason: "async-in-constructor", line: n.l, ruby: n.name });
       return e;
     }
-    if (m.info.async) {
+    // A generated method the gem makes async is awaited even where the hand
+    // twin types it synchronous: a Promise in an `if` is always truthy.
+    const genAsync =
+      !m.info.async &&
+      m.info.kind === "method" &&
+      (!recvNode || recvNode.k === "self") &&
+      !!ctx.owner &&
+      this.index
+        .ancestors(ctx.owner)
+        .some((sc) =>
+          this.resolver.asyncDefs.has(`${sc.fqn}${ctx.selfKind === "static" ? "." : "#"}${n.name}`),
+        );
+    if (m.info.async || genAsync) {
       this.stat(ctx, "await");
       if (ctx.asyncBox) ctx.asyncBox.awaits = true;
       if (ctx.inBlock) this.stat(ctx, "await-in-block");
