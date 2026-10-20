@@ -50,17 +50,17 @@ export class MockLogger {
   private _logged: Hash<LogLevel, unknown[]>;
 
   /** @noRailsEquivalent PERMANENT */
-  declare debug: (message?: unknown, block?: () => unknown) => void;
+  declare debug: (message?: unknown, block?: () => unknown) => unknown[];
   /** @noRailsEquivalent PERMANENT */
-  declare info: (message?: unknown, block?: () => unknown) => void;
+  declare info: (message?: unknown, block?: () => unknown) => unknown[];
   /** @noRailsEquivalent PERMANENT */
-  declare warn: (message?: unknown, block?: () => unknown) => void;
+  declare warn: (message?: unknown, block?: () => unknown) => unknown[];
   /** @noRailsEquivalent PERMANENT */
-  declare error: (message?: unknown, block?: () => unknown) => void;
+  declare error: (message?: unknown, block?: () => unknown) => unknown[];
   /** @noRailsEquivalent PERMANENT */
-  declare fatal: (message?: unknown, block?: () => unknown) => void;
+  declare fatal: (message?: unknown, block?: () => unknown) => unknown[];
   /** @noRailsEquivalent PERMANENT */
-  declare unknown: (message?: unknown, block?: () => unknown) => void;
+  declare unknown: (message?: unknown, block?: () => unknown) => unknown[];
   /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
   declare readonly "debug?": boolean;
   /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
@@ -88,12 +88,13 @@ export class MockLogger {
     return this._flushCount;
   }
 
-  methodMissing(level: LogLevel, message: unknown = null, block?: () => unknown): void {
+  methodMissing(level: LogLevel, message: unknown = null, block?: () => unknown): unknown[] {
     if (block) {
       this._logged.get(level)!.push(block());
     } else {
       this._logged.get(level)!.push(message);
     }
+    return this._logged.get(level)!;
   }
 
   logged(level: LogLevel): string[] {
@@ -108,8 +109,8 @@ export class MockLogger {
 for (const [severity, value] of Object.entries(LOG_LEVELS) as [LogLevel, number][]) {
   Object.defineProperty(MockLogger, severity.slice(1).toUpperCase(), { value });
   Object.defineProperty(MockLogger.prototype, severity.slice(1), {
-    value(this: MockLogger, message: unknown = null, block?: () => unknown): void {
-      this.methodMissing(severity, message, block);
+    value(this: MockLogger, message: unknown = null, block?: () => unknown): unknown[] {
+      return this.methodMissing(severity, message, block);
     },
     writable: true,
     configurable: true,

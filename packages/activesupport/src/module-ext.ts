@@ -59,7 +59,7 @@ function setMattrDefault(
   storageKey: string,
   options: MattrOptions,
 ): void {
-  const rawDefault = options.default;
+  const rawDefault = options.default ?? null;
   const symDefaultValue = typeof rawDefault === "function" ? rawDefault() : rawDefault;
   if (!(symDefaultValue == null && Object.hasOwn(target, storageKey))) {
     target[storageKey] = symDefaultValue;

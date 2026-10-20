@@ -11,6 +11,12 @@ import {
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { setVerboseQueryLogs } from "./active-record.js";
+import {
+  setup as testHelperSetup,
+  teardown as testHelperTeardown,
+  wait,
+  type MockLogger,
+} from "@blazetrails/activesupport/log-subscriber/test-helper";
 
 const REGEXP_CLEAR_STR = `\\x1b\\[${BaseLogSubscriber.MODES.clear}m`;
 const REGEXP_BOLD_STR = `\\x1b\\[${BaseLogSubscriber.MODES.bold}m`;
@@ -32,51 +38,6 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-class MockLogger extends Logger {
-  private _logged: Record<string, string[]> = {
-    debug: [],
-    info: [],
-    warn: [],
-    error: [],
-  };
-
-  constructor() {
-    super(null);
-  }
-
-  logged(level: string): string[] {
-    return this._logged[level] ?? [];
-  }
-
-  override debug(message?: string | (() => string)): boolean {
-    if (this.level > Logger.DEBUG) return true;
-    const msg = typeof message === "function" ? message() : (message ?? "");
-    this._logged.debug.push(msg);
-    return true;
-  }
-
-  override info(message?: string | (() => string)): boolean {
-    if (this.level > Logger.INFO) return true;
-    const msg = typeof message === "function" ? message() : (message ?? "");
-    this._logged.info.push(msg);
-    return true;
-  }
-
-  override warn(message?: string | (() => string)): boolean {
-    if (this.level > Logger.WARN) return true;
-    const msg = typeof message === "function" ? message() : (message ?? "");
-    this._logged.warn.push(msg);
-    return true;
-  }
-
-  override error(message?: string | (() => string)): boolean {
-    if (this.level > Logger.ERROR) return true;
-    const msg = typeof message === "function" ? message() : (message ?? "");
-    this._logged.error.push(msg);
-    return true;
-  }
-}
-
 class TestDebugLogSubscriber extends LogSubscriber {
   debugs: (string | null)[] = [];
 
@@ -95,18 +56,26 @@ describe("LogSubscriberTest", () => {
   let subscriber: TestDebugLogSubscriber;
   let oldBaseLogger: typeof Base.logger;
 
+  const t = {
+    setLogger(logger: MockLogger | null): void {
+      Base.logger = logger as unknown as Logger | null;
+    },
+  } as unknown as ThisParameterType<typeof testHelperSetup> & { logger: MockLogger };
+
   fixtures([]);
   beforeEach(() => {
-    mockLogger = new MockLogger();
-    LogSubscriber.logger = mockLogger;
-    TestDebugLogSubscriber.logger = mockLogger;
+    oldBaseLogger = Base.logger;
+    testHelperSetup.call(t);
+    mockLogger = t.logger;
+    TestDebugLogSubscriber.logger = mockLogger as unknown as Logger;
     LogSubscriber.colorizeLogging = true;
     subscriber = new TestDebugLogSubscriber();
-    oldBaseLogger = Base.logger;
+    LogSubscriber.attachTo("active_record");
   });
 
   afterEach(() => {
-    LogSubscriber.logger = null;
+    testHelperTeardown.call(t);
+    LogSubscriber.logSubscribers().pop();
     Base.logger = oldBaseLogger;
     setVerboseQueryLogs(false);
   });
@@ -130,9 +99,9 @@ describe("LogSubscriberTest", () => {
   });
 
   it("basic query logging", async () => {
-    Base.logger = mockLogger;
+    Base.logger = mockLogger as unknown as Logger;
     await Developer.all().load();
-    const debug = mockLogger.logged("debug");
+    const debug = mockLogger.logged(":debug");
     expect(debug.length).toBe(1);
     expect(debug[debug.length - 1]).toMatch(/Developer Load/);
     expect(debug[debug.length - 1]).toMatch(/SELECT .*?FROM .?developers.?/i);
@@ -283,9 +252,9 @@ describe("LogSubscriberTest", () => {
   });
 
   it("exists query logging", async () => {
-    Base.logger = mockLogger;
+    Base.logger = mockLogger as unknown as Logger;
     await Developer.isExists(1);
-    const debug = mockLogger.logged("debug");
+    const debug = mockLogger.logged(":debug");
     expect(debug.length).toBe(1);
     expect(debug[debug.length - 1]).toMatch(/Developer Exists/);
     expect(debug[debug.length - 1]).toMatch(/SELECT .*?FROM .?developers.?/i);
@@ -294,8 +263,8 @@ describe("LogSubscriberTest", () => {
   it("verbose query logs", () => {
     setVerboseQueryLogs(true);
     subscriber.sql(makeEvent({ sql: "hi mom!" }));
-    expect(mockLogger.logged("debug").length).toBe(2);
-    expect(mockLogger.logged("debug")[mockLogger.logged("debug").length - 1]).toMatch(/↳/);
+    expect(mockLogger.logged(":debug").length).toBe(2);
+    expect(mockLogger.logged(":debug")[mockLogger.logged(":debug").length - 1]).toMatch(/↳/);
   });
 
   it("verbose query with ignored callstack", () => {
@@ -303,14 +272,14 @@ describe("LogSubscriberTest", () => {
     const original = (subscriber as any).querySourceLocation;
     (subscriber as any).querySourceLocation = () => null;
     subscriber.sql(makeEvent({ sql: "hi mom!" }));
-    expect(mockLogger.logged("debug").length).toBe(1);
-    expect(mockLogger.logged("debug")[mockLogger.logged("debug").length - 1]).not.toMatch(/↳/);
+    expect(mockLogger.logged(":debug").length).toBe(1);
+    expect(mockLogger.logged(":debug")[mockLogger.logged(":debug").length - 1]).not.toMatch(/↳/);
     (subscriber as any).querySourceLocation = original;
   });
 
   it("verbose query logs disabled by default", () => {
     subscriber.sql(makeEvent({ sql: "hi mom!" }));
-    const debugLogs = mockLogger.logged("debug");
+    const debugLogs = mockLogger.logged(":debug");
     for (const msg of debugLogs) {
       expect(msg).not.toMatch(/↳/);
     }
@@ -326,19 +295,21 @@ describe("LogSubscriberTest", () => {
     expect(subscriber.debugs[1]).toMatch(/SELECT \* FROM developers/);
   });
 
-  it("basic query doesnt log when level is not debug", () => {
+  it("basic query doesnt log when level is not debug", async () => {
     mockLogger.level = Logger.INFO;
-    subscriber.sql(makeEvent({ sql: "SELECT * FROM developers", name: "Developer Load" }));
-    expect(mockLogger.logged("debug").length).toBe(0);
+    await Developer.all().load();
+    wait.call(t);
+    expect(mockLogger.logged(":debug").length).toBe(0);
   });
 
-  it("cached queries doesnt log when level is not debug", () => {
+  it("cached queries doesnt log when level is not debug", async () => {
     mockLogger.level = Logger.INFO;
-    subscriber.sql(makeEvent({ sql: "SELECT * FROM developers", name: "Developer Load" }));
-    subscriber.sql(
-      makeEvent({ sql: "SELECT * FROM developers", name: "Developer Load", cached: true }),
-    );
-    expect(mockLogger.logged("debug").length).toBe(0);
+    await Base.cache(async () => {
+      await Developer.all().load();
+      await Developer.all().load();
+    });
+    wait.call(t);
+    expect(mockLogger.logged(":debug").length).toBe(0);
   });
 
   it("where in binds logging include attribute names", () => {
