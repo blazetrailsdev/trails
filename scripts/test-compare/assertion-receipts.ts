@@ -31,6 +31,40 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actionview:template/form_collections_helper_test.rb › FormCollectionsHelperTest › collection radio correctly builds unique DOM IDs for float values":
+    [
+      {
+        kind: "assert_select",
+        value: "s:label[for=user_name_1_0]",
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:57)',
+      },
+      {
+        kind: "assert_select",
+        value: 's:input#user_name_1_0[type=radio][value="1.0"]',
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:57)',
+      },
+    ],
+  "actionview:template/form_collections_helper_test.rb › FormCollectionsHelperTest › collection check boxes correctly builds unique DOM IDs for float values":
+    [
+      {
+        kind: "assert_select",
+        value: "s:label[for=user_name_1_0]",
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:326)',
+      },
+      {
+        kind: "assert_select",
+        value: 's:input#user_name_1_0[type=checkbox][value="1.0"]',
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:326)',
+      },
+    ],
   "actionview:template/date_helper_test.rb › DateHelperTest › object select html safety": [
     {
       kind: "assert_predicate",

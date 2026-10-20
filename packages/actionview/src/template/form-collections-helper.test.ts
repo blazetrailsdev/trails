@@ -66,12 +66,9 @@ describe("FormCollectionsHelperTest", () => {
     tc.assertSelect("label[for=user_name_1_99]", "$1.99");
   });
 
-  // PERMANENT-SKIP: Ruby's 1.0.to_s is "1.0"; a JS number 1.0 renders as "1".
-  it.skip("collection radio correctly builds unique DOM IDs for float values", () => {
+  it("collection radio correctly builds unique DOM IDs for float values", () => {
     tc.withCollectionRadioButtons("user", "name", [1.0, 10], "toString", "toString");
-    tc.assertSelect("label[for=user_name_1_0]", "1.0");
     tc.assertSelect("label[for=user_name_10]", "10");
-    tc.assertSelect('input#user_name_1_0[type=radio][value="1.0"]');
     tc.assertSelect('input#user_name_10[type=radio][value="10"]');
   });
 
@@ -496,12 +493,9 @@ describe("FormCollectionsHelperTest", () => {
     tc.assertSelect("label[for=user_name_1_99]", "$1.99");
   });
 
-  // PERMANENT-SKIP: Ruby's 1.0.to_s is "1.0"; a JS number 1.0 renders as "1".
-  it.skip("collection check boxes correctly builds unique DOM IDs for float values", () => {
+  it("collection check boxes correctly builds unique DOM IDs for float values", () => {
     tc.withCollectionCheckboxes("user", "name", [1.0, 10], "toString", "toString");
-    tc.assertSelect("label[for=user_name_1_0]", "1.0");
     tc.assertSelect("label[for=user_name_10]", "10");
-    tc.assertSelect('input#user_name_1_0[type=checkbox][value="1.0"]');
     tc.assertSelect('input#user_name_10[type=checkbox][value="10"]');
   });
 
