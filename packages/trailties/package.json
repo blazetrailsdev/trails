@@ -67,24 +67,20 @@
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "commander": "^14.0.0",
     "vite": "^7.0.0"
   },
   "devDependencies": {
     "@blazetrails/activerecord-cli": "workspace:*",
-    "typescript": "7.1.0-dev.20260920.1",
-    "@blazetrails/trails-tsc": "workspace:*"
+    "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {
-    "typescript": "7.1.0-dev.20260920.1",
-    "@blazetrails/trails-tsc": "workspace:*"
+    "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependenciesMeta": {
     "typescript": {
-      "optional": true
-    },
-    "@blazetrails/trails-tsc": {
       "optional": true
     }
   },

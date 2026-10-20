@@ -6,7 +6,8 @@ import { Handler, type RackEnv } from "@blazetrails/rack";
 import { DetailsKey } from "@blazetrails/actionview";
 import { requireApplicationBang } from "../command/actions.js";
 import { Trails } from "../rails.js";
-import type {} from "../trailties/action-view.js";
+import type { ActionViewConfig } from "../trailties/action-view.js";
+import type { WatchHandle } from "@blazetrails/trails-tsc";
 
 export function serverCommand(): Command {
   const cmd = new Command("server");
@@ -29,7 +30,7 @@ export function serverCommand(): Command {
       const root = Dir.pwd();
       await requireApplicationBang();
       const app = await Trails.initialize();
-      await watchViews(app, root);
+      const views = await watchViews(app, root);
       const port = parseInt(options.port, 10);
       const railsApp = (env: RackEnv) => app.call(env);
       if (options.environment !== "development" || !(await hasViteConfig(root))) {
@@ -51,6 +52,11 @@ export function serverCommand(): Command {
         app: railsApp,
       });
       await server.start();
+      const stop = server.stop.bind(server);
+      server.stop = async () => {
+        views?.close();
+        await stop();
+      };
     });
 
   return cmd;
@@ -89,21 +95,34 @@ function commandEnvironment(): string {
 async function watchViews(
   app: Awaited<ReturnType<typeof Trails.initialize>>,
   root: string,
-): Promise<void> {
+): Promise<WatchHandle | null> {
   const { config } = app;
-  if (config?.actionView == null) return;
-  const cacheTemplateLoading = config.actionView.cacheTemplateLoading;
+  const actionView: ActionViewConfig | undefined = config?.actionView;
+  if (actionView == null) return null;
+  const cacheTemplateLoading = actionView.cacheTemplateLoading;
   const enableCaching =
     cacheTemplateLoading == null ? !config.isReloadingEnabled() : cacheTemplateLoading;
-  if (enableCaching) return;
+  if (enableCaching) return null;
 
-  const { watchViews } = await import("@blazetrails/trails-tsc");
-  await watchViews({
+  const { watchViews: watchViewFiles } = await import("@blazetrails/trails-tsc");
+  let started = false;
+  let initialError: Error | null = null;
+  const handle = await watchViewFiles({
     cwd: root,
-    onRebuild: () => DetailsKey.clear(),
-    onError: (err, trigger) =>
-      console.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`),
+    onRebuild: ({ kind }) => {
+      if (kind === "change") DetailsKey.clear();
+    },
+    onError: (err, trigger) => {
+      if (!started) initialError ??= err;
+      console.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
+    },
   });
+  started = true;
+  if (initialError !== null) {
+    handle.close();
+    throw initialError;
+  }
+  return handle;
 }
 
 async function hasViteConfig(root: string): Promise<boolean> {

@@ -21,6 +21,7 @@ vi.mock(
           devServerStarts.push(options);
         }
         async start(): Promise<void> {}
+        async stop(): Promise<void> {}
       },
     }
   ),
