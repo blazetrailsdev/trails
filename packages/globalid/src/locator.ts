@@ -7,6 +7,7 @@ import {
   ArgumentError,
   compact,
   except,
+  rbModConstSet,
   rbObjMethod,
   StandardError,
 } from "@blazetrails/ruby-compat";
@@ -311,5 +312,13 @@ function modelIdArityMatches(
 function idKey(id: unknown): string {
   return Array.isArray(id) ? JSON.stringify(id.map(String)) : String(id);
 }
+
+type LocatorInvalidModelIdError = typeof InvalidModelIdError;
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export declare namespace Locator {
+  const InvalidModelIdError: LocatorInvalidModelIdError;
+}
+rbModConstSet(Locator, "InvalidModelIdError", InvalidModelIdError);
 
 GlobalID.Locator = Locator;
