@@ -615,6 +615,17 @@ jobs:
           pnpm install --frozen-lockfile --prefer-offline
           pnpm vitest run scripts/vendor-citations.test.ts
 
+      # RFC 0198's only-shrink per-file count of casts in activerecord src;
+      # the unit test asserts its total equals the RFC's grep -rcE.
+      - name: ActiveRecord cast count
+        id: ar-cast-count
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm parity:types:casts
+          pnpm vitest run scripts/parity/cast-count-mark.test.ts
+
       # PR attribution check. Scoped to deanmarano-authored PRs: the project
       # forbids Claude attribution in *his* PR descriptions and commits (see
       # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
