@@ -1842,27 +1842,46 @@ export class Emitter {
         if (s.superclassFqn && rubyAncestors(this.index, s.superclassFqn).includes(mod)) continue;
         hosts.push(s.fqn);
       }
+      // `extend M` (`Base` extends `Querying`): the module's methods are the
+      // class's own singleton methods, so `self` is the class, `typeof Base`.
+      if (!isCm)
+        for (const s of this.index.scopes.values()) {
+          if (s.kind !== "class" || !this.extendsModule(s, mod)) continue;
+          const sup = s.superclassFqn ? this.index.scopes.get(s.superclassFqn) : undefined;
+          if (sup && this.extendsModule(sup, mod)) continue;
+          hosts.push(`extend:${s.fqn}`);
+        }
       memo.set(mod, hosts);
     }
     const lib = hosts.filter((h) => {
-      const e = this.resolver.exportNames.get(h);
+      const e = this.resolver.exportNames.get(h.replace(/^extend:/, ""));
       return e && !/\.test\.ts$|(^|\/)test-helpers\//.test(e.tsFile);
     });
     if (!lib.length || lib.length > 3) return "any";
     const ctx = this.baseCtx(u, f, {});
     return lib
       .map((h) => {
-        const e = this.resolver.exportNames.get(h)!;
+        const ext = h.startsWith("extend:");
+        const e = this.resolver.exportNames.get(h.replace(/^extend:/, ""))!;
         const local =
           e.tsFile === f.tsFile
             ? e.name
             : this.lw.impType(ctx, `@root/${e.tsFile.replace(/\.ts$/, ".js")}`, e.name);
-        return `${isCm ? "typeof " : ""}${local}`;
+        return `${isCm || ext ? "typeof " : ""}${local}`;
       })
       .join(" | ");
   }
 
   hostMemo?: Map<string, string[]>;
+
+  /** Whether class scope `s` is `extend`ed with `mod` or a module including it. */
+  extendsModule(s: ScopeInfo, mod: string): boolean {
+    const chain = [...lexicalChain(this.index, s.lexicalParent), s.fqn];
+    return s.extends.some((p) => {
+      const hit = this.index.resolveConst(p, chain);
+      return hit?.kind === "scope" && rubyAncestors(this.index, hit.fqn).includes(mod);
+    });
+  }
 
   /**
    * The members a class gets from the modules that enter its Ruby ancestors at

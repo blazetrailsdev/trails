@@ -792,7 +792,11 @@ export class TypePass {
         let at: ts.Node | undefined;
         const find = (node: ts.Node): void => {
           if (d.start! < node.getStart(sf) || d.start! >= node.getEnd()) return;
-          if (node.getStart(sf) === d.start && ts.isExpression(node) && !at) at = node;
+          // The node the diagnostic spans, not an outer one starting there
+          // (`this.x = v` is reported at `this.x`).
+          if (node.getStart(sf) === d.start && ts.isExpression(node)) {
+            if (!at || node.getEnd() === d.start + (d.length ?? 0)) at = node;
+          }
           ts.forEachChild(node, find);
         };
         find(sf);
@@ -817,6 +821,14 @@ export class TypePass {
         } else if (ts.isReturnStatement(p) || ts.isExpression(at)) {
           value = at as ts.Expression;
           slot = checker.getContextualType(value);
+          // An async function's return slot is `T | PromiseLike<T>`: assert to `T`.
+          if (ts.isReturnStatement(p)) {
+            const fn = ts.findAncestor(p, ts.isFunctionLike);
+            if (fn?.type && fn.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)) {
+              const ret = checker.getTypeFromTypeNode(fn.type);
+              slot = checker.getPromisedTypeOfPromise(ret) ?? slot;
+            }
+          }
         }
         if (!value || !slot || ts.isSpreadElement(value)) continue;
         // A property name is not a value; a shorthand property is written long.
@@ -1044,8 +1056,7 @@ export class TypePass {
    * types only what has no twin.
    */
   transplantFromHand(): number {
-    if (!process.env.CODEGEN_HAND_TYPES || !this.handSrcDir || !existsSync(this.handSrcDir))
-      return 0;
+    if (process.env.CODEGEN_NO_HAND || !this.handSrcDir || !existsSync(this.handSrcDir)) return 0;
     const handFiles = walkDir(this.handSrcDir).filter((f) => !/\.test\.ts$/.test(f));
     const hp = ts.createProgram(handFiles, this.options);
     const hc = hp.getTypeChecker();
@@ -1088,11 +1099,37 @@ export class TypePass {
       }
     }
     const program = this.program();
+    const gc = program.getTypeChecker();
     let n = 0;
     const why: Record<string, number> = {};
     const loose = (t: ts.TypeNode | undefined) =>
       !!t && (t.kind === ts.SyntaxKind.AnyKeyword || t.kind === ts.SyntaxKind.UnknownKeyword);
+    // A union the hand body narrows (`string | string[] | { column? }`) is no
+    // use to a generated body that does not: only one type, null aside, or
+    // primitives only.
+    const simple = (t: ts.Type): boolean => {
+      if (!t.isUnion()) return true;
+      const rest = t.types.filter(
+        (x) => !(x.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void)),
+      );
+      if (rest.length <= 1) return true;
+      if (rest.every((x) => x.flags & ts.TypeFlags.BooleanLiteral)) return true;
+      return rest.every(
+        (x) =>
+          !!(
+            x.flags &
+            (ts.TypeFlags.StringLike |
+              ts.TypeFlags.NumberLike |
+              ts.TypeFlags.BooleanLike |
+              ts.TypeFlags.BigIntLike)
+          ),
+      );
+    };
     const text = (t: ts.Type, genSf: ts.SourceFile): string | null => {
+      if (!simple(t)) {
+        why.notSimple = (why.notSimple ?? 0) + 1;
+        return null;
+      }
       let node: ts.TypeNode | undefined;
       try {
         node = hc.typeToTypeNode(
@@ -1196,6 +1233,33 @@ export class TypePass {
               if (t) edits.push({ pos: gp.type!.getStart(sf), end: gp.type!.getEnd(), text: t });
               else why.unwritable = (why.unwritable ?? 0) + 1;
             });
+            // The return: only where the generated one is unwritten and inferred
+            // loose, and the twin's sync/async agrees with the generated method's.
+            if (twin.type && !node.type && node.body && !node.asteriskToken) {
+              const gsig = gc.getSignatureFromDeclaration(node);
+              const gret = gsig && gc.typeToString(gc.getReturnTypeOfSignature(gsig));
+              if (gret && /\b(any|unknown)\b/.test(gret)) {
+                const genAsync = !!node.modifiers?.some(
+                  (m) => m.kind === ts.SyntaxKind.AsyncKeyword,
+                );
+                let ht = hc.getTypeFromTypeNode(twin.type);
+                const promised = hc.getPromisedTypeOfPromise(ht);
+                if (promised) ht = promised;
+                if (!promised === !genAsync || (genAsync && !promised)) {
+                  const t = text(ht, sf);
+                  if (t && t !== "void" && t !== "unknown") {
+                    const close = node.parameters.end;
+                    const paren = sf.text.indexOf(")", close);
+                    edits.push({
+                      pos: paren + 1,
+                      end: paren + 1,
+                      text: `: ${genAsync ? `Promise<${t}>` : t}`,
+                    });
+                    why.returns = (why.returns ?? 0) + 1;
+                  }
+                } else why.asyncMismatch = (why.asyncMismatch ?? 0) + 1;
+              }
+            }
           }
         }
         if ((ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) && loose(node.type)) {
@@ -1241,7 +1305,7 @@ export class TypePass {
     timed("fieldsByUse", () => this.typeFieldsByUse());
     rounds("returnsByUse", 3, () => this.typeReturnsByUse());
     rounds("swept", 4, () => this.sweepAny());
-    rounds("asserted", 3, () => this.assertBoundaries());
+    rounds("asserted", 6, () => this.assertBoundaries());
     return stats;
   }
 }
