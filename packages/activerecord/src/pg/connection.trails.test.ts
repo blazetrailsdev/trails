@@ -55,6 +55,34 @@ describe("pgConnection transaction_status and status", () => {
   });
 });
 
+describe("PG::Connection#send_query and #get_last_result", () => {
+  it("dispatches without waiting and hands each result to get_last_result", async () => {
+    const raw = { rows: [[1]], fields: [{ name: "?column?" }], rowCount: 1, command: "SELECT" };
+    const query = vi.fn(() => Promise.resolve(raw));
+    const client = pgConnection({ query });
+    expect(client.sendQuery("SELECT 1")).toBeUndefined();
+    expect(query).toHaveBeenCalledOnce();
+    expect(await client.getLastResult()).toBeInstanceOf(PG.Result);
+    expect(await client.getLastResult()).toBeNull();
+  });
+
+  it("get_last_result raises the failure of the query send_query dispatched", async () => {
+    const client = pgConnection({
+      _queryable: false,
+      query: () =>
+        Promise.reject(new Error("Client has encountered a connection error and is not queryable")),
+    });
+    client.sendQuery("SELECT 1");
+    await expect(client.getLastResult()).rejects.toBeInstanceOf(PG.ConnectionBad);
+    expect(() => client.sendQuery("SELECT 1")).toThrow(PG.UnableToSend);
+  });
+
+  it("raises connection is closed on a finished connection", () => {
+    const client = pgConnection({ _ending: true, query: vi.fn() });
+    expect(() => client.sendQuery("SELECT 1")).toThrow("connection is closed");
+  });
+});
+
 describe("PG::Connection.escape_bytea", () => {
   it("renders the hex format unescape_bytea reads back", () => {
     expect(escapeBytea(Buffer.from("hi"))).toBe("\\x6869");
