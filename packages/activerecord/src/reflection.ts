@@ -69,7 +69,7 @@ import {
 import { polymorphicName, typeCondition } from "./inheritance.js";
 import { Relation } from "./relation.js";
 
-type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
+export type MacroType = "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany" | "composedOf";
 
 export interface ConcreteReflection {
   readonly macro: MacroType;

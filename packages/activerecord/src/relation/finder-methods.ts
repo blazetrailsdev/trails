@@ -1,4 +1,5 @@
-import { Nodes, type Attribute } from "@blazetrails/arel";
+import { Nodes } from "@blazetrails/arel";
+import type { Table } from "@blazetrails/arel";
 import {
   Enumerable,
   type Each,
@@ -30,10 +31,9 @@ import { defineModule, stripThenable } from "@blazetrails/activesupport";
 export const ONE_AS_ONE = "1 AS one";
 
 interface FinderRelation {
-  model: FinderRelation["_model"];
-  table: { get(name: string): Attribute };
+  table: Table;
   primaryKey: string | string[];
-  _model: {
+  model: {
     name: string;
     primaryKey: string | string[];
     isCompositePrimaryKey(): boolean;
@@ -50,7 +50,7 @@ interface FinderRelation {
   /** @internal */
   isNullRelation(): boolean;
   limitValue: number | string | null;
-  offsetValue: number | null;
+  offsetValue: number | string | null;
   distinctValue: unknown;
   limitBang(value: unknown): FinderRelation;
   /** @internal */
@@ -110,14 +110,15 @@ interface FinderRelation {
   except(...skips: string[]): FinderRelation;
   joinsBang(...args: unknown[]): FinderRelation;
   /** @internal */
-  constructJoinDependency(associations: unknown[], joinType: unknown): JoinDependency;
+  constructJoinDependency(associations: any[], joinType: unknown): JoinDependency;
   /** @internal */
   selectAssociationList(associations: unknown[]): unknown[];
   /** @internal */
-  _materializeDeferredDistinctPkPredicates(): Promise<void>;
+  _materializeDeferredDistinctPkPredicates(): void | Promise<void>;
   arel(): { ast: unknown };
-  skipQueryCacheIfNecessary<R>(block: () => R): R;
-  withConnection<R>(block: (c: any) => R): R;
+  /** @internal */
+  skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R>;
+  withConnection<R>(block: (c: DatabaseAdapter) => R | Promise<R>): Promise<R>;
   selectValues: unknown[];
   select(...fields: unknown[]): any;
   /** @internal */
@@ -202,7 +203,7 @@ export async function sole(this: FinderRelation): Promise<any> {
   } else if (undesired == null) {
     return found;
   } else {
-    throw new SoleRecordExceeded(this._model);
+    throw new SoleRecordExceeded(this.model);
   }
 }
 
@@ -230,7 +231,7 @@ export async function findNthWithLimit(
   }
   if (limit <= 0) return [];
   if (index > 0) {
-    relation = relation.offset((this.offsetValue ?? 0) + index);
+    relation = relation.offset(((this.offsetValue ?? 0) as number) + index);
   }
   return relation.limit(limit).toArray();
 }
