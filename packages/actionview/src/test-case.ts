@@ -298,7 +298,6 @@ function config(this: Behavior): unknown {
   return null;
 }
 
-/** @inventedArm if — CONVERGEABLE actionview-render-plain-is-async-inside-capture-block */
 function render(
   this: Behavior,
   options: Record<string, unknown> | string | object = {},
