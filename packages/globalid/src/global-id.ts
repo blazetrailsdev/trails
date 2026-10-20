@@ -162,14 +162,13 @@ export class GlobalID {
   }
 
   get modelClass(): LocatorModel {
-    return (this._modelClass ??= (() => {
-      const model = constantize(this.modelName) as LocatorModel;
+    if (this._modelClass !== undefined) return this._modelClass;
+    const model = constantize(this.modelName) as LocatorModel;
 
-      if (isOrExtends(model, GlobalID)) {
-        throw new ArgumentError("GlobalID and SignedGlobalID cannot be used as model_class.");
-      }
-      return model;
-    })());
+    if (isOrExtends(model, GlobalID)) {
+      throw new ArgumentError("GlobalID and SignedGlobalID cannot be used as model_class.");
+    }
+    return (this._modelClass = model);
   }
 
   async find(options?: LocateOptions): Promise<unknown | null> {

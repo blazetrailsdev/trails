@@ -4274,7 +4274,7 @@ class ApiExtractor
     NATIVE_PROMISE_CALLS.include?(name) && NATIVE_PROMISE_CONSTANTS.include?(const_name(recv))
   end
 
-  LITERAL_NEW_CONSTANTS = %w[Hash Array Concurrent::Array].freeze
+  LITERAL_NEW_CONSTANTS = %w[Hash Array Concurrent::Array String].freeze
 
   def core_new_kind(recv, args, has_block)
     return nil unless recv.is_a?(Array) && %i[var_ref const_path_ref].include?(recv[0])

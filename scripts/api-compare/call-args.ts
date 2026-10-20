@@ -1296,20 +1296,22 @@ export function comparableRubySites(
 ): CallSite[] {
   const budget = new Map<string, number>();
   for (const ts of tsSites) budget.set(ts.name, (budget.get(ts.name) ?? 0) + 1);
-  const consumeKey = (key: string): boolean => {
-    const left = budget.get(key) ?? 0;
-    if (left === 0) return false;
-    budget.set(key, left - 1);
-    return true;
+  const consume = (name: string): boolean => {
+    for (const key of tsCallNameKeys(name)) {
+      const left = budget.get(key) ?? 0;
+      if (left > 0) {
+        budget.set(key, left - 1);
+        return true;
+      }
+    }
+    return false;
   };
-  const consume = (name: string): boolean => tsCallNameKeys(name).some(consumeKey);
-  const portedStringNew = rubySites.filter((ruby) => isStringNew(ruby) && consumeKey("rbStrSNew"));
   for (const ruby of rubySites) {
-    if (!ruby.flags.includes("weak") && !portedStringNew.includes(ruby)) consume(ruby.name);
+    if (!ruby.flags.includes("weak") && !isStringNew(ruby)) consume(ruby.name);
   }
   return rubySites.filter(
     (ruby) =>
-      (!portedStringNew.includes(ruby) && !ruby.flags.includes("weak")) ||
+      (!isStringNew(ruby) && !ruby.flags.includes("weak")) ||
       (!TS_CALL_HOMONYMS.has(ruby.name) &&
         declaredInComparedFile(ruby.name) &&
         consume(ruby.name)) ||
@@ -1317,11 +1319,10 @@ export function comparableRubySites(
   );
 }
 
-/** A Ruby `String.new` site, which ruby-compat ports as `rbStrSNew(...)`
- *  (scripts/parity/ruby-compat.ts), never as a `new` expression: it pairs with
- *  an `rbStrSNew` site rather than taking a `new Foo(...)` from the body. */
+/** An argument-less Ruby `String.new` (`parser.rb:161`), which ports as the
+ *  JS literal `""`: no TS call answers it, so it takes no `new` from the body. */
 function isStringNew(ruby: CallSite): boolean {
-  return ruby.name === "new" && ruby.recv === STRING_RECEIVER;
+  return ruby.name === "new" && ruby.recv === STRING_RECEIVER && ruby.args.length === 0;
 }
 
 const STRING_RECEIVER = "const:String";
