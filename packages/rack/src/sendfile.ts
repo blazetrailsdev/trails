@@ -51,32 +51,23 @@ export class Sendfile {
 
   /** @internal */
   private variation(env: Record<string, any>): string | null {
-    return this._variation ?? env["sendfile.type"] ?? null;
+    return this._variation ?? env["sendfile.type"] ?? env["HTTP_X_SENDFILE_TYPE"] ?? null;
   }
 
   /** @internal */
   private mapAccelPath(env: Record<string, any>, path: string): string | undefined {
-    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const literal = (replacement: string) => () => replacement;
-    if (this.mappings.length > 0) {
-      const internalMapping = this.mappings.find(([internal]) =>
-        new RegExp("^" + escape(internal)).test(path),
-      );
-      if (internalMapping) {
-        return path.replace(
-          new RegExp("^" + escape(internalMapping[0])),
-          literal(internalMapping[1]),
-        );
-      }
-      return undefined;
-    }
-    const headerMapping = env["HTTP_X_ACCEL_MAPPING"];
-    if (headerMapping) {
-      for (const m of String(headerMapping)
+    let mapping: any = this.mappings.find(([internal]) =>
+      new RegExp("^" + internal, "i").test(path),
+    );
+    if (mapping != null) {
+      return path.replace(new RegExp("^" + mapping[0], "i"), literal(mapping[1]));
+    } else if ((mapping = env["HTTP_X_ACCEL_MAPPING"]) != null) {
+      for (const m of String(mapping)
         .split(",")
         .map((s: string) => s.trim())) {
         const [internal, external] = m.split("=", 2).map((s: string) => s.trim());
-        const newPath = path.replace(new RegExp("^" + escape(internal), "i"), literal(external));
+        const newPath = path.replace(new RegExp("^" + internal, "i"), literal(external));
         if (newPath !== path) return newPath;
       }
       return path;
