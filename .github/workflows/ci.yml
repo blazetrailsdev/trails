@@ -1715,10 +1715,9 @@ jobs:
     name: Rails API/Test Comparison
     needs: changes
     if: >-
-      github.event_name == 'push' || (
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
-      needs.changes.outputs.thor_only != 'true')
+      needs.changes.outputs.thor_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -1727,7 +1726,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          fetch-depth: 30
       - uses: ./.github/actions/setup-pnpm
       - uses: ruby/setup-ruby@v1
         with:
@@ -2158,7 +2157,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 2
+          fetch-depth: 30
       - uses: ./.github/actions/setup-pnpm
       - uses: ruby/setup-ruby@v1
         with:

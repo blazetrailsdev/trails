@@ -3,9 +3,9 @@
  * gate compares the PR's own outputs against (RFC 0127). Nothing is committed:
  * main's `Rails API/Test Comparison` job uploads its outputs as the artifact
  * `parity-outputs-<sha>`, laid out at their repo paths, and a gate on a PR
- * downloads the one for its base. When main has no artifact for that commit
- * (expired, or the run has not finished), the outputs are recomputed on a
- * detached worktree of the base.
+ * downloads the one for its base, or for the nearest first-parent ancestor
+ * that has one. When none does (expired, or the run has not finished), the
+ * outputs are recomputed on a detached worktree of the base.
  *
  * The base is the merge commit's first parent under CI (main as the merge ref
  * was built, so a stale branch cannot undo a sibling's convergence) and
@@ -129,8 +129,17 @@ export async function recomputeOnWorktree(
 }
 
 /**
- * The directory holding main's outputs for the base commit, at their repo
- * paths, and a `dispose` that removes it. A failed recompute disposes before
+ * How far back main's first-parent history is searched for an artifact. A main
+ * commit the `changes` filter judged comparison-neutral skips the comparison
+ * job and uploads nothing; its outputs are its parent's, so the nearest
+ * ancestor's artifact stands in for it. CI checks out this deep.
+ */
+export const SEARCH_DEPTH = 30;
+
+/**
+ * The directory holding main's outputs for the base commit (or its nearest
+ * first-parent ancestor carrying an artifact), at their repo paths, and a
+ * `dispose` that removes it. A failed recompute disposes before
  * rethrowing, so no temp dir or registered worktree outlives it.
  */
 export async function baseOutputs(
@@ -149,7 +158,25 @@ export async function baseOutputs(
     await fs.rm(dir, { recursive: true, force: true });
   };
   try {
-    if (!(await downloadArtifact(sha, dir, rootDir, env, runner))) {
+    const ancestors = (
+      await runner(
+        "git",
+        ["rev-list", "--first-parent", `--max-count=${SEARCH_DEPTH}`, sha],
+        rootDir,
+        env,
+      )
+    ).split("\n");
+    let found = false;
+    for (const ancestor of ancestors) {
+      if (ancestor === "") continue;
+      if (await downloadArtifact(ancestor, dir, rootDir, env, runner)) {
+        if (ancestor !== sha)
+          console.log(`main-artifact: ${sha} has no artifact; using ${ancestor}'s.`);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
       console.log(`main-artifact: recomputing the outputs for ${sha} on a base worktree…`);
       await fs.rm(dir, { recursive: true, force: true });
       worktree = true;

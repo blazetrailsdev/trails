@@ -77,12 +77,33 @@ describe("downloadArtifact", () => {
 
 describe("baseOutputs", () => {
   it("uses the downloaded artifact without a worktree", async () => {
-    const runner = fakeRunner({ "git rev-parse": "abc", "gh api": "42" });
+    const runner = fakeRunner({ "git rev-parse": "abc", "git rev-list": "abc", "gh api": "42" });
     const base = await baseOutputs(["pnpm", "x"], root, { CI: "1" }, runner);
     expect(base.sha).toBe("abc");
     expect(calls.some((c) => c[1] === "worktree")).toBe(false);
     await base.dispose();
     await expect(fs.stat(base.dir)).rejects.toThrow();
+  });
+
+  it("falls back to the nearest ancestor's artifact", async () => {
+    let n = 0;
+    const runner: Runner = async (cmd, args, cwd, env, inherit) => {
+      if (cmd === "git" && args[0] === "rev-list") return "abc\ndef";
+      if (cmd === "gh" && args[0] === "api") return ++n === 2 ? "7" : "";
+      return fakeRunner({ "git rev-parse": "abc" })(cmd, args, cwd, env, inherit);
+    };
+    const base = await baseOutputs(["pnpm", "x"], root, {}, runner);
+    expect(calls).toContainEqual([
+      "gh",
+      "run",
+      "download",
+      "7",
+      "-n",
+      artifactName("def"),
+      "-D",
+      base.dir,
+    ]);
+    await base.dispose();
   });
 
   it("recomputes on a base worktree when no artifact exists", async () => {
