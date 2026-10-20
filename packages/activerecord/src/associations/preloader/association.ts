@@ -134,7 +134,7 @@ export class Association {
   setInverse(record: Base): void {
     const owners = this.ownersByKey.get(this.deriveKey(record, this.associationKeyName));
     if (owners != null) {
-      const association = (first(owners) as any).association(this.reflection.name);
+      const association = first(owners)!.association(this.reflection.name);
       association.setInverseInstance(record);
     }
   }

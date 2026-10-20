@@ -12,7 +12,7 @@ import {
 import { KeyError, Marshal } from "@blazetrails/ruby-compat";
 import "./message-metadata-tests.js";
 
-const FORMATS = Object.keys(SERIALIZERS) as Format[];
+const FORMATS = [...SERIALIZERS.keys()];
 
 function serializer(format: Format): Serializer {
   return SerializerWithFallback.get(format);

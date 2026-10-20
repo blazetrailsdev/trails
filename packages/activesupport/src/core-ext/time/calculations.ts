@@ -406,6 +406,11 @@ declare module "@blazetrails/date" {
     nextMonth(months?: number): Time;
     prevYear(years?: number): Time;
     nextYear(years?: number): Time;
+    plus(other: Duration): Time;
+    plus(offset: number | bigint | Rational | Time): Time;
+    minus(other: Duration): Time;
+    minus(other: TimeWithZone): number;
+    minus(offset: number | bigint | Rational | Time): Time | number;
     plusWithDuration(other: unknown): Time;
     minusWithDuration(other: unknown): Time | number;
     minusWithCoercion(other: unknown): Time | number;

@@ -1,5 +1,5 @@
 /**
- * ESLint rule: inlined-from-only-on-constructors (RFC 0188)
+ * ESLint rule: inlined-from-placement (RFC 0188)
  *
  * `@inlinedFrom` names the Ruby body a segment of a constructor came from when
  * that body lives in another Ruby file. arel's `inlined-from` bucket pins the

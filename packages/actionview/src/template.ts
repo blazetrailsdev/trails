@@ -267,6 +267,33 @@ export class Template {
     return this.strictLocalsBang() != null;
   }
 
+  marshalDump(): unknown[] {
+    return [
+      this._source,
+      this.identifier,
+      this.handler,
+      this._compiled,
+      this._locals,
+      this.virtualPath,
+      this.format,
+      this.variant,
+    ];
+  }
+
+  marshalLoad(array: unknown[]): void {
+    const [_source, identifier, handler, _compiled, _locals, virtualPath, format, variant] = array;
+    Object.assign(this, {
+      _source,
+      identifier,
+      handler,
+      _compiled,
+      _locals,
+      virtualPath,
+      format,
+      variant,
+    });
+  }
+
   async render(
     view: Base,
     locals: Record<string, unknown> = {},

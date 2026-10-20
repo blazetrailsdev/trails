@@ -2,10 +2,12 @@ import {
   ArgumentError,
   EOFError,
   Encoding,
+  Errno,
   File,
   forceEncoding,
   include,
   NoMethodError,
+  rbObjDup,
   rbStrSNew,
   Tempfile,
 } from "@blazetrails/ruby-compat";
@@ -13,9 +15,9 @@ import { BadRequest } from "../bad-request.js";
 import { QueryParser } from "../query-parser.js";
 import { multipartFileLimit, multipartTotalPartLimit, unescapePath } from "../utils.js";
 
-export class MultipartPartLimitError extends Error {
-  constructor(message = "Maximum file multiparts in content reached") {
-    super(message);
+export class MultipartPartLimitError extends Errno.EMFILE {
+  constructor(mesg?: string) {
+    super(mesg);
     this.name = "MultipartPartLimitError";
   }
 }
@@ -228,7 +230,7 @@ export class Collector {
       klass = TempfilePart;
       this.openFiles += 1;
     } else {
-      body = "";
+      body = rbStrSNew();
       klass = BufferPart;
     }
 
@@ -320,6 +322,7 @@ export class Parser {
     return parser.result();
   }
 
+  /** @missingRailsName dup — PERMANENT */
   constructor(
     boundary: string,
     tempfile: ((filename: string, contentType: string) => any) | null,
@@ -330,7 +333,7 @@ export class Parser {
     this.params = queryParser.makeParams();
     this.bufsize = bufsize;
     this.collector = new Collector(tempfile);
-    this.sbuf = new SBuf("");
+    this.sbuf = new SBuf(rbObjDup(""));
     const qb = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     this.bodyRegex = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)`, "s");
     this.bodyRegexAtEnd = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)$`, "s");
@@ -356,13 +359,9 @@ export class Parser {
   result(): MultipartInfo {
     this.collector.each((part) =>
       part.getData((data) => {
-        const [name, body] = this.tagMultipartEncoding(
-          part.filename,
-          part.contentType,
-          part.name,
-          data,
-        );
-        this.queryParser.normalizeParams(this.params, name, body);
+        let name: string;
+        [name, data] = this.tagMultipartEncoding(part.filename, part.contentType, part.name, data);
+        this.queryParser.normalizeParams(this.params, name, data);
       }),
     );
     return new MultipartInfo(

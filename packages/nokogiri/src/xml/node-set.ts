@@ -1,4 +1,10 @@
-import { include, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  Enumerable,
+  include,
+  rbModConstSet,
+  toEnum,
+  type Enumerator,
+} from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
@@ -13,6 +19,7 @@ import {
 
 export class NodeSet implements Iterable<Node> {
   declare atCss: (...args: unknown[]) => Node | undefined;
+  declare findAll: (block?: (node: Node) => unknown) => Node[];
 
   static readonly IMPLIED_XPATH_CONTEXTS = [".//", "self::"] as const;
 
@@ -52,6 +59,15 @@ export class NodeSet implements Iterable<Node> {
     return new NodeSet(this.document, list);
   }
 
+  each(block?: (node: Node) => void): this | Enumerator<Node> {
+    if (block === undefined) return toEnum(this, "each");
+
+    for (let x = 0; x <= this.length - 1; x++) {
+      block(this._list[x]);
+    }
+    return this;
+  }
+
   get length(): number {
     return this._list.length;
   }
@@ -77,5 +93,6 @@ export class NodeSet implements Iterable<Node> {
   }
 }
 
+include(NodeSet, Enumerable);
 include(NodeSet, Searchable);
 rbModConstSet(XML, "NodeSet", NodeSet);

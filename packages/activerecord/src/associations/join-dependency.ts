@@ -230,7 +230,7 @@ export class JoinDependency {
           return [table, true];
         }
 
-        const tableName = this._references.get((reflection as any).name);
+        const tableName = this._references.get((reflection as AssociationReflection).name);
 
         table = this.aliasTracker.aliasedTableFor(
           reflection.klass.arelTable,
@@ -418,7 +418,7 @@ export class JoinDependency {
 
   /** @internal */
   private findReflection(klass: typeof Base, name: string): any {
-    const reflection = _reflectOnAssociation(klass as any, name);
+    const reflection = _reflectOnAssociation(klass, name);
     if (!rtest(reflection)) {
       throw new ConfigurationError(
         `Can't join '${klass.name}' to association named '${name}'; perhaps you misspelled it?`,

@@ -5,7 +5,8 @@
  *   from `Date.now()`.
  */
 
-import { CGI, fetch, rbFArray, rbStrSNew } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
+import { CGI, fetch, rbFArray, rbStrSNew, rbStrToI } from "@blazetrails/ruby-compat";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
 
@@ -96,26 +97,27 @@ export class MockResponse extends Response {
 
   /** @internal */
   private identifyCookieAttributes(cookieFilling: string): Record<string, any> {
-    const bits = cookieFilling.split(";");
-    const attrs: Record<string, any> = { value: bits[0].trim() };
-
-    for (let i = 1; i < bits.length; i++) {
-      const bit = bits[i].trim();
+    const cookieBits = cookieFilling.split(";");
+    const cookieAttributes: Record<string, any> = {};
+    cookieAttributes["value"] = cookieBits[0].trim();
+    for (const bit of cookieBits.slice(1)) {
       if (bit.includes("=")) {
-        const [k, v] = bit.split("=", 2);
-        attrs[k.trim().toLowerCase()] = v.trim();
+        const index = bit.indexOf("=");
+        const cookieAttribute = bit.slice(0, index);
+        const attributeValue = bit.slice(index + 1);
+        cookieAttributes[cookieAttribute.trim().toLowerCase()] = attributeValue.trim();
       }
       if (bit.includes("secure")) {
-        attrs.secure = true;
+        cookieAttributes["secure"] = true;
       }
     }
 
-    if (attrs["max-age"]) {
-      attrs.expires = new Date(Date.now() + parseInt(attrs["max-age"], 10) * 1000);
-    } else if (attrs.expires) {
-      attrs.expires = new Date(attrs.expires);
+    if (Object.hasOwn(cookieAttributes, "max-age")) {
+      cookieAttributes["expires"] = Time.now().plus(rbStrToI(cookieAttributes["max-age"]));
+    } else if (Object.hasOwn(cookieAttributes, "expires")) {
+      cookieAttributes["expires"] = Time.httpdate(cookieAttributes["expires"]);
     }
 
-    return attrs;
+    return cookieAttributes;
   }
 }

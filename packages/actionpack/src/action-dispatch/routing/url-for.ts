@@ -14,6 +14,7 @@ import {
   isSymbol,
   Module,
   rbFPublicSend,
+  rbModConstSet,
   rbModMethodDefined,
   rbObjRespondTo,
   symbolToS,
@@ -28,6 +29,7 @@ import {
   type ToModel,
 } from "./polymorphic-routes.js";
 import * as PolymorphicRoutes from "./polymorphic-routes.js";
+import { Routing } from "../../namespaces.js";
 import type { RouteSet } from "./route-set.js";
 
 export {
@@ -197,3 +199,4 @@ export const UrlFor = new Module((mod) => {
     });
   });
 });
+rbModConstSet(Routing, "UrlFor", UrlFor);

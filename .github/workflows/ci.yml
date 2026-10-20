@@ -1769,7 +1769,7 @@ jobs:
           test-names-manifest after ruby-tests: pnpm exec tsx scripts/build-rails-test-names-manifest.ts
           rails-private after privates-manifest: pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
           method-order after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/arel/src packages/activemodel/src
-          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/src packages/arel/src packages/date/src packages/did-you-mean/src packages/i18n/src --max-warnings 0
+          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/src packages/arel/src packages/date/src packages/did-you-mean/src packages/globalid/src packages/i18n/src --max-warnings 0
           dep-lint after ruby-api: pnpm exec tsx scripts/api-compare/lint-deps.ts
           detached-jsdoc: pnpm exec tsx scripts/api-compare/lint-detached-jsdoc-tags.ts
           test-compare after ruby-tests: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/compare.ts --gates --check
@@ -1797,18 +1797,6 @@ jobs:
         # api-compare manifests the step above already wrote. No --exclude-glob:
         # an exclusion disarms the stale gate (see extra-surface.ts `main()`).
         run: pnpm exec tsx scripts/api-compare/extra-surface.ts
-      - name: Arity excludes gate
-        # Fails on a malformed or STALE entry in
-        # scripts/api-compare/arity-exclude.json (the reasoned suppression file
-        # for the advisory arity check, applied by the API comparison step
-        # above). Excludes only shrink — delete a converged entry by hand.
-        run: pnpm exec tsx scripts/api-compare/lint-arity-excludes.ts
-      - name: Inheritance excludes gate
-        # Fails on a malformed or STALE entry in
-        # scripts/api-compare/inheritance-exclude.json (the reasoned suppression
-        # file for the inheritance check, applied by the API comparison step
-        # above). Excludes only shrink — delete a converged entry by hand.
-        run: pnpm exec tsx scripts/api-compare/lint-inheritance-excludes.ts
       - name: Body-pins gate
         # Source-hash pinning (RFC 0025). Fails when a pinned pair's normalized
         # Rails body digest drifts from the current vendored source

@@ -28,9 +28,7 @@
  * The advisory arity check compares the positional-arg ranges of name-matched
  * methods (it never affects the parity %). A one-line summary always prints and
  * output/arity-mismatches.json is always written; `--arity` adds the
- * per-method breakdown. A justified deviation can be suppressed with a
- * reasoned arity-exclude.json entry (arity-exclude.ts); lint-arity-excludes.ts
- * then fails that entry once it goes stale.
+ * per-method breakdown.
  *
  * The advisory parameter-NAME check (RFC 0126, param-names.ts) runs beside it on
  * the same pairs: where arity asks how many args a method takes, this asks what
@@ -132,18 +130,6 @@ import {
 } from "./arity.js";
 import { isNestedConstructorHomonym, matchParamNamesAgainst } from "./param-names.js";
 import { GENERATOR_BLOCK, dropsBlock, isInternalGenerator } from "./block-params.js";
-import {
-  ARITY_EXCLUDE_PATH,
-  arityExcludeKeyOf,
-  arityExcludeKeys,
-  parseArityExcludes,
-} from "./arity-exclude.js";
-import {
-  INHERITANCE_EXCLUDE_PATH,
-  inheritanceExcludeKeyOf,
-  inheritanceExcludeKeys,
-  parseInheritanceExcludes,
-} from "./inheritance-exclude.js";
 import { matchOptionKeysAgainst } from "./options-keys.js";
 // call-args.ts imports NO_JS_CALL_FORM back from this module and reads it at
 // CALL time for exactly that reason (see its isSkippedCallName): the pair is a
@@ -2979,8 +2965,6 @@ interface ArityResult {
    *  silently absorbing the skip. */
   forwardingSkipped: number;
   mismatched: number;
-  /** Mismatching pairs suppressed by a reasoned arity-exclude.json entry. */
-  excluded: number;
   mismatches: ArityMismatch[];
 }
 
@@ -3105,10 +3089,6 @@ interface InheritanceMismatch {
 interface InheritanceResult {
   checked: number;
   matched: number;
-  /** Mismatches suppressed by a reasoned inheritance-exclude.json entry, and
-   *  dropped from `checked` — reported so the shrunken denominator is
-   *  auditable rather than silently absorbing the deviation. */
-  excluded: number;
   mismatches: InheritanceMismatch[];
 }
 
@@ -4601,20 +4581,6 @@ export function main() {
   const ruby: ApiManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: ApiManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
-  // Reasoned arity suppressions (RFC 0072). Read sync to match this module's
-  // other manifest reads; arity-exclude.ts's async loader serves the gate.
-  const arityExcludes = arityExcludeKeys(
-    parseArityExcludes(fs.readFileSync(ARITY_EXCLUDE_PATH, "utf-8")),
-  );
-  const appliedArityExcludes = new Set<string>();
-
-  // Reasoned inheritance suppressions (RFC 0072) — a ported class whose TS
-  // superclass deliberately differs, each with its justification.
-  const inheritanceExcludes = inheritanceExcludeKeys(
-    parseInheritanceExcludes(fs.readFileSync(INHERITANCE_EXCLUDE_PATH, "utf-8")),
-  );
-  const appliedInheritanceExcludes = new Set<string>();
-
   const results: PackageResult[] = [];
   const inlinedFromPairs: InlinedFromPair[] = [];
   const tsInlinedHookTags = inlinedHookTags(ts, ruby);
@@ -5218,7 +5184,6 @@ export function main() {
     const blockParamMismatches: BlockParamMismatch[] = [];
     let arityCompared = 0;
     let arityForwardingSkipped = 0;
-    let arityExcluded = 0;
     const arityMismatches: ArityMismatch[] = [];
     let optionKeysCompared = 0;
     const optionKeyMismatches: OptionKeyMismatch[] = [];
@@ -6261,18 +6226,6 @@ export function main() {
         }
         if (candidates.every((c) => shouldSkipArity(rubyParams, c))) return;
         const verdict = matchArityAgainst(rubyParams, candidates);
-        // Excluding also drops the pair from the compared denominator, so a
-        // justified deviation neither inflates nor deflates the arity %. Only a
-        // pair that really mismatches consumes its exclude — one on a
-        // now-matching pair stays unapplied and the gate reports it stale.
-        if (!verdict.matched) {
-          const excludeKey = arityExcludeKeyOf({ package: pkg, rubyFile, rubyName });
-          if (arityExcludes.has(excludeKey)) {
-            appliedArityExcludes.add(excludeKey);
-            arityExcluded++;
-            return;
-          }
-        }
         arityCompared++;
         if (verdict.matched) return;
         arityMismatches.push({
@@ -6765,7 +6718,6 @@ export function main() {
     const inheritance: InheritanceResult = {
       checked: 0,
       matched: 0,
-      excluded: 0,
       mismatches: [],
     };
     if (tsPkg) {
@@ -6842,18 +6794,6 @@ export function main() {
         // actually declares (e.g. "ValueType", not Ruby's "Value").
         if (superclassesMatch(rubySuper, chain, tsCls.name)) {
           inheritance.matched++;
-        } else if (
-          inheritanceExcludes.has(
-            inheritanceExcludeKeyOf({ package: pkg, rubyFile: info.file, rubyFqn: fqn }),
-          )
-        ) {
-          // Reviewed deviation: drop it from the denominator rather than score
-          // it as a match, the way the arity check reports its excludes.
-          appliedInheritanceExcludes.add(
-            inheritanceExcludeKeyOf({ package: pkg, rubyFile: info.file, rubyFqn: fqn }),
-          );
-          inheritance.checked--;
-          inheritance.excluded++;
         } else {
           inheritance.mismatches.push({
             rubyFqn: fqn,
@@ -6896,7 +6836,6 @@ export function main() {
         compared: arityCompared,
         forwardingSkipped: arityForwardingSkipped,
         mismatched: arityMismatches.length,
-        excluded: arityExcluded,
         mismatches: arityMismatches,
       },
       paramNames: {
@@ -6980,9 +6919,6 @@ export function main() {
     JSON.stringify(
       {
         generatedAt: new Date().toISOString(),
-        // The inheritance gate treats every committed exclude absent from this
-        // list as stale, the same only-shrink contract arity-exclude has.
-        appliedInheritanceExcludes: [...appliedInheritanceExcludes].sort(),
         results: results.map(({ bodyHashes: _bodyHashes, ...rest }) => rest),
       },
       null,
@@ -7005,9 +6941,6 @@ export function main() {
         compared: results.reduce((n, r) => n + r.arity.compared, 0),
         forwardingSkipped: results.reduce((n, r) => n + r.arity.forwardingSkipped, 0),
         mismatched: arityFlat.length,
-        excluded: results.reduce((n, r) => n + r.arity.excluded, 0),
-        // The gate treats every committed exclude absent from this list as stale.
-        appliedExcludes: [...appliedArityExcludes].sort(),
         mismatches: arityFlat,
       },
       null,
@@ -7362,7 +7295,6 @@ function printReport(
   let grandInhMatched = 0;
   let grandArityCompared = 0;
   let grandArityMismatched = 0;
-  let grandArityExcluded = 0;
   let grandOptKeysCompared = 0;
   let grandOptKeysMismatched = 0;
   let grandOptKeysMissing = 0;
@@ -7389,7 +7321,6 @@ function printReport(
     grandInhMatched += pkg.inheritance.matched;
     grandArityCompared += pkg.arity.compared;
     grandArityMismatched += pkg.arity.mismatched;
-    grandArityExcluded += pkg.arity.excluded;
     grandOptKeysCompared += pkg.optionKeys.compared;
     grandOptKeysMismatched += pkg.optionKeys.mismatched;
     grandOptKeysMissing += pkg.optionKeys.mismatches.filter((m) => m.missingInTs.length > 0).length;
@@ -7407,18 +7338,13 @@ function printReport(
       pkg.excludedFiles.length > 0 ? "  (some intentionally excluded, see unported-files/)" : "";
     const inh = pkg.inheritance;
     const inhPct = inh.checked > 0 ? Math.round((inh.matched / inh.checked) * 1000) / 10 : 0;
-    const inhExcludedNote = inh.excluded > 0 ? `, ${inh.excluded} excluded` : "";
     const inhNote =
-      inh.checked > 0
-        ? `  |  inheritance: ${inh.matched}/${inh.checked} (${inhPct}%${inhExcludedNote})`
-        : "";
+      inh.checked > 0 ? `  |  inheritance: ${inh.matched}/${inh.checked} (${inhPct}%)` : "";
     const misplacedNote = pkg.misplacedFiles > 0 ? `  |  ${pkg.misplacedFiles} misplaced` : "";
     const ar = pkg.arity;
     const arOk = ar.compared - ar.mismatched;
     const arPct = ar.compared > 0 ? Math.round((arOk / ar.compared) * 1000) / 10 : 0;
-    const arExcludedNote = ar.excluded > 0 ? `, ${ar.excluded} excluded` : "";
-    const arityNote =
-      ar.compared > 0 ? `  |  arity: ${arOk}/${ar.compared} (${arPct}%${arExcludedNote})` : "";
+    const arityNote = ar.compared > 0 ? `  |  arity: ${arOk}/${ar.compared} (${arPct}%)` : "";
     const pn = pkg.paramNames;
     const pnOk = pn.compared - pn.mismatchedPairs;
     const pnPct = pn.compared > 0 ? Math.round((pnOk / pn.compared) * 1000) / 10 : 0;
@@ -7587,11 +7513,8 @@ function printReport(
   const grandArOk = grandArityCompared - grandArityMismatched;
   const arPct =
     grandArityCompared > 0 ? Math.round((grandArOk / grandArityCompared) * 1000) / 10 : 0;
-  const grandArityExcludedNote = grandArityExcluded > 0 ? `, ${grandArityExcluded} excluded` : "";
   const aritySummary =
-    grandArityCompared > 0
-      ? `  |  arity: ${grandArOk}/${grandArityCompared} (${arPct}%${grandArityExcludedNote})`
-      : "";
+    grandArityCompared > 0 ? `  |  arity: ${grandArOk}/${grandArityCompared} (${arPct}%)` : "";
   console.log(
     `  Overall: ${grandMatched}/${grandTotal} methods (${grandPct}%)  |  files: ${grandFilesExist}/${grandFiles}${inhSummary}${aritySummary}`,
   );

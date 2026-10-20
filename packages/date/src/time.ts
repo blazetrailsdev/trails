@@ -1579,14 +1579,16 @@ export class Time extends rbCTime {
     return this.#tzmodeUtc;
   }
 
-  plus(offset: number | bigint | Rational | Time): Time {
+  plus(offset: number | bigint | Rational | Time): Time;
+  plus(offset: unknown): Time {
     if (offset instanceof Time) {
       throw new TypeError("time + time?");
     }
-    return this.#timeAdd(offset, 1);
+    return this.#timeAdd(offset as number | bigint | Rational, 1);
   }
 
-  minus(offset: number | bigint | Rational | Time): Time | number {
+  minus(offset: number | bigint | Rational | Time): Time | number;
+  minus(offset: unknown): Time | number {
     if (offset instanceof Time) {
       return new Rational(this.#instant.epochNanoseconds - offset.#instant.epochNanoseconds, 1)
         .add(this.#subnano)
@@ -1594,7 +1596,7 @@ export class Time extends rbCTime {
         .quo(1_000_000_000)
         .toF();
     }
-    return this.#timeAdd(offset, -1);
+    return this.#timeAdd(offset as number | bigint | Rational, -1);
   }
 
   #timeAdd(offset: number | bigint | Rational, sign: 1 | -1): Time {

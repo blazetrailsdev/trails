@@ -154,13 +154,17 @@ export function fetch(
     const own = ownMethod(receiver, "fetch");
     if (own) return own.call(receiver, key, ...rest);
   }
+  const blockGiven = rbBlockGivenP(rest[rest.length - 1]);
+  const argc = 1 + rest.length - (blockGiven ? 1 : 0);
+  if (argc > 2) {
+    throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
+  }
   const hash = receiver as Record<string, unknown> | Map<unknown, unknown>;
-  const blockGiven = rbBlockGivenP(rest[0]);
   const isMap = !plain && hash instanceof Map;
   if (!(isMap ? hash.has(key) : hasKey(hash, key as string))) {
     if (blockGiven) {
-      return (rest[0] as (key: unknown) => unknown)(key);
-    } else if (rest.length === 0) {
+      return (rest[rest.length - 1] as (key: unknown) => unknown)(key);
+    } else if (argc === 1) {
       throw new KeyError(`key not found: ${strEllipsize(rbInspect(key), 65)}`, {
         receiver: hash,
         key,
@@ -1080,13 +1084,16 @@ export class Hash<K, V> extends Map<K, V> {
   /**
    * `Hash.new` (`vendor/ruby/v3.3.11/hash.c:1782` `rb_hash_initialize`): a block is
    * the default_proc, an argument the default value, neither is `nil`. A block
-   * is a single trailing function argument, the spelling `fetch` uses.
+   * is a single trailing function argument, the spelling `fetch` uses, and a
+   * block beside a default is `rb_check_arity(argc, 0, 0)`'s ArgumentError.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Hash.new` (`vendor/ruby/v3.3.11/hash.c:1782`).
    */
-  constructor(ifnone?: DefaultProc<K, V> | V) {
+  constructor(ifnone?: DefaultProc<K, V> | V, block?: DefaultProc<K, V>) {
     super();
-    if (typeof ifnone === "function") {
+    if (block !== undefined) {
+      throw new ArgumentError("wrong number of arguments (given 1, expected 0)");
+    } else if (typeof ifnone === "function") {
       this.setDefaultProc(ifnone as DefaultProc<K, V>);
     } else if (ifnone !== undefined) {
       this.setDefault(ifnone);

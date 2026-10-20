@@ -2122,7 +2122,7 @@ class TestExtractor
     name = self_call_name(node)
     if name
       if assertion_method?(name)
-        count += 1
+        count += 1 unless spec_value_receiver?(node)
       elsif depth < MAX_HELPER_DEPTH && !visiting.include?(name)
         resolved = resolve_helper(name, scope)
         if resolved
@@ -2176,7 +2176,19 @@ class TestExtractor
   # Is this node a receiver-form (`:call`/`:command_call`) assertion call?
   def receiver_call_assertion?(node)
     return false unless node[0] == :call || node[0] == :command_call
-    node[3] && assertion_method?(ident_name(node[3]))
+    return false unless node[3] && assertion_method?(ident_name(node[3]))
+    mark_spec_value_receiver(node[1])
+    true
+  end
+
+  def mark_spec_value_receiver(recv)
+    recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_arg
+    return unless recv.is_a?(Array) && recv[0] == :fcall && ident_name(recv[1]) == "expect"
+    (@spec_values ||= {}.compare_by_identity)[recv] = true
+  end
+
+  def spec_value_receiver?(node)
+    @spec_values&.key?(node)
   end
 
   MSPEC_SHOULD = %w[should should_not].freeze
@@ -2421,7 +2433,7 @@ class TestExtractor
         # A parenthesized call `assert_equal(a, b)` is `[:method_add_arg,
         # [:fcall, ...], ...]`; self_call_name matches the inner :fcall, and the
         # recursion below descends into it — so the wrapper is not double-counted.
-        unless @rspec_expects&.key?(node)
+        unless @rspec_expects&.key?(node) || spec_value_receiver?(node)
           results << (pending_never ? "#{name}_never" : name)
           args = node[0] == :command ? node[2] : pending_args
           values << literal_token(expected_arg(args, name))
@@ -2441,8 +2453,9 @@ class TestExtractor
       # parenthesized `:call` form gets it threaded via `pending_args` from its
       # `:method_add_arg` parent (mirroring the self-call path).
       rname = ident_name(node[3])
-      results << (pending_never ? "#{rname}_never" : rname)
       args = node[0] == :command_call ? node[4] : pending_args
+      rname = predicate_form(rname, positional_args(args)) if PREDICATE_FORMS.key?(rname)
+      results << (pending_never ? "#{rname}_never" : rname)
       values << literal_token(expected_arg(args, rname))
     elsif (mname = mspec_should_kind(node))
       results << mname
@@ -2462,6 +2475,15 @@ class TestExtractor
         collect_assertion_kinds_expanded(child, results, values, visiting, depth, nil, scope) if child.is_a?(Array)
       end
     end
+  end
+
+  PREDICATE_FORMS = { "must_be" => "assert_predicate", "wont_be" => "refute_predicate" }.freeze
+  NIL_PREDICATE_FORMS = { "must_be" => "assert_nil", "wont_be" => "refute_nil" }.freeze
+
+  def predicate_form(name, list)
+    return name unless list&.length == 1
+    nil_pred = list[0].is_a?(Array) && list[0][0] == :symbol_literal && list[0].flatten.include?("nil?")
+    (nil_pred ? NIL_PREDICATE_FORMS : PREDICATE_FORMS).fetch(name)
   end
 
   # Assertion method names whose comparable expected value is NOT the first

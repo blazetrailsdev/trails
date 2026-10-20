@@ -28,7 +28,7 @@ type TransactionAction = "create" | "update" | "destroy";
 
 export async function transaction<T>(
   modelClass: typeof Base,
-  fn: (tx: PublicTransaction) => Promise<T>,
+  fn: (tx: PublicTransaction) => Promise<T> | T,
   options: { isolation?: string; requiresNew?: boolean; joinable?: boolean } = {},
 ): Promise<T | undefined> {
   return modelClass.withConnection((connection) => {

@@ -664,14 +664,15 @@ export class TimeZone {
   static findTzinfo(name: string): Timezone {
     return Timezone.get(MAPPING[name] ?? name);
   }
-  static create(
+  static create<T extends typeof TimeZone>(
+    this: T,
     name: string,
     utcOffset: number | null = null,
     tzinfo: Timezone | null = null,
-  ): TimeZone {
+  ): InstanceType<T> {
     creating = true;
     try {
-      return new TimeZone(name, utcOffset, tzinfo);
+      return new this(name, utcOffset, tzinfo) as InstanceType<T>;
     } finally {
       creating = false;
     }

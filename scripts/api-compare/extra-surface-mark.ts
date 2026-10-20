@@ -8,8 +8,9 @@
  * on the same contract as the RFC 0047/0084 call-set mark and its RFC 0095
  * call-argument twin:
  *
- *   - a committed mark per gated package — `novel` and `total`;
- *   - CI fails on ANY increase in either number;
+ *   - a committed mark per gated package — `novel`, `total`,
+ *     `noCounterpartFiles` and `allowed`;
+ *   - CI fails on ANY increase in any of them;
  *   - converging surface makes the mark stale-HIGH, which `--tighten` narrows
  *     to the current measurement — never a reseed, and never a widening.
  *
@@ -118,6 +119,17 @@ import { serializeBaseline } from "./baseline-json.js";
 export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
 
 /**
+ * The `@internal` mark (RFC 0120): public declarations each gated package
+ * hides through `internal: true`, ratcheted only-shrink. It lives apart from
+ * {@link MARK_PATH} because a rowless package carries no row there, while this
+ * number is never pinned at 0 — most `@internal` uses are correct, and the
+ * gate exists so a spike is visible, not so the count reaches zero.
+ */
+export const INTERNAL_MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-internal-mark.json");
+
+export type InternalMarks = Record<string, number>;
+
+/**
  * Gated packages whose `novel` is still a number to burn down rather than a
  * rule to hold, so the mark's value governs both dimensions.
  */
@@ -132,6 +144,7 @@ export const COUNTED_PACKAGES = [] as const;
 export const TAGGED_ONLY_PACKAGES = [
   "actioncontroller",
   "actiondispatch",
+  "globalid",
   "ruby-compat",
   "thor",
 ] as const;
@@ -167,14 +180,40 @@ export const GATED_PACKAGES: readonly GatedPackage[] = [
  */
 export const INLINED_FROM_PACKAGES = ["arel"] as const;
 
+/**
+ * The dimensions every mark row carries, compared by {@link exceedances},
+ * {@link staleMarks} and {@link tightened} alike.
+ */
+export const MARK_DIMENSIONS = ["novel", "total", "noCounterpartFiles", "allowed"] as const;
+
+/**
+ * The dimensions a rowless package is pinned at 0 in. `noCounterpartFiles`
+ * and `allowed` are not: a receipted member is allowed by construction, so
+ * pinning `allowed` would forbid the receipt that is the pinned remedy.
+ */
+const PINNED_DIMENSIONS = ["novel", "total"] as const;
+
+/**
+ * Gated packages whose `allowed` is inventory, not debt: ruby-compat's rule 2
+ * puts a receipt on every export, so a receipted addition is mark-neutral and
+ * `allowed` grows with the package. Their rows carry no `allowed`.
+ */
+export const UNGATED_ALLOWED_PACKAGES = ["ruby-compat"] as const;
+
 /** The dimensions gated for one package — see {@link INLINED_FROM_PACKAGES}. */
-function dimensionsFor(name: string): readonly MarkDimension[] {
+function dimensionsFor(
+  name: string,
+  dimensions: readonly MarkDimension[] = MARK_DIMENSIONS,
+): readonly MarkDimension[] {
+  const gated = (UNGATED_ALLOWED_PACKAGES as readonly string[]).includes(name)
+    ? dimensions.filter((d) => d !== "allowed")
+    : dimensions;
   return (INLINED_FROM_PACKAGES as readonly string[]).includes(name)
-    ? (["novel", "total", "inlinedFrom"] as const)
-    : (["novel", "total"] as const);
+    ? [...gated, "inlinedFrom"]
+    : gated;
 }
 
-export type MarkDimension = "novel" | "total" | "inlinedFrom";
+export type MarkDimension = (typeof MARK_DIMENSIONS)[number] | "inlinedFrom";
 
 export interface SurfaceMark {
   /**
@@ -184,6 +223,18 @@ export interface SurfaceMark {
   novel: number;
   /** All extras, novel plus moved-not-novel. */
   total: number;
+  /**
+   * Extras on TS files no Rails file maps onto. They are scored against an
+   * empty allowed set, so one new unmapped file lands its whole public surface
+   * at once; gating the file count keeps that red apart from real invention.
+   */
+  noCounterpartFiles: number;
+  /**
+   * Extras subtracted from `novel` and `total` because they carry a receipt.
+   * Gated so a package cannot reach `novel: 0` by tagging rather than deleting.
+   * Absent for the packages in {@link UNGATED_ALLOWED_PACKAGES}.
+   */
+  allowed?: number;
   /**
    * Members inlined onto an including class's file. Present only for the
    * packages in {@link INLINED_FROM_PACKAGES}.
@@ -198,6 +249,9 @@ export interface MeasuredTotals {
   package: string;
   totalNovel: number;
   totalExtras: number;
+  noCounterpartFiles: number;
+  totalAllowlisted: number;
+  totalInternal: number;
   inlinedFrom: readonly unknown[];
 }
 
@@ -206,7 +260,14 @@ export function measure(packages: readonly MeasuredTotals[]): SurfaceMarks {
   for (const name of GATED_PACKAGES) {
     const measured = packages.find((p) => p.package === name);
     if (!measured) continue;
-    marks[name] = { novel: measured.totalNovel, total: measured.totalExtras };
+    marks[name] = {
+      novel: measured.totalNovel,
+      total: measured.totalExtras,
+      noCounterpartFiles: measured.noCounterpartFiles,
+    };
+    if (!(UNGATED_ALLOWED_PACKAGES as readonly string[]).includes(name)) {
+      marks[name].allowed = measured.totalAllowlisted;
+    }
     if ((INLINED_FROM_PACKAGES as readonly string[]).includes(name)) {
       marks[name].inlinedFrom = measured.inlinedFrom.length;
     }
@@ -216,7 +277,7 @@ export function measure(packages: readonly MeasuredTotals[]): SurfaceMarks {
 
 export interface MarkViolation {
   package: string;
-  dimension: MarkDimension;
+  dimension: MarkDimension | "internal";
   mark: number;
   current: number;
 }
@@ -289,6 +350,24 @@ export function unmarkedPackages(marks: SurfaceMarks): string[] {
 }
 
 /**
+ * Every gated dimension a committed row is missing, as `package dimension`.
+ * Each comparison skips a dimension the row lacks, so a dropped field would
+ * disarm that dimension silently — the dimension-level twin of
+ * {@link unmarkedPackages}.
+ */
+export function incompleteMarks(marks: SurfaceMarks): string[] {
+  const missing: string[] = [];
+  for (const name of GATED_PACKAGES) {
+    const mark = marks[name];
+    if (!mark) continue;
+    for (const dimension of dimensionsFor(name)) {
+      if (mark[dimension] === undefined) missing.push(`${name} ${dimension}`);
+    }
+  }
+  return missing;
+}
+
+/**
  * A rowless package the mark file carries a row for anyway. Every comparison
  * would then read that row as a number to hold, and a widened one would look
  * like a budget where the rule is the constant 0 — so the row is refused
@@ -321,7 +400,7 @@ export function taggedOnlyViolations(current: SurfaceMarks): MarkViolation[] {
   for (const name of ROWLESS_PACKAGES) {
     const now = current[name];
     if (!now) continue;
-    for (const dimension of dimensionsFor(name)) {
+    for (const dimension of dimensionsFor(name, PINNED_DIMENSIONS)) {
       const nowValue = now[dimension] ?? 0;
       if (nowValue > 0) {
         violations.push({ package: name, dimension, mark: 0, current: nowValue });
@@ -346,19 +425,82 @@ export function tightened(marks: SurfaceMarks, current: SurfaceMarks): SurfaceMa
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
-    next[name] = {
-      novel: Math.min(mark.novel, now.novel),
-      total: Math.min(mark.total, now.total),
-    };
-    if (mark.inlinedFrom !== undefined && now.inlinedFrom !== undefined) {
-      next[name].inlinedFrom = Math.min(mark.inlinedFrom, now.inlinedFrom);
+    const row: SurfaceMark = { ...mark };
+    for (const dimension of dimensionsFor(name)) {
+      const markValue = mark[dimension];
+      const nowValue = now[dimension];
+      if (markValue === undefined || nowValue === undefined) continue;
+      row[dimension] = Math.min(markValue, nowValue);
     }
+    next[name] = row;
   }
   return next;
 }
 
-export async function writeMarks(marks: SurfaceMarks): Promise<void> {
+/** The bytes `writeMarks` puts on disk: keys sorted, `serializeBaseline`'s format. */
+export function serializeMarks(marks: SurfaceMarks): string {
   const sorted: SurfaceMarks = {};
   for (const name of Object.keys(marks).sort()) sorted[name] = marks[name]!;
-  await fs.writeFile(MARK_PATH, serializeBaseline(sorted));
+  return serializeBaseline(sorted);
+}
+
+export async function writeMarks(marks: SurfaceMarks): Promise<void> {
+  await fs.writeFile(MARK_PATH, serializeMarks(marks));
+}
+
+/** {@link measure}'s `internal` twin, over every gated package. */
+export function measureInternal(packages: readonly MeasuredTotals[]): InternalMarks {
+  const marks: InternalMarks = {};
+  for (const name of GATED_PACKAGES) {
+    const measured = packages.find((p) => p.package === name);
+    if (measured) marks[name] = measured.totalInternal;
+  }
+  return marks;
+}
+
+/**
+ * Every gated package whose `internal` count moved off its mark: `grew` fails
+ * the gate, `stale` is narrowed by `--tighten`, and `unmarked` names a gated
+ * package the mark never seeded.
+ */
+export function internalViolations(
+  marks: InternalMarks,
+  current: InternalMarks,
+): { grew: MarkViolation[]; stale: MarkViolation[]; unmarked: string[] } {
+  const grew: MarkViolation[] = [];
+  const stale: MarkViolation[] = [];
+  const unmarked: string[] = [];
+  for (const name of GATED_PACKAGES) {
+    const mark = marks[name];
+    const now = current[name];
+    if (now === undefined) continue;
+    if (mark === undefined) {
+      unmarked.push(name);
+      continue;
+    }
+    const violation = { package: name, dimension: "internal" as const, mark, current: now };
+    if (now > mark) grew.push(violation);
+    if (now < mark) stale.push(violation);
+  }
+  return { grew, stale, unmarked };
+}
+
+/** Narrow each `internal` mark to `current`; never raises one. */
+export function tightenedInternal(marks: InternalMarks, current: InternalMarks): InternalMarks {
+  const next: InternalMarks = { ...marks };
+  for (const [name, mark] of Object.entries(marks)) {
+    const now = current[name];
+    if (now !== undefined) next[name] = Math.min(mark, now);
+  }
+  return next;
+}
+
+export async function loadInternalMarks(): Promise<InternalMarks> {
+  return JSON.parse(await fs.readFile(INTERNAL_MARK_PATH, "utf-8")) as InternalMarks;
+}
+
+export async function writeInternalMarks(marks: InternalMarks): Promise<void> {
+  const sorted: InternalMarks = {};
+  for (const name of Object.keys(marks).sort()) sorted[name] = marks[name]!;
+  await fs.writeFile(INTERNAL_MARK_PATH, serializeBaseline(sorted));
 }

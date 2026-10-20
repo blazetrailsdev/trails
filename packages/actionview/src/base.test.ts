@@ -398,19 +398,6 @@ describe("ActionView::Base#render", () => {
     expect(String(await buildView().render({ inline: "Hello, World!" }))).toBe("Hello, World!");
   });
 
-  it("render inline with locals", async () => {
-    expect(
-      String(await buildView().render({ inline: "Hello, <%= name %>!", locals: { name: "Josh" } })),
-    ).toBe("Hello, Josh!");
-  });
-
-  it("render file with relative path", () => {
-    const templatePath = "fixtures/test/hello_world.erb";
-    expect(() => buildView().render({ file: templatePath })).toThrow(
-      /`render file:` should be given the absolute path to a file. (.+) was given instead/,
-    );
-  });
-
   it("restores the lookup context after in_rendering_context prepends formats", async () => {
     const view = buildView();
     const before = view.lookupContext;

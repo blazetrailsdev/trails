@@ -4,6 +4,7 @@ import {
   isEmpty,
   kernelCatch,
   rbEqual,
+  rbFSend,
   rbObjRespondTo,
   rbDeclareIvar,
   Set,
@@ -144,7 +145,7 @@ export abstract class CollectionAssociation extends Association {
   /** @missingRailsName size — PERMANENT */
   async find(...args: unknown[]): Promise<Base | Base[] | null> {
     if (this.options.inverseOf && this.isLoaded()) {
-      const argsFlatten = (args as any[]).flat(Infinity);
+      const argsFlatten = args.flat(Infinity);
       const model = this.scope().model;
 
       if (isBlank(argsFlatten)) {
@@ -211,7 +212,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected transaction<R>(block: () => Promise<R> | R): Promise<R | undefined> {
-    return (this.reflection.klass as any).transaction(block);
+    return this.reflection.klass.transaction(block);
   }
 
   /** @internal */
@@ -219,6 +220,9 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected abstract intersection(a: Base[], b: Base[]): Base[];
+
+  /** @internal */
+  protected abstract countRecords(): Promise<number>;
 
   /** @internal */
   async insertRecord(
@@ -371,11 +375,9 @@ export abstract class CollectionAssociation extends Association {
       return Promise.resolve(this.loadTarget()).then((target) => target.length);
     } else if (!this.associationScope().distinctValue && !isEmpty(this.target)) {
       const unsavedRecords = this.target.filter((record) => record.isNewRecord());
-      return (this as unknown as { countRecords(): Promise<number> })
-        .countRecords()
-        .then((count) => unsavedRecords.length + count);
+      return this.countRecords().then((count) => unsavedRecords.length + count);
     } else {
-      return (this as unknown as { countRecords(): Promise<number> }).countRecords();
+      return this.countRecords();
     }
   }
 
@@ -426,15 +428,9 @@ export abstract class CollectionAssociation extends Association {
   }
 
   private async isIncludeInMemory(record: Base): Promise<boolean> {
-    const reflection = this.reflection as unknown as {
-      isThroughReflection?: () => boolean;
-      throughReflection?: { name: string } | null;
-      sourceReflection?: { name: string } | null;
-    };
+    const reflection = this.reflection;
     if (reflection.isThroughReflection?.()) {
-      const assoc = (
-        this.owner as unknown as { association: (n: string) => Association }
-      ).association(reflection.throughReflection!.name);
+      const assoc = this.owner.association(reflection.throughReflection!.name);
       const sourceName = reflection.sourceReflection!.name;
       const reader = (await (assoc as unknown as { reader: unknown }).reader) as Base[];
       for (const source of reader) {
@@ -550,7 +546,7 @@ export abstract class CollectionAssociation extends Association {
     if (records.length === 0) return undefined;
     const coerced = this.coerceToRecords(records);
     const remove = (coerced: Base[]): Promise<Base[] | undefined> | Base[] | undefined => {
-      const resolved = (coerced as unknown[]).flat(Infinity) as Base[];
+      const resolved = coerced.flat(Infinity);
       for (const record of resolved) this.raiseOnTypeMismatchBang(record);
       const existingRecords = resolved.filter((r) => !r.isNewRecord());
       if (existingRecords.length === 0) {
@@ -626,8 +622,7 @@ export abstract class CollectionAssociation extends Association {
       if (memRecord != null) {
         const memAttributeNames = new Set(memRecord.attributeNames());
         const changedAttributeNamesToSave = new Set(memRecord.changedAttributeNamesToSave);
-        const attrReadonly = (memRecord.constructor as unknown as { _attrReadonly: string[] })
-          ._attrReadonly;
+        const attrReadonly = (memRecord.constructor as typeof Base)._attrReadonly;
         for (const name of record
           .attributeNames()
           .filter((name) => memAttributeNames.has(name))
@@ -817,7 +812,7 @@ export function callback(this: CallbackHost, method: string, record: Base): void
 export function callbacksFor(this: CallbackHost, callbackName: string): unknown[] {
   const fullCallbackName = `${callbackName}For${this.reflection.name.charAt(0).toUpperCase()}${this.reflection.name.slice(1)}`;
   if (rbObjRespondTo(this.owner.constructor, fullCallbackName)) {
-    return (this.owner.constructor as any)[fullCallbackName];
+    return rbFSend(this.owner.constructor, fullCallbackName) as unknown[];
   } else {
     return [];
   }

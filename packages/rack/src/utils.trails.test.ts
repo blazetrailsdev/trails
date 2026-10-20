@@ -45,3 +45,23 @@ describe("Utils.unescapePath", () => {
     expect(Utils.unescapePath("/100%")).toBe("/100%");
   });
 });
+
+describe("Utils.multipartPartLimit", () => {
+  it("is the same accessor as multipartFileLimit", () => {
+    const old = Utils.multipartFileLimit();
+    try {
+      Utils.setMultipartPartLimit(7);
+      expect(Utils.multipartFileLimit()).toBe(7);
+      Utils.setMultipartFileLimit(9);
+      expect(Utils.multipartPartLimit()).toBe(9);
+    } finally {
+      Utils.setMultipartFileLimit(old);
+    }
+  });
+});
+
+describe("Rack::Utils.parse_cookies_header", () => {
+  it("reads a key-only cookie as nil", () => {
+    expect(Utils.parseCookiesHeader("foo; bar=baz")).toEqual({ foo: null, bar: "baz" });
+  });
+});

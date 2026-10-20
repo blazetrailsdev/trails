@@ -71,7 +71,7 @@ export class SqlTypeMetadata {
   /** @internal */
   deduplicated(): this {
     this.sqlType = strUminus(this.sqlType!);
-    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
+    return Object.freeze(this);
   }
 }
 

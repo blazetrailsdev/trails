@@ -129,7 +129,11 @@ export const NAMING_CLASSES: NamingClassInfo[] = [
     reason:
       "Ruby `String#b` re-tags a String ASCII-8BIT — `File.join(@root, path.b)` (static.rb:145). " +
       "A JS string carries no encoding tag (CLAUDE.md, A String has no encoding tag either), so " +
-      "where the TS passes the receiver itself the value is the same and only Ruby's tag is gone.",
+      "where the TS passes the receiver itself the value is the same and only Ruby's tag is gone. " +
+      "Its twin is an ASCII-8BIT read handed to a byte sink — `gzip.write(part)` " +
+      "(deflater.rb:105-106): ruby-compat's `IO#read` answers one char per byte and " +
+      "`GzipWriter#write` UTF-8-encodes a string, so the TS hands it the bytes (`Buffer.from`). " +
+      "Ruled permanent by the repo owner on 2026-10-19 (trails#9108).",
   },
   {
     name: "module-mixin-receiver",
@@ -398,7 +402,9 @@ export function classifyPair(
   if (chainExport !== undefined && recordedExport(chainExport) === tsRef) {
     return "no-js-equivalent";
   }
-  if (rubyRef === "b" && tsRef === "path") return "encoding-tag";
+  if ((rubyRef === "b" && tsRef === "path") || (rubyRef === "part" && tsRef === "from")) {
+    return "encoding-tag";
+  }
   if (tsRef === "toS" || tsRef === "toString" || rubyRef === "toS" || rubyRef === "to_s") {
     return "implicit-to-s";
   }

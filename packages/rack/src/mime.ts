@@ -3,6 +3,7 @@ import { MIME_TYPES } from "./mime-types.js";
 
 export { MIME_TYPES };
 
+/** @missingRailsName downcase — PERMANENT */
 export function mimeType(
   ext: string,
   fallback: string | null = "application/octet-stream",

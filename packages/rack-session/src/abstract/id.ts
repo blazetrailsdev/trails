@@ -1,4 +1,5 @@
 import {
+  hashDelete,
   ArgumentError,
   valuesAt,
   getCrypto,
@@ -10,6 +11,8 @@ import {
   rbFSend,
   rbObjClassname,
   KeyError,
+  registerConstant,
+  eachPair,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_ERRORS, RACK_SESSION, RACK_SESSION_OPTIONS, Request, Raw } from "@blazetrails/rack";
@@ -285,9 +288,9 @@ export class SessionHash implements PersistedSession {
       typeof candidate?.toHash === "function"
         ? candidate.toHash()
         : (other as Record<string, unknown>);
-    for (const key of Object.keys(source)) {
-      hash[String(key)] = source[key];
-    }
+    eachPair(source, (key, value) => {
+      hash[String(key)] = value;
+    });
     return hash;
   }
 }
@@ -329,7 +332,8 @@ export interface PersistedRequest {
   cookies: Record<string, unknown>;
   params: Record<string, unknown>;
   getHeader(key: string): PersistedSession;
-  setHeader(key: string, value: unknown): void;
+  setHeader(key: string, value: unknown): unknown;
+  fetchHeader<T>(key: string, block: (key: string) => T): T;
   sessionOptions: Record<string, unknown>;
   ssl?: unknown;
 }
@@ -360,14 +364,10 @@ export class Persisted {
       ...(this.constructor as typeof Persisted).DEFAULT_OPTIONS,
       ...options,
     };
-    this.key = this.defaultOptions["key"] as string;
-    delete this.defaultOptions["key"];
-    this.assumeSsl = this.defaultOptions["assumeSsl"];
-    delete this.defaultOptions["assumeSsl"];
-    this.cookieOnly = this.defaultOptions["cookieOnly"];
-    delete this.defaultOptions["cookieOnly"];
-    this.sameSite = this.defaultOptions["sameSite"];
-    delete this.defaultOptions["sameSite"];
+    this.key = hashDelete(this.defaultOptions, "key") as string;
+    this.assumeSsl = hashDelete(this.defaultOptions, "assumeSsl");
+    this.cookieOnly = hashDelete(this.defaultOptions, "cookieOnly");
+    this.sameSite = hashDelete(this.defaultOptions, "sameSite");
     this.initializeSid();
   }
 
@@ -429,15 +429,16 @@ export class Persisted {
   loadSession(
     req: PersistedRequest,
   ): [unknown, Record<string, unknown>] | Promise<[unknown, Record<string, unknown>]> {
-    const currentSid = this.currentSessionId(req);
-    const found = this.findSession(req, currentSid);
+    let sid = this.currentSessionId(req);
+    const found = this.findSession(req, sid);
     if (found instanceof Promise) {
       return found.then(([sid, session]): [unknown, Record<string, unknown>] => [
         sid,
         session ?? {},
       ]);
     }
-    const [sid, session] = found;
+    sid = found[0];
+    const session = found[1];
     return [sid, session ?? {}];
   }
 
@@ -691,3 +692,4 @@ Object.defineProperty(PersistedSecure, "name", {
   value: "Rack::Session::Abstract::PersistedSecure",
 });
 Object.defineProperty(ID, "name", { value: "Rack::Session::Abstract::ID" });
+registerConstant("Rack::Session::SessionId", SessionId);

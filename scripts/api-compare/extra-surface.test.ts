@@ -380,6 +380,26 @@ describe("a TS-only package", () => {
       expect.objectContaining({ name: "first", kind: "moved" }),
     ]);
   });
+
+  it("shows a receipt swapped for @internal: allowed falls, internal rises", () => {
+    const ruby: ApiManifest = { source: "ruby", generatedAt: "", packages: {} };
+    const report = (squeeze: MethodInfo) =>
+      buildReport(
+        ruby,
+        {
+          source: "typescript",
+          generatedAt: "",
+          packages: {
+            "ruby-compat": { classes: {}, modules: {}, fileFunctions: { "range.ts": [squeeze] } },
+          },
+        },
+        { filterPkg: "ruby-compat", excludeGlobs: [], novelOnly: false, topN: 50 },
+      ).packages[0];
+    const receipted = report({ ...method("squeeze"), noRailsEquivalent: "PERMANENT" });
+    const hidden = report({ ...method("squeeze"), internal: true });
+    expect([receipted?.totalAllowlisted, receipted?.totalInternal]).toEqual([1, 0]);
+    expect([hidden?.totalAllowlisted, hidden?.totalInternal]).toEqual([0, 1]);
+  });
 });
 
 describe("concernHookNames", () => {
@@ -1567,6 +1587,15 @@ describe("buildReport — novel vs moved classification", () => {
             }),
           },
           modules: {},
+          fileConstants: {
+            "type.rb": {
+              Value: {
+                kind: "alias",
+                target: "ActiveModel::Type::Value",
+                namespace: "ActiveRecord::Type",
+              },
+            },
+          },
         },
       },
     };
@@ -4958,5 +4987,178 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
       ).map((f) => f.tsName);
     expect(inlined([])).toEqual(["constructor"]);
     expect(inlined(["[initialize]"])).toEqual([]);
+  });
+});
+
+describe("buildReport — --package does not scope the stale-tag check", () => {
+  it("reports a stale tag in another package under a filtered run", () => {
+    const stale: MethodInfo = { ...method("_hidden"), noRailsEquivalent: "PERMANENT" };
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Foo": rubyClass({
+              name: "Foo",
+              file: "foo.rb",
+              instance: [method("bar")],
+            }),
+          },
+          modules: {},
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Baz": rubyClass({
+              name: "Baz",
+              file: "baz.rb",
+              instance: [method("quux")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const host = (name: string, file: string, instanceMethods: MethodInfo[]) => ({
+      name,
+      file,
+      includes: [],
+      extends: [],
+      instanceMethods,
+      classMethods: [],
+    });
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: { Foo: host("Foo", "foo.ts", [method("bar"), stale]) },
+          modules: {},
+        },
+        activerecord: { classes: { Baz: host("Baz", "baz.ts", [method("quux")]) }, modules: {} },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages.map((p) => p.package)).toEqual(["activerecord"]);
+    expect(report.tagged.stale.map((e) => [e.package, e.tsFile])).toEqual([
+      ["activemodel", "foo.ts"],
+    ]);
+    expect(gateStale(report.tagged)).toContain("activemodel  foo.ts");
+  });
+});
+
+describe("buildReport — prepended modules", () => {
+  it("credits a lexically prepended module's methods to the host", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activesupport: {
+          classes: {
+            "ActiveSupport::TestCase": {
+              ...rubyClass({ name: "TestCase", file: "test_case.rb" }),
+              prepends: ["ActiveSupport::Testing::SetupAndTeardown"],
+            },
+          },
+          modules: {
+            "ActiveSupport::Testing::SetupAndTeardown": rubyClass({
+              name: "SetupAndTeardown",
+              file: "testing/setup_and_teardown.rb",
+              instance: [method("before_setup")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activesupport: {
+          classes: {
+            TestCase: {
+              name: "TestCase",
+              file: "test-case.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("beforeSetup")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+});
+
+describe("buildReport — DelegateClass resolution", () => {
+  it("resolves an unaliased DelegateClass name to nothing rather than a suffix match", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Type::Value": rubyClass({
+              name: "Value",
+              file: "type/value.rb",
+              instance: [method("cast")],
+            }),
+          },
+          modules: {},
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Locking::LockingType": {
+              ...rubyClass({ name: "LockingType", file: "locking/optimistic.rb" }),
+              superclass: "Type::Value",
+              delegateClass: true,
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            LockingType: {
+              name: "LockingType",
+              file: "locking/optimistic.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("cast")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "locking/optimistic.ts");
+    expect(f!.extras.map((e) => e.name)).toEqual(["cast"]);
   });
 });

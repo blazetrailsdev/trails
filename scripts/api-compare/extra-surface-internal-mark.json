@@ -1,0 +1,11 @@
+{
+  "actioncontroller": 213,
+  "actiondispatch": 804,
+  "activemodel": 253,
+  "activerecord": 2428,
+  "arel": 288,
+  "globalid": 38,
+  "rack": 219,
+  "ruby-compat": 933,
+  "thor": 176
+}

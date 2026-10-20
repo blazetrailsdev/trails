@@ -28,7 +28,7 @@ describe("Rack::Session::Abstract::ID", () => {
   });
 
   it.skip("should warn when subclassing", () => {
-    // PERMANENT-SKIP: Ruby's `self.inherited` hook fires when a subclass is defined; JS has no such hook
+    // PERMANENT-SKIP: `ID.inherited` (abstract/id.rb:500-507) warns when `Class.new(@id)` is defined; CLAUDE.md § "`inherited` is deferred to own-property memo guards"
   });
 
   it("#find_session should find session in request", async () => {

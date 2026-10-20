@@ -114,7 +114,7 @@ describe("ActionView::Base class-hosted accessors", () => {
 });
 
 describe("ActionView::Base#initialize Routing::UrlFor segment", () => {
-  it("starts a view with _routes nil", () => {
-    expect(new Base()._routes).toBeNull();
+  it("a bare view sets no own _routes", () => {
+    expect(Object.hasOwn(Base.empty(), "_routes")).toBe(false);
   });
 });

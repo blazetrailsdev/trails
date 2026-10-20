@@ -92,6 +92,62 @@ describe("parseScript", () => {
     expect(find(program, "Literal", "/a[/]b/i")).not.toBeNull();
   });
 
+  it("covers switch, do-while, labels and class", () => {
+    const source = [
+      "<% switch (kind) { case 'a': case 'b': %>ab<% break; default: %>other<% } %>",
+      "<% let i = 0; do { i++ } while (i < 3); %>",
+      "<% outer: for (const row of rows) { for (const c of row) { if (c) continue outer; break outer; } } %>",
+      "<% class Row extends Base.Item { static count = 0; #id; static { Row.count = 1 } get id() { return this.#id } static of(x) { return new Row(x) } } %>",
+      "<%= new (class { name = 'anon' })().name %>",
+    ].join("\n");
+    const { code } = compileJs(source, { async: true });
+    const program = parseScript(code).value;
+    const types = new Set<string>();
+    program.breadthFirstSearch((node) => (types.add(node.type), false));
+    for (const type of [
+      "SwitchStatement",
+      "SwitchCase",
+      "DoWhileStatement",
+      "LabeledStatement",
+      "ClassDeclaration",
+      "ClassExpression",
+      "ClassBody",
+      "StaticBlock",
+      "MethodDefinition",
+      "PropertyDefinition",
+    ]) {
+      expect(types, type).toContain(type);
+    }
+    expect(find(program, "SwitchCase", "case 'a':")).not.toBeNull();
+    expect(find(program, "ContinueStatement", "continue outer;")).not.toBeNull();
+    expect(find(program, "BreakStatement", "break outer;")).not.toBeNull();
+    expect(find(program, "MethodDefinition", "get id() { return this.#id }")).not.toBeNull();
+    const afterStatement = parseScript("switch (x) { case 1: f(); default: g() }").value;
+    expect(find(afterStatement, "SwitchCase", "default: g()")).not.toBeNull();
+    const members = parseScript(
+      "class A extends f(x) { async m() {} *g() {} async *ag() {} set v(x) {} [k]() {} 'str' = 1; 2() {} get() {} static = 1\n async\n x = 2\n static async s() {} }",
+    ).value;
+    for (const slice of [
+      "async m() {}",
+      "*g() {}",
+      "async *ag() {}",
+      "set v(x) {}",
+      "[k]() {}",
+      "2() {}",
+      "get() {}",
+      "static async s() {}",
+    ])
+      expect(find(members, "MethodDefinition", slice), slice).not.toBeNull();
+    for (const slice of ["'str' = 1;", "static = 1", "async", "x = 2"])
+      expect(find(members, "PropertyDefinition", slice), slice).not.toBeNull();
+    expect(find(members, "CallExpression", "f(x)")).not.toBeNull();
+    const nl = parseScript("outer: for (;;) { continue\nouter }").value;
+    expect(find(nl, "ContinueStatement", "continue")).not.toBeNull();
+    expect(find(nl, "ExpressionStatement", "outer")).not.toBeNull();
+    expect(() => parseScript("switch (x) { case 1: f()")).toThrow(JsParseError);
+    expect(() => parseScript("class A { m() {}")).toThrow(JsParseError);
+  });
+
   it("raises JsParseError with the offending offset", () => {
     expect(() => parseScript("a(b,;")).toThrow(JsParseError);
     expect(() => parseScript("async\n(x) => x")).toThrow('Unexpected token "=>"');

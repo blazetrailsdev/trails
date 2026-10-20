@@ -3021,6 +3021,13 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
     }
     const sf = node.getSourceFile();
     const line = sf.getLineAndCharacterOfPosition(tag.getStart()).line + 1;
+    if (!hasConvergeableStoryId(reason)) {
+      throw new Error(
+        `@noRailsEquivalent CONVERGEABLE needs a story id: ${sf.fileName}:${line} — ` +
+          "write `CONVERGEABLE <story-id>` with the bare kebab-case id of the story " +
+          "that removes this surface, or `PERMANENT` if nothing ever will.",
+      );
+    }
     const proseTag = proseTagAfter(tag);
     if (proseTag !== undefined) {
       throw new Error(
@@ -3037,6 +3044,16 @@ export function noRailsEquivalentReason(node: ts.Node): string | undefined {
     return reason;
   }
   return undefined;
+}
+
+/**
+ * False only for a `CONVERGEABLE` reason whose next token is not a story id
+ * (bare kebab-case, no RFC prefix). The shape is checked, not the story's
+ * existence, which needs the tasks checkout (RFC 0120).
+ */
+export function hasConvergeableStoryId(reason: string): boolean {
+  const claim = /^CONVERGEABLE\b\s*(\S*)/.exec(reason);
+  return claim === null || /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(claim[1]);
 }
 
 /**
@@ -3687,9 +3704,12 @@ function includedHookOwner(expr: ts.Expression): string | undefined {
           ts.isElementAccessExpression(expr.left)
         ? expr.left
         : undefined;
-  if (hook === undefined || !ts.isIdentifier(hook.expression)) return undefined;
+  if (hook === undefined) return undefined;
+  let owner: ts.Expression = hook.expression;
+  while (ts.isParenthesizedExpression(owner) || ts.isAsExpression(owner)) owner = owner.expression;
+  if (!ts.isIdentifier(owner)) return undefined;
   const name = ts.isPropertyAccessExpression(hook) ? hook.name : hook.argumentExpression;
-  return ts.isIdentifier(name) && name.text === "included" ? hook.expression.text : undefined;
+  return ts.isIdentifier(name) && name.text === "included" ? owner.text : undefined;
 }
 
 function isExportedModuleConst(sourceFile: ts.SourceFile, name: string): boolean {

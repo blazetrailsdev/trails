@@ -142,6 +142,12 @@ describe("classifyPair", () => {
     expect(classifyPair("b", "data")).toBe("burndown");
   });
 
+  // deflater.rb:105-106 `gzip.write(part)` vs deflater.ts `gzip.write(Buffer.from(part, "binary"))`.
+  it("names an ASCII-8BIT read handed to a byte sink as an encoding tag", () => {
+    expect(classifyPair("part", "from")).toBe("encoding-tag");
+    expect(classifyPair("part", "data")).toBe("burndown");
+  });
+
   // Ruby builtins whose TS spelling is the free function or method doing the
   // same work: locator.rb:107 `compact`, base.rb:282 `File.read`,
   // flatten.rb:100 `gsub`, base.rb:269 `inspect`.

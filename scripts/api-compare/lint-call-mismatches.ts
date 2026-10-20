@@ -118,7 +118,7 @@
  * are counted, and `--show-dropped-seeded` lists the seeded keys too.
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
- * entry guard is the sole exception, matching lint-arity-excludes.ts), async fs.
+ * entry guard is the sole exception), async fs.
  */
 
 import * as fs from "fs/promises";

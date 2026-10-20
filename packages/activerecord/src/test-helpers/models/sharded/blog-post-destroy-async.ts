@@ -1,14 +1,9 @@
-import {
-  Module,
-  rbModConstSet,
-  registerConstant,
-  registeredConstant,
-} from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant, registeredConstant } from "@blazetrails/ruby-compat";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 
-const Sharded = (registeredConstant("Sharded") as Module | undefined) ?? new Module();
+const Sharded = (registeredConstant("Sharded") as object | undefined) ?? {};
 registerConstant("Sharded", Sharded);
 
 /** @missingRailsArgs has_many — CONVERGEABLE port-destroy-association-async-test-and-flip-models */

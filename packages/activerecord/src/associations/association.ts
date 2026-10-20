@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
+import { AssociationScope } from "./association-scope.js";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import type { AssociationReflection, ThroughReflection } from "../reflection.js";
 import { kernelArray, safeConstantize, tryCall } from "@blazetrails/activesupport";
@@ -130,9 +130,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   scope(): any {
     let scope: any;
     if (this.disableJoins) {
-      return Associations.DisableJoinsAssociationScope.create().scope(
-        this as unknown as AssociationScopeable,
-      );
+      return Associations.DisableJoinsAssociationScope.create().scope(this);
     } else if ((scope = this.klass.currentScope()) && tryCall(scope, "proxyAssociation") === this) {
       return scope.spawn();
     } else if ((scope = this.klass.globalCurrentScope())) {
@@ -146,8 +144,8 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   associationScope(): any {
     if (this.klass) {
       return (this._cachedScope ||= this.disableJoins
-        ? Associations.DisableJoinsAssociationScope.scope(this as unknown as AssociationScopeable)
-        : AssociationScope.scope(this as unknown as AssociationScopeable));
+        ? Associations.DisableJoinsAssociationScope.scope(this)
+        : AssociationScope.scope(this));
     }
   }
 
@@ -399,7 +397,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     return this.reflection
       .associationScopeCache(this.klass, this.owner, (params: { bind(): unknown }) => {
         const as = AssociationScope.create(() => params.bind());
-        return this.targetScope().mergeBang(as.scope(this as unknown as AssociationScopeable));
+        return this.targetScope().mergeBang(as.scope(this));
       })
       .then((sc: StatementCache) => {
         const binds = AssociationScope.getBindValues(this.owner, this.reflection.chain as never);
@@ -498,9 +496,9 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   }
 
   protected enqueueDestroyAssociation(options: Record<string, unknown>): void {
-    const jobClass = (this.owner.constructor as any).destroyAssociationAsyncJob;
+    const jobClass = (this.owner.constructor as typeof Base).destroyAssociationAsyncJob;
     if (jobClass) {
-      (this.owner as any)._afterCommitJobs.push([jobClass, options]);
+      this.owner._afterCommitJobs.push([jobClass, options]);
     }
   }
 }

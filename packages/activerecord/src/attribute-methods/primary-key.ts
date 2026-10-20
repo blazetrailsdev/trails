@@ -121,29 +121,8 @@ function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource | undefi
 }
 
 /**
- * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key
- *
- * Rails' `inherited` (primary_key.rb:143-150) resets a subclass's
- * `@primary_key`, so a configured key is answered only when it is an own
- * property; any other class takes `reset_primary_key`, whose base-class arm
- * consults the schema cache so a key-less data source
- * (e.g. a view) resolves to `null` rather than the "id" convention. The lookup
- * is query-free — it reads only what `loadSchema` already warmed — so a cold
- * cache falls back to "id". The `null` it can return matches Rails'
- * dynamically-nil `primary_key` for a key-less data source (a view); this is
- * the one accessor that surfaces that case honestly. The public boundaries
- * (`Base.primaryKey`, the `primaryKey()` class method) and the model-typed
- * `PrimaryKeyHost` deliberately narrow to the non-null `string | string[]`
- * contract — never null for a persistable model — so hot paths that read
- * `primary_key` are not forced to null-guard. That narrowing is the accepted
- * deviation; this function is where the truth lives.
- * Rails' `primary_key` runs `reset_primary_key` on first read
- * (primary_key.rb:80-81) and latches the answer into `@primary_key`. trails
- * latches too, but only once the answer is reflected: `table_exists?` is async
- * here, so a read taken before the schema cache is warm answers the "id"
- * convention without latching it.
  * @internal
- * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (attribute_methods/primary_key.rb:80-81) as a this-typed function; a cold-cache read does not latch because table_exists? is async.
+ * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost & typeof Base): string | string[] | null {
   if (Object.hasOwn(this, "_primaryKey")) {
@@ -174,11 +153,8 @@ function isPrimaryKeyReflected(host: PrimaryKeyHost & typeof Base): boolean {
 }
 
 /**
- * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key=
- * (attribute_methods/primary_key.rb:130-140), as a this-typed function behind
- * the Rails-named `static set primaryKey` accessor on `Base`.
  * @internal
- * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key= (attribute_methods/primary_key.rb:130) as a this-typed function behind the Rails-named Base accessor.
+ * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
  */
 export function setPrimaryKeyAttr(this: PrimaryKeyHost, value: string | string[] | null): void {
   if (Array.isArray(value)) {

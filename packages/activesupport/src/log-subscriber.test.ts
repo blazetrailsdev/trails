@@ -6,71 +6,7 @@ import { Logger } from "./logger.js";
 import { Event } from "./notifications/instrumenter.js";
 import { assertEmpty, assertNotEmpty } from "./testing/assertions.js";
 import { assertNotCalled } from "./testing/method-call-assertions.js";
-
-class MockLogger extends Logger {
-  private _logged: Record<string, string[]> = {
-    debug: [],
-    info: [],
-    warn: [],
-    error: [],
-    fatal: [],
-    unknown: [],
-  };
-  flushCount = 0;
-
-  constructor() {
-    super(null);
-  }
-
-  logged(level: string): string[] {
-    return this._logged[level] ?? [];
-  }
-
-  override debug(message: string | null = null, block?: () => string): boolean {
-    if (this.level > Logger.DEBUG) return true;
-    const msg = block ? block() : (message ?? "");
-    this._logged.debug.push(msg);
-    return true;
-  }
-
-  override info(message: string | null = null, block?: () => string): boolean {
-    if (this.level > Logger.INFO) return true;
-    const msg = block ? block() : (message ?? "");
-    this._logged.info.push(msg);
-    return true;
-  }
-
-  override warn(message: string | null = null, block?: () => string): boolean {
-    if (this.level > Logger.WARN) return true;
-    const msg = block ? block() : (message ?? "");
-    this._logged.warn.push(msg);
-    return true;
-  }
-
-  override error(message: string | null = null, block?: () => string): boolean {
-    if (this.level > Logger.ERROR) return true;
-    const msg = block ? block() : (message ?? "");
-    this._logged.error.push(msg);
-    return true;
-  }
-
-  override fatal(message: string | null = null, block?: () => string): boolean {
-    if (this.level > Logger.FATAL) return true;
-    const msg = block ? block() : (message ?? "");
-    this._logged.fatal.push(msg);
-    return true;
-  }
-
-  override unknown(message: string | null = null, block?: () => string): boolean {
-    const msg = block ? block() : (message ?? "");
-    this._logged.unknown.push(msg);
-    return true;
-  }
-
-  flush(): void {
-    this.flushCount++;
-  }
-}
+import { MockLogger, setLogger, setup, teardown } from "./log-subscriber/test-helper.js";
 
 class MyLogSubscriber extends LogSubscriber {
   event: Event | null = null;
@@ -109,37 +45,31 @@ describe("SyncLogSubscriberTest", () => {
   let logger: MockLogger;
   let logSubscriber: MyLogSubscriber;
 
+  const t = { setLogger } as unknown as ThisParameterType<typeof setup> & { logger: MockLogger };
+
   beforeEach(() => {
-    logger = new MockLogger();
+    setup.call(t);
+    logger = t.logger;
     logSubscriber = new MyLogSubscriber();
-    LogSubscriber.logger = logger;
-    LogSubscriber.colorizeLogging = false;
   });
 
   afterEach(() => {
-    const subs = LogSubscriber.subscribers;
-    while (subs.length > 0) {
-      const sub = subs.pop()!;
-      for (const [, handle] of sub.patterns) {
-        Notifications.unsubscribe(handle);
-      }
-    }
-    LogSubscriber.logger = null;
+    teardown.call(t);
+    LogSubscriber.logSubscribers().length = 0;
     LogSubscriber.logLevels.clear();
-    Notifications.unsubscribeAll();
   });
 
   it("proxies method to rails logger", () => {
     logSubscriber.foo(null);
-    expect(logger.logged("debug")).toEqual(["debug"]);
-    expect(logger.logged("info")).toEqual(["info"]);
-    expect(logger.logged("warn")).toEqual(["warn"]);
+    expect(logger.logged(":debug")).toEqual(["debug"]);
+    expect(logger.logged(":info")).toEqual(["info"]);
+    expect(logger.logged(":warn")).toEqual(["warn"]);
   });
 
   it("set color for messages", () => {
     LogSubscriber.colorizeLogging = true;
     logSubscriber.bar(null);
-    expect(logger.logged("info")[logger.logged("info").length - 1]).toBe(
+    expect(logger.logged(":info")[logger.logged(":info").length - 1]).toBe(
       "\x1b[31mcool\x1b[0m, \x1b[1m\x1b[34misn't it?\x1b[0m",
     );
   });
@@ -147,20 +77,20 @@ describe("SyncLogSubscriberTest", () => {
   it("set mode for messages", () => {
     LogSubscriber.colorizeLogging = true;
     logSubscriber.baz(null);
-    expect(logger.logged("info")[logger.logged("info").length - 1]).toBe(
+    expect(logger.logged(":info")[logger.logged(":info").length - 1]).toBe(
       "\x1b[1;4m\x1b[32mrad\x1b[0m, \x1b[3m\x1b[33misn't it?\x1b[0m",
     );
   });
 
   it("does not set color if colorize logging is set to false", () => {
     logSubscriber.bar(null);
-    expect(logger.logged("info")[logger.logged("info").length - 1]).toBe("cool, isn't it?");
+    expect(logger.logged(":info")[logger.logged(":info").length - 1]).toBe("cool, isn't it?");
   });
 
   it("event is sent to the registered class", () => {
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
     Notifications.instrument("some_event.my_log_subscriber");
-    expect(logger.logged("info")).toEqual(["some_event.my_log_subscriber"]);
+    expect(logger.logged(":info")).toEqual(["some_event.my_log_subscriber"]);
   });
 
   it("event is an active support notifications event", () => {
@@ -232,44 +162,44 @@ describe("SyncLogSubscriberTest", () => {
     Notifications.instrument("puke.my_log_subscriber");
     Notifications.instrument("some_event.my_log_subscriber");
 
-    expect(logger.logged("info").length).toBe(1);
-    expect(logger.logged("info")[0]).toBe("some_event.my_log_subscriber");
+    expect(logger.logged(":info").length).toBe(1);
+    expect(logger.logged(":info")[0]).toBe("some_event.my_log_subscriber");
 
-    expect(logger.logged("error").length).toBe(1);
-    expect(logger.logged("error")[0]).toMatch(
+    expect(logger.logged(":error").length).toBe(1);
+    expect(logger.logged(":error")[0]).toMatch(
       /Could not log "puke.my_log_subscriber" event\. Error: puke/,
     );
   });
 
   it("subscribe log level", () => {
-    MyLogSubscriber.logger = logger;
+    MyLogSubscriber.logger = logger as unknown as Logger;
     logger.level = Logger.INFO;
     MyLogSubscriber.subscribeLogLevel("debug_only", "debug");
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
-    assertEmpty(logger.logged("debug"));
+    assertEmpty(logger.logged(":debug"));
 
     Notifications.instrument("debug_only.my_log_subscriber");
-    assertEmpty(logger.logged("debug"));
+    assertEmpty(logger.logged(":debug"));
 
     logger.level = Logger.DEBUG;
     Notifications.instrument("debug_only.my_log_subscriber");
-    assertNotEmpty(logger.logged("debug"));
+    assertNotEmpty(logger.logged(":debug"));
   });
 
   it("subscribe log level with non numeric levels", () => {
     const semanticLogger = new MockLogger();
-    LogSubscriber.logger = semanticLogger;
-    MyLogSubscriber.logger = semanticLogger;
+    setLogger.call(t, semanticLogger);
+    MyLogSubscriber.logger = semanticLogger as unknown as Logger;
     semanticLogger.level = Logger.INFO;
     MyLogSubscriber.subscribeLogLevel("debug_only", "debug");
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
-    assertEmpty(semanticLogger.logged("debug"));
+    assertEmpty(semanticLogger.logged(":debug"));
 
     Notifications.instrument("debug_only.my_log_subscriber");
-    assertEmpty(semanticLogger.logged("debug"));
+    assertEmpty(semanticLogger.logged(":debug"));
 
     semanticLogger.level = Logger.DEBUG;
     Notifications.instrument("debug_only.my_log_subscriber");
-    assertNotEmpty(semanticLogger.logged("debug"));
+    assertNotEmpty(semanticLogger.logged(":debug"));
   });
 });

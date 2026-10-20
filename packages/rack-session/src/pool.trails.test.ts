@@ -1,4 +1,4 @@
-import { StringIO } from "@blazetrails/ruby-compat";
+import { Mutex, StringIO } from "@blazetrails/ruby-compat";
 import { Request, Raw } from "@blazetrails/rack";
 import { describe, expect, it } from "vitest";
 
@@ -12,11 +12,16 @@ function stubRequest(): PersistedRequest {
     params: {},
     getHeader: () => undefined as unknown as PersistedSession,
     setHeader: () => {},
+    fetchHeader: <T>(key: string, block: (key: string) => T) => block(key),
     sessionOptions: {},
   };
 }
 
 describe("Rack::Session::Pool", () => {
+  it("exposes its mutex, as attr_reader :mutex does", () => {
+    expect(new Pool(undefined).mutex).toBeInstanceOf(Mutex);
+  });
+
   it("DEFAULT_OPTIONS adds drop and allow_fallback", async () => {
     expect(Pool.DEFAULT_OPTIONS["drop"]).toBe(false);
     expect(Pool.DEFAULT_OPTIONS["allowFallback"]).toBe(true);

@@ -157,23 +157,14 @@ export const ClassMethods = {
   },
 };
 
-export const Rescuable = new Module((mod) => {
-  extend(mod, Concern);
-
-  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
-    null,
-    function (this: object) {
-      classAttribute.call(this, "rescueHandlers", { default: [] });
-    },
-  );
-
-  mod.defineMethod("rescueWithHandler", rescueWithHandler);
-  mod.defineMethod("handlerForRescue", handlerForRescue);
-}) as Module<{
-  rescueWithHandler: typeof rescueWithHandler;
-  handlerForRescue: typeof handlerForRescue;
-}> & { ClassMethods: typeof ClassMethods };
-Rescuable.ClassMethods = ClassMethods;
+export const Rescuable = { rescueWithHandler, handlerForRescue, ClassMethods };
+extend(Rescuable, Concern);
+(Rescuable as unknown as { included(base: null, block: (this: object) => void): void }).included(
+  null,
+  function (this: object) {
+    classAttribute.call(this, "rescueHandlers", { default: [] });
+  },
+);
 export type Rescuable = Included<typeof Rescuable>;
 
 export function rescueWithHandler(this: object, exception: unknown): unknown {

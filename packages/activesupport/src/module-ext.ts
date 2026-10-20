@@ -59,7 +59,7 @@ function setMattrDefault(
   storageKey: string,
   options: MattrOptions,
 ): void {
-  const rawDefault = options.default;
+  const rawDefault = options.default ?? null;
   const symDefaultValue = typeof rawDefault === "function" ? rawDefault() : rawDefault;
   if (!(symDefaultValue == null && Object.hasOwn(target, storageKey))) {
     target[storageKey] = symDefaultValue;
@@ -145,14 +145,8 @@ export function mattrAccessor(this: any, ...syms: (string | MattrOptions)[]): vo
 export const cattrAccessor = mattrAccessor;
 
 /**
- * configAccessor — defines inheritable configuration accessors (config_accessor in Rails).
- * Works like mattrAccessor but uses a separate config hash namespace.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE Backed by the private
- * `Configurable::ClassMethods#config_accessor` (configurable.rb:111-128, made private at :129); the privates
- * manifest cannot back it here because trails hosts it in module-ext.ts rather than a
- * configurable.ts, and the manifest keys private names by the .rb they live in.
+ * @noRailsEquivalent CONVERGEABLE config-accessor-belongs-in-configurable-not-module-ext
  */
 export function configAccessor(this: any, ...syms: (string | MattrOptions)[]): void {
   mattrAccessor.call(this, ...syms);

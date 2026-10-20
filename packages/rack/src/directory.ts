@@ -1,4 +1,4 @@
-import { Dir, File, sprintf } from "@blazetrails/ruby-compat";
+import { Dir, File, rbObjMethod, sprintf } from "@blazetrails/ruby-compat";
 import type { FsStatResult } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH, PATH_INFO, SCRIPT_NAME } from "./constants.js";
 import { escapeHtml, escapePath, unescapePath, validPath } from "./utils.js";
@@ -57,26 +57,27 @@ export class DirectoryBody {
     this.files = files;
   }
 
+  /** @missingRailsName sub — PERMANENT */
   each(cb: (chunk: string) => void): void {
     const showPath = escapeHtml(this.path.replace(new RegExp(`^${this.root}`), ""));
     cb(sprintf(DIR_PAGE_HEADER, showPath, showPath));
 
     if (this.path.replace(/\/$/, "") !== this.root) {
-      cb(sprintf(DIR_FILE, ...this.DIR_FILE_escape(this.files("..")!)));
+      cb(sprintf(DIR_FILE, ...this.DIRFILEEscape(this.files("..")!)));
     }
 
     Dir.foreach(this.path, (basename) => {
       if (basename.startsWith(".")) return;
       const f = this.files(basename);
       if (!f) return;
-      cb(sprintf(DIR_FILE, ...this.DIR_FILE_escape(f)));
+      cb(sprintf(DIR_FILE, ...this.DIRFILEEscape(f)));
     });
 
     cb(DIR_PAGE_FOOTER);
   }
 
   /** @internal */
-  private DIR_FILE_escape(htmls: string[]): string[] {
+  private DIRFILEEscape(htmls: string[]): string[] {
     return htmls.map((e) => escapeHtml(e));
   }
 }
@@ -86,10 +87,11 @@ export class Directory {
   private app: any;
   private head: Head;
 
+  /** @missingRailsName method — PERMANENT */
   constructor(root: string, app?: any) {
     this.root = File.expandPath(root);
     this.app = app || new Files(this.root);
-    this.head = new Head(this.get.bind(this));
+    this.head = new Head(rbObjMethod(this, ":get"));
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {

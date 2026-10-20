@@ -112,8 +112,8 @@ it("handles exceptions without a backtrace", async () => {
 
 it("allows subclasses to override template", async () => {
   class CustomShowExceptions extends ShowExceptions {
-    protected template(): string {
-      return "foo";
+    protected template() {
+      return () => "foo";
     }
   }
   const app = new CustomShowExceptions(async () => {

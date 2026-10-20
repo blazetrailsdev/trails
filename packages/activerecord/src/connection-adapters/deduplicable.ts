@@ -1,14 +1,7 @@
 import { Concern } from "@blazetrails/activesupport";
-import { Hash, Module, extend, hashAref, hashAset } from "@blazetrails/ruby-compat";
+import { Hash, extend, hashAref, hashAset } from "@blazetrails/ruby-compat";
 
 type DeduplicableClass = { registry(): Hash<object, object> };
-
-export const Deduplicable = new Module() as Module<{
-  deduplicate<T>(this: T): T;
-  negate<T>(this: T): T;
-  deduplicated(): object;
-}> & { ClassMethods: typeof ClassMethods };
-extend(Deduplicable, Concern);
 
 export function deduplicate<T extends object & { deduplicated(): T }>(this: T): T {
   const registry = (this.constructor as unknown as DeduplicableClass).registry();
@@ -30,8 +23,16 @@ export function registry(this: object): Hash<object, object> {
 export const ClassMethods = {
   registry,
 };
-Deduplicable.ClassMethods = ClassMethods;
 
-Deduplicable.defineMethod("deduplicate", deduplicate);
-Deduplicable.defineMethod("negate", negate);
-Deduplicable.defineMethod("deduplicated", deduplicated);
+export const Deduplicable: {
+  ClassMethods: typeof ClassMethods;
+  deduplicate<T>(this: T): T;
+  negate<T>(this: T): T;
+  deduplicated(): object;
+} = {
+  ClassMethods,
+  deduplicate: deduplicate as <T>(this: T) => T,
+  negate: negate as <T>(this: T) => T,
+  deduplicated,
+};
+extend(Deduplicable, Concern);

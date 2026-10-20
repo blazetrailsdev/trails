@@ -1,21 +1,15 @@
-import { rbModName } from "@blazetrails/ruby-compat";
-import {
-  foreignKey,
-  underscore,
-  singularize,
-  pluralize,
-  camelize,
-} from "@blazetrails/activesupport";
-import { joinHabtmTableNames } from "../../associations.js";
+import { block, fetch, rbModName } from "@blazetrails/ruby-compat";
+import type { Base } from "../../base.js";
+import { foreignKey, singularize, pluralize, camelize } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../namespaces.js";
 import { HasMany } from "./has-many.js";
 
 export class HasAndBelongsToMany {
-  readonly lhsModel: any;
+  readonly lhsModel: typeof Base;
   readonly associationName: string;
   readonly options: Record<string, unknown>;
 
-  constructor(associationName: string, lhsModel: any, options: Record<string, unknown>) {
+  constructor(associationName: string, lhsModel: typeof Base, options: Record<string, unknown>) {
     this.associationName = associationName;
     this.lhsModel = lhsModel;
     this.options = options;
@@ -73,11 +67,11 @@ export class HasAndBelongsToMany {
     };
 
     Object.defineProperty(joinModel, "name", {
-      value: `HABTM_${camelize(this.associationName)}`,
+      value: `HABTM_${camelize(String(this.associationName))}`,
       writable: true,
       configurable: true,
     });
-    joinModel.tableNameResolver = () => builder._tableName();
+    joinModel.tableNameResolver = () => builder.tableName();
     joinModel.leftModel = lhsModel;
 
     joinModel.addLeftAssociation("leftSide", { anonymousClass: lhsModel });
@@ -120,48 +114,21 @@ export class HasAndBelongsToMany {
     return rhsOptions;
   }
 
-  private _fallbackTableName(name: string): string {
-    return underscore(pluralize(name)).replace(/\//g, "_");
-  }
-
-  private _tableName(): string {
-    if (this.options.joinTable) {
-      return this.options.joinTable as string;
-    }
-    const className =
-      (this.options.className as string) ?? camelize(singularize(this.associationName));
-    const lhsTable = this.lhsModel.tableName ?? this._fallbackTableName(this.lhsModel.name);
-
-    let rhsTable: string;
-    if (typeof this.lhsModel.computeType === "function") {
-      try {
-        const klass = this.lhsModel.computeType(className);
-        rhsTable = klass?.tableName ?? this._fallbackTableName(className);
-      } catch {
-        rhsTable = this._fallbackTableName(className);
-      }
+  private tableName(): string {
+    if (this.options.joinTable != null && this.options.joinTable !== false) {
+      return String(this.options.joinTable);
     } else {
-      rhsTable = this._fallbackTableName(className);
+      const className = fetch<unknown>(
+        this.options,
+        "className",
+        block(() => singularize(camelize(String(this.associationName)))),
+      );
+      const klass = this.lhsModel.computeType(String(className));
+      return [this.lhsModel.tableName, klass.tableName]
+        .sort()
+        .join("\0")
+        .replace(/^(.*[._])(.+)\0\1(.+)/gm, "$1$2_$3")
+        .replaceAll("\0", "_");
     }
-
-    return joinHabtmTableNames(lhsTable, rhsTable);
   }
-}
-
-/** @internal */
-function middleOptions(builder: HasAndBelongsToMany, joinModel: unknown): Record<string, unknown> {
-  return (builder as any).middleOptions(joinModel);
-}
-
-/** @internal */
-function tableName(builder: HasAndBelongsToMany): string {
-  return (builder as any)._tableName?.() ?? "";
-}
-
-/** @internal */
-function belongsToOptions(
-  builder: HasAndBelongsToMany,
-  options: Record<string, unknown>,
-): Record<string, unknown> {
-  return (builder as any).belongsToOptions(options);
 }

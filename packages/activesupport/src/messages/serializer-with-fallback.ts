@@ -1,7 +1,8 @@
 import {
   ArgumentError,
-  KeyError,
+  Hash,
   LoadError,
+  fetch,
   Marshal,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
@@ -55,14 +56,14 @@ function load(this: Serializer, dumped: string): unknown {
     return this._load(dumped);
   } else if (format && this.fallback(format)) {
     const payload: Record<string, unknown> = {
-      serializer: this.key,
+      serializer: SERIALIZERS.key(this),
       fallback: format,
       serialized: dumped,
     };
     return Notifications.instrument(
       "message_serializer_fallback.active_support",
       payload,
-      (p) => (p.deserialized = SERIALIZERS[format]._load(dumped)),
+      (p) => (p.deserialized = SERIALIZERS.get(format)!._load(dumped)),
     );
   } else {
     throw new RuntimeError("Unsupported serialization format");
@@ -181,13 +182,12 @@ const messagePackWithFallbackAllowMarshal: Serializer = {
 };
 
 /** @internal */
-export const SERIALIZERS: Record<Format, Serializer> = {
-  marshal: marshalWithFallback,
-  json: jsonWithFallback,
-  json_allow_marshal: jsonWithFallbackAllowMarshal,
-  message_pack: messagePackWithFallback,
-  message_pack_allow_marshal: messagePackWithFallbackAllowMarshal,
-};
+export const SERIALIZERS = new Hash<Format, Serializer>()
+  .set("marshal", marshalWithFallback)
+  .set("json", jsonWithFallback)
+  .set("json_allow_marshal", jsonWithFallbackAllowMarshal)
+  .set("message_pack", messagePackWithFallback)
+  .set("message_pack_allow_marshal", messagePackWithFallbackAllowMarshal);
 
 /** @internal */
 export const SerializerWithFallback = {
@@ -199,8 +199,6 @@ export const SerializerWithFallback = {
       throw new LoadError("cannot load such file -- active_support/message_pack");
     }
 
-    const serializer = SERIALIZERS[format as Format];
-    if (!serializer) throw new KeyError(`key not found: ${JSON.stringify(format)}`);
-    return serializer;
+    return fetch(SERIALIZERS, format as Format) as Serializer;
   },
 };

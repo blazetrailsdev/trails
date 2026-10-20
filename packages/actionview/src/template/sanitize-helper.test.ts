@@ -229,29 +229,27 @@ function sanitizeHelperVendorTests(vendor: SanitizerVendor): void {
     assertKindOf(String, Array.from(result)[0]);
   });
 
-  // BLOCKED: sanitize-helper-sanitized-allowed-writers
-  it.skip("sanitized allowed tags is settable", () => {
+  it("sanitized allowed tags is settable", () => {
     const savedValue = (subjectClass as any).sanitizedAllowedTags();
     try {
-      (subjectClass as any).sanitizedAllowedTags = ["a", "b"];
+      (subjectClass as any).setSanitizedAllowedTags(["a", "b"]);
       const result = (subjectClass as any).sanitizedAllowedTags();
 
       expect(result).toEqual(["a", "b"]);
     } finally {
-      (subjectClass as any).sanitizedAllowedTags = savedValue;
+      (subjectClass as any).setSanitizedAllowedTags(savedValue);
     }
   });
 
-  // BLOCKED: sanitize-helper-sanitized-allowed-writers
-  it.skip("sanitized allowed attributes is settable", () => {
+  it("sanitized allowed attributes is settable", () => {
     const savedValue = (subjectClass as any).sanitizedAllowedAttributes();
     try {
-      (subjectClass as any).sanitizedAllowedAttributes = ["a", "b"];
+      (subjectClass as any).setSanitizedAllowedAttributes(["a", "b"]);
       const result = (subjectClass as any).sanitizedAllowedAttributes();
 
       expect(result).toEqual(["a", "b"]);
     } finally {
-      (subjectClass as any).sanitizedAllowedAttributes = savedValue;
+      (subjectClass as any).setSanitizedAllowedAttributes(savedValue);
     }
   });
 

@@ -31,6 +31,7 @@ import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/me
 import {
   SERIALIZERS,
   SerializerWithFallback,
+  type Serializer as SerializerWithFallbackSerializer,
 } from "@blazetrails/activesupport/messages/serializer-with-fallback";
 import {
   InvalidMessage,
@@ -794,8 +795,8 @@ export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
 export function isReserialize(this: SerializedCookieJarsHost, dumped: string): boolean {
   const configured = serializer.call(this);
   return (
-    Object.values(SERIALIZERS).includes(configured as (typeof SERIALIZERS)["json"]) &&
-    configured !== SERIALIZERS.marshal &&
+    [...SERIALIZERS.values()].includes(configured as SerializerWithFallbackSerializer) &&
+    configured !== SerializerWithFallback.get("marshal") &&
     !configured.dumped(dumped)
   );
 }

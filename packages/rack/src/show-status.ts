@@ -48,7 +48,10 @@ export class ShowStatus {
     return response;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName inspect — PERMANENT
+   */
   private h(obj: unknown): string {
     if (typeof obj === "string") {
       return escapeHtml(obj);

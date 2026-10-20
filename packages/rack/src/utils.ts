@@ -12,6 +12,8 @@ import {
   ArgumentError,
   aryDeleteIf,
   block,
+  compact,
+  last,
   stringSplit,
   fetch,
   warn,
@@ -54,6 +56,9 @@ export function multipartFileLimit(): number {
 export function setMultipartFileLimit(v: number): void {
   _multipartFileLimit = v;
 }
+
+export const multipartPartLimit = multipartFileLimit;
+export const setMultipartPartLimit = setMultipartFileLimit;
 
 export function paramDepthLimit(): number {
   return defaultQueryParser().paramDepthLimit;
@@ -157,20 +162,22 @@ export function forwardedValues(
 
 export function bestQMatch(qValueHeader: string, availableMimes: string[]): string | null {
   const values = qValues(qValueHeader);
-  let bestMatch: string | null = null;
-  let bestScore = -Infinity;
 
-  for (const [reqMime, quality] of values) {
-    const match = availableMimes.find((am) => RackMime.match(am, reqMime));
-    if (!match) continue;
-    const wildcards = match.split("/", 2).filter((p) => p === "*").length * -10;
-    const score = wildcards + quality;
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = match;
-    }
-  }
-  return bestMatch;
+  const matches = last(
+    compact(
+      values.map(([reqMime, quality]): [string, number] | null => {
+        const match = availableMimes.find((am) => RackMime.match(am, reqMime));
+        if (!match) return null;
+        return [match, quality];
+      }),
+    ).sort(
+      ([aMatch, aQuality], [bMatch, bQuality]) =>
+        aMatch.split("/", 2).filter((part) => part === "*").length * -10 +
+        aQuality -
+        (bMatch.split("/", 2).filter((part) => part === "*").length * -10 + bQuality),
+    ),
+  );
+  return matches?.[0] ?? null;
 }
 
 export function escapeHtml(string: any): string {
@@ -224,30 +231,28 @@ export function selectBestEncoding(
   return null;
 }
 
-export function parseCookiesHeader(value: string | null | undefined): Record<string, string> {
+export function parseCookiesHeader(
+  value: string | null | undefined,
+): Record<string, string | null> {
   if (!value) return {};
-  const cookies: Record<string, string> = {};
+  const cookies: Record<string, string | null> = {};
   for (const cookie of value.split(/; */)) {
     if (!cookie) continue;
     const eqIdx = cookie.indexOf("=");
-    let key: string, val: string;
-    if (eqIdx === -1) {
-      key = cookie;
-      val = "";
-    } else {
-      key = cookie.substring(0, eqIdx);
-      val = cookie.substring(eqIdx + 1);
-    }
-    try {
-      if (!(key in cookies)) cookies[key] = unescape(val);
-    } catch {
-      if (!(key in cookies)) cookies[key] = val;
+    const key = eqIdx === -1 ? cookie : cookie.substring(0, eqIdx);
+    value = eqIdx === -1 ? null : cookie.substring(eqIdx + 1);
+    if (!Object.hasOwn(cookies, key)) {
+      try {
+        cookies[key] = unescape(value!);
+      } catch {
+        cookies[key] = value;
+      }
     }
   }
   return cookies;
 }
 
-export function parseCookies(env: Record<string, any>): Record<string, string> {
+export function parseCookies(env: Record<string, any>): Record<string, string | null> {
   return parseCookiesHeader(env[HTTP_COOKIE]);
 }
 
@@ -437,20 +442,20 @@ export function statusCode(status: number | string): number {
     ((status.trim() !== "" && Number.isNaN(parseInt(status, 10))) || isSymbol(status))
   ) {
     const symbol = stringToSym(status);
-    const name = symbolToS(symbol);
+    status = symbolToS(symbol);
     return fetch(
       SYMBOL_TO_STATUS_CODE,
-      name,
+      status,
       block(() => {
         const fallbackCode = fetch(
           OBSOLETE_SYMBOLS_TO_STATUS_CODES,
-          name,
+          status as string,
           block(() => {
             throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
           }),
         ) as number;
         const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
-        const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[name];
+        const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[status];
         if (canonicalSymbol == null) {
           warn(message, { uplevel: 3 });
         }

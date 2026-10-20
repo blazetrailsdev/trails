@@ -92,6 +92,7 @@ export const TopLevel: {
       PolymorphicRoutes: {
         HelperMethodBuilder: { path(): PolymorphicBuilder; url(): PolymorphicBuilder };
       };
+      UrlFor?: object;
     };
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };

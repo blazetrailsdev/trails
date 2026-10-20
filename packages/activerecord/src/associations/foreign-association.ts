@@ -1,5 +1,5 @@
 import { isPresent, kernelArray as Array } from "@blazetrails/activesupport";
-import { Module, zip } from "@blazetrails/ruby-compat";
+import { zip } from "@blazetrails/ruby-compat";
 import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
 
@@ -46,10 +46,8 @@ export function setOwnerAttributes(this: ForeignAssociationHost, record: Base): 
   }
 }
 
-export const ForeignAssociation: Module = new Module((mod) =>
-  mod.include({
-    foreignKeyPresent,
-    nullifiedOwnerAttributes,
-    setOwnerAttributes,
-  }),
-);
+export const ForeignAssociation = {
+  foreignKeyPresent,
+  nullifiedOwnerAttributes,
+  setOwnerAttributes,
+};

@@ -1,6 +1,11 @@
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
 import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
+import { b } from "./string/b.js";
+import { StandardError } from "./standard-error.js";
+import { registerConstant } from "./variable.js";
+
+class ZError extends StandardError {}
 
 /**
  * `Zlib::GzipFile` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4838`). `gzfile_s_open`
@@ -207,6 +212,44 @@ export const Zlib = {
   GzipWriter,
 
   /**
+   * `Zlib::Error` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4646` `cZError`), a `StandardError`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Error`.
+   */
+  Error: ZError,
+
+  /**
+   * `Zlib::Deflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4713`), whose one-shot
+   * `deflate` (`rb_deflate_s_deflate`, `zlib.c:1730`) compresses the String's
+   * bytes (a text String's UTF-8 bytes) at `Z_DEFAULT_COMPRESSION` and answers them
+   * as a binary String.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Deflate`.
+   */
+  Deflate: {
+    deflate(src: string | Uint8Array): string {
+      return b(getZlib().deflate(src instanceof Uint8Array ? src : new TextEncoder().encode(src)));
+    },
+  },
+
+  /**
+   * `Zlib::Inflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4725`), whose one-shot
+   * `inflate` (`rb_inflate_s_inflate`, `zlib.c:2044`) answers the inflated bytes
+   * as a binary String, held as its bytes, raising `Zlib::Error` on a malformed stream.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Inflate`.
+   */
+  Inflate: {
+    inflate(src: string): Uint8Array {
+      try {
+        return getZlib().inflate(Uint8Array.from(src, (c) => c.charCodeAt(0)));
+      } catch (error) {
+        throw new ZError((error as Error).message);
+      }
+    },
+  },
+
+  /**
    * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:507` `rb_zlib_crc32`, which is
    * `do_checksum(argc, argv, crc32)` (`zlib.c:410`): `crc` seeds `sum`, an
    * omitted `string` answers that seed unchanged (`zlib.c:428`), and otherwise
@@ -227,3 +270,5 @@ export const Zlib = {
     return (sum ^ 0xffffffff) >>> 0;
   },
 };
+
+registerConstant("Zlib::Error", ZError);
