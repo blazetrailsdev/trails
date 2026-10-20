@@ -60,13 +60,29 @@ export function setDefaultEnforceUtf8(value: boolean): void {
 
 export function formTag(
   this: FormTagHelperHost,
+  urlForOptions: unknown,
+  options: Record<string, unknown>,
+  block: (...args: unknown[]) => PromiseLike<unknown>,
+): Promise<SafeBuffer>;
+export function formTag(
+  this: FormTagHelperHost,
+  urlForOptions?: unknown,
+  options?: Record<string, unknown>,
+  block?: ((...args: unknown[]) => unknown) | null,
+): SafeBuffer;
+export function formTag(
+  this: FormTagHelperHost,
   urlForOptions: unknown = {},
   options: Record<string, unknown> = {},
   block?: ((...args: unknown[]) => unknown) | null,
-): SafeBuffer {
+): SafeBuffer | Promise<SafeBuffer> {
   const htmlOptions = htmlOptionsForForm.call(this, urlForOptions, options);
   if (block != null) {
-    return formTagWithBody.call(this, htmlOptions, this.capture(block));
+    const content = this.capture(block);
+    if (content instanceof Promise) {
+      return content.then((content) => formTagWithBody.call(this, htmlOptions, content));
+    }
+    return formTagWithBody.call(this, htmlOptions, content);
   } else {
     return formTagHtml.call(this, htmlOptions);
   }

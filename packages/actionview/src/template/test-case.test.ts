@@ -431,8 +431,8 @@ describe("ATestHelperTest", () => {
 const AssertionsTest = named(
   class AssertionsTest extends TestCase {
     renderFromHelper(this: Tc) {
-      return this.formTag("/foo", {}, () => {
-        this.safeConcat(this.render({ plain: "<ul><li>foo</li></ul>" }));
+      return this.formTag("/foo", {}, async () => {
+        this.safeConcat(await this.render({ plain: "<ul><li>foo</li></ul>" }));
       });
     }
   },
@@ -443,8 +443,12 @@ const AssertionsTest = named(
 describe("AssertionsTest", () => {
   const tc = testCase(AssertionsTest as TestCaseClass);
 
-  it.skip("uses the output_buffer for assert_select", () => {
-    // BLOCKED: actionview-render-plain-is-async-inside-capture-block
+  it("uses the output_buffer for assert_select", async () => {
+    await tc().render({ partial: "test/from_helper" });
+
+    tc().assertSelect("form", () => {
+      tc().assertSelect("li", { text: "foo" });
+    });
   });
 
   it("do not memoize the document_root_element in view tests", () => {

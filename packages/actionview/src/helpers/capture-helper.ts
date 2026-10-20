@@ -8,29 +8,46 @@ export interface CaptureHelperHost {
   viewFlow: OutputFlow;
 }
 
+/** @inventedArm then — PERMANENT */
+export function capture<TArgs extends unknown[]>(
+  this: CaptureHelperHost,
+  block: (...args: TArgs) => PromiseLike<unknown>,
+  ...args: TArgs
+): Promise<SafeBuffer | null>;
 export function capture<TArgs extends unknown[]>(
   this: CaptureHelperHost,
   block: (...args: TArgs) => unknown,
   ...args: TArgs
-): SafeBuffer | null {
+): SafeBuffer | null;
+export function capture<TArgs extends unknown[]>(
+  this: CaptureHelperHost,
+  block: (...args: TArgs) => unknown,
+  ...args: TArgs
+): SafeBuffer | null | Promise<SafeBuffer | null> {
   let value: unknown = null;
   if (!this.outputBuffer) this.outputBuffer = new OutputBuffer();
   const buf = this.outputBuffer;
-  const buffer = buf.capture(() => {
-    value = block(...args);
-  });
+  const result = (buffer: SafeBuffer): SafeBuffer | null => {
+    let string: unknown;
+    if (buf === value) {
+      string = buffer;
+    } else {
+      string = isPresent(buffer.toString()) ? buffer : value;
+    }
 
-  let string: unknown;
-  if (buf === value) {
-    string = buffer;
-  } else {
-    string = isPresent(buffer.toString()) ? buffer : value;
+    if (string instanceof OutputBuffer) return string.toString();
+    if (string instanceof SafeBuffer) return string;
+    if (typeof string === "string") return htmlEscape(string);
+    return null;
+  };
+  const buffer = buf.capture(() => (value = block(...args)));
+  if (buffer instanceof Promise) {
+    return buffer.then(async (buffer) => {
+      value = await value;
+      return result(buffer);
+    });
   }
-
-  if (string instanceof OutputBuffer) return string.toString();
-  if (string instanceof SafeBuffer) return string;
-  if (typeof string === "string") return htmlEscape(string);
-  return null;
+  return result(buffer);
 }
 
 /** @inventedArm if — PERMANENT */
