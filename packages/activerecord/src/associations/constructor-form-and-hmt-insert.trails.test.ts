@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { assigningSynchronously } from "@blazetrails/activemodel";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -54,9 +55,14 @@ describe("constructor-form association writer", () => {
 
   it("restores the sync assignment mark after a nested assignAttributes", () => {
     const post = new Post({ title: "p" });
-    const author = new Author({ name: "x" });
+    const author = new Author({ name: "x" }) as Author & Record<symbol, boolean | undefined>;
+    expect(author[assigningSynchronously]).toBeUndefined();
+    author[assigningSynchronously] = true;
     author.assignAttributes({ name: "y" });
-    expect(() => author.assignAttributes({ post })).not.toThrow();
+    expect(author[assigningSynchronously]).toBe(true);
+    author[assigningSynchronously] = undefined;
+    author.assignAttributes({ post });
+    expect(author[assigningSynchronously]).toBeUndefined();
     expect((author as any).association("post").target).toBe(post);
   });
 
