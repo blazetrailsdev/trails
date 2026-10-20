@@ -1475,9 +1475,15 @@ export class Emitter {
     }
     if (opts.asFunction)
       return `${doc}export ${asy}function ${tsName}(${thisParam}${ps})${ret} {\n${indent(body).join("\n")}\n}`;
+    // A module's private method is called on its includer (`this: TestCase`),
+    // which TypeScript's `protected` would hide from an interface extending the
+    // module: `@internal` only, as the hand port marks one (activejob core.ts).
+    const hidden =
+      (opts.vis === "protected" || opts.vis === "private") &&
+      !(opts.module && this.resolver.isClassModule(u.fqn));
     const mod = opts.objectMember
       ? ""
-      : `${opts.static ? "static " : ""}${opts.vis === "protected" || opts.vis === "private" ? "protected " : ""}`;
+      : `${opts.static ? "static " : ""}${hidden ? "protected " : ""}`;
     return `${doc}${mod}${asy}${propKey(tsName)}(${thisParam}${ps})${ret} {\n${indent(body).join("\n")}\n}`;
   }
 

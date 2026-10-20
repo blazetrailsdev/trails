@@ -1576,6 +1576,8 @@ export class Lowerer {
     const out: string[] = [];
     const kw: string[] = [];
     let kwRequired = false;
+    const kwType: string[] = [];
+    let kwRest = false;
     let position = 0;
     const positionalType = () => (isBlock ? null : ctx.paramTypes?.[position++]) ?? "any";
     for (const p of params) {
@@ -1598,14 +1600,17 @@ export class Lowerer {
           if (!p.name) ctx.scope.locals.add("rest");
           break;
         case "key":
+          kwType.push(`${jsIdent(p.name!)}?: unknown`);
           kw.push(`${jsIdent(p.name!)} = ${this.expr(p.default!, ctx)}`);
           this.noteParamType(ctx, p.name!, p.default!);
           break;
         case "keyreq":
+          kwType.push(`${jsIdent(p.name!)}: unknown`);
           kw.push(jsIdent(p.name!));
           kwRequired = true;
           break;
         case "keyrest":
+          kwRest = true;
           kw.push(`...${nm ?? "kwrest"}`);
           if (!p.name) ctx.scope.locals.add("kwrest");
           break;
@@ -1618,7 +1623,17 @@ export class Lowerer {
           break;
       }
     }
-    if (kw.length) out.push(`{ ${kw.join(", ")} }: any = {}`);
+    // Ruby keywords are one options object, typed by its keys (`**rest` is any
+    // other key of it).
+    if (kw.length) {
+      const lit = `{ ${kwType.join("; ")}${kwType.length ? ";" : ""} }`;
+      const t = kwRest
+        ? kwType.length
+          ? `${lit} & Record<string, unknown>`
+          : "Record<string, unknown>"
+        : lit;
+      out.push(`{ ${kw.join(", ")} }: ${t} = {}`);
+    }
     void kwRequired;
     const blk = params.find((p) => p.kind === "block");
     // A Ruby `&block` is a Proc or nil: a function, optional.
