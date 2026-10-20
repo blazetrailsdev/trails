@@ -475,6 +475,7 @@ export default defineConfig({
             "./packages/activesupport/src/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
             "./packages/bcrypt/src/index.ts",
+            "./packages/actionview/src/test-helpers/setup-compile-template.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
