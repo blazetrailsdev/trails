@@ -1307,17 +1307,25 @@ export function comparableRubySites(
     return false;
   };
   for (const ruby of rubySites) {
-    if (!ruby.flags.includes("weak")) consume(ruby.name);
+    if (!ruby.flags.includes("weak") && !isStringNew(ruby)) consume(ruby.name);
   }
   return rubySites.filter(
     (ruby) =>
-      !ruby.flags.includes("weak") ||
+      (!isStringNew(ruby) && !ruby.flags.includes("weak")) ||
       (!TS_CALL_HOMONYMS.has(ruby.name) &&
         declaredInComparedFile(ruby.name) &&
         consume(ruby.name)) ||
       hasNativeFormSite(ruby, tsSites),
   );
 }
+
+/** An argument-less Ruby `String.new` (`parser.rb:161`), which ports as the
+ *  JS literal `""`: no TS call answers it, so it takes no `new` from the body. */
+function isStringNew(ruby: CallSite): boolean {
+  return ruby.name === "new" && ruby.recv === STRING_RECEIVER && ruby.args.length === 0;
+}
+
+const STRING_RECEIVER = "const:String";
 
 function hasNativeFormSite(ruby: CallSite, tsSites: readonly CallSite[]): boolean {
   const keyed = keyedFormName(ruby.name);

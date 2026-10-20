@@ -43,6 +43,7 @@ export class GlobalID {
   }
 
   readonly uri: GID;
+  private _modelClass: LocatorModel | undefined;
 
   constructor(gid: string | GID, _options: GlobalIDOptions = {}) {
     this.uri = gid instanceof GID ? gid : GID.parse(gid);
@@ -161,11 +162,13 @@ export class GlobalID {
   }
 
   get modelClass(): LocatorModel {
-    const klass = constantize(this.modelName) as LocatorModel;
-    if (isOrExtends(klass, GlobalID)) {
+    if (this._modelClass !== undefined) return this._modelClass;
+    const model = constantize(this.modelName) as LocatorModel;
+
+    if (isOrExtends(model, GlobalID)) {
       throw new ArgumentError("GlobalID and SignedGlobalID cannot be used as model_class.");
     }
-    return klass;
+    return (this._modelClass = model);
   }
 
   async find(options?: LocateOptions): Promise<unknown | null> {

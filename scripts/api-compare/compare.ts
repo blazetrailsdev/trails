@@ -833,7 +833,7 @@ export function invokeForms(calls: Iterable<string>): string[] {
  * expression (extract-ruby-api.rb#core_new_kind):
  *
  * - `literal-new`: an argument-less, block-less `Hash.new` / `Array.new` /
- *   `Concurrent::Array.new`, the literal `{}` / `[]`
+ *   `Concurrent::Array.new` / `String.new`, the literal `{}` / `[]` / `""`
  *   (`associations/foreign_association.rb:14`, `core.rb:220`).
  * - `string-new`: `String.new(x)`, credited only against a TS body that makes
  *   the `String(x)` conversion call (`relation/query_methods.rb:2047`).
