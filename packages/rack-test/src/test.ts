@@ -360,7 +360,12 @@ export class Session {
     Object.getOwnPropertyDescriptor(app, "prototype")?.writable !== false
       ? app(env)
       : (app as RackMiddleware).call(env));
-    const [status, headers, body] = result instanceof Response ? result.toArray() : result;
+    const [status, headers, rackBody] = result instanceof Response ? result.toArray() : result;
+    let body = rackBody;
+    if (Symbol.asyncIterator in Object(rackBody)) {
+      body = [];
+      for await (const chunk of rackBody as AsyncIterable<string | Uint8Array>) body.push(chunk);
+    }
 
     this._lastResponse = new MockResponse(
       status,
