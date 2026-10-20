@@ -24,6 +24,7 @@ import {
   rbEqual,
   rbEql,
   cmp,
+  rbFSend,
 } from "@blazetrails/ruby-compat";
 
 const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
@@ -2010,5 +2011,29 @@ describe("a Ruby date against its Temporal seat", () => {
     const time = Temporal.ZonedDateTime.from("2001-02-03T04:05:06+00:00[UTC]");
     expect([rbEqual(time, dt), cmp(time, dt)]).toEqual([false, null]);
     expect([rbEqual(dt, time), cmp(dt, time), dt.cmp(time)]).toEqual([false, null, null]);
+  });
+});
+
+describe("Date#hour, #min, #sec (d_lite_zero, private)", () => {
+  it("answer 0 through send on a Date instance, and are not JS members", () => {
+    const d = new RubyDate(2013, 2, 20);
+    for (const m of ["hour", "min", "minute", "sec", "second"]) {
+      expect(rbFSend(d, m)).toBe(0);
+      expect(m in d).toBe(false);
+    }
+  });
+
+  it("leave DateTime's public readers in place", () => {
+    const dt = new RubyDateTime(2013, 2, 20, 7, 8, 9);
+    expect(["hour", "min", "minute", "sec", "second"].map((m) => rbFSend(dt, m))).toEqual([
+      7, 8, 8, 9, 9,
+    ]);
+  });
+
+  it("raise ArgumentError on an argument, as the arity-0 private readers do", () => {
+    expect(() => rbFSend(new RubyDate(2013, 2, 20), "hour", 1)).toThrow(ArgumentError);
+    expect(() => rbFSend(new RubyDateTime(2013, 2, 20, 7, 8, 9), "minute", 1)).toThrow(
+      ArgumentError,
+    );
   });
 });

@@ -2110,6 +2110,11 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
       extendObject(klass, table);
       (klass as Record<symbol, Set<object>>)[includedModulesKey].delete(table);
       trackIncludedModule(klass, nested);
+      if (typeof klass !== "function") {
+        const singleton = rbObjSingletonClass(klass).prototype as Record<symbol, Set<object>>;
+        singleton[includedModulesKey].delete(table);
+        trackIncludedModule(singleton, nested);
+      }
     }
   }
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
@@ -2176,6 +2181,7 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   }
 
   trackIncludedModule(klass, mod);
+  if (typeof klass !== "function") trackIncludedModule(rbObjSingletonClass(klass).prototype, mod);
   if (typeof (mod as ModuleHooks)[extended] === "function") {
     (mod as ModuleHooks)[extended]!(klass);
   }

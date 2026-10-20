@@ -51,7 +51,10 @@ export class TypeMetadata extends DelegateClass(SqlTypeMetadata) {
     return rbHash(TypeMetadata) ^ rbHash(this.__getobj__()) ^ rbHash(this.oid) ^ rbHash(this.fmod);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inlinedFrom ActiveRecord::ConnectionAdapters::Deduplicable#deduplicated rails/v8.0.2/activerecord/lib/active_record/connection_adapters/deduplicable.rb:24-26
+   */
   deduplicated(): this {
     this.__setobj__(this.__getobj__().deduplicate());
     return Object.freeze(this);

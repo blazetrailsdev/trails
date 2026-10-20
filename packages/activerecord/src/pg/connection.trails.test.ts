@@ -55,6 +55,42 @@ describe("pgConnection transaction_status and status", () => {
   });
 });
 
+describe("PG::Connection#send_query and #get_last_result", () => {
+  it("dispatches without waiting and hands each result to get_last_result", async () => {
+    const raw = { rows: [[1]], fields: [{ name: "?column?" }], rowCount: 1, command: "SELECT" };
+    const query = vi.fn(() => Promise.resolve(raw));
+    const client = pgConnection({ query });
+    expect(client.sendQuery("SELECT 1")).toBeUndefined();
+    expect(query).toHaveBeenCalledOnce();
+    expect(() => client.sendQuery("SELECT 2")).toThrow("another command is already in progress");
+    expect(query).toHaveBeenCalledOnce();
+    const last = client.getLastResult();
+    const again = client.getLastResult();
+    expect(() => client.sendQuery("SELECT 2")).toThrow("another command is already in progress");
+    expect(await last).toBeInstanceOf(PG.Result);
+    expect(await again).toBeNull();
+    expect(await client.getLastResult()).toBeNull();
+    client.sendQuery("SELECT 2");
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  it("get_last_result raises the failure of the query send_query dispatched", async () => {
+    const client = pgConnection({
+      _queryable: false,
+      query: () =>
+        Promise.reject(new Error("Client has encountered a connection error and is not queryable")),
+    });
+    client.sendQuery("SELECT 1");
+    await expect(client.getLastResult()).rejects.toBeInstanceOf(PG.ConnectionBad);
+    expect(() => client.sendQuery("SELECT 1")).toThrow(PG.UnableToSend);
+  });
+
+  it("raises connection is closed on a finished connection", () => {
+    const client = pgConnection({ _ending: true, query: vi.fn() });
+    expect(() => client.sendQuery("SELECT 1")).toThrow("connection is closed");
+  });
+});
+
 describe("PG::Connection.escape_bytea", () => {
   it("renders the hex format unescape_bytea reads back", () => {
     expect(escapeBytea(Buffer.from("hi"))).toBe("\\x6869");
@@ -134,15 +170,24 @@ describe("PG::Error#result on every carrier path", () => {
   const terminated = () => new Error("Connection terminated unexpectedly");
 
   it("rewraps a rejection from async_exec, exec_params, exec_prepared and query", async () => {
-    const client = pgConnection({
-      _ended: true,
-      query: (_config: unknown) => Promise.reject(terminated()),
-    });
+    const client = () =>
+      pgConnection({
+        _ended: true,
+        query: (_config: unknown) => Promise.reject(terminated()),
+      });
     const errors = [
-      await client.asyncExec("SELECT 1").catch((e: unknown) => e),
-      await client.execParams("SELECT $1", [1]).catch((e: unknown) => e),
-      await client.execPrepared("a1", [1]).catch((e: unknown) => e),
-      await client.query("").catch((e: unknown) => e),
+      await client()
+        .asyncExec("SELECT 1")
+        .catch((e: unknown) => e),
+      await client()
+        .execParams("SELECT $1", [1])
+        .catch((e: unknown) => e),
+      await client()
+        .execPrepared("a1", [1])
+        .catch((e: unknown) => e),
+      await client()
+        .query("")
+        .catch((e: unknown) => e),
     ];
     for (const error of errors) {
       expect(error).toBeInstanceOf(PG.ConnectionBad);
