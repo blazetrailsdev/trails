@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Helpers, Request } from "./request.js";
+import { Env, Helpers, Request } from "./request.js";
 import { QueryParser } from "./query-parser.js";
 import { EmptyContentError } from "./multipart/parser.js";
 import { MockRequest } from "./mock-request.js";
@@ -1497,6 +1497,7 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
         this.env = env;
       }
     };
+    include(c, Env);
     const h = {};
     expect(new c(h).env).toBe(h);
   });
