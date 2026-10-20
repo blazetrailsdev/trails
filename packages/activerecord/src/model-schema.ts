@@ -75,10 +75,8 @@ function containedTableNamePrefix(this: SchemaKlass): string {
 }
 
 /**
- * Build a WHERE clause string for the primary key of a given record.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the primary-key predicate Ruby builds through predicate_builder in _update_record (persistence.rb:263).
+ * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
  */
 export function buildPkWhere(this: SchemaKlass, idValue: unknown): string {
   const pk = this.primaryKey;
@@ -98,10 +96,8 @@ export function buildPkWhere(this: SchemaKlass, idValue: unknown): string {
 }
 
 /**
- * Build an Arel node for a primary key WHERE condition.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the Arel form of that same predicate_builder call (persistence.rb:263).
+ * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
  */
 export function buildPkWhereNode(
   this: SchemaKlass,
@@ -127,25 +123,8 @@ export function buildPkWhereNode(
 }
 
 /**
- * Build an Arel node for a WHERE condition from a `_query_constraints_hash`
- * (column name → value). A single entry yields a bare predicate node and
- * multiple entries an `And` of predicates — for the simple single-PK and
- * composite-PK cases this reproduces the non-null `buildPkWhereNode` output,
- * while a `query_constraints` model maps each declared constraint column to its
- * value.
- *
- * A null/undefined value produces an `IS NULL` predicate (not a dead `1=0`),
- * mirroring Rails' `_update_record`/`_delete_record`, which route every
- * `{name, value}` pair through `predicate_builder[name, value]` — and
- * `predicate_builder[name, nil]` builds `name IS NULL`. This matters for
- * `query_constraints` columns that are legitimately null in the DB: a `1=0`
- * predicate would silently update/delete zero rows.
- *
- * Mirrors: how `ActiveRecord::Persistence#_update_record` / `#_delete_record`
- * turn `_query_constraints_hash` into the predicate WHERE.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE turns _query_constraints_hash into the predicate WHERE Ruby builds inline (persistence.rb:263).
+ * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
  */
 export function buildWhereNodeFromConstraints(
   this: SchemaKlass,
@@ -545,43 +524,8 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void 
 }
 
 /**
- * Register attribute definitions from the adapter's schema cache.
- *
- * Mirrors: ActiveRecord::ModelSchema#load_schema! — walks `columns_hash`
- * and calls `define_attribute(..., user_provided_default: false)` for each
- * column so the cast type comes from the adapter (e.g. PG OID map) rather
- * than the generic ActiveModel type registry.
- *
- * Populates the schema cache if needed (async). User-declared attributes —
- * the ones carrying a pending `attribute(...)` modification — are NEVER
- * overwritten, matching Rails where the pending replay runs after the column
- * seed so `attribute :foo, :bar` always wins over the reflected type.
- *
- * This is the async half of `schema_cache.columns_hash` (schema_cache.rb):
- * it warms the cache and then enters the single `load_schema!` body, so the
- * concern overrides (counter_cache.rb:186-195, encryptable_record.rb:126-130)
- * run over a real anchor.
- *
- * Rails' `schema_cache` is a POOL read (`load_schema!`, model_schema.rb:591) and
- * never checks a connection out permanently, so the warm runs inside a
- * `with_connection` scope, so the connection `reflectionAdapter` reads through
- * `withConnectionSync` stays threaded for the whole warm and the guard is false
- * on re-entry, so the body runs once. A model with a directly-assigned adapter has no
- * pool to scope against and skips it, as does a pool-less model, whose
- * `connection_pool` throws where Ruby's always answers.
- *
- * Rails latches `@primary_key` at the first `primary_key` read
- * (attribute_methods/primary_key.rb:80-81), where `get_primary_key` asks the
- * current pool (`:101-108`). That read is synchronous here and only peeks, so
- * a pool whose cache is cold answers the "id" convention. The warm above is
- * the awaited half of that read, and `resetPrimaryKey` under `primary_key`'s
- * own guard latches its answer while the cache is known warm. The guard is
- * spelled out because the reader (`getPrimaryKeyAttr`) latches only after its
- * own peek of the cache succeeds and answers the convention unlatched when it
- * does not, so reading it here would not guarantee the latch.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
+ * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
  */
 export async function loadSchemaFromAdapter(this: SchemaKlass): Promise<void> {
   if (this.isAbstractClass()) return;
@@ -709,13 +653,8 @@ export function setIgnoredColumns(this: SchemaKlass, columns: string[]): void {
 }
 
 /**
- * Synchronous, cache-only view of `tableExists`: `false` only when the schema
- * cache has already resolved this table as absent, `undefined` when unknown
- * (cold cache / no adapter). Sync callers of Rails' `table_exists?` guard
- * (class-level `attribute_names`) use this since `tableExists` is async.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE cache-only view of ModelSchema#table_exists? (model_schema.rb:416) for the sync callers; retires with RFC 0073.
+ * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
  */
 export function cachedTableExists(this: SchemaKlass): boolean | undefined {
   let pool: ReturnType<typeof Base.connectionPool>;

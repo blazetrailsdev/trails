@@ -9,11 +9,14 @@ import {
   UNGATED_ALLOWED_PACKAGES,
   exceedances,
   incompleteMarks,
+  internalViolations,
   measure,
+  measureInternal,
   staleMarks,
   strandedMarks,
   taggedOnlyViolations,
   tightened,
+  tightenedInternal,
   unmarkedPackages,
   unmeasuredPackages,
   type SurfaceMarks,
@@ -35,6 +38,7 @@ describe("extra-surface mark", () => {
         totalExtras: 63,
         noCounterpartFiles: 0,
         totalAllowlisted: 0,
+        totalInternal: 4,
         inlinedFrom: [],
       },
       {
@@ -43,6 +47,7 @@ describe("extra-surface mark", () => {
         totalExtras: 1424,
         noCounterpartFiles: 0,
         totalAllowlisted: 0,
+        totalInternal: 4,
         inlinedFrom: [],
       },
       {
@@ -51,6 +56,7 @@ describe("extra-surface mark", () => {
         totalExtras: 0,
         noCounterpartFiles: 0,
         totalAllowlisted: 0,
+        totalInternal: 4,
         inlinedFrom: [],
       },
       {
@@ -59,6 +65,7 @@ describe("extra-surface mark", () => {
         totalExtras: 34,
         noCounterpartFiles: 0,
         totalAllowlisted: 0,
+        totalInternal: 4,
         inlinedFrom: [],
       },
     ]);
@@ -66,6 +73,41 @@ describe("extra-surface mark", () => {
       arel: { novel: 0, total: 63, noCounterpartFiles: 0, allowed: 0, inlinedFrom: 0 },
       activerecord: { novel: 399, total: 1424, noCounterpartFiles: 0, allowed: 0 },
       "ruby-compat": { novel: 0, total: 0, noCounterpartFiles: 0 },
+    });
+  });
+
+  it("ratchets internal for every gated package, rowless ones included", () => {
+    expect(
+      measureInternal([
+        {
+          package: "arel",
+          totalNovel: 0,
+          totalExtras: 0,
+          noCounterpartFiles: 0,
+          totalAllowlisted: 0,
+          totalInternal: 288,
+          inlinedFrom: [],
+        },
+        {
+          package: "activesupport",
+          totalNovel: 1,
+          totalExtras: 1,
+          noCounterpartFiles: 0,
+          totalAllowlisted: 0,
+          totalInternal: 9,
+          inlinedFrom: [],
+        },
+      ]),
+    ).toEqual({ arel: 288 });
+    const marks = { arel: 288, "ruby-compat": 3 };
+    expect(internalViolations(marks, { arel: 290, "ruby-compat": 1, thor: 4 })).toEqual({
+      grew: [{ package: "arel", dimension: "internal", mark: 288, current: 290 }],
+      stale: [{ package: "ruby-compat", dimension: "internal", mark: 3, current: 1 }],
+      unmarked: ["thor"],
+    });
+    expect(tightenedInternal(marks, { arel: 290, "ruby-compat": 1 })).toEqual({
+      arel: 288,
+      "ruby-compat": 1,
     });
   });
 

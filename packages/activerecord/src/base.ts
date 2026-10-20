@@ -704,19 +704,8 @@ export class Base extends Model {
   }
 
   /**
-   * Reflect the schema from the configured adapter the first time the
-   * query/persistence path needs it — the async analogue of Rails' synchronous
-   * `method_missing` schema load (activemodel/attribute_methods.rb:474-486).
-   * Every declaration reaching here is a user `attribute()`; whether it also
-   * names a real column is decided by `columns_hash`, which is DB-sourced
-   * (model_schema.rb:437-441), so nothing has to be classified first.
-   *
-   * The residual gap is attribute access on a record that was never queried and
-   * never loaded (e.g. `new User().handle` before any DB hit), which a getter
-   * can't await without wrapping instances in a `Proxy`.
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the schema load Ruby performs synchronously from method_missing (active_model/attribute_methods.rb:507-486); async here, so callers must await it.
+   * @noRailsEquivalent CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts
    */
   static ensureSchemaLoaded(this: typeof Base): Promise<void> {
     return this.loadSchema();

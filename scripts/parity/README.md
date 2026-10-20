@@ -84,8 +84,6 @@ hand.
 | ------------------------------------------- | ----------------- | ------------------------------ |
 | `api-compare/call-mismatches-exclude/`      | exclude (sharded) | `lint-call-mismatches.ts`      |
 | `api-compare/call-mismatches-unreviewed/`   | mark (sharded)    | `lint-call-mismatches.ts`      |
-| `api-compare/arity-exclude.json`            | exclude           | `lint-arity-excludes.ts`       |
-| `api-compare/inheritance-exclude.json`      | exclude           | `lint-inheritance-excludes.ts` |
 | `api-compare/body-pins.json`                | pin               | `lint-body-pins.ts`            |
 | `test-compare/assertion-mismatch-mark.json` | mark              | `lint-assertion-mismatches.ts` |
 | `schema-compare/invented-baseline.json`     | baseline          | `schema-compare/compare.ts`    |

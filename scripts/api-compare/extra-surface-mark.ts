@@ -119,6 +119,17 @@ import { serializeBaseline } from "./baseline-json.js";
 export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
 
 /**
+ * The `@internal` mark (RFC 0120): public declarations each gated package
+ * hides through `internal: true`, ratcheted only-shrink. It lives apart from
+ * {@link MARK_PATH} because a rowless package carries no row there, while this
+ * number is never pinned at 0 — most `@internal` uses are correct, and the
+ * gate exists so a spike is visible, not so the count reaches zero.
+ */
+export const INTERNAL_MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-internal-mark.json");
+
+export type InternalMarks = Record<string, number>;
+
+/**
  * Gated packages whose `novel` is still a number to burn down rather than a
  * rule to hold, so the mark's value governs both dimensions.
  */
@@ -239,6 +250,7 @@ export interface MeasuredTotals {
   totalExtras: number;
   noCounterpartFiles: number;
   totalAllowlisted: number;
+  totalInternal: number;
   inlinedFrom: readonly unknown[];
 }
 
@@ -264,7 +276,7 @@ export function measure(packages: readonly MeasuredTotals[]): SurfaceMarks {
 
 export interface MarkViolation {
   package: string;
-  dimension: MarkDimension;
+  dimension: MarkDimension | "internal";
   mark: number;
   current: number;
 }
@@ -428,4 +440,61 @@ export async function writeMarks(marks: SurfaceMarks): Promise<void> {
   const sorted: SurfaceMarks = {};
   for (const name of Object.keys(marks).sort()) sorted[name] = marks[name]!;
   await fs.writeFile(MARK_PATH, serializeBaseline(sorted));
+}
+
+/** {@link measure}'s `internal` twin, over every gated package. */
+export function measureInternal(packages: readonly MeasuredTotals[]): InternalMarks {
+  const marks: InternalMarks = {};
+  for (const name of GATED_PACKAGES) {
+    const measured = packages.find((p) => p.package === name);
+    if (measured) marks[name] = measured.totalInternal;
+  }
+  return marks;
+}
+
+/**
+ * Every gated package whose `internal` count moved off its mark: `grew` fails
+ * the gate, `stale` is narrowed by `--tighten`, and `unmarked` names a gated
+ * package the mark never seeded.
+ */
+export function internalViolations(
+  marks: InternalMarks,
+  current: InternalMarks,
+): { grew: MarkViolation[]; stale: MarkViolation[]; unmarked: string[] } {
+  const grew: MarkViolation[] = [];
+  const stale: MarkViolation[] = [];
+  const unmarked: string[] = [];
+  for (const name of GATED_PACKAGES) {
+    const mark = marks[name];
+    const now = current[name];
+    if (now === undefined) continue;
+    if (mark === undefined) {
+      unmarked.push(name);
+      continue;
+    }
+    const violation = { package: name, dimension: "internal" as const, mark, current: now };
+    if (now > mark) grew.push(violation);
+    if (now < mark) stale.push(violation);
+  }
+  return { grew, stale, unmarked };
+}
+
+/** Narrow each `internal` mark to `current`; never raises one. */
+export function tightenedInternal(marks: InternalMarks, current: InternalMarks): InternalMarks {
+  const next: InternalMarks = { ...marks };
+  for (const [name, mark] of Object.entries(marks)) {
+    const now = current[name];
+    if (now !== undefined) next[name] = Math.min(mark, now);
+  }
+  return next;
+}
+
+export async function loadInternalMarks(): Promise<InternalMarks> {
+  return JSON.parse(await fs.readFile(INTERNAL_MARK_PATH, "utf-8")) as InternalMarks;
+}
+
+export async function writeInternalMarks(marks: InternalMarks): Promise<void> {
+  const sorted: InternalMarks = {};
+  for (const name of Object.keys(marks).sort()) sorted[name] = marks[name]!;
+  await fs.writeFile(INTERNAL_MARK_PATH, serializeBaseline(sorted));
 }
