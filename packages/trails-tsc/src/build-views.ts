@@ -85,7 +85,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
       for (const view of views) await writeShim(view, viewsDir);
       program = ts.createProgram(roots, EMIT_OPTIONS, host, program);
     }
-    emitDeclarations(program, host, outViews);
+    emitViews(program, host, outViews);
   }
   const registryEntries = Array.from(registryMap, ([key, types]) => ({
     key,
@@ -212,7 +212,7 @@ function relocateImports(typeText: string, shimDir: string): string {
 const EMIT_OPTIONS: ts.CompilerOptions = {
   declaration: true,
   declarationMap: true,
-  emitDeclarationOnly: true,
+  sourceMap: true,
   skipLibCheck: true,
   strict: true,
   moduleResolution: ts.ModuleResolutionKind.Bundler,
@@ -828,13 +828,13 @@ function emitRegistryAugmentation(entries: Array<{ key: string; localsType: stri
   return lines.join("\n");
 }
 
-function emitDeclarations(program: ts.Program, host: ts.CompilerHost, outViews: string): void {
+function emitViews(program: ts.Program, host: ts.CompilerHost, outViews: string): void {
   const emitResult = program.emit(undefined, (fileName, ...rest) => {
     if (path.resolve(fileName).startsWith(outViews + path.sep)) host.writeFile(fileName, ...rest);
   });
   if (emitResult.emitSkipped) {
     const diagnostics = [...ts.getPreEmitDiagnostics(program), ...emitResult.diagnostics];
     const formatted = ts.formatDiagnostics(ts.sortAndDeduplicateDiagnostics(diagnostics), host);
-    throw new Error(`declaration emit failed:\n${formatted}`);
+    throw new Error(`view emit failed:\n${formatted}`);
   }
 }
