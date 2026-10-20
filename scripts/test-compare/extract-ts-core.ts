@@ -788,8 +788,6 @@ export function extractTestsFromSource(
   for (const [name, body] of deferredBodies) {
     const sites = callSiteAncestors.get(name) ?? [];
     if (sites.some((outer) => sites.some((inner) => extendsSuite(inner, outer)))) {
-      // Called from a suite and from a suite nested in it: the examples run at
-      // each, as a Minitest subclass replays its same-file superclass's tests.
       sites.forEach((site, i) => {
         const siteGate = callSiteGates.get(name)![i];
         currentAncestors.push(...site);
