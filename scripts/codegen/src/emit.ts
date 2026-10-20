@@ -1927,6 +1927,55 @@ export class Emitter {
         }
       }
     }
+    // `extend M` on the class itself (`Base` extends `ConnectionHandling`):
+    // M's methods, and those of the modules M includes, are its statics.
+    const classSide: string[] = [];
+    for (const m of mods) {
+      const cm = this.index.scopes.get(`${m}::ClassMethods`);
+      if (this.index.scopes.get(m)?.concern && cm) classSide.push(cm.fqn);
+    }
+    const chainHere = [...lexicalChain(this.index, sc.lexicalParent), sc.fqn];
+    for (const p of sc.extends) {
+      const hit = this.index.resolveConst(p, chainHere);
+      if (hit?.kind !== "scope" || this.index.scopes.get(hit.fqn)?.kind !== "module") continue;
+      for (const em of rubyAncestors(this.index, hit.fqn)) {
+        const es = this.index.scopes.get(em);
+        if (!es || es.kind !== "module" || classSide.includes(em)) continue;
+        classSide.push(em);
+        const tr = typeRef(em);
+        const allStatic = em.endsWith("::ClassMethods") || !!es.moduleFunction;
+        for (const d of es.defs.keys()) {
+          const n = fnName(d, em);
+          if (d === "new" || d === "initialize" || n === "constructor" || own.stat.has(n)) continue;
+          if (!tr && !/^[\w$.]+$/.test(ref(em))) continue;
+          own.stat.add(n);
+          statics.push(
+            tr
+              ? allStatic
+                ? `declare static ${n}: typeof ${tr}.${n};`
+                : `declare static ${n}: ${tr}[${quote(n)}];`
+              : `declare static ${n}: ${this.lw.imp(ctx, "@blazetrails/ruby-compat", "Extended")}<typeof ${ref(em)}>[${quote(n)}];`,
+          );
+        }
+      }
+    }
+    // The class-level ivars those methods keep on the class (`@sequence_name`
+    // in ModelSchema::ClassMethods): its static storage, typed by the type pass.
+    for (const cs of classSide) {
+      for (const d of this.index.scopes.get(cs)?.defs.values() ?? [])
+        walk(d.node?.body ?? null, (nd) => {
+          if (nd.k === "def") return false;
+          if (nd.k !== "ivar" && nd.k !== "iasgn") return;
+          const field = `_${propName(String(nd.name).slice(1)).replace(/^_/, "")}`;
+          if (
+            own.stat.has(field) ||
+            members.some((m) => new RegExp(`^static (?:get |set )?${field}\\b`).test(m))
+          )
+            return;
+          own.stat.add(field);
+          statics.push(`declare static ${field}: unknown;`);
+        });
+    }
     const iface =
       bases.length || attrs.length || methods.length
         ? `export interface ${name}${bases.length ? ` extends ${bases.join(", ")}` : ""} {${attrs.length || methods.length ? `\n${indent([...attrs, ...methods]).join("\n")}\n` : ""}}`

@@ -1632,7 +1632,15 @@ export class Lowerer {
           ? `${lit} & Record<string, unknown>`
           : "Record<string, unknown>"
         : lit;
-      out.push(`{ ${kw.join(", ")} }: ${t} = {}`);
+      // A method takes them as one `options` parameter and unpacks it first,
+      // as the hand port writes keywords (`Column`'s constructor); a block
+      // destructures in place.
+      const taken = params.some((p) => p.name === "options");
+      if (isBlock || taken) out.push(`{ ${kw.join(", ")} }: ${t} = {}`);
+      else {
+        out.push(`options: ${t} = {}`);
+        (ctx.prologue ??= []).push(`const { ${kw.join(", ")} } = options;`);
+      }
     }
     void kwRequired;
     const blk = params.find((p) => p.kind === "block");

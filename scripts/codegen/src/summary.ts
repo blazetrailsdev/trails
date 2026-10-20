@@ -81,8 +81,13 @@ function agreement() {
     const uni = new Set([...a, ...b]).size;
     jac += uni === 0 ? 1 : inter / uni;
     if (inter === uni) sameCalls++;
-    if ((gm.params ?? []).map((p) => p.name).join() === (hm.params ?? []).map((p) => p.name).join())
-      sameParams++;
+    // TypeScript's `this` parameter is a type annotation, not a parameter.
+    const names = (m: M) =>
+      (m.params ?? [])
+        .map((p) => p.name)
+        .filter((n) => n !== "this")
+        .join();
+    if (names(gm) === names(hm)) sameParams++;
     if ((gm.skeleton ?? []).join() === (hm.skeleton ?? []).join()) sameSkeleton++;
   }
   return {
