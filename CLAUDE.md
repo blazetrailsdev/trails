@@ -1378,8 +1378,16 @@ Two corollaries:
   work is a reason to converge it (§ "A documented deviation is debt, not
   permission"), not to match it.
 
-Neither gate stands in the way, which is why this is a judgement the rule has
-to settle rather than a ratchet. For the call SET, `extract-ts-api.ts` credits
+One gate holds the line. `pnpm parity:api:sends` counts, per non-test file,
+the sends whose name argument is a string literal, and fails on any file above
+its count at the merge-base with `origin/main` — only-shrink, with no mark file
+to seed or tighten, on trails#9129's reasoning that the base tree IS the mark.
+It is a floor, not the rule: it is line-based, so a name on a continuation line
+is uncounted, and a computed name it never sees is still governed by the order
+above.
+
+The call gates do not help, which is why the order above has to be a rule.
+For the call SET, `extract-ts-api.ts` credits
 `rbFSend(recv, "literalName")` as a call to `literalName` itself
 (`collectCalls`), so spelling one out changes nothing there. The ARGUMENT
 stream does not follow it: `callSiteName` has no send arm, so the site is
