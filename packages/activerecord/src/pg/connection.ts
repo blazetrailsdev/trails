@@ -86,7 +86,7 @@ export class Connection {
 
   status(): number {
     const { _ending, _ended } = this.client;
-    return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
+    return this.bad || _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
   }
 
   async reset(): Promise<void> {
@@ -167,6 +167,9 @@ export class Connection {
 
   async sendQuery(sql: string): Promise<void> {
     const client = this.client;
+    if (this.bad) {
+      throw new UnableToSend("no connection to the server\n", { connection: this });
+    }
     const fatal = await (this.query as unknown as Query)(sql).then(
       () => false,
       (error: unknown) => (error as { cause?: { severity?: string } }).cause?.severity === "FATAL",
