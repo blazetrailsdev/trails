@@ -553,6 +553,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler

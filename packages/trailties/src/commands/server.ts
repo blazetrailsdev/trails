@@ -3,8 +3,11 @@ import { getFs, getPath, setEnv } from "@blazetrails/ruby-compat";
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { Handler, type RackEnv } from "@blazetrails/rack";
+import { DetailsKey } from "@blazetrails/actionview";
 import { requireApplicationBang } from "../command/actions.js";
 import { Trails } from "../rails.js";
+import type { ActionViewConfig } from "../trailties/action-view.js";
+import type { WatchHandle } from "@blazetrails/trails-tsc";
 
 export function serverCommand(): Command {
   const cmd = new Command("server");
@@ -27,6 +30,7 @@ export function serverCommand(): Command {
       const root = Dir.pwd();
       await requireApplicationBang();
       const app = await Trails.initialize();
+      await watchViews(app, root);
       const port = parseInt(options.port, 10);
       const railsApp = (env: RackEnv) => app.call(env);
       if (options.environment !== "development" || !(await hasViteConfig(root))) {
@@ -80,6 +84,40 @@ function environment(options: ServerOptions): string {
 
 function commandEnvironment(): string {
   return presence(getEnv("TRAILS_ENV")) || presence(getEnv("NODE_ENV")) || "development";
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function watchViews(
+  app: Awaited<ReturnType<typeof Trails.initialize>>,
+  root: string,
+): Promise<WatchHandle | null> {
+  const { config } = app;
+  const actionView: ActionViewConfig | undefined = config?.actionView;
+  if (actionView == null) return null;
+  const cacheTemplateLoading = actionView.cacheTemplateLoading;
+  const enableCaching =
+    cacheTemplateLoading == null ? !config.isReloadingEnabled() : cacheTemplateLoading;
+  if (enableCaching) return null;
+
+  const { watchViews: watchViewFiles } = await import("@blazetrails/trails-tsc");
+  let started = false;
+  let initialError: Error | null = null;
+  const handle = await watchViewFiles({
+    cwd: root,
+    onRebuild: ({ kind }) => {
+      if (kind === "change") DetailsKey.clear();
+    },
+    onError: (err, trigger) => {
+      if (!started) initialError ??= err;
+      console.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`);
+    },
+  });
+  started = true;
+  if (initialError !== null) {
+    handle.close();
+    throw initialError;
+  }
+  return handle;
 }
 
 async function hasViteConfig(root: string): Promise<boolean> {

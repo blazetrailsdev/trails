@@ -396,6 +396,15 @@ binstub:
 - Database: \`config/database.ts\`
 - Routes: \`config/routes.ts\`
 - Environment-specific: \`config/environments/\`
+
+## Views and deployment
+
+\`.tse\` views are precompiled into \`.trails/views/\`. In development,
+\`${this.pmRun()} dev\` watches \`app/views/\`, rebuilds a changed view and
+re-imports it on the next render. In production templates load once from the
+deploy-time build, so the deploy must run \`trails-tsc-views build --views
+app/views\` (the \`prepare\` script) before the server boots; a view with no
+built module raises \`LoadError\`.
 `,
     );
 
