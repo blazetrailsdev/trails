@@ -87,6 +87,7 @@ hand.
 | `api-compare/body-pins.json`                | pin               | `lint-body-pins.ts`            |
 | `test-compare/assertion-mismatch-mark.json` | mark              | `lint-assertion-mismatches.ts` |
 | `schema-compare/invented-baseline.json`     | baseline          | `schema-compare/compare.ts`    |
+| `parity/cast-count-mark.json`               | mark              | `parity/cast-count-mark.ts`    |
 
 **Do not move these files.** They are referenced by path from CI workflow steps
 and from the lint tooling, and the sharded ones (`call-mismatches-*`) are split
