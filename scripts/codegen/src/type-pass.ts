@@ -39,14 +39,23 @@ function walkDir(d: string): string[] {
   );
 }
 
+/** Bumped on every write, so a program built since the last one is reused. */
+let generation = 0;
+
 function applyEdits(file: string, edits: Edit[]): void {
   if (!edits.length) return;
+  generation++;
   let text = readFileSync(file, "utf8");
+  // Applied from the end backwards; an edit overlapping one already applied
+  // (an assertion around an expression another assertion is inside) is
+  // dropped, for the next round to reconsider on the edited text.
+  let floor = Infinity;
   const seen = new Set<number>();
-  for (const e of [...edits].sort((a, b) => b.pos - a.pos)) {
-    if (seen.has(e.pos)) continue;
+  for (const e of [...edits].sort((a, b) => b.pos - a.pos || b.end - a.end)) {
+    if (seen.has(e.pos) || e.end > floor) continue;
     seen.add(e.pos);
     text = text.slice(0, e.pos) + e.text + text.slice(e.end);
+    floor = e.pos;
   }
   writeFileSync(file, text);
 }
@@ -86,10 +95,17 @@ export class TypePass {
     this.files = walkDir(srcDir).filter((f) => !f.endsWith("codegen-runtime.ts"));
   }
 
-  /** A program over the tree, bound (the binder sets the parent pointers the passes walk). */
+  private cached?: { program: ts.Program; generation: number };
+
+  /**
+   * A program over the tree, bound (the binder sets the parent pointers the
+   * passes walk); the same one until an edit is written.
+   */
   private program(): ts.Program {
-    const p = ts.createProgram(this.files, this.options);
+    if (this.cached?.generation === generation) return this.cached.program;
+    const p = ts.createProgram(this.files, this.options, undefined, this.cached?.program);
     p.getTypeChecker();
+    this.cached = { program: p, generation };
     return p;
   }
 
