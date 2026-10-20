@@ -144,6 +144,7 @@ export const COUNTED_PACKAGES = [] as const;
 export const TAGGED_ONLY_PACKAGES = [
   "actioncontroller",
   "actiondispatch",
+  "globalid",
   "ruby-compat",
   "thor",
 ] as const;

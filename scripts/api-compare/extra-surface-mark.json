@@ -11,6 +11,12 @@
     "noCounterpartFiles": 0,
     "allowed": 40
   },
+  "globalid": {
+    "novel": 0,
+    "total": 1,
+    "noCounterpartFiles": 0,
+    "allowed": 4
+  },
   "ruby-compat": {
     "novel": 0,
     "total": 52,
