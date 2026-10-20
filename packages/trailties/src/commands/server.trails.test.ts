@@ -7,6 +7,7 @@ import { Handler, MockRequest, type RackApp, type RackEnv } from "@blazetrails/r
 import { Trails, _resetTrailsEnv } from "../rails.js";
 import { Application } from "../application.js";
 import { DetailsKey } from "@blazetrails/actionview";
+import type { BuildViewsResult, WatchViewsOptions } from "@blazetrails/trails-tsc";
 
 const devServerStarts = vi.hoisted(() => [] as unknown[]);
 
@@ -27,12 +28,12 @@ vi.mock(
   ),
 );
 
-const viewWatches = vi.hoisted(() => [] as Array<Record<string, any>>);
+const viewWatches = vi.hoisted(() => [] as WatchViewsOptions[]);
 const watchState = vi.hoisted(() => ({ initialError: null as Error | null, closed: 0 }));
 vi.mock("@blazetrails/trails-tsc", () => ({
-  watchViews: async (opts: Record<string, any>) => {
+  watchViews: async (opts: WatchViewsOptions) => {
     viewWatches.push(opts);
-    if (watchState.initialError) opts.onError(watchState.initialError);
+    if (watchState.initialError) opts.onError!(watchState.initialError);
     return {
       close() {
         watchState.closed++;
@@ -208,9 +209,13 @@ describe("trails server environment (trails)", () => {
     await serverCommand().parseAsync(["-e", "development"], { from: "user" });
     const clear = vi.spyOn(DetailsKey, "clear");
 
-    viewWatches[0].onRebuild({ kind: "initial", result: { count: 0 } });
+    viewWatches[0].onRebuild!({ kind: "initial", result: { count: 0 } as BuildViewsResult });
     expect(clear).not.toHaveBeenCalled();
-    viewWatches[0].onRebuild({ kind: "change", trigger: "a.html.tse", result: { count: 1 } });
+    viewWatches[0].onRebuild!({
+      kind: "change",
+      trigger: "a.html.tse",
+      result: { count: 1 } as BuildViewsResult,
+    });
     expect(clear).toHaveBeenCalledTimes(1);
   });
 });
