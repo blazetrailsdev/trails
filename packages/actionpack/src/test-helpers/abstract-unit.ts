@@ -25,7 +25,7 @@ import {
   URI,
 } from "@blazetrails/ruby-compat";
 import { Head, MethodOverride, type RackEnv, type RackResponse } from "@blazetrails/rack";
-import { withRoutesHelpers } from "../abstract-controller/trailties/routes-helpers.js";
+import * as RoutesHelpers from "../abstract-controller/trailties/routes-helpers.js";
 import { ActionDispatch } from "../namespaces.js";
 import { API } from "../action-controller/api.js";
 import { Base } from "../action-controller/base.js";
@@ -276,9 +276,9 @@ TestCase.prototype.assertResponse = function (
 
 export const Rack = { TestCase };
 
-withRoutesHelpers(SharedTestRoutes)(API);
+RoutesHelpers.with(SharedTestRoutes)(API);
 
-withRoutesHelpers(SharedTestRoutes)(Base);
+RoutesHelpers.with(SharedTestRoutes)(Base);
 include(Base, SharedTestRoutes.mountedHelpers());
 
 Base.viewPaths(FIXTURE_LOAD_PATH);

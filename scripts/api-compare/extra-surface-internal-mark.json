@@ -1,9 +1,12 @@
 {
+  "abstractcontroller": 34,
   "actioncontroller": 213,
   "actiondispatch": 804,
+  "actionpackversion": 0,
   "activemodel": 253,
   "activerecord": 2428,
   "arel": 288,
+  "did-you-mean": 8,
   "globalid": 38,
   "rack": 219,
   "ruby-compat": 933,

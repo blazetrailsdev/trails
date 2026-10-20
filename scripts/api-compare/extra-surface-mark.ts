@@ -104,6 +104,8 @@
  * under RFC 0172 once its moved extras and its inlined-from bucket reached
  * zero; a rowless package in {@link INLINED_FROM_PACKAGES} has that third
  * dimension pinned at 0 as well.
+ * did-you-mean, actionpackversion and abstractcontroller enrolled there
+ * directly under RFC 0120, each measured at zero in every dimension.
  * Enrollment is only-grow, exactly like RFC 0121's: a package joins when it
  * reaches zero and is never moved back out to turn a red run green.
  *
@@ -154,7 +156,15 @@ export const TAGGED_ONLY_PACKAGES = [
  * therefore carry no mark row — see ROWLESS MODE in the module comment.
  * Only-grow, like {@link TAGGED_ONLY_PACKAGES}.
  */
-export const ROWLESS_PACKAGES = ["activemodel", "activerecord", "arel", "rack"] as const;
+export const ROWLESS_PACKAGES = [
+  "abstractcontroller",
+  "actionpackversion",
+  "activemodel",
+  "activerecord",
+  "arel",
+  "did-you-mean",
+  "rack",
+] as const;
 
 /**
  * The packages this gate covers, in either mode. Everything else is measured

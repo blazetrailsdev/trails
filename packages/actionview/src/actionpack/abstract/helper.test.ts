@@ -12,7 +12,7 @@ interface HelpersStatics {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include AbstractController::Rendering`; the class/interface merge is how a mixin surfaces on the type side.
-class ControllerWithHelpers extends AbstractController.AbstractController {
+class ControllerWithHelpers extends AbstractController.Base {
   withModule(): unknown {
     return this.render({ inline: "Module <%= includedMethod() %>" });
   }

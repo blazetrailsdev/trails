@@ -48,7 +48,7 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-type AppRoutes = Parameters<typeof AbstractController.withRoutesHelpers>[0] & {
+type AppRoutes = Parameters<typeof AbstractController.RoutesHelpers.with>[0] & {
   mountedHelpers(): object;
 };
 
@@ -103,7 +103,7 @@ export class Trailtie extends BaseTrailtie {
       onLoad("action_controller", (base: AbstractController.RoutesHelpersControllerClass) => {
         const routes = app.routes();
         include(base as unknown as new (...args: never[]) => unknown, routes.mountedHelpers());
-        AbstractController.withRoutesHelpers(routes)(base);
+        AbstractController.RoutesHelpers.with(routes)(base);
 
         if (options.wrapParametersByDefault && rbObjRespondTo(base, "wrapParameters")) {
           (base as unknown as typeof ActionController.Base).wrapParameters({ format: [":json"] });

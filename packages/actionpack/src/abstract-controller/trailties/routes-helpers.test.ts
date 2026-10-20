@@ -5,7 +5,8 @@ import { include, Module } from "@blazetrails/ruby-compat";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { UrlFor } from "../../action-dispatch/routing/url-for.js";
 type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown>;
-import { withRoutesHelpers, type RoutesHelpersControllerClass } from "./routes-helpers.js";
+import * as RoutesHelpers from "./routes-helpers.js";
+import { type RoutesHelpersControllerClass } from "./routes-helpers.js";
 
 function makeClass(): RoutesHelpersControllerClass {
   return { prototype: {} } as RoutesHelpersControllerClass;
@@ -14,7 +15,7 @@ function makeClass(): RoutesHelpersControllerClass {
 describe("withRoutesHelpers", () => {
   it("returns a wiring function that installs routes.urlHelpers as instance methods on the class", () => {
     const RouteHelper: HelperMethodsModule = { postPath: () => "/posts" };
-    const wire = withRoutesHelpers({ urlHelpers: vi.fn().mockReturnValue(RouteHelper) });
+    const wire = RoutesHelpers.with({ urlHelpers: vi.fn().mockReturnValue(RouteHelper) });
 
     const cls = makeClass();
     wire(cls);
@@ -24,11 +25,11 @@ describe("withRoutesHelpers", () => {
 
   it("passes include_path_helpers through to routes.urlHelpers (default true)", () => {
     const spy = vi.fn().mockReturnValue({});
-    withRoutesHelpers({ urlHelpers: spy })(makeClass());
+    RoutesHelpers.with({ urlHelpers: spy })(makeClass());
     expect(spy).toHaveBeenCalledWith(true);
 
     const spy2 = vi.fn().mockReturnValue({});
-    withRoutesHelpers({ urlHelpers: spy2 }, false)(makeClass());
+    RoutesHelpers.with({ urlHelpers: spy2 }, false)(makeClass());
     expect(spy2).toHaveBeenCalledWith(false);
   });
 
@@ -39,7 +40,7 @@ describe("withRoutesHelpers", () => {
       prototype: {},
       trailtieRoutesUrlHelpers: () => Namespaced,
     };
-    withRoutesHelpers({ urlHelpers: routesSpy })(cls);
+    RoutesHelpers.with({ urlHelpers: routesSpy })(cls);
 
     expect((cls.prototype as { nsPath?: () => string }).nsPath?.()).toBe("/ns");
     expect(routesSpy).not.toHaveBeenCalled();
@@ -53,7 +54,7 @@ describe("withRoutesHelpers", () => {
     ) as RoutesHelpersControllerClass;
     child.prototype = {};
 
-    withRoutesHelpers({ urlHelpers: vi.fn() })(child);
+    RoutesHelpers.with({ urlHelpers: vi.fn() })(child);
 
     expect((child.prototype as { up?: () => string }).up?.()).toBe("from-parent");
   });
@@ -64,7 +65,7 @@ describe("withRoutesHelpers", () => {
       prototype: {},
       trailtieRoutesUrlHelpers: nsSpy,
     };
-    withRoutesHelpers({ urlHelpers: vi.fn() }, false)(cls);
+    RoutesHelpers.with({ urlHelpers: vi.fn() }, false)(cls);
     expect(nsSpy).toHaveBeenCalledWith(false);
   });
 
@@ -73,7 +74,7 @@ describe("withRoutesHelpers", () => {
     const layered = Object.create(base) as HelperMethodsModule;
     layered.own = () => "own";
     const cls = makeClass();
-    withRoutesHelpers({ urlHelpers: () => layered })(cls);
+    RoutesHelpers.with({ urlHelpers: () => layered })(cls);
     const proto = cls.prototype as { inherited?: () => string; own?: () => string };
     expect(proto.inherited?.()).toBe("from-proto");
     expect(proto.own?.()).toBe("own");
@@ -86,7 +87,7 @@ describe("withRoutesHelpers", () => {
     try {
       const cls = makeClass();
       const RouteHelper: HelperMethodsModule = { clean: () => "clean" };
-      withRoutesHelpers({ urlHelpers: () => RouteHelper })(cls);
+      RoutesHelpers.with({ urlHelpers: () => RouteHelper })(cls);
       const proto = cls.prototype as { clean?: () => string; sneaky?: () => string };
       expect(proto.clean?.()).toBe("clean");
       expect(proto.sneaky).toBeUndefined();
@@ -103,7 +104,7 @@ describe("withRoutesHelpers", () => {
       postsPath: () => "/posts",
     } as unknown as HelperMethodsModule;
     const cls = makeClass();
-    withRoutesHelpers({ urlHelpers: () => mod })(cls);
+    RoutesHelpers.with({ urlHelpers: () => mod })(cls);
     const proto = cls.prototype as {
       _supportsPath?: unknown;
       _routes?: unknown;
@@ -118,8 +119,8 @@ describe("withRoutesHelpers", () => {
     const A: HelperMethodsModule = { a: () => "a" };
     const B: HelperMethodsModule = { b: () => "b" };
     const cls = makeClass();
-    withRoutesHelpers({ urlHelpers: () => A })(cls);
-    withRoutesHelpers({ urlHelpers: () => B })(cls);
+    RoutesHelpers.with({ urlHelpers: () => A })(cls);
+    RoutesHelpers.with({ urlHelpers: () => B })(cls);
     const proto = cls.prototype as { a?: () => string; b?: () => string };
     expect(proto.a?.()).toBe("a");
     expect(proto.b?.()).toBe("b");
@@ -137,7 +138,7 @@ describe("withRoutesHelpers", () => {
     };
     include(parent, UrlFor);
     const cls = class extends parent {};
-    withRoutesHelpers(routes, false)(cls as unknown as RoutesHelpersControllerClass);
+    RoutesHelpers.with(routes, false)(cls as unknown as RoutesHelpersControllerClass);
     const sub = class extends cls {};
     const instance = new sub() as unknown as {
       _generatePathsByDefault(): boolean;
@@ -164,7 +165,7 @@ describe("withRoutesHelpers", () => {
     const parent = class {};
     include(parent, higher);
     const cls = class extends parent {};
-    withRoutesHelpers({ urlHelpers: () => urlHelpers })(
+    RoutesHelpers.with({ urlHelpers: () => urlHelpers })(
       cls as unknown as RoutesHelpersControllerClass,
     );
 
@@ -177,7 +178,7 @@ describe("withRoutesHelpers", () => {
       this.get("posts", { to: "posts#index", as: "posts" });
     });
     const cls = class {};
-    withRoutesHelpers(routes)(cls as unknown as RoutesHelpersControllerClass);
+    RoutesHelpers.with(routes)(cls as unknown as RoutesHelpersControllerClass);
     const instance = new cls() as unknown as { postsPath?: unknown; commentsPath?: unknown };
     expect(typeof instance.postsPath).toBe("function");
 

@@ -1,5 +1,5 @@
 export {
-  AbstractController,
+  Base,
   ActionNotFound,
   type ActionCallback,
   type AroundCallback,
@@ -78,8 +78,8 @@ export {
   type HelpersClassMethods,
   type HelpersHost,
 } from "./helpers.js";
+export * as RoutesHelpers from "./trailties/routes-helpers.js";
 export {
-  withRoutesHelpers,
   type RoutesHelpersClassMethods,
   type RoutesHelpersControllerClass,
   type UrlHelpersRouteSet,

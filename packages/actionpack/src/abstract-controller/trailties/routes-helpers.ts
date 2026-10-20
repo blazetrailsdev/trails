@@ -15,7 +15,7 @@ export interface RoutesHelpersClassMethods extends HelpersClassMethods {
   _routes?: unknown;
 }
 
-export function withRoutesHelpers(
+function withRoutesHelpers(
   routes: UrlHelpersRouteSet,
   includePathHelpers = true,
 ): (cls: RoutesHelpersControllerClass) => void {
