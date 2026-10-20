@@ -381,7 +381,11 @@ report.seatMembers = augmentSeatTypes(outDir);
 // The type pass: every `any` the lowering wrote replaced by what the checker
 // sees reach it (type-pass.ts). `--no-types` skips it.
 if (!process.argv.includes("--no-types"))
-  report.typePass = typePass(outDir, path.join(PKG_DIR, "tsconfig.json"));
+  report.typePass = typePass(
+    outDir,
+    path.join(PKG_DIR, "tsconfig.json"),
+    path.join(PKG_DIR, "src"),
+  );
 // The signature index: a nullable argument or receiver meeting a non-null
 // parameter or member takes `!` (nonnull-pass.ts). `--no-nonnull` skips it.
 if (!process.argv.includes("--no-nonnull"))

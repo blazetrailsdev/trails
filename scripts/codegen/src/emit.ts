@@ -2934,7 +2934,10 @@ export class Emitter {
     }
     const plainMembers = [
       // Not on a reopening: an includer extended with it would take its `name`.
-      ...(plain && fnModule && !reopening ? [`name: ${JSON.stringify(u.fqn)}`] : []),
+      // Nor where the module defines its own `name`, which Ruby's lookup finds first.
+      ...(plain && fnModule && !reopening && !seatNames.includes("name")
+        ? [`name: ${JSON.stringify(u.fqn)}`]
+        : []),
       ...consts.map((c: N) => c.path[0] as string),
       ...(plain ? seatNames : []),
       ...dedupeMembers(members),

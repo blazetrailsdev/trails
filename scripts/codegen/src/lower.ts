@@ -768,7 +768,7 @@ export class Lowerer {
     // In an async function, `return x` inside `try` hands back a promise that
     // settles after the `catch` / `finally` already ran; Ruby's `rescue` /
     // `ensure` wrap the whole call, so the value is awaited there.
-    if (ctx0.asyncBox?.awaits || ctx0.defAsync)
+    if (ctx0.asyncBox?.awaits || (ctx0.defAsync && !ctx0.inBlock))
       body = body.map((l) =>
         /^return (?!await )\S/.test(l) &&
         l !== "return null;" &&
@@ -4405,13 +4405,6 @@ export class Lowerer {
           : (this.typedArgs(n, m.info.params, ctx) ?? argList());
       e = `${recv}${nav}${m.tsName}(${args})`;
     }
-    if (m.info.async && ctx.isCtor && !ctx.inBlock) {
-      // A JS constructor cannot await (plan: hard stop). Keep the call, count it.
-      ctx.f.declines.push({ reason: "async-in-constructor", line: n.l, ruby: n.name });
-      return e;
-    }
-    // A generated method the gem makes async is awaited even where the hand
-    // twin types it synchronous: a Promise in an `if` is always truthy.
     const genAsync =
       !m.info.async &&
       m.info.kind === "method" &&
@@ -4422,6 +4415,13 @@ export class Lowerer {
         .some((sc) =>
           this.resolver.asyncDefs.has(`${sc.fqn}${ctx.selfKind === "static" ? "." : "#"}${n.name}`),
         );
+    if ((m.info.async || genAsync) && ctx.isCtor && !ctx.inBlock) {
+      // A JS constructor cannot await (plan: hard stop). Keep the call, count it.
+      ctx.f.declines.push({ reason: "async-in-constructor", line: n.l, ruby: n.name });
+      return e;
+    }
+    // A generated method the gem makes async is awaited even where the hand
+    // twin types it synchronous: a Promise in an `if` is always truthy.
     if (m.info.async || genAsync) {
       this.stat(ctx, "await");
       if (ctx.asyncBox) ctx.asyncBox.awaits = true;

@@ -18,7 +18,7 @@
  *
  *   pnpm tsx scripts/codegen/src/type-pass.ts <generated src dir> <package tsconfig>
  */
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript-5";
 import { ROOT } from "./gem.js";
@@ -80,6 +80,8 @@ export class TypePass {
   constructor(
     private srcDir: string,
     tsconfig: string,
+    /** The hand port's `src`, whose declared types a twin is given (transplant). */
+    private handSrcDir?: string,
   ) {
     const cfg = ts.readConfigFile(tsconfig, ts.sys.readFile);
     const parsed = ts.parseJsonConfigFileContent(cfg.config, ts.sys, path.dirname(tsconfig));
@@ -817,13 +819,18 @@ export class TypePass {
           slot = checker.getContextualType(value);
         }
         if (!value || !slot || ts.isSpreadElement(value)) continue;
+        // A property name is not a value; a shorthand property is written long.
+        if (ts.isPropertyAssignment(value.parent) && value.parent.name === value) continue;
+        const shorthand = ts.isShorthandPropertyAssignment(value.parent)
+          ? value.parent.name.text
+          : null;
         if (!(checker.getTypeAtLocation(value).flags & ts.TypeFlags.Unknown)) continue;
         const t = this.typeText(checker, slot, value, f);
         if (!t || t === "unknown") continue;
         edits.push({
           pos: value.getStart(sf),
           end: value.getEnd(),
-          text: `(${value.getText(sf)} as ${t})`,
+          text: `${shorthand ? `${shorthand}: ` : ""}(${value.getText(sf)} as ${t})`,
         });
       }
       const ie = this.importEdit(sf);
@@ -1029,6 +1036,188 @@ export class TypePass {
     return n;
   }
 
+  /**
+   * The hand port types what the Ruby cannot: each generated parameter or
+   * field still `any` / `unknown` takes its hand twin's declared type (same
+   * file, class, member and parameter position), written with the generated
+   * file's own `import type`s. Runs before the call-site inference, which then
+   * types only what has no twin.
+   */
+  transplantFromHand(): number {
+    if (!process.env.CODEGEN_HAND_TYPES || !this.handSrcDir || !existsSync(this.handSrcDir))
+      return 0;
+    const handFiles = walkDir(this.handSrcDir).filter((f) => !/\.test\.ts$/.test(f));
+    const hp = ts.createProgram(handFiles, this.options);
+    const hc = hp.getTypeChecker();
+    // Hand declarations by `file#Owner#member` (`file#.fn` for a function).
+    const hand = new Map<
+      string,
+      ts.SignatureDeclaration | ts.PropertyDeclaration | ts.PropertySignature
+    >();
+    // By name within the file, where the two ports' shapes differ (a function
+    // on a hand Module, a member of a generated class module): unique only.
+    const byName = new Map<string, ts.Node | null>();
+    const note = (rel: string, name: string, d: ts.Node) => {
+      const k = `${rel}#${name}`;
+      byName.set(k, byName.has(k) ? null : d);
+    };
+    for (const f of handFiles) {
+      const sf = hp.getSourceFile(f);
+      if (!sf) continue;
+      const rel = path.relative(this.handSrcDir, f);
+      for (const st of sf.statements) {
+        if (ts.isFunctionDeclaration(st) && st.name) {
+          hand.set(`${rel}#.${st.name.text}`, st);
+          note(rel, st.name.text, st);
+        }
+        if ((ts.isClassDeclaration(st) || ts.isInterfaceDeclaration(st)) && st.name)
+          for (const m of st.members as ts.NodeArray<ts.ClassElement | ts.TypeElement>) {
+            if (!m.name || !ts.isIdentifier(m.name)) continue;
+            const key = `${rel}#${st.name.text}#${m.name.text}`;
+            if (
+              ts.isMethodDeclaration(m) ||
+              ts.isMethodSignature(m) ||
+              ts.isPropertyDeclaration(m) ||
+              ts.isPropertySignature(m)
+            )
+              if (!hand.has(key)) {
+                hand.set(key, m as ts.SignatureDeclaration);
+                note(rel, m.name.text, m);
+              }
+          }
+      }
+    }
+    const program = this.program();
+    let n = 0;
+    const why: Record<string, number> = {};
+    const loose = (t: ts.TypeNode | undefined) =>
+      !!t && (t.kind === ts.SyntaxKind.AnyKeyword || t.kind === ts.SyntaxKind.UnknownKeyword);
+    const text = (t: ts.Type, genSf: ts.SourceFile): string | null => {
+      let node: ts.TypeNode | undefined;
+      try {
+        node = hc.typeToTypeNode(
+          t,
+          undefined,
+          ts.NodeBuilderFlags.NoTruncation | ts.NodeBuilderFlags.IgnoreErrors,
+        );
+      } catch {
+        return null;
+      }
+      if (!node) return null;
+      let out = ts
+        .createPrinter({ removeComments: true })
+        .printNode(ts.EmitHint.Unspecified, node, genSf);
+      if (/\bany\b|\(Anonymous|__object|__type|\bthis\b/.test(out) || out.length > 400) return null;
+      let ok = true;
+      const wanted: [string, string][] = [];
+      out = out.replace(/import\("([^"]+)"\)\.([\w$]+)/g, (m0, spec: string, name: string) => {
+        let id: string | null = null;
+        if (path.isAbsolute(spec) && spec.startsWith(this.handSrcDir!)) {
+          const genPath = path.join(this.srcDir, path.relative(this.handSrcDir!, spec));
+          id = path.relative(path.dirname(genSf.fileName), genPath).replace(/\.d$|\.ts$/, "");
+          if (!id.startsWith(".")) id = `./${id}`;
+          id = `${id}.js`;
+        } else {
+          const pkg = /\/packages\/([\w-]+)\//.exec(spec)?.[1];
+          const pid = pkg ? `@blazetrails/${pkg}` : null;
+          if (pid && this.exportsOf.get(pid)?.has(name)) id = pid;
+        }
+        if (!id) {
+          ok = false;
+          return m0;
+        }
+        wanted.push([id, name]);
+        return `@@type${wanted.length - 1}@@`;
+      });
+      if (
+        !ok ||
+        /\b[A-Z][\w$]*\b/.test(
+          out
+            .replace(/@@type\d+@@/g, "")
+            .replace(
+              /\b(Record|Promise|Array|Map|Set|ReadonlyArray|Partial|Readonly|Pick|Omit|Exclude|Extract|NonNullable|ReturnType|Parameters|InstanceType|Iterable|IterableIterator|AsyncIterable|PromiseLike|Date|RegExp|Error|Function|Symbol|BigInt)\b/g,
+              "",
+            ),
+        )
+      )
+        return null;
+      return out.replace(/@@type(\d+)@@/g, (_m, i: string) =>
+        this.typeLocal(genSf, ...wanted[Number(i)]),
+      );
+    };
+    for (const f of this.files) {
+      const sf = program.getSourceFile(f);
+      if (!sf) continue;
+      const rel = path.relative(this.srcDir, f);
+      const edits: Edit[] = [];
+      const twinOf = (node: ts.Node): ts.Node | undefined => {
+        const exact = exactTwin(node);
+        if (exact) return exact;
+        const nm = (node as ts.NamedDeclaration).name;
+        return nm && ts.isIdentifier(nm)
+          ? (byName.get(`${rel}#${nm.text}`) ?? undefined)
+          : undefined;
+      };
+      const exactTwin = (node: ts.Node): ts.Node | undefined => {
+        if (ts.isFunctionDeclaration(node) && node.name)
+          return hand.get(`${rel}#.${node.name.text}`);
+        const owner = node.parent;
+        if (
+          (ts.isClassDeclaration(owner) || ts.isInterfaceDeclaration(owner)) &&
+          owner.name &&
+          (node as ts.NamedDeclaration).name &&
+          ts.isIdentifier((node as ts.NamedDeclaration).name!)
+        )
+          return hand.get(
+            `${rel}#${owner.name.text}#${((node as ts.NamedDeclaration).name as ts.Identifier).text}`,
+          );
+        return undefined;
+      };
+      const visit = (node: ts.Node): void => {
+        if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
+          const twin = twinOf(node) as ts.SignatureDeclaration | undefined;
+          if (!twin && node.parameters.some((p) => loose(p.type)))
+            why.noTwin = (why.noTwin ?? 0) + 1;
+          if (twin && "parameters" in twin) {
+            const hps = twin.parameters.filter(
+              (p) => !(ts.isIdentifier(p.name) && p.name.text === "this"),
+            );
+            const gps = node.parameters.filter(
+              (p) => !(ts.isIdentifier(p.name) && p.name.text === "this"),
+            );
+            gps.forEach((gp, i) => {
+              const hpar = hps[i];
+              if (!loose(gp.type)) return;
+              if (!hpar?.type || !!gp.dotDotDotToken !== !!hpar.dotDotDotToken) {
+                why.noParam = (why.noParam ?? 0) + 1;
+                return;
+              }
+              const t = text(hc.getTypeFromTypeNode(hpar.type), sf);
+              if (t) edits.push({ pos: gp.type!.getStart(sf), end: gp.type!.getEnd(), text: t });
+              else why.unwritable = (why.unwritable ?? 0) + 1;
+            });
+          }
+        }
+        if ((ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) && loose(node.type)) {
+          const twin = twinOf(node) as ts.PropertyDeclaration | undefined;
+          if (twin && ts.isPropertyDeclaration(twin) && twin.type) {
+            const t = text(hc.getTypeFromTypeNode(twin.type), sf);
+            if (t) edits.push({ pos: node.type!.getStart(sf), end: node.type!.getEnd(), text: t });
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(sf);
+      const ie = this.importEdit(sf);
+      if (ie) edits.push(ie);
+      applyEdits(f, edits);
+      n += edits.length;
+    }
+    if (process.env.CODEGEN_TIMING)
+      console.error("type-pass fromHand skipped:", JSON.stringify(why));
+    return n;
+  }
+
   run(): Record<string, number> {
     const stats: Record<string, number> = {};
     // `CODEGEN_TIMING=1`: each step's time and edit count, to stderr.
@@ -1045,6 +1234,7 @@ export class TypePass {
     };
     timed("returns", () => this.dropAnyReturns());
     timed("locals", () => this.dropAnyLocals());
+    timed("fromHand", () => this.transplantFromHand());
     rounds("params", 6, () => this.paramRound(false));
     timed("params", () => this.paramRound(true));
     rounds("uninferable", 3, () => this.annotateUninferable());
@@ -1082,11 +1272,21 @@ function splitUnion(t: string): string[] {
   return out;
 }
 
-export function typePass(srcDir: string, tsconfig: string): Record<string, number> {
-  return new TypePass(srcDir, tsconfig).run();
+export function typePass(
+  srcDir: string,
+  tsconfig: string,
+  handSrcDir?: string,
+): Record<string, number> {
+  return new TypePass(srcDir, tsconfig, handSrcDir).run();
 }
 
 if (process.argv[1]?.endsWith("type-pass.ts")) {
-  const [srcDir, tsconfig] = process.argv.slice(2);
-  console.log(typePass(path.resolve(srcDir), path.resolve(tsconfig)));
+  const [srcDir, tsconfig, handSrc] = process.argv.slice(2);
+  console.log(
+    typePass(
+      path.resolve(srcDir),
+      path.resolve(tsconfig),
+      handSrc ? path.resolve(handSrc) : undefined,
+    ),
+  );
 }
