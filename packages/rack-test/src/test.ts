@@ -1,5 +1,5 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import { Generic, HTTPS, URI, b, hashDelete, pack } from "@blazetrails/ruby-compat";
+import { Generic, HTTPS, URI, b, hashDelete, pack, rbObjDup } from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
@@ -226,10 +226,8 @@ export class Session {
   async restoreState<T>(block: () => T | Promise<T>): Promise<T> {
     const request = this._lastRequest;
     const response = this._lastResponse;
-    const cookieJar = (Object.create(CookieJar.prototype) as CookieJar).initializeCopy(
-      this.cookieJar,
-    );
-    const afterRequest = this._afterRequest.slice();
+    const cookieJar = rbObjDup(this.cookieJar);
+    const afterRequest = rbObjDup(this._afterRequest);
 
     try {
       return await block();
@@ -384,3 +382,5 @@ export class Session {
 export function encodingAwareStrings(): boolean {
   return release() >= "1.6";
 }
+
+export const MockSession = Session;

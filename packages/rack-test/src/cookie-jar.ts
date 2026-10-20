@@ -1,6 +1,6 @@
 import { Time } from "@blazetrails/date";
 import { Utils } from "@blazetrails/rack";
-import { type Generic, URI, rbStrSNew, regexpEscape } from "@blazetrails/ruby-compat";
+import { type Generic, URI, rbObjDup, rbStrSNew, regexpEscape } from "@blazetrails/ruby-compat";
 import { DEFAULT_HOST } from "./test.js";
 
 /** @internal */
@@ -152,10 +152,8 @@ export class CookieJar {
     this._cookies = cookies.sort((a, b) => a.spaceship(b));
   }
 
-  initializeCopy(other: CookieJar): this {
-    this.defaultHost = other.defaultHost;
-    this._cookies = other._cookies.slice();
-    return this;
+  initializeCopy(_other: CookieJar): void {
+    this._cookies = rbObjDup(this._cookies);
   }
 
   get(name: string | { toString(): string }): string | undefined {

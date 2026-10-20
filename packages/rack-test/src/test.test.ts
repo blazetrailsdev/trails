@@ -2,7 +2,7 @@ import { assertEmpty } from "@blazetrails/activesupport";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { MockResponse, Request } from "@blazetrails/rack";
 import { FAKE_APP } from "./fixtures/fake-app.js";
-import { Error as RackTestError, Session } from "./index.js";
+import { Error as RackTestError, MockSession, Session } from "./index.js";
 import { mustBe, wontBe } from "./test-helpers/assertions.js";
 
 const app = FAKE_APP;
@@ -22,6 +22,10 @@ const lastRequest = (): Request => session.lastRequest();
 const lastResponse = (): MockResponse => session.lastResponse();
 
 describe("Rack::Test::Session", () => {
+  it("has alias of Rack::MockSession for backwards compatibility", () => {
+    expect(MockSession).toBe(Session);
+  });
+
   it("supports being initialized with a Rack::MockSession app", async () => {
     mustBe(await new Session(new Session(app)).request("/"), "isOk");
   });
