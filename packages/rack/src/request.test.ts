@@ -14,12 +14,6 @@ function makeEnv(overrides: Record<string, any> = {}): Record<string, any> {
 const IPV6 = "2620:0:1c00:0:812c:9583:754b:ca11";
 const PRIVATE_IPV6 = "fd5b:982e:9130:247f:0000:0000:0000:0000";
 
-class MyRequest extends Request {
-  get params(): Record<string, any> {
-    return { foo: "bar" };
-  }
-}
-
 function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void {
   function makeReq(uri = "/", overrides: Record<string, any> = {}): Request {
     return makeRequest(MockRequest.envFor(uri, overrides));
@@ -910,9 +904,9 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
   });
 
   it("provide the original env", () => {
-    const env = makeEnv();
-    const req = new Request(env);
-    expect(req.env).toBe(env);
+    const e = MockRequest.envFor("");
+    const req = makeRequest(e);
+    expect(req.env).toEqual(e);
   });
 
   it("restore the base URL", () => {
@@ -1442,6 +1436,12 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
     expect(req.env["rack.session.options"]).toBe(sessionOptions);
     expect(req.sessionOptions).toEqual({});
   });
+
+  class MyRequest extends Request {
+    get params(): Record<string, any> {
+      return { foo: "bar" };
+    }
+  }
 
   it("allow subclass request to be instantiated after parent request", () => {
     const env = MockRequest.envFor("/?foo=bar");
