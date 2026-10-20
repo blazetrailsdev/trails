@@ -86,6 +86,7 @@ class TestController extends ActionController.Base {
     this.layout(":determineLayout");
     this.beforeAction(
       (c) => {
+        // BLOCKED: render-test-controller-gaps
         ((c as TestController).request as unknown as { format: string }).format = "xml";
       },
       { only: "renderWithFilters" },
@@ -300,6 +301,7 @@ class TestController extends ActionController.Base {
   }
 
   async renderTextWithResource(): Promise<void> {
+    // BLOCKED: action-controller-render-is-untyped
     await this.render({ plain: new Customer("David") as unknown as string });
   }
 
@@ -320,6 +322,7 @@ class TestController extends ActionController.Base {
   async greeting(): Promise<void> {}
 
   async builderLayoutTest(): Promise<void> {
+    // BLOCKED: render-test-controller-gaps
     this.name = null as unknown as string;
     await this.render({ action: "hello", layout: "layouts/builder" });
   }
@@ -421,6 +424,7 @@ class TestController extends ActionController.Base {
   async actionTalkToLayout(): Promise<void> {}
 
   async renderWithAssignsOption(): Promise<void> {
+    // BLOCKED: action-controller-render-is-untyped
     await this.render({
       inline: "<%= this.hello %>",
       assigns: { hello: "world" },
@@ -492,6 +496,7 @@ class TestController extends ActionController.Base {
   }
 
   async partialWithHashlikeLocals(): Promise<void> {
+    // BLOCKED: action-controller-render-is-untyped
     await this.render({
       partial: "customer",
       locals: new ActionController.Parameters({
@@ -617,6 +622,7 @@ class TestController extends ActionController.Base {
   }
 
   async partialWithNestedObjectShorthand(): Promise<void> {
+    // BLOCKED: action-controller-render-is-untyped
     await this.render(new Quiz.Question("first") as unknown as string);
   }
 
@@ -1277,6 +1283,7 @@ describe("RenderTest", () => {
   test.skip("partial with form builder and invalid model custom field error proc", async () => {
     const oldProc = Base.fieldErrorProc;
     Base.fieldErrorProc = function (html) {
+      // BLOCKED: render-test-controller-gaps
       return (this.tag() as unknown as { div(...args: unknown[]): unknown }).div(html, {
         class: "errors",
       });
