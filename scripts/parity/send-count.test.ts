@@ -15,6 +15,14 @@ describe("countLines", () => {
     expect(countLines('rbFSend(File.extname(f).toLowerCase(), "delete", ".")\n')).toBe(1);
   });
 
+  it("counts a receiver whose own call holds a comma", () => {
+    expect(countLines('rbFSend(this.databaseAdapterFor(dbConfig, ...args), "create");\n')).toBe(1);
+  });
+
+  it("skips a computed name followed by a string-literal argument", () => {
+    expect(countLines('rbFSend(recv, name, "x");\n')).toBe(0);
+  });
+
   it("counts matching lines, not matches", () => {
     expect(countLines('rbFSend(a, "x") + rbFSend(b, "y")\n')).toBe(1);
   });

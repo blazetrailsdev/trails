@@ -20,7 +20,8 @@
  * seed, or to tighten.
  *
  * Line-based, like the cast ratchet: a send whose name argument sits on its own
- * continuation line is not counted. Such a site is still governed by the
+ * continuation line is not counted, and nor is one whose receiver nests
+ * parentheses more than one deep. Such a site is still governed by the
  * section; the gate is a floor, not the rule.
  *
  * Hard rules: no node:* imports, no process.*, async fs only, no third-party
@@ -38,11 +39,13 @@ export const SRC = "packages";
 
 /**
  * An `rbFSend` / `rbFPublicSend` whose second argument opens with a double
- * quote: the receiver may hold anything but a comma or a quote, which keeps a
- * nested call (`rbFSend(File.extname(f), "delete", ".")`) in and a computed
- * name (`rbFSend(recv, name)`) out.
+ * quote. The receiver is a run of non-comma, non-quote characters and
+ * single-level parenthesised groups, so a nested call keeps its own commas
+ * (`rbFSend(this.databaseAdapterFor(cfg, ...args), "create")`) while a
+ * computed name stays out: the comma before `"` has to be the receiver's own,
+ * and `rbFSend(recv, name, "x")` has an identifier where the quote must be.
  */
-export const SEND_PATTERN = String.raw`rbF(Public)?Send\([^,"]*, *"`;
+export const SEND_PATTERN = String.raw`rbF(Public)?Send\((\([^)]*\)|[^,"])*, *"`;
 export const SEND_RE = new RegExp(SEND_PATTERN);
 
 /** Matching lines per file with a non-zero count, keyed by path relative to the source root. */

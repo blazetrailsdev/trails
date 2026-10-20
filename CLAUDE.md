@@ -1382,9 +1382,9 @@ One gate holds the line. `pnpm parity:api:sends` counts, per non-test file,
 the sends whose name argument is a string literal, and fails on any file above
 its count at the merge-base with `origin/main` — only-shrink, with no mark file
 to seed or tighten, on trails#9129's reasoning that the base tree IS the mark.
-It is a floor, not the rule: it is line-based, so a name on a continuation line
-is uncounted, and a computed name it never sees is still governed by the order
-above.
+It is a floor, not the rule: it is line-based, so a name on a continuation
+line is uncounted, as is one whose receiver nests parentheses more than one
+deep, and a computed name it never sees is still governed by the order above.
 
 The call gates do not help, which is why the order above has to be a rule.
 For the call SET, `extract-ts-api.ts` credits
