@@ -158,20 +158,22 @@ export class Base {
     return this.withViewPaths([]);
   }
 
-  static withViewPaths(
+  static withViewPaths<T extends typeof Base>(
+    this: T,
     viewPaths: ConstructorParameters<typeof LookupContext>[0],
     assigns: Record<string, unknown> = {},
     controller: unknown = null,
-  ): Base {
+  ): InstanceType<T> {
     return this.withContext(new LookupContext(viewPaths), assigns, controller);
   }
 
-  static withContext(
+  static withContext<T extends typeof Base>(
+    this: T,
     context: LookupContext | null,
     assigns: Record<string, unknown> = {},
     controller: unknown = null,
-  ): Base {
-    return new this(context, assigns, controller);
+  ): InstanceType<T> {
+    return new this(context, assigns, controller) as InstanceType<T>;
   }
 
   private _viewRenderer: Renderer;

@@ -191,13 +191,18 @@ const resolver = new FixtureResolver({
     '<%= cache("uhoh", {}, () => { %>\n  <%= uncacheableBang() %>\n<% }) %>\n',
 });
 
-let view: Base;
+let view: Base & {
+  controller: TestController | null;
+  combinedFragmentCacheKey(key: unknown): unknown[];
+};
 let controllerView: Base;
 
 function setupView(paths: PathSet): void {
   const assigns = { secret: "in the sauce" };
 
   view = class extends Base.withEmptyTemplateCache() {
+    declare controller: TestController | null;
+
     viewCacheDependencies(): unknown[] {
       return [];
     }
@@ -232,9 +237,7 @@ function cacheKey(...namesAndVirtualPath: unknown[]): unknown {
     finder: view.lookupContext!,
     dependencies: [],
   });
-  return (
-    view as unknown as { combinedFragmentCacheKey(key: unknown): unknown }
-  ).combinedFragmentCacheKey([`${virtualPath}:${digest}`, ...namesAndVirtualPath]);
+  return view.combinedFragmentCacheKey([`${virtualPath}:${digest}`, ...namesAndVirtualPath]);
 }
 
 function teardown(): void {
@@ -775,7 +778,8 @@ describe("CachedViewRenderTest", () => {
   it("render renderable does not mask nomethoderror from within render in", async () => {
     const renderable = {
       renderIn(): unknown {
-        return (null as unknown as { renderIn(): unknown }).renderIn();
+        const nothing: { renderIn(): unknown } | null = null;
+        return nothing!.renderIn();
       },
     };
     await assertRaises([TypeError], { match: /renderIn/ }, () =>
@@ -1162,7 +1166,7 @@ describe("CachedViewRenderTest", () => {
 
   it("render partial with layout raises descriptive error", async () => {
     const e = await assertRaises([MissingTemplate], {}, () =>
-      view.render({ partial: "test/partial", layout: true as never }),
+      view.render(Object.assign({ partial: "test/partial" }, { layout: true })),
     );
     assertMatch("Missing partial /_true with", e.message);
   });
@@ -1371,7 +1375,7 @@ describe("CachedCollectionViewRenderTest", () => {
   });
 
   it("collection caching does not cache if perform_caching is disabled", async () => {
-    (view.controller as unknown as TestController).performCaching = false;
+    view.controller!.performCaching = false;
 
     const customer = new Customer("david", 1);
     const key = cacheKey(customer, "test/_customer");
