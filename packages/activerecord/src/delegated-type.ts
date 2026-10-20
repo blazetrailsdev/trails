@@ -81,7 +81,7 @@ export function defineDelegatedTypeMethods(
     const singularName = camelize(singularSnake, false);
     const predicateSuffix = camelize(singularSnake, true);
 
-    (this as any).scope(scopeName, function (this: any) {
+    this.scope(scopeName, function (this: any) {
       return this.where({ [roleType]: typeName });
     });
 

@@ -60,7 +60,7 @@ export function acceptsNestedAttributesFor(
   if (options.rejectIf === "all_blank") options.rejectIf = REJECT_ALL_BLANK_PROC;
 
   for (const associationName of attrNames as string[]) {
-    const reflection = (this as any)._reflectOnAssociation?.(associationName);
+    const reflection = this._reflectOnAssociation?.(associationName);
     if (reflection) {
       reflection.autosave = true;
       defineAutosaveValidationCallbacks.call(this, reflection);

@@ -12,17 +12,17 @@ export const ORDER_IGNORE_MESSAGE =
 export const DEFAULT_ORDER = ":asc" as const;
 
 export function findEach<T extends Base>(
-  this: any,
+  this: Relation<Base>,
   opts: FindEachOptions,
   block: (record: T) => void | Promise<void>,
 ): Promise<null>;
 export function findEach<T extends Base>(
-  this: any,
+  this: Relation<Base>,
   opts?: FindEachOptions,
 ): AsyncGenerator<T> & { size(): Promise<number> };
 /** @inventedArm loop — PERMANENT */
 export function findEach<T extends Base>(
-  this: any,
+  this: Relation<Base>,
   {
     start,
     finish,
@@ -36,8 +36,8 @@ export function findEach<T extends Base>(
   if (block) {
     return this.findInBatches(
       { start, finish, batchSize, errorOnIgnore, cursor, order },
-      async (records: T[]) => {
-        for (const record of records) await block(record);
+      async (records: Base[]) => {
+        for (const record of records) await block(record as T);
       },
     );
   } else {
@@ -65,17 +65,17 @@ export function findEach<T extends Base>(
 }
 
 export function findInBatches<T extends Base>(
-  this: any,
+  this: Relation<Base>,
   opts: FindEachOptions,
   block: (batch: T[]) => void | Promise<void>,
 ): Promise<null>;
 export function findInBatches<T extends Base>(
-  this: any,
+  this: Relation<Base>,
   opts?: FindEachOptions,
 ): AsyncGenerator<T[]> & { size(): Promise<number> };
 /** @inventedArm loop — PERMANENT */
 export function findInBatches<T extends Base>(
-  this: any,
+  this: Relation<Base>,
   {
     start,
     finish,
@@ -108,19 +108,19 @@ export function findInBatches<T extends Base>(
 
   return relation.inBatches(
     { of: batchSize, start, finish, load: true, errorOnIgnore, cursor, order },
-    async (batch: LoadedRelation<Relation<T>>) => {
-      await block(await batch.toArray());
+    async (batch: LoadedRelation<Relation<Base>>) => {
+      await block((await batch.toArray()) as T[]);
     },
   );
 }
 
 export function inBatches<T extends Base>(
-  this: any,
+  this: Relation<Base>,
   opts: InBatchesOptions,
   block: (relation: LoadedRelation<Relation<T>>) => void | Promise<void>,
 ): Promise<null>;
 export function inBatches<T extends Base>(
-  this: any,
+  this: Relation<Base>,
   opts?: InBatchesOptions,
 ): BatchEnumerator<LoadedRelation<Relation<T>>>;
 /**
@@ -128,7 +128,7 @@ export function inBatches<T extends Base>(
  * @inventedArm indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
  */
 export function inBatches<T extends Base>(
-  this: any,
+  this: Relation<Base>,
   {
     of = 1000,
     start,
@@ -286,7 +286,7 @@ export const Batches = defineModule(
  * @inventedArm if — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
  */
 export function ensureValidOptionsForBatchingBang(
-  this: any,
+  this: Relation<Base>,
   cursor: string[],
   start: unknown,
   finish: unknown,
@@ -327,7 +327,7 @@ export function ensureValidOptionsForBatchingBang(
 
 /** @internal */
 export function applyLimits(
-  this: any,
+  this: Relation<Base>,
   relation: any,
   cursor: string[],
   start: unknown,
@@ -345,7 +345,7 @@ export function applyLimits(
 
 /** @internal */
 export function applyStartLimit(
-  this: any,
+  this: Relation<Base>,
   relation: any,
   cursor: string[],
   start: unknown,
@@ -357,7 +357,7 @@ export function applyStartLimit(
 
 /** @internal */
 export function applyFinishLimit(
-  this: any,
+  this: Relation<Base>,
   relation: any,
   cursor: string[],
   finish: unknown,
@@ -369,7 +369,7 @@ export function applyFinishLimit(
 
 /** @internal */
 export function batchCondition(
-  this: any,
+  this: Relation<Base>,
   relation: any,
   cursor: string[],
   values: unknown,
@@ -392,7 +392,7 @@ export function batchCondition(
 
 /** @internal */
 export function buildBatchOrders(
-  this: any,
+  this: Relation<Base>,
   cursor: string[],
   order: ":asc" | ":desc" | (":asc" | ":desc")[],
 ): [string, ":asc" | ":desc"][] {
@@ -411,7 +411,7 @@ export function actOnIgnoredOrder(this: any, errorOnIgnore: boolean | undefined)
 
 /** @internal */
 export async function batchOnLoadedRelation(
-  this: any,
+  this: Relation<Base>,
   {
     relation,
     start,
@@ -466,7 +466,7 @@ export function recordCursorValues(this: any, record: any, cursor: string[]): un
 
 /** @internal */
 export function compareValuesForOrder(
-  this: any,
+  this: Relation<Base>,
   values1: unknown[],
   values2: unknown[],
   order: (":asc" | ":desc")[],
@@ -484,7 +484,7 @@ export function compareValuesForOrder(
 
 /** @internal */
 export async function batchOnUnloadedRelation(
-  this: any,
+  this: Relation<Base>,
   opts: {
     relation: any;
     start: unknown;

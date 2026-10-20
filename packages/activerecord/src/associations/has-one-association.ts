@@ -1,4 +1,11 @@
-import { fetch, include, kernelThrow, rbEqual, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  include,
+  kernelThrow,
+  rbEqual,
+  rbFPublicSend,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
@@ -46,7 +53,7 @@ export class HasOneAssociation extends SingularAssociation {
     method: string | undefined = this.options.dependent as string | undefined,
   ): Promise<void> {
     if (await this.loadTarget()) {
-      const target = this.target as any;
+      const target = this.target as Base;
       switch (method) {
         case "delete":
           await target.delete();
@@ -59,12 +66,12 @@ export class HasOneAssociation extends SingularAssociation {
         case "destroyAsync": {
           let primaryKeyColumn: string | string[];
           let id: unknown;
-          if (queryConstraintsList.call(target.constructor)) {
-            primaryKeyColumn = queryConstraintsList.call(target.constructor)!;
-            id = primaryKeyColumn.map((col) => target[col]);
+          if (queryConstraintsList.call(target.constructor as typeof Base)) {
+            primaryKeyColumn = queryConstraintsList.call(target.constructor as typeof Base)!;
+            id = primaryKeyColumn.map((col) => rbFPublicSend(target, col));
           } else {
-            primaryKeyColumn = target.constructor.primaryKey as string;
-            id = target[primaryKeyColumn];
+            primaryKeyColumn = (target.constructor as typeof Base).primaryKey as string;
+            id = rbFPublicSend(target, primaryKeyColumn);
           }
 
           this.enqueueDestroyAssociation({
