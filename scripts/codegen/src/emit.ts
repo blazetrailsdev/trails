@@ -542,16 +542,14 @@ export class Emitter {
           // `class << self; def x` in a test class: a static method on it.
           for (const d of this.lw.seqBody(s.body)) {
             if (d.k !== "def") continue;
-            const fn = this.emitMethod(d, u, f, {
-              static: true,
-              module: false,
-              vis: "public",
-              asFunction: true,
-              selfExpr: "this",
-            }).replace(/^export /, "");
-            const nm = /function (\w+)/.exec(fn)![1];
-            classLines.push(fn, `${short}.${nm} = ${nm};`);
-            hostMembers.push(`static ${nm}: any;`);
+            hostMembers.push(
+              this.emitMethod(d, u, f, {
+                static: true,
+                module: false,
+                vis: "public",
+                selfExpr: "this",
+              }),
+            );
           }
         } else if (
           s.k === "call" &&
@@ -606,16 +604,10 @@ export class Emitter {
     // `class << self; def x` (collected into `sbody`): static methods on the test class.
     for (const d of u.sbody) {
       if (d.k !== "def") continue;
-      const fn = this.emitMethod(d, u, f, {
-        static: true,
-        module: false,
-        vis: "public",
-        asFunction: true,
-        selfExpr: "this",
-      }).replace(/^export /, "");
-      const nm = /function (\w+)/.exec(fn)![1];
-      classLines.push(fn, `${short}.${nm} = ${nm};`);
-      hostMembers.push(`static ${nm}: any;`);
+      // A static method of the test class, in its body.
+      hostMembers.push(
+        this.emitMethod(d, u, f, { static: true, module: false, vis: "public", selfExpr: "this" }),
+      );
     }
     emitBody(u.body, out);
     // activesupport's testing/autorun runs each test on a fresh instance of the
