@@ -215,9 +215,6 @@ importers:
         specifier: workspace:*
         version: link:../tse-compiler
     devDependencies:
-      '@blazetrails/trails-tsc':
-        specifier: workspace:*
-        version: link:../trails-tsc
       typescript:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1

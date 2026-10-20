@@ -55,11 +55,12 @@ type StandIn = (
 
 type TemplateCompiler = (
   template: Template,
+  methodName: string,
   source: string,
   file: boolean,
 ) => Promise<{ default: StandIn }>;
 
-let templateCompiler: TemplateCompiler = async (template, _source, file) => {
+let templateCompiler: TemplateCompiler = async (template, methodName, _source, file) => {
   if (!file) {
     // @nie disposition=TODO
     throw new NotImplementedError(
@@ -73,7 +74,7 @@ let templateCompiler: TemplateCompiler = async (template, _source, file) => {
       ? `${identifier}.js`
       : `${identifier.slice(0, at)}/.trails/views/${identifier.slice(at + "/app/views/".length)}.js`;
   const url = new URL(compiled, "file:///");
-  url.search = `?${template.methodName()}`;
+  url.search = `?${methodName}`;
   try {
     return (await import(url.href)) as { default: StandIn };
   } catch (error) {
@@ -136,7 +137,6 @@ export class Template {
   private readonly _objectId = ++nextObjectId;
   private _compiled = false;
   private _compiledStreaming = false;
-  private _methodArguments = "";
 
   constructor(
     source: string | SourcesFile,
@@ -379,20 +379,8 @@ export class Template {
    * @missingRailsCall call — PERMANENT
    */
   private compiledSource(): string {
-    const setStrictLocals = this.strictLocalsBang();
+    this.strictLocalsBang();
     const source = this.encodeBang();
-
-    let methodArguments: string;
-    if (setStrictLocals != null) {
-      if (setStrictLocals.includes("&")) {
-        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}`;
-      } else {
-        methodArguments = `local_assigns, output_buffer, ${setStrictLocals}, &_`;
-      }
-    } else {
-      methodArguments = "local_assigns, output_buffer, &_";
-    }
-    this._methodArguments = methodArguments;
 
     if (/\p{Surrogate}/u.test(source)) {
       throw new WrongEncodingError(source, Encoding.defaultInternal);
@@ -411,6 +399,7 @@ export class Template {
     try {
       ({ default: render } = await templateCompiler(
         this,
+        methodName,
         compiledSource,
         this._source instanceof SourcesFile,
       ));
@@ -421,7 +410,7 @@ export class Template {
     Object.defineProperty(render, "name", { value: methodName });
 
     const virtualPath = this.virtualPath;
-    const signature = methodParameters(this._methodArguments);
+    const signature = methodParameters(setStrictLocals ?? "");
     const keyreq = signature.filter(([type]) => type === "keyreq").map(([, name]) => name!);
     const keywords = signature
       .filter(([type]) => type === "keyreq" || type === "key")

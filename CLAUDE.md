@@ -1758,6 +1758,14 @@ environment, and shipped code has no eval pipeline.** The split is:
   map chained back to the `.tse` file, so a backtrace names the template's own
   line (Rails' `identifier, offset`) when Node runs with source maps enabled.
 
+The loader reads a template's module from where `build-views` writes it by
+default: an identifier under `<root>/app/views/` loads
+`<root>/.trails/views/<path>.js`, and any other identifier loads
+`<identifier>.js`, which is where `--in-place` writes. A build with a custom
+`--out` (`BuildViewsOptions.outDir`) or a views directory not named
+`app/views` and not built in place is for type-checking only, and rendering
+from it raises `LoadError`.
+
 `Template#compile` keeps its name and call site. It loads the emitted module
 with an awaited `import()` under a URL no earlier load used (the `rbFLoad`
 shape), names the method after `method_name`, and seats it on

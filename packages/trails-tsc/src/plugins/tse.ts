@@ -237,6 +237,7 @@ export interface TseScope {
   locals?: string;
   resolved?: boolean;
   escapeIgnore?: boolean;
+  localsSignature?: string | null;
 }
 
 export function virtualizeTse(source: string, scope?: TseScope): string {
@@ -245,6 +246,7 @@ export function virtualizeTse(source: string, scope?: TseScope): string {
 
 export function virtualizeTseWithDeltas(source: string, scope?: TseScope): VirtualizeTseResult {
   const ast = parse(source);
+  ast.localsSignature ??= scope?.localsSignature ?? null;
   const locals = ast.localsSignature === null ? [] : parseLocalsSignature(ast.localsSignature);
   const localsType = localsParamType(ast, locals);
   const needsNoExtraKeys = localsType.includes("NoExtraKeys");

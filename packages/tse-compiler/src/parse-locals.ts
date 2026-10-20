@@ -96,7 +96,16 @@ export function parseLocalsSignature(sig: string): LocalEntry[] {
       continue;
     }
     const colon = trimmed.indexOf(":");
-    if (colon === -1 || /^[&*]|^[\w$]+\s*=/u.test(trimmed)) continue;
+    if (
+      /^&[A-Za-z_$]?[\w$]*$|^\*[A-Za-z_$]?[\w$]*$|^[A-Za-z_$][\w$]*(?:\s*=[\s\S]+)?$/u.test(trimmed)
+    ) {
+      continue;
+    }
+    if (colon === -1) {
+      throw new LocalsSignatureError(
+        `malformed locals entry ${JSON.stringify(trimmed)} — expected \`name:\` or \`name: default\``,
+      );
+    }
     const name = trimmed.slice(0, colon).trim();
     if (!/^[A-Za-z_$][\w$]*$/u.test(name)) {
       throw new LocalsSignatureError(

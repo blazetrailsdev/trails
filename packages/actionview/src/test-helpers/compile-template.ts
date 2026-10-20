@@ -35,37 +35,29 @@ export async function compileTemplate(
     return { default: fn };
   }
   const prepared = template.handler.stripTrailingNewlines ? chomp(source) : source;
-  const signature = template.strictLocalsBang();
-  const comment = `<%# locals: (${signature === "**nil" ? "" : signature}) %>`;
-  const restored =
-    signature == null || /#\s+locals:\s+\(/u.test(prepared)
-      ? prepared
-      : /<%(\s*-?%>)/u.test(prepared)
-        ? prepared.replace(
-            /<%(\s*-?%>)/u,
-            `<%# locals: (${signature === "**nil" ? "" : signature})$1`,
-          )
-        : `${comment}${prepared}`;
   const escapeIgnore = Tse.escapeIgnoreList.some((type) => rbEqual(type, template.type));
   api ??= new API();
   const { outputText } = api.transpileModule(
-    virtualizeTse(restored, { view: "any", escapeIgnore }),
+    virtualizeTse(prepared, {
+      view: "any",
+      escapeIgnore,
+      localsSignature: template.strictLocalsBang(),
+    }),
     {
       compilerOptions: {
         target: ScriptTarget.Latest,
-        module: ModuleKind.ESNext,
+        module: ModuleKind.CommonJS,
         isolatedModules: true,
       },
     },
   );
-  const body = outputText
-    .replace(/^import\s[^;]*;$/gmu, "")
-    .replace(/^export default async function render\(/mu, "return async function render(");
-  const standIn = new Function("TopLevel", "htmlSafe", "RubyCompat", "ArgumentError", body)(
-    TopLevel,
-    htmlSafe,
-    RubyCompat,
-    ArgumentError,
-  ) as StandIn;
-  return { default: standIn };
+  const exports: { default?: StandIn } = {};
+  new Function("exports", "require", outputText)(exports, (id: string) => MODULES[id]);
+  return { default: exports.default! };
 }
+
+const MODULES: Record<string, unknown> = {
+  "@blazetrails/actionview": { TopLevel },
+  "@blazetrails/activesupport": { htmlSafe },
+  "@blazetrails/ruby-compat": RubyCompat,
+};

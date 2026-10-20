@@ -76,7 +76,9 @@ describe("Templates are precompiled", () => {
     );
     expect(files.length).toBeGreaterThan(100);
     const offenders = files
-      .filter(([, source]) => /\beval\s*\(|\bnew\s+Function\b|["']node:vm["']/u.test(source))
+      .filter(([, source]) =>
+        /\beval\s*[()]|(?<![\w$.])Function\s*\(|["'](?:node:)?vm["']/u.test(source),
+      )
       .map(([file]) => file);
     expect(offenders).toEqual([]);
   });

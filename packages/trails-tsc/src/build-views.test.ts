@@ -80,6 +80,20 @@ describe("buildViews", () => {
     expect(fs.existsSync(path.join(cwd, ".trails/views-manifest.ts"))).toBe(false);
   });
 
+  it("writes only the runtime module and its map beside each template when built in place", async () => {
+    const cwd = mkScratch();
+    write(cwd, "templates/rescues/show.html.tse", "<%= 1 %>");
+
+    await buildViews({ cwd, viewsDir: "templates", inPlace: true });
+
+    expect(fs.readdirSync(path.join(cwd, "templates/rescues")).sort()).toEqual([
+      "show.html.tse",
+      "show.html.tse.js",
+      "show.html.tse.js.map",
+    ]);
+    expect(fs.existsSync(path.join(cwd, ".trails"))).toBe(false);
+  });
+
   it("is a no-op when the views dir is absent", async () => {
     const cwd = mkScratch();
     const { count } = await buildViews({ cwd });

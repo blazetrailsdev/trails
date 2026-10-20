@@ -16201,13 +16201,6 @@
   {
     "package": "actionview",
     "rubyFile": "template.rb",
-    "rubyName": "locals_code",
-    "digest": "09b317f6078b2b12",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "template.rb",
     "rubyName": "method_name",
     "digest": "395d45cad460a67b",
     "ref": "v8.0.2"

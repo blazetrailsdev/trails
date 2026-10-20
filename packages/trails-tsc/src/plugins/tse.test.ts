@@ -94,8 +94,13 @@ describe("virtualizeTse", () => {
   });
 
   it("leaves positional and block parameters to Template#compile's non-keyword check", () => {
-    const out = virtualizeTse("<%# locals: (user, &block) %>");
+    const out = virtualizeTse("<%# locals: (user, count = {a: 1}, *rest, &block) %>");
     expect(out).not.toContain("} = locals;");
+  });
+
+  it("still rejects a locals entry compile would not read as a parameter", () => {
+    expect(() => virtualizeTse("<%# locals: (foo bar) %>")).toThrow(TseLocalsSignatureError);
+    expect(() => virtualizeTse("<%# locals: (user user:) %>")).toThrow(/invalid local name/);
   });
 
   it("types a reserved-word keyword local without binding it", () => {

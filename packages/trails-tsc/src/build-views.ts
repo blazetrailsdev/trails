@@ -82,7 +82,14 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
     key,
     localsType: types.length === 1 ? types[0] : types.map((t) => `(${t})`).join(" & "),
   }));
-  if (opts.inPlace) return { count: files.length, files };
+  if (opts.inPlace) {
+    for (const view of views) {
+      for (const ext of [".ts", ".ts.map", ".d.ts", ".d.ts.map"]) {
+        await fs.rm(view.outBase + ext, { force: true });
+      }
+    }
+    return { count: files.length, files };
+  }
   await fs.mkdir(outDir, { recursive: true });
   await fs.writeFile(
     path.join(outDir, "template-registry-augmentation.d.ts"),
