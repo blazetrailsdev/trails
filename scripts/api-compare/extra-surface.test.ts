@@ -2428,10 +2428,6 @@ describe("buildReport — reopened modules", () => {
   });
 
   it("allows a reopening file's methods when the file also declares constants", () => {
-    // i18n/interpolate/ruby.rb declares `DEFAULT_INTERPOLATION_PATTERNS` and
-    // reopens `module I18n` (primary site i18n.rb) for `interpolate`
-    // (vendor/i18n/v1.14.8/lib/i18n/interpolate/ruby.rb:7-23). Its constants put
-    // the file among the covered ones, which must not stop its methods counting.
     const ruby: ApiManifest = {
       source: "ruby",
       generatedAt: "",
