@@ -27,6 +27,7 @@ let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
 const _threads = new Set<Thread>();
 const _locations = new WeakMap<object, string>();
+const _wakeups = new WeakMap<object, (() => void) | true>();
 const _locals = new WeakMap<object, Map<string, unknown>>();
 const _variables = new WeakMap<object, Map<string, unknown>>();
 
@@ -87,13 +88,12 @@ export class Thread<R = unknown> {
    */
   static stop(): Promise<null> {
     const th = Thread.current();
-    if (!(#ready in th)) return new Promise(() => {});
-    if (th.#ready) {
-      th.#ready = false;
+    if (_wakeups.get(th) === true) {
+      _wakeups.delete(th);
       return Promise.resolve(null);
     }
     th.status = "sleep";
-    return new Promise((resolve) => (th.#wake = () => resolve(null)));
+    return new Promise((resolve) => _wakeups.set(th, () => resolve(null)));
   }
 
   /**
@@ -164,8 +164,6 @@ export class Thread<R = unknown> {
   #value!: R;
   #error: { raised: unknown } | null = null;
   #kill!: () => void;
-  #wake: (() => void) | null = null;
-  #ready = false;
   readonly #killed = new Promise<void>((resolve) => (this.#kill = resolve));
 
   /**
@@ -253,12 +251,12 @@ export class Thread<R = unknown> {
    */
   wakeup(): this {
     if (this.status === "dead") throw new ThreadError("killed thread");
-    const wake = this.#wake;
-    if (wake == null) {
-      this.#ready = true;
+    const wake = _wakeups.get(this);
+    if (wake == null || wake === true) {
+      _wakeups.set(this, true);
       return this;
     }
-    this.#wake = null;
+    _wakeups.delete(this);
     this.status = "run";
     wake();
     return this;
