@@ -134,19 +134,25 @@ export function baseClass(this: typeof Base): typeof Base {
   return (this as typeof Base & { _computedBaseClass: typeof Base })._computedBaseClass;
 }
 
+type AbstractClassHost = { _abstractClass: boolean };
+
 export const ClassMethods = new Module().include({
   get abstractClass(): boolean {
-    return Object.hasOwn(this, "_abstractClass") ? (this as any)._abstractClass : false;
+    return Object.hasOwn(this, "_abstractClass")
+      ? (this as AbstractClassHost)._abstractClass
+      : false;
   },
 
   set abstractClass(value: boolean) {
-    (this as any)._abstractClass = value;
+    (this as AbstractClassHost)._abstractClass = value;
   },
 
   isAbstractClass(this: object): boolean {
     const field = Object.getOwnPropertyDescriptor(this, "abstractClass");
     if (field && "value" in field) return field.value === true;
-    return Object.hasOwn(this, "_abstractClass") && (this as any)._abstractClass === true;
+    return (
+      Object.hasOwn(this, "_abstractClass") && (this as AbstractClassHost)._abstractClass === true
+    );
   },
 });
 

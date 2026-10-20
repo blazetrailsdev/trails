@@ -216,7 +216,7 @@ export class ClassMethods {
     const host = this as unknown as CoreHost;
     return (
       (Object.hasOwn(host, "_arelTable") ? host._arelTable : undefined) ||
-      (host._arelTable = new Table((this as any).tableName, { klass: this as any }))
+      (host._arelTable = new Table(host.tableName!, { klass: this as unknown as typeof Base }))
     );
   }
 
@@ -225,7 +225,7 @@ export class ClassMethods {
     return (
       (Object.hasOwn(host, "_predicateBuilder") ? host._predicateBuilder : undefined) ||
       (host._predicateBuilder = new PredicateBuilder(
-        new TableMetadata(this as any, (this as any).arelTable),
+        new TableMetadata(this as unknown as typeof Base, host.arelTable),
       ))
     );
   }
