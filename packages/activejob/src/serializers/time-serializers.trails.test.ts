@@ -19,6 +19,7 @@ describe("ActiveJob::Serializers time objects", () => {
   });
 
   it.skip("round-trips a Date and a DateTime as their own classes", async () => {
+    // BLOCKED: date-iso8601-answers-gem-shaped-date
     expect(await roundTrip(new Date(2001, 2, 3))).toBeInstanceOf(Date);
     expect(
       await roundTrip(new DateTime(2001, 2, 3, 4, 5, new Rational(6123456, 1000000), "+03:00")),
