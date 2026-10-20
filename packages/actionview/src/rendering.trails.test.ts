@@ -20,7 +20,7 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
         await this.render({ plain: "" });
       }
     }
-    AbstractController.RoutesHelpers.with(routes as never)(FooController as never);
+    AbstractController.Trailties.RoutesHelpers.with(routes as never)(FooController as never);
     const controller = new FooController();
     await controller.dispatch(
       "other",

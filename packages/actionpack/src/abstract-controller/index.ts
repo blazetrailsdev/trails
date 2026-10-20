@@ -78,7 +78,7 @@ export {
   type HelpersClassMethods,
   type HelpersHost,
 } from "./helpers.js";
-export * as RoutesHelpers from "./trailties/routes-helpers.js";
+export { Trailties } from "./trailties/routes-helpers.js";
 export {
   type RoutesHelpersClassMethods,
   type RoutesHelpersControllerClass,
