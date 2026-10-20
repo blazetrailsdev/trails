@@ -3862,6 +3862,12 @@ class ApiExtractor
     maybe_record_collection_constant(const[1], rhs)
     maybe_record_symbol_hash_keys(const[1], rhs)
     record_file_hash_keys(literal_hash_keys(rhs))
+    if rhs.is_a?(Array) && %i[var_ref const_path_ref top_const_ref].include?(rhs[0]) &&
+       (target = qualified_const_name(rhs))
+      (@file_constants[@current_file] ||= {})[const[1]] =
+        { kind: "alias", target: target, namespace: current_fqn }
+      return
+    end
     lit = literal_value(rhs, method(:string_opener_at))
     return if lit.nil?
     (@file_constants[@current_file] ||= {})[const[1]] = lit

@@ -1,17 +1,21 @@
-import { File, rbFSend } from "@blazetrails/ruby-compat";
+import { File, rbFSend, rbStrSub } from "@blazetrails/ruby-compat";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { BodyProxy } from "./body-proxy.js";
 import { escapePath } from "./utils.js";
 
 export class Sendfile {
   private app: RackApp;
   private _variation: string | null;
-  private mappings: [string, string][];
+  private mappings: [RegExp, string][];
 
   constructor(app: RackApp, variation?: string | null, mappings?: [string, string][]) {
     this.app = app;
     this._variation = variation ?? null;
-    this.mappings = mappings || [];
+    this.mappings = (mappings || []).map(([internal, external]) => [
+      new RegExp("^" + internal, "im"),
+      external,
+    ]);
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
@@ -27,8 +31,9 @@ export class Sendfile {
           headers["content-length"] = "0";
           headers[type.toLowerCase()] = escapePath(url).replace(/\?/g, "%3F");
           const obody = body;
-          if (typeof obody.close === "function") obody.close();
-          response[2] = [];
+          response[2] = new BodyProxy([], () => {
+            if (typeof obody.close === "function") obody.close();
+          });
         } else {
           env[RACK_ERRORS].puts("x-accel-mapping header missing");
         }
@@ -37,8 +42,9 @@ export class Sendfile {
         headers["content-length"] = "0";
         headers[type.toLowerCase()] = path;
         const obody = body;
-        if (typeof obody.close === "function") obody.close();
-        response[2] = [];
+        response[2] = new BodyProxy([], () => {
+          if (typeof obody.close === "function") obody.close();
+        });
       } else if (type === "" || type == null) {
         /** @empty */
       } else {
@@ -51,32 +57,20 @@ export class Sendfile {
 
   /** @internal */
   private variation(env: Record<string, any>): string | null {
-    return this._variation ?? env["sendfile.type"] ?? null;
+    return this._variation ?? env["sendfile.type"] ?? env["HTTP_X_SENDFILE_TYPE"] ?? null;
   }
 
   /** @internal */
   private mapAccelPath(env: Record<string, any>, path: string): string | undefined {
-    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const literal = (replacement: string) => () => replacement;
-    if (this.mappings.length > 0) {
-      const internalMapping = this.mappings.find(([internal]) =>
-        new RegExp("^" + escape(internal)).test(path),
-      );
-      if (internalMapping) {
-        return path.replace(
-          new RegExp("^" + escape(internalMapping[0])),
-          literal(internalMapping[1]),
-        );
-      }
-      return undefined;
-    }
-    const headerMapping = env["HTTP_X_ACCEL_MAPPING"];
-    if (headerMapping) {
-      for (const m of String(headerMapping)
-        .split(",")
-        .map((s: string) => s.trim())) {
-        const [internal, external] = m.split("=", 2).map((s: string) => s.trim());
-        const newPath = path.replace(new RegExp("^" + escape(internal), "i"), literal(external));
+    let mapping: [RegExp, string] | string | undefined = this.mappings.find(([internal]) =>
+      internal.test(path),
+    );
+    if (mapping !== undefined) {
+      return rbStrSub({ string: path }, ...mapping);
+    } else if ((mapping = env["HTTP_X_ACCEL_MAPPING"] as string | undefined) != null) {
+      for (const m of mapping.split(",").map((s) => s.trim())) {
+        const [internal, external] = m.split("=", 2).map((s) => s.trim());
+        const newPath = rbStrSub({ string: path }, new RegExp("^" + internal, "im"), external);
         if (newPath !== path) return newPath;
       }
       return path;

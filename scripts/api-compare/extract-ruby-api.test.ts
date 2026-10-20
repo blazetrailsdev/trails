@@ -2351,6 +2351,29 @@ describe("Ruby extractor file constants", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS 
     `);
     expect(c["OPTION_NAMES"]).toEqual({ kind: "expr" });
   });
+
+  it("records a bare constant reference as an alias with its target and namespace", () => {
+    const c = rubyFileConstants(`
+      module ActiveRecord
+        module Type
+          Value = ActiveModel::Type::Value
+          Root = ::Object
+          Registry = AdapterSpecificRegistry.new
+        end
+      end
+    `);
+    expect(c["Value"]).toEqual({
+      kind: "alias",
+      target: "ActiveModel::Type::Value",
+      namespace: "ActiveRecord::Type",
+    });
+    expect(c["Root"]).toEqual({
+      kind: "alias",
+      target: "::Object",
+      namespace: "ActiveRecord::Type",
+    });
+    expect(c["Registry"]).toEqual({ kind: "expr" });
+  });
 });
 
 describe(
