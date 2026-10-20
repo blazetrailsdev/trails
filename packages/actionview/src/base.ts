@@ -189,7 +189,7 @@ export class Base {
     return this.lookupContext?.formats;
   }
 
-  set formats(values: LookupContext["formats"]) {
+  set formats(values: LookupContext["formats"] | null) {
     if (this.lookupContext) this.lookupContext.formats = values;
   }
 

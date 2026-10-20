@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import "../test-helpers/abstract-unit.js";
+import { ORIGINAL_LOCALES } from "../test-helpers/abstract-unit.js";
 
 import { ActionController, Mime } from "@blazetrails/actionpack";
 
@@ -33,6 +33,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { MissingTemplate, TemplateError } from "./error.js";
 import { Digestor } from "../digestor.js";
+import type { PathSet } from "../path-set.js";
 import { PartialRenderer } from "../renderer/partial-renderer.js";
 import { Customer, GoodCustomer } from "../test-helpers/fake-models.js";
 
@@ -123,6 +124,7 @@ const resolver = new FixtureResolver({
   "plain_text_with_characters.raw": "Here are some characters: !@#$%^&*()-=\"'}{`\n",
   "test/hello_world.da.html.tse": "Hey verden",
   "test/hello_world.pt-BR.html.tse": "Ola mundo",
+  "test/syntax_error.html.tse": "<%= foo(\n  1,\n  2,\n%>\n",
   "test/_raise.html.tse": "<%= doesnt_exist %>",
   "test/sub_template_raise.html.tse": '<%= render({ partial: "test/raise" }) %>',
   "test/_klass.tse": "<%= klass.constructor.name %>",
@@ -190,7 +192,7 @@ const resolver = new FixtureResolver({
 let view: Base;
 let controllerView: Base;
 
-function setupView(paths: FixtureResolver[]): void {
+function setupView(paths: PathSet): void {
   const assigns = { secret: "in the sauce" };
 
   view = class extends Base.withEmptyTemplateCache() {
@@ -203,7 +205,6 @@ function setupView(paths: FixtureResolver[]): void {
     }
   }.withViewPaths(paths, assigns);
 
-  TestController.viewPaths(paths);
   const controller = new TestController();
   controller.performCaching = true;
   controller.cacheStore = ":memory_store";
@@ -217,6 +218,8 @@ function setupView(paths: FixtureResolver[]): void {
 
   I18n.backend().storeTranslations("da", {});
   I18n.backend().storeTranslations("pt-BR", {});
+
+  assertEqual(ORIGINAL_LOCALES, I18n.availableLocales().map(String).sort());
 }
 
 function cacheKey(...namesAndVirtualPath: unknown[]): unknown {
@@ -234,12 +237,13 @@ function cacheKey(...namesAndVirtualPath: unknown[]): unknown {
 
 function teardown(): void {
   I18n.reloadBang();
-  TestController.viewPaths().paths.map((path) => path.clearCache!());
+  ActionController.Base.viewPaths().paths.map((path) => path.clearCache!());
 }
 
 describe("CachedViewRenderTest", () => {
   beforeEach(() => {
-    setupView([resolver]);
+    ActionController.Base.viewPaths([resolver]);
+    setupView(ActionController.Base.viewPaths());
   });
 
   afterEach(teardown);
@@ -404,7 +408,7 @@ describe("CachedViewRenderTest", () => {
       {
         match: "'nil' is not an ActiveModel-compatible object. It must implement #to_partial_path.",
       },
-      () => view.render({ partial: null as never }),
+      () => view.render({ partial: null }),
     );
   });
 
@@ -529,7 +533,7 @@ describe("CachedViewRenderTest", () => {
   });
 
   it("render partial with nil collection should return nil", async () => {
-    assertNil(await view.render({ partial: "test/customer", collection: null as never }));
+    assertNil(await view.render({ partial: "test/customer", collection: null }));
   });
 
   it("render partial without object does not put partial name to local assigns", async () => {
@@ -722,8 +726,7 @@ describe("CachedViewRenderTest", () => {
   // PERMANENT-SKIP: `ruby_template` is a `.ruby` template. (CLAUDE.md, "Templates are precompiled").
   it.skip("render template via symbol lookup", () => {});
 
-  // BLOCKED: render-test-surfaced-rendering-gaps
-  it.skip("render template with localization on context level", async () => {
+  it("render template with localization on context level", async () => {
     const oldLocale = view.locale;
     view.locale = "da";
     try {
@@ -733,8 +736,7 @@ describe("CachedViewRenderTest", () => {
     }
   });
 
-  // BLOCKED: render-test-surfaced-rendering-gaps
-  it.skip("render template with dashed locale", async () => {
+  it("render template with dashed locale", async () => {
     const oldLocale = view.locale;
     view.locale = "pt-BR";
     try {
@@ -750,16 +752,22 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // PERMANENT-SKIP: a syntax error is reported by `tsc` at build time, not by `compile`. (CLAUDE.md, "Templates are precompiled").
-  it.skip("render template with syntax error", () => {});
+  // BLOCKED: render-test-surfaced-rendering-gaps
+  it.skip("render template with syntax error", async () => {
+    const e = await assertRaises([TemplateError], {}, () =>
+      view.render({ template: "test/syntax_error" }),
+    );
+    assertMatch(/syntax/i, e.message);
+    assertEqual("1:    <%= foo(", (e as TemplateError).annotatedSourceCode()[0].trim());
+  });
 
-  // PERMANENT-SKIP: `SourceMapLocation#spot` reads ErrorHighlight's Prism spot. (CLAUDE.md, "Templates are precompiled").
+  // BLOCKED: tse-undefined-local-raises-template-error
   it.skip("render runtime error", () => {});
 
-  // PERMANENT-SKIP: `SourceMapLocation#spot` reads ErrorHighlight's Prism spot. (CLAUDE.md, "Templates are precompiled").
+  // BLOCKED: tse-undefined-local-raises-template-error
   it.skip("render location conditional append", () => {});
 
-  // PERMANENT-SKIP: `SourceMapLocation#spot` reads ErrorHighlight's Prism spot. (CLAUDE.md, "Templates are precompiled").
+  // BLOCKED: tse-undefined-local-raises-template-error
   it.skip("render location conditional append 2", () => {});
 
   it("render renderable does not mask nomethoderror from within render in", async () => {
@@ -838,7 +846,7 @@ describe("CachedViewRenderTest", () => {
     })();
     assertEqual(
       "Hello: davidHello: mary",
-      String(await view.render({ partial: "test/customer", collection: customers as never })),
+      String(await view.render({ partial: "test/customer", collection: customers })),
     );
   });
 
@@ -871,7 +879,7 @@ describe("CachedViewRenderTest", () => {
       "Hello: lifo",
       String(
         await controllerView.render({
-          partial: new Customer("lifo") as never,
+          partial: new Customer("lifo"),
           locals: { greeting: "Hello" },
         }),
       ),
@@ -883,7 +891,7 @@ describe("CachedViewRenderTest", () => {
       "<greeting>Hello</greeting><name>lifo</name>",
       String(
         await controllerView.render({
-          partial: new Customer("lifo") as never,
+          partial: new Customer("lifo"),
           formats: ":xml",
           locals: { greeting: "Hello" },
         }),
@@ -928,7 +936,7 @@ describe("CachedViewRenderTest", () => {
         view.render({ partial: "test/layout_for_partial" }),
       );
     } finally {
-      view.formats = null as never;
+      view.formats = null;
     }
   });
 
@@ -1311,7 +1319,8 @@ describe("CachedCollectionViewRenderTest", () => {
 
   beforeEach(() => {
     PartialRenderer.setCollectionCache(new MemoryStore());
-    setupView([resolver]);
+    ActionController.Base.viewPaths([resolver]);
+    setupView(ActionController.Base.viewPaths());
   });
 
   afterEach(teardown);
