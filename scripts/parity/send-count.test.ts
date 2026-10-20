@@ -23,6 +23,17 @@ describe("countLines", () => {
     expect(countLines('rbFSend(recv, name, "x");\n')).toBe(0);
   });
 
+  it("skips a computed name whose receiver call holds a string", () => {
+    expect(countLines('rbFSend(foo(a, "x"), name);\n')).toBe(0);
+  });
+
+  it("matches a long parenthesised receiver without backtracking", () => {
+    const line = `rbFSend(${"(x)".repeat(40)}`;
+    const started = Date.now();
+    expect(countLines(line + "\n")).toBe(0);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
   it("counts matching lines, not matches", () => {
     expect(countLines('rbFSend(a, "x") + rbFSend(b, "y")\n')).toBe(1);
   });

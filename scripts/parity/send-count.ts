@@ -39,13 +39,21 @@ export const SRC = "packages";
 
 /**
  * An `rbFSend` / `rbFPublicSend` whose second argument opens with a double
- * quote. The receiver is a run of non-comma, non-quote characters and
- * single-level parenthesised groups, so a nested call keeps its own commas
+ * quote. The receiver is a run of characters that are neither comma, quote nor
+ * parenthesis, and single-level parenthesised groups holding no quote, so a
+ * nested call keeps its own commas
  * (`rbFSend(this.databaseAdapterFor(cfg, ...args), "create")`) while a
  * computed name stays out: the comma before `"` has to be the receiver's own,
  * and `rbFSend(recv, name, "x")` has an identifier where the quote must be.
+ *
+ * The two branches share no character, so the alternation is unambiguous — a
+ * `[^,"]` that also matched a parenthesis would give a JS engine two parses of
+ * every group and exponential backtracking on a long receiver with no `, "`
+ * after it. Excluding the quote inside a group is what keeps
+ * `rbFSend(foo(a, "x"), name)` — a computed name whose receiver holds a
+ * string — from counting.
  */
-export const SEND_PATTERN = String.raw`rbF(Public)?Send\((\([^)]*\)|[^,"])*, *"`;
+export const SEND_PATTERN = String.raw`rbF(Public)?Send\((\([^)"]*\)|[^,"()])*, *"`;
 export const SEND_RE = new RegExp(SEND_PATTERN);
 
 /** Matching lines per file with a non-zero count, keyed by path relative to the source root. */
