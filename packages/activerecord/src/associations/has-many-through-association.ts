@@ -156,7 +156,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
             this.buildThroughRecord(record),
           );
         } else if (inverse.isHasOne()) {
-          (record.association(inverse.name) as HasOneAssociation).syncWrite(
+          void (record.association(inverse.name) as HasOneAssociation).writer(
             this.buildThroughRecord(record),
           );
         }

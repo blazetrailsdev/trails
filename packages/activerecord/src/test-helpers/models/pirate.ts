@@ -142,7 +142,7 @@ export class Pirate extends Base {
     this.validates("catchphrase", { presence: true });
 
     this.beforeSave(
-      function (this: any) {
+      function (this: Pirate) {
         return this.cancelSaveCallbackMethod();
       },
       { if: (r: any) => r.cancelSaveFromCallback },

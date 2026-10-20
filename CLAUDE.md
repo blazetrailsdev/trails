@@ -150,12 +150,18 @@ port a body:
   so a caller forwarding an absent kwarg silently gets the default where Ruby
   would have seen `nil`. Match Ruby's kwarg semantics explicitly when it matters.
 - **An optional positional before trailing options or a block.** Ruby tells
-  `remove_foreign_key(from_table, to_table = nil, **options)` apart by syntax;
-  JS has only position. Keep every Rails parameter in its own slot, with the
-  Rails default, and have the caller pass `undefined` for a positional it
-  skips: `removeForeignKey("astronauts", undefined, { column: "rocket_id" })`,
-  `withExampleTable(connection, "ex", undefined, block)`. Never overload the
-  slot on `typeof`, which is an arm Rails does not have.
+  `has_many(name, scope = nil, **options)` apart by syntax; JS has only
+  position. Keep every Rails parameter in its own slot, with the Rails default
+  (`scope = null`). Where the skipped positional and the options hash are told
+  apart by type (a callable or `nil` against a plain object), the method may
+  take the options in the positional's slot and move them across at the top of
+  its body, as Ruby's signature does, so `hasMany("posts", { dependent:
+"destroy" })` keeps working. Where they cannot be told apart (both hashes,
+  both strings), the caller passes `undefined` for the skipped positional:
+  `removeForeignKey("astronauts", undefined, { column: "rocket_id" })`,
+  `withExampleTable(connection, "ex", undefined, block)`. The move-across lives
+  in the method whose Ruby signature does the split, never in a helper it
+  calls. Ruled by the repo owner on 2026-10-20.
 - **Predicates.** A Ruby predicate returns a value, not necessarily a boolean;
   a value-returning predicate ported as a `boolean` breaks every call site that
   used the value.

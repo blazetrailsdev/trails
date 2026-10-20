@@ -1,9 +1,16 @@
 import { RuntimeError, kernelThrow } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
+import type { ScopeOn } from "../../scoping/named.js";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
 import { association as associationInstance } from "../../associations.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    awesome: ScopeOn<T, Bulb>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Bulb extends Base {
@@ -30,7 +37,7 @@ export class Bulb extends Base {
       record.scopeAfterInitialize = (record.constructor as typeof Bulb).all();
     });
     this.afterInitialize((record: Bulb) => {
-      record.attributesAfterInitialize = { ...(record as any).attributes };
+      record.attributesAfterInitialize = { ...record.attributes };
     });
     this.afterCreate(async (record: Bulb) => {
       record.countAfterCreate = await Bulb.unscoped(async () => {
@@ -60,7 +67,7 @@ export class CustomBulb extends Bulb {
 
   /** @internal */
   private setAwesomeness() {
-    if ((this as any).name === "Dude") {
+    if (this.name === "Dude") {
       this.writeAttribute("frickinawesome", true);
     }
   }

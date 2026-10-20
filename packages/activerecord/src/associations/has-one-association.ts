@@ -17,7 +17,7 @@ import { queryConstraintsList } from "../persistence.js";
 import { assertAssignedSynchronously, type PermittedAttributes } from "@blazetrails/activemodel";
 
 export class HasOneAssociation extends SingularAssociation {
-  /** @noRailsEquivalent CONVERGEABLE has-many-through-has-one-inverse-sends-writer */
+  /** @noRailsEquivalent CONVERGEABLE base-constructor-assigns-associations-through-writer */
   syncWrite(record: Base | null): void {
     assertAssignedSynchronously(this.replace(record, false), `${this.reflection.name}=`);
   }

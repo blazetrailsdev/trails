@@ -348,11 +348,12 @@ registerModel(Person);
 
 export class PersonWithTimestampInCreate extends Base {
   declare born_at: RubyTime | Temporal.PlainDateTime | null;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this._tableName = "people";
     this.beforeCreate(function (this: PersonWithTimestampInCreate) {
-      (this as any).born_at = (this as any).created_at;
+      this.born_at = this.created_at;
     });
   }
 }
@@ -360,11 +361,12 @@ registerModel(PersonWithTimestampInCreate);
 
 export class PersonWithTimestampInUpdate extends Base {
   declare born_at: RubyTime | Temporal.PlainDateTime | null;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this._tableName = "people";
     this.beforeUpdate(function (this: PersonWithTimestampInUpdate) {
-      (this as any).born_at = (this as any).created_at;
+      this.born_at = this.created_at;
     });
   }
 }
@@ -372,11 +374,12 @@ registerModel(PersonWithTimestampInUpdate);
 
 export class PersonWithTimestampInSave extends Base {
   declare born_at: RubyTime | Temporal.PlainDateTime | null;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this._tableName = "people";
     this.beforeCreate(function (this: PersonWithTimestampInSave) {
-      (this as any).born_at = (this as any).created_at;
+      this.born_at = this.created_at;
     });
   }
 }

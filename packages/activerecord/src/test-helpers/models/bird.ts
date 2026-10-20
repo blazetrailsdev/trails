@@ -24,7 +24,7 @@ export class Bird extends Base {
     });
 
     this.beforeSave(
-      function (this: any) {
+      function (this: Bird) {
         this.cancelSaveCallbackMethod();
       },
       { if: (r: any) => r.cancelSaveFromCallback },
