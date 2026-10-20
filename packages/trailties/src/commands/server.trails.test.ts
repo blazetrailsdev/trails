@@ -26,6 +26,14 @@ vi.mock(
   ),
 );
 
+const viewWatches = vi.hoisted(() => [] as Array<Record<string, unknown>>);
+vi.mock("@blazetrails/trails-tsc", () => ({
+  watchViews: async (opts: Record<string, unknown>) => {
+    viewWatches.push(opts);
+    return { close() {} };
+  },
+}));
+
 const { serverCommand } = await import("./server.js");
 
 describe("trails server environment (trails)", () => {
@@ -47,6 +55,7 @@ describe("trails server environment (trails)", () => {
     setEnv("NODE_ENV", undefined);
     _resetTrailsEnv();
     devServerStarts.length = 0;
+    viewWatches.length = 0;
     runOptions = [];
     runApps = [];
     vi.spyOn(Trails, "initialize").mockResolvedValue({ app: () => () => [200, {}, []] } as never);
@@ -148,5 +157,28 @@ describe("trails server environment (trails)", () => {
       const rackEnv = await served((devServerStarts[0] as { app: RackApp }).app);
       expect(rackEnv["action_dispatch.key_generator"]).toBe(app.keyGenerator());
     });
+  });
+
+  function initializeWith(actionView: Record<string, unknown>, reloading: boolean): void {
+    vi.spyOn(Trails, "initialize").mockResolvedValue({
+      app: () => () => [200, {}, []],
+      config: { actionView, isReloadingEnabled: () => reloading },
+    } as never);
+  }
+
+  it("watches app/views when template caching is off", async () => {
+    initializeWith({ cacheTemplateLoading: null }, true);
+    await serverCommand().parseAsync(["-e", "development"], { from: "user" });
+
+    expect(viewWatches.map((o) => o.cwd)).toEqual([process.cwd()]);
+  });
+
+  it("loads templates once from the build when template caching is on", async () => {
+    initializeWith({ cacheTemplateLoading: null }, false);
+    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+    initializeWith({ cacheTemplateLoading: true }, true);
+    await serverCommand().parseAsync(["-e", "development"], { from: "user" });
+
+    expect(viewWatches).toEqual([]);
   });
 });
