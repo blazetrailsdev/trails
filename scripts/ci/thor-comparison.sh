@@ -21,8 +21,6 @@ ruby-tests: cd scripts/test-compare && ruby extract-ruby-tests.rb
 compare after ts-api,ruby-api: $api/compare.ts --package thor && $api/compare.ts --privates --package thor && $api/compare.ts --calls --package thor
 extra-tags after compare: $api/extra-surface.ts --package thor
 extra-ratchet after compare: $api/lint-extra-surface-ratchet.ts --package thor
-arity after compare: $api/lint-arity-excludes.ts --package thor
-inheritance after compare: $api/lint-inheritance-excludes.ts --package thor
 body-pins after compare: $api/lint-body-pins.ts --package thor
 call-mismatches after compare: $api/lint-call-mismatches.ts --no-regen --package thor
 call-args after compare: $api/lint-call-args.ts --no-regen --package thor

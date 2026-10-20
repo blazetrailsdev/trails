@@ -73,7 +73,7 @@ not in the PR body.
 ### A documented deviation is debt, not permission
 
 Convergence is the goal. Every deviation register in this repo — the
-`call-mismatches-exclude` baselines, `arity-exclude.json`, `@noRailsEquivalent`,
+`call-mismatches-exclude` baselines, `@noRailsEquivalent`,
 `@missingRailsCall`, `SKIP_GROUPS`, and every story in a
 `<package>-surfaced-deviations` bucket — is a **burndown ledger**, not a settled
 decision. A row in one of them says "we know this is wrong and haven't fixed it

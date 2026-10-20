@@ -918,6 +918,12 @@ interface PackageTotals {
    */
   totalOverrideExempt: number;
   /**
+   * Public declarations dropped from the surface by `internal: true` — the
+   * `@internal` escape (RFC 0120). Moving a name from `@noRailsEquivalent` to
+   * `@internal` lowers `totalAllowlisted` and raises this, so the swap shows.
+   */
+  totalInternal: number;
+  /**
    * The `rubyFile === null` slice of the totals above — files no Rails file
    * maps onto. Broken out so a consumer can tell how much of a package's
    * extra surface comes from that population (it was unmeasured before this
@@ -1221,6 +1227,28 @@ function walkTsFileSurface(
     out.push({ name, interfaceDeclaration: false, interfaceMemberOf: null, owner: null });
   }
   return out;
+}
+
+/**
+ * The public names a file declares that `internal: true` keeps out of
+ * {@link walkTsFileSurface} — counted, not scored, so `@internal` is never a
+ * silent hiding place (RFC 0120).
+ */
+export function countTsInternalNames(
+  file: string,
+  classes: ClassInfo[],
+  modules: ClassInfo[],
+  fileFunctions: MethodInfo[] | undefined,
+  internalConstants: string[],
+): number {
+  const isInternal = (m: MethodInfo): boolean =>
+    m.internal === true && m.declaredIn === undefined && !m.name.startsWith("_");
+  let count = internalConstants.filter((n) => !n.startsWith("_")).length;
+  for (const c of [...classes, ...modules]) {
+    if (c.file !== file) continue;
+    count += [...c.instanceMethods, ...c.classMethods].filter(isInternal).length;
+  }
+  return count + (fileFunctions ?? []).filter(isInternal).length;
 }
 
 /**
@@ -2271,6 +2299,7 @@ function buildPackageReport(
     totalAllowlisted: 0,
     totalInterfaceExempt: 0,
     totalOverrideExempt: 0,
+    totalInternal: 0,
     noCounterpartFiles: 0,
     noCounterpartExtras: 0,
     noCounterpartNovel: 0,
@@ -2561,6 +2590,9 @@ function buildPackageReport(
     const fileConsts = Object.keys(tsFileConstants[expectedTs] ?? {}).filter(
       (n) => !internalConsts.has(n),
     );
+    result.totalInternal += countTsInternalNames(expectedTs, classes, modules, fileFns, [
+      ...internalConsts,
+    ]);
     if (classes.length === 0 && modules.length === 0 && !fileFns && fileConsts.length === 0)
       continue;
 
@@ -2892,19 +2924,22 @@ function printHumanReport(report: Report, topN: number, maxDetail: number, verbo
 
   console.log(`${p.bold}Per-package totals${p.reset}`);
   console.log(
-    `  ${"Package".padEnd(20)} ${"Files".padStart(7)} ${"Novel".padStart(7)} ${"Moved".padStart(7)} ${"Total".padStart(7)} ${"Allowed".padStart(7)} ${"NoCntrp".padStart(7)}`,
+    `  ${"Package".padEnd(20)} ${"Files".padStart(7)} ${"Novel".padStart(7)} ${"Moved".padStart(7)} ${"Total".padStart(7)} ${"Allowed".padStart(7)} ${"NoCntrp".padStart(7)} ${"Intrnl".padStart(7)}`,
   );
   console.log(
-    `  ${"-".repeat(20)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)}`,
+    `  ${"-".repeat(20)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)} ${"-".repeat(7)}`,
   );
   for (const pkg of report.packages) {
     const novel = padNumCell(pkg.totalNovel, colorCount(pkg.totalNovel, p), 7);
     console.log(
-      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)} ${String(pkg.totalAllowlisted).padStart(7)} ${String(pkg.noCounterpartExtras).padStart(7)}`,
+      `  ${pkg.package.padEnd(20)} ${String(pkg.filesWithDrift).padStart(7)} ${novel} ${String(pkg.totalMoved).padStart(7)} ${String(pkg.totalExtras).padStart(7)} ${String(pkg.totalAllowlisted).padStart(7)} ${String(pkg.noCounterpartExtras).padStart(7)} ${String(pkg.totalInternal).padStart(7)}`,
     );
   }
   console.log(
     `${p.dim}  NoCntrp = the slice of Total from TS files no Rails file maps onto (scored with an empty allowed set).${p.reset}`,
+  );
+  console.log(
+    `${p.dim}  Intrnl = public declarations kept out of every column by \`internal: true\` (\`@internal\`, TS private/protected).${p.reset}`,
   );
   const interfaceExempt = report.packages.reduce((n, pkg) => n + pkg.totalInterfaceExempt, 0);
   console.log(

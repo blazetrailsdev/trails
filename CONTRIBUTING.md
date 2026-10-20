@@ -355,16 +355,6 @@ Once the counters are pinned their burn rate is measurable, which is what the
 ActiveRecord release estimate needs to price promoting this from a ratchet to a
 hard release gate (the path `gates.ts` already took: advisory → ratchet → zero).
 
-The advisory **arity** check has its own reasoned suppression file,
-`scripts/api-compare/arity-exclude.json` (RFC 0072), keyed by
-`package + rubyFile + rubyName` with a mandatory `reason` per entry. `pnpm
-parity:api` applies it — an excluded pair drops out of both the mismatch list
-and the compared denominator, and the summary reports `N excluded`. `pnpm
-parity:api:arity` (a CI step) fails on a malformed entry or a **stale** one: excludes
-are a ratchet, so an entry whose pair converged (or no longer exists) must be
-deleted by hand. There is deliberately no reseed — an exclude only ever earns
-its place by being written with its justification.
-
 "Misplaced" means tests exist but are in
 the wrong file per Rails layout — they need to be moved, not rewritten. The
 per-file "Extra" column counts TS tests in the convention file that matched no

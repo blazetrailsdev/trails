@@ -380,6 +380,26 @@ describe("a TS-only package", () => {
       expect.objectContaining({ name: "first", kind: "moved" }),
     ]);
   });
+
+  it("shows a receipt swapped for @internal: allowed falls, internal rises", () => {
+    const ruby: ApiManifest = { source: "ruby", generatedAt: "", packages: {} };
+    const report = (squeeze: MethodInfo) =>
+      buildReport(
+        ruby,
+        {
+          source: "typescript",
+          generatedAt: "",
+          packages: {
+            "ruby-compat": { classes: {}, modules: {}, fileFunctions: { "range.ts": [squeeze] } },
+          },
+        },
+        { filterPkg: "ruby-compat", excludeGlobs: [], novelOnly: false, topN: 50 },
+      ).packages[0];
+    const receipted = report({ ...method("squeeze"), noRailsEquivalent: "PERMANENT" });
+    const hidden = report({ ...method("squeeze"), internal: true });
+    expect([receipted?.totalAllowlisted, receipted?.totalInternal]).toEqual([1, 0]);
+    expect([hidden?.totalAllowlisted, hidden?.totalInternal]).toEqual([0, 1]);
+  });
 });
 
 describe("concernHookNames", () => {

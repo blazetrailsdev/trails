@@ -5859,6 +5859,29 @@ describe("extractFromProgram — @noRailsEquivalent JSDoc", () => {
     ).toThrow(/@noRailsEquivalent needs a reason/);
   });
 
+  it("throws with file:line when a CONVERGEABLE tag names no story id", () => {
+    for (const reason of ["CONVERGEABLE", "CONVERGEABLE — prose", "CONVERGEABLE (story: x-y)"]) {
+      expect(() =>
+        extractFromFiles("/p", {
+          "seams.ts": `\n/** @noRailsEquivalent ${reason} */\nexport class Seam {}\n`,
+        }),
+      ).toThrow(/CONVERGEABLE needs a story id: .*seams\.ts:2/);
+    }
+  });
+
+  it("accepts a CONVERGEABLE tag whose first token is a story id, and a bare PERMANENT", () => {
+    const info = extractFromFiles("/p", {
+      "seams.ts": `
+        /** @noRailsEquivalent CONVERGEABLE port-the-seam — the reason */
+        export class Seam {}
+        /** @noRailsEquivalent PERMANENT */
+        export class Fact {}
+      `,
+    });
+    const reasons = Object.values(info.classes).map((c) => c.noRailsEquivalent);
+    expect(reasons).toEqual(["CONVERGEABLE port-the-seam — the reason", "PERMANENT"]);
+  });
+
   it("throws when the tag carries no reason", () => {
     expect(() =>
       extractFromSource(`

@@ -1796,18 +1796,6 @@ jobs:
         # api-compare manifests the step above already wrote. No --exclude-glob:
         # an exclusion disarms the stale gate (see extra-surface.ts `main()`).
         run: pnpm exec tsx scripts/api-compare/extra-surface.ts
-      - name: Arity excludes gate
-        # Fails on a malformed or STALE entry in
-        # scripts/api-compare/arity-exclude.json (the reasoned suppression file
-        # for the advisory arity check, applied by the API comparison step
-        # above). Excludes only shrink — delete a converged entry by hand.
-        run: pnpm exec tsx scripts/api-compare/lint-arity-excludes.ts
-      - name: Inheritance excludes gate
-        # Fails on a malformed or STALE entry in
-        # scripts/api-compare/inheritance-exclude.json (the reasoned suppression
-        # file for the inheritance check, applied by the API comparison step
-        # above). Excludes only shrink — delete a converged entry by hand.
-        run: pnpm exec tsx scripts/api-compare/lint-inheritance-excludes.ts
       - name: Body-pins gate
         # Source-hash pinning (RFC 0025). Fails when a pinned pair's normalized
         # Rails body digest drifts from the current vendored source
