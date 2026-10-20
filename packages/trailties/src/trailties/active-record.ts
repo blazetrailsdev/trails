@@ -3,12 +3,10 @@ import "./action-controller.js";
 import {
   constantize,
   include,
-  type EncryptedConfiguration,
   isPresent,
   onLoad,
   TopLevel,
   upcaseFirst,
-  type Deprecators,
 } from "@blazetrails/activesupport";
 import { except, Process, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
@@ -112,13 +110,6 @@ const setPostgresqlDecodeDates = (adapter: typeof PostgreSQLAdapter): void => {
 };
 
 /** @noRailsEquivalent PERMANENT */
-interface TrailtieApp {
-  deprecators: Deprecators;
-  config: { get(key: string): unknown; fileWatcher: unknown };
-  credentials(): Promise<EncryptedConfiguration>;
-}
-
-/** @noRailsEquivalent PERMANENT */
 interface QueryLogsContext {
   connection: {
     pool: { dbConfig: { socket?: string; host?: string; database?: string } };
@@ -162,7 +153,7 @@ export class Trailtie extends BaseTrailtie {
     this.config.eagerLoadNamespaces.push(ActiveRecord.ActiveRecord);
 
     this.initializer("active_record.deprecator", { before: "load_environment_config" }, (app) => {
-      (app as TrailtieApp).deprecators.set("activeRecord", deprecator());
+      app.deprecators.set("activeRecord", deprecator());
     });
 
     this.initializer("active_record.initialize_timezone", () => {
@@ -182,29 +173,29 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_record.migration_error", (app) => {
-      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
+      const cfg = this.config.activeRecord;
       if (cfg.migrationError === "page_load") {
         this.config.appMiddleware().insertAfter(Callbacks, Migration.CheckPending, {
-          fileWatcher: (app as TrailtieApp).config.fileWatcher,
+          fileWatcher: app.config.fileWatcher,
         });
       }
     });
 
     this.initializer("active_record.copy_schema_cache_config", () => {
-      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
+      const cfg = this.config.activeRecord;
       SchemaReflection.useSchemaCacheDump = cfg.useSchemaCacheDump;
       SchemaReflection.checkSchemaCacheDumpVersion = cfg.checkSchemaCacheDumpVersion;
     });
 
     this.initializer("active_record.sqlite3_adapter_strict_strings_by_default", () => {
-      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
+      const cfg = this.config.activeRecord;
       if (cfg.sqlite3AdapterStrictStringsByDefault) {
         onLoad("active_record_sqlite3adapter", { runOnce: true }, setSqlite3StrictStringsByDefault);
       }
     });
 
     this.initializer("active_record.postgresql_adapter_decode_dates", () => {
-      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
+      const cfg = this.config.activeRecord;
       if (cfg.postgresqlAdapterDecodeDates) {
         onLoad("active_record_postgresqladapter", { runOnce: true }, setPostgresqlDecodeDates);
       }
@@ -292,7 +283,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_record_encryption.configuration", async (app) => {
-      const credentials = await (app as TrailtieApp).credentials();
+      const credentials = await app.credentials();
       onLoad("active_record_encryption", () => {
         Encryption.configure({
           primaryKey: credentials.dig("active_record_encryption", "primary_key") as string,
@@ -304,7 +295,7 @@ export class Trailtie extends BaseTrailtie {
             "active_record_encryption",
             "key_derivation_salt",
           ) as string,
-          ...(this.config.get("activeRecord") as ActiveRecordConfig).encryption,
+          ...this.config.activeRecord.encryption,
         });
 
         const autoFilteredParameters = new AutoFilteredParameters(app as AutoFilteredParametersApp);
@@ -322,7 +313,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_record.query_log_tags_config", (app) => {
       this.config.afterInitialize(() => {
-        const cfg = (app as TrailtieApp).config.get("activeRecord") as ActiveRecordConfig;
+        const cfg = app.config.activeRecord;
         if (cfg.queryLogTagsEnabled) {
           ActiveRecord.queryTransformers().push(QueryLogs);
           QueryLogs.taggings = {

@@ -7,7 +7,6 @@ import {
   onLoad,
   TopLevel,
   type CacheStore,
-  type Deprecators,
   type Logger,
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
@@ -23,8 +22,6 @@ import {
   registerConstant,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
-import type { Root } from "../paths.js";
-import type { ActiveSupportConfig } from "./active-support.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionControllerConfig {
@@ -51,19 +48,6 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-interface TrailtieApp {
-  deprecators: Deprecators;
-  routes(): AppRoutes;
-  config: {
-    helpersPaths: string[];
-    paths(): Root;
-    activeSupport: ActiveSupportConfig;
-    assetHost: string | null;
-    relativeUrlRoot: string | null;
-  };
-}
-
 type AppRoutes = Parameters<typeof AbstractController.withRoutesHelpers>[0] & {
   mountedHelpers(): object;
 };
@@ -83,7 +67,7 @@ export class Trailtie extends BaseTrailtie {
       "action_controller.deprecator",
       { before: "load_environment_config" },
       (app) => {
-        (app as TrailtieApp).deprecators.set("actionController", ActionController.deprecator());
+        app.deprecators.set("actionController", ActionController.deprecator());
       },
     );
 
@@ -91,7 +75,7 @@ export class Trailtie extends BaseTrailtie {
       "action_controller.set_helpers_path",
       { after: "prepend_helpers_path" },
       async (app) => {
-        const helpersPaths = (app as TrailtieApp).config.helpersPaths;
+        const helpersPaths = app.config.helpersPaths;
         ActionController.setHelpersPath(helpersPaths);
 
         for (const [name, mod] of await helperConstants(helpersPaths)) registerConstant(name, mod);
@@ -104,8 +88,8 @@ export class Trailtie extends BaseTrailtie {
     );
 
     this.initializer("action_controller.set_configs", async (app) => {
-      const paths = (app as TrailtieApp).config.paths();
-      const options = this.config.get("actionController") as ActionControllerConfig;
+      const paths = app.config.paths();
+      const options = this.config.actionController;
 
       options.logger ??= TopLevel.Trails!.logger;
       options.cacheStore ??= TopLevel.Trails!.cache;
@@ -113,11 +97,11 @@ export class Trailtie extends BaseTrailtie {
       options.javascriptsDir ??= await paths.get("public/javascripts")!.first();
       options.stylesheetsDir ??= await paths.get("public/stylesheets")!.first();
 
-      options.assetHost ??= (app as TrailtieApp).config.assetHost;
-      options.relativeUrlRoot ??= (app as TrailtieApp).config.relativeUrlRoot;
+      options.assetHost ??= app.config.assetHost;
+      options.relativeUrlRoot ??= app.config.relativeUrlRoot;
 
       onLoad("action_controller", (base: AbstractController.RoutesHelpersControllerClass) => {
-        const routes = (app as TrailtieApp).routes();
+        const routes = app.routes();
         include(base as unknown as new (...args: never[]) => unknown, routes.mountedHelpers());
         AbstractController.withRoutesHelpers(routes)(base);
 
@@ -147,7 +131,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("action_controller.request_forgery_protection", () => {
-      const options = this.config.get("actionController") as ActionControllerConfig;
+      const options = this.config.actionController;
 
       onLoad("action_controller_base", (base: typeof ActionController.Base) => {
         if (options.defaultProtectFromForgery) {
@@ -158,9 +142,8 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_controller.test_case", (app) => {
       onLoad("action_controller_test_case", () => {
-        ActionController.TestCase.executorAroundEachRequest = (
-          app as TrailtieApp
-        ).config.activeSupport.executorAroundTestCase;
+        ActionController.TestCase.executorAroundEachRequest =
+          app.config.activeSupport.executorAroundTestCase;
       });
     });
   }

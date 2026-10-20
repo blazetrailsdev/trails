@@ -3,7 +3,14 @@ import { ArgumentError, resetLoadHooks, runLoadHooks } from "@blazetrails/active
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { GlobalID } from "@blazetrails/globalid";
 import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "@blazetrails/globalid";
-import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./global-id.js";
+import { Trailtie, type GlobalIdConfig } from "./global-id.js";
+import type { Configuration } from "../trailtie/configuration.js";
+
+interface TrailtieApp {
+  railtieName: string;
+  config: Pick<Configuration, "get" | "set">;
+  keyGenerator(): KeyGenerator;
+}
 import { Application } from "../application.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 

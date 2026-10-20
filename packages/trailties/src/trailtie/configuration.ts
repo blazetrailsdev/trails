@@ -1,6 +1,7 @@
 import { onLoad } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/ruby-compat";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import type { Application } from "../application.js";
 import { Generators, MiddlewareStackProxy } from "../configuration.js";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
@@ -79,7 +80,7 @@ export class Configuration {
     onLoad("before_initialize", { yield: true }, block);
   }
 
-  afterInitialize(block: ConfigurationBlock): void {
+  afterInitialize(block: (this: unknown, app: Application) => void): void {
     onLoad("after_initialize", { yield: true }, block);
   }
 

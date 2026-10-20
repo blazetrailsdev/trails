@@ -4,7 +4,6 @@ import {
   deprecator,
   TopLevel,
   type Deprecation,
-  type Deprecators,
   type DeprecationBehavior,
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
@@ -33,12 +32,6 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-interface TrailtieApp {
-  config: { get(key: string): unknown };
-  deprecators: Deprecators;
-}
-
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
@@ -46,12 +39,12 @@ export class Trailtie extends BaseTrailtie {
     this.config.set("activeSupport", {} satisfies ActiveSupportConfig);
 
     this.initializer("active_support.deprecator", { before: "load_environment_config" }, (app) => {
-      (app as TrailtieApp).deprecators.set("activeSupport", deprecator());
+      app.deprecators.set("activeSupport", deprecator());
     });
 
     this.initializer("active_support.deprecation_behavior", (app) => {
-      const activeSupport = (app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig;
-      const deprecators = (app as TrailtieApp).deprecators;
+      const activeSupport = app.config.activeSupport;
+      const deprecators = app.deprecators;
       if (activeSupport.reportDeprecations === false) {
         deprecators.setSilenced(true);
         deprecators.setBehavior("silence");
@@ -75,8 +68,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_support.set_hash_digest_class", (app) => {
-      const klass = ((app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig)
-        .hashDigestClass;
+      const klass = app.config.activeSupport.hashDigestClass;
       if (klass != null) {
         Digest.hashDigestClass = klass;
       }
@@ -84,9 +76,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_support.set_default_message_serializer", (app) => {
       this.config.afterInitialize(() => {
-        const messageSerializer = (
-          (app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig
-        ).messageSerializer;
+        const messageSerializer = app.config.activeSupport.messageSerializer;
         if (messageSerializer != null) {
           Codec.defaultSerializer = (
             isSymbol(messageSerializer) ? symbolToS(messageSerializer) : messageSerializer
@@ -99,9 +89,7 @@ export class Trailtie extends BaseTrailtie {
       "active_support.require_message_pack",
       { after: "finisher_hook" },
       async (app) => {
-        const messageSerializer = (
-          (app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig
-        ).messageSerializer;
+        const messageSerializer = app.config.activeSupport.messageSerializer;
         if (
           typeof messageSerializer === "string" &&
           messageSerializer.includes("message_pack") &&
