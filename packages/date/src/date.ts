@@ -6716,7 +6716,7 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   get minute(): number {
-    return this.min;
+    return dfToTime(this.mLocalDf())[1];
   }
 
   get sec(): number {
@@ -6724,7 +6724,7 @@ export class DateTime extends DateWithoutParseStatics {
   }
 
   get second(): number {
-    return this.sec;
+    return dfToTime(this.mLocalDf())[2];
   }
 
   get secFraction(): Rational {
