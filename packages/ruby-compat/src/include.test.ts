@@ -2162,6 +2162,40 @@ describe("extend on an object", () => {
     expect(obj.constructor).toBe(Object);
   });
 
+  it("includes a plain module into the object's singleton class", async () => {
+    const { defineModule, extend, rbClassInheritedP } = await import("./include.js");
+    const { rbClassOf } = await import("./object.js");
+    const Mod = defineModule({ m: () => 1 });
+    const obj = extend({}, Mod);
+    expect(rbClassInheritedP(rbClassOf(obj), Mod)).toBe(true);
+  });
+
+  it("keeps the object's own prototype beneath its singleton class", async () => {
+    const { defineModule, extend } = await import("./include.js");
+    const proto = { inherited: () => 2 };
+    const obj = extend(Object.create(proto) as { inherited: () => number }, defineModule({}));
+    expect(obj.inherited()).toBe(2);
+  });
+
+  it("puts a class module a plain module includes on the singleton class", async () => {
+    const { classModule, defineModule, extend, include, rbClassInheritedP, rbModAncestors } =
+      await import("./include.js");
+    const { rbClassOf } = await import("./object.js");
+    class Nested {
+      static readonly [classModule] = true;
+      n(): number {
+        return 3;
+      }
+    }
+    const Mod = defineModule({});
+    include(Mod, Nested);
+    const obj = extend({}, Mod);
+    expect(rbClassInheritedP(rbClassOf(obj), Nested)).toBe(true);
+    expect(rbModAncestors(rbClassOf(obj)).some((m) => m !== Nested && Object.hasOwn(m, "n"))).toBe(
+      false,
+    );
+  });
+
   it("raises FrozenError for a frozen object", async () => {
     const { Module, extend } = await import("./include.js");
     const { FrozenError } = await import("./frozen-error.js");

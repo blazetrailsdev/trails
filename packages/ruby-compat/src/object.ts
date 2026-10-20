@@ -192,6 +192,7 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
     writable: true,
     configurable: true,
   });
+  Object.setPrototypeOf(klass.prototype, proto);
   Object.setPrototypeOf(obj, klass.prototype);
   return klass;
 }
