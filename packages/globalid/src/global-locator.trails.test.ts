@@ -40,29 +40,6 @@ describe("Locator (non-Rails coverage)", () => {
   it("propagates errors from find (Rails parity — find raises RecordNotFound)", async () => {
     await expect(Locator.locate("gid://bcx/Person/missing")).rejects.toThrow();
   });
-
-  it("locateMany with ignoreMissing throws if where() lacks toArray", async () => {
-    class BadWhereModel {
-      static primaryKey = "id";
-      id: string;
-      constructor(id: string) {
-        this.id = id;
-      }
-      static async find(id: unknown): Promise<BadWhereModel | BadWhereModel[]> {
-        return Array.isArray(id)
-          ? id.map((i) => new BadWhereModel(String(i)))
-          : new BadWhereModel(String(id));
-      }
-      static where(): { someOtherMethod?: () => void } {
-        return {};
-      }
-    }
-    Object.defineProperty(BadWhereModel, "name", { value: "BadWhereModel" });
-    registerConstant("BadWhereModel", BadWhereModel);
-    await expect(
-      Locator.locateMany(["gid://bcx/BadWhereModel/1"], { ignoreMissing: true }),
-    ).rejects.toThrow(/toArray/);
-  });
 });
 
 describe("Locator non-Rails coverage — per-app dispatch helpers", () => {

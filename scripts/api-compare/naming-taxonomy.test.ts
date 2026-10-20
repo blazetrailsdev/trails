@@ -4,9 +4,9 @@ import {
   differingRefPairs,
   classifyRow,
   refName,
-  JS_RESERVED_WORDS,
   NAMING_CLASSES,
 } from "./naming-taxonomy.js";
+import { JS_RESERVED_WORDS } from "@blazetrails/parity/conventions";
 
 describe("classifyPair", () => {
   // postgresql_adapter.rb:781's second parameter is `default`.

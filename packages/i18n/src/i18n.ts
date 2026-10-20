@@ -147,11 +147,10 @@ export async function eagerLoadBang(): Promise<void> {
 
 export type TranslateKey = TranslationKey | null;
 
-/** @missingRailsName throw — PERMANENT */
 export function translate(
   key: TranslateKey | TranslateKey[] = null,
   {
-    throw: throwOption = false,
+    throw: throw_ = false,
     raise = false,
     locale = null,
     ...options
@@ -164,9 +163,9 @@ export function translate(
   const backend = config().backend;
 
   if (Array.isArray(key)) {
-    return key.map((k) => translateKey(k, throwOption, raise, locale as Locale, backend, options));
+    return key.map((k) => translateKey(k, throw_, raise, locale as Locale, backend, options));
   } else {
-    return translateKey(key, throwOption, raise, locale as Locale, backend, options);
+    return translateKey(key, throw_, raise, locale as Locale, backend, options);
   }
 }
 
@@ -208,7 +207,7 @@ export function exists(
 export function transliterate(
   key: string,
   {
-    throw: throwOption = false,
+    throw: throw_ = false,
     raise = false,
     locale = null,
     replacement = null,
@@ -224,7 +223,7 @@ export function transliterate(
   } catch (exception) {
     if (!(exception instanceof ArgumentError)) throw exception;
     return handleException(
-      truthy(throwOption) ? "throw" : truthy(raise) ? "raise" : false,
+      truthy(throw_) ? "throw" : truthy(raise) ? "raise" : false,
       exception,
       locale as Locale,
       key,
@@ -330,7 +329,7 @@ function truthy(value: unknown): boolean {
 /** @internal */
 function translateKey(
   key: TranslateKey,
-  throwOption: unknown,
+  throw_: unknown,
   raise: unknown,
   locale: Locale,
   backend: Base,
@@ -340,7 +339,7 @@ function translateKey(
 
   if (result instanceof MissingTranslation) {
     return handleException(
-      truthy(throwOption) ? "throw" : truthy(raise) ? "raise" : false,
+      truthy(throw_) ? "throw" : truthy(raise) ? "raise" : false,
       result,
       locale,
       key,
