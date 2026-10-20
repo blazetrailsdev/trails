@@ -5,6 +5,7 @@ import {
   rbModConstSet,
   rbObjClassname,
   strNew,
+  stringSplit,
 } from "@blazetrails/ruby-compat";
 import { BadRequest } from "./bad-request.js";
 import { Rack } from "./namespaces.js";
@@ -117,16 +118,8 @@ export class QueryParser {
     const result: Record<string, string | string[] | null> = Object.create(null);
 
     for (const p of str.split(sep)) {
-      if (!p) continue;
-      const eqIdx = p.indexOf("=");
-      let k: string, v: string | null;
-      if (eqIdx === -1) {
-        k = unescape(p);
-        v = null;
-      } else {
-        k = unescape(p.substring(0, eqIdx));
-        v = unescape(p.substring(eqIdx + 1));
-      }
+      if (p.length === 0) continue;
+      const [k, v = null] = stringSplit(p, "=", 2).map((s) => unescape(s));
       if (Object.hasOwn(result, k)) {
         const cur = result[k];
         if (Array.isArray(cur)) {
@@ -150,11 +143,7 @@ export class QueryParser {
       const sep = separator ? (COMMON_SEP[separator] ?? escapedSepRe(separator)) : DEFAULT_SEP;
 
       for (const p of str.split(sep)) {
-        if (!p) continue;
-        const eqIdx = p.indexOf("=");
-        const [k, v = null] = (
-          eqIdx === -1 ? [p] : [p.substring(0, eqIdx), p.substring(eqIdx + 1)]
-        ).map((s) => unescape(s));
+        const [k = null, v = null] = stringSplit(p, "=", 2).map((s) => unescape(s));
         this._normalizeParams(params, k, v, 0);
       }
     } catch (e) {
