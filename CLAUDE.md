@@ -1046,7 +1046,10 @@ As a consequence:
   (`attribute_methods.rb:528-533`) are still ported as two calls.
 - `rbFPublicSend` dispatches a defined method exactly as `rbFSend` does. It still
   raises `NoMethodError` for an undefined name and still goes to `methodMissing`,
-  so a Rails `public_send` keeps its `rbFPublicSend` spelling and its rescue.
+  so a Rails `public_send` that survives § "A dispatch by name is spelled
+  directly" keeps its `rbFPublicSend` spelling and its rescue — visibility is
+  not what decides between the two spellings, and neither spelling is a reason
+  to keep a send where the name is a literal.
   `rbModPublicMethodDefined` (`Module#public_method_defined?`) answers "defined".
 - A Rails test whose assertions turn on private / protected visibility at run
   time is permanently unportable for that arm: `assert_not_respond_to` on a
@@ -1317,6 +1320,89 @@ backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
 `domTestingDefaultHtmlVersion`, and the `:html4` arm of `chooseHtmlParser` raises
 `NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
 the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
+
+## A dispatch by name is spelled directly (`send`, `public_send`)
+
+`rbFSend` / `rbFPublicSend` are the ports of `Kernel#send` / `#public_send`
+(`rb_f_send`, `vendor/ruby/v3.3.11/vm_eval.c:1330`; `rb_f_public_send`,
+`:1350`), and they stay — but they are the last
+shape to reach for, not the first. A string-keyed send throws away everything
+the call site knew: no TS type checks the receiver or the target, the Ruby name
+has to be guessed into a TS spelling (`camelized`, `writerSpelling` and
+`RELOPS` inside `sendInternal`, `packages/ruby-compat/src/object.ts`), and a
+direct property read becomes a prototype walk plus a table lookup. By
+repo-owner ruling on 2026-10-20:
+
+**Write the member call directly.** Wherever the name is known where the call
+is written, spell it — `app.call(env)`, with `app` typed. An `rbFSend` with a
+string literal for a name, or one standing in for a cast the author did not
+want to write, is a direct call with the types discarded. This is not a
+preference between shapes: it is the answer at nearly every call site in the
+repo that reaches for a send today, and "the Rails body says `send`" is not a
+reason to keep one where Rails' own name is a literal.
+
+Two fallbacks exist, and both are last resorts:
+
+- **An explicit registry**, where the name genuinely varies at run time but its
+  set is closed — a format, a pragma, a config option, an association's writer,
+  a visitor's node kind, a Thor instruction. A registry is a declared map from
+  the Ruby-visible name to a real, typed function, read at the call site;
+  ruby-compat's own `OBJECT_METHOD_TABLE` and `TEMPORAL_METHOD_TABLE`
+  (`packages/ruby-compat/src/object.ts`) are that shape. Reach for it only once the
+  direct spelling is genuinely impossible, and keep it module-private where
+  nothing outside the file reads it — a table is extra surface like any other
+  name, and a registry written where a direct call would have done is its own
+  invented indirection (§ "Fidelity is the job").
+- **`rbFSend` / `rbFPublicSend`**, where the dispatched name is
+  caller-supplied and the set it comes from is open — extended by application
+  code, so no table the framework writes can enumerate it. `Object#try`'s
+  `public_send(*args, &block)`
+  (`vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/object/try.rb:14-15`)
+  takes any name its caller passes. `MimeResponds::Collector#any`'s
+  `args.each { |type| send(type, &block) }`
+  (`vendor/rails/v8.0.2/actionpack/lib/action_controller/metal/mime_responds.rb:262-264`)
+  dispatches a registered Mime symbol, and `Mime::Type.register` appends to
+  `SET` at run time
+  (`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/http/mime_type.rb:186-193`),
+  which is why the collector is a Proxy in the first place (§ "Ruby protocol
+  methods with a different JS mechanism"). `Channel::Base#dispatch_action`'s
+  `public_send action, data`
+  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/channel/base.rb:280-286`)
+  dispatches a client-supplied string gated by `action_methods`, which is the
+  USER subclass's public instance methods less `Base`'s (`:128-134`) — a set
+  the framework cannot see. A gate on a set application code supplies is not a
+  table trails can write, so the send IS the ported method, and it stays.
+
+Two corollaries:
+
+- **Do not widen the send machinery's name guessing** to make one new call site
+  work. A snake_case Ruby name, an `is…`-spelled predicate, a writer spelling,
+  a Ruby operator name — each is a reason to spell that call site directly, not
+  to teach `sendInternal` another heuristic for every receiver in the repo.
+- **A story does not propose a send.** When filing or sizing work, name the
+  direct call in the acceptance criteria. Finding an `rbFSend` next to your
+  work is a reason to converge it (§ "A documented deviation is debt, not
+  permission"), not to match it.
+
+One gate holds the line. `pnpm parity:api:sends` counts, per non-test file,
+the sends whose name argument is a string literal, and fails on any file above
+its count at the merge-base with `origin/main` — only-shrink, with no mark file
+to seed or tighten, on trails#9129's reasoning that the base tree IS the mark.
+It is a floor, not the rule: it is line-based, so a name on a continuation
+line is uncounted, as is one whose receiver nests parentheses more than one
+deep, and a computed name it never sees is still governed by the order above.
+
+The call gates do not help, which is why the order above has to be a rule.
+For the call SET, `extract-ts-api.ts` credits
+`rbFSend(recv, "literalName")` as a call to `literalName` itself
+(`collectCalls`), so spelling one out changes nothing there. The ARGUMENT
+stream does not follow it: `callSiteName` has no send arm, so the site is
+recorded under `rbFSend` with the receiver and the name occupying argument
+slots — it can never pair with Rails' own `literalName(…)` site, and
+converging it can only improve that pairing. A computed name is credited as
+Ruby's own `send` / `publicSend`, and both sit in `SKIP_CALLS`
+(`scripts/api-compare/lint-calls.ts`), so a send converged onto a direct call
+or a registry needs no baseline row and no `@missingRailsCall` receipt.
 
 ## Ruby protocol methods with a different JS mechanism
 
