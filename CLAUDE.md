@@ -1786,6 +1786,14 @@ string) raises `NotImplementedError` from the same loader in
 stand-in, runs `transpileModule` and evaluates it, and the `other` vitest
 project's setup installs it through `setTemplateCompiler`.
 
+**`Template#spot` is line-based.** Rails' `spot`
+(`vendor/rails/v8.0.2/actionview/lib/action_view/template.rb:231-246`) parses
+`compiled_source` with Prism to find the failing node's span. trails builds no
+second compiler, by repo-owner ruling (2026-10-19), so no in-process JS parser
+stands in for Prism: `spot` answers the backtrace line of `compiled_source`,
+from the reported column to the end of that line, and carries
+`@missingRailsCall parse — PERMANENT` against this section.
+
 This is a genuine language shortcoming, ratified repo-wide here. Code that
 serves it cites this section, and a new instance is not a new decision to
 argue.
