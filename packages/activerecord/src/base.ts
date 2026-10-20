@@ -1808,7 +1808,7 @@ export class Base extends Model {
 
   static transaction<R>(
     this: typeof Base,
-    fn: (tx: any) => Promise<R>,
+    fn: (tx: any) => Promise<R> | R,
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
   ): Promise<R | undefined> {
     return _transaction(this, fn, options);

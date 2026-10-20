@@ -212,7 +212,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected transaction<R>(block: () => Promise<R> | R): Promise<R | undefined> {
-    return this.reflection.klass.transaction(async () => block());
+    return this.reflection.klass.transaction(block);
   }
 
   /** @internal */
