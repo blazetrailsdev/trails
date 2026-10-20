@@ -44,8 +44,8 @@ describe("ModuleAttributeAccessorTest", () => {
   });
 
   it("should use mattr default", () => {
-    expect(module.foo).toBeUndefined();
-    expect(object.foo).toBeUndefined();
+    expect(module.foo).toBeNull();
+    expect(object.foo).toBeNull();
   });
 
   it("mattr default keyword arguments", () => {

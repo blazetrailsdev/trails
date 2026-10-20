@@ -16,8 +16,8 @@ describe("ClassAttributeTest", () => {
   });
 
   it("defaults to nil", () => {
-    expect(Klass.setting).toBeUndefined();
-    expect(Sub.setting).toBeUndefined();
+    expect(Klass.setting).toBeNull();
+    expect(Sub.setting).toBeNull();
   });
 
   it("custom default", () => {
@@ -31,7 +31,7 @@ describe("ClassAttributeTest", () => {
 
   it("overridable", () => {
     Sub.setting = 1;
-    expect(Klass.setting).toBeUndefined();
+    expect(Klass.setting).toBeNull();
     expect(Sub.setting).toBe(1);
 
     Klass.setting = 2;
@@ -49,7 +49,7 @@ describe("ClassAttributeTest", () => {
   });
 
   it("instance reader delegates to class", () => {
-    expect(new Klass().setting).toBeUndefined();
+    expect(new Klass().setting).toBeNull();
 
     Klass.setting = 1;
     expect(new Klass().setting).toBe(1);
@@ -58,7 +58,7 @@ describe("ClassAttributeTest", () => {
   it("instance override", () => {
     const object = new Klass();
     object.setting = 1;
-    expect(Klass.setting).toBeUndefined();
+    expect(Klass.setting).toBeNull();
     Klass.setting = 2;
     expect(object.setting).toBe(1);
   });
@@ -116,11 +116,11 @@ describe("ClassAttributeTest", () => {
     (rbObjSingletonClass(object) as any).setting = "foo";
     expect((rbObjSingletonClass(object) as any).setting).toBe("foo");
     expect(object.setting).toBe("foo");
-    expect(Klass.setting).toBeUndefined();
+    expect(Klass.setting).toBeNull();
 
     (rbObjSingletonClass(object) as any).setting = "bar";
     expect(object.setting).toBe("bar");
-    expect(Klass.setting).toBeUndefined();
+    expect(Klass.setting).toBeNull();
 
     Klass.setting = "plop";
     expect(object.setting).toBe("bar");
@@ -140,7 +140,7 @@ describe("ClassAttributeTest", () => {
   });
 
   it("works when overriding private methods from an ancestor", () => {
-    expect(Klass.system).toBeUndefined();
+    expect(Klass.system).toBeNull();
     Klass.system = 1;
     expect(Klass.system).toBe(1);
 
