@@ -2032,5 +2032,8 @@ describe("Date#hour, #min, #sec (d_lite_zero, private)", () => {
 
   it("raise ArgumentError on an argument, as the arity-0 private readers do", () => {
     expect(() => rbFSend(new RubyDate(2013, 2, 20), "hour", 1)).toThrow(ArgumentError);
+    expect(() => rbFSend(new RubyDateTime(2013, 2, 20, 7, 8, 9), "minute", 1)).toThrow(
+      ArgumentError,
+    );
   });
 });

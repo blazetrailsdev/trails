@@ -3,7 +3,7 @@ import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
-import { rbCheckStringType, stringValue } from "./string/support.js";
+import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.js";
 import { rbPlus } from "./numeric.js";
 import { STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
@@ -1164,6 +1164,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (desc && argc === 0 && !isAbsentHalf(desc.get)) {
       return desc.get ? desc.get.call(recv) : desc.value;
     }
+    if (desc?.get && !isAbsentHalf(desc.get)) rbErrorArity(argc, 0, 0);
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter && !isAbsentHalf(setter)) return setter.call(recv, args[0]);
     const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
