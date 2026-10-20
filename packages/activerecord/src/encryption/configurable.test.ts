@@ -90,7 +90,11 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      class NamedPirate extends Pirate {}
+      class NamedPirate extends Pirate {
+        static {
+          this.tableName = "pirates";
+        }
+      }
       NamedPirate.encrypts("catchphrase");
 
       expect(filterParameters).toContain("named_pirate.catchphrase");
@@ -109,7 +113,13 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      (() => class extends Pirate {})().encrypts("catchphrase");
+      (() =>
+        class extends Pirate {
+          static {
+            this.tableName = "pirates";
+            this.encrypts("catchphrase");
+          }
+        })();
 
       expect(filterParameters).toContain("catchphrase");
     } finally {
@@ -129,7 +139,12 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      (class extends Pirate {}).encrypts("catchphrase");
+      void class extends Pirate {
+        static {
+          this.tableName = "pirates";
+          this.encrypts("catchphrase");
+        }
+      };
 
       expect(filterParameters).toEqual([]);
     } finally {
