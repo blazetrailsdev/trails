@@ -1732,3 +1732,60 @@ The decision is unchanged; the heading stays here so code citing it still
 resolves. The one-line rule: every `async_*` reader returns a native promise,
 `promise.rb` is not ported, and a `Promise.new` / `Promise.wrap` call is
 omitted without a receipt.
+
+## Templates are precompiled (`Template#compile`'s `module_eval`)
+
+Rails compiles a template at its first render: `compiled_source`
+(`vendor/rails/v8.0.2/actionview/lib/action_view/template.rb:443-486`) wraps
+the handler's Ruby in a `def`, and `compile` (`:500-539`) hands it to
+`mod.module_eval(compiled_source, identifier, offset)`. JS can only evaluate
+source text through `eval`, `new Function` or `vm`, each of which runs code
+that was never type-checked, and a `with` scope chain is sloppy-mode only, so
+it cannot appear in an ES module. By repo-owner ruling (2026-10-19,
+2026-10-20), **file-backed `.tse` templates are precompiled in every
+environment, and shipped code has no eval pipeline.** The split is:
+
+- **`compileJs` is the Erubi step.** `@blazetrails/tse-compiler` turns TSE
+  into JS, as Erubi turns ERB into Ruby.
+- **The typed stand-in is `compiled_source`.** `virtualizeTse`
+  (`packages/trails-tsc/src/plugins/tse.ts`) writes the method body, its
+  locals binding (Rails' `locals_code`) and its strict-locals signature as a
+  TypeScript module, and `build-views` (`trails-tsc-views build`) writes one
+  for every `.tse` file, partials and unused templates included, into
+  `.trails/views/` (`--in-place` beside the file, for a package's own
+  templates).
+- **`tsc` is the compiler.** `build-views` emits `<template>.js` with a source
+  map chained back to the `.tse` file, so a backtrace names the template's own
+  line (Rails' `identifier, offset`) when Node runs with source maps enabled.
+
+The loader reads a template's module from where `build-views` writes it by
+default: an identifier under `<root>/app/views/` loads
+`<root>/.trails/views/<path>.js`, and any other identifier loads
+`<identifier>.js`, which is where `--in-place` writes. A build with a custom
+`--out` (`BuildViewsOptions.outDir`) or a views directory not named
+`app/views` and not built in place is for type-checking only, and rendering
+from it raises `LoadError`.
+
+`Template#compile` keeps its name and call site. It loads the emitted module
+with an awaited `import()` under a URL no earlier load used (the `rbFLoad`
+shape), names the method after `method_name`, and seats it on
+`mod._compiledMethods`; Rails' `SyntaxError` rescue and non-keyword strict
+locals check follow as written. A JS function has no keyword parameters, so
+the seated method raises Ruby's `missing keyword` / `unknown keyword` /
+`no keywords accepted` `ArgumentError`s itself before it calls the module's
+default export. ESM never evicts a module record, so each
+compile keeps its module for the life of the process where Rails' redefined
+method is collected. That growth is bounded by the number of compiles: a
+template compiles once per `Template` object, and only a cleared template
+cache (a development reload) compiles it again. A file-backed template with no emitted module
+raises `LoadError` ("cannot load such file -- <path>"), and a string-source
+template (`Template::Inline`, `render inline:`, a `Template` built from a
+string) raises `NotImplementedError` from the same loader in
+`packages/actionview/src/template.ts`. Test code compiles from source instead:
+`packages/actionview/src/test-helpers/compile-template.ts` builds the same
+stand-in, runs `transpileModule` and evaluates it, and the `other` vitest
+project's setup installs it through `setTemplateCompiler`.
+
+This is a genuine language shortcoming, ratified repo-wide here. Code that
+serves it cites this section, and a new instance is not a new decision to
+argue.

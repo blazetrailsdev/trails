@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && cp -R src/action-dispatch/journey/visualizer dist/action-dispatch/journey/ && cp -R src/action-dispatch/middleware/templates dist/action-dispatch/middleware/"
+    "build": "tsc && cp -R src/action-dispatch/journey/visualizer dist/action-dispatch/journey/ && cp -R src/action-dispatch/middleware/templates dist/action-dispatch/middleware/ && trails-tsc-views build --views dist/action-dispatch/middleware/templates --in-place && trails-tsc-views build --views dist/action-dispatch/journey/visualizer --in-place"
   },
   "files": [
     "dist"
@@ -46,6 +46,7 @@
     "node": ">=24"
   },
   "devDependencies": {
+    "@blazetrails/trails-tsc": "workspace:*",
     "vite": "^7.0.0"
   }
 }

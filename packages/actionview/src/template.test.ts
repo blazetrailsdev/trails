@@ -129,11 +129,12 @@ describe("ActionView::Template (smoke)", () => {
     expect(error.annotatedSourceCode()).toEqual(["    1: one", "    2: two", "    3: three"]);
   });
 
-  it("spot reports a location inside the compiled source", () => {
-    const t = new Template("<%= boom() %>", "posts/show", new Tse(), {
+  it("spot reports a location inside the compiled source", async () => {
+    const t = new Template("<%= 1 %>", "posts/show", new Tse(), {
       locals: [],
       format: ":html",
     });
+    await t.render(view());
     const spot = t.spot({ lineno: 1, column: 1 });
     expect(spot).not.toBeNull();
     expect(spot!.firstLineno).toBe(1);
@@ -306,10 +307,10 @@ describe("ActionView::Template (smoke)", () => {
       expect(container._compiledMethods.size).toBe(after);
     });
 
-    it("gives two withEmptyTemplateCache containers separate compiled methods", () => {
+    it("gives two withEmptyTemplateCache containers separate compiled methods", async () => {
       const a = new (Base.withEmptyTemplateCache())(null, {}, null);
       const b = new (Base.withEmptyTemplateCache())(null, {}, null);
-      template("<%= n %>").render(a, { n: 1 });
+      await template("<%= n %>").render(a, { n: 1 });
       expect(a.compiledMethodContainer()._compiledMethods.size).toBe(1);
       expect(b.compiledMethodContainer()._compiledMethods.size).toBe(0);
     });
