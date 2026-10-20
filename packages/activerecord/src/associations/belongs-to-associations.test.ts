@@ -21,6 +21,7 @@ import {
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { Treasure } from "../test-helpers/models/treasure.js";
+import "../test-helpers/models/parrot.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
