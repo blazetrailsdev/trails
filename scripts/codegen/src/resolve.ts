@@ -10,6 +10,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { GEM, ROOT, handNamespaceFqns, handSeatMembers } from "./gem.js";
+import { walk } from "./ir.js";
 import { TS_CLASS_RENAMES, rubyFileToTs } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES, tsConstantRenameKey } from "./constant-renames.js";
 import type { N, Param } from "./ir.js";
@@ -128,11 +129,41 @@ export class Resolver {
    * `namespaces.ts` keep the object of functions.
    */
   isClassModule(fqn: string): boolean {
+    const memo = (this.classModuleMemo ??= new Map<string, boolean>());
+    const hit = memo.get(fqn);
+    if (hit !== undefined) return hit;
+    memo.set(fqn, false);
     const s = this.index.scopes.get(fqn);
-    if (!s || s.kind !== "module" || s.moduleFunction || s.sclassMixin) return false;
     const e = this.exportNames.get(fqn);
-    return !!e && handNamespaceFqns().get(fqn) !== e.name;
+    let yes =
+      !!s &&
+      s.kind === "module" &&
+      !s.moduleFunction &&
+      !s.sclassMixin &&
+      !!e &&
+      handNamespaceFqns().get(fqn) !== e.name;
+    // A `super` this module's methods cannot resolve statically keeps the
+    // Module, whose `superMethod` finds it at run time (the hand port's
+    // aggregations.ts): `include()` flattens a class module's methods.
+    if (yes && this.superResolvable)
+      for (const [name, d] of s!.defs) {
+        let calls = false;
+        walk(d.node?.body ?? null, (n) => {
+          if (n.k === "def") return false;
+          if (n.k === "super" || n.k === "zsuper") calls = true;
+        });
+        if (calls && !this.superResolvable(fqn, name)) {
+          yes = false;
+          break;
+        }
+      }
+    memo.set(fqn, yes);
+    return yes;
   }
+
+  classModuleMemo?: Map<string, boolean>;
+  /** Set by the Lowerer: a module's `super` from `name` resolves statically. */
+  superResolvable?: (mod: string, name: string) => boolean;
 
   pkgExports(spec: string): Set<string> {
     return this.exportsByPkg[spec] ?? new Set();

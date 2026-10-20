@@ -257,7 +257,16 @@ export class Lowerer {
   constructor(
     readonly index: GemIndex,
     readonly resolver: Resolver,
-  ) {}
+  ) {
+    // Whether a module's `super` from `name` resolves statically, which a
+    // module emitted as a class needs (resolve.ts isClassModule).
+    resolver.superResolvable = (mod, name) =>
+      !!(
+        this.moduleSuperTarget(mod, name) ||
+        this.classMethodsSuperTarget(mod, name, null) ||
+        this.externalSuperTarget(mod, name, null)
+      );
+  }
 
   // ───────────────────────────── helpers ─────────────────────────────
 
@@ -2390,11 +2399,11 @@ export class Lowerer {
   classMethodsSuperTarget(
     owner: string,
     name: string,
-    ctx: Ctx,
+    ctx: Ctx | null,
   ): ((args: string) => string) | undefined {
     if (!owner.endsWith("::ClassMethods")) return undefined;
     const concern = owner.slice(0, -"::ClassMethods".length);
-    const fn = this.defTsName(ctx);
+    const fn = ctx ? this.defTsName(ctx) : "";
     for (const sc of this.index.scopes.values()) {
       if (sc.kind !== "class") continue;
       const anc = rubyAncestors(this.index, sc.fqn);
@@ -2411,6 +2420,7 @@ export class Lowerer {
         if (!target) continue;
         const e = this.resolver.exportNames.get(target);
         if (!e) return undefined;
+        if (!ctx) return () => "";
         const ref = this.resolver.importFrom(e.tsFile, e.name, ctx, this);
         return (args) => `${ref}.${fn}.call(${["this", args].filter(Boolean).join(", ")})`;
       }
@@ -2428,8 +2438,12 @@ export class Lowerer {
    * `before_setup` through `ActiveSupport::TestCase`). A call builder, or
    * undefined.
    */
-  externalSuperTarget(mod: string, name: string, ctx: Ctx): ((args: string) => string) | undefined {
-    const fn = this.defTsName(ctx);
+  externalSuperTarget(
+    mod: string,
+    name: string,
+    ctx: Ctx | null,
+  ): ((args: string) => string) | undefined {
+    const fn = ctx ? this.defTsName(ctx) : "";
     for (const sc of this.index.scopes.values()) {
       if (sc.kind !== "class") continue;
       const anc = rubyAncestors(this.index, sc.fqn);
@@ -2443,6 +2457,7 @@ export class Lowerer {
           if (this.index.resolveConst(inc, chain)) continue;
           const written = inc.filter((x: string) => x).join("::");
           if (!this.index.depMethods.get(written)?.has(name)) continue;
+          if (!ctx) return () => "";
           const ref = this.constRef({ k: "const", path: inc } as N, ctx);
           return (args) =>
             `${ref}.instanceMethod(${JSON.stringify(fn)})!.value.call(${["this", args].filter(Boolean).join(", ")})`;
@@ -2455,6 +2470,7 @@ export class Lowerer {
         if (s.kind !== "class" || !s.superclassPath) continue;
         const sup = s.superclassFqn ? this.index.scopes.get(s.superclassFqn) : undefined;
         if (sup && ![...sup.files].every((x) => x.startsWith("test/"))) continue;
+        if (!ctx) return () => "";
         const ref = this.constRef({ k: "const", path: s.superclassPath } as N, ctx);
         return (args) =>
           `${ref}.prototype.${fn}.call(${["this", args].filter(Boolean).join(", ")})`;
