@@ -92,7 +92,12 @@ export function receiptsCoveringNothing(
       extras.add(allowKeyOf({ package: f.package, tsFile: f.tsFile, name: e.name }));
     }
   }
-  return tagged.scored.filter((e) => !extras.has(allowKeyOf(e)) && !copied.has(allowKeyOf(e)));
+  return tagged.scored.filter(
+    (e) =>
+      (filterPkg === null || e.package === filterPkg) &&
+      !extras.has(allowKeyOf(e)) &&
+      !copied.has(allowKeyOf(e)),
+  );
 }
 
 export interface SourceFile {
