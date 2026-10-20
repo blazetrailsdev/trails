@@ -1,4 +1,5 @@
 import type { Module } from "@blazetrails/ruby-compat";
+import { assigningSynchronously } from "@blazetrails/activemodel";
 import { SingularAssociation } from "./singular-association.js";
 
 export class HasOne extends SingularAssociation {
@@ -21,10 +22,15 @@ export class HasOne extends SingularAssociation {
       mixin.defineMethod(
         methodName,
         function (
-          this: { association(n: string): { writer(v: unknown): unknown } },
+          this: {
+            association(n: string): { writer(v: unknown): unknown; syncWrite(v: unknown): void };
+            [assigningSynchronously]?: boolean;
+          },
           value: unknown,
         ) {
-          return this.association(name).writer(value);
+          const association = this.association(name);
+          if (this[assigningSynchronously]) return association.syncWrite(value);
+          return association.writer(value);
         },
       );
     }

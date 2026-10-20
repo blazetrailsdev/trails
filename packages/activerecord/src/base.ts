@@ -3,10 +3,7 @@ import {
   block as rbBlock,
   fetch,
   hasKey,
-  eachPair,
   hashAref,
-  isEmpty,
-  keys,
   rbDeclareIvar,
   rbModConstSet,
   rbModName,
@@ -68,7 +65,6 @@ import {
   _registerAssociationBuilderExtension,
 } from "./autosave-association.js";
 import { Association as AssociationBuilder } from "./associations/builder/association.js";
-import { idsName as _idsName } from "./associations/builder/collection-association.js";
 import {
   isValid as validationsIsValid,
   defaultValidationContext,
@@ -119,7 +115,6 @@ import {
 } from "./callbacks.js";
 import {
   Access,
-  sanitizeForMassAssignment,
   type PermittedAttributes,
   assertAssignedSynchronously,
   type DirtyOptions,
@@ -437,88 +432,6 @@ function expandCallbackSourcesWithHelpers(
     }
   }
   return result;
-}
-
-/** @internal */
-interface _AssociationDefLike {
-  name: string;
-  macro: string;
-}
-
-/** @internal */
-interface _PendingAssociationAttr {
-  name: string;
-  value: unknown;
-  assoc: _AssociationDefLike;
-  idsKey: boolean;
-}
-
-/** @internal */
-function _collectionIdsKeyOwner(
-  defs: _AssociationDefLike[],
-  key: string,
-): _AssociationDefLike | undefined {
-  if (!key.endsWith("Ids")) return undefined;
-  return defs.find(
-    (a) => (a.macro === "hasMany" || a.macro === "hasAndBelongsToMany") && _idsName(a.name) === key,
-  );
-}
-
-/** @internal */
-function _extractAssociationAttrs(
-  ctor: typeof Base,
-  attrs: Record<string, unknown> | Map<string, unknown>,
-): {
-  rest: Record<string, unknown>;
-  assocs: _PendingAssociationAttr[];
-} | null {
-  const defs = Object.values(ctor._reflections);
-  if (defs.length === 0) return null;
-  let assocs: _PendingAssociationAttr[] | null = null;
-  for (const k of keys(attrs)) {
-    const named = defs.find((a) => a.name === k);
-    if (named) {
-      (assocs ??= []).push({ name: k, value: hashAref(attrs, k), assoc: named, idsKey: false });
-      continue;
-    }
-    const idsOwner = _collectionIdsKeyOwner(defs, k);
-    if (idsOwner) {
-      (assocs ??= []).push({ name: k, value: hashAref(attrs, k), assoc: idsOwner, idsKey: true });
-    }
-  }
-  if (!assocs) return null;
-  const rest = Object.create(null) as Record<string, unknown>;
-  const assocNames = new Set(assocs.map((a) => a.name));
-  eachPair(attrs, (k, v) => {
-    if (!assocNames.has(k)) rest[k] = v;
-  });
-  return { rest, assocs };
-}
-
-/** @internal */
-function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr[]): void {
-  for (const { value, assoc, idsKey } of assocs) {
-    const proxy = (
-      record as unknown as { association(n: string): _ConstructorAssociationWriter | null }
-    ).association(assoc.name);
-    if (!proxy) continue;
-    if (idsKey) {
-      proxy.syncIdsWrite?.(value as unknown[]);
-    } else if (assoc.macro === "hasMany" || assoc.macro === "hasAndBelongsToMany") {
-      proxy.syncWrite?.(value as unknown[]);
-    } else if (assoc.macro === "hasOne") {
-      proxy.syncWrite?.(value);
-    } else if (assoc.macro === "belongsTo") {
-      proxy.writer?.(value);
-    }
-  }
-}
-
-/** @internal */
-interface _ConstructorAssociationWriter {
-  writer?: (v: unknown) => void;
-  syncWrite?: (v: unknown) => void;
-  syncIdsWrite?: (v: unknown[]) => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -1456,10 +1369,6 @@ export class Base extends Model {
         }
       }
     }
-    const assocPending =
-      attributes == null || isEmpty(attributes)
-        ? null
-        : _extractAssociationAttrs(new.target, sanitizeForMassAssignment(attributes));
     super(null);
 
     if (!allocating) {
@@ -1473,11 +1382,8 @@ export class Base extends Model {
     this.initInternals();
     if (!allocating) this.initializeInternalsCallback();
 
-    if (attributes != null) this.assignAttributes(assocPending?.rest ?? attributes);
+    if (attributes != null) this.assignAttributes(attributes);
 
-    if (assocPending) {
-      _dispatchAssociationAttrs(this, assocPending.assocs);
-    }
     if (!allocating) {
       initBlock?.(this);
       this._runInitializeCallbacks();
