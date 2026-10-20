@@ -27,17 +27,10 @@ class Person {
     if (id === "missing") throw new Error("not found");
     return new this(String(id));
   }
-  static where(
-    this: typeof Person,
-    conds: Record<string, unknown>,
-  ): { toArray(): Promise<Person[]> } {
+  static where(this: typeof Person, conds: Record<string, unknown>): Promise<Person[]> {
     const ids = conds["id"] as unknown[];
     const make = (id: unknown) => new this(String(id));
-    return {
-      async toArray() {
-        return ids.filter((id) => id !== "missing").map(make);
-      },
-    };
+    return Promise.resolve(ids.filter((id) => id !== "missing").map(make));
   }
 }
 class PersonChild extends Person {}
@@ -470,13 +463,9 @@ describe("GlobalLocatorTest", () => {
         if (Array.isArray(id)) return id.map((i) => new PersonNoPk(String(i)));
         return new PersonNoPk(String(id));
       }
-      static where(conds: Record<string, unknown>): { toArray(): Promise<PersonNoPk[]> } {
+      static where(conds: Record<string, unknown>): Promise<PersonNoPk[]> {
         const ids = conds["id"] as unknown[];
-        return {
-          async toArray() {
-            return ids.map((i) => new PersonNoPk(String(i)));
-          },
-        };
+        return Promise.resolve(ids.map((i) => new PersonNoPk(String(i))));
       }
     }
     registerConstants(REGISTRY);

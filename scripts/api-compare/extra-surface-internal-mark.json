@@ -6,11 +6,13 @@
   "activemodel": 253,
   "activerecord": 2427,
   "arel": 288,
+  "bcrypt": 2,
   "did-you-mean": 8,
-  "globalid": 37,
+  "globalid": 36,
   "i18n": 102,
   "rack": 219,
   "rack-session": 60,
+  "rack-test": 45,
   "ruby-compat": 933,
   "thor": 176
 }

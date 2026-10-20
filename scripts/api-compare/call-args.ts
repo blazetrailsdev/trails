@@ -12,7 +12,11 @@
 // 604 activerecord rows).
 
 import type { CallSite, LiteralValue, ParamInfo } from "@blazetrails/parity/types";
-import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
+import {
+  JS_RESERVED_WORDS,
+  rubyMethodToTsIgnoringSkip,
+  snakeToCamel,
+} from "@blazetrails/parity/conventions";
 import { stripThis, isReceiverParam } from "./arity.js";
 import { decodeRubyString, normalizeConstantSpelling, normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
@@ -46,59 +50,6 @@ export const RECEIVER_DROPPING_CONVERSIONS = new Set(["toS", "toSym"]);
  *  anywhere in an argument list — INCLUDING nested inside a `kwargs{}` — makes
  *  the whole site uncomparable. */
 const OPAQUE_DESCRIPTORS = new Set(["?", "array", "hash", "str-interp", "ternary"]);
-
-/** The words TS cannot spell as an identifier, so a port of a Ruby local or
- *  parameter with one of these names has to add a trailing underscore
- *  (`default` → `default_`, `null` → `null_`). Deliberately the reserved list
- *  only: a `foo_` local is a rename and must keep reporting. */
-const JS_RESERVED_WORDS = new Set([
-  "await",
-  "break",
-  "case",
-  "catch",
-  "class",
-  "const",
-  "continue",
-  "debugger",
-  "default",
-  "delete",
-  "do",
-  "else",
-  "enum",
-  "export",
-  "extends",
-  "false",
-  "finally",
-  "for",
-  "function",
-  "if",
-  "implements",
-  "import",
-  "in",
-  "instanceof",
-  "interface",
-  "let",
-  "new",
-  "null",
-  "package",
-  "private",
-  "protected",
-  "public",
-  "return",
-  "static",
-  "super",
-  "switch",
-  "this",
-  "throw",
-  "true",
-  "try",
-  "typeof",
-  "var",
-  "void",
-  "while",
-  "with",
-  "yield",
-]);
 
 /** Per-site flags that make the argument list's arity unknowable on that side. */
 const UNCOMPARABLE_FLAGS = new Set(["splat", "blockpass", "zsuper"]);

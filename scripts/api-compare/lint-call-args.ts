@@ -111,9 +111,12 @@ export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "activerecord",
   "activerecord-test-support",
   "arel",
+  "bcrypt",
+  "did-you-mean",
   "globalid",
   "i18n",
   "rack",
+  "rack-test",
 ];
 
 /**

@@ -6,6 +6,23 @@
 import * as path from "path";
 
 /**
+ * The words TS cannot spell as a binding name (`arguments` / `eval` are
+ * unusable in strict mode). A Ruby local, parameter, or kwarg binding with one
+ * of these names is ported with a trailing underscore: `I18n.translate`'s
+ * `throw:` kwarg (`vendor/i18n/v1.14.8/lib/i18n.rb:212`) binds `throw_`. The
+ * call-args gate reads `throw_` as Ruby `throw`; any other spelling is a
+ * rename and keeps reporting.
+ */
+export const JS_RESERVED_WORDS: ReadonlySet<string> = new Set(
+  (
+    "arguments await break case catch class const continue debugger default delete do else " +
+    "enum eval export extends false finally for function if implements import in instanceof " +
+    "interface let new null package private protected public return static super switch this " +
+    "throw true try typeof var void while with yield"
+  ).split(" "),
+);
+
+/**
  * Token-level Ruby→TS renames applied before camelization.
  *
  * `erb` → `tse`: trails uses a `.tse` (Trails Server Embedded) template
@@ -1933,6 +1950,16 @@ manifest and \`parity:api:extra\` resolve operators through that table, so a
 ported operator sorts into its Rails slot and does not read as extra surface.
 The pin is per-class on purpose: \`<<\` is \`bitwiseShiftLeft\` on \`Arel::Math\` and
 means _append_ on the collectors, so a global entry would mis-credit them.
+
+## Reserved-word locals
+
+A Ruby local, parameter, or kwarg binding whose name is a JS reserved word
+(\`throw\`, \`default\`, \`class\`, …; \`JS_RESERVED_WORDS\`) cannot be a TS
+binding name. It is ported with a trailing underscore: \`translate(key = nil,
+throw: false, …)\` (\`i18n.rb:212\`) destructures \`{ throw: throw_ = false }\`
+and passes \`throw_\` on. \`parity:api:calls:args\` reads \`throw_\` as Ruby
+\`throw\`. Any other spelling (\`throwOption\`) is a
+rename the gate reports.
 
 ## Token renames
 

@@ -117,6 +117,16 @@ ported operator sorts into its Rails slot and does not read as extra surface.
 The pin is per-class on purpose: `<<` is `bitwiseShiftLeft` on `Arel::Math` and
 means _append_ on the collectors, so a global entry would mis-credit them.
 
+## Reserved-word locals
+
+A Ruby local, parameter, or kwarg binding whose name is a JS reserved word
+(`throw`, `default`, `class`, …; `JS_RESERVED_WORDS`) cannot be a TS
+binding name. It is ported with a trailing underscore: `translate(key = nil,
+throw: false, …)` (`i18n.rb:212`) destructures `{ throw: throw_ = false }`
+and passes `throw_` on. `parity:api:calls:args` reads `throw_` as Ruby
+`throw`. Any other spelling (`throwOption`) is a
+rename the gate reports.
+
 ## Token renames
 
 Applied to every identifier before camelization (and the equivalent applies to
