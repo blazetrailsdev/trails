@@ -1714,8 +1714,6 @@ jobs:
   rails-comparison:
     name: Rails API/Test Comparison
     needs: changes
-    # Every push to main runs it: the artifact it uploads is the base each PR's
-    # only-shrink gates compare against (RFC 0127, scripts/parity/main-artifact.ts).
     if: >-
       github.event_name == 'push' || (
       needs.changes.outputs.docs_only != 'true' &&
@@ -1729,7 +1727,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # The base the parity gates compare against is HEAD^1.
           fetch-depth: 2
       - uses: ./.github/actions/setup-pnpm
       - uses: ruby/setup-ruby@v1
@@ -2116,7 +2113,7 @@ jobs:
         # Only-shrink gate on the assertion-count / kind / value totals inside
         # name-matched tests (RFC 0025). Reads output/convention-comparison.json
         # written by the step above — --no-regen because CI must not pay for the
-        # extraction twice — and compares it against main's artifact for HEAD^1.
+        # extraction twice.
         run: node scripts/ci/bg-gates.mjs wait assertions
       - name: Stage parity outputs
         if: github.event_name == 'push'
@@ -2126,8 +2123,6 @@ jobs:
           mkdir -p "$dir/scripts/test-compare/output"
           cp scripts/test-compare/output/convention-comparison.json "$dir/scripts/test-compare/output/"
       - name: Upload parity outputs
-        # Laid out at repo paths, so a PR's gate reads the same relative path
-        # from the download as from its own checkout.
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
