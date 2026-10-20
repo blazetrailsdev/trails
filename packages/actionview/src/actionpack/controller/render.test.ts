@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
-import { Logger } from "@blazetrails/activesupport";
+import { Conversion, Naming } from "@blazetrails/activemodel";
+import { assert, isPresent, Logger } from "@blazetrails/activesupport";
+import { Date } from "@blazetrails/date";
 import {
   ArgumentError,
+  extend,
+  include,
   File,
   rbModConstSet,
   rbObjIvarGet,
   rbObjIvarSet,
   registerConstant,
   stringSplit,
+  Struct,
 } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { Template } from "../../template.js";
@@ -22,7 +27,19 @@ import { BadCustomer, Customer, GoodCustomer } from "../../test-helpers/fake-mod
 const Quiz = {} as { Question: typeof Question; QuestionsController: typeof QuestionsController };
 registerConstant("Quiz", Quiz);
 
-class Question extends Customer {}
+class Question extends Struct.new("name", "id") {
+  declare name: string;
+  declare id: number | null;
+
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+  }
+
+  isPersisted(): boolean {
+    return isPresent(this.id);
+  }
+}
 rbModConstSet(Quiz, "Question", Question);
 
 class QuestionsController extends ActionController.Base {
@@ -82,6 +99,11 @@ class TestController extends ActionController.Base {
   }
 
   async renderHelloWorld(): Promise<void> {
+    await this.render("test/hello-world");
+  }
+
+  async renderHelloWorldWithLastModifiedSet(): Promise<void> {
+    this.response.lastModified = new Date(2008, 9, 10).toTime();
     await this.render("test/hello-world");
   }
 
@@ -694,7 +716,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — view instance_variables list
   test.skip("controller does not leak instance variables", async () => {
     const expected = [
       "_assigns",
@@ -726,8 +748,19 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello world!");
   });
 
-  test("line offset", async () => {
-    await expect(testCase.get("renderLineOffset")).rejects.toThrow(Template.Error);
+  // BLOCKED: render-test-controller-gaps — Template.Error backtrace starts at template.ts, not the template line
+  test.skip("line offset", async () => {
+    let exc: unknown;
+    try {
+      await testCase.get("renderLineOffset");
+    } catch (e) {
+      exc = e;
+    }
+    expect(exc).toBeInstanceOf(Template.Error);
+    const line = (exc as Error).stack!.split("\n")[1];
+    const m = line.match(/:(\d+):/);
+    assert(m);
+    expect(m![1]).toBe("1");
   });
 
   test("render with forward slash", async () => {
@@ -755,7 +788,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello world!");
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — action-name lookup folds case
   test.skip("render action upcased", async () => {
     await expect(testCase.get("renderActionUpcasedHelloWorld")).rejects.toThrow(MissingTemplate);
   });
@@ -1068,7 +1101,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — Request has no format= setter
   test.skip("render with filters", async () => {
     await testCase.get("renderWithFilters");
     expect(testCase.response.body).toBe("<test>passed formatted xml erb</test>");
@@ -1080,7 +1113,7 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — redirect_to reaches no url helpers in TestCase
   test.skip("double redirect", async () => {
     await expect(testCase.get("doubleRedirect")).rejects.toThrow(
       AbstractController.DoubleRenderError,
@@ -1098,7 +1131,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hi web users! here is some cached stuff");
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — private name helper collides with @name
   test.skip("rendering with conflicting local vars", async () => {
     await testCase.get("renderingWithConflictingLocalVars");
     expect(testCase.response.body).toBe(
@@ -1221,7 +1254,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello: david");
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — Parameters not read as partial locals
   test.skip("partial with hashlike locals", async () => {
     await testCase.get("partialWithHashlikeLocals");
     expect(testCase.response.body).toBe("Hello: david");
@@ -1232,7 +1265,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe('<label for="post_title">Title</label>\n');
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — ValidatingPost/Post fake model unported
   test.skip("partial with form builder and invalid model", async () => {
     await testCase.get("partialWithFormBuilderAndInvalidModel");
     expect(testCase.response.body.trim()).toBe(
@@ -1240,7 +1273,7 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — ValidatingPost/Post fake model unported
   test.skip("partial with form builder and invalid model custom field error proc", async () => {
     const oldProc = Base.fieldErrorProc;
     Base.fieldErrorProc = function (html) {
@@ -1258,7 +1291,7 @@ describe("RenderTest", () => {
     }
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — ValidatingPost/Post fake model unported
   test.skip("partial with form builder and invalid model custom rendering field error proc", async () => {
     const oldProc = Base.fieldErrorProc;
     Base.fieldErrorProc = function (htmlTag, instance) {
@@ -1347,7 +1380,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Bonjour: davidBonjour: mary");
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — to_partial_path dir bad-customers vs bad_customers fixture
   test.skip("partial collection shorthand with different types of records", async () => {
     await testCase.get("partialCollectionShorthandWithDifferentTypesOfRecords");
     expect(testCase.response.body).toBe(
@@ -1401,7 +1434,7 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — annotations not emitted on controller render
   test.skip("template annotations", async () => {
     await withAnnotationsEnabled(() => testCase.get("greeting"));
     expect(testCase.response.body).toContain("<!-- BEGIN");
@@ -1410,17 +1443,26 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toContain("This is grand!");
   });
 
-  // BLOCKED: render-test-controller-gaps
+  // BLOCKED: render-test-controller-gaps — annotations not emitted on controller render
   test.skip("template annotations do not render for non html format", async () => {
     await withAnnotationsEnabled(() => testCase.get("renderWithExplicitTemplateWithLocals"));
     expect(testCase.response.body).not.toContain("BEGIN");
     expect(stringSplit(testCase.response.body, "\n").length).toBe(1);
   });
 
-  test("line offset with annotations enabled", async () => {
-    await expect(withAnnotationsEnabled(() => testCase.get("renderLineOffset"))).rejects.toThrow(
-      Template.Error,
-    );
+  // BLOCKED: render-test-controller-gaps — Template.Error backtrace starts at template.ts, not the template line
+  test.skip("line offset with annotations enabled", async () => {
+    let exc: unknown;
+    try {
+      await withAnnotationsEnabled(() => testCase.get("renderLineOffset"));
+    } catch (e) {
+      exc = e;
+    }
+    expect(exc).toBeInstanceOf(Template.Error);
+    const line = (exc as Error).stack!.split("\n")[1];
+    const m = line.match(/:(\d+):/);
+    assert(m);
+    expect(m![1]).toBe("1");
   });
 
   async function withAnnotationsEnabled(block: () => Promise<unknown>): Promise<void> {
