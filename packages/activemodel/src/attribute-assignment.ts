@@ -34,7 +34,6 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
 export const assigningSynchronously: unique symbol = Symbol.for(
   "@blazetrails/activemodel:assigningSynchronously",
 );
