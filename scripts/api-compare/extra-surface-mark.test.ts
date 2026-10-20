@@ -1,9 +1,11 @@
+import * as fs from "fs/promises";
 import { describe, expect, it } from "vitest";
 import { staleMarkFailure } from "./param-name-mark.js";
 import {
   COUNTED_PACKAGES,
   GATED_PACKAGES,
   MARK_DIMENSIONS,
+  MARK_PATH,
   ROWLESS_PACKAGES,
   TAGGED_ONLY_PACKAGES,
   UNGATED_ALLOWED_PACKAGES,
@@ -12,6 +14,7 @@ import {
   internalViolations,
   measure,
   measureInternal,
+  serializeMarks,
   staleMarks,
   strandedMarks,
   taggedOnlyViolations,
@@ -30,6 +33,20 @@ const zeroMarks: SurfaceMarks = {
 };
 
 describe("extra-surface mark", () => {
+  it("keeps the committed mark file byte-identical to what writeMarks writes", async () => {
+    const committed = await fs.readFile(MARK_PATH, "utf-8");
+    expect(committed).toBe(serializeMarks(JSON.parse(committed) as SurfaceMarks));
+  });
+
+  it("sorts keys, indents by two and ends with a newline", () => {
+    const rack = { novel: 0, total: 0, noCounterpartFiles: 0, allowed: 0 };
+    const arel = { novel: 1, total: 2, noCounterpartFiles: 0, allowed: 0 };
+    expect(serializeMarks({ rack, arel })).toBe(
+      '{\n  "arel": {\n    "novel": 1,\n    "total": 2,\n    "noCounterpartFiles": 0,\n    "allowed": 0\n  },\n' +
+        '  "rack": {\n    "novel": 0,\n    "total": 0,\n    "noCounterpartFiles": 0,\n    "allowed": 0\n  }\n}\n',
+    );
+  });
+
   it("measures only the gated packages", () => {
     const measured = measure([
       {
