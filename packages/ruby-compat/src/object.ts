@@ -549,7 +549,11 @@ export const CLASS_METHOD_TABLE: Record<string, (self: never, ...args: never[]) 
  * spells a Ruby Time at the boundary and has no such tag, is keyed `"Date"`:
  * the date package seats `Time#utc?`, `#getutc` and `#getlocal`
  * (`vendor/ruby/v3.3.11/time.c:4340,4425,4374`) there and on
- * `Temporal.Instant`.
+ * `Temporal.Instant`. An instance of {@link rbCDate} (the date package's
+ * `Date` and its subclasses) is keyed `"rbCDate"`, for the private methods
+ * `Date` defines (`hour` and the rest, `date_core.c:9773-9777`): they answer
+ * `send` but not a JS `name in object`, and a subclass's own member, such as
+ * `DateTime#hour`, is found first.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -560,9 +564,16 @@ export const TEMPORAL_METHOD_TABLE: Record<
   "Temporal.PlainDate": { toDate: (self: unknown) => self },
   "Temporal.PlainDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
   "Temporal.ZonedDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
+  rbCDate: {},
 };
 
 function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unknown) | undefined {
+  if (obj instanceof rbCDate) {
+    const table = TEMPORAL_METHOD_TABLE.rbCDate;
+    return !(mid in obj) && Object.hasOwn(table, mid)
+      ? (table[mid] as (...args: unknown[]) => unknown)
+      : undefined;
+  }
   const table =
     obj == null
       ? undefined

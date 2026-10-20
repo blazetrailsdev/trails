@@ -6810,6 +6810,14 @@ Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], {
   second: dLiteZero,
 });
 
+Object.assign(TEMPORAL_METHOD_TABLE.rbCDate, {
+  hour: dLiteZero,
+  min: dLiteZero,
+  minute: dLiteZero,
+  sec: dLiteZero,
+  second: dLiteZero,
+});
+
 for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
   Object.assign(TEMPORAL_METHOD_TABLE[seat], {
     iso8601: (self: Temporal.PlainDateTime | Temporal.ZonedDateTime, n = 0) =>
