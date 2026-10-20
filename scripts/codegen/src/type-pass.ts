@@ -822,9 +822,12 @@ export class TypePass {
       const out: ts.ClassDeclaration[] = [];
       let cur: ts.ClassDeclaration | undefined = c;
       for (let i = 0; cur && i < 20; i++) {
-        const h = cur.heritageClauses?.find((x) => x.token === ts.SyntaxKind.ExtendsKeyword)
-          ?.types[0];
-        const d = h ? c2.getTypeAtLocation(h.expression).getSymbol()?.declarations?.[0] : undefined;
+        const h: ts.ExpressionWithTypeArguments | undefined = cur.heritageClauses?.find(
+          (x) => x.token === ts.SyntaxKind.ExtendsKeyword,
+        )?.types[0];
+        const d: ts.Declaration | undefined = h
+          ? c2.getTypeAtLocation(h.expression).getSymbol()?.declarations?.[0]
+          : undefined;
         cur = d && ts.isClassDeclaration(d) ? d : undefined;
         if (cur) out.push(cur);
       }
