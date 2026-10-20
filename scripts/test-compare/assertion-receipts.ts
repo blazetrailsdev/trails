@@ -45,7 +45,7 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         value: 's:input#user_name_1_0[type=radio][value="1.0"]',
         as: null,
         reason:
-          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:57)',
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:59)',
       },
     ],
   "actionview:template/form_collections_helper_test.rb › FormCollectionsHelperTest › collection check boxes correctly builds unique DOM IDs for float values":
@@ -62,7 +62,7 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         value: 's:input#user_name_1_0[type=checkbox][value="1.0"]',
         as: null,
         reason:
-          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:326)',
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:328)',
       },
     ],
   "actionview:template/date_helper_test.rb › DateHelperTest › object select html safety": [
