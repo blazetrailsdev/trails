@@ -42,17 +42,6 @@ export function strlen(str: string): number {
 }
 
 /**
- * `String.new(str)` (`rb_str_s_new`, `vendor/ruby/v3.3.11/string.c:1910`): a
- * String holding a copy of `str`'s content. A JS string is an immutable value
- * with no identity, so the value is its own copy.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbStrSNew(str: string = ""): string {
-  return str;
-}
-
-/**
  * `String#-@` (`str_uminus`, `vendor/ruby/v3.3.11/string.c:3059`): the frozen,
  * interned String with `str`'s content. A JS string is already immutable and
  * compared by value, so the value is its own interned copy.

@@ -1180,9 +1180,9 @@ change type and break `===`, `typeof`, Map keys and the 197 `typeof x ===
 interpolation, to buy eight ActiveModel tests. This is the same trade
 § "Records are not Proxies" records. As a consequence:
 
-- `Type::String#cast_value` returns a primitive. Its `::String.new(value)` is
-  ruby-compat's `rbStrSNew`, which answers the string itself: the value is its
-  own copy.
+- `Type::String#cast_value` returns a primitive. A Ruby `String.new` ports as
+  the JS string itself, `""` or the value, with no helper: the value is its
+  own copy, and the call gates credit it without a `new` expression.
 - `Attribute#initializeDup` keeps Rails' `duplicable?` guard and `dup` call,
   and `rbObjDup` answers a string unchanged. `attribute.value()` and
   `attribute.dup().value()` are the same value.

@@ -1,6 +1,6 @@
 import { Time } from "@blazetrails/date";
 import { Utils } from "@blazetrails/rack";
-import { type Generic, URI, rbObjDup, rbStrSNew, regexpEscape } from "@blazetrails/ruby-compat";
+import { type Generic, URI, rbObjDup, regexpEscape } from "@blazetrails/ruby-compat";
 import { DEFAULT_HOST } from "./test.js";
 
 /** @internal */
@@ -198,7 +198,7 @@ export class CookieJar {
   }
 
   for(uri: Generic | null): string {
-    let buf = rbStrSNew();
+    let buf = "";
     let delimiter: string | undefined;
 
     this.eachCookieFor(uri, (cookie) => {
