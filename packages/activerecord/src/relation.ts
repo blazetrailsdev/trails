@@ -1766,7 +1766,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     return value < 0 ? new Nodes.Subtraction(expr, bind) : new Nodes.Addition(expr, bind);
   }
 
-  private skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
+  /** @internal */
+  skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
     if (this.skipQueryCacheValue) {
       return this.model.uncached(block);
     }

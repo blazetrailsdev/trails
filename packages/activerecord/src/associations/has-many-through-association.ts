@@ -20,6 +20,7 @@ import { exceptBang, underscore, isBlank, wrap } from "@blazetrails/activesuppor
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import type { Association } from "./association.js";
+import type { HasOneAssociation } from "./has-one-association.js";
 
 export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
@@ -155,11 +156,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
             this.buildThroughRecord(record),
           );
         } else if (inverse.isHasOne()) {
-          (
-            record.association(inverse.name) as unknown as {
-              syncWrite(record: Base | null): void;
-            }
-          ).syncWrite(this.buildThroughRecord(record));
+          (record.association(inverse.name) as HasOneAssociation).syncWrite(
+            this.buildThroughRecord(record),
+          );
         }
       }
 

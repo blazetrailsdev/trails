@@ -2,7 +2,7 @@ import type { Module } from "@blazetrails/ruby-compat";
 import { SingularAssociation } from "./singular-association.js";
 
 export class HasOne extends SingularAssociation {
-  static override macro(): string {
+  static override macro(): "hasOne" {
     return "hasOne";
   }
 

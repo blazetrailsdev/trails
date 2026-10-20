@@ -18,7 +18,7 @@ import { assertAssignedSynchronously, type PermittedAttributes } from "@blazetra
 
 export class HasOneAssociation extends SingularAssociation {
   /** @internal */
-  protected syncWrite(record: Base | null): void {
+  syncWrite(record: Base | null): void {
     assertAssignedSynchronously(this.replace(record, false), `${this.reflection.name}=`);
   }
 
