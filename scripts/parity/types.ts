@@ -36,11 +36,11 @@ export interface LiteralValue {
     | "hash"
     | "expr"
     | "alias";
-  value?: string | boolean;
-  /** Ruby side only, `alias`: the constant a bare-reference RHS names, as
-   *  written, and the namespace the assignment sits in. */
+  value?: string | boolean; // int/float token (underscores kept), string/symbol text, or boolean
+  /** Ruby side only, `alias`: the constant a bare-reference RHS names, as written. */
   target?: string;
-  namespace?: string; // int/float token (underscores kept), string/symbol text, or boolean
+  /** Ruby side only, `alias`: the namespace the assignment sits in. */
+  namespace?: string;
   /** Ruby side only: the opening token of a string whose source text does not
    *  decode by the double-quoted rules — `'`, `%q(`, or a `<<~'EOS'` heredoc.
    *  See literals.ts `decodeRubyString`. */

@@ -1,4 +1,4 @@
-import { File, rbFSend } from "@blazetrails/ruby-compat";
+import { File, rbFSend, rbStrSub } from "@blazetrails/ruby-compat";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";
@@ -13,7 +13,7 @@ export class Sendfile {
     this.app = app;
     this._variation = variation ?? null;
     this.mappings = (mappings || []).map(([internal, external]) => [
-      new RegExp("^" + internal, "i"),
+      new RegExp("^" + internal, "im"),
       external,
     ]);
   }
@@ -62,16 +62,15 @@ export class Sendfile {
 
   /** @internal */
   private mapAccelPath(env: Record<string, any>, path: string): string | undefined {
-    const literal = (replacement: string) => () => replacement;
-    let mapping: any = this.mappings.find(([internal]) => internal.test(path));
-    if (mapping != null) {
-      return path.replace(mapping[0], literal(mapping[1]));
-    } else if ((mapping = env["HTTP_X_ACCEL_MAPPING"]) != null) {
-      for (const m of String(mapping)
-        .split(",")
-        .map((s: string) => s.trim())) {
-        const [internal, external] = m.split("=", 2).map((s: string) => s.trim());
-        const newPath = path.replace(new RegExp("^" + internal, "i"), literal(external));
+    let mapping: [RegExp, string] | string | undefined = this.mappings.find(([internal]) =>
+      internal.test(path),
+    );
+    if (mapping !== undefined) {
+      return rbStrSub({ string: path }, ...mapping);
+    } else if ((mapping = env["HTTP_X_ACCEL_MAPPING"] as string | undefined) != null) {
+      for (const m of mapping.split(",").map((s) => s.trim())) {
+        const [internal, external] = m.split("=", 2).map((s) => s.trim());
+        const newPath = rbStrSub({ string: path }, new RegExp("^" + internal, "im"), external);
         if (newPath !== path) return newPath;
       }
       return path;

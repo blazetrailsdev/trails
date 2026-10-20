@@ -5083,3 +5083,62 @@ describe("buildReport — prepended modules", () => {
     expect(report.packages[0].extraFiles).toEqual([]);
   });
 });
+
+describe("buildReport — DelegateClass resolution", () => {
+  it("resolves an unaliased DelegateClass name to nothing rather than a suffix match", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Type::Value": rubyClass({
+              name: "Value",
+              file: "type/value.rb",
+              instance: [method("cast")],
+            }),
+          },
+          modules: {},
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Locking::LockingType": {
+              ...rubyClass({ name: "LockingType", file: "locking/optimistic.rb" }),
+              superclass: "Type::Value",
+              delegateClass: true,
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            LockingType: {
+              name: "LockingType",
+              file: "locking/optimistic.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("cast")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "locking/optimistic.ts");
+    expect(f!.extras.map((e) => e.name)).toEqual(["cast"]);
+  });
+});
