@@ -123,8 +123,7 @@ type InstanceLockingHost = {
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
-  changes: Record<string, [unknown, unknown]>;
-  _touchAttrNames: Set<string>;
+  _touchAttrNames: Set<string> | null;
   _queryConstraintsHash(): Record<string, unknown>;
 };
 
@@ -150,7 +149,7 @@ export function _touchRow(
 ): unknown {
   const ctor = this.constructor;
   if (ctor.lockingEnabled) {
-    this._touchAttrNames.add(ctor.lockingColumn);
+    this._touchAttrNames!.add(ctor.lockingColumn);
   }
   return superFn(touchAttrNames, time);
 }

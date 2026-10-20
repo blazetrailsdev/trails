@@ -22,7 +22,7 @@ export function isAppliedTo(klass: typeof Base): boolean {
 
 /** @missingRailsName class — PERMANENT */
 export function isNoTouching(this: Base): boolean {
-  return isAppliedTo(this.constructor as typeof Base);
+  return isAppliedTo(this.constructor);
 }
 
 export function touchLater(this: Base, ...args: unknown[]): Promise<void> | undefined {

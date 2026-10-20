@@ -256,7 +256,7 @@ export class Author extends Base {
     });
     this.hasMany(
       "commentsWithOrder",
-      function (this: any) {
+      function () {
         return this.orderedByPostId();
       },
       {

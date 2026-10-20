@@ -1967,6 +1967,11 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 
       static {
         this.attribute("name", "string");
+        this.hasMany("children", {
+          autosave: true,
+          className: `${seed}Child`,
+          ...(opts.indexErrors ? { indexErrors: true as const } : {}),
+        });
       }
     }
     class Child extends Base {
@@ -1981,11 +1986,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     }
     registerModel(`${seed}Parent`, Parent);
     registerModel(`${seed}Child`, Child);
-    Associations.hasMany.call(Parent, "children", {
-      autosave: true,
-      className: `${seed}Child`,
-      ...(opts.indexErrors ? { indexErrors: true as const } : {}),
-    });
     return { Parent, Child };
   }
   it("errors should be indexed when global flag is set", async () => {

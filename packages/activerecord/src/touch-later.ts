@@ -12,7 +12,7 @@ export const TouchLater = new Module();
 type TouchLaterHost = Base & {
   _deferTouchAttrs?: readonly string[] | null;
   _touchTime?: unknown;
-  _skipDirtyTracking?: boolean;
+  _skipDirtyTracking?: boolean | null;
   _newRecordBeforeLastCommit?: boolean | null;
 };
 
@@ -26,7 +26,7 @@ function raiseRecordNotTouchedError(): never {
 export async function touchLater(this: TouchLaterHost, ...names: string[]): Promise<void> {
   if (!this.isPersisted()) raiseRecordNotTouchedError();
 
-  const ctor = this.constructor as typeof Base;
+  const ctor = this.constructor;
 
   this._deferTouchAttrs ??= this.timestampAttributesForUpdateInModel();
   if (names.length > 0) {

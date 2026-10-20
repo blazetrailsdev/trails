@@ -315,7 +315,7 @@ describe("HasOneAssociationsTest", () => {
     const chef = await (department as any).chefs.create({ employable: designer });
 
     expect(chef.employable_id).toBe(designer.id);
-    expect(chef.employable_type).toBe((designer.constructor as typeof Base).name);
+    expect(chef.employable_type).toBe(designer.constructor.name);
 
     await designer.destroy();
     await chef.reload();

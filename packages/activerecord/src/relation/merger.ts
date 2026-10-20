@@ -117,7 +117,7 @@ export class Merger {
         associations as AssociationSpec[],
         Nodes.InnerJoin,
       );
-      QueryMethods.joinsBang.call(rel, joinDependency as any, ...(others as any[]));
+      QueryMethods.joinsBang.call(rel, joinDependency, ...(others as any[]));
     }
   }
 

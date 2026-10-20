@@ -65,7 +65,7 @@ export class AssociationScope {
 
     binds.push(...lastReflection.joinIdFor(owner));
     if (lastReflection.type) {
-      binds.push((owner.constructor as typeof Base).polymorphicName());
+      binds.push(owner.constructor.polymorphicName());
     }
 
     eachCons(chain as AssociationReflection[], 2).forEach(([reflection, nextReflection]) => {
@@ -125,9 +125,7 @@ export class AssociationScope {
     }
 
     if (reflection.type) {
-      const polymorphicType = this.transformValue(
-        (owner.constructor as typeof Base).polymorphicName(),
-      );
+      const polymorphicType = this.transformValue(owner.constructor.polymorphicName());
       scope = this.applyScope(scope, table, reflection.type, polymorphicType);
     }
 

@@ -1,3 +1,4 @@
+import type { ScopeOn } from "../../scoping/named.js";
 import { kernelThrow, Module, registerConstant } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
@@ -30,6 +31,12 @@ import { registerModel } from "../../associations.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    orderedByPostId: ScopeOn<T, Comment | Post>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CategoryPost extends Base {

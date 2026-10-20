@@ -89,9 +89,7 @@ export class BelongsToAssociation extends SingularAssociation {
     if (this.reflection.isPolymorphic()) {
       const modelTypeWas = this.owner.attributeBeforeLastSave(this.reflection.foreignType!);
       if (modelTypeWas != null) {
-        modelWas = (this.owner.constructor as typeof Base).polymorphicClassFor(
-          modelTypeWas as string,
-        );
+        modelWas = this.owner.constructor.polymorphicClassFor(modelTypeWas as string);
       }
     } else {
       modelWas = this.klass;
@@ -180,9 +178,7 @@ export class BelongsToAssociation extends SingularAssociation {
     const reflectionFk = this.reflection.foreignKey();
     if (Array.isArray(reflectionFk)) {
       const targetKeyValues = record
-        ? kernelArray(this.primaryKey(record.constructor as typeof Base)).map((key) =>
-            record._readAttribute(key),
-          )
+        ? kernelArray(this.primaryKey(record.constructor)).map((key) => record._readAttribute(key))
         : [];
 
       if (
@@ -198,7 +194,7 @@ export class BelongsToAssociation extends SingularAssociation {
       }
     } else {
       const targetKeyValue = record
-        ? record._readAttribute(this.primaryKey(record.constructor as typeof Base) as string)
+        ? record._readAttribute(this.primaryKey(record.constructor) as string)
         : null;
 
       if (force || !rbEqual(this.owner._readAttribute(reflectionFk), targetKeyValue)) {

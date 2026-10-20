@@ -2068,24 +2068,23 @@ function _assertPgAdvisoryLockId(lockId: number | bigint | string): void {
 
 const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/;
 
-(PostgreSQLAdapter.prototype as any).explain = pgExplain;
+PostgreSQLAdapter.prototype.explain = pgExplain;
 PostgreSQLAdapter.prototype.query = pgQuery;
 PostgreSQLAdapter.prototype.unescapeBytea = quotingUnescapeBytea;
-(PostgreSQLAdapter.prototype as any).isWriteQuery = pgIsWriteQuery;
+PostgreSQLAdapter.prototype.isWriteQuery = pgIsWriteQuery;
 PostgreSQLAdapter.prototype.execute = pgExecute;
-(PostgreSQLAdapter.prototype as any).execInsert = pgExecInsert;
-(PostgreSQLAdapter.prototype as any).beginDbTransaction = pgBeginDbTransaction;
-(PostgreSQLAdapter.prototype as any).beginIsolatedDbTransaction = pgBeginIsolatedDbTransaction;
-(PostgreSQLAdapter.prototype as any).commitDbTransaction = pgCommitDbTransaction;
-(PostgreSQLAdapter.prototype as any).execRollbackDbTransaction = pgExecRollbackDbTransaction;
-(PostgreSQLAdapter.prototype as any).execRestartDbTransaction = pgExecRestartDbTransaction;
-(PostgreSQLAdapter.prototype as any).cancelAnyRunningQuery = pgCancelAnyRunningQuery;
-(PostgreSQLAdapter.prototype as any).highPrecisionCurrentTimestamp =
-  pgHighPrecisionCurrentTimestamp;
-(PostgreSQLAdapter.prototype as any).buildExplainClause = pgBuildExplainClause;
-(PostgreSQLAdapter.prototype as any).setConstraints = pgSetConstraints;
+PostgreSQLAdapter.prototype.execInsert = pgExecInsert;
+PostgreSQLAdapter.prototype.beginDbTransaction = pgBeginDbTransaction;
+PostgreSQLAdapter.prototype.beginIsolatedDbTransaction = pgBeginIsolatedDbTransaction;
+PostgreSQLAdapter.prototype.commitDbTransaction = pgCommitDbTransaction;
+PostgreSQLAdapter.prototype.execRollbackDbTransaction = pgExecRollbackDbTransaction;
+PostgreSQLAdapter.prototype.execRestartDbTransaction = pgExecRestartDbTransaction;
+PostgreSQLAdapter.prototype.cancelAnyRunningQuery = pgCancelAnyRunningQuery;
+PostgreSQLAdapter.prototype.highPrecisionCurrentTimestamp = pgHighPrecisionCurrentTimestamp;
+PostgreSQLAdapter.prototype.buildExplainClause = pgBuildExplainClause;
+PostgreSQLAdapter.prototype.setConstraints = pgSetConstraints;
 (PostgreSQLAdapter.prototype as any).castResult = castResult;
-(PostgreSQLAdapter.prototype as any).handleWarnings = handleWarnings;
+PostgreSQLAdapter.prototype.handleWarnings = handleWarnings;
 (PostgreSQLAdapter.prototype as any)._abstractIsWarningIgnored =
   AbstractAdapter.prototype.isWarningIgnored;
 (PostgreSQLAdapter.prototype as any).isWarningIgnored = pgIsWarningIgnored;

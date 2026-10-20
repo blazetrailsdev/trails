@@ -86,7 +86,7 @@ export class Member extends Base {
     this.hasOne("clubCategory", { through: "club", source: "category" });
     this.hasOne(
       "generalClub",
-      function (this: any) {
+      function () {
         return this.general();
       },
       {

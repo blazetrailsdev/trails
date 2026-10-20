@@ -1,9 +1,16 @@
+import type { ScopeOn } from "../../scoping/named.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Company } from "./company.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    open: ScopeOn<T, Account>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Account extends Base {
@@ -34,7 +41,7 @@ export class Account extends Base {
     this.scope("open", function () {
       return this.where("firm_name = ?", "37signals");
     });
-    this.scope("available", function (this: any) {
+    this.scope("available", function () {
       return this.open();
     });
 

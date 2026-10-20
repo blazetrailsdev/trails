@@ -64,7 +64,7 @@ export function signedId(
 ): string {
   if (instance.isNewRecord()) throw new ArgumentError("Cannot get a signed_id for a new record");
 
-  const klass = instance.constructor as typeof Base;
+  const klass = instance.constructor;
   return klass.signedIdVerifier.generate(instance.id, {
     expiresIn,
     expiresAt,

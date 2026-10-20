@@ -383,7 +383,7 @@ export function initWith(
   block?: (record: Base) => void,
 ): void {
   coder = LegacyYamlAdapter.convert(coder);
-  const attributes = (this.constructor as typeof Base).yamlEncoder().decode(coder);
+  const attributes = this.constructor.yamlEncoder().decode(coder);
   for (const name of attributes.keys()) {
     if (!basicObjRespondTo(this, name, false)) {
       (
@@ -444,7 +444,7 @@ export function encodeWith(
   this: Base & { _attributes: AttributeSet; isNewRecord(): boolean },
   coder: Record<string, unknown>,
 ): void {
-  (this.constructor as typeof Base).yamlEncoder().encode(this._attributes, coder);
+  this.constructor.yamlEncoder().encode(this._attributes, coder);
   coder["new_record"] = this.isNewRecord();
   coder["active_record_yaml_version"] = 2;
 }
@@ -783,7 +783,7 @@ export function initInternals(
   this._markedForDestruction = false;
   this._destroyedByAssociation = null;
   this._startTransactionState = null;
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   this._primaryKey = klass.primaryKey;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
@@ -862,7 +862,7 @@ export function inspectWithAttributes(this: Base, attributesToList: string[]): s
 }
 
 export function attributesForInspect(this: Base): string[] {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   return klass.attributesForInspect === ":all"
     ? allAttributesForInspect.call(this)
     : klass.attributesForInspect;

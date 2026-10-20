@@ -254,7 +254,7 @@ Inheritance.defineMethod("initializeInternalsCallback", initializeInternalsCallb
 
 /** @internal */
 export function ensureProperType(this: Base): void {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   if (klass.isFinderNeedsTypeCondition()) {
     this._writeAttribute(klass.inheritanceColumn as string, klass.stiName());
   }

@@ -54,7 +54,7 @@ export class Default {
     }
   }
 
-  static unscoped(this: any, block?: () => any): any {
+  static unscoped(this: typeof Base, block?: () => any): any {
     return block ? this.relation().scoping(block) : this.relation();
   }
 }
@@ -140,17 +140,17 @@ function isExecuteScope(
 }
 
 /** @internal */
-export function isIgnoreDefaultScope(this: any): boolean {
+export function isIgnoreDefaultScope(this: typeof Base): boolean {
   return !!ScopeRegistry.ignoreDefaultScope(this.baseClass);
 }
 
 /** @internal */
-function setIgnoreDefaultScope(this: any, ignore: boolean | null): void {
+function setIgnoreDefaultScope(this: typeof Base, ignore: boolean | null): void {
   ScopeRegistry.setIgnoreDefaultScope(this.baseClass, ignore);
 }
 
 /** @internal */
-function evaluateDefaultScope(this: any, fn: () => unknown): unknown {
+function evaluateDefaultScope(this: typeof Base, fn: () => unknown): unknown {
   if (isIgnoreDefaultScope.call(this)) return undefined;
 
   try {
