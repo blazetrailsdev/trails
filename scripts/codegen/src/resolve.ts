@@ -648,12 +648,12 @@ export class Resolver {
     }
     if (hit) return null;
     const segs = p[0] === "" ? p.slice(1) : p;
-    // Ruby's core Time / Date / DateTime are `@blazetrails/date`'s classes;
-    // activesupport only reopens them (core_ext).
+    // Ruby's core Time is `@blazetrails/date`'s class (activesupport only
+    // reopens it). Not Date / DateTime: trails also carries a Ruby Date as a
+    // `Temporal.PlainDate` (activesupport's `Date.today`), which has none of
+    // that class's methods, so a call on one keeps its dynamic dispatch.
     const CORE: Record<string, string> = {
       Time: "@date/time.ts#Time",
-      Date: "@date/date.ts#Date",
-      DateTime: "@date/date.ts#DateTime",
     };
     if (segs.length === 1 && CORE[segs[0]] && this.types.cls(CORE[segs[0]]))
       return { k: "class", key: CORE[segs[0]], static: true };

@@ -1198,7 +1198,12 @@ export class Emitter {
           Range: "@ruby-compat/range.ts#Range",
           Module: "@ruby-compat/include.ts#Module",
         };
-        const key = (path.length === 1 && core[path[0]]) || this.lw.resolver.types.depClass(path);
+        // A Ruby Date / DateTime may be a `Temporal.PlainDate` / `ZonedDateTime`
+        // in trails (activesupport's `Date.today`): left untyped, its calls dispatch.
+        const temporal = path.length === 1 && (path[0] === "Date" || path[0] === "DateTime");
+        const key = temporal
+          ? undefined
+          : (path.length === 1 && core[path[0]]) || this.lw.resolver.types.depClass(path);
         if (key) (ctx.scope.types ??= new Map()).set(params[0].name, { k: "class", key } as any);
       }
     }
