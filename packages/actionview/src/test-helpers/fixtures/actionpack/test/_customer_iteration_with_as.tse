@@ -1,0 +1,1 @@
+<%= client_iteration.size %>-<%= client_iteration.index %>: <%= client.name %><%= client_iteration.isFirst() ? '-first' : null %><%= client_iteration.isLast() ? '-last' : null %>
