@@ -224,9 +224,9 @@ describe("Rack::Session::Pool", () => {
   });
 
   it("should merge sessions when multithreaded", async () => {
-    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors `unless $DEBUG` (spec_session_pool.rb:229)
+    // eslint-disable-next-line vitest/no-conditional-in-test
     if (rbGvGet("$DEBUG") == null || rbGvGet("$DEBUG") === false) {
-      // eslint-disable-next-line vitest/no-conditional-expect -- mirrors spec_session_pool.rb:230
+      // eslint-disable-next-line vitest/no-conditional-expect
       expect(1).toBe(1);
       return;
     }
@@ -244,7 +244,7 @@ describe("Rack::Session::Pool", () => {
       env["rack.session"] = rbObjDup(env["rack.session"] as SessionHash);
       await Thread.stop();
       (env["rack.session"] as SessionHash).set(
-        String(Math.trunc(Date.now() * Math.random())),
+        String(Math.trunc((Date.now() % 1000) * 1000 * Math.random())),
         true,
       );
       return incrementor(env);
