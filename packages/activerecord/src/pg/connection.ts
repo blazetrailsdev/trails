@@ -14,6 +14,7 @@ export interface PGConnection extends pg.Client {
   prepare(stmtName: string, sql: string): Promise<void>;
   execPrepared(stmtName: string, params: unknown[]): Promise<PG.Result>;
   asyncExec(sql: string | null): Promise<PG.Result>;
+  sendQuery(sql: string): Promise<void>;
   execParams(sql: string | null, params: unknown[]): Promise<PG.Result>;
   unescapeBytea(value: string | Uint8Array): Buffer;
   transactionStatus(): number;
@@ -60,6 +61,7 @@ export class Connection {
   connParams: pg.ClientConfig | undefined;
   prepared = new Map<string, string>();
   readyForQuery = "I";
+  bad = false;
   typeMapForResults = new PGTypeMapByOid();
 
   constructor(client: object, connParams?: pg.ClientConfig) {
@@ -102,6 +104,7 @@ export class Connection {
     listen(this, conn);
     this.prepared.clear();
     this.readyForQuery = "I";
+    this.bad = false;
     await client
       .end()
       .then(() => conn.connect())
@@ -160,6 +163,17 @@ export class Connection {
         sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
       ).catch((error: unknown) => raise(this, error)),
     );
+  }
+
+  async sendQuery(sql: string): Promise<void> {
+    const client = this.client;
+    const fatal = await (this.query as unknown as Query)(sql).then(
+      () => false,
+      (error: unknown) => (error as { cause?: { severity?: string } }).cause?.severity === "FATAL",
+    );
+    if (fatal && client._ended !== true) {
+      await new Promise<void>((resolve) => client.once("end", () => resolve()));
+    }
   }
 
   async execParams(sql: string | null, params: unknown[]): Promise<PG.Result> {
@@ -301,6 +315,8 @@ function pgError(conn: Connection, error: unknown, klass?: typeof PGError): unkn
       connection: conn,
       result: { errorField, resultErrorField: errorField },
     });
+  } else if (conn.bad && / is not queryable$/.test(error.message)) {
+    wrapped = new ConnectionBad("no connection to the server\n", { connection: conn });
   } else if (_ending === true) {
     wrapped = new ConnectionBad("connection is closed", { connection: conn });
   } else if (_ended === true || _queryable === false || _connectionError === true) {
@@ -309,6 +325,9 @@ function pgError(conn: Connection, error: unknown, klass?: typeof PGError): unkn
     wrapped = new UnableToSend(`${error.message}\n`, { connection: conn });
   }
   wrapped.cause = error;
+  if (wrapped instanceof ConnectionBad || (error as { severity?: string }).severity === "FATAL") {
+    conn.bad = true;
+  }
   return wrapped;
 }
 
