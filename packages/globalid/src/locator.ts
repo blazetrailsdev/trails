@@ -20,6 +20,7 @@ export interface LocatorModel {
   where?(conditions: Record<string, unknown>): {
     toArray?(): Promise<unknown[]> | unknown[];
   };
+  includes?(includes: unknown): LocatorModel;
   /** @internal */
   unscoped?<R>(block: () => R | Promise<R>): R | Promise<R>;
 }
@@ -29,6 +30,7 @@ export class InvalidModelIdError extends StandardError {}
 export interface LocateOptions {
   only?: LocatorModel | LocatorModel[];
   ignoreMissing?: boolean;
+  includes?: unknown;
 }
 
 export type LocateSignedOptions = LocateOptions & ParseOptions;
@@ -41,11 +43,12 @@ export interface LocatorLike {
 }
 
 export class BaseLocator {
-  async locate(gid: GlobalID, _options: LocateOptions = {}): Promise<unknown | null> {
+  async locate(gid: GlobalID, options: LocateOptions = {}): Promise<unknown | null> {
     if (!this.modelIdIsValid(gid)) return null;
-    const modelClass = gid.modelClass;
-    const record = await modelClass.find(gid.modelId);
-    return record ?? null;
+    let modelClass = gid.modelClass;
+    if (options.includes) modelClass = modelClass.includes!(options.includes);
+
+    return modelClass.find(gid.modelId);
   }
 
   async locateMany(gids: GlobalID[], options: LocateOptions = {}): Promise<unknown[]> {
@@ -103,9 +106,6 @@ export class BaseLocator {
   /** @internal */
   protected modelIdIsValid(gid: GlobalID): boolean {
     return rbFArray(gid.modelId).length === rbFArray(this.primaryKey(gid.modelClass)).length;
-    return (
-      (Array.isArray(gid.modelId) ? gid.modelId.length : 1) === (Array.isArray(pk) ? pk.length : 1)
-    );
   }
 
   /** @internal */
@@ -205,11 +205,7 @@ export class Locator {
     options: LocateSignedOptions = {},
   ): Promise<unknown[]> {
     return Locator.locateMany(
-      compact(
-        sgids.map((sgid) =>
-          SignedGlobalID.parse(String(sgid), slice(options as Record<string, unknown>, "for")),
-        ),
-      ),
+      compact(sgids.map((sgid) => SignedGlobalID.parse(String(sgid), slice(options, "for")))),
       options,
     );
   }
