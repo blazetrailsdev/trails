@@ -1567,6 +1567,15 @@ describe("buildReport — novel vs moved classification", () => {
             }),
           },
           modules: {},
+          fileConstants: {
+            "type.rb": {
+              Value: {
+                kind: "alias",
+                target: "ActiveModel::Type::Value",
+                namespace: "ActiveRecord::Type",
+              },
+            },
+          },
         },
       },
     };
@@ -5020,5 +5029,59 @@ describe("buildReport — --package does not scope the stale-tag check", () => {
       ["activemodel", "foo.ts"],
     ]);
     expect(gateStale(report.tagged)).toContain("activemodel  foo.ts");
+  });
+});
+
+describe("buildReport — prepended modules", () => {
+  it("credits a lexically prepended module's methods to the host", () => {
+    // activesupport/lib/active_support/test_case.rb:145 — `prepend
+    // ActiveSupport::Testing::SetupAndTeardown`.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activesupport: {
+          classes: {
+            "ActiveSupport::TestCase": {
+              ...rubyClass({ name: "TestCase", file: "test_case.rb" }),
+              prepends: ["ActiveSupport::Testing::SetupAndTeardown"],
+            },
+          },
+          modules: {
+            "ActiveSupport::Testing::SetupAndTeardown": rubyClass({
+              name: "SetupAndTeardown",
+              file: "testing/setup_and_teardown.rb",
+              instance: [method("before_setup")],
+            }),
+          },
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activesupport: {
+          classes: {
+            TestCase: {
+              name: "TestCase",
+              file: "test-case.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("beforeSetup")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
   });
 });

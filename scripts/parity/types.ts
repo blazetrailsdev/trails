@@ -25,8 +25,22 @@ export interface InlinedFrom {
  *  a non-literal (call/ref/lambda), recorded so the comparer skips it rather
  *  than confusing it with "no default". See literals.ts. */
 export interface LiteralValue {
-  kind: "int" | "float" | "string" | "symbol" | "bool" | "nil" | "array" | "hash" | "expr";
-  value?: string | boolean; // int/float token (underscores kept), string/symbol text, or boolean
+  kind:
+    | "int"
+    | "float"
+    | "string"
+    | "symbol"
+    | "bool"
+    | "nil"
+    | "array"
+    | "hash"
+    | "expr"
+    | "alias";
+  value?: string | boolean;
+  /** Ruby side only, `alias`: the constant a bare-reference RHS names, as
+   *  written, and the namespace the assignment sits in. */
+  target?: string;
+  namespace?: string; // int/float token (underscores kept), string/symbol text, or boolean
   /** Ruby side only: the opening token of a string whose source text does not
    *  decode by the double-quoted rules — `'`, `%q(`, or a `<<~'EOS'` heredoc.
    *  See literals.ts `decodeRubyString`. */
