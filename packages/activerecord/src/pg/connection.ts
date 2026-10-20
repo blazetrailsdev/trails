@@ -185,10 +185,14 @@ export class Connection {
     this.pendingResult = pending;
   }
 
-  getLastResult(): Promise<PG.Result | null> {
+  async getLastResult(): Promise<PG.Result | null> {
     const pending = this.pendingResult;
-    this.pendingResult = null;
-    return pending ?? Promise.resolve(null);
+    if (pending == null) return null;
+    try {
+      return await pending;
+    } finally {
+      if (this.pendingResult === pending) this.pendingResult = null;
+    }
   }
 
   async execParams(sql: string | null, params: unknown[]): Promise<PG.Result> {
