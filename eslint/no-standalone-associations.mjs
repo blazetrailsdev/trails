@@ -37,43 +37,10 @@
  *     anything that could reorder behavior or that we can't resolve statically
  *     is reported only.
  *
- * Existing violators are grandfathered via a site-granular baseline,
- * `eslint/no-standalone-associations-exclude.json`. Each entry is
- * `"<repo-rel-path>::<receiver>::<macro>::<assocName>"`, so it survives line
- * moves (unlike a line:col key) and lets a single converted site drop out of
- * the baseline without disturbing its file's other sites. Regenerate with
- * `pnpm tsx scripts/generate-standalone-associations-exclude.ts`.
+ * Existing violators are counted per file against origin/main by
+ * `pnpm parity:lint:counts` (scripts/parity/eslint-count.ts); the rule itself
+ * reports every site.
  */
-
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Env override lets the rule's own unit test point at a tmp baseline rather
-// than mutating the committed list. Resolved lazily so a test that sets the
-// env var after importing the rule still wins.
-function excludePath() {
-  return (
-    process.env.NO_STANDALONE_ASSOCIATIONS_EXCLUDE_PATH ??
-    path.join(__dirname, "no-standalone-associations-exclude.json")
-  );
-}
-
-// Cache by path+mtime so a single eslint run reads the baseline at most once.
-let excludeCache = null;
-function loadExclude() {
-  const p = excludePath();
-  if (!fs.existsSync(p)) return new Set();
-  const mtime = fs.statSync(p).mtimeMs;
-  if (excludeCache && excludeCache.path === p && excludeCache.mtime === mtime) {
-    return excludeCache.value;
-  }
-  const value = new Set(JSON.parse(fs.readFileSync(p, "utf8")));
-  excludeCache = { path: p, mtime, value };
-  return value;
-}
 
 /** Repo-relative path under packages/; null if outside the repo tree. */
 export function repoRel(filename) {
@@ -95,38 +62,6 @@ export function macroOfCall(callee) {
   if (inner.object.type !== "Identifier" || inner.object.name !== "Associations") return null;
   if (inner.property.type !== "Identifier") return null;
   return MACROS.has(inner.property.name) ? inner.property.name : null;
-}
-
-/**
- * Whether `code` can hold a call {@link macroOfCall} matches: its callee is
- * rooted at the identifier `Associations`, which source text spells either
- * literally or with a `\u` escape. A sound text prefilter for callers that
- * would otherwise parse every file; widen it with `macroOfCall`.
- */
-export function mayContainMacroCall(code) {
-  return code.includes("Associations") || code.includes("\\u");
-}
-
-/** Static name of a string-literal first-arg, else "<dynamic>". */
-export function assocName(arg) {
-  if (arg && arg.type === "Literal" && typeof arg.value === "string") return arg.value;
-  if (arg && arg.type === "TemplateLiteral" && arg.expressions.length === 0) {
-    return arg.quasis[0]?.value?.cooked ?? "<dynamic>";
-  }
-  return "<dynamic>";
-}
-
-/**
- * Site-granular baseline key for a standalone `.call` node:
- * `<repo-rel-path>::<receiver>::<macro>::<assocName>`. Line-independent so a
- * converted site drops out without disturbing its file's other sites. Shared
- * verbatim with scripts/generate-standalone-associations-exclude.ts.
- */
-export function siteKey(rel, node, macro) {
-  const receiverArg = node.arguments[0];
-  const receiver =
-    receiverArg && receiverArg.type === "Identifier" ? receiverArg.name : "<dynamic>";
-  return `${rel}::${receiver}::${macro}::${assocName(node.arguments[1])}`;
 }
 
 /** The `static { … }` block of a class, or null. */
@@ -155,7 +90,6 @@ const rule = {
     const filename = context.filename ?? context.getFilename();
     const rel = repoRel(filename);
     if (!rel) return {};
-    const exclude = loadExclude();
     const sourceCode = context.sourceCode ?? context.getSourceCode();
 
     // Collect class declarations + expressions by name so we can resolve a
@@ -368,8 +302,6 @@ const rule = {
           const receiverArg = node.arguments[0];
           const receiver =
             receiverArg && receiverArg.type === "Identifier" ? resolveReceiver(receiverArg) : null;
-
-          if (exclude.has(siteKey(rel, node, macro))) continue;
 
           // Decide fixability.
           let reason = null;

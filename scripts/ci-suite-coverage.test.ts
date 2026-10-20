@@ -510,7 +510,6 @@ const THOR_COMPARISON_SKIPS: Record<string, string> = {
   "scripts/build-rails-file-structure-manifest.ts": "method order: arel and activemodel only",
   "scripts/build-rails-test-names-manifest.ts": "test names: no thor path is enrolled",
   "scripts/parity/conventions-doc.ts": "generated from conventions.ts",
-  "scripts/generate-standalone-associations-exclude.ts": "reads packages/activerecord only",
   "scripts/test-deps/rails-test-deps.ts": "reads packages/activerecord only",
   "scripts/test-deps/build-fixture-baseline.ts": "reads packages/activerecord only",
   "scripts/test-compare/closure-cli.ts": "reads vendored activesupport tests only",
@@ -1146,7 +1145,7 @@ describe("CI runs every tooling test suite", () => {
     for (const input of [
       "eslint.config.mjs",
       "eslint/no-raw-sql.mjs",
-      "eslint/no-explicit-any-src-exclude.json",
+      "eslint/rails-error-classes.json",
       "eslint/rails-deprecated-methods.json",
       "package.json",
       "pnpm-lock.yaml",

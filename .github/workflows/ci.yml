@@ -395,6 +395,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       # Lints only the changed files. `__ALL__` is the fallback sentinel from
@@ -414,6 +416,9 @@ jobs:
           else
             printf '%s\n' "$LINT_FILES" | xargs -r -d '\n' pnpm run lint:files
           fi
+      - name: ESLint violation counts
+        if: ${{ github.event_name == 'pull_request' }}
+        run: pnpm parity:lint:counts:ci
   # Consolidated sub-minute PR/push preflight checks. Each of prettier,
   # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
   # work; GitHub bills every job rounded UP to a whole minute, so running them
@@ -1771,7 +1776,7 @@ jobs:
           ruby-api: if [ "$RUBY_EXTRACTION_HIT" = true ]; then echo "rails-api.json restored from cache"; else cd scripts/api-compare && LIB_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-paths.json) LIB_ENTRY_FILES_JSON=$(cat $RUNNER_TEMP/ruby-extraction/lib-entry-files.json) LOCKFILE_PATH=$GITHUB_WORKSPACE/vendor/sources.lock.json ruby extract-ruby-api.rb; fi
           ruby-tests: if [ "$RUBY_EXTRACTION_HIT" = true ]; then echo "rails-tests.json restored from cache"; else cd scripts/test-compare && TEST_PATHS_JSON=$(cat $RUNNER_TEMP/ruby-extraction/test-paths.json) ruby extract-ruby-tests.rb; fi
           deprecated: pnpm exec tsx scripts/build-rails-privates-manifest.ts --check-deprecated
-          eslint-excludes: pnpm exec tsx scripts/generate-standalone-associations-exclude.ts && pnpm exec tsx scripts/test-deps/rails-test-deps.ts && pnpm exec tsx scripts/test-deps/build-fixture-baseline.ts
+          eslint-excludes: pnpm exec tsx scripts/test-deps/rails-test-deps.ts && pnpm exec tsx scripts/test-deps/build-fixture-baseline.ts
           privates-manifest after ruby-api,deprecated: pnpm exec tsx scripts/build-rails-privates-manifest.ts
           method-order-manifest after ruby-api: RAILS_STRUCTURE_REPORT=1 pnpm exec tsx scripts/build-rails-file-structure-manifest.ts
           test-names-manifest after ruby-tests: pnpm exec tsx scripts/build-rails-test-names-manifest.ts
@@ -1996,15 +2001,13 @@ jobs:
         # methods. Regenerate with `pnpm rails-privates:manifest`.
         run: node scripts/ci/bg-gates.mjs wait deprecated
       - name: ESLint exclude baselines up to date
-        # Both baselines are generated grandfather lists that only shrink as
-        # sites convert. Nothing read them back, so they drifted ~200 rows loose
-        # on main before this guard. Regenerate with
-        # `pnpm tsx scripts/generate-standalone-associations-exclude.ts` and
-        # `pnpm fixture-baseline:refresh`.
+        # A generated grandfather list that only shrinks as sites convert.
+        # Nothing read it back, so it drifted loose on main before this guard.
+        # Regenerate with `pnpm fixture-baseline:refresh`.
         run: |
           set -euo pipefail
           node scripts/ci/bg-gates.mjs wait eslint-excludes
-          baselines='eslint/no-standalone-associations-exclude.json eslint/expected-fixtures-exclude.json'
+          baselines='eslint/expected-fixtures-exclude.json'
           if git diff --quiet -- $baselines; then
             echo "ESLint exclude baselines are in sync with a fresh regeneration."
             exit 0
