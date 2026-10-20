@@ -1,5 +1,6 @@
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Lint, MockRequest, RACK_SESSION_OPTIONS, Response, Utils } from "@blazetrails/rack";
+import { Thread, rbGvGet, rbObjDup, warn } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import type { SessionHash } from "./index.js";
@@ -222,8 +223,48 @@ describe("Rack::Session::Pool", () => {
     expect(res.headers["set-cookie"]).toMatch(/SameSite=Lax/i);
   });
 
-  it.skip("should merge sessions when multithreaded", () => {
-    // PERMANENT-SKIP: porting the trivial non-$DEBUG arm alone reds parity:test:assertions — the Ruby body counts 6 assertions statically, and the other 5 are Thread.new/Thread.stop/join
+  it("should merge sessions when multithreaded", async () => {
+    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors `unless $DEBUG` (spec_session_pool.rb:229)
+    if (rbGvGet("$DEBUG") == null || rbGvGet("$DEBUG") === false) {
+      // eslint-disable-next-line vitest/no-conditional-expect -- mirrors spec_session_pool.rb:230
+      expect(1).toBe(1);
+      return;
+    }
+
+    warn("Running multithread tests for Session::Pool");
+    const pool = new Pool(incrementor);
+    const req = new MockRequest((env) => pool.call(env));
+
+    const res = await req.get("/");
+    expect(res.body).toBe('{"counter"=>1}');
+    const cookie = res.headers["set-cookie"] as string;
+    const sessId = cookie.match(new RegExp(`${pool.key}=([^,;]+)`))![1];
+
+    const deltaIncrementor = async (env: RackEnv): Promise<RackResponse> => {
+      env["rack.session"] = rbObjDup(env["rack.session"] as SessionHash);
+      await Thread.stop();
+      (env["rack.session"] as SessionHash).set(
+        String(Math.trunc(Date.now() * Math.random())),
+        true,
+      );
+      return incrementor(env);
+    };
+    const tses = new Utils.Context(pool, deltaIncrementor);
+    const treq = new MockRequest((env) => tses.call(env));
+    const tnum = Math.trunc(Math.random() * 7) + 5;
+    const threads = Array.from(
+      { length: tnum },
+      () => new Thread(treq, (run: MockRequest) => run.get("/", { HTTP_COOKIE: cookie })),
+    ).reverse();
+    const r = await Promise.all(threads.map(async (t) => (await t.join()).value()));
+    for (const resp of r) {
+      expect(resp.headers["set-cookie"]).toBe(cookie);
+      expect(resp.body).toContain('"counter"=>2');
+    }
+
+    const session = pool.pool[sessId]!;
+    expect(Object.keys(session).length).toBe(tnum + 1);
+    expect(session["counter"]).toBe(2);
   });
 
   it("does not return a cookie if cookie was not read/written", async () => {

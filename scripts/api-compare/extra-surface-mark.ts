@@ -436,10 +436,15 @@ export function tightened(marks: SurfaceMarks, current: SurfaceMarks): SurfaceMa
   return next;
 }
 
-export async function writeMarks(marks: SurfaceMarks): Promise<void> {
+/** The bytes `writeMarks` puts on disk: keys sorted, `serializeBaseline`'s format. */
+export function serializeMarks(marks: SurfaceMarks): string {
   const sorted: SurfaceMarks = {};
   for (const name of Object.keys(marks).sort()) sorted[name] = marks[name]!;
-  await fs.writeFile(MARK_PATH, serializeBaseline(sorted));
+  return serializeBaseline(sorted);
+}
+
+export async function writeMarks(marks: SurfaceMarks): Promise<void> {
+  await fs.writeFile(MARK_PATH, serializeMarks(marks));
 }
 
 /** {@link measure}'s `internal` twin, over every gated package. */
