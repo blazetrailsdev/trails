@@ -4960,3 +4960,65 @@ describe("buildReport — members Ruby supplies without a def in the mapped file
     expect(inlined(["[initialize]"])).toEqual([]);
   });
 });
+
+describe("buildReport — --package does not scope the stale-tag check", () => {
+  it("reports a stale tag in another package under a filtered run", () => {
+    const stale: MethodInfo = { ...method("_hidden"), noRailsEquivalent: "PERMANENT" };
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Foo": rubyClass({
+              name: "Foo",
+              file: "foo.rb",
+              instance: [method("bar")],
+            }),
+          },
+          modules: {},
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Baz": rubyClass({
+              name: "Baz",
+              file: "baz.rb",
+              instance: [method("quux")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const host = (name: string, file: string, instanceMethods: MethodInfo[]) => ({
+      name,
+      file,
+      includes: [],
+      extends: [],
+      instanceMethods,
+      classMethods: [],
+    });
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: { Foo: host("Foo", "foo.ts", [method("bar"), stale]) },
+          modules: {},
+        },
+        activerecord: { classes: { Baz: host("Baz", "baz.ts", [method("quux")]) }, modules: {} },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages.map((p) => p.package)).toEqual(["activerecord"]);
+    expect(report.tagged.stale.map((e) => [e.package, e.tsFile])).toEqual([
+      ["activemodel", "foo.ts"],
+    ]);
+    expect(gateStale(report.tagged)).toContain("activemodel  foo.ts");
+  });
+});

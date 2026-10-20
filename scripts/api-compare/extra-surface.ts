@@ -3028,27 +3028,28 @@ export function buildReport(
   const fileTagRejections: FileTagRejection[] = [];
   const scannedPkgs = new Set<string>();
   for (const pkg of [...Object.keys(ruby.packages), ...TS_ONLY_PACKAGES]) {
-    if (opts.filterPkg && pkg !== opts.filterPkg) continue;
     if (!ts.packages[pkg]) continue;
     scannedPkgs.add(pkg);
-    packages.push(
-      buildPackageReport(
-        pkg,
-        ruby,
-        ts,
-        opts.excludeGlobs,
-        globalRubyCandidates,
-        crossPackageModules,
-        crossPackagePkgByFqn,
-        crossPackageClasses,
-        opts.novelOnly,
-        tagKeys,
-        matchedTagKeys,
-        redundantTagKeys,
-        fileTagRejections,
-        concernHooks,
-      ),
+    // Every package is scored even under --package: a stale tag is a
+    // whole-repo invariant CI gates unfiltered, so only the totals are scoped.
+    const report = buildPackageReport(
+      pkg,
+      ruby,
+      ts,
+      opts.excludeGlobs,
+      globalRubyCandidates,
+      crossPackageModules,
+      crossPackagePkgByFqn,
+      crossPackageClasses,
+      opts.novelOnly,
+      tagKeys,
+      matchedTagKeys,
+      redundantTagKeys,
+      fileTagRejections,
+      concernHooks,
     );
+    if (opts.filterPkg && pkg !== opts.filterPkg) continue;
+    packages.push(report);
   }
   packages.sort((a, b) => b.totalNovel - a.totalNovel || b.totalExtras - a.totalExtras);
 
@@ -3262,7 +3263,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     excludeGlobs: args.excludeGlobs,
     novelOnly: args.novelOnly,
     topN: args.topN,
-    concernHooks: await loadConcernHooks(ruby, args.filterPkg),
+    concernHooks: await loadConcernHooks(ruby, null),
   });
 
   if (args.json) {

@@ -140,6 +140,11 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // multibyte/chars.rb:53 `delegate :<=>, :=~, :match?, :acts_like_string?, to: :wrapped_string`
   // → chars.ts `compareTo` and `matchOperator` (`match?` is `isMatch`).
   "ActiveSupport::Multibyte::Chars": { "<=>": ["compareTo"], "=~": ["matchOperator"] },
+  // time_with_zone.rb:231 `def <=>(other)` → time-with-zone.ts `compareTo`, and
+  // values/time_zone.rb:333 → values/time-zone.ts `compareTo`: both
+  // `include Comparable`, whose ruby-compat mixin dispatches on `compareTo`.
+  "ActiveSupport::TimeWithZone": { "<=>": ["compareTo"] },
+  "ActiveSupport::TimeZone": { "<=>": ["compareTo"] },
   // abstract_adapter.rb:252 `def <=>(version_string)` → abstract-adapter.ts
   // `compare`. `Version` does `include Comparable`, so `>=` / `<` are derived
   // and have no TS member of their own.
