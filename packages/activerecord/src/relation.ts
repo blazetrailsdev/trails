@@ -8,6 +8,7 @@ import {
   type Module,
   Range,
   rbEnsure,
+  rbFSend,
   rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
@@ -195,9 +196,7 @@ export class ExplainProxy<T extends Base> {
   }
 
   inspect(): Promise<string> {
-    return this.execExplain(() =>
-      (this._relation as unknown as { execQueries(): Promise<T[]> }).execQueries(),
-    );
+    return this.execExplain(() => rbFSend(this._relation, "execQueries") as Promise<T[]>);
   }
 
   average(columnName: string | ArelNode): Promise<string> {

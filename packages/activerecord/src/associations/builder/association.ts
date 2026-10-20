@@ -53,20 +53,10 @@ export class Association {
   static build(
     model: any,
     name: string,
-    scope: ((...args: any[]) => any) | null | Record<string, unknown>,
+    scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown> = {},
     block?: (mod: Module) => void,
   ): any {
-    if (
-      typeof scope === "object" &&
-      scope !== null &&
-      !Array.isArray(scope) &&
-      !(scope instanceof Function)
-    ) {
-      options = scope;
-      scope = null;
-    }
-
     if (model.isDangerousAttributeMethod(name)) {
       throw new ArgumentError(
         `You tried to define an association named ${name} on the model ${model.name}, but ` +
@@ -75,13 +65,7 @@ export class Association {
       );
     }
 
-    const reflection = this.createReflection(
-      model,
-      name,
-      scope as ((...args: any[]) => any) | null,
-      options,
-      block,
-    );
+    const reflection = this.createReflection(model, name, scope, options, block);
     this.defineAccessors(model, reflection);
     this.defineCallbacks(model, reflection);
     this.defineValidations(model, reflection);

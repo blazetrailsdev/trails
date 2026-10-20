@@ -42,7 +42,7 @@ export class Ship extends Base {
     this.validates("name", { presence: true });
 
     this.beforeSave(
-      function (this: any) {
+      function (this: Ship) {
         this.cancelSaveCallbackMethod();
       },
       { if: (r: any) => r.cancelSaveFromCallback },

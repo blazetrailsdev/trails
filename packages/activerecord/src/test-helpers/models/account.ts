@@ -53,15 +53,15 @@ export class Account extends Base {
   }
 
   checkEmptyCreditLimit() {
-    const v = (this as any).credit_limit;
+    const v = this.credit_limit;
     if (v == null || String(v).trim() === "") {
-      (this as any).errors.add("credit_limit", ":blank");
+      this.errors.add("credit_limit", ":blank");
     }
   }
 
   ensureGoodCredit() {
-    if (!((this as any).credit_limit > 10_000)) {
-      (this as any).errors.add("credit_limit", "too low");
+    if (!(this.credit_limit > 10_000)) {
+      this.errors.add("credit_limit", "too low");
     }
   }
 

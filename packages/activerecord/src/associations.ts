@@ -143,10 +143,14 @@ export class Associations {
     scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
     options: AssociationOptions = {},
   ): void {
+    if (typeof scope === "object" && scope !== null) {
+      options = scope;
+      scope = null;
+    }
     const reflection = BelongsToBuilder.build(
       this,
       name,
-      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
+      scope,
       options as Record<string, unknown>,
     );
     Reflection.addReflection(this as any, name, reflection);
@@ -157,12 +161,11 @@ export class Associations {
     scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
     options: AssociationOptions = {},
   ): void {
-    const reflection = HasOneBuilder.build(
-      this,
-      name,
-      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
-      options as Record<string, unknown>,
-    );
+    if (typeof scope === "object" && scope !== null) {
+      options = scope;
+      scope = null;
+    }
+    const reflection = HasOneBuilder.build(this, name, scope, options as Record<string, unknown>);
     Reflection.addReflection(this as any, name, reflection);
   }
 
@@ -172,10 +175,14 @@ export class Associations {
     options: AssociationOptions = {},
     extension?: (mod: Module) => void,
   ): void {
+    if (typeof scope === "object" && scope !== null) {
+      options = scope;
+      scope = null;
+    }
     const reflection = HasManyBuilder.build(
       this,
       name,
-      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
+      scope,
       options as Record<string, unknown>,
       extension,
     );
@@ -191,19 +198,14 @@ export class Associations {
     options: AssociationOptions & { joinTable?: string } = {},
     extension?: (mod: Module) => void,
   ): void {
-    if (
-      typeof scope === "object" &&
-      scope !== null &&
-      !Array.isArray(scope) &&
-      !(scope instanceof Function)
-    ) {
+    if (typeof scope === "object" && scope !== null) {
       options = scope;
       scope = null;
     }
     const self = this as any;
     const habtmReflection = new Reflection.HasAndBelongsToManyReflection(
       name,
-      scope as ((...args: any[]) => any) | null,
+      scope,
       options as Record<string, unknown>,
       self,
     );

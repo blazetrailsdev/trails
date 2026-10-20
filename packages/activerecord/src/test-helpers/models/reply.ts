@@ -31,7 +31,7 @@ export class Reply extends Topic {
   }
 
   static open() {
-    return (this as any).approved();
+    return this.approved();
   }
 }
 registerModel(Reply);
@@ -74,42 +74,42 @@ export class WrongReply extends Reply {
   }
 
   checkEmptyTitle() {
-    if (!(this as any).attributePresent("title")) {
-      (this as any).errors.add("title", "Empty");
+    if (!this.attributePresent("title")) {
+      this.errors.add("title", "Empty");
     }
   }
 
   errorsOnEmptyContent() {
-    if (!(this as any).attributePresent("content")) {
-      (this as any).errors.add("content", "Empty");
+    if (!this.attributePresent("content")) {
+      this.errors.add("content", "Empty");
     }
   }
 
   checkContentMismatch() {
     if (
-      (this as any).attributePresent("title") &&
-      (this as any).attributePresent("content") &&
-      (this as any).content === "Mismatch"
+      this.attributePresent("title") &&
+      this.attributePresent("content") &&
+      this.content === "Mismatch"
     ) {
-      (this as any).errors.add("title", "is Content Mismatch");
+      this.errors.add("title", "is Content Mismatch");
     }
   }
 
   titleIsWrongCreate() {
-    if ((this as any).attributePresent("title") && (this as any).title === "Wrong Create") {
-      (this as any).errors.add("title", "is Wrong Create");
+    if (this.attributePresent("title") && this.title === "Wrong Create") {
+      this.errors.add("title", "is Wrong Create");
     }
   }
 
   checkWrongUpdate() {
-    if ((this as any).attributePresent("title") && (this as any).title === "Wrong Update") {
-      (this as any).errors.add("title", "is Wrong Update");
+    if (this.attributePresent("title") && this.title === "Wrong Update") {
+      this.errors.add("title", "is Wrong Update");
     }
   }
 
   checkAuthorNameIsSecret() {
-    if ((this as any).author_name !== "secret") {
-      (this as any).errors.add("author_name", "Invalid");
+    if (this.author_name !== "secret") {
+      this.errors.add("author_name", "Invalid");
     }
   }
 }

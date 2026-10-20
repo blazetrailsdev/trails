@@ -39,12 +39,12 @@ export class Parrot extends Base {
 
     this.attribute("cancelSaveFromCallback", "boolean");
     this.beforeSave(
-      function (this: any) {
+      function (this: Parrot) {
         this.cancelSaveCallbackMethod();
       },
       { if: (r: any) => r.readAttribute("cancelSaveFromCallback") },
     );
-    this.beforeUpdate(function (this: any) {
+    this.beforeUpdate(function (this: Parrot) {
       this.incrementUpdatedCount();
     });
   }

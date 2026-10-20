@@ -1,6 +1,7 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
+import type { ScopeOn } from "../../scoping/named.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Author } from "./author.js";
 import type { Company } from "./company.js";
@@ -11,6 +12,12 @@ import type { Rating } from "./rating.js";
 import type { SpecialPostWithDefaultScope } from "./post.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    forFirstAuthor: ScopeOn<T, Comment>;
+  }
+}
 
 export class OopsError extends Error {}
 registerConstant("OopsError", OopsError);
@@ -205,7 +212,7 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
       className: "PostThatLoadsCommentsInAnAfterSaveHook",
       foreignKey: "post_id",
     });
-    this.afterSave(async function (this: any) {
+    this.afterSave(async function (this: CommentThatAutomaticallyAltersPostBody) {
       const post = await this.post;
       if (post) await post.update({ body: "Automatically altered" });
     });
@@ -231,7 +238,7 @@ export interface CommentWithDefaultScopeReferencesAssociation {
 
 export class CommentWithAfterCreateUpdate extends Comment {
   static {
-    this.afterCreate(async function (this: any) {
+    this.afterCreate(async function (this: CommentWithAfterCreateUpdate) {
       await this.update({ body: "bar" });
     });
   }

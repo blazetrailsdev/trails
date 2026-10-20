@@ -28,7 +28,7 @@ export class Reference extends Base {
 
   async makeComments() {
     if ((this.constructor as typeof Reference).makeComments) {
-      const person = await (this as any).person;
+      const person = await this.person;
       if (person) await person.update({ comments: "Reference destroyed" });
     }
   }

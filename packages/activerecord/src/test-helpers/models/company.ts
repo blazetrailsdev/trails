@@ -621,7 +621,7 @@ export class Client extends Company {
       if (this.raiseOnDestroy) throw new Client.RaisedOnDestroy();
     });
     this.beforeDestroy(async function (this: Client) {
-      const firm = await (this as any).firm;
+      const firm = await this.firm;
       if (firm) {
         Client.destroyedClientIds.get(firm.id as number)!.push(this.id as number);
       }
@@ -635,7 +635,7 @@ export class Client extends Company {
   static RaisedOnDestroy = class extends Error {};
 
   isRating(): boolean {
-    return (this as any).queryAttribute("rating");
+    return this.queryAttribute("rating");
   }
 
   overwriteToRaise(): void {}
@@ -714,7 +714,7 @@ export class LargeClient extends Client {
   }
 
   setExtraSize(): void {
-    (this as any)["extraSize"] = 50;
+    this["extraSize"] = 50;
   }
 }
 registerModel(LargeClient);

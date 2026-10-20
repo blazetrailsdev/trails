@@ -358,7 +358,7 @@ export class Author extends Base {
     );
     this.hasMany(
       "commentsForFirstAuthor",
-      function (this: any) {
+      function () {
         return this.forFirstAuthor();
       },
       {
@@ -715,7 +715,7 @@ export class Author extends Base {
     );
     this.hasOne(
       "unreadListing",
-      function (this: any) {
+      function () {
         return this.unread();
       },
       {
@@ -725,7 +725,7 @@ export class Author extends Base {
     );
     this.hasOne(
       "readingListing",
-      function (this: any) {
+      function () {
         return this.reading();
       },
       {
@@ -900,7 +900,7 @@ export class Author extends Base {
   }
 
   label() {
-    return `${this.id}-${(this as any).name}`;
+    return `${this.id}-${this.name}`;
   }
 
   social() {
