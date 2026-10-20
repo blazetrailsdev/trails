@@ -102,6 +102,7 @@ export class CollectionAssociation extends Association {
     });
   }
 
+  /** @inventedArm if — CONVERGEABLE sync-collection-mass-assignment-refuses-rails-replace */
   static override defineWriters(mixin: Module, name: string): void {
     mixin.defineMethod(`${name}=`, function (this: SyncAssignmentHost, value: unknown) {
       const association = this.association(name);
