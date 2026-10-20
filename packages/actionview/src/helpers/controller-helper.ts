@@ -13,7 +13,6 @@ interface ControllerLike {
   config?(): { inheritableCopy(): unknown };
   defaultFormBuilder?(): unknown;
   logger?: unknown;
-  [key: string]: unknown;
 }
 
 export const CONTROLLER_DELEGATES = [

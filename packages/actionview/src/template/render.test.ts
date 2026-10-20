@@ -125,6 +125,8 @@ const resolver = new FixtureResolver({
   "test/hello_world.da.html.tse": "Hey verden",
   "test/hello_world.pt-BR.html.tse": "Ola mundo",
   "test/syntax_error.html.tse": "<%= foo(\n  1,\n  2,\n%>\n",
+  "test/_raise_indentation.html.tse":
+    '<p>First paragraph</p>\n<p>Second paragraph</p>\n<p>Third paragraph</p>\n<p>Fourth paragraph</p>\n<p>Fifth paragraph</p>\n<p>Sixth paragraph</p>\n<p>Seventh paragraph</p>\n<p>Eight paragraph</p>\n<p>Ninth paragraph</p>\n<p>Tenth paragraph</p>\n<%= (() => { throw new Error("error here!"); })() %>\n<p>Eleventh paragraph</p>\n<p>Twelfth paragraph</p>',
   "test/_raise.html.tse": "<%= doesnt_exist %>",
   "test/sub_template_raise.html.tse": '<%= render({ partial: "test/raise" }) %>',
   "test/_klass.tse": "<%= klass.constructor.name %>",
@@ -208,7 +210,7 @@ function setupView(paths: PathSet): void {
   const controller = new TestController();
   controller.performCaching = true;
   controller.cacheStore = ":memory_store";
-  view.controller = controller as never;
+  view.controller = controller;
 
   controllerView = new (controller.viewContextClass().withEmptyTemplateCache())(
     controller.lookupContext,
@@ -605,7 +607,7 @@ describe("CachedViewRenderTest", () => {
   });
 
   it("render partial with empty array should return nil", async () => {
-    assertNil(await view.render({ partial: [] as never }));
+    assertNil(await view.render({ partial: [] }));
   });
 
   it("render partial with no block given to yield", async () => {
@@ -788,8 +790,17 @@ describe("CachedViewRenderTest", () => {
     assertEqual("", (e as TemplateError).subTemplateMessage());
   });
 
-  // PERMANENT-SKIP: `raise` inside `<%= %>` is a Ruby expression with no TSE spelling that keeps the fixture's line layout. (CLAUDE.md, "Templates are precompiled").
-  it.skip("render error indentation", () => {});
+  // BLOCKED: tse-undefined-local-raises-template-error
+  it.skip("render error indentation", async () => {
+    const e = await assertRaises([TemplateError], {}, () =>
+      view.render({ partial: "test/raise_indentation" }),
+    );
+    const errorLines = (e as TemplateError).annotatedSourceCode();
+    assertMatch(/error\shere/, e.message);
+    assertEqual(11, (e as TemplateError).lineNumber());
+    assertEqual("     9: <p>Ninth paragraph</p>", errorLines[1]);
+    assertEqual("    10: <p>Tenth paragraph</p>", errorLines[2]);
+  });
 
   // BLOCKED: tse-undefined-local-raises-template-error
   it.skip("render template with errors", async () => {
@@ -1259,7 +1270,7 @@ describe("CachedViewRenderTest", () => {
 
   it("render throws exception when no extensions passed to register template handler function call", async () => {
     await assertRaises([ArgumentError], {}, () =>
-      TemplateHandlers.registerTemplateHandler(CustomHandler as never),
+      TemplateHandlers.registerTemplateHandler(CustomHandler),
     );
   });
 
@@ -1408,7 +1419,7 @@ describe("CachedCollectionViewRenderTest", () => {
     const b = { toPartialPath: () => "test/partial_iteration_2" };
 
     await assertRaises([NotImplementedError], {}, () =>
-      controllerView.render({ partial: [a, b] as never, cached: true }),
+      controllerView.render({ partial: [a, b], cached: true }),
     );
   });
 
