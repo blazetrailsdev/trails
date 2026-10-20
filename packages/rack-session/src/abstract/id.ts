@@ -15,7 +15,8 @@ import {
   eachPair,
 } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { RACK_ERRORS, RACK_SESSION, RACK_SESSION_OPTIONS, Request, Raw } from "@blazetrails/rack";
+import { RACK_ERRORS, Request, Raw } from "@blazetrails/rack";
+import { RACK_SESSION, RACK_SESSION_OPTIONS } from "../constants.js";
 
 export class SessionId {
   static ID_VERSION = 2;

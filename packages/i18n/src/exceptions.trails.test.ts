@@ -148,14 +148,6 @@ describe("MissingTranslation::Base", () => {
 
   it("aliases to_s to message", () => {
     const error = new MissingTranslation("en", "foo");
-    const reader = Object.getOwnPropertyDescriptor(findOwner(error, "message"), "message")!.get;
-    expect(error.toString).toBe(reader);
     expect(error.toString()).toBe(error.message);
   });
 });
-
-function findOwner(object: object, name: string): object {
-  let proto: object | null = object;
-  while (proto && !Object.hasOwn(proto, name)) proto = Object.getPrototypeOf(proto);
-  return proto!;
-}

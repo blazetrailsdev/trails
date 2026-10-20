@@ -1,5 +1,5 @@
 import { classpaths } from "./classpath.js";
-import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
+import { ARRAY_METHOD_TABLE, aryIncludes, toA } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
@@ -1166,6 +1166,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
   }
+  if (mid === "toA" && Array.isArray(recv)) return toA(recv);
   if (mid === "isInclude") {
     if (typeof recv === "string") return recv.includes(stringValue(args[0]));
     if (Array.isArray(recv)) return aryIncludes(recv, args[0]);

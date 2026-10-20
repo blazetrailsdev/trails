@@ -1,10 +1,9 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import { Generic, HTTPS, URI, b, hashDelete, pack, rbObjDup, toA } from "@blazetrails/ruby-compat";
+import { Generic, HTTPS, URI, b, hashDelete, pack, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
   Request,
-  type Response,
   parseNestedQuery,
   release,
   type RackApp,
@@ -361,9 +360,7 @@ export class Session {
     Object.getOwnPropertyDescriptor(app, "prototype")?.writable !== false
       ? app(env)
       : (app as RackMiddleware).call(env));
-    const [status, headers, body] = (
-      Array.isArray(response) ? toA(response) : (response as Response).toArray()
-    ) as RackResponse;
+    const [status, headers, body] = rbFSend(response, "toA") as RackResponse;
 
     this._lastResponse = new MockResponse(
       status,
