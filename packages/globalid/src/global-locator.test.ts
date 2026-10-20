@@ -27,8 +27,8 @@ class Person {
     if (id === "missing") throw new Error("not found");
     return new this(String(id));
   }
-  static where(this: typeof Person, conds: Record<string, unknown>): Promise<Person[]> {
-    const ids = conds["id"] as unknown[];
+  static where(this: typeof Person, conds: Map<string | string[], unknown>): Promise<Person[]> {
+    const ids = conds.get("id") as unknown[];
     const make = (id: unknown) => new this(String(id));
     return Promise.resolve(ids.filter((id) => id !== "missing").map(make));
   }
@@ -463,8 +463,8 @@ describe("GlobalLocatorTest", () => {
         if (Array.isArray(id)) return id.map((i) => new PersonNoPk(String(i)));
         return new PersonNoPk(String(id));
       }
-      static where(conds: Record<string, unknown>): Promise<PersonNoPk[]> {
-        const ids = conds["id"] as unknown[];
+      static where(conds: Map<string | string[], unknown>): Promise<PersonNoPk[]> {
+        const ids = conds.get("id") as unknown[];
         return Promise.resolve(ids.map((i) => new PersonNoPk(String(i))));
       }
     }

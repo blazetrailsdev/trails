@@ -17,7 +17,7 @@ export interface LocatorModel {
   name: string;
   primaryKey?: string | string[];
   find(id: unknown): Promise<unknown> | unknown;
-  where?(conditions: Record<string, unknown>): PromiseLike<unknown[]> | unknown[];
+  where?(conditions: Map<string | string[], unknown>): PromiseLike<unknown[]> | unknown[];
   includes?(includes: unknown): LocatorModel;
   /** @internal */
   unscoped?<R>(block: () => R | Promise<R>): R | Promise<R>;
@@ -90,7 +90,7 @@ export class BaseLocator {
   ): Promise<unknown[]> {
     if (options.includes) modelClass = modelClass.includes!(options.includes);
     if (options.ignoreMissing) {
-      return modelClass.where!({ [this.primaryKey(modelClass) as string]: ids });
+      return modelClass.where!(new Map([[this.primaryKey(modelClass), ids]]));
     } else {
       return modelClass.find(ids) as Promise<unknown[]>;
     }
