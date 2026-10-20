@@ -3,7 +3,7 @@ import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
 import { Enumerable } from "./enumerable.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
-import { rbCheckStringType, stringValue } from "./string/support.js";
+import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.js";
 import { rbPlus } from "./numeric.js";
 import { STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
@@ -550,7 +550,11 @@ export const CLASS_METHOD_TABLE: Record<string, (self: never, ...args: never[]) 
  * spells a Ruby Time at the boundary and has no such tag, is keyed `"Date"`:
  * the date package seats `Time#utc?`, `#getutc` and `#getlocal`
  * (`vendor/ruby/v3.3.11/time.c:4340,4425,4374`) there and on
- * `Temporal.Instant`.
+ * `Temporal.Instant`. An instance of {@link rbCDate} (the date package's
+ * `Date` and its subclasses) is keyed `"rbCDate"`, for the private methods
+ * `Date` defines (`hour` and the rest, `date_core.c:9773-9777`): they answer
+ * `send` but not a JS `name in object`, and a subclass's own member, such as
+ * `DateTime#hour`, is found first.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -561,9 +565,16 @@ export const TEMPORAL_METHOD_TABLE: Record<
   "Temporal.PlainDate": { toDate: (self: unknown) => self },
   "Temporal.PlainDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
   "Temporal.ZonedDateTime": { toDate: (self: { toPlainDate(): unknown }) => self.toPlainDate() },
+  rbCDate: {},
 };
 
 function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unknown) | undefined {
+  if (obj instanceof rbCDate) {
+    const table = TEMPORAL_METHOD_TABLE.rbCDate;
+    return !(mid in obj) && Object.hasOwn(table, mid)
+      ? (table[mid] as (...args: unknown[]) => unknown)
+      : undefined;
+  }
   const table =
     obj == null
       ? undefined
@@ -1154,6 +1165,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (desc && argc === 0 && !isAbsentHalf(desc.get)) {
       return desc.get ? desc.get.call(recv) : desc.value;
     }
+    if (desc?.get && !isAbsentHalf(desc.get)) rbErrorArity(argc, 0, 0);
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter && !isAbsentHalf(setter)) return setter.call(recv, args[0]);
     const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
