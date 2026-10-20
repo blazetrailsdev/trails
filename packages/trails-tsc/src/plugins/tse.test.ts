@@ -148,6 +148,12 @@ describe("virtualizeTse", () => {
     expect(lines.filter((l) => l === "  })));")).toHaveLength(1);
   });
 
+  it("rejects a function-form blockExpr as compileJs does", () => {
+    expect(() => virtualizeTse("<%= each(items, function (item) { %>x<% }) %>")).toThrow(
+      /must use arrow syntax/,
+    );
+  });
+
   it("throws a clear error when a blockExpr is never closed in virtualization", () => {
     expect(() => virtualizeTse("<%= forEach(items, (item) => { %>no closer")).toThrow(
       /block-expr.*never closed/,

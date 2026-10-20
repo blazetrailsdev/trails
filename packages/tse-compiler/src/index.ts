@@ -2,6 +2,7 @@ export { tokenize, TseSyntaxError, type Token, type TokenKind } from "./lexer.js
 export { parse, type TseAst, type TseNode } from "./parser.js";
 export {
   compileJs,
+  ARROW_BLOCK_RE,
   awaitFlowReads,
   FUNCTION_BLOCK_RE,
   netUnclosedParens,

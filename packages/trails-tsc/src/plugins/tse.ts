@@ -1,5 +1,6 @@
 import ts from "typescript-5";
 import {
+  ARROW_BLOCK_RE,
   awaitFlowReads,
   FUNCTION_BLOCK_RE,
   netUnclosedParens,
@@ -57,6 +58,12 @@ function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
     const bufRef = insideBlock ? "context.outputBuffer" : "_ob";
     const awaits = !insideBlock && functionDepths.length === 0;
     if (node.kind === "blockExpr") {
+      const trimmed = node.value.trim();
+      if (!ARROW_BLOCK_RE.test(trimmed)) {
+        throw new Error(
+          `TSE: block-expr tag must use arrow syntax (e.g. \`(x) => {\`); function/do forms are not supported. Got: \`${trimmed}\``,
+        );
+      }
       innerDepths.push(0);
       innerCallExprParens.push(netUnclosedParens(node.value) + (awaits ? 1 : 0));
       lines.push([`  ${bufRef}.append(${awaits ? "await (" : ""}${node.value.trim()}`, node]);

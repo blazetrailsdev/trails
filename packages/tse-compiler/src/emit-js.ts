@@ -36,7 +36,7 @@ export function compileJs(source: string, options: EmitJsOptions = {}): EmitResu
 
 const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
 
-const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
+export const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
 export const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
 
