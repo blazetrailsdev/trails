@@ -593,10 +593,6 @@ describe("Locator (non-Rails coverage)", () => {
     resetConstants();
   });
 
-  it("returns null when model class isn't registered", async () => {
-    expect(await Locator.locate("gid://bcx/UnknownModel/1")).toBeNull();
-  });
-
   it("propagates errors from find (Rails parity — find raises RecordNotFound)", async () => {
     await expect(Locator.locate("gid://bcx/Person/missing")).rejects.toThrow();
   });
@@ -622,18 +618,6 @@ describe("Locator (non-Rails coverage)", () => {
     await expect(
       Locator.locateMany(["gid://bcx/BadWhereModel/1"], { ignoreMissing: true }),
     ).rejects.toThrow(/toArray/);
-  });
-});
-
-describe("Locator without model finder", () => {
-  beforeEach(() => {
-    GlobalID.setApp(TEST_APP);
-    resetConstants();
-  });
-  afterEach(() => (GlobalID["_app"] = undefined));
-
-  it("returns null when no finder is registered", async () => {
-    expect(await Locator.locate("gid://bcx/Person/1")).toBeNull();
   });
 });
 
@@ -685,13 +669,6 @@ describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
   it("locateMany returns [] when parseAllowed filters out every input", async () => {
     const found = await Locator.locateMany(["not-a-gid", "gid://bcx/Unknown/1"], {});
     expect(found).toEqual([]);
-  });
-
-  it("locate returns null for arity-mismatched GIDs even with a BlockLocator registered", async () => {
-    Locator.use("ba", () => {
-      throw new Error("should not be called — bad-arity GID must be filtered at the facade");
-    });
-    expect(await Locator.locate("gid://ba/Person/1/2")).toBeNull();
   });
 
   it("locateMany drops arity-mismatched GIDs before the first-app dispatch selection", async () => {

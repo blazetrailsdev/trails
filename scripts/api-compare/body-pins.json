@@ -67358,6 +67358,13 @@
   {
     "package": "globalid",
     "rubyFile": "global_id.rb",
+    "rubyName": "hash",
+    "digest": "f5b800fe7d400fcd",
+    "ref": "v1.3.0"
+  },
+  {
+    "package": "globalid",
+    "rubyFile": "global_id.rb",
     "rubyName": "initialize",
     "digest": "2e54851f39bc3f6f",
     "ref": "v1.3.0"

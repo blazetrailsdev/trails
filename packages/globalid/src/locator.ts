@@ -3,7 +3,14 @@ import { SignedGlobalID } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ArgumentError, except, rbObjMethod } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  compact,
+  except,
+  rbModConstSet,
+  rbObjMethod,
+  StandardError,
+} from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export interface LocatorModel {
@@ -16,6 +23,8 @@ export interface LocatorModel {
   /** @internal */
   unscoped?<R>(block: () => R | Promise<R>): R | Promise<R>;
 }
+
+export class InvalidModelIdError extends StandardError {}
 
 export interface LocateOptions {
   only?: LocatorModel | LocatorModel[];
@@ -163,11 +172,9 @@ export class Locator {
     options: LocateOptions = {},
   ): Promise<unknown | null> {
     gid = GlobalID.parse(gid) as GlobalID;
-    if (!gid) return null;
-    const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
-    if (!klass) return null;
-    if (!Locator.findAllowed(klass, options.only)) return null;
-    if (!modelIdArityMatches(klass, gid.modelId)) return null;
+
+    if (!(gid && Locator.findAllowed(gid.modelClass, options.only))) return null;
+
     const locator = Locator.locatorFor(gid);
 
     if (rbObjMethod(locator, "locate").arity() === 1) {
@@ -205,17 +212,16 @@ export class Locator {
     return Locator.locate(parsed.uri.toString(), options);
   }
 
-  /** @missingRailsName compact — PERMANENT */
   static async locateManySigned(
     sgids: Array<string | SignedGlobalID>,
     options: LocateSignedOptions,
   ): Promise<unknown[]> {
     return Locator.locateMany(
-      sgids
-        .map((sgid) =>
+      compact(
+        sgids.map((sgid) =>
           SignedGlobalID.parse(String(sgid), { for: options.for, verifier: options.verifier }),
-        )
-        .filter((sgid) => sgid != null),
+        ),
+      ),
       options,
     );
   }
@@ -306,5 +312,13 @@ function modelIdArityMatches(
 function idKey(id: unknown): string {
   return Array.isArray(id) ? JSON.stringify(id.map(String)) : String(id);
 }
+
+type LocatorInvalidModelIdError = typeof InvalidModelIdError;
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export declare namespace Locator {
+  const InvalidModelIdError: LocatorInvalidModelIdError;
+}
+rbModConstSet(Locator, "InvalidModelIdError", InvalidModelIdError);
 
 GlobalID.Locator = Locator;
