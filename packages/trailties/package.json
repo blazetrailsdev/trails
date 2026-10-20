@@ -22,6 +22,10 @@
       "types": "./dist/trailtie.d.ts",
       "default": "./dist/trailtie.js"
     },
+    "./trailtie/configuration": {
+      "types": "./dist/trailtie/configuration.d.ts",
+      "default": "./dist/trailtie/configuration.js"
+    },
     "./test-help": {
       "types": "./dist/test-help.d.ts",
       "default": "./dist/test-help.js"

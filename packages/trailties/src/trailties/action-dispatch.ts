@@ -1,4 +1,4 @@
-import { type Deprecators, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   ActionDispatch,
@@ -55,11 +55,6 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-interface TrailtieApp {
-  deprecators: Deprecators;
-}
-
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
@@ -100,11 +95,11 @@ export class Trailtie extends BaseTrailtie {
     } satisfies ActionDispatchConfig);
 
     this.initializer("action_dispatch.deprecator", { before: "load_environment_config" }, (app) => {
-      (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());
+      app.deprecators.set("actionDispatch", deprecator());
     });
 
     this.initializer("action_dispatch.configure", (app) => {
-      const cfg = this.config.get("actionDispatch") as ActionDispatchConfig;
+      const cfg = this.config.actionDispatch;
 
       HttpURL.tldLength = cfg.tldLength;
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
@@ -121,8 +116,7 @@ export class Trailtie extends BaseTrailtie {
       "action_dispatch.require_message_pack",
       { after: "finisher_hook" },
       async () => {
-        const cookiesSerializer = (this.config.get("actionDispatch") as ActionDispatchConfig)
-          .cookiesSerializer;
+        const cookiesSerializer = this.config.actionDispatch.cookiesSerializer;
         if (
           typeof cookiesSerializer === "string" &&
           cookiesSerializer.includes("message_pack") &&

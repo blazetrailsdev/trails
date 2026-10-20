@@ -1,4 +1,4 @@
-import { onLoad, TopLevel, type Deprecators, type Reloader } from "@blazetrails/activesupport";
+import { onLoad, TopLevel, type Reloader } from "@blazetrails/activesupport";
 import { UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
@@ -46,14 +46,6 @@ declare module "../trailtie/configuration.js" {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-interface TrailtieApp {
-  deprecators: Deprecators;
-  config: { get(key: string): unknown; isReloadingEnabled(): boolean; fileWatcher: unknown };
-  reloaders: unknown[];
-  reloader: typeof Reloader;
-}
-
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
@@ -70,21 +62,21 @@ export class Trailtie extends BaseTrailtie {
     } satisfies ActionViewConfig);
 
     this.config.afterInitialize((app) => {
-      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const actionView = app.config.actionView;
       const embedAuthenticityTokenInRemoteForms = actionView.embedAuthenticityTokenInRemoteForms;
       delete (actionView as Partial<ActionViewConfig>).embedAuthenticityTokenInRemoteForms;
       setEmbedAuthenticityTokenInRemoteForms(embedAuthenticityTokenInRemoteForms ?? null);
     });
 
     this.config.afterInitialize((app) => {
-      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const actionView = app.config.actionView;
       const formWithGeneratesRemoteForms = actionView.formWithGeneratesRemoteForms;
       delete actionView.formWithGeneratesRemoteForms;
       setFormWithGeneratesRemoteForms(formWithGeneratesRemoteForms as boolean);
     });
 
     this.config.afterInitialize((app) => {
-      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const actionView = app.config.actionView;
       const formWithGeneratesIds = actionView.formWithGeneratesIds;
       delete actionView.formWithGeneratesIds;
       if (formWithGeneratesIds != null) {
@@ -93,7 +85,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.config.afterInitialize((app) => {
-      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const actionView = app.config.actionView;
       const defaultEnforceUtf8 = actionView.defaultEnforceUtf8;
       delete (actionView as Partial<ActionViewConfig>).defaultEnforceUtf8;
       if (defaultEnforceUtf8 != null) {
@@ -102,14 +94,14 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.config.afterInitialize((app) => {
-      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const actionView = app.config.actionView;
       const prependContentExfiltrationPrevention = actionView.prependContentExfiltrationPrevention;
       delete (actionView as Partial<ActionViewConfig>).prependContentExfiltrationPrevention;
       setPrependContentExfiltrationPrevention(prependContentExfiltrationPrevention);
     });
 
     this.config.afterInitialize((app) => {
-      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const actionView = app.config.actionView;
       const klass = actionView.sanitizerVendor;
       delete actionView.sanitizerVendor;
       if (klass != null) {
@@ -118,7 +110,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.config.afterInitialize((app) => {
-      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const actionView = app.config.actionView;
       const buttonToGeneratesButtonTag = actionView.buttonToGeneratesButtonTag;
       delete actionView.buttonToGeneratesButtonTag;
       if (buttonToGeneratesButtonTag != null) {
@@ -127,14 +119,14 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.config.afterInitialize((app) => {
-      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const actionView = app.config.actionView;
       const frozenStringLiteral = actionView.frozenStringLiteral;
       delete actionView.frozenStringLiteral;
       Template.frozenStringLiteral = frozenStringLiteral;
     });
 
     this.config.afterInitialize((app) => {
-      const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+      const actionView = app.config.actionView;
       const imageLoading = actionView.imageLoading;
       delete actionView.imageLoading;
       setImageLoading(imageLoading ?? null);
@@ -151,7 +143,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.config.afterInitialize((app) => {
       onLoad("action_view", (base: typeof Base) => {
-        const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+        const actionView = app.config.actionView;
         for (const [k, v] of Object.entries(actionView)) {
           (base as unknown as Record<string, unknown>)[k] = v;
         }
@@ -159,8 +151,8 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.config.afterInitialize((app) => {
-      const { config } = app as TrailtieApp;
-      const actionView = config.get("actionView") as ActionViewConfig;
+      const { config } = app;
+      const actionView = config.actionView;
       const enableCaching =
         actionView.cacheTemplateLoading == null
           ? !config.isReloadingEnabled()
@@ -171,8 +163,8 @@ export class Trailtie extends BaseTrailtie {
           watcher: config.fileWatcher as ConstructorParameters<typeof ViewReloader>[0]["watcher"],
         });
 
-        (app as TrailtieApp).reloaders.push(viewReloader);
-        (app as TrailtieApp).reloader.toRun(function (this: Reloader) {
+        app.reloaders.push(viewReloader);
+        app.reloader.toRun(function (this: Reloader) {
           this.requireUnloadLockBang();
           return viewReloader.execute();
         });
@@ -180,7 +172,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {
-      (app as TrailtieApp).deprecators.set("actionView", deprecator());
+      app.deprecators.set("actionView", deprecator());
     });
 
     this.initializer("action_view.logger", () => {
@@ -191,9 +183,9 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_view.caching", (app) => {
       onLoad("action_view", () => {
-        const actionView = (app as TrailtieApp).config.get("actionView") as ActionViewConfig;
+        const actionView = app.config.actionView;
         if (actionView.cacheTemplateLoading == null) {
-          Resolver.caching = !(app as TrailtieApp).config.isReloadingEnabled();
+          Resolver.caching = !app.config.isReloadingEnabled();
         }
       });
     });
