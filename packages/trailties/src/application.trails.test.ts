@@ -2,10 +2,16 @@ import { describe, expect, it } from "vitest";
 import { useInMemoryDatabaseUrl } from "./support/in-memory-database-url.js";
 import { Trailtie as BaseTrailtie } from "./trailtie.js";
 import { Trailtie as ActiveRecordTrailtie } from "./trailties/active-record.js";
-import { Logger } from "@blazetrails/activesupport";
+import { Logger, OrderedOptions } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils, NameError, SecureRandom } from "@blazetrails/ruby-compat";
 import { MockRequest } from "@blazetrails/rack";
 import { Application } from "./application.js";
+
+declare module "./trailtie/configuration.js" {
+  interface Configuration {
+    recordNamespace: OrderedOptions & { customSerializers: string[] };
+  }
+}
 
 describe("Application framework railtie initializers", () => {
   useInMemoryDatabaseUrl();
@@ -24,6 +30,28 @@ describe("Application framework railtie initializers", () => {
     await app.initialize();
 
     expect(seen).toEqual([app]);
+  });
+
+  it("types an initializer's app and a framework config namespace without a cast", async () => {
+    const seen: unknown[] = [];
+    class RecordConfigTrailtie extends BaseTrailtie {
+      static {
+        this.config.recordNamespace = Object.assign(new OrderedOptions(), {
+          customSerializers: [],
+        });
+        this.config.recordNamespace.customSerializers = ["a"];
+      }
+    }
+    BaseTrailtie.register(RecordConfigTrailtie);
+    RecordConfigTrailtie.initializer("framework.record_config", (app) => {
+      seen.push(app.config.recordNamespace.customSerializers);
+    });
+
+    class ConfigBridgeApp extends Application {}
+    Application.register(ConfigBridgeApp);
+    await ConfigBridgeApp.instance().initialize();
+
+    expect(seen).toEqual([["a"]]);
   });
 
   it("runs the app's own initializers first when railtiesOrder is [:all, :main_app]", async () => {
