@@ -61,7 +61,44 @@ function methodsOf(side: string): Map<string, M> {
   return out;
 }
 
-function agreement() {
+/**
+ * Pairs of generated and hand methods. By the TypeScript key (file, owner,
+ * name), and with `byName` also by the Ruby identity the two shapes share when
+ * they differ: the same method name in the same file, unique on each side (a
+ * method the hand port keeps on a ruby-compat Module as a file function, the
+ * generator on a class module).
+ */
+function pairs(g: Map<string, M>, h: Map<string, M>, byName: boolean): [M, M][] {
+  const out: [M, M][] = [];
+  const matched = new Set<string>();
+  for (const [k, gm] of g) {
+    const hm = h.get(k);
+    if (!hm) continue;
+    out.push([gm, hm]);
+    matched.add(k);
+  }
+  if (!byName) return out;
+  const index = (m: Map<string, M>) => {
+    const by = new Map<string, string[]>();
+    for (const k of m.keys()) {
+      if (matched.has(k)) continue;
+      const file = k.slice(0, k.indexOf("#"));
+      const name = k.slice(Math.max(k.lastIndexOf("#"), k.lastIndexOf(".")) + 1);
+      const key = `${file}#${name}`;
+      (by.get(key) ?? by.set(key, []).get(key)!).push(k);
+    }
+    return by;
+  };
+  const gi = index(g);
+  const hi = index(h);
+  for (const [key, gks] of gi) {
+    const hks = hi.get(key);
+    if (gks.length === 1 && hks?.length === 1) out.push([g.get(gks[0])!, h.get(hks[0])!]);
+  }
+  return out;
+}
+
+function agreement(byName = false) {
   const g = methodsOf("gen");
   const h = methodsOf("hand");
   let both = 0;
@@ -71,9 +108,7 @@ function agreement() {
   let jac = 0;
   const norm = (c?: string[]) =>
     new Set((c ?? []).filter((x) => !x.startsWith("@") && !x.startsWith(".")));
-  for (const [k, gm] of g) {
-    const hm = h.get(k);
-    if (!hm) continue;
+  for (const [gm, hm] of pairs(g, h, byName)) {
     both++;
     const a = norm(gm.calls);
     const b = norm(hm.calls);
@@ -101,7 +136,12 @@ function agreement() {
   };
 }
 
-const res = { gen: overall("gen"), hand: overall("hand"), agreement: agreement() };
+const res = {
+  gen: overall("gen"),
+  hand: overall("hand"),
+  agreement: agreement(),
+  agreementByName: agreement(true),
+};
 if (process.argv.includes("--json")) console.log(JSON.stringify(res, null, 2));
 else {
   for (const side of ["gen", "hand"] as const) {

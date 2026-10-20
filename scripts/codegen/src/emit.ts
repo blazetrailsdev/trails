@@ -2810,29 +2810,35 @@ export class Emitter {
           return j === u.fqn || u.fqn.endsWith(`::${j}`);
         }),
     );
-    const plain =
-      !f.rubyFile.startsWith("test/") &&
-      !(isConcern && (includedByModule || !!u.late?.length)) &&
-      // A Concern's `ClassMethods` stays a Module: extended as its own layer, a
-      // subclass's override (TestHelper's per-job `queue_adapter`) sits above it.
-      !(
-        u.fqn.endsWith("::ClassMethods") &&
-        this.index.scopes.get(u.fqn.slice(0, -"::ClassMethods".length))?.concern
-      ) &&
-      ![...this.index.scopes.keys()].some(
-        (k) => k.startsWith(`${u.fqn}::`) && !(isConcern && k === cmFqn),
-      ) &&
-      !modAttrs.length &&
-      !mixes &&
-      !usesSuper &&
-      !defs2.some((l) => l.includes("moduleEval("));
+    // A module of functions (`extend self`, `module_function`) is a plain object
+    // carrying its Ruby `name`, as the hand port's namespace objects do
+    // (`{ name: "ActiveJob", loadPath }`): nested constants seat on it and
+    // `mattr_accessor` defines on it, so only `super` or `module_eval` need more.
+    const fnModule = !!this.index.scopes.get(u.fqn)?.moduleFunction;
+    const plain = fnModule
+      ? !usesSuper && !defs2.some((l) => l.includes("moduleEval("))
+      : !f.rubyFile.startsWith("test/") &&
+        !(isConcern && (includedByModule || !!u.late?.length)) &&
+        // A Concern's `ClassMethods` stays a Module: extended as its own layer, a
+        // subclass's override (TestHelper's per-job `queue_adapter`) sits above it.
+        !(
+          u.fqn.endsWith("::ClassMethods") &&
+          this.index.scopes.get(u.fqn.slice(0, -"::ClassMethods".length))?.concern
+        ) &&
+        ![...this.index.scopes.keys()].some(
+          (k) => k.startsWith(`${u.fqn}::`) && !(isConcern && k === cmFqn),
+        ) &&
+        !modAttrs.length &&
+        !mixes &&
+        !usesSuper &&
+        !defs2.some((l) => l.includes("moduleEval("));
     const ModuleRef = plain ? "" : this.lw.rc(this.baseCtx(u, f, {}), "Module");
     const modLines = [...modAttrs, ...defs2];
     const ctorBody = modLines.length ? `(mod: any) => {\n${indent(modLines).join("\n")}\n}` : "";
     // A plain module's constants (`VERSION::STRING`) are its properties.
     const consts = u.body.filter((c: N) => c.k === "casgn" && c.path?.length === 1);
     // Its singleton functions are its own members too, rather than seated later.
-    if (plain) this.plainModules.add(u.fqn);
+    if (plain && !fnModule) this.plainModules.add(u.fqn);
     if (plain && isConcern) {
       this.plainConcerns.add(u.fqn);
       const hc = this.baseCtx(u, f, {});
@@ -2850,6 +2856,7 @@ export class Emitter {
       incl = "";
     }
     const plainMembers = [
+      ...(plain && fnModule ? [`name: ${JSON.stringify(u.fqn)}`] : []),
       ...consts.map((c: N) => c.path[0] as string),
       ...(plain ? seatNames : []),
       ...dedupeMembers(members),
