@@ -41,7 +41,10 @@ interface AutosaveAssociationHost {
   errors: {
     add(attr: string, type?: string, opts?: Record<string, unknown>): void;
     uniqBang(): void;
+    objects: unknown[];
+    isAny(): boolean;
   };
+  _validationContext?: unknown;
   constructor: { primaryKey?: string | string[]; name: string; _reflections: object };
 }
 
@@ -178,7 +181,7 @@ export async function saveCollectionAssociation(
     }
 
     for (const record of records) {
-      if ((record as any).isDestroyed?.()) continue;
+      if (record.isDestroyed?.()) continue;
 
       let saved = true;
 
@@ -399,7 +402,7 @@ export async function isAssociationValid(
   association: any,
   record: any,
 ): Promise<boolean> {
-  const owner = this as any;
+  const owner = this;
   if (record.isDestroyed() || (association.options.autosave && record.markedForDestruction()))
     return true;
 

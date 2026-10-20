@@ -111,6 +111,8 @@ interface CalculationConnection {
 }
 
 interface CalculationRelation {
+  /** @internal */
+  skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R>;
   model: CalculationRelation["_model"];
   primaryKey: string | string[];
   _model: {
@@ -857,9 +859,7 @@ export async function executeSimpleCalculation(
     ? this._async
       ? FutureResult.wrap(Result.empty())
       : Result.empty()
-    : (
-        this as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
-      ).skipQueryCacheIfNecessary(() =>
+    : this.skipQueryCacheIfNecessary(() =>
         this.model.withConnection((c) =>
           c.selectAll(
             queryBuilder,
@@ -946,9 +946,7 @@ export async function executeGroupedCalculation(
     relation.selectValues = selectValues as (string | ArelNode)[];
 
     const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
-    const calculatedData = await (
-      this as unknown as { skipQueryCacheIfNecessary<R>(block: () => R): R }
-    ).skipQueryCacheIfNecessary(() =>
+    const calculatedData = await this.skipQueryCacheIfNecessary(() =>
       connection.selectAll(relation.arel(), `${this.model.name} ${opName}`),
     );
 
