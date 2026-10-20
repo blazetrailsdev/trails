@@ -68,7 +68,7 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     instanceReader = instanceAccessor,
     instanceWriter = instanceAccessor,
     instancePredicate = true,
-    default: defaultValue,
+    default: defaultValue = null,
   } = options;
 
   for (const name of attrs as string[]) {

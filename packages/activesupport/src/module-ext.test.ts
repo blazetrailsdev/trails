@@ -149,7 +149,7 @@ describe("ModuleAttributeAccessorTest", () => {
   it("should use mattr default", () => {
     class MyModule {}
     mattrAccessor.call(MyModule, "setting");
-    expect((MyModule as any).setting).toBeUndefined();
+    expect((MyModule as any).setting).toBeNull();
   });
 
   it("mattr default keyword arguments", () => {
@@ -284,7 +284,7 @@ describe("ConfigurableActiveSupport", () => {
   it("adds a configuration hash to a module as well", () => {
     class MyModule {}
     configAccessor.call(MyModule, "setting");
-    expect((MyModule as any).setting).toBeUndefined();
+    expect((MyModule as any).setting).toBeNull();
   });
 
   it("configuration hash is inheritable", () => {

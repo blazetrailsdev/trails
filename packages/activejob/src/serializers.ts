@@ -11,13 +11,22 @@ import {
 import { ActiveJob, Serializers, type SerializerLike } from "./namespaces.js";
 import { SymbolSerializer } from "./serializers/symbol-serializer.js";
 import { DurationSerializer } from "./serializers/duration-serializer.js";
+import { DateTimeSerializer } from "./serializers/date-time-serializer.js";
+import { DateSerializer } from "./serializers/date-serializer.js";
+import { TimeWithZoneSerializer } from "./serializers/time-with-zone-serializer.js";
+import { TimeSerializer } from "./serializers/time-serializer.js";
 import { ModuleSerializer } from "./serializers/module-serializer.js";
 import { RangeSerializer } from "./serializers/range-serializer.js";
 import { BigDecimalSerializer } from "./serializers/big-decimal-serializer.js";
 
 Serializers.autoload("ObjectSerializer");
+Serializers.autoload("TimeObjectSerializer");
 Serializers.autoload("SymbolSerializer");
 Serializers.autoload("DurationSerializer");
+Serializers.autoload("DateTimeSerializer");
+Serializers.autoload("DateSerializer");
+Serializers.autoload("TimeWithZoneSerializer");
+Serializers.autoload("TimeSerializer");
 Serializers.autoload("ModuleSerializer");
 Serializers.autoload("RangeSerializer");
 Serializers.autoload("BigDecimalSerializer");
@@ -65,6 +74,10 @@ Object.assign(Serializers, { serialize, deserialize, serializers, addSerializers
 addSerializers(
   SymbolSerializer,
   DurationSerializer,
+  DateTimeSerializer,
+  DateSerializer,
+  TimeWithZoneSerializer,
+  TimeSerializer,
   ModuleSerializer,
   RangeSerializer,
   BigDecimalSerializer,

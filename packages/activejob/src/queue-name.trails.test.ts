@@ -24,7 +24,7 @@ describe("ActiveJob::QueueName", () => {
     PrefixedJob.queueNamePrefix = " ";
     PrefixedJob.queueAs("high");
     expect(new PrefixedJob().queueName).toBe("high");
-    expect(Base.queueNamePrefix == null).toBe(true);
+    expect(Base.queueNamePrefix).toBeNull();
   });
 
   it("evaluates a queue_as block against the job and memoizes it", () => {
@@ -44,12 +44,12 @@ describe("ActiveJob::QueueName", () => {
 describe("ActiveJob::QueuePriority", () => {
   it("stores a priority and evaluates a priority block", () => {
     class PriorityJob extends Base {}
-    expect(new PriorityJob().priority == null).toBe(true);
+    expect(new PriorityJob().priority).toBeNull();
     PriorityJob.queueWithPriority(10);
     expect(new PriorityJob().priority).toBe(10);
     PriorityJob.queueWithPriority(null, () => 50);
     expect(new PriorityJob().priority).toBe(50);
-    expect(Base.priority == null).toBe(true);
+    expect(Base.priority).toBeNull();
   });
 });
 

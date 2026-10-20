@@ -1,47 +1,39 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Logger, Notifications, setTrailsRoot } from "@blazetrails/activesupport";
+import {
+  LogSubscriber as ActiveSupportLogSubscriber,
+  Notifications,
+  setTrailsRoot,
+} from "@blazetrails/activesupport";
+import {
+  setup as testHelperSetup,
+  teardown as testHelperTeardown,
+  type MockLogger,
+} from "@blazetrails/activesupport/log-subscriber/test-helper";
 
 import { Base } from "./base.js";
 import { LookupContext } from "./lookup-context.js";
-import { Start } from "./log-subscriber.js";
+import { LogSubscriber, Start } from "./log-subscriber.js";
 import { Renderer } from "./renderer/renderer.js";
 import type { RenderableTemplate } from "./renderer/abstract-renderer.js";
 
-class MockLogger extends Logger {
-  private _logged: Record<string, string[]> = { debug: [], info: [] };
-
-  constructor() {
-    super(null);
-  }
-
-  logged(level: string): string[] {
-    return this._logged[level] ?? [];
-  }
-
-  override debug(message: unknown = null, block?: () => unknown): boolean {
-    this._logged.debug.push(String(block ? block() : (message ?? "")));
-    return true;
-  }
-
-  override info(message: unknown = null, block?: () => unknown): boolean {
-    this._logged.info.push(String(block ? block() : (message ?? "")));
-    return true;
-  }
-}
-
 describe("ActionView::LogSubscriber", () => {
   let logger: MockLogger;
-  let oldLogger: unknown;
+  const t = {
+    setLogger(logger: MockLogger | null): void {
+      Base.logger = logger as unknown;
+    },
+  } as unknown as ThisParameterType<typeof testHelperSetup> & { logger: MockLogger };
 
   beforeEach(() => {
-    logger = new MockLogger();
-    oldLogger = Base.logger;
-    Base.logger = logger;
+    testHelperSetup.call(t);
+    logger = t.logger;
+    LogSubscriber.attachTo("action_view");
     setTrailsRoot("/srv/app");
   });
 
   afterEach(() => {
-    Base.logger = oldLogger;
+    testHelperTeardown.call(t);
+    ActiveSupportLogSubscriber.logSubscribers().length = 0;
     setTrailsRoot(null);
   });
 
@@ -58,10 +50,10 @@ describe("ActionView::LogSubscriber", () => {
       { template },
     );
 
-    expect(logger.logged("debug")).toEqual(["  Rendering test/hello_world.tse"]);
-    expect(logger.logged("info")).toHaveLength(1);
-    expect(logger.logged("info")[0]).toMatch(
-      /^ {2}Rendered test\/hello_world\.tse \(Duration: .*ms \| GC: .*ms\)$/,
+    expect(logger.logged(":debug")).toEqual(["Rendering test/hello_world.tse"]);
+    expect(logger.logged(":info")).toHaveLength(1);
+    expect(logger.logged(":info")[0]).toMatch(
+      /^Rendered test\/hello_world\.tse \(Duration: .*ms \| GC: .*ms\)$/,
     );
   });
 
@@ -72,11 +64,11 @@ describe("ActionView::LogSubscriber", () => {
       () => undefined,
     );
 
-    expect(logger.logged("debug")).toHaveLength(1);
-    expect(logger.logged("debug")[0]).toMatch(/^ {2}Rendering test\/hello_world\.tse$/);
-    expect(logger.logged("info")).toHaveLength(1);
-    expect(logger.logged("info")[0]).toMatch(
-      /^ {2}Rendered test\/hello_world\.tse \(Duration: .*ms \| GC: .*ms\)$/,
+    expect(logger.logged(":debug")).toHaveLength(1);
+    expect(logger.logged(":debug")[0]).toMatch(/^Rendering test\/hello_world\.tse$/);
+    expect(logger.logged(":info")).toHaveLength(1);
+    expect(logger.logged(":info")[0]).toMatch(
+      /^Rendered test\/hello_world\.tse \(Duration: .*ms \| GC: .*ms\)$/,
     );
   });
 
@@ -87,10 +79,10 @@ describe("ActionView::LogSubscriber", () => {
       () => undefined,
     );
 
-    expect(logger.logged("debug")[0]).toMatch(
+    expect(logger.logged(":debug")[0]).toMatch(
       /Rendering test\/hello_world\.tse within layouts\/yield/,
     );
-    expect(logger.logged("info")[0]).toMatch(
+    expect(logger.logged(":info")[0]).toMatch(
       /Rendered test\/hello_world\.tse within layouts\/yield/,
     );
   });
@@ -102,9 +94,9 @@ describe("ActionView::LogSubscriber", () => {
       () => undefined,
     );
 
-    expect(logger.logged("debug")[0]).toBe("  Rendering layout layouts/yield.tse");
-    expect(logger.logged("info")[0]).toMatch(
-      /^ {2}Rendered layout layouts\/yield\.tse \(Duration: .*ms \| GC: .*ms\)$/,
+    expect(logger.logged(":debug")[0]).toBe("Rendering layout layouts/yield.tse");
+    expect(logger.logged(":info")[0]).toMatch(
+      /^Rendered layout layouts\/yield\.tse \(Duration: .*ms \| GC: .*ms\)$/,
     );
   });
 
@@ -120,8 +112,8 @@ describe("ActionView::LogSubscriber", () => {
       () => undefined,
     );
 
-    expect(logger.logged("debug")[0]).toMatch(/Rendered test\/_customer\.tse .* \[cache hit\]$/);
-    expect(logger.logged("debug")[1]).toMatch(/Rendered test\/_customer\.tse .* \[cache miss\]$/);
+    expect(logger.logged(":debug")[0]).toMatch(/Rendered test\/_customer\.tse .* \[cache hit\]$/);
+    expect(logger.logged(":debug")[1]).toMatch(/Rendered test\/_customer\.tse .* \[cache miss\]$/);
   });
 
   it("reports the collection count, or the cache hit ratio when the collection was cached", () => {
@@ -136,10 +128,10 @@ describe("ActionView::LogSubscriber", () => {
       () => undefined,
     );
 
-    expect(logger.logged("debug")[0]).toMatch(
+    expect(logger.logged(":debug")[0]).toMatch(
       /Rendered collection of test\/_customer\.tse \[2 times\]/,
     );
-    expect(logger.logged("debug")[1]).toMatch(
+    expect(logger.logged(":debug")[1]).toMatch(
       /Rendered collection of test\/_customer\.tse \[0 \/ 2 cache hits\]/,
     );
   });
@@ -147,7 +139,7 @@ describe("ActionView::LogSubscriber", () => {
   it("falls back to `templates` when a collection render has no identifier", () => {
     Notifications.instrument("render_collection.action_view", { count: 2 }, () => undefined);
 
-    expect(logger.logged("debug")[0]).toMatch(/Rendered collection of templates/);
+    expect(logger.logged(":debug")[0]).toMatch(/Rendered collection of templates/);
   });
 
   it("is silenced when there is no logger, or the logger is not at debug level", () => {
@@ -162,6 +154,6 @@ describe("ActionView::LogSubscriber", () => {
       { identifier: "/srv/app/app/views/test/hello_world.tse" },
       () => undefined,
     );
-    expect(logger.logged("debug")).toEqual([]);
+    expect(logger.logged(":debug")).toEqual([]);
   });
 });

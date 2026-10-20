@@ -1,0 +1,24 @@
+import { Date } from "@blazetrails/date";
+import { hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Serializers } from "../namespaces.js";
+import { ObjectSerializer } from "./object-serializer.js";
+
+export class DateSerializer extends ObjectSerializer {
+  static toString(): string {
+    return "ActiveJob::Serializers::DateSerializer";
+  }
+
+  serialize(date: Date): Record<string, unknown> {
+    return super.serialize({ value: date.iso8601() });
+  }
+
+  deserialize(hash: Record<string, unknown> | Map<string, unknown>): unknown {
+    return Date.iso8601(hashAref(hash, "value") as string);
+  }
+
+  /** @internal */
+  protected klass(): typeof Date {
+    return Date;
+  }
+}
+rbModConstSet(Serializers, "DateSerializer", DateSerializer);
