@@ -1,5 +1,14 @@
 import { isPlainObject, type Included } from "@blazetrails/activesupport";
-import { Generic, HTTPS, URI, b, hashDelete, pack, rbObjDup } from "@blazetrails/ruby-compat";
+import {
+  Generic,
+  HTTPS,
+  URI,
+  b,
+  hashDelete,
+  pack,
+  rbObjDup,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import {
   MockRequest,
   MockResponse,
@@ -365,6 +374,7 @@ export class Session {
     if (Symbol.asyncIterator in Object(rackBody)) {
       body = [];
       for await (const chunk of rackBody as AsyncIterable<string | Uint8Array>) body.push(chunk);
+      if (rbObjRespondTo(rackBody, "close")) (rackBody as { close(): void }).close();
     }
 
     this._lastResponse = new MockResponse(
