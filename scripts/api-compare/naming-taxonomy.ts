@@ -191,8 +191,6 @@ export const BLOCK_IDIOM_RUBY_REFS = new Set(["instance_exec", "instanceExec", "
  */
 export const IVAR_METHOD_COLLISION_RUBY_REFS = new Set(["value_for_database", "valueForDatabase"]);
 
-export { JS_RESERVED_WORDS };
-
 /**
  * Ruby constructs whose TS spelling is the JS builtin doing the same work,
  * keyed by the RUBY name and valued by every TS spelling that counts as it.
