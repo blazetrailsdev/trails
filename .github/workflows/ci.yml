@@ -414,12 +414,8 @@ jobs:
           else
             printf '%s\n' "$LINT_FILES" | xargs -r -d '\n' pnpm run lint:files
           fi
-      # The burndown rules held at `warn` (no-explicit-any, rails-error-parity,
-      # no-standalone-associations): per file, no count above the base's.
       - name: ESLint violation counts
         if: ${{ github.event_name == 'pull_request' }}
-        # The base is current main, not a stale branch merge-base, so a stale
-        # branch cannot undo a sibling's convergence.
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin main:refs/remotes/origin/main
