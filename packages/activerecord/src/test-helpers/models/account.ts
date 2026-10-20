@@ -1,3 +1,4 @@
+import type { Reply } from "./reply.js";
 import type { ScopeOn } from "../../scoping/named.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -8,7 +9,7 @@ import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
-    open: ScopeOn<T, Account>;
+    open: ScopeOn<T, Account | Reply>;
   }
 }
 

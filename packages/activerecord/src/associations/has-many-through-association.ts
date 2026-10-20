@@ -152,9 +152,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
       if (inverse) {
         if (inverse.isCollection()) {
-          void (record.association(inverse.name) as CollectionAssociation).reader.push(
-            this.buildThroughRecord(record),
-          );
+          void (
+            record.association(inverse.name) as CollectionAssociation
+          ).reader.proxyAssociation.concat(this.buildThroughRecord(record));
         } else if (inverse.isHasOne()) {
           void (record.association(inverse.name) as HasOneAssociation).writer(
             this.buildThroughRecord(record),

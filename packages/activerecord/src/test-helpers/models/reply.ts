@@ -1,6 +1,15 @@
+import type { Base } from "../../base.js";
+import type { ScopeOn } from "../../scoping/named.js";
+import type { Account } from "./account.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Topic, Web, WebTopic } from "./topic.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    open: ScopeOn<T, Account | Reply>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reply extends Topic {

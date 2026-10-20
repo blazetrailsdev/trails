@@ -493,19 +493,20 @@ export function resetTransaction(
   options?: { restore?: boolean },
   callback?: () => Promise<unknown>,
 ): void | Promise<unknown> {
-  const self = this as any;
   const oldState =
-    options?.restore && self._transactionManager?.isRestorable() ? self._transactionManager : null;
+    options?.restore && this._transactionManager?.isRestorable() ? this._transactionManager : null;
 
-  self._transactionManager = new TransactionManager(self);
+  this._transactionManager = new TransactionManager(
+    this as unknown as ConstructorParameters<typeof TransactionManager>[0],
+  );
 
   if (callback) {
     return (async () => {
       const result = await callback();
 
       if (oldState) {
-        self._transactionManager = oldState;
-        await self._transactionManager.restoreTransactions();
+        this._transactionManager = oldState;
+        await this._transactionManager.restoreTransactions();
       }
 
       return result;

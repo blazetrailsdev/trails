@@ -489,6 +489,7 @@ interface CoreHost {
   typeForAttribute(name: string): { cast(value: unknown): unknown } | null;
   ensureSchemaLoaded(): Promise<void>;
   generatedAttributeMethods(): Module;
+  attributeAliases?: Record<string, string>;
 }
 
 function parentClass(klass: CoreHost): CoreHost | null {
@@ -917,7 +918,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
   }
   const keys = Object.keys(conditions);
   await this.ensureSchemaLoaded();
-  const aliases: Record<string, string> = (this as any).attributeAliases ?? {};
+  const aliases: Record<string, string> = this.attributeAliases ?? {};
   const resolvedKeys: (string | string[])[] = [];
   const values: unknown[] = [];
 

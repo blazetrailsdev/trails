@@ -1,5 +1,5 @@
 import type { Base } from "../base.js";
-import type { RelationName } from "../relation.js";
+import type { Relation, RelationName } from "../relation.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
@@ -147,8 +147,8 @@ export const ClassMethods = {
   },
 };
 
-export function methodMissing(this: any, method: string, ...args: any[]): unknown {
-  const model = this._model as typeof Base;
+export function methodMissing(this: Relation<Base>, method: string, ...args: any[]): unknown {
+  const model: typeof Base = this.model;
   if (rbObjRespondTo(model, method)) {
     if (!DelegateCache.delegateBaseMethods && rbObjRespondTo(ActiveRecord.Base, method)) {
       // @nie disposition=TODO

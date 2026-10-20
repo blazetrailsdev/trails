@@ -165,12 +165,12 @@ export class EnumMethods extends Module {
 
     if (scopes) {
       klass.detectEnumConflictBang(name, scopeName, true);
-      klass.scope(scopeName, function (this: any) {
+      klass.scope(scopeName, function () {
         return this.where({ [name]: value });
       });
 
       klass.detectEnumConflictBang(name, notScopeName, true);
-      klass.scope(notScopeName, function (this: any) {
+      klass.scope(notScopeName, function () {
         return this.where().not({ [name]: value });
       });
     }

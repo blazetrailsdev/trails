@@ -23,8 +23,10 @@ export const SignedId = {
 };
 
 export class ClassMethods {
+  declare private static _signedIdVerifier: MessageVerifier | undefined;
+
   static get signedIdVerifier(): MessageVerifier {
-    return ((this as any)._signedIdVerifier ??= (() => {
+    return (this._signedIdVerifier ??= (() => {
       let secret = (this as any).signedIdVerifierSecret as
         | string
         | (() => string | null | undefined)
@@ -43,7 +45,7 @@ export class ClassMethods {
   }
 
   static set signedIdVerifier(verifier: MessageVerifier) {
-    (this as any)._signedIdVerifier = verifier;
+    this._signedIdVerifier = verifier;
   }
 }
 
