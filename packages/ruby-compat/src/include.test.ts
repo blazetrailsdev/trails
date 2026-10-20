@@ -1753,12 +1753,14 @@ describe("Module#include of a plain module", () => {
         return "host";
       }
     }
-    const plain = { who: () => "plain", only: () => "only" };
+    Object.defineProperty(Host.prototype, "Version", { value: "host", configurable: true });
+    const plain = { who: () => "plain", only: () => "only", Version: "plain" };
     const mod = new Module((m) => m.include(plain));
     prepend(Host, mod);
     const host = new Host() as unknown as DynMethods;
     expect(host.who()).toBe("plain");
     expect(host.only()).toBe("only");
+    expect(Object.getOwnPropertyDescriptor(Host.prototype, "Version")?.value).toBe("host");
   });
 
   it("lets an object extended later outrank a Module's plain module on extend", () => {

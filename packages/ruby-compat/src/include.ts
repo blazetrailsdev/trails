@@ -589,7 +589,7 @@ export class Module<I extends object = Record<never, never>> {
         for (const key of typeof mod === "function"
           ? Object.getOwnPropertyNames((mod as AnyClass).prototype)
           : Object.keys(mod)) {
-          if (key !== "constructor") keys.add(key);
+          if (this.instanceMethod(key) !== undefined) keys.add(key);
         }
       }
     }

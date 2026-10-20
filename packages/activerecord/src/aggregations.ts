@@ -7,8 +7,8 @@ import { include, isModuleIncluded, Module, NoMethodError } from "@blazetrails/r
 export const Aggregations = new Module();
 
 type AggregationsHost = Base & {
-  _aggregationCache?: Map<string, unknown>;
-  clearAggregationCache?(): void;
+  _aggregationCache: Map<string, unknown>;
+  clearAggregationCache(): void;
 };
 
 /** @internal */
@@ -63,7 +63,7 @@ function readerMethod(
   Object.defineProperty(this.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get(this: AggregationsHost): unknown {
-      const cache = this._aggregationCache!;
+      const cache = this._aggregationCache;
       if (
         cache.get(name) == null &&
         (!allowNil || mapping.some(([key]) => this.readAttribute(key) != null))
@@ -98,7 +98,7 @@ function writerMethod(
     get: existing?.get,
     set(this: AggregationsHost, part: unknown): void {
       const klass = constantize(className) as new (...args: any[]) => any;
-      const cache = this._aggregationCache!;
+      const cache = this._aggregationCache;
 
       if (!(part instanceof klass || converter == null || part == null)) {
         part = converter(part);
@@ -145,7 +145,7 @@ export function initializeDup(this: AggregationsHost, other: unknown): void {
 }
 
 export function reload(this: AggregationsHost, options?: ReloadOptions): Promise<Base> {
-  this.clearAggregationCache!();
+  this.clearAggregationCache();
   return Aggregations.superMethod(this, "reload")!(options) as Promise<Base>;
 }
 
