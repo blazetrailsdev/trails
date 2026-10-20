@@ -3,8 +3,10 @@ import { getFs, getPath, setEnv } from "@blazetrails/ruby-compat";
 import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { Handler, type RackEnv } from "@blazetrails/rack";
+import { DetailsKey } from "@blazetrails/actionview";
 import { requireApplicationBang } from "../command/actions.js";
 import { Trails } from "../rails.js";
+import type {} from "../trailties/action-view.js";
 
 export function serverCommand(): Command {
   const cmd = new Command("server");
@@ -27,6 +29,7 @@ export function serverCommand(): Command {
       const root = Dir.pwd();
       await requireApplicationBang();
       const app = await Trails.initialize();
+      await watchViews(app, root);
       const port = parseInt(options.port, 10);
       const railsApp = (env: RackEnv) => app.call(env);
       if (options.environment !== "development" || !(await hasViteConfig(root))) {
@@ -80,6 +83,27 @@ function environment(options: ServerOptions): string {
 
 function commandEnvironment(): string {
   return presence(getEnv("TRAILS_ENV")) || presence(getEnv("NODE_ENV")) || "development";
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function watchViews(
+  app: Awaited<ReturnType<typeof Trails.initialize>>,
+  root: string,
+): Promise<void> {
+  const { config } = app;
+  if (config?.actionView == null) return;
+  const cacheTemplateLoading = config.actionView.cacheTemplateLoading;
+  const enableCaching =
+    cacheTemplateLoading == null ? !config.isReloadingEnabled() : cacheTemplateLoading;
+  if (enableCaching) return;
+
+  const { watchViews } = await import("@blazetrails/trails-tsc");
+  await watchViews({
+    cwd: root,
+    onRebuild: () => DetailsKey.clear(),
+    onError: (err, trigger) =>
+      console.error(`trails-tsc-views: ${trigger ?? "build"}: ${err.message}`),
+  });
 }
 
 async function hasViteConfig(root: string): Promise<boolean> {

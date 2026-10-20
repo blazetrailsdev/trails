@@ -73,13 +73,18 @@
   },
   "devDependencies": {
     "@blazetrails/activerecord-cli": "workspace:*",
-    "typescript": "7.1.0-dev.20260920.1"
+    "typescript": "7.1.0-dev.20260920.1",
+    "@blazetrails/trails-tsc": "workspace:*"
   },
   "peerDependencies": {
-    "typescript": "7.1.0-dev.20260920.1"
+    "typescript": "7.1.0-dev.20260920.1",
+    "@blazetrails/trails-tsc": "workspace:*"
   },
   "peerDependenciesMeta": {
     "typescript": {
+      "optional": true
+    },
+    "@blazetrails/trails-tsc": {
       "optional": true
     }
   },
