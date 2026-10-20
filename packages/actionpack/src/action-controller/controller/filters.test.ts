@@ -10,7 +10,7 @@ import {
   type CallbackChain,
 } from "@blazetrails/activesupport";
 import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { type AbstractController } from "../../abstract-controller/base.js";
+import { type Base as AbstractControllerBase } from "../../abstract-controller/base.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 import { Request } from "../../action-dispatch/http/request.js";
@@ -74,7 +74,7 @@ async function run(ctrl: Base, action = "show"): Promise<Base & Ivars> {
   return ctrl;
 }
 function push(name: string, prop = "ranFilter") {
-  return (c: AbstractController) => {
+  return (c: AbstractControllerBase) => {
     const self = c as unknown as Record<string, string[] | undefined>;
     (self[prop] ??= []).push(name);
   };
@@ -581,7 +581,7 @@ FT_AnotherChildOfConditionalParentController.skipBeforeAction("conditionalInPare
   only: "show",
 });
 
-const classFilterFn = (c: AbstractController) => {
+const classFilterFn = (c: AbstractControllerBase) => {
   ivars(c).ranClassAction = true;
 };
 class FT_ClassController extends FT_ConditionalFilterController {}

@@ -28,12 +28,12 @@ export class Project extends Base {
 
   static {
     this.belongsTo("mentor");
-    this.hasAndBelongsToMany("developers", function (this: any) {
+    this.hasAndBelongsToMany("developers", function () {
       return this.distinct().order("developers.name desc, developers.id desc");
     });
     this.hasAndBelongsToMany(
       "readonlyDevelopers",
-      function (this: any) {
+      function () {
         return this.readonly();
       },
       {
@@ -42,14 +42,14 @@ export class Project extends Base {
     );
     this.hasAndBelongsToMany(
       "nonUniqueDevelopers",
-      function (this: any) {
+      function () {
         return this.order("developers.name desc, developers.id desc");
       },
       { className: "Developer" },
     );
     this.hasAndBelongsToMany(
       "limitedDevelopers",
-      function (this: any) {
+      function () {
         return this.limit(1);
       },
       {
@@ -58,21 +58,21 @@ export class Project extends Base {
     );
     this.hasAndBelongsToMany(
       "developersNamedDavid",
-      function (this: any) {
+      function () {
         return this.where("name = 'David'").distinct();
       },
       { className: "Developer" },
     );
     this.hasAndBelongsToMany(
       "developersNamedDavidWithHashConditions",
-      function (this: any) {
+      function () {
         return this.where({ name: "David" }).distinct();
       },
       { className: "Developer" },
     );
     this.hasAndBelongsToMany(
       "salariedDevelopers",
-      function (this: any) {
+      function () {
         return this.where("salary > 0");
       },
       {
@@ -100,7 +100,7 @@ export class Project extends Base {
     }
     this.hasAndBelongsToMany(
       "wellPaidSalaryGroups",
-      function (this: any) {
+      function () {
         return this.group("developers.salary")
           .having("SUM(salary) > 10000")
           .select("SUM(salary) as salary");
@@ -120,7 +120,7 @@ export class Project extends Base {
       this.developersLog = [];
     });
 
-    this.scope("allAsScope", function (this: any) {
+    this.scope("allAsScope", function () {
       return this.all();
     });
   }

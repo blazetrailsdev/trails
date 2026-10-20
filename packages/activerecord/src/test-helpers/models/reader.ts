@@ -20,7 +20,7 @@ export class Reader extends Base {
       foreignKey: "person_id",
       inverseOf: "reader",
     });
-    this.belongsTo("firstPost", function (this: any) {
+    this.belongsTo("firstPost", function () {
       return this.where({ id: [2, 3] });
     });
   }
@@ -64,10 +64,10 @@ export class LazyReader extends Base {
 
   static {
     this._tableName = "readers";
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ skimmer: true });
     });
-    this.scope("skimmersOrNot", function (this: any) {
+    this.scope("skimmersOrNot", function () {
       return this.unscope({ ":where": "skimmer" });
     });
     this.belongsTo("post");

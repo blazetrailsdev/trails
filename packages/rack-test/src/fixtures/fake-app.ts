@@ -4,7 +4,6 @@ import {
   Request,
   release,
   type RackApp,
-  type RackBody,
   type RackEnv,
   type RackResponse,
 } from "@blazetrails/rack";
@@ -16,20 +15,15 @@ type FakeResponse = [number, Record<string, string | string[]>, string[]];
 /** @internal */
 const textEncoder = new TextEncoder();
 
-/** @internal */
-async function* eachBody(body: string[]): RackBody {
-  for (const s of body) yield s;
-}
-
 export class FakeApp {
   async call(env: RackEnv): Promise<RackResponse> {
     const res = this.handle(env);
-    const [status, h, b] = res;
+    const [, h, b] = res;
     let length = 0;
     for (const s of b) length += textEncoder.encode(s).length;
     h["content-length"] = String(length);
     h["content-type"] = "text/html;charset=utf-8";
-    return [status, h, eachBody(b)];
+    return res;
   }
 
   /** @internal */

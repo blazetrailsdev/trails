@@ -1,4 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
+import type { Table } from "@blazetrails/arel";
 import {
   Enumerable,
   type Each,
@@ -30,10 +31,9 @@ import { defineModule, stripThenable } from "@blazetrails/activesupport";
 export const ONE_AS_ONE = "1 AS one";
 
 interface FinderRelation {
-  model: FinderRelation["_model"];
-  table: { get(name: string): Nodes.Node };
+  table: Table;
   primaryKey: string | string[];
-  _model: {
+  model: {
     name: string;
     primaryKey: string | string[];
     isCompositePrimaryKey(): boolean;
@@ -110,14 +110,23 @@ interface FinderRelation {
   except(...skips: string[]): FinderRelation;
   joinsBang(...args: unknown[]): FinderRelation;
   /** @internal */
-  constructJoinDependency(associations: unknown[], joinType: unknown): JoinDependency;
+  constructJoinDependency(associations: any[], joinType: unknown): JoinDependency;
   /** @internal */
   selectAssociationList(associations: unknown[]): unknown[];
   /** @internal */
-  _materializeDeferredDistinctPkPredicates(): Promise<void>;
+  _materializeDeferredDistinctPkPredicates(): void | Promise<void>;
   arel(): { ast: unknown };
-  skipQueryCacheIfNecessary<R>(block: () => R): R;
-  withConnection<R>(block: (c: any) => R): R;
+  /** @internal */
+  skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R>;
+  withConnection<R>(block: (c: DatabaseAdapter) => R | Promise<R>): Promise<R>;
+  selectValues: unknown[];
+  select(...fields: unknown[]): any;
+  /** @internal */
+  findSome(ids: unknown[]): Promise<any>;
+  /** @internal */
+  findSomeOrdered(ids: unknown[]): Promise<any>;
+  _take?: any;
+  _offsets?: Record<number, any>;
 }
 
 function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
@@ -173,7 +182,7 @@ export async function firstBang(this: FinderRelation): Promise<any> {
 }
 
 export async function last(this: FinderRelation, limit?: number): Promise<any> {
-  if (this.isLoaded || (this as any).limitValue != null || (this as any).offsetValue != null) {
+  if (this.isLoaded || this.limitValue != null || this.offsetValue != null) {
     return findLast.call(this, limit);
   }
   let result: any = orderedRelation.call(this).limit(limit ?? null);
@@ -194,7 +203,7 @@ export async function sole(this: FinderRelation): Promise<any> {
   } else if (undesired == null) {
     return found;
   } else {
-    throw new SoleRecordExceeded(this._model);
+    throw new SoleRecordExceeded(this.model);
   }
 }
 
@@ -216,13 +225,13 @@ export async function findNthWithLimit(
     return (await this.records()).slice(index, index + limit) ?? [];
   }
   let relation: any = orderedRelation.call(this);
-  const limitValue = (this as any).limitValue;
+  const limitValue = this.limitValue;
   if (limitValue != null) {
     limit = Math.min(numericMinus(limitValue, index) as number, limit);
   }
   if (limit <= 0) return [];
   if (index > 0) {
-    relation = relation.offset(((this as any).offsetValue ?? 0) + index);
+    relation = relation.offset(((this.offsetValue ?? 0) as number) + index);
   }
   return relation.limit(limit).toArray();
 }
@@ -552,7 +561,7 @@ export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Prom
       return expectsArray ? [result] : result;
     }
     default:
-      return (this as any).findSome(ids);
+      return this.findSome(ids);
   }
 }
 
@@ -567,8 +576,8 @@ export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
 
   const pk = this.primaryKey;
   const relation = Array.isArray(pk)
-    ? (this as any).where(buildPkWhere(pk, id as unknown[]))
-    : (this as any).where({ [pk]: id });
+    ? this.where(buildPkWhere(pk, id as unknown[]))
+    : this.where({ [pk]: id });
   const record = await relation.take();
   if (!record) {
     this.raiseRecordNotFoundExceptionBang(id, 0, 1);
@@ -581,11 +590,11 @@ export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
  * @missingRailsName size — PERMANENT
  */
 export async function findSome(this: FinderRelation, ids: unknown[]): Promise<any[]> {
-  if (this.orderValues.length === 0) return (this as any).findSomeOrdered(ids);
+  if (this.orderValues.length === 0) return this.findSomeOrdered(ids);
 
   const pk = this.primaryKey;
-  let relation = (this as any).where(new Map([[pk, ids]]));
-  if ((this as any).selectValues.length > 0) {
+  let relation = this.where(new Map([[pk, ids]]));
+  if (this.selectValues.length > 0) {
     relation = relation.select(this.table.get(pk as string));
   }
   const result = await relation.toArray();
@@ -621,10 +630,10 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
   ids =
     (arySlice(ids, this.offsetValue ?? 0, this.limitValue ?? ids.length) as unknown[] | null) ?? [];
 
-  let relation = (this as any).except("limit", "offset");
+  let relation = this.except("limit", "offset");
   const pk = this.model.primaryKey;
   relation = relation.where(new Map([[pk, ids]]));
-  if ((this as any).selectValues.length > 0) {
+  if (this.selectValues.length > 0) {
     relation = relation.select(this.table.get(this.model.primaryKey as string));
   }
   const result: any[] = await relation.records();
@@ -643,21 +652,20 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
 /** @internal */
 export async function findTake(this: FinderRelation): Promise<any | null> {
   if (this.isLoaded) return aryFirst(await this.records()) ?? null;
-  (this as any)._take ??= aryFirst(await (this as any).limit(1).records()) ?? null;
-  return (this as any)._take;
+  this._take ??= aryFirst(await this.limit(1).records()) ?? null;
+  return this._take;
 }
 
 /** @internal */
 export async function findTakeWithLimit(this: FinderRelation, limit: number): Promise<any[]> {
   if (this.isLoaded) return aryTake(await this.records(), limit);
-  return (this as any).limit(limit).toArray();
+  return this.limit(limit).toArray();
 }
 
 /** @internal */
 export async function findNth(this: FinderRelation, index: number): Promise<any | null> {
-  (this as any)._offsets ||= {};
-  return ((this as any)._offsets[index] ||=
-    aryFirst(await this.findNthWithLimit(index, 1)) ?? null);
+  this._offsets ||= {};
+  return (this._offsets[index] ||= aryFirst(await this.findNthWithLimit(index, 1)) ?? null);
 }
 
 /** @internal */
@@ -674,9 +682,7 @@ export function orderedRelation(this: FinderRelation): any {
       this.model.queryConstraintsList() != null ||
       rtest(this.primaryKey))
   ) {
-    return this.order(
-      _orderColumns.call(this).map((column) => (this as any).table.get(column).asc()),
-    );
+    return this.order(_orderColumns.call(this).map((column) => this.table.get(column).asc()));
   } else {
     return this;
   }

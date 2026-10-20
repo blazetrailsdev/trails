@@ -15,19 +15,14 @@ import {
   type CallbackCondition,
   type CallbackOptions as ASCallbackOptions,
 } from "@blazetrails/activesupport";
-import { ActionNotFound, type AbstractController } from "./base.js";
+import { ActionNotFound, type Base } from "./base.js";
 
-export type ActionCallback = (
-  controller: AbstractController,
-) => void | boolean | Promise<void | boolean>;
+export type ActionCallback = (controller: Base) => void | boolean | Promise<void | boolean>;
 
-export type AroundCallback = (
-  controller: AbstractController,
-  next: () => Promise<void>,
-) => void | Promise<void>;
+export type AroundCallback = (controller: Base, next: () => Promise<void>) => void | Promise<void>;
 
 export interface CallbackPredicateLike {
-  isMatch(controller: AbstractController): boolean;
+  isMatch(controller: Base): boolean;
 }
 
 export interface CallbackOptions {
@@ -35,12 +30,12 @@ export interface CallbackOptions {
   except?: string | string[];
   if?:
     | `:${string}`
-    | ((controller: AbstractController) => boolean)
-    | Array<`:${string}` | ((controller: AbstractController) => boolean) | CallbackPredicateLike>;
+    | ((controller: Base) => boolean)
+    | Array<`:${string}` | ((controller: Base) => boolean) | CallbackPredicateLike>;
   unless?:
     | `:${string}`
-    | ((controller: AbstractController) => boolean)
-    | Array<`:${string}` | ((controller: AbstractController) => boolean) | CallbackPredicateLike>;
+    | ((controller: Base) => boolean)
+    | Array<`:${string}` | ((controller: Base) => boolean) | CallbackPredicateLike>;
   prepend?: boolean;
   raise?: boolean;
 }
@@ -76,7 +71,7 @@ export class ActionFilter implements CallbackPredicateLike {
     this._actions = new Set((Array.isArray(actions) ? actions : [actions]).map((a) => String(a)));
   }
 
-  isMatch(controller: AbstractController): boolean {
+  isMatch(controller: Base): boolean {
     const Constructor = controller.constructor as { raiseOnMissingCallbackActions?: boolean };
     if (Constructor.raiseOnMissingCallbackActions) {
       const missingAction = [...this._actions].find((a) => !controller.isAvailableAction(a));
@@ -98,15 +93,15 @@ export class ActionFilter implements CallbackPredicateLike {
   }
 
   /** @internal */
-  after(controller: AbstractController): boolean {
+  after(controller: Base): boolean {
     return this.isMatch(controller);
   }
   /** @internal */
-  before(controller: AbstractController): boolean {
+  before(controller: Base): boolean {
     return this.isMatch(controller);
   }
   /** @internal */
-  around(controller: AbstractController): boolean {
+  around(controller: Base): boolean {
     return this.isMatch(controller);
   }
 }
@@ -131,9 +126,8 @@ export function _normalizeCallbackOption(
   fromValue = new ActionFilter(filters, from, fromValue);
 
   const existing = options[to];
-  const list: Array<
-    `:${string}` | ((controller: AbstractController) => boolean) | CallbackPredicateLike
-  > = existing === undefined ? [] : Array.isArray(existing) ? existing.slice() : [existing];
+  const list: Array<`:${string}` | ((controller: Base) => boolean) | CallbackPredicateLike> =
+    existing === undefined ? [] : Array.isArray(existing) ? existing.slice() : [existing];
   list.unshift(fromValue);
   options[to] = list;
 }
@@ -171,7 +165,7 @@ function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | und
       ? item
       : typeof item === "function"
         ? (item as unknown as CallbackCondition)
-        : (c: object) => item.isMatch(c as AbstractController),
+        : (c: object) => item.isMatch(c as Base),
   );
 }
 
@@ -321,7 +315,7 @@ export const ClassMethods: Module = new Module((mod) => {
 
 /** @internal */
 export async function processAction(
-  this: AbstractController & Included<typeof ASCallbacks>,
+  this: Base & Included<typeof ASCallbacks>,
   ...args: unknown[]
 ): Promise<unknown> {
   return this.runCallbacks("process_action", () =>
@@ -329,7 +323,7 @@ export async function processAction(
   );
 }
 
-type CallbacksIncludingClass = typeof AbstractController & ActionCallbackHost;
+type CallbacksIncludingClass = typeof Base & ActionCallbackHost;
 
 export const Callbacks = new Module((mod) => {
   extend(mod, Concern);
@@ -342,7 +336,7 @@ export const Callbacks = new Module((mod) => {
     this.defineCallbacks("process_action", {
       terminator: async (controller, resultLambda) => {
         await resultLambda();
-        return (controller as AbstractController).performed;
+        return (controller as Base).performed;
       },
       skipAfterCallbacksIfTerminated: true,
     });

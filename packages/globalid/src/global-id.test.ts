@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertNil, assertEqual } from "@blazetrails/activesupport";
 import { rbHash, registerConstant, resetConstants, uniq } from "@blazetrails/ruby-compat";
 import { GlobalID } from "./global-id.js";
+import { SignedGlobalID } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
 import { type LocatorModel } from "./locator.js";
 
@@ -105,10 +106,9 @@ describe("GlobalIDParamEncodedTest", () => {
 
   it("finding", async () => {
     const gid = GlobalID.create(new Person("id"));
-    const parsed = GlobalID.parse(gid.toParam())!;
-    const found = (await parsed.find()) as Person;
-    expect(found).toBeInstanceOf(Person);
-    expect(found.id).toBe(parsed.modelId);
+    const found = (await GlobalID.find(gid.toParam())) as Person;
+    expect(found).toBeInstanceOf(gid.modelClass);
+    expect(found.id).toBe(gid.modelId);
   });
 });
 
@@ -309,13 +309,14 @@ describe("GlobalIDCreationTest", () => {
     expect(cpkModelGid.modelName).toBe("CompositePrimaryKeyModel");
   });
 
-  it("model class", () => {
+  it("model class", async () => {
     expect(personGid.modelClass).toBe(Person);
     expect(personUuidGid.modelClass).toBe(PersonUuid);
     expect(personNamespacedGid.modelClass).toBe(PersonChild);
     expect(personModelGid.modelClass).toBe(PersonModel);
     expect(cpkModelGid.modelClass).toBe(CompositePrimaryKeyModel);
-    expect(() => GlobalID.parse("gid://bcx/SignedGlobalID/5")!.modelClass).toThrow();
+    registerConstant("SignedGlobalID", SignedGlobalID as unknown as LocatorModel);
+    await expect(GlobalID.find("gid://bcx/SignedGlobalID/5")).rejects.toThrow(ArgumentError);
   });
 
   it(":app option", () => {

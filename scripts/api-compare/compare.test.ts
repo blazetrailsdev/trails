@@ -491,20 +491,9 @@ describe("significantMissingCalls", () => {
     expect(significantCallsForReceivers({}).has("with_indifferent_access")).toBe(true);
   });
 
-  it("significantCallsForReceivers credits String.new(x) only to a TS body making the String(x) conversion call", () => {
-    const conversion = new Set(["String"]);
-    expect(
-      significantCallsForReceivers({ new: ["string-new"] }, undefined, conversion).has("new"),
-    ).toBe(false);
-    expect(significantCallsForReceivers({ new: ["string-new"] }).has("new")).toBe(true);
-    expect(
-      significantCallsForReceivers({ new: ["const", "string-new"] }, undefined, conversion).has(
-        "new",
-      ),
-    ).toBe(true);
-    expect(significantCallsForReceivers({ new: ["const"] }, undefined, conversion).has("new")).toBe(
-      true,
-    );
+  it("significantCallsForReceivers credits String.new to a TS body with no new expression", () => {
+    expect(significantCallsForReceivers({ new: ["string-new"] }).has("new")).toBe(false);
+    expect(significantCallsForReceivers({ new: ["const", "string-new"] }).has("new")).toBe(true);
   });
 
   it("significantCallsForReceivers still flags size for a TS body with no .length read", () => {

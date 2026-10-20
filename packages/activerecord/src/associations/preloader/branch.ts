@@ -13,7 +13,11 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { Relation } from "../../relation.js";
-import type { AbstractReflection } from "../../reflection.js";
+import type {
+  AbstractReflection,
+  AssociationReflection,
+  ThroughReflection,
+} from "../../reflection.js";
 import { Association } from "./association.js";
 import { ThroughAssociation } from "./through-association.js";
 
@@ -164,8 +168,8 @@ export class Branch {
     return runnableLoaders.flat().filter((l) => !l.isRun());
   }
 
-  async groupedRecords(): Promise<Map<AbstractReflection, Base[]>> {
-    const h = new Map<AbstractReflection, Base[]>();
+  async groupedRecords(): Promise<Map<AssociationReflection | ThroughReflection, Base[]>> {
+    const h = new Map<AssociationReflection | ThroughReflection, Base[]>();
     const polymorphicParent = !this.isRoot() && (await this.parent!.isPolymorphic());
 
     for (const record of await this.sourceRecords()) {
@@ -183,7 +187,7 @@ export class Branch {
   }
 
   preloadersForReflection(
-    reflection: AbstractReflection,
+    reflection: AssociationReflection | ThroughReflection,
     reflectionRecords: Base[],
   ): Association[] {
     return [
@@ -204,7 +208,7 @@ export class Branch {
         new (this.preloaderFor(reflection))(
           rhsKlass,
           rs,
-          reflection as any,
+          reflection,
           this.scope,
           reflectionScope,
           this.associateByDefault,
@@ -249,9 +253,9 @@ export class Branch {
   }
 
   private preloaderFor(
-    reflection: AbstractReflection,
+    reflection: AssociationReflection | ThroughReflection,
   ): typeof Association | typeof ThroughAssociation {
-    if ((reflection as any).options.through != null) {
+    if (reflection.options.through != null) {
       return ThroughAssociation;
     } else {
       return Association;

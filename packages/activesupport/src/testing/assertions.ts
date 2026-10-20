@@ -6,6 +6,7 @@ import {
   RbConfig,
   StandardError,
   basicObjRespondTo,
+  rbDeclareIvar,
   Tempfile,
   env,
   isEmpty,
@@ -69,9 +70,9 @@ export class Test {
   /** @noRailsEquivalent PERMANENT */
   failures: Assertion[];
   /** @noRailsEquivalent PERMANENT */
-  time: number | null = null;
+  declare time: number | null;
   private _assertions: number;
-  private _metadata?: Record<string, unknown>;
+  declare private _metadata?: Record<string, unknown>;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(name: string) {
@@ -208,6 +209,8 @@ export class Test {
     return undefined;
   }
 }
+
+rbDeclareIvar(Test, "@NAME", "name");
 
 function classNameOf(e: Error): string {
   if (e.name && e.name !== "Error") return e.name;
@@ -682,10 +685,13 @@ export function assertIncludes(
   obj: unknown,
   message?: string,
 ): void | Promise<void> {
-  assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
+  assert(
+    respondsToInclude(collection),
+    () => `Expected ${inspect(collection)} to respond to include?`,
+  );
   const included = collectionIncludes(collection, obj);
   const check = (result: unknown): void => {
-    assert(result, message ?? `Expected ${inspect(collection)} to include ${inspect(obj)}`);
+    assert(result, message ?? (() => `Expected ${inspect(collection)} to include ${inspect(obj)}`));
   };
   return included instanceof Promise ? included.then(check) : check(included);
 }
@@ -701,10 +707,16 @@ export function assertNotIncludes(
   obj: unknown,
   message?: string,
 ): void | Promise<void> {
-  assert(respondsToInclude(collection), `Expected ${inspect(collection)} to respond to include?`);
+  assert(
+    respondsToInclude(collection),
+    () => `Expected ${inspect(collection)} to respond to include?`,
+  );
   const included = collectionIncludes(collection, obj);
   const check = (result: unknown): void => {
-    assertNot(result, message ?? `Expected ${inspect(collection)} to not include ${inspect(obj)}`);
+    assertNot(
+      result,
+      message ?? (() => `Expected ${inspect(collection)} to not include ${inspect(obj)}`),
+    );
   };
   return included instanceof Promise ? included.then(check) : check(included);
 }

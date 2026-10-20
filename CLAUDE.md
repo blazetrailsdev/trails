@@ -79,6 +79,8 @@ Convergence is the goal. Every deviation register in this repo — the
 decision. A row in one of them says "we know this is wrong and haven't fixed it
 yet." It is never a licence to leave it, to copy the pattern into new code, or
 to add a sibling row next to it.
+Which registers are JSDoc tags at a declaration and which stay JSON is in
+[docs/infrastructure/curation-register-split.md](docs/infrastructure/curation-register-split.md).
 
 So:
 
@@ -1178,9 +1180,9 @@ change type and break `===`, `typeof`, Map keys and the 197 `typeof x ===
 interpolation, to buy eight ActiveModel tests. This is the same trade
 § "Records are not Proxies" records. As a consequence:
 
-- `Type::String#cast_value` returns a primitive. Its `::String.new(value)` is
-  ruby-compat's `rbStrSNew`, which answers the string itself: the value is its
-  own copy.
+- `Type::String#cast_value` returns a primitive. A Ruby `String.new` ports as
+  the JS string itself, `""` or the value, with no helper: the value is its
+  own copy, and the call gates credit it without a `new` expression.
 - `Attribute#initializeDup` keeps Rails' `duplicable?` guard and `dup` call,
   and `rbObjDup` answers a string unchanged. `attribute.value()` and
   `attribute.dup().value()` are the same value.

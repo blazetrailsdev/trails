@@ -10,7 +10,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
   readonly key: string;
   private readonly _ids: DjarIds;
 
-  constructor(klass: typeof Base, key: string, ids: DjarIds) {
+  constructor(klass: Relation<T>["model"], key: string, ids: DjarIds) {
     super(klass);
     this._ids = ids;
     this.key = key;

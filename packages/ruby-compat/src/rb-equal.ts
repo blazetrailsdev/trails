@@ -194,15 +194,20 @@ export function hashEntries(value: unknown): [unknown, unknown][] | null {
 
 /* `RB_TYPE_P(hash2, T_HASH)` (`vendor/ruby/v3.3.11/hash.c:3751`), which
    `hash_equal` asks of the other operand before it reads either table. Its
-   `to_hash` arm for a non-Hash operand (`hash.c:3752-3764`) is not ported. */
+   `to_hash` arm for a non-Hash operand (`hash.c:3752-3764`) is not ported.
+   A plain object recording the modules it includes is a Module, whose `==`
+   is `rb_obj_equal` (`vendor/ruby/v3.3.11/object.c:4374`), not a Hash. */
 function isHash(value: unknown): boolean {
   return (
     value instanceof Map ||
     (typeof value === "object" &&
       value !== null &&
-      [Object.prototype, null].includes(Object.getPrototypeOf(value)))
+      [Object.prototype, null].includes(Object.getPrototypeOf(value)) &&
+      !Object.hasOwn(value, MODULE_INCLUDES))
   );
 }
+
+const MODULE_INCLUDES = Symbol.for("@blazetrails/ruby-compat:moduleIncludes");
 
 /**
  * The `===` send (`rb_funcall(pattern, idEqq, 1, target)`, what

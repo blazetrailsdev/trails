@@ -1,4 +1,4 @@
-import { Date } from "@blazetrails/date";
+import { Date, dNewByFrags } from "@blazetrails/date";
 import { hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
@@ -12,8 +12,8 @@ export class DateSerializer extends ObjectSerializer {
     return super.serialize({ value: date.iso8601() });
   }
 
-  deserialize(hash: Record<string, unknown> | Map<string, unknown>): unknown {
-    return Date.iso8601(hashAref(hash, "value") as string);
+  deserialize(hash: Record<string, unknown> | Map<string, unknown>): Date {
+    return dNewByFrags(Date._iso8601(hashAref(hash, "value") as string));
   }
 
   /** @internal */

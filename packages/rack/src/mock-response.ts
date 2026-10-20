@@ -6,7 +6,7 @@
  */
 
 import { Time } from "@blazetrails/date";
-import { CGI, fetch, rbFArray, rbStrSNew, rbStrToI } from "@blazetrails/ruby-compat";
+import { CGI, fetch, rbFArray, rbStrToI } from "@blazetrails/ruby-compat";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
 
@@ -42,7 +42,7 @@ export class MockResponse extends Response {
   override get body(): string {
     if (this._bufferedBody !== undefined) return this._bufferedBody;
 
-    let buffer = (this._bufferedBody = rbStrSNew());
+    let buffer = (this._bufferedBody = "");
 
     for (const chunk of this._body) {
       buffer +=

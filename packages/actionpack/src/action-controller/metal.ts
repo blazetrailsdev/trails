@@ -1,5 +1,5 @@
 import type { MimeType } from "../action-dispatch/http/mime-type.js";
-import { AbstractController } from "../abstract-controller/base.js";
+import { Base as AbstractControllerBase } from "../abstract-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import type { Session } from "../action-dispatch/request/session.js";
@@ -104,7 +104,7 @@ function inherited(this: typeof Metal, subclass: typeof Metal): void {
   subclass.middlewareStack = rbObjDup(this.middlewareStack);
 }
 
-export class Metal extends AbstractController {
+export class Metal extends AbstractControllerBase {
   static {
     this.abstractBang();
   }

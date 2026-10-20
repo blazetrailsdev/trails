@@ -15,7 +15,7 @@ export class Invoice extends Base {
     this.hasMany("lineItems", { autosave: true });
     this.hasMany(
       "shippingLines",
-      function (this: any) {
+      function () {
         return this.from("shipping_lines");
       },
       { autosave: true },

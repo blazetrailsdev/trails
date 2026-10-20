@@ -1,0 +1,1 @@
+<% contentFor("title", () => { -%>Putting stuff in the title!<% }) -%>Great stuff!

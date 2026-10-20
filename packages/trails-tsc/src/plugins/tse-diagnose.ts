@@ -4,6 +4,7 @@ const DEFAULT_STUB = [
   "export interface TemplateRegistry {}",
   "export type TemplateLocals<T> = T;",
   "export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };",
+  "export declare const TopLevel: {};",
 ].join("\n");
 
 export interface DiagnoseOptions {
@@ -42,6 +43,7 @@ export function diagnose(source: string, options: DiagnoseOptions = {}): string[
   const program = ts.createProgram({
     rootNames: [fileName],
     options: {
+      target: ts.ScriptTarget.ES2022,
       ...options.extraCompilerOptions,
       noEmit: true,
       types: [],

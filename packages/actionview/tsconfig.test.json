@@ -11,7 +11,7 @@
       "@blazetrails/rack": ["../rack/src/index.ts"]
     }
   },
-  "include": ["src/**/*.test.ts", "src/test-helpers/**/*.ts"],
+  "include": ["src/**/*.test.ts", "src/test-helpers/**/*.ts", "src/test-case.ts"],
   "references": [
     { "path": "./tsconfig.json" },
     { "path": "../actionpack" },

@@ -17,14 +17,14 @@ export class Rating extends Base {
     this.hasMany("taggings", { as: "taggable" });
     this.hasMany(
       "taggingsWithoutTag",
-      function (this: any) {
+      function () {
         return this.leftJoins(":tag").where({ "tags.id": [null, 0] });
       },
       { as: "taggable", className: "Tagging" },
     );
     this.hasMany(
       "taggingsWithNoTag",
-      function (this: any) {
+      function () {
         return this.joins("LEFT OUTER JOIN tags ON tags.id = taggings.tag_id").where({
           "tags.id": null,
         });

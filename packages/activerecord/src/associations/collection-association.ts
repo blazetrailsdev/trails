@@ -103,21 +103,19 @@ export abstract class CollectionAssociation extends Association {
   /** @missingRailsName size — PERMANENT */
   async idsWriter(ids: unknown[]): Promise<void> {
     const primaryKey = this.reflection.associationPrimaryKey();
-    const klass = this.klass as any;
-    const pkType = klass.typeForAttribute(primaryKey);
+    const klass = this.klass;
+    const pkType = klass.typeForAttribute(primaryKey as string)!;
     ids = compactBlank(kernelArray(ids));
     ids = ids.map((id) => pkType.cast(id));
 
     let indexed: Record<string, Base>;
     if (klass.isCompositePrimaryKey()) {
-      indexed = indexBy<Base, string>(
-        await klass.where(new Map([[primaryKey, ids]])).toArray(),
-        (record) =>
-          String((primaryKey as string[]).map((primaryKey) => record._readAttribute(primaryKey))),
+      indexed = indexBy<Base, string>(await klass.where(new Map([[primaryKey, ids]])), (record) =>
+        String((primaryKey as string[]).map((primaryKey) => record._readAttribute(primaryKey))),
       );
     } else {
       indexed = indexBy<Base, string>(
-        await klass.where({ [primaryKey as string]: ids }).toArray(),
+        await klass.where({ [primaryKey as string]: ids }),
         (record) => String(record._readAttribute(primaryKey as string)),
       );
     }
@@ -432,9 +430,9 @@ export abstract class CollectionAssociation extends Association {
     if (reflection.isThroughReflection?.()) {
       const assoc = this.owner.association(reflection.throughReflection!.name);
       const sourceName = reflection.sourceReflection!.name;
-      const reader = (await (assoc as unknown as { reader: unknown }).reader) as Base[];
+      const reader = await (assoc as CollectionAssociation).reader;
       for (const source of reader) {
-        const targetReflection = await (source as unknown as Record<string, unknown>)[sourceName];
+        const targetReflection = await rbFSend(source, sourceName);
         if (
           Array.isArray(targetReflection)
             ? targetReflection.some((r: Base) => r.equals(record))

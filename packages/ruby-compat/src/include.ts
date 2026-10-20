@@ -1475,11 +1475,14 @@ export function defineModule<
     private: privateSection ? Object.keys(privateSection) : [],
   };
   assertSectionsDisjoint(sections);
-  const mod = {
-    ...publicSection,
-    ...protectedSection,
-    ...privateSection,
-  } as Pub & Prot & Priv;
+  const mod = Object.defineProperties(
+    {},
+    {
+      ...Object.getOwnPropertyDescriptors(publicSection),
+      ...Object.getOwnPropertyDescriptors(protectedSection ?? {}),
+      ...Object.getOwnPropertyDescriptors(privateSection ?? {}),
+    },
+  ) as Pub & Prot & Priv;
   Object.defineProperty(mod, moduleVisibility, { value: sections });
   return mod;
 }

@@ -2424,22 +2424,6 @@ describe("body call capture", () => {
     expect(calls("dispatch")).toEqual(["@invoked:rbFSend", "rbFSend"]);
   });
 
-  it("marks the String(x) conversion call as a native form", () => {
-    const cls = extractFromSource(
-      `class Foo {
-        plain(order: unknown) {
-          return String(order);
-        }
-        boxed(order: unknown) {
-          return new String(order);
-        }
-      }`,
-    );
-    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
-    expect(calls("plain")).toContain("@String");
-    expect(calls("boxed") ?? []).not.toContain("@String");
-  });
-
   it("marks a call INVOKED on another object with the foreign-read prefix", () => {
     // `details.digest(x)` runs a member of `details`, not the same-file method
     // `digest` — the closure must not union that one's call-set (RFC 0108).

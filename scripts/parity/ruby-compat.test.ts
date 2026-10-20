@@ -103,9 +103,9 @@ describe("rubyCompatExport", () => {
     expect(rubyCompatAliases("include?", ["expr"])).toEqual(["aryIncludes"]);
   });
 
-  it("credits String.new on a constant receiver only through rbStrSNew", () => {
-    expect(rubyCompatAliases("new", ["const"])).toEqual(["rbStrSNew"]);
-    expect(rubyCompatAliases("new", ["string-new"])).toEqual(["rbStrSNew"]);
+  it("resolves String.new to no ruby-compat alias", () => {
+    expect(rubyCompatAliases("new", ["const"])).toEqual([]);
+    expect(rubyCompatAliases("new", ["string-new"])).toEqual([]);
     expect(rubyCompatExport("new", ["const"])).toBeUndefined();
     expect(rubyCompatAliases("new")).toEqual([]);
   });

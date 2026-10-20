@@ -26,7 +26,7 @@ function isHash(value: unknown): value is TranslationData | Record<string, unkno
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE i18n-core-string-helpers-move-to-ruby-compat */
 export function tr(subject: string, fromStr: string, toStr: string): string {
   const from = [...fromStr];
   const to = [...toStr];

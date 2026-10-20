@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AbstractController, ActionNotFound } from "./base.js";
+import { Base, ActionNotFound } from "./base.js";
 import {
   ActionFilter,
   afterAction,
@@ -17,7 +17,7 @@ import {
 } from "./callbacks.js";
 import { assertIncludes, assertNot, assertRaises, include } from "@blazetrails/activesupport";
 
-class ControllerWithCallbacks extends AbstractController {
+class ControllerWithCallbacks extends Base {
   declare static setCallback: ActionCallbackHost["setCallback"];
   declare static skipCallback: ActionCallbackHost["skipCallback"];
   declare static raiseOnMissingCallbackActions: boolean;

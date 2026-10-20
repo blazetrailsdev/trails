@@ -144,7 +144,7 @@ export const COUNTED_PACKAGES = [] as const;
 export const TAGGED_ONLY_PACKAGES = [
   "actioncontroller",
   "actiondispatch",
-  "globalid",
+  "i18n",
   "ruby-compat",
   "thor",
 ] as const;
@@ -154,7 +154,16 @@ export const TAGGED_ONLY_PACKAGES = [
  * therefore carry no mark row — see ROWLESS MODE in the module comment.
  * Only-grow, like {@link TAGGED_ONLY_PACKAGES}.
  */
-export const ROWLESS_PACKAGES = ["activemodel", "activerecord", "arel", "rack"] as const;
+export const ROWLESS_PACKAGES = [
+  "abstractcontroller",
+  "actionpackversion",
+  "activemodel",
+  "activerecord",
+  "arel",
+  "did-you-mean",
+  "globalid",
+  "rack",
+] as const;
 
 /**
  * The packages this gate covers, in either mode. Everything else is measured

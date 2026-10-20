@@ -985,7 +985,15 @@ export function extractFromProgram(
           const objectLiteral = ts.isObjectLiteralExpression(decl.initializer);
           const methods = ts.isObjectLiteralExpression(decl.initializer)
             ? harvestObjectLiteralMethods(decl.initializer, checker, relPath)
-            : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
+            : isDefineModuleCall(decl.initializer)
+              ? decl.initializer.arguments
+                  .map(unwrapAssertions)
+                  .filter(ts.isObjectLiteralExpression)
+                  .map((o) =>
+                    ts.factory.updateObjectLiteralExpression(o, o.properties.filter(ts.isAccessor)),
+                  )
+                  .flatMap((o) => harvestObjectLiteralMethods(o, checker, relPath))
+              : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
           if (methods.length === 0) continue;
           const modKey = `${relPath}:${decl.name.text}`;
           if (info.classes[modKey]) continue;
@@ -3770,6 +3778,14 @@ function moduleObjectLiterals(
   return out;
 }
 
+function isDefineModuleCall(expr: ts.Expression): expr is ts.CallExpression {
+  return (
+    ts.isCallExpression(expr) &&
+    ts.isIdentifier(expr.expression) &&
+    expr.expression.text === "defineModule"
+  );
+}
+
 function unwrapAssertions(expr: ts.Expression): ts.Expression {
   let cur = expr;
   while (ts.isAsExpression(cur) || ts.isSatisfiesExpression(cur)) cur = cur.expression;
@@ -4295,6 +4311,27 @@ export function extractFileLocalHelpers(
     if (!ts.isIdentifier(decl.name)) continue;
     const init = decl.initializer;
     if (!init) continue;
+    if (ts.isIdentifier(init)) {
+      const target = node
+        .getSourceFile()
+        .statements.find(
+          (s): s is ts.FunctionDeclaration =>
+            ts.isFunctionDeclaration(s) && s.name?.text === init.text && s.body !== undefined,
+        );
+      if (!target) continue;
+      out.push({
+        name: decl.name.text,
+        visibility: "private",
+        params: extractParameters(target.parameters),
+        isStatic: false,
+        line: decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1,
+        file: relPath,
+        internal: true,
+        bodyless: true,
+        aliasOf: init.text,
+      });
+      continue;
+    }
     if (!ts.isArrowFunction(init) && !ts.isFunctionExpression(init)) continue;
     if (isNotImplementedStub(init.body)) continue;
     const line = decl.getSourceFile().getLineAndCharacterOfPosition(decl.getStart()).line + 1;
@@ -7123,9 +7160,6 @@ function collectCalls(
         }
         const kernel = KERNEL_CALLEES.get(resolve(callee.text));
         if (kernel !== undefined) called.push(kernel);
-        if (!skipHoistedClosures && callee.text === "String" && n.arguments.length > 0) {
-          names.add(`${NATIVE_FORM_PREFIX}String`);
-        }
         if (!skipHoistedClosures && isSuspensionTimer(callee.text, n, promiseSettlers)) {
           names.add(`${NATIVE_FORM_PREFIX}timer`);
         }

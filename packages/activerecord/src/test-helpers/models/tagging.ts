@@ -17,7 +17,7 @@ export class Tagging extends Base {
   declare taggable_type: string;
 
   static {
-    this.belongsTo("tag", function (this: any) {
+    this.belongsTo("tag", function () {
       return this.includes(":tagging");
     });
     this.belongsTo("superTag", { className: "Tag", foreignKey: "super_tag_id" });
@@ -25,7 +25,7 @@ export class Tagging extends Base {
     this.belongsTo("orderedTag", { className: "OrderedTag", foreignKey: "tag_id" });
     this.belongsTo(
       "blueTag",
-      function (this: any) {
+      function () {
         return this.where({ tags: { name: "Blue" } });
       },
       {

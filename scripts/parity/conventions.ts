@@ -66,6 +66,9 @@ export const TOKEN_RENAMES: Record<string, string> = {
  *   (`type/registry.rb:5`), same rationale under `ActiveModel::Type`.
  * - `Railtie` → `Trailtie`: trails railties are not `Rails::Railtie`
  *   subclasses; the pun name signals that distinction across all packages.
+ * - `Railties` → `Trailties`: the same pun on a namespace module
+ *   (`AbstractController::Railties`, `abstract_controller/railties/`), as the
+ *   `railties` path segment already reads `trailties`.
  * - `Rails` → `Trails`: top-level `module Rails` (`railties/lib/rails.rb`)
  *   maps to the `Trails` global in `packages/trailties/src/rails.ts`.
  *
@@ -78,6 +81,7 @@ export const TOKEN_RENAMES: Record<string, string> = {
 export const TS_CLASS_RENAMES: Record<string, string> = {
   Name: "ModelName",
   Railtie: "Trailtie",
+  Railties: "Trailties",
   Rails: "Trails",
   Registry: "TypeRegistry",
 };

@@ -1,6 +1,14 @@
 /** @internal */
 
-import { include, includedModules, isModuleIncluded, Module } from "@blazetrails/ruby-compat";
+import {
+  include,
+  includedModules,
+  isModuleIncluded,
+  Module,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
+
+import { AbstractController } from "../../namespaces.js";
 
 import type { HelpersClassMethods } from "../helpers.js";
 
@@ -15,53 +23,55 @@ export interface RoutesHelpersClassMethods extends HelpersClassMethods {
   _routes?: unknown;
 }
 
-export function withRoutesHelpers(
-  routes: UrlHelpersRouteSet,
-  includePathHelpers = true,
-): (cls: RoutesHelpersControllerClass) => void {
-  return (cls) => {
-    const namespaceBuilder = findTrailtieUrlHelpers(cls);
-    const urlHelpersModule = (): HelperMethodsModule | Module =>
-      namespaceBuilder
-        ? namespaceBuilder(includePathHelpers)
-        : routes.urlHelpers(includePathHelpers);
-    const proto = cls.prototype;
-    Object.setPrototypeOf(
-      proto,
-      new Proxy(Object.create(Object.getPrototypeOf(proto) as object) as object, {
-        get(target, key, receiver) {
-          if (typeof key === "string") {
-            const accessor = includedAccessor(cls, urlHelpersModule(), key);
-            if (accessor) return accessor.get!.call(receiver);
-            const member = includedMember(cls, urlHelpersModule(), key);
-            if (member !== undefined) return member;
-          }
-          return Reflect.get(target, key, receiver);
-        },
-        set(target, key, value, receiver) {
-          const accessor =
-            typeof key === "string" ? includedAccessor(cls, urlHelpersModule(), key) : undefined;
-          if (accessor?.set) {
-            accessor.set.call(receiver, value);
-            return true;
-          }
-          return Reflect.set(target, key, value, receiver);
-        },
-        has(target, key) {
-          if (
-            typeof key === "string" &&
-            (includedAccessor(cls, urlHelpersModule(), key) ||
-              includedMember(cls, urlHelpersModule(), key) !== undefined)
-          ) {
-            return true;
-          }
-          return Reflect.has(target, key);
-        },
-      }),
-    );
-    cls._routes = (urlHelpersModule() as { _routes?: unknown })._routes ?? routes;
-  };
-}
+export const RoutesHelpers = {
+  with(
+    routes: UrlHelpersRouteSet,
+    includePathHelpers = true,
+  ): (cls: RoutesHelpersControllerClass) => void {
+    return (cls) => {
+      const namespaceBuilder = findTrailtieUrlHelpers(cls);
+      const urlHelpersModule = (): HelperMethodsModule | Module =>
+        namespaceBuilder
+          ? namespaceBuilder(includePathHelpers)
+          : routes.urlHelpers(includePathHelpers);
+      const proto = cls.prototype;
+      Object.setPrototypeOf(
+        proto,
+        new Proxy(Object.create(Object.getPrototypeOf(proto) as object) as object, {
+          get(target, key, receiver) {
+            if (typeof key === "string") {
+              const accessor = includedAccessor(cls, urlHelpersModule(), key);
+              if (accessor) return accessor.get!.call(receiver);
+              const member = includedMember(cls, urlHelpersModule(), key);
+              if (member !== undefined) return member;
+            }
+            return Reflect.get(target, key, receiver);
+          },
+          set(target, key, value, receiver) {
+            const accessor =
+              typeof key === "string" ? includedAccessor(cls, urlHelpersModule(), key) : undefined;
+            if (accessor?.set) {
+              accessor.set.call(receiver, value);
+              return true;
+            }
+            return Reflect.set(target, key, value, receiver);
+          },
+          has(target, key) {
+            if (
+              typeof key === "string" &&
+              (includedAccessor(cls, urlHelpersModule(), key) ||
+                includedMember(cls, urlHelpersModule(), key) !== undefined)
+            ) {
+              return true;
+            }
+            return Reflect.has(target, key);
+          },
+        }),
+      );
+      cls._routes = (urlHelpersModule() as { _routes?: unknown })._routes ?? routes;
+    };
+  },
+};
 
 export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods {
   prototype: object;
@@ -151,4 +161,6 @@ function findTrailtieUrlHelpers(
   return undefined;
 }
 
-export { withRoutesHelpers as with };
+export const Trailties = { RoutesHelpers };
+
+rbModConstSet(AbstractController, "Trailties", Trailties);

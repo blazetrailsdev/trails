@@ -34,11 +34,11 @@ export function compileJs(source: string, options: EmitJsOptions = {}): EmitResu
   };
 }
 
-const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
+export const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
 
-const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
+export const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
-const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
+export const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
 
 const REGEX_PRECEDING_KEYWORD_RE =
   /(?:^|[^\w$])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/;
@@ -118,7 +118,7 @@ function isRegexStart(code: string, i: number, prev: string): boolean {
   return REGEX_PRECEDING_KEYWORD_RE.test(code.slice(0, i).trimEnd());
 }
 
-function netBraceDepth(code: string): number {
+export function netBraceDepth(code: string): number {
   const mask = codeMask(code);
   let depth = 0;
   for (let i = 0; i < code.length; i++) {
@@ -132,7 +132,7 @@ function netBraceDepth(code: string): number {
 const FLOW_READ_RE =
   /(?<![\w$.])(?:(_layoutFor|contentFor|isContentFor|_|yield)\s*\(|yield(?![\w$]))/y;
 
-function awaitFlowReads(
+export function awaitFlowReads(
   code: string,
   mask: boolean[] = codeMask(code),
   start = 0,
@@ -189,7 +189,7 @@ function awaitFlowReads(
   return out;
 }
 
-function netUnclosedParens(code: string): number {
+export function netUnclosedParens(code: string): number {
   let depth = 0;
   for (const ch of code) {
     if (ch === "(") depth++;

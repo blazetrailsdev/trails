@@ -334,7 +334,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     ...Relation.CLAUSE_METHODS,
   ];
 
-  private _model: typeof Base;
+  private _model: typeof Base & (new (attributes?: any, block?: any) => T);
   /** @internal */
   _values: ValuesHash = {};
   _withIsRecursive = false;
@@ -351,7 +351,8 @@ export class Relation<T extends Base, G extends boolean = false> {
   protected set _records(records: T[]) {
     this._recordsStore = records;
   }
-  protected _offsets?: Record<number, T | null>;
+  /** @internal */
+  _offsets?: Record<number, T | null>;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
   /** @internal */
   _loadResult?: Promise<T[]>;
@@ -365,7 +366,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   /** @inventedArm if — PERMANENT */
   constructor(
-    model: typeof Base,
+    model: typeof Base & (new (attributes?: any, block?: any) => T),
     {
       table = null,
       predicateBuilder = null,
@@ -1101,7 +1102,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       return joinDependency.instantiate(rows, this.strictLoadingValue, block) as T[];
     }
 
-    return this._model._loadFromSql(rows, block as never) as T[];
+    return this._model._loadFromSql(rows, block);
   }
 
   /** @internal */
@@ -1302,7 +1303,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       }
       return records;
     } else {
-      return (await this.model.update(id, attributes)) as T;
+      return await this.model.update(id, attributes);
     }
   }
 
@@ -1321,7 +1322,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       }
       return records;
     } else {
-      return (await this.model.updateBang(id, attributes)) as T;
+      return await this.model.updateBang(id, attributes);
     }
   }
 
@@ -1440,11 +1441,11 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this._table;
   }
 
-  get model(): typeof Base {
+  get model(): typeof Base & (new (attributes?: any, block?: any) => T) {
     return this._model;
   }
 
-  get klass(): typeof Base {
+  get klass(): typeof Base & (new (attributes?: any, block?: any) => T) {
     return this._model;
   }
 
@@ -1697,27 +1698,21 @@ export class Relation<T extends Base, G extends boolean = false> {
     attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): T {
-    return new this.model(attributes, block as ((record: Base) => void) | undefined) as T;
+    return new this.model(attributes, block);
   }
 
   protected _create(
     attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
-    return this.model.create(
-      attributes,
-      block as ((record: Base) => void) | undefined,
-    ) as Promise<T>;
+    return this.model.create(attributes, block);
   }
 
   protected _createBang(
     attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
-    return this.model.createBang(
-      attributes,
-      block as ((record: Base) => void) | undefined,
-    ) as Promise<T>;
+    return this.model.createBang(attributes, block);
   }
 
   private _scoping<R>(
@@ -1772,7 +1767,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     return value < 0 ? new Nodes.Subtraction(expr, bind) : new Nodes.Addition(expr, bind);
   }
 
-  private skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
+  /** @internal */
+  skipQueryCacheIfNecessary<R>(block: () => R | Promise<R>): R | Promise<R> {
     if (this.skipQueryCacheValue) {
       return this.model.uncached(block);
     }

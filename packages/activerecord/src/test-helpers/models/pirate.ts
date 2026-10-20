@@ -60,7 +60,7 @@ export class Pirate extends Base {
     this.belongsTo("nonValidatedParrot", { className: "Parrot" });
     this.hasAndBelongsToMany(
       "parrots",
-      function (this: any) {
+      function () {
         return this.order("parrots.id ASC");
       },
       { validate: true },
@@ -89,7 +89,7 @@ export class Pirate extends Base {
     this.hasOne("ship");
     this.hasOne("updateOnlyShip", { className: "Ship" });
     this.hasOne("nonValidatedShip", { className: "Ship" });
-    this.hasMany("birds", function (this: any) {
+    this.hasMany("birds", function () {
       return this.order("birds.id ASC");
     });
     this.hasMany("birdsWithMethodCallbacks", {
@@ -110,7 +110,7 @@ export class Pirate extends Base {
 
     this.hasOne(
       "fooBulb",
-      function (this: any) {
+      function () {
         return this.where({ name: "foo" });
       },
       {
@@ -245,7 +245,7 @@ export class SpacePirate extends Base {
     this.belongsTo("parrot");
     this.belongsTo(
       "parrotWithAnnotation",
-      function (this: any) {
+      function () {
         return this.annotate("that tells jokes");
       },
       {
@@ -256,7 +256,7 @@ export class SpacePirate extends Base {
     this.hasAndBelongsToMany("parrots", { foreignKey: "pirate_id" });
     this.hasAndBelongsToMany(
       "parrotsWithAnnotation",
-      function (this: any) {
+      function () {
         return this.annotate("that are very colorful");
       },
       { className: "Parrot", foreignKey: "pirate_id" },
@@ -264,7 +264,7 @@ export class SpacePirate extends Base {
     this.hasOne("ship", { foreignKey: "pirate_id" });
     this.hasOne(
       "shipWithAnnotation",
-      function (this: any) {
+      function () {
         return this.annotate("that is a rocket");
       },
       {
@@ -275,7 +275,7 @@ export class SpacePirate extends Base {
     this.hasMany("birds", { foreignKey: "pirate_id" });
     this.hasMany(
       "birdsWithAnnotation",
-      function (this: any) {
+      function () {
         return this.annotate("that are also parrots");
       },
       {
@@ -287,7 +287,7 @@ export class SpacePirate extends Base {
     this.hasMany("treasureEstimates", { through: "treasures", source: "priceEstimates" });
     this.hasMany(
       "treasureEstimatesWithAnnotation",
-      function (this: any) {
+      function () {
         return this.annotate("yarrr");
       },
       {

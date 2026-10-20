@@ -119,7 +119,12 @@ describe("vendor/sources.ts", () => {
       ref: "v1.3.0",
     });
     expect(gid!.packages).toEqual([
-      { name: "globalid", libPath: "lib/global_id", testPath: "test/cases" },
+      {
+        name: "globalid",
+        libPath: "lib/global_id",
+        libEntryFile: "lib/global_id.rb",
+        testPath: "test/cases",
+      },
     ]);
   });
 
@@ -194,6 +199,7 @@ describe("vendor/sources.ts", () => {
       "activejob",
       "rack-test",
       "did-you-mean",
+      "globalid",
       "msgpack",
       "mysql2",
       "pg",

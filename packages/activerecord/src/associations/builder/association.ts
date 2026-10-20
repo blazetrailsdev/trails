@@ -1,3 +1,4 @@
+import type { MacroType } from "../../reflection.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   NotImplementedError,
@@ -74,7 +75,13 @@ export class Association {
       );
     }
 
-    const reflection = this.createReflection(model, name, scope as any, options, block);
+    const reflection = this.createReflection(
+      model,
+      name,
+      scope as ((...args: any[]) => any) | null,
+      options,
+      block,
+    );
     this.defineAccessors(model, reflection);
     this.defineCallbacks(model, reflection);
     this.defineValidations(model, reflection);
@@ -101,7 +108,7 @@ export class Association {
     scope = this.buildScope(scope);
 
     const macro = this.macro();
-    return ActiveRecord.Reflection.create(macro as any, name, scope, options, model);
+    return ActiveRecord.Reflection.create(macro, name, scope, options, model);
   }
 
   static buildScope(scope: ((...args: any[]) => any) | null): ((...args: any[]) => any) | null {
@@ -114,7 +121,7 @@ export class Association {
     return scope;
   }
 
-  static macro(): string {
+  static macro(): Exclude<MacroType, "composedOf"> {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/builder/association.rb:62
     throw new NotImplementedError();
   }

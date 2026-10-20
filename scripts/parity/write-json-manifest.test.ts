@@ -171,9 +171,7 @@ describe("manifest emitters", () => {
 
   it("ratchet/exclude generators emit via writeJsonManifest", () => {
     const generators = [
-      "generate-no-explicit-any-allowlist.ts",
       "generate-fixture-parity-exclude.ts",
-      "generate-standalone-associations-exclude.ts",
       "test-deps/build-fixture-baseline.ts",
     ];
     for (const name of generators) {

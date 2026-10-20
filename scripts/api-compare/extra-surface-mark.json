@@ -11,11 +11,11 @@
     "noCounterpartFiles": 0,
     "allowed": 40
   },
-  "globalid": {
+  "i18n": {
     "novel": 0,
-    "total": 1,
+    "total": 8,
     "noCounterpartFiles": 0,
-    "allowed": 4
+    "allowed": 14
   },
   "ruby-compat": {
     "novel": 0,

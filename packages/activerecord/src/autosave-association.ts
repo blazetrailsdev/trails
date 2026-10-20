@@ -32,6 +32,7 @@ interface AutosaveAssociationHost {
   isAutosavingBelongsToFor(association: unknown): boolean;
   _alreadyCalled?: Record<string, boolean> | null;
   _newRecordBeforeSave?: boolean;
+  _associationCache: Base["_associationCache"];
   _nestedRecordsChangedForAutosaveAlreadyCalled?: boolean;
   customValidationContext(): boolean;
   _readAttribute(name: string): unknown;
@@ -40,7 +41,10 @@ interface AutosaveAssociationHost {
   errors: {
     add(attr: string, type?: string, opts?: Record<string, unknown>): void;
     uniqBang(): void;
+    objects: unknown[];
+    isAny(): boolean;
   };
+  _validationContext?: unknown;
   constructor: { primaryKey?: string | string[]; name: string; _reflections: object };
 }
 
@@ -153,11 +157,11 @@ export async function saveCollectionAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
+  const association = associationInstanceGet.call(this, reflection.name) as any;
   if (!association) return;
   const autosave = reflection.options?.autosave;
 
-  const newRecordBeforeSave = !!(this as any)._newRecordBeforeSave;
+  const newRecordBeforeSave = !!this._newRecordBeforeSave;
 
   association.resetScope();
 
@@ -177,7 +181,7 @@ export async function saveCollectionAssociation(
     }
 
     for (const record of records) {
-      if ((record as any).isDestroyed?.()) continue;
+      if (record.isDestroyed?.()) continue;
 
       let saved = true;
 
@@ -205,7 +209,7 @@ export async function saveCollectionAssociation(
 
 /** @internal */
 export async function saveHasOneAssociation(this: AutosaveAssociationHost, reflection: any) {
-  const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
+  const association = associationInstanceGet.call(this, reflection.name) as any;
   if (!(association && association.isLoaded())) return;
 
   const record = await association.loadTarget();
@@ -249,7 +253,7 @@ export async function saveHasOneAssociation(this: AutosaveAssociationHost, refle
 
 /** @internal */
 export async function saveBelongsToAssociation(this: AutosaveAssociationHost, reflection: any) {
-  const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
+  const association = associationInstanceGet.call(this, reflection.name) as any;
   if (!(association && association.isLoaded() && !association.isStaleTarget())) return;
 
   const record = await association.loadTarget();
@@ -322,10 +326,7 @@ export function isNestedRecordsChangedForAutosave(this: AutosaveAssociationHost)
     this._nestedRecordsChangedForAutosaveAlreadyCalled = true;
     return Object.values<any>(this.constructor._reflections).some((reflection) => {
       if (reflection.options.autosave) {
-        const association = associationInstanceGet.call(
-          this as unknown as Base,
-          reflection.name,
-        ) as any;
+        const association = associationInstanceGet.call(this, reflection.name) as any;
         return (
           association && wrap(association.target).some((record: any) => record.changedForAutosave())
         );
@@ -342,7 +343,7 @@ export async function validateHasOneAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
+  const association = associationInstanceGet.call(this, reflection.name) as any;
   const record = association && (await association.reader);
   if (!(record && (record.changedForAutosave() || this.customValidationContext()))) return;
 
@@ -363,7 +364,7 @@ export async function validateBelongsToAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
+  const association = associationInstanceGet.call(this, reflection.name) as any;
   const record = association && (await association.reader);
   if (!(record && (record.changedForAutosave() || this.customValidationContext()))) return;
 
@@ -381,7 +382,7 @@ export async function validateCollectionAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const association = associationInstanceGet.call(this as unknown as Base, reflection.name) as any;
+  const association = associationInstanceGet.call(this, reflection.name) as any;
   if (association) {
     const records = associatedRecordsToValidateOrSave.call(
       this,
@@ -401,11 +402,10 @@ export async function isAssociationValid(
   association: any,
   record: any,
 ): Promise<boolean> {
-  const owner = this as any;
   if (record.isDestroyed() || (association.options.autosave && record.markedForDestruction()))
     return true;
 
-  const context = owner.customValidationContext() ? owner._validationContext : undefined;
+  const context = this.customValidationContext() ? this._validationContext : undefined;
   if (await record.isValid(context)) return true;
 
   let associatedErrors: any[];
@@ -418,15 +418,15 @@ export async function isAssociationValid(
   }
 
   if (association.options.autosave) {
-    if (owner === record) return false;
+    if (this === record) return false;
     for (const error of associatedErrors) {
-      owner.errors.objects.push(new AssociationsNestedError(association, error));
+      this.errors.objects.push(new AssociationsNestedError(association, error));
     }
   } else if (associatedErrors.length > 0) {
-    owner.errors.add(association.reflection.name);
+    this.errors.add(association.reflection.name);
   }
 
-  return owner.errors.isAny();
+  return this.errors.isAny();
 }
 
 /** @internal */

@@ -17,7 +17,7 @@ type LayoutOption = Parameters<typeof Layouts.ClassMethods.layout>[0];
 type LayoutConditions = Parameters<typeof Layouts.ClassMethods.layout>[1];
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include AbstractController::Rendering`; the class/interface merge is how a mixin surfaces on the type side.
-class Base extends AbstractController.AbstractController {
+class Base extends AbstractController.Base {
   declare static layout: (layout: LayoutOption, conditions?: LayoutConditions) => void;
   declare static viewPaths: (paths: unknown) => void;
   declare _actionHasLayout: boolean;

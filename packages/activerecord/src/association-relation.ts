@@ -10,7 +10,7 @@ export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
   /** @internal */
   _association: CollectionProxy<T> | Association;
 
-  constructor(klass: typeof Base, association: CollectionProxy<T> | Association) {
+  constructor(klass: Relation<T>["model"], association: CollectionProxy<T> | Association) {
     super(klass);
     this._association = association;
   }

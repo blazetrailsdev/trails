@@ -131,7 +131,7 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
       (0, eval)(
         `${"\n".repeat(line - 1)}(function (rbFSend, attr, writer) { return { ` +
           `get() { const controller = this.controller; ` +
-          `if (attr in controller && typeof controller[attr] !== "function") return rbFSend(controller, attr); ` +
+          `if (attr in controller) { const value = controller[attr]; if (typeof value !== "function") return value; } ` +
           `return (...args) => rbFSend(controller, attr, ...args); }, ` +
           `set: writer ? function (value) { rbFSend(this.controller, attr + "=", value); } : undefined, ` +
           `enumerable: true, configurable: true }; })` +

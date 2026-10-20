@@ -3,7 +3,7 @@ import { registerModel } from "../../associations.js";
 
 export class WithoutTable extends Base {
   static {
-    this.defaultScope(function (this: any) {
+    this.defaultScope(function () {
       return this.where({ published: true });
     });
   }

@@ -333,7 +333,7 @@ export function detectEnumConflictBang(
     });
   } else if (klassMethod && methodName === "id") {
     raiseConflictError.call(this, enumName, methodName);
-  } else if (!klassMethod && isDangerousAttributeMethod.call(this as any, methodName)) {
+  } else if (!klassMethod && isDangerousAttributeMethod.call(this, methodName)) {
     raiseConflictError.call(this, enumName, methodName);
   } else if (
     !klassMethod &&

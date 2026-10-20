@@ -166,7 +166,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return new Ctor(targetModel, association) as CollectionProxy<T>;
   }
 
-  constructor(klass: typeof Base, association: CollectionAssociation) {
+  constructor(klass: Relation<T>["model"], association: CollectionAssociation) {
     super(klass);
     this._association = association;
     this._assocName = association.reflection.name;
@@ -287,7 +287,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   override last(limit: number): Promise<T[]>;
   override async last(limit?: number): Promise<T | T[] | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return FinderMethods.last.call(this as any, limit);
+    return FinderMethods.last.call(this, limit);
   }
 
   override take(): Promise<T | null>;
@@ -298,15 +298,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   }
 
   /** @internal */
-  protected override async findNthWithLimit(index: number, limit: number): Promise<T[]> {
+  override async findNthWithLimit(index: number, limit: number): Promise<T[]> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return baseFindNthWithLimit.call(this as any, index, limit);
+    return baseFindNthWithLimit.call(this, index, limit);
   }
 
   /** @internal */
-  protected override async findNthFromLast(index: number): Promise<T | null> {
+  override async findNthFromLast(index: number): Promise<T | null> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    return baseFindNthFromLast.call(this as any, index);
+    return baseFindNthFromLast.call(this, index);
   }
 
   async replace(otherArray: T[]): Promise<T[] | undefined> {

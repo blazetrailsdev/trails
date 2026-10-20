@@ -8,7 +8,6 @@ import {
   include,
   NoMethodError,
   rbObjDup,
-  rbStrSNew,
   Tempfile,
 } from "@blazetrails/ruby-compat";
 import { BadRequest } from "../bad-request.js";
@@ -230,7 +229,7 @@ export class Collector {
       klass = TempfilePart;
       this.openFiles += 1;
     } else {
-      body = rbStrSNew();
+      body = "";
       klass = BufferPart;
     }
 
@@ -431,7 +430,7 @@ export class Parser {
           let value: string;
           if (disposition[0] === '"') {
             disposition = disposition.slice(1);
-            value = rbStrSNew();
+            value = "";
 
             let m: RegExpExecArray | null;
             while ((m = /(["\\])/.exec(disposition))) {
@@ -539,7 +538,7 @@ export class Parser {
         /** @empty */
       }
     }
-    return filename.split(/[/\\]/).at(-1) ?? rbStrSNew();
+    return filename.split(/[/\\]/).at(-1) ?? "";
   }
   /** @internal */
   private tagMultipartEncoding(

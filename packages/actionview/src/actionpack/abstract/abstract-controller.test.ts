@@ -28,7 +28,7 @@ const views = new FixtureResolver({
   "layouts/abstract-controller/testing/me4.tse": "Me4 Enter : <%= yield %> : Exit",
 });
 
-class SimpleController extends AbstractController.AbstractController {}
+class SimpleController extends AbstractController.Base {}
 
 class Me extends SimpleController {
   index(): string {
@@ -46,7 +46,7 @@ describe("TestBasic", () => {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include AbstractController::Rendering`; the class/interface merge is how a mixin surfaces on the type side.
-class RenderingController extends AbstractController.AbstractController {
+class RenderingController extends AbstractController.Base {
   _prefixes(): string[] {
     return [];
   }
@@ -192,7 +192,7 @@ describe("TestPrefixedViews", () => {
   });
 });
 
-class OverridingLocalPrefixes extends AbstractController.AbstractController {
+class OverridingLocalPrefixes extends AbstractController.Base {
   index(): unknown {
     return (this as unknown as RenderingController).render();
   }
@@ -279,20 +279,20 @@ describe("TestLayouts", () => {
   });
 });
 
-class DefaultRespondToActionController extends AbstractController.AbstractController {
+class DefaultRespondToActionController extends AbstractController.Base {
   index(): void {
     this.responseBody = "success";
   }
 }
 
-class ActionMissingRespondToActionController extends AbstractController.AbstractController {
+class ActionMissingRespondToActionController extends AbstractController.Base {
   /** @internal */
   actionMissing(_actionName: string): void {
     this.responseBody = "success";
   }
 }
 
-class RespondToActionController extends AbstractController.AbstractController {
+class RespondToActionController extends AbstractController.Base {
   index(): void {
     this.responseBody = "success";
   }
@@ -309,7 +309,7 @@ class RespondToActionController extends AbstractController.AbstractController {
 
 describe("TestRespondToAction", () => {
   async function assertDispatch(
-    klass: new () => AbstractController.AbstractController,
+    klass: new () => AbstractController.Base,
     body = "success",
     action = "index",
   ): Promise<void> {
@@ -341,7 +341,7 @@ describe("TestRespondToAction", () => {
   });
 });
 
-class Me6 extends AbstractController.AbstractController {
+class Me6 extends AbstractController.Base {
   static {
     this.actionMethods();
   }
