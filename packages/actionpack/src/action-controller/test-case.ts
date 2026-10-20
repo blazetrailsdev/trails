@@ -25,7 +25,8 @@ import {
   b,
   KeyError,
   merge,
-  Module,
+  classModule,
+  rbModAttrReader,
   rbModConstSet,
   rbObjIvarSet,
   RuntimeError,
@@ -153,6 +154,7 @@ export const ClassMethods: BehaviorClassMethods & ThisType<BehaviorClass> = {
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class below.
 export interface Behavior extends Included<typeof TestProcess> {
   routes?: RouteSet;
   controller: Metal;
@@ -493,53 +495,51 @@ function checkRequiredIvars(this: Behavior): void {
   }
 }
 
-export const Behavior = new Module((mod) => {
-  extend(mod, Concern);
-  mod.include(TestProcess);
-  mod.include(ConstantLookup);
-  mod.include(DomTestingAssertions);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a class module's instance methods are assigned to its prototype below; the interface above types them.
+export class Behavior {
+  static readonly [classModule] = true;
+  static readonly ClassMethods = ClassMethods;
+}
 
-  mod.attrReader("response", "request");
+extend(Behavior, Concern);
+include(Behavior, TestProcess);
+include(Behavior, ConstantLookup);
+include(Behavior, DomTestingAssertions);
 
-  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
+rbModAttrReader(Behavior, "response", "request");
 
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      get,
-      post,
-      patch,
-      put,
-      delete: deleteRequest,
-      head,
-      process,
-      controllerClassName,
-      generatedPath,
-      queryParameterNames,
-      setupControllerRequestAndResponse,
-      buildResponse,
-    });
-  });
+Object.assign(Behavior.prototype, {
+  get,
+  post,
+  patch,
+  put,
+  delete: deleteRequest,
+  head,
+  process,
+  controllerClassName,
+  generatedPath,
+  queryParameterNames,
+  setupControllerRequestAndResponse,
+  buildResponse,
+});
 
-  (
-    mod as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
-  ).included(null, function (this: typeof TestCase) {
-    include(this, TemplateAssertions);
-    include(this, Assertions);
-    classAttribute.call(this, "_controllerClass");
-    this.setup(":setupControllerRequestAndResponse");
-    runLoadHooks("action_controller_test_case", this);
-  });
+(
+  Behavior as unknown as { included(base: null, block: (this: typeof TestCase) => void): void }
+).included(null, function (this: typeof TestCase) {
+  include(this, TemplateAssertions);
+  include(this, Assertions);
+  classAttribute.call(this, "_controllerClass");
+  this.setup(":setupControllerRequestAndResponse");
+  runLoadHooks("action_controller_test_case", this);
+});
 
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      setupRequest,
-      wrapExecution,
-      processControllerResponse,
-      scrubEnvBang,
-      checkRequiredIvars,
-      documentRootElement,
-    });
-  });
+Object.assign(Behavior.prototype, {
+  setupRequest,
+  wrapExecution,
+  processControllerResponse,
+  scrubEnvBang,
+  checkRequiredIvars,
+  documentRootElement,
 });
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Behavior` (`actionpack/lib/action_controller/test_case.rb:696`) and the two `include`s of its `included do` block (`:597-598`); the class/interface merge is how a mixin surfaces on the type side. */
