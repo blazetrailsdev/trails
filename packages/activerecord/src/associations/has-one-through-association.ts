@@ -79,7 +79,7 @@ function createThroughRecord(
           } else {
             return throughRecord.update(attributes).then(() => {});
           }
-        } else if ((this.owner as any).isNewRecord() || !save) {
+        } else if (this.owner.isNewRecord() || !save) {
           return buildThroughProxyRecord(throughProxy, attributes);
         } else {
           return throughProxy.create(attributes).then(() => {});

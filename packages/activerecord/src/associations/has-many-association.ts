@@ -183,10 +183,7 @@ export class HasManyAssociation extends CollectionAssociation {
 
   /** @internal */
   async countRecords(): Promise<number> {
-    const reflection = this.reflection as unknown as {
-      hasActiveCachedCounter(): boolean;
-      counterCacheColumn(): string | null;
-    };
+    const reflection = this.reflection;
     let count: number;
     if (reflection.hasActiveCachedCounter()) {
       const counterCacheColumn = reflection.counterCacheColumn();
@@ -220,14 +217,7 @@ async function updateCounter(
 ): Promise<void> {
   if (!reflection.hasCachedCounter?.()) return;
   const counterCacheColumn = reflection.counterCacheColumn?.() as string;
-  const owner = this.owner as any;
-  if (typeof owner.incrementBang === "function") {
-    await owner.incrementBang(counterCacheColumn, difference);
-  } else if (typeof owner.updateCounters === "function") {
-    await owner.updateCounters({ [counterCacheColumn]: difference });
-  } else if (typeof owner.increment === "function") {
-    owner.increment(counterCacheColumn, difference);
-  }
+  await this.owner.incrementBang(counterCacheColumn, difference);
 }
 
 /** @internal */
@@ -235,7 +225,7 @@ function updateCounterInMemory(this: HasManyAssociation, difference: number): vo
   const reflection = this.reflection;
   if (!reflection.isCounterMustBeUpdatedByHasMany?.()) return;
   const counter = reflection.counterCacheColumn?.() as string;
-  const owner = this.owner as any;
+  const owner = this.owner;
   const current = Number(owner.readAttribute?.(counter) ?? 0);
   owner.writeAttribute?.(counter, current + difference);
   owner.clearAttributeChange?.(counter);

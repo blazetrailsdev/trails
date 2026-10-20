@@ -1690,8 +1690,11 @@ export class Base extends Model {
   declare static _destroyAssociationAsyncJob: unknown;
   declare static is_destroyAssociationAsyncJob: boolean;
 
-  declare static destroyAssociationAsyncJob: any;
-  declare destroyAssociationAsyncJob: any;
+  declare static destroyAssociationAsyncJob:
+    | string
+    | (abstract new (...args: never[]) => unknown)
+    | null;
+  declare destroyAssociationAsyncJob: string | (abstract new (...args: never[]) => unknown) | null;
   /** @internal */
   declare _afterCommitJobs: Array<[unknown, Record<string, unknown>]>;
 
@@ -1805,7 +1808,7 @@ export class Base extends Model {
 
   static transaction<R>(
     this: typeof Base,
-    fn: (tx: any) => Promise<R>,
+    fn: (tx: any) => Promise<R> | R,
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
   ): Promise<R | undefined> {
     return _transaction(this, fn, options);

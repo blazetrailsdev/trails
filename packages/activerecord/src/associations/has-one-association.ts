@@ -230,7 +230,7 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private async removeTargetBang(method: string | undefined): Promise<void> {
-    const target = this.target as any;
+    const target = this.target!;
     switch (method) {
       case "delete":
         await target.delete();

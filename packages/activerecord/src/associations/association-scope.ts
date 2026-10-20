@@ -18,7 +18,7 @@ export type ValueTransformation<T = unknown> = (v: T) => unknown;
 
 export interface AssociationScopeable {
   readonly owner: Base;
-  readonly reflection: AssociationReflection;
+  readonly reflection: AssociationReflection | ThroughReflection;
   readonly klass: typeof Base;
 }
 
@@ -135,7 +135,7 @@ export class AssociationScope {
   }
 
   protected getChain(
-    reflection: AssociationReflection,
+    reflection: AssociationReflection | ThroughReflection,
     association: AssociationScopeable,
     tracker: AliasTracker,
   ): Array<ChainReflection> {
