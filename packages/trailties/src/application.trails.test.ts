@@ -7,9 +7,9 @@ import { Dir, File, FileUtils, NameError, SecureRandom } from "@blazetrails/ruby
 import { MockRequest } from "@blazetrails/rack";
 import { Application } from "./application.js";
 
-declare module "./trailtie/configuration.js" {
+declare module "@blazetrails/trailties/trailtie/configuration" {
   interface Configuration {
-    recordNamespace: OrderedOptions & { customSerializers: string[] };
+    trailsTestOnlyNamespace: OrderedOptions & { customSerializers: string[] };
   }
 }
 
@@ -36,22 +36,23 @@ describe("Application framework railtie initializers", () => {
     const seen: unknown[] = [];
     class RecordConfigTrailtie extends BaseTrailtie {
       static {
-        this.config.recordNamespace = Object.assign(new OrderedOptions(), {
+        this.config.trailsTestOnlyNamespace = Object.assign(new OrderedOptions(), {
           customSerializers: [],
         });
-        this.config.recordNamespace.customSerializers = ["a"];
+        this.config.trailsTestOnlyNamespace.customSerializers = ["a"];
       }
     }
     BaseTrailtie.register(RecordConfigTrailtie);
     RecordConfigTrailtie.initializer("framework.record_config", (app) => {
-      seen.push(app.config.recordNamespace.customSerializers);
+      seen.push(app.root, app.config.trailsTestOnlyNamespace.customSerializers);
     });
 
     class ConfigBridgeApp extends Application {}
     Application.register(ConfigBridgeApp);
-    await ConfigBridgeApp.instance().initialize();
+    const app = ConfigBridgeApp.instance();
+    await app.initialize();
 
-    expect(seen).toEqual([["a"]]);
+    expect(seen).toEqual([app.root, ["a"]]);
   });
 
   it("runs the app's own initializers first when railtiesOrder is [:all, :main_app]", async () => {
