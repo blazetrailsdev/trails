@@ -17,6 +17,12 @@
     "noCounterpartFiles": 0,
     "allowed": 4
   },
+  "i18n": {
+    "novel": 0,
+    "total": 8,
+    "noCounterpartFiles": 0,
+    "allowed": 14
+  },
   "ruby-compat": {
     "novel": 0,
     "total": 52,

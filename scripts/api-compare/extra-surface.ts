@@ -2450,7 +2450,7 @@ function buildPackageReport(
   }
   for (const rubyFile of [...overriddenRubyFiles(pkg), ...[...methodDeclarationFiles].sort()]) {
     const tsFile = rubyFileToTs(rubyFile, pkg);
-    const alreadyDeclared = rubyFiles.has(rubyFile);
+    const alreadyDeclared = rubyFileNames.has(rubyFile);
     if (!alreadyDeclared && coveredTsFiles.has(tsFile)) continue;
     const declared = new Set((rubyFiles.get(rubyFile) ?? []).map((e) => e.fqn));
     for (const [fqn, info] of [
