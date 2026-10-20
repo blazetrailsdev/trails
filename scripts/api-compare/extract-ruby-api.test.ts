@@ -3771,7 +3771,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     expect(names["Core#pairs"]).toEqual({ merge: ["from_entries"] });
   });
 
-  it("names an argument-less Hash.new / Array.new a literal and String.new(x) a conversion", () => {
+  it("names an argument-less Hash.new / Array.new / String.new a literal and String.new(x) a conversion", () => {
     const c = rubyCallReceivers({
       "lib/active_support/core.rb": `
         class Core
@@ -3822,7 +3822,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     expect(c["Core#blocked"]).toEqual({ new: ["const"] });
     expect(c["Core#other"]).toEqual({ new: ["const"] });
     expect(c["Core#conversion"]).toEqual({ new: ["string-new"] });
-    expect(c["Core#empty_string"]).toEqual({ new: ["const"] });
+    expect(c["Core#empty_string"]).toBeNull();
   });
 
   it("proves a Hash local from a hash-literal default, a `**` param and an assignment", () => {
