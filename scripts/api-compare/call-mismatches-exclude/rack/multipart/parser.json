@@ -6,6 +6,6 @@
     "call": "new",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "rack multipart/parser.rb:161-164 makes two `new` calls, `String.new` (ported as `rbStrSNew()`, which is no `new` expression) and the 5-argument `klass.new`; the argument comparer pairs Ruby's argument-less `String.new` with the port's one `new`, the `klass.new` it mirrors as-is."
+    "reason": "CONVERGEABLE call-args-pairs-string-new-with-rbstrsnew-in-mixed-new-bodies: parser.rb:161-164 `String.new` (ported `rbStrSNew()`) is paired with the port's only `new`, the 5-argument `klass.new`."
   }
 ]

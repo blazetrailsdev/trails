@@ -80,123 +80,6 @@ export class Frame {
   }
 }
 
-export class ShowExceptions {
-  static readonly CONTEXT = 7;
-
-  private app: RackApp;
-
-  constructor(app: RackApp) {
-    this.app = app;
-  }
-
-  prefersPlaintext(env: Record<string, any>): boolean {
-    return !this.acceptsHtml(env);
-  }
-
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
-    try {
-      return await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
-    } catch (e: any) {
-      const exceptionString = this.dumpException(e);
-
-      env[RACK_ERRORS].puts(exceptionString);
-      env[RACK_ERRORS].flush();
-
-      let contentType: string;
-      let body: string;
-      if (this.acceptsHtml(env)) {
-        contentType = "text/html";
-        body = this.pretty(env, e);
-      } else {
-        contentType = "text/plain";
-        body = exceptionString;
-      }
-
-      return [
-        500,
-        { [CONTENT_TYPE]: contentType, [CONTENT_LENGTH]: String(Buffer.byteLength(body)) },
-        [body],
-      ];
-    }
-  }
-
-  dumpException(exception: Error): string {
-    const message = (exception as any).detailedMessage
-      ? (exception as any).detailedMessage()
-      : exception.message || "";
-    const name = exception.constructor?.name || (exception as any).name || "Error";
-    const backtrace = this.backtrace(exception)
-      .map((l) => `\t${l}`)
-      .join("\n");
-    return `${name}: ${message}\n${backtrace}`;
-  }
-
-  pretty(env: Record<string, any>, exception: Error): string {
-    const req = new Request(env);
-
-    const path = (req.scriptName + req.pathInfo).replace(/\/+/g, "/");
-
-    const frames = this.backtrace(exception)
-      .map((line) => {
-        const frame = new Frame();
-        const m = /(.*?):(\d+)(:in `(.*)')?/.exec(line);
-        if (m) {
-          frame.setFilename(m[1]);
-          frame.setLineno(parseInt(m[2], 10));
-          frame.setFunction(m[4] ?? null);
-
-          try {
-            const lineno = frame.lineno! - 1;
-            const lines = File.readlines(frame.filename!);
-            frame.setPreContextLineno(Math.max(lineno - ShowExceptions.CONTEXT, 0));
-            frame.setPreContext(lines.slice(frame.preContextLineno!, lineno));
-            frame.setContextLine(chomp(lines[lineno]));
-            frame.setPostContextLineno(Math.min(lineno + ShowExceptions.CONTEXT, lines.length));
-            frame.setPostContext(lines.slice(lineno + 1, frame.postContextLineno! + 1));
-          } catch {
-            /** @empty */
-          }
-
-          return frame;
-        } else {
-          return null;
-        }
-      })
-      .filter((frame): frame is Frame => frame !== null);
-
-    return this.template()({ h: (obj) => this.h(obj), env, exception, req, path, frames });
-  }
-
-  private backtrace(exception: Error): string[] {
-    if (!exception.stack) return [];
-    return exception.stack
-      .split("\n")
-      .slice(1)
-      .map((line) => {
-        const m = /^\s*at (?:(.*?) \()?(.*?):(\d+):\d+\)?$/.exec(line);
-        return m ? `${m[2]}:${m[3]}${m[1] ? `:in \`${m[1]}'` : ""}` : line.trim();
-      });
-  }
-
-  protected template(): (binding: TemplateBinding) => string {
-    return TEMPLATE;
-  }
-
-  /** @missingRailsName inspect — PERMANENT */
-  h(obj: any): string {
-    if (typeof obj === "string") {
-      return escapeHtml(obj);
-    } else {
-      return escapeHtml(rbInspect(obj));
-    }
-  }
-
-  /** @internal */
-  private acceptsHtml(env: Record<string, any>): string | null {
-    return bestQMatch(env["HTTP_ACCEPT"], ["text/html"]);
-  }
-}
-
 type TemplateBinding = {
   h: (obj: unknown) => string;
   env: Record<string, any>;
@@ -365,10 +248,10 @@ ${frames
         <code>${h(frame.filename)}</code>: in <code>${h(frame.function)}</code>
 
           ${
-            frame.contextLine
+            frame.contextLine != null
               ? `<div class="context" id="c${h(rbObjId(frame))}">
               ${
-                frame.preContext
+                frame.preContext != null
                   ? `<ol start="${h(frame.preContextLineno! + 1)}" class="pre-context" id="pre${h(rbObjId(frame))}">
                 ${frame.preContext
                   .map(
@@ -384,7 +267,7 @@ ${frames
               <li onclick="toggle('pre${h(rbObjId(frame))}', 'post${h(rbObjId(frame))}')">${h(frame.contextLine)}<span>...</span></li></ol>
 
               ${
-                frame.postContext
+                frame.postContext != null
                   ? `<ol start='${h(frame.lineno! + 1)}' class="post-context" id="post${h(rbObjId(frame))}">
                 ${frame.postContext
                   .map(
@@ -515,3 +398,122 @@ ${frames
 </html>
 `;
 };
+
+export class ShowExceptions {
+  static readonly CONTEXT = 7;
+
+  private app: RackApp;
+
+  constructor(app: RackApp) {
+    this.app = app;
+  }
+
+  prefersPlaintext(env: Record<string, any>): boolean {
+    return !this.acceptsHtml(env);
+  }
+
+  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+    try {
+      return await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    } catch (e: any) {
+      const exceptionString = this.dumpException(e);
+
+      env[RACK_ERRORS].puts(exceptionString);
+      env[RACK_ERRORS].flush();
+
+      let contentType: string;
+      let body: string;
+      if (this.acceptsHtml(env)) {
+        contentType = "text/html";
+        body = this.pretty(env, e);
+      } else {
+        contentType = "text/plain";
+        body = exceptionString;
+      }
+
+      return [
+        500,
+        { [CONTENT_TYPE]: contentType, [CONTENT_LENGTH]: String(Buffer.byteLength(body)) },
+        [body],
+      ];
+    }
+  }
+
+  dumpException(exception: Error): string {
+    const message = (exception as any).detailedMessage
+      ? (exception as any).detailedMessage()
+      : exception.message || "";
+    const name = exception.constructor?.name || (exception as any).name || "Error";
+    const backtrace = this.backtrace(exception)
+      .map((l) => `\t${l}`)
+      .join("\n");
+    return `${name}: ${message}\n${backtrace}`;
+  }
+
+  pretty(env: Record<string, any>, exception: Error): string {
+    const req = new Request(env);
+
+    const path = (req.scriptName + req.pathInfo).replace(/\/+/g, "/");
+
+    const frames = this.backtrace(exception)
+      .map((line) => {
+        const frame = new Frame();
+        const m = /(.*?):(\d+)(:in `(.*)')?/.exec(line);
+        if (m) {
+          frame.setFilename(m[1]);
+          frame.setLineno(parseInt(m[2], 10));
+          frame.setFunction(m[4] ?? null);
+
+          try {
+            const lineno = frame.lineno! - 1;
+            const lines = File.readlines(frame.filename!);
+            frame.setPreContextLineno(Math.max(lineno - ShowExceptions.CONTEXT, 0));
+            frame.setPreContext(lines.slice(frame.preContextLineno!, lineno));
+            frame.setContextLine(chomp(lines[lineno]));
+            frame.setPostContextLineno(Math.min(lineno + ShowExceptions.CONTEXT, lines.length));
+            frame.setPostContext(lines.slice(lineno + 1, frame.postContextLineno! + 1));
+          } catch {
+            /** @empty */
+          }
+
+          return frame;
+        } else {
+          return null;
+        }
+      })
+      .filter((frame): frame is Frame => frame !== null);
+
+    return this.template()({ h: (obj) => this.h(obj), env, exception, req, path, frames });
+  }
+
+  private backtrace(exception: Error): string[] {
+    if (!exception.stack) return [];
+    return exception.stack
+      .split("\n")
+      .slice(1)
+      .map((line) => {
+        const m = /^\s*at (?:(.*?) \()?(.*?):(\d+):\d+\)?$/.exec(line);
+        return m ? `${m[2]}:${m[3]}${m[1] ? `:in \`${m[1]}'` : ""}` : line.trim();
+      });
+  }
+
+  protected template(): (binding: TemplateBinding) => string {
+    return ShowExceptions.TEMPLATE;
+  }
+
+  /** @missingRailsName inspect — PERMANENT */
+  h(obj: any): string {
+    if (typeof obj === "string") {
+      return escapeHtml(obj);
+    } else {
+      return escapeHtml(rbInspect(obj));
+    }
+  }
+
+  static readonly TEMPLATE = TEMPLATE;
+
+  /** @internal */
+  private acceptsHtml(env: Record<string, any>): string | null {
+    return bestQMatch(env["HTTP_ACCEPT"], ["text/html"]);
+  }
+}
