@@ -116,7 +116,7 @@ interface DirtyPrivateHost {
   _mutationsFromDatabase: unknown;
   _touchAttrNames: Set<string> | null;
   _skipDirtyTracking: boolean | null;
-  attributeChanged(name: string): boolean;
+  attributeChanged(name: string): boolean | undefined;
   attributeWas(name: string): unknown;
   /** @internal */
   clearAttributeChange(name: string): void;

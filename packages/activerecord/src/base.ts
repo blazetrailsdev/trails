@@ -1450,12 +1450,12 @@ export class Base extends Model {
 
   declare static validatesUniquenessOf: typeof _Validations.validatesUniquenessOf;
 
-  private _touchRecord: boolean | null = null;
+  _touchRecord: boolean | null = null;
   declare recordTimestamps: boolean;
 
   /** @internal */
   private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
-    const ctor = this.constructor as typeof Base;
+    const ctor = this.constructor;
     if (typeof this.association !== "function") return;
     const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
     if (!opaque && sources.length === 0) return;
@@ -1714,7 +1714,7 @@ export class Base extends Model {
     fn: (tx: any) => Promise<R>,
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
   ): Promise<R | undefined> {
-    return (this.constructor as typeof Base).transaction(fn, options);
+    return this.constructor.transaction(fn, options);
   }
 
   static transaction<R>(
@@ -1810,7 +1810,15 @@ rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
 rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
+export interface Base
+  extends
+    AutosaveAssociation,
+    JSONSerializer,
+    AMDirty,
+    Pick<ThisParameterType<typeof Timestamp.initInternals>, "allTimestampAttributesInModel"> {
+  constructor: typeof Base;
+  _touchAttrNames: Set<string> | null;
+  _skipDirtyTracking: boolean | null;
   /** @internal */
   strictLoadedAssociations: OmitThisParameter<typeof _Persistence.strictLoadedAssociations>;
   /** @internal */
@@ -2373,7 +2381,7 @@ for (const [name, fn] of [
   [
     "createOrUpdate",
     function (this: Base, touch = true, block?: (record: Base) => void): Promise<boolean> {
-      return Timestamp.createOrUpdate.call(this as any, touch, () =>
+      return Timestamp.createOrUpdate.call(this, touch, () =>
         callbacksCreateOrUpdate.call(this, () => _Persistence.createOrUpdate.call(this, block)),
       );
     },
@@ -2385,7 +2393,7 @@ for (const [name, fn] of [
       attributeNames?: string[],
       block?: (record: Base) => void,
     ): Promise<boolean> {
-      return Timestamp._createRecord.call(this as any, () =>
+      return Timestamp._createRecord.call(this, () =>
         callbacksCreateRecord.call(this, attributeNames, block),
       ) as Promise<boolean>;
     },
@@ -2403,12 +2411,12 @@ for (const [name, fn] of [
     "_touchRow",
     function (this: Base, attributeNames: string[], time: unknown): Promise<number> {
       return _DirtyModule._touchRow.call(
-        this as any,
+        this,
         attributeNames,
         time,
         (dirtyNames: string[], dirtyTime: unknown) =>
           LockingOptimistic._touchRow.call(
-            this as any,
+            this,
             dirtyNames,
             dirtyTime,
             (lockNames: string[], lockTime: unknown) =>
@@ -2421,8 +2429,8 @@ for (const [name, fn] of [
     "destroyRow",
     function (this: Base): Promise<number> {
       return Promise.resolve(
-        LockingOptimistic.destroyRow.call(this as any, () =>
-          CounterCache.destroyRow.call(this as any, () => _Persistence.destroyRow.call(this)),
+        LockingOptimistic.destroyRow.call(this, () =>
+          CounterCache.destroyRow.call(this, () => _Persistence.destroyRow.call(this)),
         ),
       );
     },
@@ -2430,7 +2438,7 @@ for (const [name, fn] of [
   [
     "_queryConstraintsHash",
     function (this: Base): Record<string, unknown> {
-      return LockingOptimistic._queryConstraintsHash.call(this as any, () =>
+      return LockingOptimistic._queryConstraintsHash.call(this, () =>
         _Persistence._queryConstraintsHash.call(this),
       );
     },
@@ -2439,7 +2447,7 @@ for (const [name, fn] of [
     "_updateRow",
     function (this: Base, attributeNames: string[], attemptedAction = "update"): Promise<number> {
       return LockingOptimistic._updateRow.call(
-        this as any,
+        this,
         attributeNames,
         attemptedAction,
         (names: string[], action: string) => _Persistence._updateRow.call(this, names, action),
@@ -2453,7 +2461,7 @@ for (const [name, fn] of [
       attributeNames?: string[],
       block?: (record: Base) => void,
     ): Promise<unknown> {
-      return Timestamp._updateRecord.call(this as any, () =>
+      return Timestamp._updateRecord.call(this, () =>
         callbacksUpdateRecord.call(this, attributeNames, block),
       );
     },

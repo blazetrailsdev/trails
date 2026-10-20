@@ -367,7 +367,7 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 
   it("Fixture#find locates a composite-primary-key row by its full key tuple", async () => {
     const book = cpkBooks("cpk_book_with_generated_pk");
-    const modelClass = book.constructor as typeof Base;
+    const modelClass = book.constructor;
     expect(modelClass.primaryKey).toEqual(["author_id", "id"]);
     const fixture = new Fixture(
       {

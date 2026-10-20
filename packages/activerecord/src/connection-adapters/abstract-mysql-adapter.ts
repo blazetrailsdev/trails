@@ -622,7 +622,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     }
 
     const td = this.createTableDefinition(tableName);
-    const cd = td.newColumnDefinition(column.name, type as any, options as any);
+    const cd = td.newColumnDefinition(column.name, type, options);
     return new ChangeColumnDefinition(cd, column.name);
   }
 

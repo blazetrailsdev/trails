@@ -114,7 +114,7 @@ export class InsertAll {
     options: InsertAllOptions = {},
   ): Promise<Result> {
     const model = relation.model as ModelClass;
-    return withConnection.call(model as any, async (c: any) =>
+    return withConnection.call(model, async (c: any) =>
       new InsertAll(
         relation,
         c,

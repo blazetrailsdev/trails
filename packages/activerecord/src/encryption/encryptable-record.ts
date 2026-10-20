@@ -142,7 +142,7 @@ export function sourceAttributeFromPreservedAttribute(
 
 /** @internal */
 export function isEncryptedAttribute(this: Base, attributeName: string): boolean {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   const name = klass.attributeAliases?.[attributeName] ?? attributeName;
   if (!(klass.encryptedAttributes ?? new Set<string>()).has(name)) return false;
   const type = klass.typeForAttribute(name) as EncryptedAttributeType;
@@ -151,7 +151,7 @@ export function isEncryptedAttribute(this: Base, attributeName: string): boolean
 
 /** @internal */
 export function ciphertextFor(this: Base, attributeName: string): unknown {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   attributeName = klass.attributeAliases?.[attributeName] ?? attributeName;
   if (isEncryptedAttribute.call(this, attributeName)) {
     return this.readAttributeBeforeTypeCast?.(attributeName);
@@ -197,7 +197,7 @@ export function validateEncryptionAllowed(this: unknown): void {
 
 /** @internal */
 export function hasEncryptedAttributes(this: Base): boolean {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   return (klass.encryptedAttributes ?? new Set<string>()).size > 0;
 }
 
@@ -207,7 +207,7 @@ export async function _createRecord(
   attributeNames: string[] | undefined,
   superFn: (attributeNames: string[]) => Promise<unknown>,
 ): Promise<unknown> {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   attributeNames ??= this.attributeNames();
   if (hasEncryptedAttributes.call(this)) {
     attributeNames = [
@@ -219,7 +219,7 @@ export async function _createRecord(
 
 /** @internal */
 export function buildEncryptAttributeAssignments(this: Base): Record<string, unknown> {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   return Object.fromEntries(
     Array<string>(klass.encryptedAttributes).map((attributeName) => [
       attributeName,
@@ -230,7 +230,7 @@ export function buildEncryptAttributeAssignments(this: Base): Record<string, unk
 
 /** @internal */
 export function buildDecryptAttributeAssignments(this: Base): Record<string, unknown> {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   return Object.fromEntries(
     Array<string>(klass.encryptedAttributes).map((attributeName) => {
       const type = klass.typeForAttribute(attributeName) as EncryptedAttributeType;
@@ -289,7 +289,7 @@ export function preserveOriginalEncrypted(this: typeof Base, name: string): void
 
 /** @internal */
 export function cantModifyEncryptedAttributesWhenFrozen(this: Base): void {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   for (const attribute of klass.encryptedAttributes!) {
     if (this.changedAttributes.include(attribute)) {
       this.errors.add(attribute, "can't be modified because it is encrypted");

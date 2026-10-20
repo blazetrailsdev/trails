@@ -87,7 +87,7 @@ export class HasManyAssociation extends CollectionAssociation {
         }
 
         if (!isEmpty(this.target)) {
-          const associationClass = first(this.target)!.constructor as typeof Base;
+          const associationClass = first(this.target)!.constructor;
           let primaryKeyColumn: string | string[];
           let ids: unknown[];
           if (queryConstraintsList.call(associationClass)) {
@@ -102,7 +102,7 @@ export class HasManyAssociation extends CollectionAssociation {
 
           for (const idsBatch of eachSlice(
             ids,
-            (this.owner.constructor as typeof Base).destroyAssociationAsyncBatchSize ?? ids.length,
+            this.owner.constructor.destroyAssociationAsyncBatchSize ?? ids.length,
           )) {
             this.enqueueDestroyAssociation({
               ownerModelName: this.owner.constructor.name,

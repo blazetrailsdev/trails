@@ -83,6 +83,7 @@ export interface AutosaveAssociation {
     typeof isInversePolymorphicAssociationChanged
   >;
   saveBelongsToAssociation: OmitThisParameter<typeof saveBelongsToAssociation>;
+  _alreadyCalled?: Record<string, boolean> | null;
 }
 
 export const AutosaveAssociation = new Module().include({
@@ -533,20 +534,24 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
 }
 
 /** @internal */
-export function defineNonCyclicMethod(this: any, name: string, block: (this: any) => any): void {
+export function defineNonCyclicMethod(
+  this: typeof Base,
+  name: string,
+  block: (this: Base) => any,
+): void {
   if (rbModMethodDefined(this, name, false)) return;
 
-  rbModDefineMethod(this, name, function (this: any) {
+  rbModDefineMethod(this, name, function (this: Base) {
     let result: any = true;
     this._alreadyCalled ||= {};
     if (!this._alreadyCalled[name]) {
       result = rbEnsure(
         () => {
-          this._alreadyCalled[name] = true;
+          this._alreadyCalled![name] = true;
           return block.call(this);
         },
         () => {
-          this._alreadyCalled[name] = false;
+          this._alreadyCalled![name] = false;
         },
       );
     }
@@ -556,25 +561,25 @@ export function defineNonCyclicMethod(this: any, name: string, block: (this: any
 }
 
 /** @internal */
-export function addAutosaveAssociationCallbacks(this: any, reflection: any): void {
+export function addAutosaveAssociationCallbacks(this: typeof Base, reflection: any): void {
   const saveMethod = `:autosaveAssociatedRecordsFor_${reflection.name}`;
 
   if (reflection.isCollection()) {
     this.aroundSave(":aroundSaveCollectionAssociation");
 
-    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: any) {
+    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: Base) {
       return this.saveCollectionAssociation(reflection);
     });
     this.afterCreate(saveMethod);
     this.afterUpdate(saveMethod);
   } else if (reflection.isHasOne()) {
-    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: any) {
+    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: Base) {
       return this.saveHasOneAssociation(reflection);
     });
     this.afterCreate(saveMethod);
     this.afterUpdate(saveMethod);
   } else {
-    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: any) {
+    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: Base) {
       if ((await this.saveBelongsToAssociation(reflection)) === false) kernelThrow(":abort");
     });
     this.beforeSave(saveMethod);
@@ -584,7 +589,7 @@ export function addAutosaveAssociationCallbacks(this: any, reflection: any): voi
 }
 
 /** @internal */
-export function defineAutosaveValidationCallbacks(this: any, reflection: any): void {
+export function defineAutosaveValidationCallbacks(this: typeof Base, reflection: any): void {
   const validationMethod = `:validateAssociatedRecordsFor_${reflection.name}`;
   if (reflection.isValidate() && !rbModMethodDefined(this, validationMethod.slice(1))) {
     let method: string;
@@ -596,7 +601,7 @@ export function defineAutosaveValidationCallbacks(this: any, reflection: any): v
       method = "validateBelongsToAssociation";
     }
 
-    defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: any) {
+    defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: Base) {
       return rbFSend(this, method, reflection);
     });
     this.validate(validationMethod);

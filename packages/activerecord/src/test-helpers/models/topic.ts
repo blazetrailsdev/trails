@@ -133,7 +133,7 @@ export class Topic extends Base {
     );
     this.hasMany(
       "openReplies",
-      function (this: any) {
+      function () {
         return this.open();
       },
       {

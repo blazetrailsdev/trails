@@ -65,7 +65,7 @@ export class PolymorphicArrayValue {
   /** @internal */
   private klass(value: unknown): typeof Base | undefined {
     if (value instanceof ActiveRecord.Base) {
-      return value.constructor as typeof Base;
+      return value.constructor;
     } else if (value instanceof ActiveRecord.Relation) {
       return value.model;
     }

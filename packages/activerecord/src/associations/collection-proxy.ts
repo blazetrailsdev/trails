@@ -229,15 +229,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return this._association.isEmpty();
   }
 
-  async push(...records: T[]): Promise<Omit<this, "then"> | false> {
+  push(...records: T[]): Promise<Omit<this, "then"> | false> {
     if (this.reflection.options.through) {
-      await this._pushThrough(records);
-      return stripThenable(this);
+      return this._pushThrough(records).then(() => stripThenable(this));
     }
 
-    const concatResult = await this._association.concat(...records);
-    if (!concatResult) return false;
-    return stripThenable(this);
+    return Promise.resolve(this._association.concat(...records)).then((concatResult) =>
+      concatResult ? stripThenable(this) : false,
+    );
   }
 
   private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {

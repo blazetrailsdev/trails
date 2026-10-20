@@ -494,7 +494,7 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
       return this.where({ name: "David" });
     });
     this.defaultScope(function () {
-      return (LazyBlockReferencingScopeDeveloperCalledDavid as any).david();
+      return LazyBlockReferencingScopeDeveloperCalledDavid.david();
     });
   }
 }

@@ -126,7 +126,7 @@ export function registerModel(
 
 /** @internal */
 export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
-  const macro = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)?.macro;
+  const macro = record.constructor._reflectOnAssociation?.(assocName)?.macro;
   if (macro === "belongsTo" || macro === "hasOne") {
     const assoc = record.association(assocName);
     assoc.inversedFrom(target);
@@ -304,7 +304,7 @@ export function association(this: Base, name: string): AssociationInstance {
   const existing = associationInstanceGet.call(this, name) as AssociationInstance | null;
   if (existing) return existing;
 
-  const ctor = this.constructor as typeof Base;
+  const ctor = this.constructor;
   const assocDef = ctor._reflectOnAssociation?.(name) as unknown as
     | AssociationDefinition
     | undefined;

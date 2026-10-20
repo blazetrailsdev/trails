@@ -88,15 +88,15 @@ export function resetLockingColumn(this: LockingHost): void {
 }
 
 export class ClassMethods {
+  declare private static _lockingColumn: string;
+
   static get lockingColumn(): string {
-    return Object.hasOwn(this, "_lockingColumn")
-      ? (this as any)._lockingColumn
-      : DEFAULT_LOCKING_COLUMN;
+    return Object.hasOwn(this, "_lockingColumn") ? this._lockingColumn : DEFAULT_LOCKING_COLUMN;
   }
 
   static set lockingColumn(column: string) {
     (this as any).reloadSchemaFromCache();
-    (this as any)._lockingColumn = column == null ? "" : String(column);
+    this._lockingColumn = column == null ? "" : String(column);
   }
 
   static get lockingEnabled(): boolean {
@@ -123,8 +123,7 @@ type InstanceLockingHost = {
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
-  changes: Record<string, [unknown, unknown]>;
-  _touchAttrNames: Set<string>;
+  _touchAttrNames: Set<string> | null;
   _queryConstraintsHash(): Record<string, unknown>;
 };
 
@@ -150,7 +149,7 @@ export function _touchRow(
 ): unknown {
   const ctor = this.constructor;
   if (ctor.lockingEnabled) {
-    this._touchAttrNames.add(ctor.lockingColumn);
+    this._touchAttrNames!.add(ctor.lockingColumn);
   }
   return superFn(touchAttrNames, time);
 }

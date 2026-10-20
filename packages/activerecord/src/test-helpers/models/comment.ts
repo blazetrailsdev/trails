@@ -15,6 +15,7 @@ import { registerModel } from "../../associations.js";
 
 declare module "../../relation.js" {
   interface RelationScopes<T extends Base> {
+    orderedByPostId: ScopeOn<T, Comment | Post>;
     forFirstAuthor: ScopeOn<T, Comment>;
   }
 }

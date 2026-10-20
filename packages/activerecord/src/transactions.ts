@@ -274,7 +274,7 @@ export function restoreTransactionRecordState(
       });
       this._mutationsFromDatabase = null;
       this._mutationsBeforeLastSave = null;
-      const ctor = this.constructor as typeof Base;
+      const ctor = this.constructor;
       const primaryKey = ctor.primaryKey;
       if (ctor.isCompositePrimaryKey()) {
         const cols = primaryKey as string[];
@@ -300,12 +300,12 @@ export function destroy<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
 }
 
 export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
-  await (this.constructor as typeof Base).ensureSchemaLoaded();
+  await this.constructor.ensureSchemaLoaded();
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
 export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
-  await (this.constructor as typeof Base).ensureSchemaLoaded();
+  await this.constructor.ensureSchemaLoaded();
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
@@ -320,7 +320,7 @@ export async function withTransactionReturningStatus<T>(
   this: Base,
   fn: () => Promise<T>,
 ): Promise<T> {
-  const modelClass = this.constructor as typeof Base;
+  const modelClass = this.constructor;
 
   let status: T;
 

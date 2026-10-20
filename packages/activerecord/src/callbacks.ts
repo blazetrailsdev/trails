@@ -186,7 +186,7 @@ export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
 }
 
 export function incrementBang<T>(
-  this: any,
+  this: Base,
   attribute: string,
   by: number = 1,
   options: { touch?: unknown } = {},
@@ -199,7 +199,7 @@ export function incrementBang<T>(
 }
 
 /** @internal */
-export function createOrUpdate(this: any, superFn: () => Promise<boolean>): Promise<boolean> {
+export function createOrUpdate(this: Base, superFn: () => Promise<boolean>): Promise<boolean> {
   return this._runSaveCallbacks(superFn) as Promise<boolean>;
 }
 

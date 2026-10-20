@@ -9,6 +9,7 @@ import {
 import { Module, extend, hashAref, hashAset, include, isEmpty } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Relation } from "../relation.js";
+import type { Base } from "../base.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 
 export interface SerializableType {
@@ -108,19 +109,19 @@ export class EncryptedQuery {
 }
 
 export const RelationQueries: Module = new Module((mod) => {
-  mod.defineMethod("where", function (this: any, ...args: unknown[]): unknown {
+  mod.defineMethod("where", function (this: Relation<Base>, ...args: unknown[]): unknown {
     return RelationQueries.superMethod(this, "where")!(
       ...EncryptedQuery.processArguments(this, args, true),
     );
   });
 
-  mod.defineMethod("isExists", function (this: any, ...args: unknown[]): unknown {
+  mod.defineMethod("isExists", function (this: Relation<Base>, ...args: unknown[]): unknown {
     return RelationQueries.superMethod(this, "isExists")!(
       ...EncryptedQuery.processArguments(this, args, true),
     );
   });
 
-  mod.defineMethod("scopeForCreate", function (this: any): Record<string, unknown> {
+  mod.defineMethod("scopeForCreate", function (this: Relation<Base>): Record<string, unknown> {
     if (!any(this.model.deterministicEncryptedAttributes() ?? []))
       return RelationQueries.superMethod(this, "scopeForCreate")!() as Record<string, unknown>;
 
@@ -130,7 +131,7 @@ export const RelationQueries: Module = new Module((mod) => {
     >;
     const wheres = this.whereValuesHash();
 
-    for (let attributeName of this.model.deterministicEncryptedAttributes()) {
+    for (let attributeName of this.model.deterministicEncryptedAttributes()!) {
       attributeName = String(attributeName);
       const values = wheres[attributeName];
       if (Array.isArray(values) && values.slice(1).every((v) => v instanceof AdditionalValue)) {
@@ -145,7 +146,7 @@ export const RelationQueries: Module = new Module((mod) => {
 export const CoreQueries = new Module() as Module & { ClassMethods: Module };
 extend(CoreQueries, Concern);
 
-export function findBy(this: any, ...args: unknown[]): unknown {
+export function findBy(this: typeof Base, ...args: unknown[]): unknown {
   return CoreQueries.ClassMethods.superMethod(this, "findBy")!(
     ...EncryptedQuery.processArguments(this, args, false),
   );
