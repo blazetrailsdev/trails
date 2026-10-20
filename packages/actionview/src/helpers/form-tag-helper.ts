@@ -70,6 +70,10 @@ export function formTag(
   options?: Record<string, unknown>,
   block?: ((...args: unknown[]) => unknown) | null,
 ): SafeBuffer;
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm then — PERMANENT
+ */
 export function formTag(
   this: FormTagHelperHost,
   urlForOptions: unknown = {},
@@ -80,7 +84,7 @@ export function formTag(
   if (block != null) {
     const content = this.capture(block);
     if (content instanceof Promise) {
-      return content.then((content) => formTagWithBody.call(this, htmlOptions, content));
+      return content.then((content) => formTag.call(this, urlForOptions, options, () => content));
     }
     return formTagWithBody.call(this, htmlOptions, content);
   } else {
