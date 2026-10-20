@@ -1101,7 +1101,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       return joinDependency.instantiate(rows, this.strictLoadingValue, block) as T[];
     }
 
-    return this._model._loadFromSql(rows, block as never);
+    return this._model._loadFromSql(rows, block);
   }
 
   /** @internal */
