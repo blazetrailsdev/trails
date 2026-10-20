@@ -41,7 +41,14 @@ import {
   QueryParser,
   unescape,
 } from "./utils.js";
-import { block as rbBlock, fetch, hashDelete, include, warn } from "@blazetrails/ruby-compat";
+import {
+  block as rbBlock,
+  fetch,
+  hashDelete,
+  include,
+  rbObjDup,
+  warn,
+} from "@blazetrails/ruby-compat";
 import { MediaType } from "./media-type.js";
 import * as Multipart from "./multipart.js";
 
@@ -156,7 +163,7 @@ export abstract class Env {
   }
 
   initializeCopy(other: Env): Record<string, any> {
-    return (this.env = { ...other.env });
+    return (this.env = rbObjDup(other.env));
   }
 }
 
