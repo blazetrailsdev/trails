@@ -77,14 +77,14 @@ export class RelationMethods<T extends Base = Base> {
     this: Relation<T>,
     ...args: [signedId: string, options?: { purpose?: string }]
   ): Promise<T | null> {
-    return this.scoping(() => this.model.findSigned(...args)) as Promise<T | null>;
+    return this.scoping(() => this.model.findSigned(...args));
   }
 
   findSignedBang(
     this: Relation<T>,
     ...args: [signedId: string, options?: { purpose?: string }]
   ): Promise<T> {
-    return this.scoping(() => this.model.findSignedBang(...args)) as Promise<T>;
+    return this.scoping(() => this.model.findSignedBang(...args));
   }
 }
 
