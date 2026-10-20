@@ -79,6 +79,8 @@ Convergence is the goal. Every deviation register in this repo — the
 decision. A row in one of them says "we know this is wrong and haven't fixed it
 yet." It is never a licence to leave it, to copy the pattern into new code, or
 to add a sibling row next to it.
+Which registers are JSDoc tags at a declaration and which stay JSON is in
+[docs/infrastructure/curation-register-split.md](docs/infrastructure/curation-register-split.md).
 
 So:
 

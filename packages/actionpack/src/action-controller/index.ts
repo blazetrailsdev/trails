@@ -1,5 +1,4 @@
 export {
-  AbstractController,
   ActionNotFound,
   type ActionCallback,
   type AroundCallback,

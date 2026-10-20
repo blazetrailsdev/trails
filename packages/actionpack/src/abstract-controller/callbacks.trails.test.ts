@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { include } from "@blazetrails/activesupport";
-import { AbstractController } from "./base.js";
+import { Base } from "./base.js";
 import { Callbacks } from "./callbacks.js";
 
-class Answering extends AbstractController {
+class Answering extends Base {
   index(): string {
     return "answered";
   }

@@ -5,7 +5,7 @@ import { FixtureResolver } from "../../testing/resolvers.js";
 import { Rendering } from "../../rendering.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include AbstractController::Rendering`; the class/interface merge is how a mixin surfaces on the type side.
-class ControllerRenderer extends AbstractController.AbstractController {
+class ControllerRenderer extends AbstractController.Base {
   _prefixes(): string[] {
     return ["renderer"];
   }
