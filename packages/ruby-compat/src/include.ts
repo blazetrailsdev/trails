@@ -358,7 +358,29 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   instanceMethod(name: string): PropertyDescriptor | undefined {
-    return methodEntryOf(this, name);
+    for (const ancestor of this.ancestors()) {
+      if (ancestor instanceof Module) {
+        const entry = Object.getOwnPropertyDescriptor(carrierOf(ancestor), name);
+        if (entry !== undefined) return entry;
+        continue;
+      }
+      if (name === "constructor" || /^[A-Z]/.test(name)) continue;
+      const members = (
+        typeof ancestor === "function" ? (ancestor as AnyClass).prototype : ancestor
+      ) as Record<string, unknown>;
+      const descriptor = Object.getOwnPropertyDescriptor(members, name);
+      if (descriptor === undefined || (typeof ancestor !== "function" && !descriptor.enumerable)) {
+        continue;
+      }
+      const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
+      if (!("value" in descriptor) && namespace !== "Module") {
+        return { get: descriptor.get, set: descriptor.set, configurable: true };
+      }
+      if (typeof members[name] === "function") {
+        return { value: members[name], writable: true, configurable: true };
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -440,7 +462,7 @@ export class Module<I extends object = Record<never, never>> {
     const carrier = carrierOf(this);
     try {
       for (const name of names) {
-        const entry = methodEntryOf(this, name);
+        const entry = this.instanceMethod(name);
         if (entry === undefined || ("value" in entry && entry.value === undefined)) {
           throw new NameError(`undefined method '${name}' for module '#<Module>'`, name);
         }
@@ -464,7 +486,7 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT
    */
   aliasMethod(newName: string, oldName: string): string {
-    const descriptor = methodEntryOf(this, oldName);
+    const descriptor = this.instanceMethod(oldName);
     if (!descriptor) {
       throw new NameError(`undefined method '${oldName}' for module '#<Module>'`, oldName);
     }
@@ -767,36 +789,6 @@ export class Module<I extends object = Record<never, never>> {
 function appendPlainFeatures(base: Module, mod: ModuleObject): void {
   if (!isModuleMethodTablePresent({ prototype: carrierOf(base) }, mod))
     recordPlainModule(base, mod);
-}
-
-function plainMethodEntry(mod: object, key: string): PropertyDescriptor | undefined {
-  if (key === "constructor" || /^[A-Z]/.test(key)) return undefined;
-  const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
-    string,
-    unknown
-  >;
-  const descriptor = Object.getOwnPropertyDescriptor(members, key);
-  if (descriptor === undefined || (typeof mod !== "function" && !descriptor.enumerable)) {
-    return undefined;
-  }
-  const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
-  if (!("value" in descriptor) && namespace !== "Module") {
-    return { get: descriptor.get, set: descriptor.set, configurable: true };
-  }
-  return typeof members[key] === "function"
-    ? { value: members[key], writable: true, configurable: true }
-    : undefined;
-}
-
-function methodEntryOf(mod: Module, name: string): PropertyDescriptor | undefined {
-  for (const ancestor of mod.ancestors()) {
-    const entry =
-      ancestor instanceof Module
-        ? Object.getOwnPropertyDescriptor(carrierOf(ancestor), name)
-        : plainMethodEntry(ancestor, name);
-    if (entry !== undefined) return entry;
-  }
-  return undefined;
 }
 
 function recordPlainModule(base: Module, mod: ModuleObject): void {

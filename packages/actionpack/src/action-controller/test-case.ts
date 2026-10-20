@@ -25,8 +25,6 @@ import {
   b,
   KeyError,
   merge,
-  classModule,
-  rbModAttrReader,
   rbModConstSet,
   rbObjIvarSet,
   RuntimeError,
@@ -154,7 +152,6 @@ export const ClassMethods: BehaviorClassMethods & ThisType<BehaviorClass> = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class below.
 export interface Behavior extends Included<typeof TestProcess> {
   routes?: RouteSet;
   controller: Metal;
@@ -495,20 +492,25 @@ function checkRequiredIvars(this: Behavior): void {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a class module's instance methods are assigned to its prototype below; the interface above types them.
-export class Behavior {
-  static readonly [classModule] = true;
-  static readonly ClassMethods = ClassMethods;
-}
-
+export const Behavior = { ClassMethods } as Record<string, unknown> & {
+  ClassMethods: typeof ClassMethods;
+};
 extend(Behavior, Concern);
 include(Behavior, TestProcess);
 include(Behavior, ConstantLookup);
 include(Behavior, DomTestingAssertions);
 
-rbModAttrReader(Behavior, "response", "request");
+for (const id of ["response", "request"]) {
+  Object.defineProperty(Behavior, id, {
+    get(this: Record<string, unknown>) {
+      return this[`_${id}`] ?? null;
+    },
+    enumerable: true,
+    configurable: true,
+  });
+}
 
-Object.assign(Behavior.prototype, {
+Object.assign(Behavior, {
   get,
   post,
   patch,
@@ -533,7 +535,7 @@ Object.assign(Behavior.prototype, {
   runLoadHooks("action_controller_test_case", this);
 });
 
-Object.assign(Behavior.prototype, {
+Object.assign(Behavior, {
   setupRequest,
   wrapExecution,
   processControllerResponse,
