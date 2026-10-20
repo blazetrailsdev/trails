@@ -22,23 +22,35 @@ export { LocalsSignatureError as TseLocalsSignatureError };
 export function localsParamType(ast: TseAst, locals: LocalEntry[]): string {
   if (ast.typesAnnotation !== null) return ast.typesAnnotation;
   if (ast.localsSignature === null) return "Record<string, unknown>";
-  if (locals.length === 0) return "NoExtraKeys<Record<string, never>>";
-  const fields = locals.map((l) => `${l.name}${l.defaultExpr ? "?" : ""}: unknown`);
+  const keyrest = locals.some((l) => l.rest);
+  const keywords = locals.filter((l) => !l.rest);
+  if (keywords.length === 0) {
+    return keyrest ? "Record<string, unknown>" : "NoExtraKeys<Record<string, never>>";
+  }
+  const fields = keywords.map((l) => `${l.name}${l.defaultExpr ? "?" : ""}: unknown`);
+  if (keyrest) return `{ ${fields.join("; ")}; [key: string]: unknown }`;
   return `NoExtraKeys<{ ${fields.join("; ")} }>`;
 }
 
 function destructureLines(locals: LocalEntry[]): string[] {
-  if (locals.length === 0) return [];
-  const pieces = locals.map((l) =>
-    l.defaultExpr === null ? l.name : `${l.name} = ${l.defaultExpr}`,
-  );
-  const voids = `  ${locals.map((l) => `void ${l.name};`).join(" ")}`;
+  const bound = locals.filter((l) => l.bound !== false);
+  if (bound.length === 0) return [];
+  const keywords = locals.filter((l) => !l.rest);
+  const rest = bound.find((l) => l.rest);
+  const pieces = keywords
+    .filter((l) => l.bound !== false || rest)
+    .map((l) => {
+      const target = l.bound === false ? `${JSON.stringify(l.name)}: __${l.name}` : l.name;
+      return l.defaultExpr === null ? target : `${target} = ${l.defaultExpr}`;
+    });
+  if (rest) pieces.push(`...${rest.name}`);
+  const voids = `  ${bound.map((l) => `void ${l.name};`).join(" ")}`;
   return [`  const { ${pieces.join(", ")} } = locals;`, voids];
 }
 
 type EmittedLine = [code: string, node: TseAst["nodes"][number]];
 
-function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
+function emitNodes(nodes: TseAst["nodes"], escapeIgnore = false): EmittedLine[] {
   const lines: EmittedLine[] = [];
   const innerDepths: number[] = [];
   const innerCallExprParens: number[] = [];
@@ -69,7 +81,7 @@ function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
         lines.push([`  ${closer}${suffix}`, node]);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        lines.push([emitNode(node, bufRef, false), node]);
+        lines.push([emitNode(node, bufRef, false, escapeIgnore), node]);
       }
     } else {
       if (node.kind === "code") {
@@ -82,7 +94,7 @@ function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
         }
         if (FUNCTION_BLOCK_RE.test(node.value.trimEnd())) functionDepths.push(braceDepth);
       }
-      lines.push([emitNode(node, bufRef, awaits), node]);
+      lines.push([emitNode(node, bufRef, awaits, escapeIgnore), node]);
     }
   }
   if (innerDepths.length > 0) {
@@ -130,12 +142,35 @@ function lineMappings(genLine: number, code: string, node: TseAst["nodes"][numbe
 
 function contextYield(value: string): string {
   const m = YIELD_EXPR_RE.exec(value);
-  if (m === null) return value;
+  if (m === null) return embeddedYields(value);
   const section = m[1] ?? m[2] ?? "";
   return `context.yield(${section.trim()})`;
 }
 
-function emitNode(node: TseAst["nodes"][number], bufRef: string, awaits: boolean): string {
+function embeddedYields(value: string): string {
+  const sf = ts.createSourceFile("expr.ts", `(${value})`, ts.ScriptTarget.ESNext, true);
+  const sites: [start: number, end: number, called: boolean][] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === "yield" && isReference(node)) {
+      const called = ts.isCallExpression(node.parent) && node.parent.expression === node;
+      sites.push([node.getStart(sf) - 1, node.getEnd() - 1, called]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  let out = value;
+  for (const [start, end, called] of sites.reverse()) {
+    out = `${out.slice(0, start)}${called ? "context.yield" : "context.yield()"}${out.slice(end)}`;
+  }
+  return out;
+}
+
+function emitNode(
+  node: TseAst["nodes"][number],
+  bufRef: string,
+  awaits: boolean,
+  escapeIgnore: boolean,
+): string {
   if (node.kind !== "text") node = { ...node, value: node.value.trim() };
   const value = (expr: string): string => (awaits ? `await (${awaitFlowReads(expr)})` : expr);
   switch (node.kind) {
@@ -147,7 +182,7 @@ function emitNode(node: TseAst["nodes"][number], bufRef: string, awaits: boolean
       return `  ${awaits ? awaitFlowReads(node.value) : node.value}${needsSemi ? ";" : ""}`;
     }
     case "expr":
-      return `  ${bufRef}.append(${value(contextYield(node.value))});`;
+      return `  ${bufRef}.${escapeIgnore ? "safeExprAppend" : "append"}(${value(contextYield(node.value))});`;
     case "rawExpr":
       return `  ${bufRef}.safeExprAppend(${value(contextYield(node.value))});`;
     case "blockExpr":
@@ -201,6 +236,7 @@ export interface TseScope {
   view: string;
   locals?: string;
   resolved?: boolean;
+  escapeIgnore?: boolean;
 }
 
 export function virtualizeTse(source: string, scope?: TseScope): string {
@@ -212,7 +248,7 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
   const locals = ast.localsSignature === null ? [] : parseLocalsSignature(ast.localsSignature);
   const localsType = localsParamType(ast, locals);
   const needsNoExtraKeys = localsType.includes("NoExtraKeys");
-  const emitted = emitNodes(ast.nodes);
+  const emitted = emitNodes(ast.nodes, scope?.escapeIgnore === true);
   const body = emitted.map(([code]) => code);
 
   const header: string[] = [buildPreamble(needsNoExtraKeys, scope !== undefined)];
@@ -224,17 +260,23 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
     ...(scope === undefined ? [] : ["  this: View,"]),
     "  context: RenderContext,",
     `  locals: ${localsType},`,
-    "  _?: (...name: [] | [string]) => unknown,",
+    "  __block?: (...name: [] | [string]) => unknown,",
     "): Promise<SafeString> {",
     "  void context; void locals;",
+    "  const localAssigns = locals; void localAssigns;",
     "  const __view = context;",
-    '  context = Object.create(__view, { yield: { value: (...name: [] | [string]) => (name.length > 0 ? _!(...name) : _ !== undefined ? _() : Reflect.get(__view, "yield")) } });',
+    '  context = Object.create(__view, { yield: { value: (...name: [] | [string]) => (name.length > 0 ? __block!(...name) : __block !== undefined ? __block() : Reflect.get(__view, "yield")) } });',
     "  const _ob = context.outputBuffer;",
   );
   for (const line of destructureLines(locals)) header.push(line);
   if (scope !== undefined) {
     const declared = new Set(locals.map((l) => l.name));
     const free = freeIdentifiers(body).filter((name) => !declared.has(name));
+    for (const [name, line] of Object.entries(INJECTED)) {
+      if (!free.includes(name)) continue;
+      free.splice(free.indexOf(name), 1);
+      header.unshift(line);
+    }
     if (free.length > 0) {
       const scopes = ast.localsSignature === null ? "[locals, this, TopLevel]" : "[this, TopLevel]";
       header.push(
@@ -298,17 +340,27 @@ export function shimScope(shim: string): TseScope | undefined {
   };
 }
 
+const INJECTED: Record<string, string> = {
+  htmlSafe: 'import { htmlSafe } from "@blazetrails/activesupport";',
+  RubyCompat: 'import * as RubyCompat from "@blazetrails/ruby-compat";',
+  ArgumentError: 'import { ArgumentError } from "@blazetrails/ruby-compat";',
+};
+
 const UNDECLARABLE = new Set([
   "undefined",
   "NaN",
   "Infinity",
   "globalThis",
+  "Object",
+  "Reflect",
+  "TopLevel",
   "arguments",
   "eval",
   "context",
   "locals",
   "_ob",
-  "_",
+  "__block",
+  "localAssigns",
   "__view",
   "__lookup",
 ]);

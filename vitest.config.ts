@@ -404,6 +404,7 @@ const otherSetupFiles = [
   "./packages/activesupport/src/testing/autorun.ts",
   "./packages/activesupport/src/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
+  "./packages/actionview/src/test-helpers/setup-compile-template.ts",
 ];
 
 export default defineConfig({
@@ -538,6 +539,7 @@ export default defineConfig({
             "vendor/*.test.ts",
           ],
           exclude: ["packages/activerecord/**", "packages/trailties/**", ...SHARED_EXCLUDE],
+          globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
           setupFiles: otherSetupFiles,
         },
       },

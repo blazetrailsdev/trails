@@ -1,6 +1,8 @@
 export interface LocalEntry {
   name: string;
   defaultExpr: string | null;
+  rest?: boolean;
+  bound?: boolean;
 }
 
 export class LocalsSignatureError extends Error {}
@@ -19,14 +21,12 @@ const RESERVED_NAMES = new Set([
 
 // prettier-ignore
 const EMITTER_RESERVED = new Set([
-  "context", "locals", "_ob",
+  "context", "locals", "localAssigns", "_ob", "__view", "__lookup", "__block",
   "__allowedKeys", "__extraKeys", "__missingKeys",
 ]);
 
-function isUsableLocalName(name: string): boolean {
-  if (!/^[A-Za-z_$][\w$]*$/u.test(name)) return false;
-  if (RESERVED_NAMES.has(name)) return false;
-  return !EMITTER_RESERVED.has(name);
+function isBindableLocalName(name: string): boolean {
+  return !RESERVED_NAMES.has(name) && !EMITTER_RESERVED.has(name);
 }
 
 export function parseLocalsSignature(sig: string): LocalEntry[] {
@@ -85,14 +85,20 @@ export function parseLocalsSignature(sig: string): LocalEntry[] {
   for (const raw of parts) {
     const trimmed = raw.trim();
     if (trimmed === "" || trimmed === "**nil") continue;
-    const colon = trimmed.indexOf(":");
-    if (colon === -1) {
-      throw new LocalsSignatureError(
-        `malformed locals entry ${JSON.stringify(trimmed)} — expected \`name:\` or \`name: default\``,
-      );
+    const rest = /^\*\*([A-Za-z_$][\w$]*)$/u.exec(trimmed);
+    if (rest) {
+      entries.push({
+        name: rest[1],
+        defaultExpr: null,
+        rest: true,
+        bound: isBindableLocalName(rest[1]),
+      });
+      continue;
     }
+    const colon = trimmed.indexOf(":");
+    if (colon === -1 || /^[&*]|^[\w$]+\s*=/u.test(trimmed)) continue;
     const name = trimmed.slice(0, colon).trim();
-    if (!isUsableLocalName(name)) {
+    if (!/^[A-Za-z_$][\w$]*$/u.test(name)) {
       throw new LocalsSignatureError(
         `invalid local name ${JSON.stringify(name)} in locals signature ${JSON.stringify(sig)}`,
       );
@@ -103,7 +109,11 @@ export function parseLocalsSignature(sig: string): LocalEntry[] {
       );
     }
     const tail = trimmed.slice(colon + 1).trim();
-    entries.push({ name, defaultExpr: tail === "" ? null : tail });
+    entries.push({
+      name,
+      defaultExpr: tail === "" ? null : tail,
+      bound: isBindableLocalName(name),
+    });
   }
   return entries;
 }

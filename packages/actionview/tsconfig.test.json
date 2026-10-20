@@ -8,7 +8,8 @@
       "@blazetrails/actionpack": ["../actionpack/src/index.ts"],
       "@blazetrails/activemodel": ["../activemodel/src/index.ts"],
       "@blazetrails/activerecord": ["../activerecord/src/index.ts"],
-      "@blazetrails/rack": ["../rack/src/index.ts"]
+      "@blazetrails/rack": ["../rack/src/index.ts"],
+      "@blazetrails/trails-tsc": ["../trails-tsc/src/index.ts"]
     }
   },
   "include": ["src/**/*.test.ts", "src/test-helpers/**/*.ts", "src/test-case.ts"],
@@ -17,6 +18,7 @@
     { "path": "../actionpack" },
     { "path": "../activemodel" },
     { "path": "../activerecord" },
-    { "path": "../rack" }
+    { "path": "../rack" },
+    { "path": "../trails-tsc" }
   ]
 }

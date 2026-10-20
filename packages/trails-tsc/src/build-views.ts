@@ -3,7 +3,12 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import ts from "typescript-5";
 import { camelize, dasherize, pluralize, underscore } from "@blazetrails/activesupport";
-import { parse, generateSourceMap } from "@blazetrails/tse-compiler";
+import {
+  decodeLineMappings,
+  generateSourceMap,
+  parse,
+  type LineMapping,
+} from "@blazetrails/tse-compiler";
 import {
   virtualizeTseWithDeltas,
   parseLocalsSignature,
@@ -15,6 +20,7 @@ export interface BuildViewsOptions {
   cwd?: string;
   viewsDir?: string;
   outDir?: string;
+  inPlace?: boolean;
 }
 
 export interface BuildViewsResult {
@@ -26,25 +32,9 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const cwd = opts.cwd ?? process.cwd();
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const outDir = path.resolve(cwd, opts.outDir ?? ".trails");
-  const outViews = path.join(outDir, "views");
+  const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
   const files = await walkTse(viewsDir);
-  const lexicalRel = path.relative(cwd, outViews);
-  if (lexicalRel === "" || lexicalRel.startsWith("..") || path.isAbsolute(lexicalRel)) {
-    throw new Error(
-      `refusing to build into ${JSON.stringify(outViews)} — outDir must resolve under cwd ${JSON.stringify(cwd)}`,
-    );
-  }
-  const realCwd = await fs.realpath(cwd);
-  const realOutAncestor = await fs.realpath(await deepestExisting(outViews));
-  const realRel = path.relative(realCwd, realOutAncestor);
-  if (realRel !== "" && (realRel.startsWith("..") || path.isAbsolute(realRel))) {
-    throw new Error(
-      `refusing to build into ${JSON.stringify(outViews)} — resolved path ${JSON.stringify(realOutAncestor)} is outside cwd ${JSON.stringify(realCwd)} (symlink escape)`,
-    );
-  }
-  await fs.rm(outViews, { recursive: true, force: true });
-  await fs.rm(path.join(outDir, "views-manifest.ts"), { force: true });
-  await fs.mkdir(outViews, { recursive: true });
+  if (!opts.inPlace) await clearOutViews(cwd, outDir, outViews);
   const registryMap = new Map<string, string[]>();
   const appDir = path.dirname(viewsDir);
   const helpers = await allHelpersFromPath(path.join(appDir, "helpers"));
@@ -86,17 +76,39 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
       program = ts.createProgram(roots, EMIT_OPTIONS, host, program);
     }
     emitViews(program, host, outViews);
+    for (const view of views) await chainSourceMap(view, viewsDir);
   }
   const registryEntries = Array.from(registryMap, ([key, types]) => ({
     key,
     localsType: types.length === 1 ? types[0] : types.map((t) => `(${t})`).join(" & "),
   }));
+  if (opts.inPlace) return { count: files.length, files };
   await fs.mkdir(outDir, { recursive: true });
   await fs.writeFile(
     path.join(outDir, "template-registry-augmentation.d.ts"),
     emitRegistryAugmentation(registryEntries),
   );
   return { count: files.length, files };
+}
+
+async function clearOutViews(cwd: string, outDir: string, outViews: string): Promise<void> {
+  const lexicalRel = path.relative(cwd, outViews);
+  if (lexicalRel === "" || lexicalRel.startsWith("..") || path.isAbsolute(lexicalRel)) {
+    throw new Error(
+      `refusing to build into ${JSON.stringify(outViews)} — outDir must resolve under cwd ${JSON.stringify(cwd)}`,
+    );
+  }
+  const realCwd = await fs.realpath(cwd);
+  const realOutAncestor = await fs.realpath(await deepestExisting(outViews));
+  const realRel = path.relative(realCwd, realOutAncestor);
+  if (realRel !== "" && (realRel.startsWith("..") || path.isAbsolute(realRel))) {
+    throw new Error(
+      `refusing to build into ${JSON.stringify(outViews)} — resolved path ${JSON.stringify(realOutAncestor)} is outside cwd ${JSON.stringify(realCwd)} (symlink escape)`,
+    );
+  }
+  await fs.rm(outViews, { recursive: true, force: true });
+  await fs.rm(path.join(outDir, "views-manifest.ts"), { force: true });
+  await fs.mkdir(outViews, { recursive: true });
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -189,6 +201,7 @@ async function writeShim(shim: ViewShim, viewsDir: string): Promise<void> {
     view: relocateImports(shim.view.join(" & "), shimDir),
     locals: relocateImports(locals.length === 0 ? "{}" : `{ ${locals.join("; ")} }`, shimDir),
     resolved: shim.resolved,
+    escapeIgnore: path.basename(shim.rel).split(".").slice(1, -1).includes("text"),
   };
   const { ts: code, mappings } = virtualizeTseWithDeltas(shim.src, scope);
   const base = path.basename(shim.rel);
@@ -199,6 +212,40 @@ async function writeShim(shim: ViewShim, viewsDir: string): Promise<void> {
     .join("/");
   const map = generateSourceMap(`${base}.ts`, sourceFileName, shim.src, mappings);
   await fs.writeFile(shim.outBase + ".ts.map", JSON.stringify(map));
+}
+
+async function chainSourceMap(shim: ViewShim, viewsDir: string): Promise<void> {
+  const jsMap = JSON.parse(await fs.readFile(shim.outBase + ".js.map", "utf8")) as {
+    mappings: string;
+  };
+  const tsMap = JSON.parse(await fs.readFile(shim.outBase + ".ts.map", "utf8")) as {
+    mappings: string;
+  };
+  const byLine = new Map<number, LineMapping[]>();
+  for (const m of decodeLineMappings(tsMap.mappings)) {
+    byLine.set(m.genLine, [...(byLine.get(m.genLine) ?? []), m]);
+  }
+  const mappings: LineMapping[] = [];
+  for (const m of decodeLineMappings(jsMap.mappings)) {
+    const line = byLine.get(m.srcLine);
+    if (line === undefined) continue;
+    const t = line.filter((c) => (c.genCol ?? 0) <= (m.srcCol ?? 0)).at(-1) ?? line[0];
+    const srcCol = (t.srcCol ?? 0) + Math.max(0, (m.srcCol ?? 0) - (t.genCol ?? 0));
+    mappings.push({ genLine: m.genLine, genCol: m.genCol, srcLine: t.srcLine, srcCol });
+  }
+  const shimDir = path.dirname(shim.outBase);
+  const sourceFileName = path
+    .relative(shimDir, path.join(viewsDir, shim.rel))
+    .split(path.sep)
+    .join("/");
+  const base = path.basename(shim.rel);
+  const map = generateSourceMap(`${base}.js`, sourceFileName, shim.src, mappings);
+  await fs.writeFile(shim.outBase + ".js.map", JSON.stringify(map));
+  const js = await fs.readFile(shim.outBase + ".js", "utf8");
+  await fs.writeFile(
+    shim.outBase + ".js",
+    `${js.replace(/^\/\/# sourceMappingURL=.*\n?/gmu, "")}//# sourceMappingURL=${base}.js.map\n`,
+  );
 }
 
 function relocateImports(typeText: string, shimDir: string): string {

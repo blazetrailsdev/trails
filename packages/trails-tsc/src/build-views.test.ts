@@ -72,7 +72,10 @@ describe("buildViews", () => {
       expect(js).not.toMatch(/: View|as Scope</);
       expect(js.trimEnd().endsWith(`//# sourceMappingURL=${path.basename(rel)}.js.map`)).toBe(true);
       const map = JSON.parse(fs.readFileSync(base + ".js.map", "utf8"));
-      expect(map.sources).toEqual([`${path.basename(rel)}.ts`]);
+      expect(path.resolve(path.dirname(base), map.sources[0])).toBe(
+        path.join(cwd, "app/views", rel),
+      );
+      expect(map.mappings).not.toBe("");
     }
     expect(fs.existsSync(path.join(cwd, ".trails/views-manifest.ts"))).toBe(false);
   });

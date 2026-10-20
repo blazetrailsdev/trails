@@ -41,10 +41,6 @@ describe("virtualizeTse", () => {
     expect(ts).toContain("const { a = \"x, y\", b = 'p, q', c = `t, ${x}, u` } = locals;");
   });
 
-  it("throws on a malformed locals entry (no colon)", () => {
-    expect(() => virtualizeTse("<%# locals: (user) %>")).toThrow(TseLocalsSignatureError);
-  });
-
   it("shields unused destructured locals with `void name;`", () => {
     const out = virtualizeTse("<%# locals: (user:, count: 0) %><p>hi</p>");
     expect(out).toContain("const { user, count = 0 } = locals;");
@@ -97,19 +93,21 @@ describe("virtualizeTse", () => {
     );
   });
 
-  it("rejects TS reserved words as local names", () => {
-    expect(() => virtualizeTse("<%# locals: (default: 1) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (await: 1) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (eval:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (arguments:) %>")).toThrow(/invalid local name/);
+  it("leaves positional and block parameters to Template#compile's non-keyword check", () => {
+    const out = virtualizeTse("<%# locals: (user, &block) %>");
+    expect(out).not.toContain("} = locals;");
   });
 
-  it("rejects emitter-reserved names that would produce duplicate-declaration SyntaxErrors", () => {
-    expect(() => virtualizeTse("<%# locals: (context:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (locals:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (_ob:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (__allowedKeys:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (__extraKeys:) %>")).toThrow(/invalid local name/);
+  it("types a reserved-word keyword local without binding it", () => {
+    const out = virtualizeTse("<%# locals: (class:, context:) %>");
+    expect(out).toContain("locals: NoExtraKeys<{ class: unknown; context: unknown }>");
+    expect(out).not.toContain("} = locals;");
+  });
+
+  it("collects a named keyrest local with an object rest", () => {
+    const out = virtualizeTse("<%# locals: (message: 'Hi', **kwargs) %>");
+    expect(out).toContain("const { message = 'Hi', ...kwargs } = locals;");
+    expect(out).toContain("locals: { message?: unknown; [key: string]: unknown }");
   });
 
   it("dispatches expression sites and preserves code chunks raw", () => {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { BacktraceCleaner, TopLevel } from "@blazetrails/activesupport";
 import {
   Base,
+  LookupContext,
   MissingTemplate,
   PathRegistry,
   PathSet,
@@ -41,12 +42,16 @@ describe("ExceptionWrapper template spots", () => {
 
   it("remaps a compiled-template frame onto the template's own source", async () => {
     TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
-    const template = new Template(
-      "first line\n<%= [].boom.length %>\nlast line\n",
-      "posts/show.html.tse",
-      new TseHandler(),
-      { locals: [], format: ":html", virtualPath: "posts/show" },
+    const root = decodeURIComponent(
+      new URL("../../test-helpers/precompiled", import.meta.url).pathname,
     );
+    const template = new LookupContext([`${root}/app/views`]).findTemplate(
+      "show",
+      ["posts"],
+      false,
+      [],
+      {},
+    ) as Template;
     const resolver = { findAll: () => [], builtTemplates: () => [template] };
     PathRegistry.setViewPaths(Holder, new PathSet([resolver]));
 
@@ -69,11 +74,9 @@ describe("ExceptionWrapper template spots", () => {
 
     expect(extract).toBeDefined();
     expect(extract.lineNumber).toBe(2);
-    expect(extract.code).toEqual({
-      1: "first line\n",
-      2: ["<%= [].boom.", "length %>\n", ""],
-      3: "last line\n",
-    });
+    expect(extract.code?.[1]).toBe("first line\n");
+    expect((extract.code?.[2] as string[]).join("")).toBe("<%= [].boom.length %>\n");
+    expect(extract.code?.[3]).toBe("last line\n");
   });
 });
 

@@ -9,8 +9,8 @@ export class Inline extends Template {
       mod._compiledMethods.delete(methodName);
     };
 
-  protected override compile(mod: CompiledMethodContainer): void {
-    super.compile(mod);
+  protected override async compile(mod: CompiledMethodContainer): Promise<void> {
+    await super.compile(mod);
     ObjectSpace.defineFinalizer(this, Inline.Finalizer(this.methodName(), mod));
   }
 }

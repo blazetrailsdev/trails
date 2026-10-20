@@ -36,6 +36,10 @@
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*"
   },
+  "devDependencies": {
+    "@blazetrails/trails-tsc": "workspace:*",
+    "typescript": "7.1.0-dev.20260920.1"
+  },
   "engines": {
     "node": ">=24"
   }
