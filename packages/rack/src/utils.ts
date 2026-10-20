@@ -231,30 +231,28 @@ export function selectBestEncoding(
   return null;
 }
 
-export function parseCookiesHeader(value: string | null | undefined): Record<string, string> {
+export function parseCookiesHeader(
+  value: string | null | undefined,
+): Record<string, string | null> {
   if (!value) return {};
-  const cookies: Record<string, string> = {};
+  const cookies: Record<string, string | null> = {};
   for (const cookie of value.split(/; */)) {
     if (!cookie) continue;
     const eqIdx = cookie.indexOf("=");
-    let key: string, val: string;
-    if (eqIdx === -1) {
-      key = cookie;
-      val = "";
-    } else {
-      key = cookie.substring(0, eqIdx);
-      val = cookie.substring(eqIdx + 1);
-    }
-    try {
-      if (!(key in cookies)) cookies[key] = unescape(val);
-    } catch {
-      if (!(key in cookies)) cookies[key] = val;
+    const key = eqIdx === -1 ? cookie : cookie.substring(0, eqIdx);
+    value = eqIdx === -1 ? null : cookie.substring(eqIdx + 1);
+    if (!Object.hasOwn(cookies, key)) {
+      try {
+        cookies[key] = unescape(value!);
+      } catch {
+        cookies[key] = value;
+      }
     }
   }
   return cookies;
 }
 
-export function parseCookies(env: Record<string, any>): Record<string, string> {
+export function parseCookies(env: Record<string, any>): Record<string, string | null> {
   return parseCookiesHeader(env[HTTP_COOKIE]);
 }
 
@@ -444,20 +442,20 @@ export function statusCode(status: number | string): number {
     ((status.trim() !== "" && Number.isNaN(parseInt(status, 10))) || isSymbol(status))
   ) {
     const symbol = stringToSym(status);
-    const name = symbolToS(symbol);
+    status = symbolToS(symbol);
     return fetch(
       SYMBOL_TO_STATUS_CODE,
-      name,
+      status,
       block(() => {
         const fallbackCode = fetch(
           OBSOLETE_SYMBOLS_TO_STATUS_CODES,
-          name,
+          status as string,
           block(() => {
             throw new ArgumentError(`Unrecognized status code ${rbInspect(symbol)}`);
           }),
         ) as number;
         const message = `Status code ${rbInspect(symbol)} is deprecated and will be removed in a future version of Rack.`;
-        const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[name];
+        const canonicalSymbol = OBSOLETE_SYMBOL_MAPPINGS[status];
         if (canonicalSymbol == null) {
           warn(message, { uplevel: 3 });
         }

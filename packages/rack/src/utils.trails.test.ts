@@ -59,3 +59,9 @@ describe("Utils.multipartPartLimit", () => {
     }
   });
 });
+
+describe("Rack::Utils.parse_cookies_header", () => {
+  it("reads a key-only cookie as nil", () => {
+    expect(Utils.parseCookiesHeader("foo; bar=baz")).toEqual({ foo: null, bar: "baz" });
+  });
+});

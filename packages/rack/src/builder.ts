@@ -131,6 +131,10 @@ export class Builder {
     return rbFSend(this.toApp(), "call", env);
   }
 
+  /**
+   * @missingRailsName run — PERMANENT
+   * @missingRailsName map — PERMANENT
+   */
   toApp(): RackApp {
     let app = this._map ? this.generateMap(this._run, this._map) : this._run;
     if (!app) throw new Error("missing run or map statement");

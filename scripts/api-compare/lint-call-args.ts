@@ -113,6 +113,7 @@ export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "arel",
   "globalid",
   "i18n",
+  "rack",
 ];
 
 /**

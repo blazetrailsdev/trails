@@ -132,6 +132,7 @@ export class GzipStream {
     this.sync = sync;
   }
 
+  /** @missingRailsName part — PERMANENT */
   async each(block: (data: Uint8Array) => void): Promise<void> {
     this.writer = block;
     const gzip = new GzipWriter(this);

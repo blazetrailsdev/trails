@@ -38,7 +38,10 @@ export class Generator {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName params — PERMANENT
+   */
   private isMultipart(): boolean {
     const has = (value: unknown): boolean => {
       if (value instanceof UploadedFile) return true;

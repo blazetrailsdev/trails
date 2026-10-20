@@ -2,21 +2,10 @@
   {
     "package": "rack",
     "tsFile": "multipart/parser.ts",
-    "rubyName": "initialize",
-    "call": "new",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:dup"
-    ],
-    "reason": "multipart/parser.rb:209 is `StringScanner.new(\"\".dup)` — the `dup` exists only to hand the scanner an UNFROZEN copy of the frozen string literal (the file is `# frozen_string_literal: true`). JS strings are immutable and have no frozen/unfrozen distinction, so there is no `dup` to call and `new SBuf(\"\")` is the same value."
-  },
-  {
-    "package": "rack",
-    "tsFile": "multipart/parser.ts",
     "rubyName": "on_mime_head",
     "call": "new",
     "kind": "args",
     "rubyArgs": [],
-    "reason": "rack multipart/parser.rb:161 seeds the buffer part's body with `String.new` (a mutable String buffer); JS strings are immutable and have no such constructor, so the port seeds it with the empty string literal — the 5-argument `klass.new` beside it (parser.rb:164) is ported as-is."
+    "reason": "CONVERGEABLE call-args-pairs-string-new-with-rbstrsnew-in-mixed-new-bodies: parser.rb:161-164 `String.new` (ported `rbStrSNew()`) is paired with the port's only `new`, the 5-argument `klass.new`."
   }
 ]

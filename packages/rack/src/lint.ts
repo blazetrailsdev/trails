@@ -212,7 +212,7 @@ export class Lint {
       if (typeof value === "string") {
         this.checkHeaderValue(key, value);
       } else if (Array.isArray(value)) {
-        for (const v of value) this.checkHeaderValue(key, v);
+        value.forEach((value) => this.checkHeaderValue(key, value));
       } else {
         throw new LintError(
           `a header value must be a String or Array of Strings, but the value of '${key}' is a ${rbObjClassname(value)}`,
