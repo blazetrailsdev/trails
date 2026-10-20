@@ -155,8 +155,8 @@ export abstract class Env {
     return hashDelete(this.env, name);
   }
 
-  initializeCopy(other: Env): void {
-    this.env = { ...other.env };
+  initializeCopy(other: Env): Record<string, any> {
+    return (this.env = { ...other.env });
   }
 }
 
