@@ -46,7 +46,7 @@ export async function connectsTo(
   }
 
   const connections: ConnectionPool[] = [];
-  (this as any)._shardKeys = Object.keys(shards);
+  this._shardKeys = Object.keys(shards);
   const shardEntries: Record<string, Record<string, unknown>> = Object.keys(shards).length > 0
     ? shards
     : { default: database };
@@ -56,7 +56,7 @@ export async function connectsTo(
     for (const [role, dbKey] of Object.entries(dbKeys)) {
       const dbConfig = resolveConfigForConnection.call(this, dbKey)!;
 
-      (this as any).connectionClass = true;
+      this.connectionClass = true;
       connections.push(
         await this.connectionHandler.establishConnection(dbConfig, {
           ownerName: this,
@@ -120,7 +120,7 @@ export function connectedToMany<T>(this: typeof Base, ...classes: unknown[]): T 
   let entry: Parameters<typeof appendToConnectedToStack>[0] | undefined;
   return rbEnsure(
     () => {
-      if ((this as unknown) !== ActiveRecord.Base || classes.includes(ActiveRecord.Base)) {
+      if (this !== ActiveRecord.Base || classes.includes(ActiveRecord.Base)) {
         // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:169 cluster=connection-pool
         throw new NotImplementedError(
           "connected_to_many can only be called on ActiveRecord::Base.",
@@ -167,15 +167,15 @@ export function isConnectedTo(
   options: { role: string; shard?: string },
 ): boolean {
   return (
-    coreCurrentRole.call(this as any) === options.role &&
-    coreCurrentShard.call(this as any) === (options.shard ?? ActiveRecord.Base.defaultShard)
+    coreCurrentRole.call(this) === options.role &&
+    coreCurrentShard.call(this) === (options.shard ?? ActiveRecord.Base.defaultShard)
   );
 }
 
 export function whilePreventingWrites<T>(this: typeof Base, fn: () => T, enabled = true): T {
   return connectedTo.call(
     this,
-    { role: coreCurrentRole.call(this as any), preventWrites: enabled },
+    { role: coreCurrentRole.call(this), preventWrites: enabled },
     fn,
   ) as T;
 }
@@ -268,7 +268,7 @@ Either use \`with_connection\` or \`lease_connection\`.
 }
 
 export function isPrimaryClass(this: typeof Base): boolean | undefined {
-  return (this as unknown) === ActiveRecord.Base || coreIsApplicationRecordClass.call(this as any);
+  return this === ActiveRecord.Base || coreIsApplicationRecordClass.call(this);
 }
 
 export function adapterClass(this: typeof Base): typeof DatabaseAdapter {
@@ -278,7 +278,7 @@ export function adapterClass(this: typeof Base): typeof DatabaseAdapter {
 export async function removeConnection(this: typeof Base): Promise<HashConfig | undefined> {
   let name: string | null | undefined;
   if (Object.hasOwn(this, "_connectionSpecificationName")) {
-    name = (this as any)._connectionSpecificationName;
+    name = this._connectionSpecificationName;
   }
 
   if (
@@ -297,10 +297,10 @@ export async function removeConnection(this: typeof Base): Promise<HashConfig | 
 
 export function connectionSpecificationName(this: typeof Base): string {
   const connectionSpecificationName = Object.hasOwn(this, "_connectionSpecificationName")
-    ? (this as any)._connectionSpecificationName
+    ? this._connectionSpecificationName
     : null;
   if (connectionSpecificationName == null) {
-    return (this as unknown) === ActiveRecord.Base
+    return this === ActiveRecord.Base
       ? "ActiveRecord::Base"
       : (Object.getPrototypeOf(this) as typeof Base).connectionSpecificationName;
   }
@@ -317,7 +317,7 @@ export function clearCacheBang(this: typeof Base): void {
 
 export function shardKeys(this: typeof Base): string[] {
   const connClass = this.connectionClassForSelf();
-  return (connClass as any)._shardKeys ?? [];
+  return connClass._shardKeys ?? [];
 }
 
 export function isSharded(this: typeof Base): boolean {
@@ -434,9 +434,7 @@ export function resolveConfigForConnection(
   configOrEnv: unknown,
 ): HashConfig | null {
   if (!this.name) throw new RuntimeError("Anonymous class is not allowed.");
-  (this as any)._connectionSpecificationName = isPrimaryClass.call(this)
-    ? "ActiveRecord::Base"
-    : this.name;
+  this._connectionSpecificationName = isPrimaryClass.call(this) ? "ActiveRecord::Base" : this.name;
   return baseConfigurations().resolve(configOrEnv);
 }
 

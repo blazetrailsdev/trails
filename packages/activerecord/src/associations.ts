@@ -329,7 +329,10 @@ AssociationsNamespace.defineMethod("initInternals", initInternals);
 AssociationsNamespace.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
-export function associationInstanceGet(this: Base, name: string): unknown {
+export function associationInstanceGet(
+  this: Pick<Base, "_associationCache">,
+  name: string,
+): unknown {
   return this._associationCache.get(name) ?? null;
 }
 

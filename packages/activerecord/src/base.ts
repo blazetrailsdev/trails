@@ -753,8 +753,10 @@ export class Base extends Model {
     return ConnectionHandling.connectionSpecificationName.call(this);
   }
   static set connectionSpecificationName(name: string | null) {
-    (this as any)._connectionSpecificationName = name;
+    this._connectionSpecificationName = name;
   }
+  declare static _connectionSpecificationName?: string | null;
+  declare static _shardKeys?: string[];
   declare static isConnected: typeof ConnectionHandling.isConnected;
   declare static readonly connection: Promise<DatabaseAdapter | null>;
   declare static isPrimaryClass: typeof ConnectionHandling.isPrimaryClass;

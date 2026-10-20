@@ -89,7 +89,7 @@ export function defaultScope<T extends typeof Base>(
       : (optionsOrAllQueries?.allQueries ?? false);
 
   const scopeObj = new DefaultScope(scope, allQueries);
-  (this as any).defaultScopes = [...(this as any).defaultScopes, scopeObj];
+  this.defaultScopes = [...this.defaultScopes, scopeObj];
 }
 
 export function unscoped<T extends typeof Base>(this: T): Relation<InstanceType<T>>;
