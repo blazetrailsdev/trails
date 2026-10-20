@@ -38,7 +38,7 @@ const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
 
 const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
-const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
+export const FUNCTION_BLOCK_RE = /(?:=>|\bfunction\b[^{]*)\s*\{\s*$/;
 
 const REGEX_PRECEDING_KEYWORD_RE =
   /(?:^|[^\w$])(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/;
@@ -132,7 +132,7 @@ function netBraceDepth(code: string): number {
 const FLOW_READ_RE =
   /(?<![\w$.])(?:(_layoutFor|contentFor|isContentFor|_|yield)\s*\(|yield(?![\w$]))/y;
 
-function awaitFlowReads(
+export function awaitFlowReads(
   code: string,
   mask: boolean[] = codeMask(code),
   start = 0,

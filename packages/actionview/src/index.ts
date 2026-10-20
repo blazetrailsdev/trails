@@ -7,6 +7,7 @@ export {
 } from "./template/handlers/tse.js";
 
 export { Template } from "./template.js";
+export { TopLevel } from "@blazetrails/activesupport";
 export type { BacktraceLocation, Spot } from "./template/handlers/tse.js";
 
 export { FileSystemResolver, Resolver } from "./template/resolver.js";

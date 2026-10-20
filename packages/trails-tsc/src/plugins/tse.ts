@@ -1,5 +1,7 @@
 import ts from "typescript-5";
 import {
+  awaitFlowReads,
+  FUNCTION_BLOCK_RE,
   parse,
   parseLocalsSignature,
   LocalsSignatureError,
@@ -46,22 +48,40 @@ type EmittedLine = [code: string, node: TseAst["nodes"][number]];
 function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
   const lines: EmittedLine[] = [];
   const innerDepths: number[] = [];
+  const innerAwaits: boolean[] = [];
+  let braceDepth = 0;
+  const functionDepths: number[] = [];
   for (const node of nodes) {
+    const insideBlock = innerDepths.length > 0;
+    const bufRef = insideBlock ? "context.outputBuffer" : "_ob";
+    const awaits = !insideBlock && functionDepths.length === 0;
     if (node.kind === "blockExpr") {
       innerDepths.push(0);
-      lines.push([`  _ob.append(${node.value.trim()}`, node]);
-    } else if (node.kind === "code" && innerDepths.length > 0) {
+      innerAwaits.push(awaits);
+      lines.push([`  ${bufRef}.append(${awaits ? "await (" : ""}${node.value.trim()}`, node]);
+    } else if (node.kind === "code" && insideBlock) {
       const innerDepth = innerDepths[innerDepths.length - 1];
       if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
         innerDepths.pop();
+        const close = innerAwaits.pop() ? "))" : ")";
         const t = node.value.trim();
-        lines.push([`  ${t.endsWith(";") ? t.slice(0, -1) : t});`, node]);
+        lines.push([`  ${t.endsWith(";") ? t.slice(0, -1) : t}${close};`, node]);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        lines.push([emitNode(node), node]);
+        lines.push([emitNode(node, bufRef, false), node]);
       }
     } else {
-      lines.push([emitNode(node), node]);
+      if (node.kind === "code") {
+        braceDepth += netBraceDepth(node.value);
+        while (
+          functionDepths.length > 0 &&
+          braceDepth < functionDepths[functionDepths.length - 1]
+        ) {
+          functionDepths.pop();
+        }
+        if (FUNCTION_BLOCK_RE.test(node.value.trimEnd())) functionDepths.push(braceDepth);
+      }
+      lines.push([emitNode(node, bufRef, awaits), node]);
     }
   }
   if (innerDepths.length > 0) {
@@ -83,7 +103,8 @@ function lineMappings(genLine: number, code: string, node: TseAst["nodes"][numbe
     node.kind === "expr" || node.kind === "rawExpr" ? YIELD_EXPR_RE.exec(value) : null;
   const arg = (yielded?.[1] ?? yielded?.[2] ?? "").trim();
   const anchor = yielded === null ? value.split("\n")[0] : arg || "context.yield";
-  const emitted = /^\s*(?:_ob\.\w+\()?/u.exec(pieces[0])?.[0].length ?? 0;
+  const emitted =
+    /^\s*(?:(?:_ob|context\.outputBuffer)\.\w+\((?:await \()?)?/u.exec(pieces[0])?.[0].length ?? 0;
   const at = node.kind === "text" ? 0 : pieces[0].indexOf(anchor, emitted);
   const srcCol = valueCol + (yielded !== null && arg !== "" ? value.indexOf(arg) : 0);
   const valueLines = value.split("\n");
@@ -113,34 +134,36 @@ function contextYield(value: string): string {
   return `context.yield(${section.trim()})`;
 }
 
-function emitNode(node: TseAst["nodes"][number]): string {
+function emitNode(node: TseAst["nodes"][number], bufRef: string, awaits: boolean): string {
   if (node.kind !== "text") node = { ...node, value: node.value.trim() };
+  const value = (expr: string): string => (awaits ? `await (${awaitFlowReads(expr)})` : expr);
   switch (node.kind) {
     case "text":
-      return `  _ob.safeAppend(${JSON.stringify(node.value)});`;
+      return `  ${bufRef}.safeAppend(${JSON.stringify(node.value)});`;
     case "code": {
       const t = node.value.trimEnd();
       const needsSemi = !(t.endsWith(";") || t.endsWith("{") || t.endsWith("}"));
-      return `  ${node.value}${needsSemi ? ";" : ""}`;
+      return `  ${awaits ? awaitFlowReads(node.value) : node.value}${needsSemi ? ";" : ""}`;
     }
     case "expr":
-      return `  _ob.append(${contextYield(node.value)});`;
+      return `  ${bufRef}.append(${value(contextYield(node.value))});`;
     case "rawExpr":
-      return `  _ob.safeExprAppend(${contextYield(node.value)});`;
+      return `  ${bufRef}.safeExprAppend(${value(contextYield(node.value))});`;
     case "blockExpr":
-      return `  _ob.append(${node.value}`;
+      return `  ${bufRef}.append(${node.value}`;
     default:
       throw new Error(`unreachable: unknown node kind`);
   }
 }
 
-function buildPreamble(needsNoExtraKeys: boolean): string {
+function buildPreamble(needsNoExtraKeys: boolean, withTopLevel: boolean): string {
   const actionviewImports = needsNoExtraKeys
     ? "TemplateRegistry, TemplateLocals, NoExtraKeys"
     : "TemplateRegistry, TemplateLocals";
   return [
     "/* virtualized from .tse — phase 2b trails-tsc plugin */",
     `import type { ${actionviewImports} } from "@blazetrails/actionview";`,
+    ...(withTopLevel ? ['import { TopLevel } from "@blazetrails/actionview";'] : []),
     "interface SafeString { readonly __safeStringBrand: unique symbol }",
     "interface OutputBuffer extends SafeString {",
     "  safeAppend(s: string): void;",
@@ -191,24 +214,35 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
   const emitted = emitNodes(ast.nodes);
   const body = emitted.map(([code]) => code);
 
-  const header: string[] = [buildPreamble(needsNoExtraKeys)];
+  const header: string[] = [buildPreamble(needsNoExtraKeys, scope !== undefined)];
   if (scope !== undefined) {
     header.push(...scopeTypes(scope, ast.localsSignature !== null || scope.resolved === true));
   }
   header.push(
-    "export default function render(",
+    "export default async function render(",
     ...(scope === undefined ? [] : ["  this: View,"]),
     "  context: RenderContext,",
     `  locals: ${localsType},`,
-    "): SafeString {",
+    "  _?: (...name: [] | [string]) => unknown,",
+    "): Promise<SafeString> {",
     "  void context; void locals;",
+    "  const __view = context;",
+    '  context = Object.create(__view, { yield: { value: (...name: [] | [string]) => (name.length > 0 ? _!(...name) : _ !== undefined ? _() : Reflect.get(__view, "yield")) } });',
     "  const _ob = context.outputBuffer;",
   );
   for (const line of destructureLines(locals)) header.push(line);
   if (scope !== undefined) {
     const declared = new Set(locals.map((l) => l.name));
-    for (const name of freeIdentifiers(body)) {
-      if (!declared.has(name)) header.push(`  let ${name}!: Scope<${JSON.stringify(name)}>;`);
+    const free = freeIdentifiers(body).filter((name) => !declared.has(name));
+    if (free.length > 0) {
+      const scopes = ast.localsSignature === null ? "[locals, this, TopLevel]" : "[this, TopLevel]";
+      header.push(
+        `  const __lookup = (name: string): any => { for (const scope of ${scopes} as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } return Reflect.get(globalThis, name); };`,
+      );
+    }
+    for (const name of free) {
+      const key = JSON.stringify(name);
+      header.push(`  let ${name} = __lookup(${key}) as Scope<${key}>;`);
     }
   }
   const footer = ["  return _ob;", "}", ""];
@@ -245,6 +279,8 @@ function scopeTypes(scope: TseScope, localsKnown: boolean): string[] {
     "  ? ObjectLocals[K]",
     "  : K extends keyof View",
     "    ? Bare<View[K]>",
+    "    : K extends keyof typeof TopLevel",
+    "      ? (typeof TopLevel)[K]",
     "    : K extends keyof typeof globalThis",
     "      ? (typeof globalThis)[K]",
     `      : ${localsKnown ? "never" : "any"};`,
@@ -271,12 +307,15 @@ const UNDECLARABLE = new Set([
   "context",
   "locals",
   "_ob",
+  "_",
+  "__view",
+  "__lookup",
 ]);
 
 function freeIdentifiers(body: readonly string[]): string[] {
   const sf = ts.createSourceFile(
     "body.ts",
-    `function __tse() {\n${body.join("\n")}\n}`,
+    `async function __tse() {\n${body.join("\n")}\n}`,
     ts.ScriptTarget.ESNext,
     true,
   );

@@ -54,8 +54,8 @@ describe("buildViews", () => {
     expect(files).toEqual(["posts/index.html.tse", "users/edit.html.tse", "users/show.html.tse"]);
 
     const shim = fs.readFileSync(path.join(cwd, ".trails/views/users/show.html.tse.ts"), "utf8");
-    expect(shim).toContain("export default function render(");
-    expect(shim).toContain("_ob.append(name)");
+    expect(shim).toContain("export default async function render(");
+    expect(shim).toContain("_ob.append(await (name))");
   });
 
   it("emits no runtime module — templates render from .tse source at request time", async () => {
@@ -269,7 +269,8 @@ describe("buildViews", () => {
       [
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
-        "export declare class Base { render(...args: unknown[]): string; }",
+        "export declare const TopLevel: {};",
+        "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};",
       ].join("\n"),
     );
     write(cwd, "app/models/post.ts", 'export class Post { title = ""; }');
@@ -638,6 +639,7 @@ describe("runCli", () => {
       [
         "export interface TemplateRegistry {}",
         "export type TemplateLocals<T> = T;",
+        "export declare const TopLevel: {};",
         "export declare class Base { csrfMetaTags(): string; }",
       ].join("\n"),
     );
@@ -752,7 +754,7 @@ describe("runCli", () => {
     write(
       cwd,
       "node_modules/@blazetrails/actionview/index.d.ts",
-      "export declare class Base { render(...args: unknown[]): string; }",
+      "export declare class Base { render(...args: unknown[]): string; }\nexport declare const TopLevel: {};",
     );
     write(cwd, "app/models/post.ts", 'export class Post { title = ""; }');
     write(
