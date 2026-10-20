@@ -1,4 +1,4 @@
 <%= yield("header") -%>
 <%= yield -%>
 <%= yield("footer") -%>
-<%= yield("unknown")?.toString().trim() || "." -%>
+<%= yield("unknown")?.toString().trim() ? yield("unknown") : "." -%>
