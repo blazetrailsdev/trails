@@ -38,9 +38,7 @@ it("serves directories with + in the name", async () => {
     const app = new Directory(dir, FILE_CATCH);
     const env = MockRequest.envFor(`/${plusDir}/`);
     const [status, , body] = await app.call(env);
-
     expect(status).toBe(200);
-
     let str = "";
     body.each((x: string) => (str += x));
     expect(str).toMatch("foo+bar");
@@ -49,7 +47,6 @@ it("serves directories with + in the name", async () => {
 
 it("serve root directory index", async () => {
   const res = await new MockRequest(new Lint(app)).get("/");
-
   expect(res.isOk).toBeTruthy();
   expect(res.body).toContain("<html><head>");
   expect(res.body).toContain("href='cgi");
@@ -57,7 +54,6 @@ it("serve root directory index", async () => {
 
 it("serve directory indices", async () => {
   const res = await new MockRequest(new Lint(app)).get("/cgi/");
-
   expect(res.isOk).toBeTruthy();
   expect(res.body).toContain("<html><head>");
   expect(res.body).toContain("rackup_stub.rb");
@@ -65,7 +61,6 @@ it("serve directory indices", async () => {
 
 it("return 404 for pipes", async () => {
   const res = await new MockRequest(new Lint(app)).get("/cgi/fifo");
-
   expect(res.status).toBe(404);
 });
 
@@ -73,7 +68,6 @@ it("serve directory indices with bad symlinks", async () => {
   try {
     await fs.promises.symlink("foo", File.join(DOCROOT, "cgi", "foo"));
     const res = await new MockRequest(new Lint(app)).get("/cgi/");
-
     expect(res.isOk).toBeTruthy();
     expect(res.body).toMatch(/<html><head>/);
   } finally {
@@ -86,7 +80,6 @@ it("return 404 for unreadable directories", async () => {
     File.write(File.join(DOCROOT, "cgi", "unreadable"), "");
     File.chmod(0, File.join(DOCROOT, "cgi", "unreadable"));
     const res = await new MockRequest(new Lint(app)).get("/cgi/unreadable");
-
     expect(res.status).toBe(404);
   } finally {
     File.delete(File.join(DOCROOT, "cgi", "unreadable"));
@@ -95,46 +88,35 @@ it("return 404 for unreadable directories", async () => {
 
 it("pass to app if file found", async () => {
   const res = await new MockRequest(new Lint(app)).get("/cgi/test");
-
   expect(res.isOk).toBeTruthy();
   expect(res.body).toMatch(/passed!/);
 });
 
 it("serve uri with URL encoded filenames", async () => {
   let res = await new MockRequest(new Lint(app)).get("/%63%67%69/");
-
   expect(res.isOk).toBeTruthy();
   expect(res.body).toMatch(/<html><head>/);
-
   res = await new MockRequest(new Lint(app)).get("/cgi/%74%65%73%74");
-
   expect(res.isOk).toBeTruthy();
   expect(res.body).toMatch(/passed!/);
 });
 
 it("serve uri with URL encoded null byte (%00) in filenames", async () => {
   const res = await new MockRequest(new Lint(app)).get("/cgi/test%00");
-
   expect(res.isBadRequest).toBeTruthy();
 });
 
 it("allow directory traversal inside root directory", async () => {
   let res = await new MockRequest(new Lint(app)).get("/cgi/../rackup");
-
   expect(res.isOk).toBeTruthy();
-
   res = await new MockRequest(new Lint(app)).get("/cgi/%2E%2E/rackup");
-
   expect(res.isOk).toBeTruthy();
 });
 
 it("not allow directory traversal", async () => {
   let res = await new MockRequest(new Lint(app)).get("/cgi/../../lib");
-
   expect(res.isForbidden).toBeTruthy();
-
   res = await new MockRequest(new Lint(app)).get("/cgi/%2E%2E/%2E%2E/lib");
-
   expect(res.isForbidden).toBeTruthy();
 });
 
@@ -152,18 +134,14 @@ it("not allow dir globs", async () => {
 
 it("404 if it can't find the file", async () => {
   const res = await new MockRequest(new Lint(app)).get("/cgi/blubb");
-
   expect(res.isNotFound).toBeTruthy();
 });
 
 it("uri escape path parts", async () => {
   const mr = new MockRequest(new Lint(app));
-
   let res = await mr.get("/cgi/test%2bdirectory");
-
   expect(res.isOk).toBeTruthy();
   expect(res.body).toMatch(new RegExp(escapeHtml("/cgi/test\\+directory/test\\+file")));
-
   res = await mr.get("/cgi/test%2bdirectory/test%2bfile");
   expect(res.isOk).toBeTruthy();
 });
@@ -177,9 +155,7 @@ it("correctly escape script name with spaces", async () => {
     const app = new Directory(dir, FILE_CATCH);
     const env = MockRequest.envFor(escapePath(`/${spaceDir}/`));
     const [status, , body] = await app.call(env);
-
     expect(status).toBe(200);
-
     let str = "";
     body.each((x: string) => (str += x));
     expect(str).toMatch(escapeHtml("/foo%20bar/omg%20omg.txt"));
@@ -195,9 +171,7 @@ it("correctly escape script name with '", async () => {
     const app = new Directory(dir, FILE_CATCH);
     const env = MockRequest.envFor(escape(`/${quoteDir}/`));
     const [status, , body] = await app.call(env);
-
     expect(status).toBe(200);
-
     let str = "";
     body.each((x: string) => (str += x));
     expect(str).toMatch(escapeHtml("/foo'bar/omg'omg.txt"));
@@ -211,21 +185,16 @@ it("correctly escape script name", async () => {
       b.run(_app);
     });
   });
-
   const mr = new MockRequest(new Lint(app2));
-
   let res = await mr.get("/script-path/cgi/test%2bdirectory");
-
   expect(res.isOk).toBeTruthy();
   expect(res.body).toMatch(new RegExp(escapeHtml("/script-path/cgi/test\\+directory/test\\+file")));
-
   res = await mr.get("/script-path/cgi/test+directory/test+file");
   expect(res.isOk).toBeTruthy();
 });
 
 it("return error when file not found for head request", async () => {
   const res = await new MockRequest(new Lint(app)).head("/cgi/missing");
-
   expect(res.isNotFound).toBeTruthy();
   expect(res.body.length === 0).toBeTruthy();
 });

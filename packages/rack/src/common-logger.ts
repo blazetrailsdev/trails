@@ -12,17 +12,17 @@ function clockTime(): number {
 export class CommonLogger {
   static readonly FORMAT = `%s - %s [%s] "%s %s%s%s %s" %d %s %0.4f `;
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private logger: any;
 
-  constructor(app: RackApp, logger?: any) {
+  constructor(app: RackApp | { call: RackApp }, logger?: any) {
     this.app = app;
     this.logger = logger || null;
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
     const beganAt = clockTime();
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     const [status, headers, body] = response;
 
     response[2] = new BodyProxy(body, () => {

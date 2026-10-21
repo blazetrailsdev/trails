@@ -3,15 +3,19 @@ import { Range } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { CommonLogger } from "./common-logger.js";
 import { MockRequest } from "./mock-request.js";
+import { Lint } from "./lint.js";
 
 const length = 6;
-const app = async () =>
-  [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any;
-const appWithoutLength = async () => [200, { "content-type": "text/html" }, []] as any;
+const app = new Lint(
+  async () =>
+    [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any,
+);
+const appWithoutLength = new Lint(async () => [200, { "content-type": "text/html" }, []] as any);
 const appWithoutLint = async () =>
   [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any;
-const appWithZeroLength = async () =>
-  [200, { "content-type": "text/html", "content-length": "0" }, []] as any;
+const appWithZeroLength = new Lint(
+  async () => [200, { "content-type": "text/html", "content-length": "0" }, []] as any,
+);
 
 it("log to rack.errors by default", async () => {
   const res = await new MockRequest((env) => new CommonLogger(app).call(env)).get("/");
