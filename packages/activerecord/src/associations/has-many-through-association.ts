@@ -16,7 +16,13 @@ import {
   rbDeclareIvar,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
-import { exceptBang, underscore, isBlank, wrap } from "@blazetrails/activesupport";
+import {
+  exceptBang,
+  underscore,
+  isBlank,
+  kernelArray as Array,
+  wrap,
+} from "@blazetrails/activesupport";
 import { zip } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
