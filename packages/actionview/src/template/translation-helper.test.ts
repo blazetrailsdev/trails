@@ -477,6 +477,6 @@ describe("TranslationHelperTest", () => {
     expect(options).toEqual({});
   });
 
-  // PERMANENT-SKIP: the assertion is that a lookup reaches `I18n.cache_store`
+  // PERMANENT-SKIP: the assertions turn on a lookup reaching `I18n.cache_store` (`vendor/i18n/v1.14.8/lib/i18n/backend/cache.rb:93-99`); CLAUDE.md § "A translation lookup is synchronous; the load is an awaited step" leaves `I18n::Backend::Cache` unported, so the Rails body it names does not type-check either.
   it.skip("translate caching backend", () => {});
 });
