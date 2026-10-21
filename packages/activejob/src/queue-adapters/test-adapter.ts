@@ -91,7 +91,8 @@ export class TestAdapter extends AbstractAdapter {
       this.performedJobs.push(jobData);
       return await ActiveJob.Base.execute(job.serialize());
     } else {
-      return this.enqueuedJobs.push(jobData);
+      this.enqueuedJobs.push(jobData);
+      return this.enqueuedJobs;
     }
   }
 
