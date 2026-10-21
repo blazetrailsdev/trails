@@ -24,6 +24,11 @@ export interface GemConfig {
   vendor?: string;
   /** False for a gem trails has no hand port of (marcel): no oracle of its own. */
   hand?: false;
+  /**
+   * Tests that cannot run against what trails ports, by test name: each is
+   * emitted `it.skip` under a `PERMANENT-SKIP:` line giving the reason.
+   */
+  skipTests?: Record<string, string>;
 }
 
 const GEMS: Record<string, GemConfig> = {
@@ -35,6 +40,10 @@ const GEMS: Record<string, GemConfig> = {
     namespace: "Marcel",
     vendor: "marcel/v1.0.4",
     hand: false,
+    skipTests: {
+      "gets content type from sources that conform to Rack::Lint::InputWrapper":
+        "Rack::Lint::InputWrapper is rack 2 (marcel.gemspec:25 `rack ~> 2.0`); trails ports rack 3.1.14, where it is Rack::Lint::Wrapper::InputWrapper (vendor/rack/v3.1.14/lib/rack/lint.rb:44, :445)",
+    },
   },
 };
 

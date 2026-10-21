@@ -996,7 +996,9 @@ export class Emitter {
     const emitBody = (stmts: N[], out: string[], guard: string | null): void => {
       const it = (nm: string, b: N) => {
         const lines = body(b, loopLocals);
-        const why = this.permanentSkip(u, this.lw.seqBody(b));
+        const why =
+          GEM.skipTests?.[JSON.parse(nm.startsWith('"') ? nm : '""')] ??
+          this.permanentSkip(u, this.lw.seqBody(b));
         if (why) {
           out.push(
             `// PERMANENT-SKIP: ${why}`,
