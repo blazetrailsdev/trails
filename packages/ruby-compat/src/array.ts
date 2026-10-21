@@ -685,10 +685,19 @@ export function first<T>(ary: Iterable<T>): T | null {
 export function last<T>(ary: readonly T[]): T | null;
 /** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
 export function last<T>(ary: readonly T[], n: number): T[];
+/** @noRailsEquivalent PERMANENT — `rb_funcallv` (`vendor/ruby/v3.3.11/vm_eval.c:1080`) on a receiver's own `last`. */
+export function last(ary: { readonly last: unknown }): unknown;
 /** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
-export function last<T>(ary: readonly T[], n?: number): T | null | T[] {
+export function last<T>(ary: readonly T[] | { readonly last: unknown }, n?: number): unknown {
   if (!Array.isArray(ary)) {
-    const member = (ary as { last?: unknown }).last;
+    const member = (ary as { last?: unknown } | null)?.last;
+    if (member === undefined) {
+      throw new NoMethodError(
+        ary == null
+          ? "undefined method 'last' for nil"
+          : `undefined method 'last' for an instance of ${rbObjClassname(ary)}`,
+      );
+    }
     return (
       typeof member === "function" ? member.call(ary, ...(n === undefined ? [] : [n])) : member
     ) as T;
