@@ -1,6 +1,7 @@
 import { Identification } from "@blazetrails/globalid";
 import {
   include,
+  rbEqual,
   rbModConstSet,
   registerConstant,
   StandardError,
@@ -20,7 +21,7 @@ export class Person {
   readonly id: unknown;
 
   static find(id: unknown): Person {
-    if (toI(id) === 404) {
+    if (rbEqual(toI(id), 404)) {
       throw new RecordNotFound("Cannot find person with ID=404");
     }
     return new this(id);
@@ -31,7 +32,7 @@ export class Person {
   }
 
   equals(otherPerson: unknown): boolean {
-    return otherPerson instanceof Person && toS(this.id) === toS(otherPerson.id);
+    return otherPerson instanceof Person && rbEqual(toS(this.id), toS(otherPerson.id));
   }
 }
 include(Person, Identification);
