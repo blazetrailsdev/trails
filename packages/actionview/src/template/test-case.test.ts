@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { beforeEach, describe, it } from "vitest";
+import { beforeEach, describe, it, onTestFinished } from "vitest";
 import { ActionController, ActionDispatch, RouteSet } from "@blazetrails/actionpack";
 import {
   assert,
@@ -34,8 +34,6 @@ import { Base } from "../base.js";
 import { DetailsKey } from "../lookup-context.js";
 import { ActionView } from "../namespaces.js";
 import { INTERNAL_IVARS, TestCase } from "../test-case.js";
-
-TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
 
 type Tc = Record<string, any>;
 type TestCaseClass = typeof TestCase & Record<string, any>;
@@ -374,6 +372,11 @@ describe("ATestHelperTest", () => {
   });
 
   it("is able to use mounted routes", () => {
+    const trails = TopLevel.Trails;
+    TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
+    onTestFinished(() => {
+      TopLevel.Trails = trails;
+    });
     tc().withRouting((set: any) => {
       const app = class extends Engine {
         static _routes?: RouteSet;
@@ -388,7 +391,7 @@ describe("ATestHelperTest", () => {
           });
         }
 
-        static override call(): void {}
+        static override call(..._args: unknown[]): void {}
       };
 
       set.draw(function (this: any) {
