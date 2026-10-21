@@ -3,20 +3,16 @@ import { LoadError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { setTemplateCompiler, Template } from "../template.js";
+import { buildViews } from "@blazetrails/trails-tsc";
 import { Tse } from "./handlers/tse.js";
 import { shippedTemplateCompiler } from "../test-helpers/setup-compile-template.js";
 
 const fixture = (name: string): string =>
   decodeURIComponent(new URL(`../../test-fixtures/${name}`, import.meta.url).pathname);
 const view = (): Base => new (Base.withEmptyTemplateCache())(null, {}, null);
-const greeting = (root: string): Template =>
-  new LookupContext([`${root}/app/views`]).findTemplate(
-    "show",
-    ["greetings"],
-    false,
-    [],
-    {},
-  ) as Template;
+const find = (root: string, name: string, prefix: string): Template =>
+  new LookupContext([`${root}/app/views`]).findTemplate(name, [prefix], false, [], {}) as Template;
+const greeting = (root: string): Template => find(root, "show", "greetings");
 
 describe("Templates are precompiled", () => {
   let testCompiler: ReturnType<typeof setTemplateCompiler> | undefined;
@@ -81,5 +77,64 @@ describe("Templates are precompiled", () => {
       )
       .map(([file]) => file);
     expect(offenders).toEqual([]);
+  });
+
+  it("renders a file-backed raw template from the module build-views emitted", async () => {
+    shipped();
+    const template = find(fixture("precompiled"), "plain", "greetings");
+    expect(String(await template.render(view()))).toBe("Raw <b>text</b>\n");
+  });
+
+  it("renders a file-backed html template from the module build-views emitted", async () => {
+    shipped();
+    const template = find(fixture("precompiled"), "banner", "greetings");
+    expect(String(await template.render(view()))).toBe("<em>static</em>\n");
+  });
+
+  it("builds each stand-in with the Tse handler options compile would use", async () => {
+    const root = fixture("precompiled-options");
+    const saved = [
+      Base.annotateRenderedViewWithFilenames,
+      Tse.tseTrimMode,
+      Tse.stripTrailingNewlines,
+      Tse.escapeIgnoreList,
+    ] as const;
+    Base.annotateRenderedViewWithFilenames = true;
+    Tse.tseTrimMode = "<>";
+    Tse.stripTrailingNewlines = true;
+    Tse.escapeIgnoreList = [Template.Types.get(":text") as unknown as string];
+    try {
+      await buildViews({ cwd: root });
+      const rendered: Record<string, string> = {};
+      for (const name of ["annotated", "trimmed", "stripped", "escaped"]) {
+        const template = find(root, name, "opts");
+        shipped();
+        rendered[name] = String(await template.render(view()));
+        setTemplateCompiler(testCompiler!);
+        testCompiler = undefined;
+        const fromString = new Template(
+          template.source,
+          template.identifier.slice(root.length + 1),
+          new Tse(),
+          {
+            locals: [],
+            format: template.format,
+          },
+        );
+        expect(rendered[name], name).toBe(String(await fromString.render(view())));
+      }
+      expect(rendered["annotated"]).toBe(
+        `<!-- BEGIN app/views/opts/annotated.html.tse --><p>hi</p><!-- END app/views/opts/annotated.html.tse -->`,
+      );
+      expect(rendered["stripped"]).toContain("-->line\n<!-- END");
+      expect(rendered["escaped"]).toBe("<b>");
+    } finally {
+      [
+        Base.annotateRenderedViewWithFilenames,
+        Tse.tseTrimMode,
+        Tse.stripTrailingNewlines,
+        Tse.escapeIgnoreList,
+      ] = saved;
+    }
   });
 });

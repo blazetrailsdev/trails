@@ -324,6 +324,7 @@ export {
   registerProcessAdapter,
   setEnv,
   setExitCode,
+  setSourceMapsSupport,
   stderr,
   stdin,
   setRubyTzUptodate,

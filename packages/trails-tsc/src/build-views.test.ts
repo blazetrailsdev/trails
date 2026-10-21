@@ -42,6 +42,19 @@ function write(root: string, rel: string, body: string): void {
 }
 
 describe("buildViews", () => {
+  it("reports a file with no registered handler as skipped", async () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/users/show.html.tse", "show");
+    write(cwd, "app/views/users/card.html.custom", "card");
+    write(cwd, "app/views/users/.keep", "");
+    write(cwd, "app/views/users/old.html.tse.js", "");
+
+    const { files, skipped } = await buildViews({ cwd });
+
+    expect(files).toEqual(["users/show.html.tse"]);
+    expect(skipped).toEqual(["users/card.html.custom"]);
+  });
+
   it("mirrors .tse files to .trails/views/ as typecheck shims", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "<h1><%= name %></h1>");

@@ -4,6 +4,7 @@ import {
   Base,
   FixtureResolver,
   LookupContext,
+  OutputBuffer,
   Template,
   TemplateHandlers,
   TopLevel,
@@ -436,5 +437,54 @@ describe("TSE stand-in scope", () => {
     expect(compiled.size).toBe(Object.keys(fixtures).length);
     const methods = new Set(compile.mock.contexts.map((t) => (t as Template).methodName()));
     expect(methods.size).toBe(compile.mock.calls.length);
+  });
+
+  const view = (): Base => {
+    const v = new (Base.withEmptyTemplateCache())(null, {}, null);
+    v.outputBuffer = new OutputBuffer();
+    return v;
+  };
+
+  it("writes an assigned view property to the view", async () => {
+    const v = view();
+    await standIn('<% virtualPath = "written" %>').call(v, v, {});
+    expect(v.virtualPath).toBe("written");
+  });
+
+  it("reads a view property changed during the render live", async () => {
+    const v = view();
+    v.virtualPath = "before";
+    const out = await standIn('<% this.virtualPath = "after" %><%= virtualPath %>').call(v, v, {});
+    expect(String((out as OutputBuffer).toString())).toBe("after");
+  });
+
+  it("raises ReferenceError for an undefined name at its point of use", async () => {
+    const v = view();
+    await expect(standIn("<%= notDefinedAnywhere %>").call(v, v, {})).rejects.toThrow(
+      ReferenceError,
+    );
+  });
+
+  const render = async (source: string): Promise<string> => {
+    const v = view();
+    return String(((await standIn(source).call(v, v, {})) as OutputBuffer).toString());
+  };
+
+  it("binds a for-of target that names nothing per render", async () => {
+    expect(await render("<% for (item of [1, 2]) { %><%= item %><% } %>")).toBe("12");
+  });
+
+  it("binds destructuring targets that name nothing per render", async () => {
+    expect(await render("<% [a, { b, c = 3 }] = [1, { b: 2 }] %><%= a + b + c %>")).toBe("6");
+  });
+
+  it("binds an assignment made inside a nested function", async () => {
+    expect(await render("<% (() => { count = 5; })() %><%= count %>")).toBe("5");
+  });
+
+  it("does not overwrite a global the template assigns", async () => {
+    const fetch = globalThis.fetch;
+    expect(await render("<% fetch = 1 %><%= fetch %>")).toBe("1");
+    expect(globalThis.fetch).toBe(fetch);
   });
 });

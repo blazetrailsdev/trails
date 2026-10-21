@@ -1,4 +1,5 @@
 import ts from "typescript-5";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import {
   awaitFlowReads,
   emitSteps,
@@ -193,6 +194,41 @@ export interface TseScope {
   resolved?: boolean;
   escapeIgnore?: boolean;
   localsSignature?: string | null;
+  trim?: boolean;
+  preamble?: string;
+  postamble?: string;
+}
+
+export interface HandlerTemplate {
+  handler: object;
+  type?: unknown;
+  format?: string | null;
+  shortIdentifier?: string | null;
+}
+
+export function tseHandlerScope(
+  template: HandlerTemplate,
+  annotateRenderedViewWithFilenames: boolean,
+): Pick<TseScope, "escapeIgnore" | "trim" | "preamble" | "postamble"> {
+  const ctor = template.handler.constructor as unknown as {
+    escapeIgnoreList: string[];
+    tseTrimMode: string;
+  };
+  const options: Pick<TseScope, "escapeIgnore" | "trim" | "preamble" | "postamble"> = {
+    escapeIgnore:
+      template.format != null && ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
+    trim: ctor.tseTrimMode === "-",
+  };
+  if (
+    annotateRenderedViewWithFilenames &&
+    template.format === ":html" &&
+    template.shortIdentifier
+  ) {
+    const id = template.shortIdentifier;
+    options.preamble = `_ob.safeAppend(${JSON.stringify(`<!-- BEGIN ${id} -->`)});`;
+    options.postamble = `_ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;
+  }
+  return options;
 }
 
 export function virtualizeTse(source: string, scope?: TseScope): string {
@@ -200,7 +236,7 @@ export function virtualizeTse(source: string, scope?: TseScope): string {
 }
 
 export function virtualizeTseWithDeltas(source: string, scope?: TseScope): VirtualizeTseResult {
-  const ast = parse(source);
+  const ast = parse(source, scope?.trim !== false);
   ast.localsSignature ??= scope?.localsSignature ?? null;
   const locals = ast.localsSignature === null ? [] : parseLocalsSignature(ast.localsSignature);
   const localsType = localsParamType(ast, locals);
@@ -228,25 +264,16 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
   for (const line of destructureLines(locals)) header.push(line);
   if (scope !== undefined) {
     const declared = new Set(locals.map((l) => l.name));
-    const names = freeIdentifiers(body);
-    const free = names.filter((name) => !declared.has(name));
-    for (const [name, line] of Object.entries(INJECTED)) {
-      if (!free.includes(name)) continue;
-      free.splice(free.indexOf(name), 1);
-      header.unshift(line);
-    }
-    if (free.length > 0) {
-      const scopes = ast.localsSignature === null ? "[locals, this, TopLevel]" : "[this, TopLevel]";
-      header.push(
-        `  const __lookup = (name: string, guarded = false): any => { for (const scope of ${scopes} as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded || name in globalThis) return Reflect.get(globalThis, name); throw new ReferenceError(name + " is not defined"); };`,
-      );
-    }
-    for (const name of free) {
-      const key = JSON.stringify(name);
-      header.push(`  let ${name} = __lookup(${key}, true) as Scope<${key}>;`);
-    }
+    const scopes = ast.localsSignature === null ? "[locals, this, TopLevel]" : "[this, TopLevel]";
+    header.push(...scopeLines(body, declared, scopes, (key) => `Scope<${key}>`, header));
   }
-  const footer = ["  return _ob;", "}", ""];
+  if (scope?.preamble !== undefined) header.push(`  ${scope.preamble}`);
+  const footer = [
+    ...(scope?.postamble === undefined ? [] : [`  ${scope.postamble}`]),
+    "  return _ob;",
+    "}",
+    "",
+  ];
 
   const ts = [...header, ...body, ...footer].join("\n");
   const headerLineCount = header.join("\n").split("\n").length;
@@ -263,6 +290,58 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
     genLine += code.split("\n").length;
   }
   return { ts, deltas, mappings };
+}
+
+function scopeLines(
+  body: readonly string[],
+  declared: ReadonlySet<string>,
+  scopes: string,
+  type: (key: string) => string,
+  imports: string[],
+): string[] {
+  const free = freeIdentifiers(body).filter((name) => !declared.has(name));
+  for (const [name, line] of Object.entries(INJECTED)) {
+    if (!free.includes(name)) continue;
+    free.splice(free.indexOf(name), 1);
+    imports.unshift(line);
+  }
+  if (free.length === 0) return [];
+  return [
+    "  const __own: Record<string, unknown> = Object.create(null);",
+    `  const __lookup = (name: string, guarded = false): any => { for (const scope of [...${scopes}, __own, globalThis] as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; throw new ReferenceError(name + " is not defined"); };`,
+    `  const __assign = (name: string, value: unknown): any => { for (const scope of ${scopes} as object[]) if (name in scope) { Reflect.set(scope, name, value); return value; } __own[name] = value; return value; }; void __assign;`,
+    "  const __sink: any = new Proxy({}, { set: (_target, name, value) => (__assign(name as string, value), true) }); void __sink;",
+    ...free.map((name) => {
+      const key = JSON.stringify(name);
+      return `  let ${name} = __lookup(${key}, true) as ${type(key)};`;
+    }),
+  ];
+}
+
+export function virtualizeHandler(code: string, source: string): VirtualizeTseResult {
+  const body = code.split("\n").map((line) => `  ${line}`);
+  const header = [
+    "/* virtualized from a template handler's call output */",
+    'import { OutputBuffer, TopLevel } from "@blazetrails/actionview";',
+    "export default async function render(",
+    "  this: any,",
+    "  context: any,",
+    "  localAssigns: Record<string, unknown>,",
+    "  _?: unknown,",
+    "): Promise<any> {",
+    "  const outputBuffer = context.outputBuffer; void outputBuffer; void OutputBuffer;",
+  ];
+  const declared = new Set(["outputBuffer", "OutputBuffer", "_"]);
+  header.push(...scopeLines(body, declared, "[localAssigns, this, TopLevel]", () => "any", header));
+  const ts = [...header, ...body, "}", ""].join("\n");
+  const lastLine = Math.max(0, source.split("\n").length - 1);
+  const mappings = body.map((_, i) => ({
+    genLine: header.length + i,
+    srcLine: Math.min(i, lastLine),
+    genCol: 0,
+    srcCol: 0,
+  }));
+  return { ts, deltas: [{ insertedAtLine: -1, lineCount: header.length }], mappings };
 }
 
 function scopeTypes(scope: TseScope, localsKnown: boolean): string[] {
@@ -321,6 +400,9 @@ const UNDECLARABLE = new Set([
   "localAssigns",
   "__view",
   "__lookup",
+  "__assign",
+  "__own",
+  "__sink",
 ]);
 
 function freeIdentifiers(body: readonly string[]): string[] {
@@ -413,17 +495,50 @@ function isReference(node: ts.Identifier, parent: ts.Node = node.parent): boolea
   return p.name !== node && p.propertyName !== node && p.label !== node;
 }
 
+const COMPOUND: Partial<Record<ts.SyntaxKind, ts.BinaryOperator>> = {
+  [ts.SyntaxKind.PlusEqualsToken]: ts.SyntaxKind.PlusToken,
+  [ts.SyntaxKind.MinusEqualsToken]: ts.SyntaxKind.MinusToken,
+  [ts.SyntaxKind.AsteriskEqualsToken]: ts.SyntaxKind.AsteriskToken,
+  [ts.SyntaxKind.AsteriskAsteriskEqualsToken]: ts.SyntaxKind.AsteriskAsteriskToken,
+  [ts.SyntaxKind.SlashEqualsToken]: ts.SyntaxKind.SlashToken,
+  [ts.SyntaxKind.PercentEqualsToken]: ts.SyntaxKind.PercentToken,
+  [ts.SyntaxKind.LessThanLessThanEqualsToken]: ts.SyntaxKind.LessThanLessThanToken,
+  [ts.SyntaxKind.GreaterThanGreaterThanEqualsToken]: ts.SyntaxKind.GreaterThanGreaterThanToken,
+  [ts.SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken]:
+    ts.SyntaxKind.GreaterThanGreaterThanGreaterThanToken,
+  [ts.SyntaxKind.AmpersandEqualsToken]: ts.SyntaxKind.AmpersandToken,
+  [ts.SyntaxKind.BarEqualsToken]: ts.SyntaxKind.BarToken,
+  [ts.SyntaxKind.CaretEqualsToken]: ts.SyntaxKind.CaretToken,
+  [ts.SyntaxKind.AmpersandAmpersandEqualsToken]: ts.SyntaxKind.AmpersandAmpersandToken,
+  [ts.SyntaxKind.BarBarEqualsToken]: ts.SyntaxKind.BarBarToken,
+  [ts.SyntaxKind.QuestionQuestionEqualsToken]: ts.SyntaxKind.QuestionQuestionToken,
+};
+
+const SHORT_CIRCUIT = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.AmpersandAmpersandToken,
+  ts.SyntaxKind.BarBarToken,
+  ts.SyntaxKind.QuestionQuestionToken,
+]);
+
 export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
   const f = context.factory;
-  const lookup = (name: string): ts.Expression =>
+  const lookup = (name: string, guarded = false): ts.Expression =>
     f.createCallExpression(f.createIdentifier("__lookup"), undefined, [
       f.createStringLiteral(name),
+      ...(guarded ? [f.createTrue()] : []),
+    ]);
+  const sink = (name: string): ts.Expression =>
+    f.createPropertyAccessExpression(f.createIdentifier("__sink"), name);
+  const assign = (name: string, value: ts.Expression): ts.Expression =>
+    f.createCallExpression(f.createIdentifier("__assign"), undefined, [
+      f.createStringLiteral(name),
+      value,
     ]);
   return (sf) => {
     const rewrite = (fn: ts.FunctionLikeDeclaration & { body: ts.Block }): ts.Block => {
       const names = new Set<string>();
-      for (const stmt of fn.body.statements) {
-        if (!ts.isVariableStatement(stmt)) continue;
+      const statements = fn.body.statements.filter((stmt) => {
+        if (!ts.isVariableStatement(stmt)) return true;
         for (const decl of stmt.declarationList.declarations) {
           let init = decl.initializer;
           while (init && ts.isAsExpression(init)) init = init.expression;
@@ -433,55 +548,139 @@ export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (conte
             ts.isIdentifier(init.expression) &&
             init.expression.text === "__lookup" &&
             ts.isIdentifier(decl.name)
-          )
+          ) {
             names.add(decl.name.text);
+            return false;
+          }
         }
-      }
-      const firstAssignment = new Map<string, number>();
-      const assigned = (node: ts.Node): void => {
-        const target =
-          ts.isBinaryExpression(node) &&
-          node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
-          node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
-            ? node.left
-            : (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
-                (node.operator === ts.SyntaxKind.PlusPlusToken ||
-                  node.operator === ts.SyntaxKind.MinusMinusToken)
-              ? node.operand
-              : ts.isForInStatement(node) || ts.isForOfStatement(node)
-                ? node.initializer
-                : undefined;
-        if (target && ts.isIdentifier(target) && !firstAssignment.has(target.text)) {
-          firstAssignment.set(target.text, target.pos);
-        }
-        ts.forEachChild(node, assigned);
-      };
-      assigned(fn.body);
+        return true;
+      });
       const visit = (node: ts.Node, parent: ts.Node, bound: ReadonlySet<string>): ts.Node => {
-        const unbound = (name: ts.Identifier): boolean =>
-          names.has(name.text) &&
-          !bound.has(name.text) &&
-          name.pos < (firstAssignment.get(name.text) ?? Infinity);
-        if (ts.isTypeOfExpression(node) && ts.isIdentifier(unparenthesized(node.expression))) {
-          return node;
+        const free = (name: ts.Node): name is ts.Identifier =>
+          ts.isIdentifier(name) && names.has(name.text) && !bound.has(name.text);
+        const child = (n: ts.Expression): ts.Expression => visit(n, node, bound) as ts.Expression;
+        if (ts.isTypeOfExpression(node) && free(unparenthesized(node.expression))) {
+          const name = (unparenthesized(node.expression) as ts.Identifier).text;
+          return f.updateTypeOfExpression(node, lookup(name, true));
         }
-        if (ts.isShorthandPropertyAssignment(node) && unbound(node.name)) {
+        if (ts.isShorthandPropertyAssignment(node) && free(node.name)) {
           return f.createPropertyAssignment(node.name.text, lookup(node.name.text));
         }
-        if (ts.isIdentifier(node) && unbound(node) && isReference(node, parent)) {
+        const pattern = (target: ts.Expression): ts.Expression => {
+          if (free(target)) return sink(target.text);
+          if (ts.isArrayLiteralExpression(target)) {
+            return f.updateArrayLiteralExpression(
+              target,
+              target.elements.map((el) =>
+                ts.isSpreadElement(el)
+                  ? f.updateSpreadElement(el, pattern(el.expression))
+                  : pattern(el),
+              ),
+            );
+          }
+          if (ts.isObjectLiteralExpression(target)) {
+            return f.updateObjectLiteralExpression(
+              target,
+              target.properties.map((p) => {
+                if (ts.isShorthandPropertyAssignment(p) && free(p.name)) {
+                  const value = p.objectAssignmentInitializer
+                    ? f.createAssignment(sink(p.name.text), child(p.objectAssignmentInitializer))
+                    : sink(p.name.text);
+                  return f.createPropertyAssignment(p.name.text, value);
+                }
+                if (ts.isPropertyAssignment(p)) {
+                  return f.updatePropertyAssignment(p, p.name, pattern(p.initializer));
+                }
+                if (ts.isSpreadAssignment(p)) {
+                  return f.updateSpreadAssignment(p, pattern(p.expression));
+                }
+                return visit(p, target, bound) as ts.ObjectLiteralElementLike;
+              }),
+            );
+          }
+          if (
+            ts.isBinaryExpression(target) &&
+            target.operatorToken.kind === ts.SyntaxKind.EqualsToken
+          ) {
+            return f.updateBinaryExpression(
+              target,
+              pattern(target.left),
+              target.operatorToken,
+              child(target.right),
+            );
+          }
+          return child(target);
+        };
+        if (
+          (ts.isForOfStatement(node) || ts.isForInStatement(node)) &&
+          !ts.isVariableDeclarationList(node.initializer)
+        ) {
+          const initializer = pattern(node.initializer);
+          const expression = child(node.expression);
+          const statement = visit(node.statement, node, bound) as ts.Statement;
+          return ts.isForOfStatement(node)
+            ? f.updateForOfStatement(node, node.awaitModifier, initializer, expression, statement)
+            : f.updateForInStatement(node, initializer, expression, statement);
+        }
+        if (
+          ts.isBinaryExpression(node) &&
+          node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+          (ts.isArrayLiteralExpression(node.left) || ts.isObjectLiteralExpression(node.left))
+        ) {
+          return f.updateBinaryExpression(
+            node,
+            pattern(node.left),
+            node.operatorToken,
+            child(node.right),
+          );
+        }
+        if (ts.isBinaryExpression(node) && free(node.left)) {
+          const name = node.left.text;
+          const kind = node.operatorToken.kind;
+          if (kind === ts.SyntaxKind.EqualsToken) {
+            return ts.setTextRange(assign(name, child(node.right)), node);
+          }
+          const op = COMPOUND[kind];
+          if (op !== undefined) {
+            const value = SHORT_CIRCUIT.has(op)
+              ? f.createBinaryExpression(lookup(name), op, assign(name, child(node.right)))
+              : assign(name, f.createBinaryExpression(lookup(name), op, child(node.right)));
+            return ts.setTextRange(f.createParenthesizedExpression(value), node);
+          }
+        }
+        if (
+          (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+          (node.operator === ts.SyntaxKind.PlusPlusToken ||
+            node.operator === ts.SyntaxKind.MinusMinusToken) &&
+          free(node.operand)
+        ) {
+          const name = node.operand.text;
+          const plus = node.operator === ts.SyntaxKind.PlusPlusToken;
+          const step = (value: ts.Expression, up: boolean): ts.Expression =>
+            f.createBinaryExpression(
+              value,
+              up ? ts.SyntaxKind.PlusToken : ts.SyntaxKind.MinusToken,
+              f.createNumericLiteral(1),
+            );
+          const updated = assign(name, step(f.createPrefixPlus(lookup(name)), plus));
+          return f.createParenthesizedExpression(
+            ts.isPrefixUnaryExpression(node) ? updated : step(updated, !plus),
+          );
+        }
+        if (free(node) && isReference(node, parent)) {
           return ts.setTextRange(lookup(node.text), node);
         }
         if (ts.isTypeNode(node)) return node;
         const inner = scopeBindings(node);
         const next = inner.size === 0 ? bound : new Set([...bound, ...inner]);
-        return ts.visitEachChild(node, (child) => visit(child, node, next), context);
+        return ts.visitEachChild(node, (c) => visit(c, node, next), context);
       };
       const top = new Set(
         [...scopeBindings(fn), ...scopeBindings(fn.body)].filter((n) => !names.has(n)),
       );
       return f.updateBlock(
         fn.body,
-        fn.body.statements.map((stmt) => visit(stmt, fn.body, top) as ts.Statement),
+        statements.map((stmt) => visit(stmt, fn.body, top) as ts.Statement),
       );
     };
     const visitTop = (node: ts.Node): ts.Node => {

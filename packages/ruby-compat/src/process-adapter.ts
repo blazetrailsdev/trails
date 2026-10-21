@@ -42,6 +42,7 @@ export interface ProcessAdapter {
    */
   exec?(argv: readonly string[]): never;
   setExitCode(code: number): void;
+  setSourceMapsSupport?(enabled: boolean): void;
   onSignal(name: SignalName, handler: () => void): () => void;
   readonly stdout: WriteStream;
   readonly stderr: WriteStream;
@@ -370,6 +371,11 @@ export function setExitCode(code: number): void {
 }
 
 /** @noRailsEquivalent PERMANENT */
+export function setSourceMapsSupport(enabled: boolean): void {
+  requireAdapter().setSourceMapsSupport?.(enabled);
+}
+
+/** @noRailsEquivalent PERMANENT */
 export function onSignal(name: SignalName, handler: () => void): () => void {
   return requireAdapter().onSignal(name, handler);
 }
@@ -609,6 +615,12 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
     },
     setExitCode: (code) => {
       proc.exitCode = code;
+    },
+    setSourceMapsSupport: (enabled) => {
+      const nodeModule = proc.getBuiltinModule?.("node:module") as
+        | { setSourceMapsSupport?(enabled: boolean): void }
+        | undefined;
+      nodeModule?.setSourceMapsSupport?.(enabled);
     },
     onSignal: (name, handler) => {
       proc.on(name, handler);
