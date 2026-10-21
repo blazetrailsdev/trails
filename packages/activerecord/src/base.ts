@@ -156,7 +156,6 @@ import {
   include,
   prepend,
   extend,
-  Module,
   classAttribute,
   benchmark as benchmarkable,
   type BenchmarkLogger,
@@ -2012,14 +2011,7 @@ Object.defineProperty(Base, "connection", {
 
 extend(Base, ReloadedClassesFiltering);
 extend(Base, { collectionCacheKey: _collectionCacheKey });
-extend(
-  Base,
-  new Module((mod) => {
-    mod.defineMethod("find", _Core.find);
-    mod.defineMethod("findBy", _Core.findBy);
-    mod.defineMethod("findByBang", _Core.findByBang);
-  }),
-);
+extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
 extend(Base, { configurations: _Core.configurations });
 extend(Base, { isApplicationRecordClass: _Core.isApplicationRecordClass });
 Base.configurations({});
@@ -2174,9 +2166,6 @@ extend(Base, {
 extend(Base, _StoreClassMethods);
 extend(Base, _AggregationsClassMethods);
 
-include(Base, JSONSerializer);
-Base.includeRootInJson = false;
-
 include(Base, {
   writeAttribute: _writeAttributeMethod,
   isNewRecord: _Persistence.isNewRecord,
@@ -2226,7 +2215,6 @@ include(Base, {
   cacheKey: _cacheKey,
   cacheKeyWithVersion: _cacheKeyWithVersion,
   cacheVersion: _cacheVersion,
-  serializableHash: Serialization.serializableHash,
   readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
   isRespondTo: _isRespondTo,
   respondToMissing: _respondToMissing,
@@ -2250,10 +2238,13 @@ include(Base, _Query);
 include(Base, _PrimaryKey);
 include(Base, ModelSchema.ModelSchema);
 include(Base, _TimeZoneConversion);
-include(Base, new Module((mod) => mod.defineMethod("initAttributes", _Core.initAttributes)));
+include(Base, { initAttributes: _Core.initAttributes });
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
+include(Base, JSONSerializer);
+Base.includeRootInJson = false;
+include(Base, { serializableHash: Serialization.serializableHash });
 include(Base, LockingPessimistic.Pessimistic);
 include(Base, Timestamp.Timestamp);
 include(Base, ActiveRecord.Associations);

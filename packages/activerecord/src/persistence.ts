@@ -4,7 +4,6 @@ import {
   basicObjRespondTo,
   isEmpty,
   keys,
-  Module,
   rbEqual,
   rbFPublicSend,
   rbObjAsString,
@@ -13,6 +12,7 @@ import {
   union,
   zip,
   eachPair,
+  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
@@ -712,7 +712,7 @@ export function becomesBang<
 
 /** @internal */
 export function initInternals(this: Base): void {
-  Persistence.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._triggerDestroyCallback = this._triggerUpdateCallback = null;
   this._previouslyNewRecord = false;
 }
@@ -842,45 +842,42 @@ export async function createOrUpdate(this: Base, block?: (record: any) => void):
   return result !== false;
 }
 
-export const Persistence = new Module((mod) => {
-  mod.defineMethod("save", save);
-  mod.defineMethod("saveBang", saveBang);
-  mod.defineMethod("destroy", destroy);
-  mod.defineMethod("touch", touch);
-  mod.defineMethod("_queryConstraintsHash", _queryConstraintsHash);
-  mod.defineMethod("destroyRow", destroyRow);
-  mod.defineMethod("_touchRow", _touchRow);
-  mod.defineMethod("_updateRow", _updateRow);
-  mod.defineMethod("createOrUpdate", createOrUpdate);
-  mod.defineMethod(
-    "_updateRecord",
-    /** @internal */
-    async function _updateRecord(
-      this: Base,
-      attributeNames?: string[],
-      block?: (record: any) => void,
-    ): Promise<number> {
-      attributeNames = this.attributesForUpdate(attributeNames ?? this.attributeNames());
+export const Persistence = {
+  save,
+  saveBang,
+  destroy,
+  touch,
+  _queryConstraintsHash,
+  destroyRow,
+  _touchRow,
+  _updateRow,
+  createOrUpdate,
+  /** @internal */
+  _updateRecord: async function _updateRecord(
+    this: Base,
+    attributeNames?: string[],
+    block?: (record: any) => void,
+  ): Promise<number> {
+    attributeNames = this.attributesForUpdate(attributeNames ?? this.attributeNames());
 
-      let affectedRows: number;
-      if (attributeNames.length === 0) {
-        affectedRows = 0;
-        this._triggerUpdateCallback = true;
-      } else {
-        affectedRows = await this._updateRow(attributeNames);
-        this._triggerUpdateCallback = affectedRows === 1;
-      }
+    let affectedRows: number;
+    if (attributeNames.length === 0) {
+      affectedRows = 0;
+      this._triggerUpdateCallback = true;
+    } else {
+      affectedRows = await this._updateRow(attributeNames);
+      this._triggerUpdateCallback = affectedRows === 1;
+    }
 
-      this._previouslyNewRecord = false;
-      block?.(this);
-      return affectedRows;
-    },
-  );
-  mod.defineMethod("_createRecord", _createRecord);
-  mod.defineMethod("initInternals", initInternals);
-  mod.defineMethod("incrementBang", incrementBang);
-  mod.defineMethod("reload", reload);
-});
+    this._previouslyNewRecord = false;
+    block?.(this);
+    return affectedRows;
+  },
+  _createRecord,
+  initInternals,
+  incrementBang,
+  reload,
+};
 
 /** @internal */
 export async function _createRecord(

@@ -313,3 +313,70 @@ why a computed key is `Object.hasOwn`. By the same count, 76 of the 94
 `hashDelete` call lines use the removed value and 18 are a bare statement, so
 the helper stays there, and the RFC reports that residual instead of promising
 zero helper calls.
+
+## A translation lookup is synchronous; the load is an awaited step
+
+Ratified by the repo owner on 2026-10-21, after `i18n-backend-cache`
+(RFC 0193) was filed to port `I18n::Backend::Cache` and twice failed to find a
+shape.
+
+The blocker is that `I18n.translate` is synchronous in Ruby while every
+`ActiveSupport::Cache` store's `read` / `write` is async
+(`packages/activesupport/src/cache/store.ts:250`, `:352`), so `Cache#_fetch`
+(`vendor/i18n/v1.14.8/lib/i18n/backend/cache.rb:93-99`) has no port that keeps
+both halves.
+
+**Prewarm and peek was ruled out on 2026-10-20.** The design seated an
+in-process copy of the store's `i18n/<namespace>/` entries behind an awaited
+warm, answered `_fetch`'s `read` from the copy, and started the store `write`
+without awaiting it. Two differences from Rails were accepted in the story and
+rejected by the owner: an entry another process wrote after the warm is not
+seen, and a failed store write cannot reach the `translate` caller. It is also
+the invented lazy machinery the owner has pushed back on elsewhere.
+
+**An async `translate` was measured and rejected on 2026-10-21.** The call
+sites are what this command lists, run from the repo root:
+
+```bash
+grep -rnE 'I18n\.(translate|localize|t|l)\(' packages/*/src --include='*.ts' \
+  | grep -v '\.test\.ts:' | grep -v '^packages/i18n/'
+```
+
+30 sites in 17 files across actionpack (1), actionview (12), activemodel (6),
+activerecord (1) and activesupport (10). The reviewer of trails#9180 got 30
+from an independent pattern; an earlier hand-built count said 31 because
+`html-safe-translation.ts:28` carries `Parameters<typeof I18n.translate>[1]`,
+a type reference and not a call. The trailing `\(` is what excludes it.
+
+Every member those sites sit in is synchronous. Two are constructors
+(`activemodel/validations.ts:339`, `activerecord/validations.ts:29`), which
+cannot await at all; two more are getters (`Error#message`, `#full_message`).
+So the change would not make i18n async; it would make ActiveModel's error
+messages and ActiveSupport's string helpers async, where Rails returns a
+String. CLAUDE.md § "Serialization's dual sync/async hash" had already refused
+that trade in the same direction for `as_json`.
+
+The member count is deliberately not stated as a number in the ratified
+section: resolving a call's enclosing member by text is a heuristic — it reads
+a nested call such as `assertValidKeys(...)` as a declaration unless the
+pattern excludes it — so a hardcoded count is a figure a reader cannot check
+from the section. The command above is checkable, and the claim that carries
+the ruling is that every one of those members is synchronous.
+
+**A dual-shape return was rejected as impossible, not merely costly.**
+`thenableHash` works because a Hash can be a Proxy; a Proxy cannot be a string
+primitive, so a thenable translation breaks `` `Name ${error.message}` `` and
+`error.message.length`.
+
+What made the sync answer cheap is that trails had already put the asynchrony
+at the load: `setLoadPath`, `reloadBang` and `eagerLoadBang` are async
+(`packages/i18n/src/i18n.ts:127`, `:139`, `:144`), converged there by
+`i18n-async-reload-chain` and `i18n-backend-async-read-path` under RFC 0074,
+against Ruby's lazy `init_translations unless initialized?` inside
+`Backend::Simple#lookup`
+(`vendor/i18n/v1.14.8/lib/i18n/backend/simple.rb:93-94`). i18n reports 100% on
+methods, files, inheritance, arity and params and 307/307 tests on that split.
+
+Settled by trails#9180, which also records why the parked
+`translate caching backend` test keeps an empty body: the Rails body names
+`I18n::Backend::Cache`, so a kept body would not type-check.

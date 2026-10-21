@@ -146,7 +146,7 @@ export async function execInsert(
   returning?: string[] | null,
 ): Promise<Result> {
   if (this.isUseInsertReturning() || pk === false) {
-    return DatabaseStatements.instanceMethod("execInsert")!.value.call(
+    return DatabaseStatements.execInsert.call(
       this as never,
       sql,
       name,

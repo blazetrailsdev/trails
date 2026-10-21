@@ -1,4 +1,4 @@
-import { Conversion, Naming } from "@blazetrails/activemodel";
+import { Conversion, Naming, Translation } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
 import {
   extend,
@@ -151,3 +151,46 @@ export class Customer extends Struct.new("name", "id") {
 
 export class BadCustomer extends Customer {}
 export class GoodCustomer extends Customer {}
+
+export class Post extends Struct.new(
+  "title",
+  "authorName",
+  "body",
+  "secret",
+  "persisted",
+  "writtenOn",
+  "cost",
+) {
+  declare title: unknown;
+  declare authorName: unknown;
+  declare body: unknown;
+  declare secret: unknown;
+  declare persisted: unknown;
+  declare writtenOn: unknown;
+  declare cost: unknown;
+  declare static humanAttributeName: (attribute: string) => string;
+
+  static {
+    extend(this, Naming);
+    include(this, Conversion);
+    extend(this, Translation);
+  }
+
+  isSecret(): unknown {
+    return this.secret;
+  }
+
+  isPersisted(): unknown {
+    return this.persisted;
+  }
+
+  author: unknown;
+  setAuthorAttributes(_attributes: unknown): void {}
+
+  comments: unknown;
+  commentIds: unknown;
+  setCommentsAttributes(_attributes: unknown): void {}
+
+  tags: unknown;
+  setTagsAttributes(_attributes: unknown): void {}
+}

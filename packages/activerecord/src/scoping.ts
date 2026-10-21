@@ -1,6 +1,6 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
-import { isEmpty, rbModConstSet } from "@blazetrails/ruby-compat";
+import { isEmpty, rbModConstSet, rbCallSuper } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Scoping } from "./namespaces.js";
 import { isSchemaLoaded } from "./model-schema.js";
 
@@ -119,11 +119,13 @@ export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
 }
 
 export function initializeInternalsCallback(this: ScopingHost): void {
-  Scoping.superMethod(this, "initializeInternalsCallback")!();
+  rbCallSuper(this, initializeInternalsCallback);
   populateWithCurrentScopeAttributes.call(this);
 }
 
-Scoping.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
+Object.assign(Scoping, {
+  initializeInternalsCallback,
+});
 
 interface ScopingClassHost {
   currentScope?(skipInheritedScope?: boolean): any;

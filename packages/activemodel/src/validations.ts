@@ -12,7 +12,7 @@ import {
   dup as hashDup,
   flatten,
   Hash,
-  Module,
+  rbCallSuper,
   rbBlockGivenP,
   rbFPublicSend,
   rbFSend,
@@ -364,14 +364,14 @@ export function initializeDup<TBase extends object>(
   other: unknown,
 ): void {
   this._errors = undefined;
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
 export function freeze<T extends Validations>(this: T): T {
   void this.errors;
   void this.contextForValidation();
 
-  return SuperMethods.superMethod(this, "freeze")!() as T;
+  return rbCallSuper(this, freeze) as T;
 }
 
 export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
@@ -386,7 +386,7 @@ export interface ReadAttributeForValidationHost {
 
 /** @internal */
 export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
-  SuperMethods.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._errors = undefined;
   this._contextForValidation = undefined;
 }
@@ -397,11 +397,7 @@ function inherited(this: ValidationsClassHost, base: ValidationsClassHost): void
   base._validators = dup;
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("freeze", freeze);
-  mod.defineMethod("initializeDup", initializeDup);
-  mod.defineMethod("initInternals", initInternals);
-});
+const SuperMethods = { freeze, initializeDup, initInternals };
 
 export type ConditionFn = ((record: ValidatableRecord) => boolean) | string;
 

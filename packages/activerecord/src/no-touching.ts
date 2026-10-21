@@ -1,8 +1,8 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
-import { Module, rbClassInheritedP } from "@blazetrails/ruby-compat";
+import { rbClassInheritedP, rbCallSuper } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 
-export const NoTouching = new Module();
+export const NoTouching = {};
 
 /** @internal */
 function klasses(): Array<typeof Base> {
@@ -27,13 +27,13 @@ export function isNoTouching(this: Base): boolean {
 
 export function touchLater(this: Base, ...args: unknown[]): Promise<void> | undefined {
   if (!isNoTouching.call(this)) {
-    return NoTouching.superMethod(this, "touchLater")!(...args) as Promise<void>;
+    return rbCallSuper(this, touchLater, ...args) as Promise<void>;
   }
 }
 
 export function touch(this: Base, ...args: unknown[]): Promise<boolean> | undefined {
   if (!isNoTouching.call(this)) {
-    return NoTouching.superMethod(this, "touch")!(...args) as Promise<boolean>;
+    return rbCallSuper(this, touch, ...args) as Promise<boolean>;
   }
 }
 
@@ -46,5 +46,7 @@ export async function applyTo<R>(klass: typeof Base, fn: () => R | Promise<R>): 
   }
 }
 
-NoTouching.defineMethod("touchLater", touchLater);
-NoTouching.defineMethod("touch", touch);
+Object.assign(NoTouching, {
+  touchLater,
+  touch,
+});

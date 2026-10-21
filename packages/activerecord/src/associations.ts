@@ -15,13 +15,13 @@ import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
 import {
-  Module,
   include,
   rbClassInheritedP,
   rbClassSuperclass,
   rbModConstSet,
   rbModName,
   registerConstant,
+  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 
 export type CollectionCallback<K extends string> =
@@ -61,10 +61,7 @@ export interface AssociationOptions {
   afterAdd?: CollectionCallback<"afterAdd"> | CollectionCallback<"afterAdd">[];
   beforeRemove?: CollectionCallback<"beforeRemove"> | CollectionCallback<"beforeRemove">[];
   afterRemove?: CollectionCallback<"afterRemove"> | CollectionCallback<"afterRemove">[];
-  extend?:
-    | Record<string, (...args: unknown[]) => unknown>
-    | Module
-    | Array<Record<string, (...args: unknown[]) => unknown> | Module>;
+  extend?: object | object[];
   disableJoins?: boolean;
   associationForeignKey?: string;
   foreignType?: string;
@@ -176,7 +173,7 @@ export class Associations {
     name: string,
     scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
     options: AssociationOptions = {},
-    extension?: (mod: Module) => void,
+    extension?: (mod: Record<string, unknown>) => void,
   ): void {
     if (typeof scope === "object" && scope !== null) {
       options = scope;
@@ -200,7 +197,7 @@ export class Associations {
       | (AssociationOptions & { joinTable?: string })
       | null = null,
     options: AssociationOptions & { joinTable?: string } = {},
-    extension?: (mod: Module) => void,
+    extension?: (mod: Record<string, unknown>) => void,
   ): void {
     if (typeof scope === "object" && scope !== null) {
       options = scope;
@@ -224,16 +221,13 @@ export class Associations {
     Reflection.addReflection(this, middleReflection.name, middleReflection);
     middleReflection.parentReflection = habtmReflection;
 
-    include(
-      this,
-      new Module((mod) => {
-        mod.defineMethod("destroyAssociations", async function (this: any): Promise<void> {
-          await this.association(middleReflection.name).deleteAll("deleteAll");
-          this.association(name).reset();
-          await mod.superMethod(this, "destroyAssociations")!();
-        });
-      }),
-    );
+    include(this, {
+      destroyAssociations: async function destroyAssociations(this: any): Promise<void> {
+        await this.association(middleReflection.name).deleteAll("deleteAll");
+        this.association(name).reset();
+        await rbCallSuper(this, destroyAssociations);
+      },
+    });
 
     const hmOptions: Record<string, unknown> = {};
     hmOptions.through = middleReflection.name;
@@ -319,17 +313,19 @@ export function association(this: Base, name: string): AssociationInstance {
 
 /** @internal */
 export function initInternals(this: Base): void {
-  AssociationsNamespace.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._associationCache = new Map();
 }
 
 export function initializeDup(this: Base, other: unknown): void {
   this._associationCache = new Map();
-  AssociationsNamespace.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
-AssociationsNamespace.defineMethod("initInternals", initInternals);
-AssociationsNamespace.defineMethod("initializeDup", initializeDup);
+Object.assign(AssociationsNamespace, {
+  initInternals,
+  initializeDup,
+});
 
 /** @internal */
 export function associationInstanceGet(

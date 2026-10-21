@@ -5,7 +5,6 @@ import {
   except,
   hashDelete,
   isModuleIncluded,
-  type Module,
   Range,
   rbEnsure,
   rtest,
@@ -1894,8 +1893,8 @@ export interface Relation<T extends Base, G extends boolean = false>
   extending<M extends Record<string, (...args: any[]) => any>>(
     mod: M | undefined,
   ): Relation<T, G> & Partial<M>;
-  extending(...modules: Module[]): Relation<T, G>;
-  extending(block: (mod: Module) => void): Relation<T, G>;
+  extending(...modules: object[]): Relation<T, G>;
+  extending(block: (mod: Record<string, unknown>) => void): Relation<T, G>;
   extending(): Relation<T, G>;
   optimizerHints(...args: string[]): Relation<T, G>;
   annotate(...args: string[]): Relation<T, G>;

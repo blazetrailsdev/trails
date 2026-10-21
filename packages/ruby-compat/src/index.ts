@@ -235,6 +235,7 @@ export {
   rbDefineAllocFunc,
   rbObjDup,
   include,
+  rbCallSuper,
   included,
   prepended,
   initialize,

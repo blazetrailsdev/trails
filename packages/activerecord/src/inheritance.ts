@@ -13,10 +13,10 @@ import {
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import {
   hashAref,
-  Module,
   rbClassSuperclass,
   rbModName,
   rbObjRespondTo,
+  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import { demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
@@ -26,14 +26,14 @@ export interface Inheritance {
   readonly storeFullStiClass: boolean;
 }
 
-export const Inheritance = Object.assign(new Module(), {
+export const Inheritance = {
   [included](base: object): void {
     classAttribute.call(base, "storeFullClassName", { instanceWriter: false, default: true });
     classAttribute.call(base, "storeFullStiClass", { instanceWriter: false, default: true });
 
     setBaseClass(base as typeof Base);
   },
-});
+};
 
 /**
  * @internal
@@ -136,15 +136,16 @@ export function baseClass(this: typeof Base): typeof Base {
 
 type AbstractClassHost = { _abstractClass: boolean };
 
-export const ClassMethods = new Module().include({
+export const ClassMethods: ThisType<AbstractClassHost> & {
+  abstractClass: boolean;
+  isAbstractClass(this: object): boolean;
+} = {
   get abstractClass(): boolean {
-    return Object.hasOwn(this, "_abstractClass")
-      ? (this as AbstractClassHost)._abstractClass
-      : false;
+    return Object.hasOwn(this, "_abstractClass") ? this._abstractClass : false;
   },
 
   set abstractClass(value: boolean) {
-    (this as AbstractClassHost)._abstractClass = value;
+    this._abstractClass = value;
   },
 
   isAbstractClass(this: object): boolean {
@@ -154,7 +155,7 @@ export const ClassMethods = new Module().include({
       Object.hasOwn(this, "_abstractClass") && (this as AbstractClassHost)._abstractClass === true
     );
   },
-});
+};
 
 /** @internal */
 export function findStiClass(this: typeof Base, typeName: string): typeof Base {
@@ -229,34 +230,32 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
 }
 
 export function dup(this: typeof Base): typeof Base {
-  const other = ClassMethods.superMethod(this, "dup")!() as typeof Base;
+  const other = rbCallSuper(this, dup) as typeof Base;
   setBaseClass(other);
   return other;
 }
 
-ClassMethods.defineMethod("dup", dup);
+Object.assign(ClassMethods, { dup });
 
 export function initializeClone(this: typeof Base, other: unknown): void {
-  ClassMethods.superMethod(this, "initializeClone")!(other);
+  rbCallSuper(this, initializeClone, other);
   setBaseClass(this);
 }
 
-ClassMethods.defineMethod("initializeClone", initializeClone);
+Object.assign(ClassMethods, { initializeClone });
 
 export function initializeDup(this: Base, other: unknown): void {
-  Inheritance.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
   ensureProperType.call(this);
 }
-
-Inheritance.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function initializeInternalsCallback(this: Base): void {
-  Inheritance.superMethod(this, "initializeInternalsCallback")!();
+  rbCallSuper(this, initializeInternalsCallback);
   ensureProperType.call(this);
 }
 
-Inheritance.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
+Object.assign(Inheritance, { initializeDup, initializeInternalsCallback });
 
 /** @internal */
 export function ensureProperType(this: Base): void {

@@ -62,10 +62,12 @@ export async function compileTemplate(
       } catch (error) {
         if (error instanceof Error && error.stack) {
           error.stack = error.stack.replace(
-            new RegExp(`${url}:(\\d+)(?::\\d+)?`, "gu"),
-            (whole, line: string) => {
+            new RegExp(`${url}:(\\d+)(:\\d+)?`, "gu"),
+            (whole, line: string, column: string | undefined) => {
               const source = jsToTse.get(Number(line) - FUNCTION_HEADER_LINES);
-              return source === undefined ? whole : `${template.identifier}:${source + 1}`;
+              return source === undefined
+                ? whole
+                : `${template.identifier}:${source + 1}${column ?? ""}`;
             },
           );
         }

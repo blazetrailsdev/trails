@@ -1,5 +1,7 @@
 import { it, expect } from "vitest";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Lint, LintError } from "./lint.js";
+import type { RackApp } from "./mock-request.js";
 
 function validEnv(overrides: Record<string, any> = {}): Record<string, any> {
   return {
@@ -77,9 +79,15 @@ it("notices request-target asterisk form errors", async () => {
 });
 
 it("notices request-target authority form errors", async () => {
-  const app = new Lint(async () => [200, {}, ["OK"]]);
-  const env = validEnv({ REQUEST_METHOD: "CONNECT", PATH_INFO: "/foo" });
-  await expect(app.call(env)).rejects.toThrow(LintError);
+  const validApp = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
+  const [status] = await validApp.call(
+    validEnv({ REQUEST_METHOD: "CONNECT", PATH_INFO: "example.com:80" }),
+  );
+  expect(status).toBe(200);
+
+  await expect(
+    new Lint(null as any).call(validEnv({ PATH_INFO: "example.com:80" })),
+  ).rejects.toThrow(/Only CONNECT requests may have PATH_INFO set to an authority/);
 });
 
 it("notices request-target absolute-form errors", async () => {
@@ -172,9 +180,44 @@ it("handles body.to_path returning nil", async () => {
 });
 
 it("notice body errors", async () => {
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, "not iterable"]);
-  const [, , body] = await app.call(validEnv());
-  expect(body).toBe("not iterable");
+  const bodyOf = async (body: unknown, contentLength: string) =>
+    (
+      await new Lint(async () => [
+        200,
+        { "content-type": "text/plain", "content-length": contentLength },
+        body,
+      ]).call(validEnv())
+    )[2];
+
+  const nonString = await bodyOf([1, 2, 3], "3");
+  expect(() => nonString.each(() => {})).toThrow(/yielded non-string/);
+
+  const object = await bodyOf(new (class Object {})(), "3");
+  expect(rbObjRespondTo(object, "toAry")).toBe(false);
+  expect(() => object.each(() => {})).toThrow("Enumerable Body must respond to each");
+
+  const empty = await bodyOf([], "0");
+  empty.each(() => {});
+  expect(() => empty.each(() => {})).toThrow("Response body must only be invoked once (each)");
+
+  const stackedLint = (app: RackApp, block: (body: any) => any) =>
+    new Lint(async (env) => {
+      const response = await new Lint(app).call(env);
+      response[2] = block(response[2]);
+      return response;
+    });
+  const arrayMismatch: RackApp = async () => {
+    const input = {
+      toAry: () => Array(10).fill("bar"),
+      each: (yieldBlock: (s: string) => void) => {
+        for (let i = 0; i < 10; i++) yieldBlock("foo");
+      },
+    };
+    return [200, { "content-type": "text/plain", "content-length": "30" }, input];
+  };
+  await expect(stackedLint(arrayMismatch, (body) => body.toAry()).call(validEnv())).rejects.toThrow(
+    /#to_ary not identical to contents produced by calling #each/,
+  );
 });
 
 it("notice input handling errors", async () => {
@@ -261,14 +304,13 @@ it("allows non-hijack responses when server supports hijacking", async () => {
 });
 
 it("notices when the response headers don't have a valid rack.hijack callback", async () => {
-  const app = new Lint(async () => [
-    200,
-    { "content-type": "text/plain", "rack.hijack": "not-callable" },
-    ["OK"],
-  ]);
-  const env = validEnv({ "rack.hijack?": true, "rack.hijack": () => ({}) });
-  const [status] = await app.call(env);
-  expect(status).toBe(200);
+  await expect(
+    new Lint(async () => [
+      201,
+      { "content-type": "text/plain", "content-length": "0", "rack.hijack": {} as any },
+      [],
+    ]).call(validEnv({ "rack.hijack?": true })),
+  ).rejects.toThrow("rack.hijack header must respond to #call");
 });
 
 it("notices when the response headers has a rack.hijack callback with hijacking being supported", async () => {
@@ -327,12 +369,9 @@ it("notices when the response protocol is specified in the response but not in t
 });
 
 it("pass valid rack.protocol", async () => {
-  const app = new Lint(async () => [
-    200,
-    { "content-type": "text/plain", "rack.protocol": ["h2"] as any },
-    ["OK"],
-  ]);
-  const env = validEnv({ "rack.protocol": ["h2"] });
-  const [status] = await app.call(env);
-  expect(status).toBe(200);
+  const app = new Lint(async () => [101, { "rack.protocol": "websocket" } as any, ["foo"]]);
+
+  const response = await app.call(validEnv({ "rack.protocol": ["websocket"] }));
+
+  expect(response[0]).toBe(101);
 });

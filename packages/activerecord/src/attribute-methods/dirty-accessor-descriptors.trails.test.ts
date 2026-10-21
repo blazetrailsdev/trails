@@ -13,7 +13,7 @@ describe("AttributeMethods::Dirty accessor descriptors", () => {
 
   it("save-side dirty readers are accessor properties on Base", () => {
     for (const name of SAVE_SIDE_READERS) {
-      const descriptor = Dirty.instanceMethod(name);
+      const descriptor = Object.getOwnPropertyDescriptor(Dirty, name);
       expect(name in Base.prototype, name).toBe(true);
       expect(descriptor, name).toBeDefined();
       expect(typeof descriptor!.get, name).toBe("function");

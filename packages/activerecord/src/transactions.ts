@@ -15,7 +15,7 @@ import {
   type Extended,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { mergeBang, Module, rtest } from "@blazetrails/ruby-compat";
+import { mergeBang, rtest, rbCallSuper } from "@blazetrails/ruby-compat";
 import type { TouchArgs } from "./timestamp.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
@@ -87,7 +87,7 @@ type CallbackOptions = {
   prepend?: boolean;
 };
 
-export const Transactions = Object.assign(new Module(), {
+export const Transactions = {
   [included](base: typeof Model): void {
     (base as typeof Model & Extended<typeof Callbacks.ClassMethods>).defineCallbacks(
       "commit",
@@ -96,7 +96,7 @@ export const Transactions = Object.assign(new Module(), {
       { scope: ["kind", "name"] },
     );
   },
-});
+};
 
 export function beforeCommit<T extends typeof Base>(
   this: T,
@@ -312,7 +312,7 @@ export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promis
 export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   return withTransactionReturningStatus.call(
     this,
-    () => Transactions.superMethod(this, "touch")!(...names) as Promise<boolean>,
+    () => rbCallSuper(this, touch, ...names) as Promise<boolean>,
   ) as Promise<boolean>;
 }
 
@@ -375,7 +375,7 @@ export function _triggerDestroyCallback(this: TransactionsRecord): boolean | nul
 
 /** @internal */
 export function initInternals(this: TransactionsRecord): void {
-  Transactions.superMethod(this, "initInternals")!();
+  rbCallSuper(this, initInternals);
   this._startTransactionState = null;
   this._committedAlreadyCalled = null;
   this._newRecordBeforeLastCommit = null;
@@ -470,6 +470,8 @@ function assertValidTransactionAction(actions: string[]): void {
   }
 }
 
-Transactions.defineMethod("beforeCommittedBang", beforeCommittedBang);
-Transactions.defineMethod("touch", touch);
-Transactions.defineMethod("initInternals", initInternals);
+Object.assign(Transactions, {
+  beforeCommittedBang,
+  touch,
+  initInternals,
+});

@@ -730,7 +730,13 @@ export function extractFromProgram(
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
           for (const nested of staticModuleInstances(node, classInfo.name)) {
-            const instanceMethods = harvestModuleInstanceMethods(nested.init, checker, relPath);
+            const literal = unwrapAssertions(nested.init);
+            const instanceMethods =
+              ts.isObjectLiteralExpression(literal) &&
+              /^[A-Z]/.test(nested.name) &&
+              /[a-z]/.test(nested.name)
+                ? harvestObjectLiteralMethods(literal, checker, relPath)
+                : harvestModuleInstanceMethods(nested.init, checker, relPath);
             if (instanceMethods.length === 0) continue;
             info.modules[`${relPath}:${nested.seat}`] = {
               name: nested.name,
@@ -4221,7 +4227,9 @@ export function harvestObjectLiteralMethods(
     const propMissingRailsCalls = missingRailsCallTags(prop);
     const propMissingRailsArgs = missingRailsArgsTags(prop);
     const propMissingRailsNames = missingRailsNameTags(prop);
-    const propInventedArms = inventedArmTags(prop);
+    const declaredHere =
+      file === "" || prop.getSourceFile().fileName.replace(/\\/g, "/").endsWith(`/${file}`);
+    const propInventedArms = declaredHere ? inventedArmTags(prop) : undefined;
     const propMissingRailsCallReasons = missingRailsCallTagReasons(prop);
     const propMissingRailsArgsReasons = missingRailsArgsTagReasons(prop);
     if (

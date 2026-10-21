@@ -508,6 +508,15 @@ function parseModeEnc(
 }
 
 /**
+ * The heap `os_obj_of` (`vendor/ruby/v3.3.11/gc.c:4162`) walks, for the one
+ * hierarchy ruby-compat constructs itself.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const ioObjects = new Set<WeakRef<IO>>();
+const ioObjectsSweep = new FinalizationRegistry<WeakRef<IO>>((ref) => ioObjects.delete(ref));
+
+/**
  * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
  * Rails writes a credentials file through this class —
@@ -571,6 +580,9 @@ export class IO {
     this.fd = fd;
     this.pathv = pathv;
     this.mode = rbIoModestrFmode(vmode);
+    const ref = new WeakRef(this);
+    ioObjects.add(ref);
+    ioObjectsSweep.register(this, ref);
   }
 
   /**

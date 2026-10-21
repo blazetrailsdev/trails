@@ -6,7 +6,14 @@ import {
   kernelArray,
   transformKeys,
 } from "@blazetrails/activesupport";
-import { Module, extend, hashAref, hashAset, include, isEmpty } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  hashAref,
+  hashAset,
+  include,
+  isEmpty,
+  rbCallSuper,
+} from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Relation } from "../relation.js";
 import type { Base } from "../base.js";
@@ -108,50 +115,41 @@ export class EncryptedQuery {
   }
 }
 
-export const RelationQueries: Module = new Module((mod) => {
-  mod.defineMethod("where", function (this: Relation<Base>, ...args: unknown[]): unknown {
-    return RelationQueries.superMethod(this, "where")!(
-      ...EncryptedQuery.processArguments(this, args, true),
-    );
-  });
+function where(this: Relation<Base>, ...args: unknown[]): unknown {
+  return rbCallSuper(this, where, ...EncryptedQuery.processArguments(this, args, true));
+}
 
-  mod.defineMethod("isExists", function (this: Relation<Base>, ...args: unknown[]): unknown {
-    return RelationQueries.superMethod(this, "isExists")!(
-      ...EncryptedQuery.processArguments(this, args, true),
-    );
-  });
+function isExists(this: Relation<Base>, ...args: unknown[]): unknown {
+  return rbCallSuper(this, isExists, ...EncryptedQuery.processArguments(this, args, true));
+}
 
-  mod.defineMethod("scopeForCreate", function (this: Relation<Base>): Record<string, unknown> {
-    if (!any(this.model.deterministicEncryptedAttributes() ?? []))
-      return RelationQueries.superMethod(this, "scopeForCreate")!() as Record<string, unknown>;
+function scopeForCreate(this: Relation<Base>): Record<string, unknown> {
+  if (!any(this.model.deterministicEncryptedAttributes() ?? []))
+    return rbCallSuper(this, scopeForCreate) as Record<string, unknown>;
 
-    const scopeAttributes = RelationQueries.superMethod(this, "scopeForCreate")!() as Record<
-      string,
-      unknown
-    >;
-    const wheres = this.whereValuesHash();
+  const scopeAttributes = rbCallSuper(this, scopeForCreate) as Record<string, unknown>;
+  const wheres = this.whereValuesHash();
 
-    for (let attributeName of this.model.deterministicEncryptedAttributes()!) {
-      attributeName = String(attributeName);
-      const values = wheres[attributeName];
-      if (Array.isArray(values) && values.slice(1).every((v) => v instanceof AdditionalValue)) {
-        scopeAttributes[attributeName] = values[0];
-      }
+  for (let attributeName of this.model.deterministicEncryptedAttributes()!) {
+    attributeName = String(attributeName);
+    const values = wheres[attributeName];
+    if (Array.isArray(values) && values.slice(1).every((v) => v instanceof AdditionalValue)) {
+      scopeAttributes[attributeName] = values[0];
     }
+  }
 
-    return scopeAttributes;
-  });
-});
+  return scopeAttributes;
+}
 
-export const CoreQueries = new Module() as Module & { ClassMethods: Module };
+export const RelationQueries = { where, isExists, scopeForCreate };
+
+export const CoreQueries = {} as { ClassMethods: { findBy: typeof findBy } };
 extend(CoreQueries, Concern);
 
 export function findBy(this: typeof Base, ...args: unknown[]): unknown {
-  return CoreQueries.ClassMethods.superMethod(this, "findBy")!(
-    ...EncryptedQuery.processArguments(this, args, false),
-  );
+  return rbCallSuper(this, findBy, ...EncryptedQuery.processArguments(this, args, false));
 }
-CoreQueries.ClassMethods = new Module((mod) => mod.defineMethod("findBy", findBy));
+CoreQueries.ClassMethods = { findBy };
 
 export class AdditionalValue {
   readonly value: unknown;
@@ -168,14 +166,14 @@ export class AdditionalValue {
   }
 }
 
-export const ExtendedEncryptableType: Module = new Module((mod) => {
-  mod.defineMethod("serialize", function (this: object, data: unknown): unknown {
-    if (data instanceof AdditionalValue) {
-      return data.value;
-    } else {
-      return ExtendedEncryptableType.superMethod(this, "serialize")!(data);
-    }
-  });
-});
+function serialize(this: object, data: unknown): unknown {
+  if (data instanceof AdditionalValue) {
+    return data.value;
+  } else {
+    return rbCallSuper(this, serialize, data);
+  }
+}
+
+export const ExtendedEncryptableType = { serialize };
 
 Encryption.ExtendedDeterministicQueries = ExtendedDeterministicQueries;

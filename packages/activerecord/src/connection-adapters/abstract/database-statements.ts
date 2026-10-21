@@ -24,7 +24,6 @@ import {
   rbGetKwargs,
   aryReject,
   kernelInteger,
-  Module,
   rbInspect,
   rtest,
   RuntimeError,
@@ -797,7 +796,7 @@ export function castResult(rawResult: any): never {
 
 export const create = insert;
 
-export const DatabaseStatements = new Module().include({
+export const DatabaseStatements = {
   resetTransaction,
   selectAll(
     this: DatabaseStatementsDefaultsHost,
@@ -1031,7 +1030,7 @@ export const DatabaseStatements = new Module().include({
   singleValueFromRows,
   arelFromRelation,
   extractTableRefFromInsertSql,
-});
+};
 
 /** @internal */
 export function affectedRows(rawResult: any): never {

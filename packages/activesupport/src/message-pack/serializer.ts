@@ -1,11 +1,11 @@
 import { RuntimeError, env as ENV, fetch, rbObjFrozenP, toI } from "@blazetrails/ruby-compat";
-import { Module, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { Factory, type Pool } from "@blazetrails/msgpack";
 import { delegate } from "../module-ext.js";
 import { Extensions } from "./extensions.js";
 
 const SIGNATURE = Uint8Array.of(0xcc, 0x80);
-const SIGNATURE_INT = 128;
+export const SIGNATURE_INT = 128;
 
 export interface Serializer {
   dump(object: unknown): Uint8Array;
@@ -16,16 +16,14 @@ export interface Serializer {
   warmup(): void;
 }
 
-type SerializerHost = Serializer & {
+export type SerializerHost = Serializer & {
   _messagePackFactory?: Factory;
   _messagePackPool?: Pool | null;
   messagePackPool(): Pool;
   installUnregisteredTypeHandler(): void;
 };
 
-export const Serializer = new Module((mod) => {
-  delegate.call(mod, "registerType", { to: "messagePackFactory" });
-}).include({
+export const Serializer = {
   dump(this: SerializerHost, object: unknown): Uint8Array {
     return this.messagePackPool().packer((packer) => {
       packer.write(SIGNATURE_INT);
@@ -81,6 +79,7 @@ export const Serializer = new Module((mod) => {
   installUnregisteredTypeHandler(this: SerializerHost): void {
     Extensions.installUnregisteredTypeError(this.messagePackFactory);
   },
-}) as Module<Serializer>;
+};
+delegate.call(Serializer, "registerType", { to: "messagePackFactory" });
 rbModConstSet(Serializer, "SIGNATURE", SIGNATURE);
 rbModConstSet(Serializer, "SIGNATURE_INT", SIGNATURE_INT);

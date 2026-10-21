@@ -21,7 +21,7 @@ export type { ObjectClass } from "./message-pack/extensions.js";
 
 export const MessagePack = ActiveSupport.MessagePack as Serializer & {
   Serializer: typeof Serializer;
-  CacheSerializer: typeof CacheSerializer;
+  CacheSerializer: typeof CacheSerializer & Serializer;
   Extensions: typeof Extensions;
   UnserializableObjectError: typeof UnserializableObjectError;
   MissingClassError: typeof MissingClassError;

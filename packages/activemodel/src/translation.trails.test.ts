@@ -3,12 +3,14 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Model } from "./index.js";
+import { ActiveModel, Model } from "./index.js";
 import { I18n } from "./i18n.js";
 import { raiseOnMissingTranslations } from "./translation.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { extend, include } from "@blazetrails/activesupport";
+import { Naming } from "./naming.js";
+import { Translation } from "./translation.js";
 
 describe("ActiveModelI18nTests — duplicate-name TS copies", () => {
   it("translated model attributes", () => {
@@ -164,5 +166,25 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
       activemodel: { attributes: { user: { items: "%{count} item(s)" } } },
     });
     expect(User.humanAttributeName("items", { count: 2 })).toBe("2 item(s)");
+  });
+});
+
+describe("lookupAncestors walks ancestors, not the static prototype chain", () => {
+  it("answers the subclass then the model ancestor, skipping an extended carrier", () => {
+    class Post {
+      static {
+        extend(this, Naming);
+        extend(this, Translation);
+      }
+    }
+    class ValidatingPost extends Post {
+      static {
+        include(this, ActiveModel.Validations);
+      }
+    }
+    const ancestors = (ValidatingPost as unknown as { lookupAncestors(): unknown[] })
+      .lookupAncestors;
+
+    expect(ancestors.call(ValidatingPost)).toEqual([ValidatingPost, Post]);
   });
 });

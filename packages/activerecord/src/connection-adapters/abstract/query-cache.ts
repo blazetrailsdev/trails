@@ -8,7 +8,7 @@ import {
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
-import { Fiber, included, Module, rbEnsure, Thread } from "@blazetrails/ruby-compat";
+import { Fiber, included, rbCallSuper, rbEnsure, Thread } from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
@@ -168,24 +168,22 @@ export interface ConnectionPoolConfiguration {
   readonly queryCache: Store;
 }
 
-export const ConnectionPoolConfiguration: Module = new Module((mod) => {
-  mod.defineMethod(
-    "checkoutAndVerify",
-    async function (
-      this: ConnectionPoolConfigurationHost,
-      connection: QueryCacheHost,
-    ): Promise<QueryCacheHost> {
-      await ConnectionPoolConfiguration.superMethod(this, "checkoutAndVerify")!(connection);
-      connection._queryCache ||= this.queryCache;
-      return connection;
-    },
-  );
+export const ConnectionPoolConfiguration: ThisType<ConnectionPoolConfigurationHost> &
+  Record<string, unknown> = {
+  checkoutAndVerify: async function checkoutAndVerify(
+    this: ConnectionPoolConfigurationHost,
+    connection: QueryCacheHost,
+  ): Promise<QueryCacheHost> {
+    await rbCallSuper(this, checkoutAndVerify, connection);
+    connection._queryCache ||= this.queryCache;
+    return connection;
+  },
 
-  mod.defineMethod("disableQueryCache", function <
-    T,
-  >(this: ConnectionPoolConfigurationHost, fn: () => T | Promise<T>, options: { dirties?: boolean } = {}):
-    | T
-    | Promise<T> {
+  disableQueryCache: function disableQueryCache<T>(
+    this: ConnectionPoolConfigurationHost,
+    fn: () => T | Promise<T>,
+    options: { dirties?: boolean } = {},
+  ): T | Promise<T> {
     const { dirties = true } = options;
     const cache = this.queryCache;
     const oldEnabled = cache.enabled;
@@ -196,11 +194,12 @@ export const ConnectionPoolConfiguration: Module = new Module((mod) => {
       cache.enabled = oldEnabled;
       cache.dirties = oldDirties;
     });
-  });
+  },
 
-  mod.defineMethod("enableQueryCache", function <
-    T,
-  >(this: ConnectionPoolConfigurationHost, fn: () => T | Promise<T>): T | Promise<T> {
+  enableQueryCache: function enableQueryCache<T>(
+    this: ConnectionPoolConfigurationHost,
+    fn: () => T | Promise<T>,
+  ): T | Promise<T> {
     const cache = this.queryCache;
     const oldEnabled = cache.enabled;
     const oldDirties = cache.dirties;
@@ -210,46 +209,44 @@ export const ConnectionPoolConfiguration: Module = new Module((mod) => {
       cache.enabled = oldEnabled;
       cache.dirties = oldDirties;
     });
-  });
+  },
 
-  mod.defineMethod("enableQueryCacheBang", function (this: ConnectionPoolConfigurationHost): void {
+  enableQueryCacheBang: function enableQueryCacheBang(this: ConnectionPoolConfigurationHost): void {
     const qc = this.queryCache;
     qc.enabled = true;
     qc.dirties = true;
-  });
+  },
 
-  mod.defineMethod("disableQueryCacheBang", function (this: ConnectionPoolConfigurationHost): void {
+  disableQueryCacheBang: function disableQueryCacheBang(
+    this: ConnectionPoolConfigurationHost,
+  ): void {
     const qc = this.queryCache;
     qc.enabled = false;
     qc.dirties = true;
-  });
+  },
 
-  mod.include({
-    get queryCacheEnabled(): boolean {
-      return this.queryCache.enabled;
-    },
+  get queryCacheEnabled(): boolean {
+    return this.queryCache.enabled;
+  },
 
-    get dirtiesQueryCache(): boolean {
-      return this.queryCache.dirties;
-    },
-  } satisfies ThisType<ConnectionPoolConfigurationHost>);
+  get dirtiesQueryCache(): boolean {
+    return this.queryCache.dirties;
+  },
 
-  mod.defineMethod("clearQueryCache", function (this: ConnectionPoolConfigurationHost): void {
+  clearQueryCache: function clearQueryCache(this: ConnectionPoolConfigurationHost): void {
     if (this._pinnedConnection) {
       this._queryCacheVersion.value++;
     }
     this.queryCache.clear();
-  });
+  },
 
-  mod.include({
-    get queryCache(): Store {
-      const pool = this;
-      return pool._threadQueryCaches.computeIfAbsent(IsolatedExecutionState.context(), () => {
-        return new Store(pool._queryCacheVersion, pool._queryCacheMaxSize);
-      });
-    },
-  } satisfies ThisType<ConnectionPoolConfigurationHost>);
-});
+  get queryCache(): Store {
+    const pool = this;
+    return pool._threadQueryCaches.computeIfAbsent(IsolatedExecutionState.context(), () => {
+      return new Store(pool._queryCacheVersion, pool._queryCacheMaxSize);
+    });
+  },
+};
 
 export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
   const proto = base.prototype as Record<string, unknown>;
@@ -322,12 +319,7 @@ export function selectAll(
     if (opts?.async) {
       const result =
         this.lookupSqlCache(sql, name, binds ?? []) ??
-        (QueryCache.superMethod(this, "selectAll") as OmitThisParameter<BaseSelectAll>)(
-          sql,
-          name,
-          binds,
-          forwardOpts,
-        );
+        (rbCallSuper(this, selectAll, sql, name, binds, forwardOpts) as ReturnType<BaseSelectAll>);
       return result instanceof Promise
         ? result.then((result) => FutureResult.wrap(result))
         : FutureResult.wrap(result);
@@ -337,20 +329,17 @@ export function selectAll(
       name,
       binds ?? [],
       async () =>
-        await (QueryCache.superMethod(this, "selectAll") as OmitThisParameter<BaseSelectAll>)(
+        (await rbCallSuper(
+          this,
+          selectAll,
           sql,
           name,
           binds,
           forwardOpts,
-        ),
+        )) as ReturnType<BaseSelectAll>,
     );
   }
-  return (QueryCache.superMethod(this, "selectAll") as OmitThisParameter<BaseSelectAll>)(
-    sql,
-    name,
-    binds,
-    forwardOpts,
-  );
+  return rbCallSuper(this, selectAll, sql, name, binds, forwardOpts) as ReturnType<BaseSelectAll>;
 }
 
 /** @internal */
@@ -466,12 +455,13 @@ function sqlCacheKey(sql: string, binds: unknown[]): string {
     : sql;
 }
 
-export const QueryCache: Module & {
-  [included]?: (base: {
-    prototype: object;
-    setCallback(name: string, ...filterList: unknown[]): void;
-  }) => void;
-} = new Module().include({
+export const QueryCache: ThisType<QueryCacheHost> &
+  Record<string, unknown> & {
+    [included]?: (base: {
+      prototype: object;
+      setCallback(name: string, ...filterList: unknown[]): void;
+    }) => void;
+  } = {
   get queryCache(): Store | null {
     return this._queryCache;
   },
@@ -492,7 +482,7 @@ export const QueryCache: Module & {
   cacheNotificationInfoResult,
   cacheNotificationInfo,
   selectAll,
-} satisfies ThisType<QueryCacheHost>);
+};
 
 QueryCache[included] = function (base: {
   prototype: object;

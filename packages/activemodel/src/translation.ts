@@ -1,5 +1,5 @@
 import { humanize, isPresent } from "@blazetrails/activesupport";
-import { toS } from "@blazetrails/ruby-compat";
+import { rbModAncestors, toS } from "@blazetrails/ruby-compat";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { Naming, type ModelName } from "./naming.js";
@@ -54,7 +54,10 @@ let _raiseOnMissingTranslations = false;
 export function lookupAncestors(
   this: object,
 ): Array<{ new (...args: never[]): unknown; modelName: ModelName }> {
-  return _walkAncestors(this);
+  return rbModAncestors(this as { prototype: object }).filter((x) => "modelName" in x) as Array<{
+    new (...args: never[]): unknown;
+    modelName: ModelName;
+  }>;
 }
 
 export function humanAttributeName(
@@ -108,18 +111,4 @@ export function humanAttributeName(
     translation = isPresent(attribute) ? humanize(attribute) : humanize(namespace);
   }
   return translation as string;
-}
-
-function _walkAncestors(
-  start: object,
-): Array<{ new (...args: never[]): unknown; modelName: ModelName }> {
-  const result: Array<{ new (...args: never[]): unknown; modelName: ModelName }> = [];
-  let klass: object | null = start;
-  while (klass != null && klass !== Function.prototype && klass !== Object.prototype) {
-    if ((klass as { modelName?: unknown }).modelName != null) {
-      result.push(klass as { new (...args: never[]): unknown; modelName: ModelName });
-    }
-    klass = Object.getPrototypeOf(klass) as object | null;
-  }
-  return result;
 }

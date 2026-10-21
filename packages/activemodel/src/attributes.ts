@@ -6,7 +6,7 @@ import {
   type Included,
   included,
 } from "@blazetrails/activesupport";
-import { type Hash, Module, keys, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
+import { type Hash, keys, rbCallSuper, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -27,7 +27,7 @@ import {
 
 export function initializeDup(this: AttributeInstanceHost, other: unknown): void {
   this._attributes = this._attributes.deepDup();
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
 }
 
 export type AttributeInstanceHost = { _attributes: AttributeSet };
@@ -57,13 +57,10 @@ export function freeze<T extends AttributeInstanceHost>(this: T): T {
   if (!Object.isFrozen(this)) {
     this._attributes = rbObjClone(this._attributes).freeze();
   }
-  return SuperMethods.superMethod(this, "freeze")!() as T;
+  return rbCallSuper(this, freeze) as T;
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initializeDup", initializeDup);
-  mod.defineMethod("freeze", freeze);
-});
+const SuperMethods = { initializeDup, freeze };
 
 /** @internal */
 export function _writeAttribute(

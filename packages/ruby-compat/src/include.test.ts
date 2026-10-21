@@ -21,6 +21,7 @@ import {
 } from "./object.js";
 import {
   include,
+  rbCallSuper,
   rbObjIsKindOf,
   rbModConstDefined,
   rbModConstSet,
@@ -1303,6 +1304,196 @@ describe("publicInstanceMethods", () => {
     }
     expect(publicInstanceMethods(Sub, false)).toEqual(["own"]);
     expect(publicInstanceMethods(Sub).sort()).toEqual(["inherited", "own"]);
+  });
+});
+
+describe("rbCallSuper", () => {
+  it("reaches the superclass method a plain module's copy shadows", () => {
+    class Parent {
+      greet(): string {
+        return "parent";
+      }
+    }
+    class Child extends Parent {}
+    function greet(this: Child): string {
+      return `mod+${rbCallSuper(this, greet) as string}`;
+    }
+    include(Child, { greet });
+    expect(new Child().greet()).toBe("mod+parent");
+  });
+
+  it("reaches the module included before, as a later include sits above it", () => {
+    class Host {}
+    function first(this: Host): string[] {
+      return ["first"];
+    }
+    function second(this: Host): string[] {
+      return ["second", ...(rbCallSuper(this, second) as string[])];
+    }
+    const first_ = { chain: first };
+    const second_ = { chain: second };
+    include(Host, first_);
+    include(Host, second_);
+    expect((new Host() as { chain(): string[] }).chain()).toEqual(["second", "first"]);
+  });
+
+  it("binds each includer's super separately", () => {
+    class A {
+      tag(): string {
+        return "A";
+      }
+    }
+    class B {
+      tag(): string {
+        return "B";
+      }
+    }
+    function tag(this: object): string {
+      return `m(${rbCallSuper(this, tag) as string})`;
+    }
+    class SubA extends A {}
+    class SubB extends B {}
+    include(SubA, { tag });
+    include(SubB, { tag });
+    expect(new SubA().tag()).toBe("m(A)");
+    expect(new SubB().tag()).toBe("m(B)");
+  });
+
+  it("falls through to Kernel, else raises NoMethodError", () => {
+    class Host {}
+    function nothingAbove(this: Host): unknown {
+      return rbCallSuper(this, nothingAbove);
+    }
+    include(Host, { nothingAbove });
+    expect(() => (new Host() as { nothingAbove(): unknown }).nothingAbove()).toThrow(
+      "super: no superclass method 'nothingAbove' for an instance of Host",
+    );
+  });
+
+  it("falls through to Kernel by the name the method was installed under", () => {
+    class Parent {
+      dup(): string {
+        return "parent";
+      }
+    }
+    class Host extends Parent {}
+    function copy(this: Host): unknown {
+      return rbCallSuper(this, copy);
+    }
+    include(Host, { dup: copy });
+    expect((new Host() as { dup(): unknown }).dup()).toBe("parent");
+    class Bare {}
+    function copy2(this: Bare): unknown {
+      return rbCallSuper(this, copy2);
+    }
+    const mod = { dup: copy2 };
+    include(Bare, mod);
+    const bare = new Bare() as { dup(): unknown };
+    expect(() => bare.dup()).toThrow(/no superclass method 'copy2'/);
+  });
+
+  it("reaches the class's own method from a prepended module", () => {
+    class Host {
+      greet(): string {
+        return "host";
+      }
+    }
+    function greet(this: Host): string {
+      return `prepended+${rbCallSuper(this, greet) as string}`;
+    }
+    prepend(Host, { greet });
+    expect(new Host().greet()).toBe("prepended+host");
+  });
+
+  it("prepends a plain module's recorded includes beneath it", () => {
+    class Host {}
+    const inner = {
+      inner(): string {
+        return "inner";
+      },
+    };
+    const outer = {
+      outer(): string {
+        return "outer";
+      },
+    };
+    include(outer, inner);
+    prepend(Host, outer);
+    const host = new Host() as { inner(): string; outer(): string };
+    expect(host.outer()).toBe("outer");
+    expect(host.inner()).toBe("inner");
+  });
+
+  it("reaches an earlier extended module's method from a later one", () => {
+    class Host {}
+    const first = {
+      find(): string {
+        return "first";
+      },
+    };
+    function find(this: typeof Host): string {
+      return `second+${rbCallSuper(this, find) as string}`;
+    }
+    extend(Host, first);
+    extend(Host, { find });
+    expect((Host as unknown as { find(): string }).find()).toBe("second+first");
+  });
+
+  it("extends with a class module's instance methods", () => {
+    class Mod {
+      static readonly [classModule] = true;
+      static only(): string {
+        return "singleton";
+      }
+      get descendants(): string {
+        return "instance";
+      }
+    }
+    const obj = extend({}, Mod) as { descendants?: string; only?: unknown };
+    expect(obj.descendants).toBe("instance");
+    expect(obj.only).toBeUndefined();
+  });
+
+  it("reaches a class module's shadowed method", () => {
+    class Parent {
+      run(): string {
+        return "parent";
+      }
+    }
+    class Mod {
+      static readonly [classModule] = true;
+      run(): string {
+        return `mod+${rbCallSuper(this, Mod.prototype.run) as string}`;
+      }
+    }
+    class Host extends Parent {}
+    include(Host, Mod);
+    expect(new Host().run()).toBe("mod+parent");
+  });
+
+  it("finds the shadowed method without invoking a get trap spliced in the chain", () => {
+    class Parent {
+      greet(): string {
+        return "parent";
+      }
+    }
+    class Host extends Parent {}
+    let trapped = 0;
+    Object.setPrototypeOf(
+      Host.prototype,
+      new Proxy(Object.create(Parent.prototype) as object, {
+        get(target, prop, receiver) {
+          if (receiver === Host.prototype && typeof prop === "string") trapped++;
+          return Reflect.get(target, prop, receiver);
+        },
+      }),
+    );
+    function greet(this: Host): string {
+      return `mod+${rbCallSuper(this, greet) as string}`;
+    }
+    include(Host, { greet });
+    expect(trapped).toBe(0);
+    expect(new Host().greet()).toBe("mod+parent");
   });
 });
 
