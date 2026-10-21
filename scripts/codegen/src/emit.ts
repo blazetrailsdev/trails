@@ -176,6 +176,53 @@ const PERMANENT_CONSTS: Record<string, string> = {
   Zeitwerk: 'CLAUDE.md "Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)"',
 };
 
+/**
+ * A blank line between the blocks of a test file's `describe` (each `it`, hook,
+ * helper function, and the statements between them), as a hand-written suite
+ * has; a test body keeps its own layout.
+ */
+function spaceBlocks(lines: string[]): string[] {
+  const opener =
+    /^(it|it\.\w+(\([^)]*\))?|beforeEach|afterEach|describe)\(|^\/\/ PERMANENT-SKIP|^(async )?function /;
+  const ind = (l: string) => l.length - l.trimStart().length;
+  const levels = new Set(lines.filter((l) => opener.test(l.trim())).map(ind));
+  const out: string[] = [];
+  // The indent of the `it` / hook whose body we are in, else -1.
+  let body = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const cur = lines[i];
+    const prev = out[out.length - 1];
+    const t = cur.trim();
+    if (body >= 0) {
+      out.push(cur);
+      if (ind(cur) === body && /^\}\)/.test(t)) {
+        body = -1;
+        const next = lines[i + 1];
+        if (next !== undefined && ind(next) === ind(cur) && !/^[})]/.test(next.trim()))
+          out.push("");
+      }
+      continue;
+    }
+    if (
+      prev !== undefined &&
+      prev.trim() !== "" &&
+      !prev.trimEnd().endsWith("{") &&
+      !prev.trim().startsWith("// PERMANENT-SKIP") &&
+      opener.test(t)
+    )
+      out.push("");
+    out.push(cur);
+    if (/^(it|it\.\w+(\([^)]*\))?|beforeEach|afterEach)\(/.test(t) && t.endsWith("{"))
+      body = ind(cur);
+    const next = lines[i + 1];
+    if (next === undefined || !levels.has(ind(cur)) || ind(next) !== ind(cur)) continue;
+    const nt = next.trim();
+    if (/^[})]/.test(nt) || opener.test(nt)) continue;
+    if (/^\}\)?;?$/.test(t) || (t.startsWith("let ") && !nt.startsWith("let "))) out.push("");
+  }
+  return out;
+}
+
 export class Emitter {
   /** Nested constants with no seat on their parent (see `emitFile`). */
   unseated: string[] = [];
@@ -731,7 +778,7 @@ export class Emitter {
     // Each test and hook receives this class's instance as `testCase`.
     const tc = declared ? `<{ testCase: ${short} }>` : "";
     const sub = (l: string) => l.split("@@TC@@").join(tc);
-    return [
+    const lines = [
       ...(!declared
         ? []
         : [
@@ -758,7 +805,10 @@ export class Emitter {
         ...out.map(sub),
       ]),
       "});",
-    ].join("\n");
+    ]
+      .join("\n")
+      .split("\n");
+    return spaceBlocks(lines).join("\n");
   }
 
   /** A test whose body names a constant a ratified CLAUDE.md section rules out. */
@@ -1108,7 +1158,7 @@ export class Emitter {
     // A test class that nests constants (`SerializersTest::DummySerializer`,
     // which a test `constantize`s by that name) is still their namespace.
     const nests = [...this.index.scopes.keys()].some((k) => k.startsWith(`${u.fqn}::`));
-    return [
+    return spaceBlocks([
       ...(nests
         ? [
             `class ${short} {}`,
@@ -1118,7 +1168,7 @@ export class Emitter {
       `${vitest("describe")}(${JSON.stringify(short)}, () => {`,
       ...indent([...lets, ...helperLines.flatMap((h) => h.split("\n")), ...out]),
       "});",
-    ].join("\n");
+    ]).join("\n");
   }
 
   /** `setup` / `teardown` blocks of a reopened `ActiveSupport::TestCase` as top-level hooks. */

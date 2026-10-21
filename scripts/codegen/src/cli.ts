@@ -514,7 +514,9 @@ if (!process.argv.includes("--no-prettier")) {
   const t = Date.now();
   execFileSync(
     path.join(ROOT, "node_modules/.bin/prettier"),
-    ["--write", "--log-level", "warn", `${outDir}/**/*.ts`],
+    // Only .prettierignore: prettier also reads .gitignore by default, which
+    // lists codegen-out, and an ignored path is skipped without a word.
+    ["--write", "--log-level", "warn", "--ignore-path", ".prettierignore", `${outDir}/**/*.ts`],
     { cwd: ROOT, stdio: "inherit" },
   );
   report.prettierMs = Date.now() - t;
