@@ -578,6 +578,15 @@ importers:
 
   packages/tse-compiler: {}
 
+  packages/vitest-matchers:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+      vitest:
+        specifier: '>=3.0.0'
+        version: 3.2.4(@types/node@25.3.5)(jiti@2.6.1)(jsdom@29.0.1)(lightningcss@1.32.0)(supports-color@8.1.1)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
+
   packages/website:
     devDependencies:
       '@sveltejs/adapter-static':

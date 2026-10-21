@@ -262,14 +262,18 @@ describe("diffHistograms", () => {
   });
 });
 
-describe("Minitest expect forms", () => {
-  it("credits each form with its Minitest counterpart's kind", () => {
-    expect(normalizeTrailsKind("assert")).toBe("truthy");
-    expect(normalizeTrailsKind("refute")).toBe("falsy");
-    expect(normalizeTrailsKind("not:assertEqual")).toBe("notEqual");
-    expect(normalizeTrailsKind("assertInDelta")).toBe("inDelta");
-    expect(normalizeTrailsKind("assertInstanceOf")).toBe("instanceOf");
+describe("Minitest matchers", () => {
+  it("credits each matcher with its Minitest counterpart's kind", () => {
+    expect(normalizeTrailsKind("toBeRubyTruthy")).toBe("truthy");
+    expect(normalizeTrailsKind("toBeRubyFalsy")).toBe("falsy");
+    expect(normalizeTrailsKind("not:toBeRubyTruthy")).toBe("falsy");
+    expect(normalizeTrailsKind("toBeWithinDelta")).toBe("inDelta");
+    expect(normalizeTrailsKind("toBeEmpty")).toBe("empty");
+    expect(normalizeTrailsKind("not:toBeEmpty")).toBe("notEmpty");
+    expect(normalizeTrailsKind("toBeExactInstanceOf")).toBe("instanceOf");
     expect(normalizeTrailsKind("toBeInstanceOf")).toBe("kindOf");
+    expect(normalizeTrailsKind("toRespondTo")).toBe("respondTo");
+    expect(normalizeTrailsKind("not:toRespondTo")).toBe("notRespondTo");
     expect(normalizeRailsKind("assert_kind_of")).toBe("kindOf");
   });
 });

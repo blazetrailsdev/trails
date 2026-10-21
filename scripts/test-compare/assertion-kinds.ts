@@ -255,6 +255,12 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toThrow: "raises",
   toThrowError: "raises",
   toBeInstanceOf: "kindOf",
+  toBeExactInstanceOf: "instanceOf",
+  toBeRubyTruthy: "truthy",
+  toBeRubyFalsy: "falsy",
+  toBeWithinDelta: "inDelta",
+  toBeEmpty: "empty",
+  toRespondTo: "respondTo",
   toHaveLength: "length",
   toBeGreaterThan: "operator",
   toBeGreaterThanOrEqual: "operator",
@@ -399,7 +405,7 @@ export interface KindHistogram {
  * `kind_of?` folds onto `instance_of?` for the same reason in reverse: ports
  * written before the Minitest mapping table spelled `assert_instance_of` as
  * `toBeInstanceOf`, which is `kind_of?`. Converging those ports to
- * `expect(o.constructor).toBe(cls)` lifts this fold.
+ * `toBeExactInstanceOf` lifts this fold.
  */
 const HISTOGRAM_FOLD: Partial<Record<CanonicalKind, CanonicalKind>> = {
   kindOf: "instanceOf",

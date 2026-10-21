@@ -36,34 +36,6 @@ describe("TS extractor assertion-count collection", () => {
     expect(info.testCases[0].assertionKinds).toEqual(["expect", "expect", "assertEqual", "toBe"]);
   });
 
-  it("reads each Minitest expect form as the helper it ports", () => {
-    const src = `
-      it("forms", () => {
-        expect(x != null && x !== false).toBe(true);
-        expect(x == null || x === false).toBe(true);
-        expect(rbEqual(act, exp)).toBe(true);
-        expect(rbEqual(act, exp)).not.toBe(true);
-        expect(rbObjRespondTo(o, "m")).toBe(true);
-        expect(Math.abs(exp - act)).toBeLessThanOrEqual(0.001);
-        expect(o.constructor).toBe(Klass);
-        expect(o).toBeInstanceOf(Klass);
-        expect(o.isFoo()).toBe(true);
-      });
-    `;
-    const info = extractTestsFromSource(src, "packages/activesupport/src/x.test.ts");
-    expect(info.testCases[0].assertionKinds).toEqual([
-      "assert",
-      "refute",
-      "assertEqual",
-      "not:assertEqual",
-      "assertRespondTo",
-      "assertInDelta",
-      "toBe",
-      "toBeInstanceOf",
-      "toBe",
-    ]);
-  });
-
   it("reads a two-argument mustBe / wontBe as assertPredicate / refutePredicate", () => {
     const src = `
       it("spec forms", () => {
