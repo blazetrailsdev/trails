@@ -689,28 +689,6 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
-      "`OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its " +
-      "raw String (buffers.rb:27). " +
-      "Each reads or rewrites a String's encoding tag, which a JS string does not " +
-      'have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.',
-    names: ["encoding", "encode!", "force_encoding"],
-    rubyFiles: ["buffers.rb"],
-    packages: ["actionview"],
-  },
-  {
-    reason:
-      "`Template#offset` and `#locals_code` (template.rb:541-576) build the " +
-      "`module_eval` line offset and the Ruby locals binding of `compiled_source`, " +
-      "which `virtualizeTse` writes as TypeScript at build time; " +
-      "`#find_node_by_id` (template.rb:405-415) walks the Prism tree `spot` " +
-      'parses, and `spot` is line-based (CLAUDE.md § "Templates are ' +
-      'precompiled"). PERMANENT.',
-    names: ["offset", "locals_code", "find_node_by_id"],
-    rubyFiles: ["template.rb"],
-    packages: ["actionview"],
-  },
-  {
-    reason:
       "`Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs " +
       "Thorfiles) is not ported, and these `Thor::Util` members exist only for it: " +
       "`namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside " +
@@ -1201,6 +1179,28 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "other definition stay scored.",
     names: ["then"],
     rubyFiles: ["relation.rb"],
+  },
+  {
+    reason:
+      "`OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its " +
+      "raw String (buffers.rb:27). " +
+      "Each reads or rewrites a String's encoding tag, which a JS string does not " +
+      'have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.',
+    names: ["encoding", "encode!", "force_encoding"],
+    rubyFiles: ["buffers.rb"],
+    packages: ["actionview"],
+  },
+  {
+    reason:
+      "`Template#offset` and `#locals_code` (template.rb:541-576) build the " +
+      "`module_eval` line offset and the Ruby locals binding of `compiled_source`, " +
+      "which `virtualizeTse` writes as TypeScript at build time; " +
+      "`#find_node_by_id` (template.rb:405-415) walks the Prism tree `spot` " +
+      'parses, and `spot` is line-based (CLAUDE.md § "Templates are ' +
+      'precompiled"). PERMANENT.',
+    names: ["offset", "locals_code", "find_node_by_id"],
+    rubyFiles: ["template.rb"],
+    packages: ["actionview"],
   },
 ];
 

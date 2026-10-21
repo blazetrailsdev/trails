@@ -204,10 +204,6 @@ parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
-- `OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its raw String (buffers.rb:27). Each reads or rewrites a String's encoding tag, which a JS string does not have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.
-  - `encoding`, `encode!`, `force_encoding` (only in: `buffers.rb`)
-- `Template#offset` and `#locals_code` (template.rb:541-576) build the `module_eval` line offset and the Ruby locals binding of `compiled_source`, which `virtualizeTse` writes as TypeScript at build time; `#find_node_by_id` (template.rb:405-415) walks the Prism tree `spot` parses, and `spot` is line-based (CLAUDE.md § "Templates are precompiled"). PERMANENT.
-  - `offset`, `locals_code`, `find_node_by_id` (only in: `template.rb`)
 - `Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs Thorfiles) is not ported, and these `Thor::Util` members exist only for it: `namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside `Thor::Sandbox` (util.rb:58-70, :153-166), and `user_home`, `thor_root`, `thor_root_glob` and `globs_for` (util.rb:168-216) locate the Thorfiles installed under `~/.thor`. railties never reaches them. Scoped to thor's util.rb.
   - `namespaces_in_content`, `load_thorfile`, `user_home`, `thor_root`, `thor_root_glob`, `globs_for` (only in: `util.rb`)
 - `Thor::Util.escape_html` (util.rb:280-282) is `CGI.escapeHTML`, called only by `Thor::Shell::HTML`, which is not ported: there is no terminal rendering HTML. Scoped to thor's util.rb.
@@ -264,6 +260,10 @@ a genuine gap:
   - `to_ary` (only in: `core.rb`, `base.rb`)
 - `ActiveRecord::Relation#then` (relation.rb:1157-1165) chains a block onto the relation's `@future_result`, else falls to `Kernel#then`. A trails relation is evaluated by an async query, so `Relation.prototype` carries the `then` / `catch` / `finally` that `await rel` calls, installed by `applyThenable` and declared on the class without a body (packages/activerecord/CLAUDE.md § "`Relation` is evaluated by an async query"). Scoped to relation.rb so `FutureResult#then` and any other definition stay scored.
   - `then` (only in: `relation.rb`)
+- `OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its raw String (buffers.rb:27). Each reads or rewrites a String's encoding tag, which a JS string does not have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.
+  - `encoding`, `encode!`, `force_encoding` (only in: `buffers.rb`)
+- `Template#offset` and `#locals_code` (template.rb:541-576) build the `module_eval` line offset and the Ruby locals binding of `compiled_source`, which `virtualizeTse` writes as TypeScript at build time; `#find_node_by_id` (template.rb:405-415) walks the Prism tree `spot` parses, and `spot` is line-based (CLAUDE.md § "Templates are precompiled"). PERMANENT.
+  - `offset`, `locals_code`, `find_node_by_id` (only in: `template.rb`)
 
 ## Ruby-only classes
 
