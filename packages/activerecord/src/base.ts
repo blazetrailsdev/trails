@@ -156,7 +156,6 @@ import {
   include,
   prepend,
   extend,
-  Module,
   classAttribute,
   benchmark as benchmarkable,
   type BenchmarkLogger,
@@ -2012,14 +2011,7 @@ Object.defineProperty(Base, "connection", {
 
 extend(Base, ReloadedClassesFiltering);
 extend(Base, { collectionCacheKey: _collectionCacheKey });
-extend(
-  Base,
-  new Module((mod) => {
-    mod.defineMethod("find", _Core.find);
-    mod.defineMethod("findBy", _Core.findBy);
-    mod.defineMethod("findByBang", _Core.findByBang);
-  }),
-);
+extend(Base, { find: _Core.find, findBy: _Core.findBy, findByBang: _Core.findByBang });
 extend(Base, { configurations: _Core.configurations });
 extend(Base, { isApplicationRecordClass: _Core.isApplicationRecordClass });
 Base.configurations({});
