@@ -24,6 +24,7 @@ export type Layouts = {
   _prefixes(): string[];
   _isConditionalLayout(): boolean | undefined;
   isActionHasLayout(): boolean;
+  setActionHasLayout(value: boolean): void;
   _layout(
     lookupContext: LookupContext,
     formats: readonly string[],
@@ -159,6 +160,10 @@ export function _processRenderTemplateOptions(
   }
 }
 
+export function setActionHasLayout(this: Layouts, value: boolean): void {
+  this._actionHasLayout = value;
+}
+
 export function isActionHasLayout(this: Layouts): boolean {
   return this._actionHasLayout!;
 }
@@ -253,6 +258,7 @@ export const Layouts = new Module((mod) => {
   );
 
   mod.defineMethod("_processRenderTemplateOptions", _processRenderTemplateOptions);
+  mod.defineMethod("setActionHasLayout", setActionHasLayout);
   mod.defineMethod("isActionHasLayout", isActionHasLayout);
   mod.defineMethod("_isConditionalLayout", _isConditionalLayout);
   mod.defineMethod("_layout", _layout);
