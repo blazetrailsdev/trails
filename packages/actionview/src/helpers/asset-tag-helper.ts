@@ -319,6 +319,10 @@ export function imageTag(
   return tag.call(this, "img", options) as SafeBuffer;
 }
 
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm then — PERMANENT
+ */
 export function pictureTag(
   this: AssetTagHelperHost & CaptureHelperHost,
   ...sources: [...unknown[], () => unknown] | unknown[]
@@ -335,7 +339,10 @@ export function pictureTag(
 
   return contentTag.call(this, "picture", options, null, undefined, () => {
     if (isPresent(block)) {
-      return htmlSafe(capture.call(this, block!)!.toString());
+      const captured = capture.call(this, block!);
+      if (captured instanceof Promise)
+        return captured.then((captured) => htmlSafe(captured!.toString()));
+      return htmlSafe(captured!.toString());
     } else if (sources.length <= 1) {
       return imageTag.call(this, sources[sources.length - 1], imageOptions);
     } else {

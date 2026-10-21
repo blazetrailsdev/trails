@@ -3,6 +3,8 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
 import { StreamingBuffer } from "../buffers.js";
 import { LookupContext } from "../lookup-context.js";
+import { pictureTag } from "./asset-tag-helper.js";
+import { javascriptTag } from "./javascript-helper.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 
 function makeView(): Base {
@@ -12,7 +14,7 @@ function makeView(): Base {
 }
 
 const plain = (view: Base) => async () => {
-  view.safeConcat(await view.render({ plain: "<b>rendered</b>" }));
+  view.outputBuffer!.safeAppend(await view.render({ plain: "<b>rendered</b>" }));
 };
 
 describe("capture's callers await an async block", () => {
@@ -63,6 +65,38 @@ describe("capture's callers await an async block", () => {
   it("fields", async () => {
     const view = makeView();
     expect(String(await view.fields("post", {}, plain(view)))).toBe("<b>rendered</b>");
+  });
+
+  it("form_with", async () => {
+    const view = makeView();
+    const html = String(await view.formWith({ url: "/posts" }, plain(view)));
+    expect(html).toContain("<b>rendered</b></form>");
+  });
+
+  it("javascript_tag", async () => {
+    const view = makeView();
+    expect(String(await javascriptTag.call(view as never, null, {}, plain(view)))).toContain(
+      "<b>rendered</b>\n//]]>\n</script>",
+    );
+  });
+
+  it("picture_tag", async () => {
+    const view = makeView();
+    expect(String(await pictureTag.call(view as never, plain(view)))).toBe(
+      "<picture><b>rendered</b></picture>",
+    );
+  });
+
+  it("FormBuilder#label and #button", async () => {
+    const view = makeView();
+    const html = String(
+      await view.formWith({ url: "/posts", scope: "post" }, async (f) => {
+        view.outputBuffer!.safeAppend(await f.label("title", null, {}, plain(view)));
+        view.outputBuffer!.safeAppend(await f.button(null, {}, plain(view)));
+      }),
+    );
+    expect(html).toContain("<label><b>rendered</b></label>");
+    expect(html).toContain('type="submit"><b>rendered</b></button>');
   });
 
   it("StreamingBuffer#capture awaits an async block", async () => {
