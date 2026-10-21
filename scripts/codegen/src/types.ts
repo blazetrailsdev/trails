@@ -8,7 +8,7 @@
  * type of the member it resolves to. Anything else is unknown, and an unknown
  * receiver gets no member lookup and no `await` — never a name-keyed guess.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { PKG_DIR } from "./gem.js";
 import { rubyMethodToTsIgnoringSkip } from "../../parity/conventions.js";
@@ -30,7 +30,10 @@ export class TypeOracle {
   misses = 0;
 
   constructor(file: string) {
-    this.o = JSON.parse(readFileSync(file, "utf8")) as Oracle;
+    // A gem with no hand port (marcel) has no oracle: nothing is typed from it.
+    this.o = existsSync(file)
+      ? (JSON.parse(readFileSync(file, "utf8")) as Oracle)
+      : { classes: {}, functions: {} };
     // A file's exported functions double as the members of the module it
     // ports (`export async function save(this: …)` beside `new Module(…)`).
     for (const [f, fns] of Object.entries(this.o.functions)) {

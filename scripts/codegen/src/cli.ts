@@ -9,6 +9,7 @@
  */
 import { execFileSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -24,7 +25,7 @@ import { Emitter } from "./emit.js";
 import { Resolver } from "./resolve.js";
 import { TypeOracle } from "./types.js";
 import { runtimeShim, DECLINED_SHIM } from "./runtime-shim.js";
-import { GEM, GEM_LIB, GEN_DIR, ORACLE_PATH, PKG_DIR, ROOT } from "./gem.js";
+import { GEM, GEM_LIB, GEN_DIR, ORACLE_PATH, PKG_DIR, ROOT, SYNTH_SEATS } from "./gem.js";
 import { nonNullPass } from "./nonnull-pass.js";
 import { typePass } from "./type-pass.js";
 import { augmentSeatTypes } from "./seat-types.js";
@@ -93,13 +94,17 @@ const files: IrFile[] = listJson(irDir)
       if (seen.has(rel) || !existsSync(path.join(TEST, rel))) continue;
       seen.add(rel);
       const src = readFileSync(path.join(TEST, rel), "utf8");
-      if (/^\s*require "helper"/m.test(src)) queue.push("helper.rb");
+      // `require "helper"` (Rails) or `require 'test_helper'` (marcel): the
+      // suite's helper on the test load path.
+      for (const m of src.matchAll(/^\s*require ["']((?:test_)?helper)["']/gm))
+        queue.push(`${m[1]}.rb`);
       // helper.rb's `require "adapters/#{@adapter}"`: each adapter trails runs the
       // suite under (Rakefile:5, less the queue gems it does not port).
       if (GEM.gem === "activejob" && rel === "helper.rb")
         queue.push("adapters/inline.rb", "adapters/async.rb", "adapters/test.rb");
       // helper.rb's requires sit in `ENV` branches; only the default adapter is taken.
       if (rel === "helper.rb") continue;
+      if (rel === "test_helper.rb") continue;
       for (const m of src.matchAll(/^\s*require "((?:jobs|models|support)\/[^"]+)"/gm))
         queue.push(m[1].endsWith(".rb") ? m[1] : `${m[1]}.rb`);
       // `require_relative "../support/job_buffer"` is relative to the requiring file.
@@ -284,6 +289,33 @@ index.finish((f) => resolver.tsFileOf(f));
   }
 }
 
+// A gem with no hand port has no `namespaces.ts`: a module reopened across
+// files (marcel's `Marcel`, in marcel.rb and tables.rb) is seated on a
+// namespace object here instead (CLAUDE.md, "Call-time constant resolution").
+rmSync(SYNTH_SEATS, { force: true });
+if (!existsSync(path.join(PKG_DIR, "src/namespaces.ts"))) {
+  const mods = [...index.scopes.values()]
+    .filter((s) => s.kind === "module" && s.files.size > 1 && !s.fqn.includes("::"))
+    .map((s) => s.fqn)
+    .sort();
+  if (mods.length) {
+    mkdirSync(path.dirname(SYNTH_SEATS), { recursive: true });
+    writeFileSync(
+      SYNTH_SEATS,
+      [
+        'import { registerConstant } from "@blazetrails/ruby-compat";',
+        "",
+        "export type Namespace = { name: string };",
+        ...mods.flatMap((m) => [
+          "",
+          `export const ${m} = { name: ${JSON.stringify(m)} } as Namespace & {\n};`,
+          `registerConstant(${JSON.stringify(m)}, ${m});`,
+        ]),
+        "",
+      ].join("\n"),
+    );
+  }
+}
 const emitter = new Emitter(index, resolver);
 // Register primary files first so a reopened class is exported from its home file.
 for (const f of files) emitter.register(f);
@@ -366,14 +398,23 @@ for (const [ts, texts] of byTs) {
   mkdirSync(path.dirname(p), { recursive: true });
   writeFileSync(p, texts.join("\n"));
 }
+// A suite's fixture files (marcel's test/fixtures), beside the helper that
+// finds them through `File.expand_path("../fixtures/…", __FILE__)`: test/*.rb
+// support files are generated into test-helpers/.
+{
+  const fixtures = path.join(GEM_LIB, "..", "test", "fixtures");
+  if (arg("--tests") && existsSync(fixtures))
+    cpSync(fixtures, path.join(outDir, "test-helpers", "fixtures"), { recursive: true });
+}
 writeFileSync(path.join(outDir, "codegen-runtime.ts"), runtimeShim(resolver.wanted.keys()));
 writeFileSync(path.join(outDir, "codegen-declined.ts"), DECLINED_SHIM);
 // The hand port's namespace seats (`namespaces.ts`, CLAUDE.md "Call-time constant
 // resolution") have no Ruby file; generated files import the gem namespace from it.
 {
   const seats = path.join(PKG_DIR, "src/namespaces.ts");
-  if (existsSync(seats))
-    writeFileSync(path.join(outDir, "namespaces.ts"), readFileSync(seats, "utf8"));
+  const from = existsSync(seats) ? seats : SYNTH_SEATS;
+  if (existsSync(from))
+    writeFileSync(path.join(outDir, "namespaces.ts"), readFileSync(from, "utf8"));
 }
 // The seats the hand port's `namespaces.ts` types, extended with what the
 // generated files seat on them (seat-types.ts).

@@ -227,10 +227,21 @@ module CodegenIR
       { k: "unhandled", node: node.class.name.split("::").last, src: src(node)[0, 200], l: line(node) }
     end
 
+    # A literal that is not valid UTF-8 (`"\xFF\xD8\xFF"`) is a binary
+    # String, which ruby-compat holds as a JS string of one character per byte
+    # (string-io.ts): each byte becomes the code point of the same value.
+    def str_value(s)
+      s.valid_encoding? && s.encoding != Encoding::BINARY ? s : s.bytes.pack("U*")
+    end
+
+    def str_binary?(s)
+      !s.valid_encoding? || (s.encoding == Encoding::BINARY && !s.ascii_only?)
+    end
+
     def str_parts(parts)
       parts.map do |p|
         case p
-        when Prism::StringNode then { k: "str", value: p.unescaped }
+        when Prism::StringNode then { k: "str", value: str_value(p.unescaped) }
         when Prism::EmbeddedStatementsNode
           body = stmts(p.statements)
           body.size == 1 ? body[0] : { k: "seq", body: body }
@@ -255,7 +266,7 @@ module CodegenIR
       when Prism::FloatNode then { k: "float", value: node.value }
       when Prism::RationalNode then { k: "rational", num: node.numerator.to_s, den: node.denominator.to_s }
       when Prism::ImaginaryNode then unhandled(node)
-      when Prism::StringNode, Prism::XStringNode then { k: "str", value: node.unescaped, frozen: node.frozen?, heredoc: node.heredoc? }
+      when Prism::StringNode, Prism::XStringNode then { k: "str", value: str_value(node.unescaped), binary: str_binary?(node.unescaped) || nil, frozen: node.frozen?, heredoc: node.heredoc? }.compact
       when Prism::InterpolatedStringNode then { k: "dstr", parts: str_parts(node.parts) }
       when Prism::InterpolatedXStringNode then { k: "dstr", parts: str_parts(node.parts) }
       when Prism::SymbolNode then { k: "sym", value: node.unescaped }
@@ -265,7 +276,7 @@ module CodegenIR
       when Prism::ArrayNode then { k: "array", elems: node.elements.map { |e| e.is_a?(Prism::SplatNode) ? { k: "splat", value: expr(e.expression) } : (e.is_a?(Prism::KeywordHashNode) ? { k: "hash", pairs: hash_pairs(e.elements) } : expr(e)) } }
       when Prism::HashNode, Prism::KeywordHashNode then { k: "hash", pairs: hash_pairs(node.elements) }
       when Prism::RangeNode then { k: "range", from: node.left && expr(node.left), to: node.right && expr(node.right), exclusive: node.exclude_end? }
-      when Prism::SourceFileNode then { k: "str", value: "__FILE__" }
+      when Prism::SourceFileNode then { k: "srcfile" }
       when Prism::SourceLineNode then { k: "int", value: line(node).to_s }
       when Prism::SourceEncodingNode then { k: "str", value: "UTF-8" }
 

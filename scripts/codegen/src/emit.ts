@@ -192,7 +192,49 @@ export class Emitter {
   }
 
   /** Pre-pass: assign each unit its export name so cross-file refs resolve. */
+  /** Every registered IR file, by Ruby path (`marcel/mime_type.rb`). */
+  irByFile = new Map<string, IrFile>();
+
+  /**
+   * A lib file's `require`s of other gem files, in order, split into those it
+   * makes before its first class or module body and those after (a trailing
+   * `require 'marcel/mime_type/definitions'`, mime_type.rb:98, which runs
+   * once `MimeType` exists).
+   */
+  gemRequires(rubyFile: string): { lead: string[]; trail: string[] } {
+    const file = this.irByFile.get(rubyFile);
+    const out = { lead: [] as string[], trail: [] as string[] };
+    if (!file) return out;
+    let seenBody = false;
+    const visit = (stmts: N[]) => {
+      for (const s of stmts) {
+        if (!s) continue;
+        if (s.k === "module" || s.k === "class") {
+          visit(s.body?.k === "seq" ? s.body.body : s.body ? [s.body] : []);
+          seenBody = true;
+          continue;
+        }
+        if (
+          s.k === "call" &&
+          s.recv === null &&
+          (s.name === "require" || s.name === "require_relative") &&
+          s.args[0]?.k === "str"
+        ) {
+          const v: string = s.args[0].value;
+          const target =
+            s.name === "require"
+              ? `${v}.rb`
+              : path.posix.normalize(path.posix.join(path.posix.dirname(rubyFile), `${v}.rb`));
+          if (this.irByFile.has(target)) (seenBody ? out.trail : out.lead).push(target);
+        }
+      }
+    };
+    visit(file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : []);
+    return out;
+  }
+
   register(file: IrFile): void {
+    this.irByFile.set(file.file, file);
     const tsFile = rubyFileToTsAr(file.file);
     const taken = new Set<string>();
     for (const u of collectUnits(file)) {
@@ -584,6 +626,33 @@ export class Emitter {
               selfExpr: "this",
             }),
           );
+        } else if (
+          s.k === "call" &&
+          s.recv === null &&
+          s.block?.k === "block" &&
+          !["test", "setup", "teardown"].includes(s.name)
+        ) {
+          // A class-level helper that defines tests from its block (marcel's
+          // `each_content_type_fixture('magic') do |file, name, content_type|
+          // test "…" do`, test_helper.rb:29-40): the test class's own method, run
+          // as vitest collects, as Ruby runs it at class definition.
+          const params: string[] = s.block.params.map((p: { name: string }) => p.name);
+          const mark = loopLocals.length;
+          loopLocals.push(...params);
+          const inner: string[] = [];
+          emitBody(this.lw.seqBody(s.block.body), inner, guard);
+          loopLocals.length = mark;
+          const args = s.args.map((a: N) => this.lw.expr(a, nameCtx()));
+          out.push(
+            `${short}.${tsMethodName(s.name, u.fqn, true)}(${[...args, `(${params.map(jsIdent).join(", ")}) => {`].join(", ")}`,
+            ...indent(inner),
+            "});",
+          );
+        } else if (s.k === "lasgn" || (s.k === "call" && !s.block)) {
+          // A class-body statement between test definitions (extension_test.rb:12-23's
+          // `extensions = []` and `extensions << extension`), run as vitest collects.
+          out.push(...guarded(guard, this.lw.stmt(s, nameCtx(), false)));
+          if (s.k === "lasgn" && !loopLocals.includes(s.name)) loopLocals.push(s.name);
         } else {
           const ctx = this.baseCtx(u, f, { selfKind: "static", selfExpr: "testCase" });
           out.push(
@@ -787,6 +856,9 @@ export class Emitter {
     // instance method of the same name goes inline rather than colliding, and
     // imports avoid every name this file will declare.
     const sfnNames = new Set<string>();
+    // A class or module body's locals become module-scope bindings (emitClass).
+    for (const u of collectUnits(file))
+      for (const s of u.body) if (s.k === "lasgn") f.usedLocalNames.add(jsIdent(s.name));
     for (const u of collectUnits(file)) {
       if (u.kind !== "module") continue;
       for (const s of [...u.body, ...u.sbody]) {
@@ -863,6 +935,31 @@ export class Emitter {
     ) {
       const hctx = this.baseCtx({ nesting: [] } as unknown as Unit, f, {});
       this.lw.imp(hctx, "@root/test-helpers/helper.js", "", "");
+    }
+    // A library file's `require`s of other gem files: side-effect imports in
+    // Ruby's order, each followed by the files it requires at its end.
+    if (!file.file.startsWith("test/")) {
+      const rctx = this.baseCtx({ nesting: [] } as unknown as Unit, f, {});
+      const order: string[] = (f.requireOrder ??= []);
+      const add = (rb: string, seen: Set<string>) => {
+        if (seen.has(rb)) return;
+        seen.add(rb);
+        const spec = `@root/${this.resolver.tsFileOf(rb).replace(/\.ts$/, ".js")}`;
+        this.lw.imp(rctx, spec, "", "");
+        if (!order.includes(spec)) order.push(spec);
+        for (const t of this.gemRequires(rb).trail) add(t, seen);
+      };
+      for (const rb of this.gemRequires(file.file).lead) add(rb, new Set([file.file]));
+    }
+    // A library file's top-level statements (marcel's mime_type/definitions.rb,
+    // `Marcel::MimeType.extend "text/plain", …`) run when it is loaded.
+    if (!file.file.startsWith("test/")) {
+      const top = (file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : []).filter(
+        (s: N) => s.k === "call" && s.recv?.k === "const" && rootConst(s.recv)?.path[0] !== "ENV",
+      );
+      const fake = { nesting: [], fqn: undefined, body: [], sbody: [] } as unknown as Unit;
+      const lctx = this.baseCtx(fake, f, {});
+      for (const s of top) chunks.push(...this.lw.stmt(s, lctx, false));
     }
     if (file.file.startsWith("test/")) {
       const top = (file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : []).filter(
@@ -1032,7 +1129,9 @@ export class Emitter {
     // A test's `require "helper"` is its first line, and loads the gem from its
     // root: imported first, a test entering at a leaf (`serializers/…`) does not
     // meet the gem's cycles half-evaluated.
-    const first = (x: string) => (x === "@root/test-helpers/helper.js" ? 0 : 1);
+    const req = f.requireOrder ?? [];
+    const first = (x: string) =>
+      x === "@root/test-helpers/helper.js" ? -1 : req.includes(x) ? req.indexOf(x) : req.length;
     const specs = [...f.imports.keys()].sort(
       (a, b) => first(a) - first(b) || (a < b ? -1 : a > b ? 1 : 0),
     );
@@ -1540,6 +1639,7 @@ export class Emitter {
   emitClass(u: Unit, name: string, f: FileCtx): { text: string; defs: number } {
     const members: string[] = [];
     const after: string[] = [];
+    const bodyLocals: string[] = [];
     const staticStmts: N[] = [];
     let defs = 0;
     const body = this.flattenDefs(u.body);
@@ -1633,6 +1733,10 @@ export class Emitter {
             "$1get $2()",
           );
         members.push(text);
+      } else if (s.k === "lasgn") {
+        // A local of the class body (marcel tables.rb:2391 `b = Hash.new { … }`),
+        // read by the constants after it: a module-scope binding ahead of the class.
+        bodyLocals.push(...this.lw.stmt(s, ctxStatic, false));
       } else if (s.k === "casgn" && s.path?.length === 1) {
         members.push(`static ${s.path[0]}: any = ${this.lw.expr(s.value, ctxStatic)};`);
       } else if (
@@ -1809,6 +1913,7 @@ export class Emitter {
     const mix = this.mixinDecls(u, f, name, members);
     const sig = [...this.ivarDecls(u, f, members), ...mix.statics];
     const text = [
+      ...bodyLocals,
       head,
       ...indent([...sig, ...pairSetters(dedupeMembers(members)).flatMap((m) => ["", m])]),
       "}",
@@ -2391,6 +2496,7 @@ export class Emitter {
   emitModuleClass(u: Unit, name: string, f: FileCtx): { text: string; defs: number } {
     const members: string[] = [];
     const after: string[] = [];
+    const bodyLocals: string[] = [];
     const staticStmts: N[] = [];
     const sclassStmts: N[] = [];
     let defs = 0;
@@ -2436,6 +2542,10 @@ export class Emitter {
             ...(s.singleton || (allStatic && !isCm) ? { selfExpr: "this" } : {}),
           }),
         );
+      } else if (s.k === "lasgn") {
+        // A local of the class body (marcel tables.rb:2391 `b = Hash.new { … }`),
+        // read by the constants after it: a module-scope binding ahead of the class.
+        bodyLocals.push(...this.lw.stmt(s, ctxStatic, false));
       } else if (s.k === "casgn" && s.path?.length === 1) {
         members.push(`static ${s.path[0]}: any = ${this.lw.expr(s.value, ctxStatic)};`);
       } else if (
@@ -2599,6 +2709,7 @@ export class Emitter {
         );
     }
     const text = [
+      ...bodyLocals,
       `export class ${name} {`,
       ...indent([...sig, ...pairSetters(dedupeMembers(members)).flatMap((m) => ["", m])]),
       "}",
@@ -2700,6 +2811,9 @@ export class Emitter {
             );
           }
         }
+      } else if (s.k === "lasgn") {
+        // A local of the module body (marcel tables.rb:2391), in source order.
+        fns.push(...this.lw.stmt(s, ctxTop, false));
       } else if (s.k === "casgn" && s.path?.length === 1) {
         fns.push(`export const ${s.path[0]}: any = ${this.lw.expr(s.value, ctxTop)};`);
       } else if (

@@ -17,11 +17,17 @@ export interface GemConfig {
   rubyRoot: string;
   /** The gem's top-level Ruby namespace (`ActiveRecord`). */
   namespace: string;
+  /**
+   * A gem vendored outside Rails: its source and version under `vendor/`
+   * (`marcel/v1.0.4`). Omitted for a Rails framework gem.
+   */
+  vendor?: string;
 }
 
 const GEMS: Record<string, GemConfig> = {
   activerecord: { gem: "activerecord", rubyRoot: "active_record", namespace: "ActiveRecord" },
   activejob: { gem: "activejob", rubyRoot: "active_job", namespace: "ActiveJob" },
+  marcel: { gem: "marcel", rubyRoot: "marcel", namespace: "Marcel", vendor: "marcel/v1.0.4" },
 };
 
 const name = process.env.CODEGEN_GEM ?? "activerecord";
@@ -30,20 +36,32 @@ if (!cfg) throw new Error(`CODEGEN_GEM=${name}: known gems are ${Object.keys(GEM
 
 export const GEM: GemConfig = cfg;
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+/** The gem's vendored root: `vendor/rails/v8.0.2/<gem>`, or `vendor/<vendor>`. */
+const GEM_ROOT = GEM.vendor ?? `rails/v8.0.2/${GEM.gem}`;
 /** `vendor/rails/v8.0.2/<gem>/lib`. */
-export const GEM_LIB = path.join(ROOT, "vendor/rails/v8.0.2", GEM.gem, "lib");
+export const GEM_LIB = path.join(ROOT, "vendor", GEM_ROOT, "lib");
 /** `packages/<gem>`, the hand port. */
 export const PKG_DIR = path.join(ROOT, "packages", GEM.gem);
 /** `packages/<gem>/codegen-out`, where a run writes. */
 export const GEN_DIR = path.join(PKG_DIR, "codegen-out");
 /** The `@inlinedFrom` citation prefix for a `def` in this gem. */
-export const CITE_PREFIX = `rails/v8.0.2/${GEM.gem}/lib`;
+export const CITE_PREFIX = `${GEM_ROOT}/lib`;
 /** The type oracle read from this gem's hand port (activerecord keeps its original name). */
 export const ORACLE_PATH = path.join(
   ROOT,
   "scripts/codegen/data",
   GEM.gem === "activerecord" ? "hand-oracle.json" : `hand-oracle-${GEM.gem}.json`,
 );
+
+/**
+ * The hand port's `namespaces.ts`, or, for a gem with no hand port (marcel),
+ * the seat file the CLI synthesizes in its place (`SYNTH_SEATS`).
+ */
+export const SYNTH_SEATS = path.join(GEN_DIR, "namespaces.synth.ts");
+function seatsFile(): string {
+  const hand = path.join(PKG_DIR, "src/namespaces.ts");
+  return existsSync(hand) ? hand : SYNTH_SEATS;
+}
 
 let seatFqnsMemo: Map<string, string> | undefined;
 /**
@@ -53,7 +71,7 @@ let seatFqnsMemo: Map<string, string> | undefined;
  */
 export function handNamespaceFqns(): Map<string, string> {
   if (seatFqnsMemo) return seatFqnsMemo;
-  const f = path.join(PKG_DIR, "src/namespaces.ts");
+  const f = seatsFile();
   const text = existsSync(f) ? readFileSync(f, "utf8") : "";
   seatFqnsMemo = new Map();
   for (const m of text.matchAll(/export const ([A-Z]\w*)\s*=\s*\{\s*name:\s*"([A-Za-z:]+)"/g))
@@ -69,7 +87,7 @@ let seatMembersMemo: Map<string, Set<string>> | undefined;
  */
 export function handSeatMembers(): Map<string, Set<string>> {
   if (seatMembersMemo) return seatMembersMemo;
-  const f = path.join(PKG_DIR, "src/namespaces.ts");
+  const f = seatsFile();
   const text = existsSync(f) ? readFileSync(f, "utf8") : "";
   seatMembersMemo = new Map();
   for (const m of text.matchAll(
@@ -83,7 +101,7 @@ let handAutoloadsMemo: Set<string> | undefined;
 /** `Seat.autoload("X")` calls in the hand port's `namespaces.ts`, as `Seat::X`. */
 export function handNamespaceAutoloads(): Set<string> {
   if (handAutoloadsMemo) return handAutoloadsMemo;
-  const f = path.join(PKG_DIR, "src/namespaces.ts");
+  const f = seatsFile();
   const text = existsSync(f) ? readFileSync(f, "utf8") : "";
   handAutoloadsMemo = new Set(
     [...text.matchAll(/\b([A-Z]\w*)\.autoload\("([A-Z]\w*)"/g)].map((m) => `${m[1]}::${m[2]}`),

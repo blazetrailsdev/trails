@@ -138,6 +138,8 @@ export interface FileCtx {
   imports: Map<string, Map<string, string>>; // module specifier → (exported name → local name)
   /** Names used only as types (`import type { … }`), same shape as `imports`. */
   typeImports?: Map<string, Map<string, string>>;
+  /** Specs a lib file `require`s, in Ruby's order: imported first, in this order. */
+  requireOrder?: string[];
   /** Each class's ivar types, by class fqn then Ruby ivar name (emit.ts `ivarTypes`). */
   ivarTypes?: Map<string, Map<string, TypeRef>>;
   usedLocalNames: Set<string>;
@@ -185,6 +187,8 @@ interface Ctx {
   defParams?: Param[];
   /** The hand twin's TS types for the method's positional parameters, by position. */
   paramTypes?: (string | null)[];
+  /** Lowering `Hash.new { |h, k| … }`: the block's first parameter is that Hash. */
+  hashNewBlock?: boolean;
   /** Ruby `def` is singleton (static). */
   singleton?: boolean;
   isModule?: boolean;
@@ -1502,6 +1506,7 @@ export class Lowerer {
     const inner = this.child(ctx, {
       scope,
       paramTypes: undefined,
+      hashNewBlock: undefined,
       fnScope: scope,
       inBlock: true,
       inLoop: false,
@@ -1511,6 +1516,8 @@ export class Lowerer {
     // The enclosing method's prologue is its own, not this block's.
     inner.prologue = undefined;
     const ps = this.paramList(params, inner, true);
+    if (ctx.hashNewBlock && params[0]?.name)
+      (scope.types ??= new Map()).set(params[0].name, { k: "hash", map: true });
     const stmts = [...(inner.prologue ?? []), ...this.block(this.seqBody(body), inner, true)];
     inner.prologue = undefined;
     const hz: Set<string> | undefined = scope.hoisted;
@@ -1701,7 +1708,17 @@ export class Lowerer {
       if (isBlock || taken) out.push(`{ ${kw.join(", ")} }: ${t} = {}`);
       else {
         out.push(`options: ${t} = {}`);
-        (ctx.prologue ??= []).push(`const { ${kw.join(", ")} } = options;`);
+        // A keyword the body reassigns (`extensions = (Array(extensions) + …)`,
+        // marcel mime_type.rb:9) is a `let`.
+        const reassigned = params.some(
+          (p) =>
+            (p.kind === "key" || p.kind === "keyreq") &&
+            p.name &&
+            this.assignCount(ctx, p.name) > 0,
+        );
+        (ctx.prologue ??= []).push(
+          `${reassigned ? "let" : "const"} { ${kw.join(", ")} } = options;`,
+        );
       }
     }
     void kwRequired;
@@ -1787,6 +1804,9 @@ export class Lowerer {
         return this.hashLit(n.pairs, ctx);
       case "range":
         return `new ${this.rc(ctx, "Range")}(${n.from ? this.expr(n.from, ctx) : "null"}, ${n.to ? this.expr(n.to, ctx) : "null"}, ${n.exclusive})`;
+      case "srcfile":
+        // Ruby's `__FILE__`: the path of the file being evaluated.
+        return "import.meta.filename";
       case "lvar":
         if (!this.isLocal(ctx, n.name)) return `${ctx.selfExpr}.${this.callName(n.name)}()`;
         return jsIdent(n.name);
@@ -2692,8 +2712,15 @@ export class Lowerer {
 
   // ───────────────────────────── calls ─────────────────────────────
 
-  call(n0: N, ctx: Ctx): string {
+  call(n0: N, ctx0: Ctx): string {
     let n = callbackFilterSymbols(n0);
+    const ctx =
+      n.name === "new" &&
+      n.block?.k === "block" &&
+      n.recv?.k === "const" &&
+      n.recv.path.filter((x: string) => x).join("::") === "Hash"
+        ? this.child(ctx0, { hashNewBlock: true })
+        : ctx0;
     // A Minitest assertion outside a test body (a test helper's `assert_equal`,
     // a test class's own helper method) is the same vitest `expect` a test body
     // uses: autorun counts both toward the test's assertions.
@@ -3829,10 +3856,14 @@ export class Lowerer {
     }
 
     // `ActiveJob::Base.include(M)` on a gem constant is ruby-compat `include(Base, M)`.
+    // A class that defines its own `self.extend` (marcel's `MimeType.extend`,
+    // mime_type.rb:8) is sent that method, not `Object#extend`.
+    const mixRecv =
+      recvNode?.k === "const" ? this.index.resolveConst(recvNode.path, ctx.nesting) : undefined;
     if (
       (name === "include" || name === "extend" || name === "prepend") &&
-      recvNode?.k === "const" &&
-      this.index.resolveConst(recvNode.path, ctx.nesting) &&
+      mixRecv &&
+      !(mixRecv.kind === "scope" && this.index.scopes.get(mixRecv.fqn)?.sdefs.has(name)) &&
       n.args.length
     )
       return n.args.map((a: N) => `${rc(name)}(${r}, ${this.expr(a, ctx)})`).join(", ");
@@ -4010,6 +4041,29 @@ export class Lowerer {
         parts.push(
           ...Array.from({ length: missing }, () => "undefined"),
           this.blockArg(n.block, ctx),
+        );
+        a = parts.join(", ");
+      }
+    }
+    // Keywords alone after skipped optional positionals
+    // (`MimeType.for(extension: "PDF")` against `for(pathname_or_io = nil, name: nil, …)`):
+    // the options object goes in the keywords' slot, each skipped one `undefined`.
+    const lastArg = n.args[n.args.length - 1];
+    if (
+      ps &&
+      !n.block &&
+      lastArg?.k === "kwargs" &&
+      ps.some((p) => p.kind === "key" || p.kind === "keyreq" || p.kind === "keyrest") &&
+      !ps.some((p) => p.kind === "rest") &&
+      !n.args.some((x: N) => x.k === "splat")
+    ) {
+      const positional = ps.filter((p) => p.kind === "req" || p.kind === "opt").length;
+      const given = n.args.length - 1;
+      if (given < positional) {
+        const parts = n.args.slice(0, -1).map((x: N) => this.argExpr(x, ctx));
+        parts.push(
+          ...Array.from({ length: positional - given }, () => "undefined"),
+          this.argExpr(lastArg, ctx),
         );
         a = parts.join(", ");
       }
@@ -4209,6 +4263,14 @@ export class Lowerer {
       this.classKey(this.typeOf(n.recv, ctx)) === "@activesupport/time-with-zone.ts#TimeWithZone"
     )
       return { k: "class", key: "@activesupport/values/time-zone.ts#TimeZone" } as TypeRef;
+    // `Hash.new` / `Hash.new { … }`: ruby-compat's `Hash`, a Map with a default.
+    if (
+      n.k === "call" &&
+      n.name === "new" &&
+      n.recv?.k === "const" &&
+      n.recv.path.filter((x: string) => x).join("::") === "Hash"
+    )
+      return { k: "hash", map: true } as TypeRef;
     // `Class.new(Super)` with a gem class: a subclass of it (class-level writers resolve).
     if (
       n.k === "call" &&
@@ -4595,10 +4657,31 @@ export class Lowerer {
           !this.index.resolveConst(n.recv.path, ctx.nesting)
         )
           return `${r}.find(${a[0]})`;
+        // `Dir[pattern]` (dir.c dir_s_aref): one pattern is `Dir.glob(pattern)`.
+        if (
+          n.recv?.k === "const" &&
+          n.recv.path.filter((x: string) => x).join("::") === "Dir" &&
+          a.length === 1
+        )
+          return `${r}.glob(${a[0]})`;
         if (a.length === 1 && this.mayBeMap(n.recv, ctx)) return `${rc("hashAref")}(${r}, ${a[0]})`;
         // A Range index is a slice, which JS `[]` cannot express.
         if (a.length === 1 && !a[0].startsWith("...") && n.args[0]?.k !== "range")
           return `${lhs}[${a[0]}]`;
+        {
+          // `str[1..-1]` / `ary[0, 2]`: `String#[]` (string.c rb_str_aref_m) through
+          // the String method table's `get`, or `Array#[]` (array.c rb_ary_aref).
+          const t = this.typeOf(n.recv, ctx);
+          const str = (x: string) => `${rc("rbStrSend")}(${x}, "get", ${a.join(", ")})[0]`;
+          const ary = (x: string) => `${rc("arySlice")}(${x}, ${a.join(", ")})`;
+          if (t?.k === "prim" && t.name === "string") return str(r);
+          if (t?.k === "array") return ary(r);
+          if (!a.some((x) => x.startsWith("...")))
+            return this.withOnce(
+              r,
+              (x) => `(typeof ${x} === "string" ? ${str(x)} : ${ary(`${x} as unknown[]`)})`,
+            );
+        }
         return `${rc("rbAref")}(${r}, ${a.join(", ")})`;
       case "<<":
         if (n.recv.k === "str" || n.recv.k === "dstr") return `(${r} + ${a[0]})`;
@@ -4820,7 +4903,9 @@ export class Lowerer {
     )
       return `${rc(name)}(${r}, ${n.args.map((a: N) => JSON.stringify(propName(a.value))).join(", ")})`;
     const recvType = this.typeOf(recvNode, ctx);
+    // Under `&.` a nil receiver must reach the `?.` as nil, not the conversion.
     const enumOf = (x: string) =>
+      (nav === "?." ? `${x} == null ? ${x} : ` : "") +
       `${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map ? [...${x}] : ` +
       `Object.getPrototypeOf(${x}) === Object.prototype ? Object.entries(${x} as object) : (${x} as unknown[])`;
     const E =
@@ -4937,6 +5022,14 @@ export class Lowerer {
         break;
       case "inject":
       case "reduce":
+        // enum.c enum_inject with a block: Array#reduce, which seeds with the
+        // first element as Ruby does; an empty receiver with no seed is nil in
+        // Ruby, where JS throws.
+        if (blk && n.args.length <= 1 && !this.mayBeMap(recvNode, ctx)) {
+          const xs = this.entries(r, ctx, recvNode);
+          if (n.args.length === 1) return `${xs}.reduce(${fn()}, ${this.expr(n.args[0], ctx)})`;
+          return this.withOnce(xs, (x) => `(${x}.length === 0 ? null : ${x}.reduce(${fn()}))`);
+        }
         return `${rc("inject")}(${r}, ${args().join(", ")})`;
       case "include?":
       case "member?":
