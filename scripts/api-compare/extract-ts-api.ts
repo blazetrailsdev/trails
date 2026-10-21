@@ -3620,11 +3620,6 @@ function prototypeReceiver(expr: ts.Expression): string | undefined {
     : undefined;
 }
 
-/**
- * `delegate.call(Klass.prototype, "m", …, { to: "target" })` at a file's top level —
- * Ruby's `delegate :m, to: :target` in a class module's body
- * (`core_ext/module/delegation.rb:171`), which defines instance readers only.
- */
 /** A same-file `const NAME = ["a", "b"] as const`'s strings, for a `...NAME` macro argument. */
 function sameFileConstStrings(name: string, sourceFile: ts.SourceFile): string[] | undefined {
   for (const statement of sourceFile.statements) {
@@ -3640,6 +3635,11 @@ function sameFileConstStrings(name: string, sourceFile: ts.SourceFile): string[]
   return undefined;
 }
 
+/**
+ * `delegate.call(Klass.prototype, "m", …, { to: "target" })` at a file's top level —
+ * Ruby's `delegate :m, to: :target` in a class module's body
+ * (`core_ext/module/delegation.rb:171`), which defines instance readers only.
+ */
 function readPrototypeDelegateCall(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,

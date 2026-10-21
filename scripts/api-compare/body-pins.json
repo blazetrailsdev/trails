@@ -14731,13 +14731,6 @@
   {
     "package": "actionview",
     "rubyFile": "helpers.rb",
-    "rubyName": "field_name",
-    "digest": "89c856e5cf4a0ab7",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers.rb",
     "rubyName": "field_set_tag",
     "digest": "a92e537fd02c379f",
     "ref": "v8.0.2"
@@ -14789,13 +14782,6 @@
     "rubyFile": "helpers.rb",
     "rubyName": "form_for",
     "digest": "0891bf654b7e186d",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers.rb",
-    "rubyName": "form_tag",
-    "digest": "42f18563d0d95b56",
     "ref": "v8.0.2"
   },
   {
@@ -16812,13 +16798,6 @@
     "rubyFile": "helpers/form_helper.rb",
     "rubyName": "form_for",
     "digest": "0891bf654b7e186d",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/form_helper.rb",
-    "rubyName": "form_tag",
-    "digest": "42f18563d0d95b56",
     "ref": "v8.0.2"
   },
   {
