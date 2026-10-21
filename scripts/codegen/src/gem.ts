@@ -39,7 +39,6 @@ const GEMS: Record<string, GemConfig> = {
     rubyRoot: "marcel",
     namespace: "Marcel",
     vendor: "marcel/v1.0.4",
-    hand: false,
     skipTests: {
       "gets content type from sources that conform to Rack::Lint::InputWrapper":
         "Rack::Lint::InputWrapper is rack 2 (marcel.gemspec:25 `rack ~> 2.0`); trails ports rack 3.1.14, where it is Rack::Lint::Wrapper::InputWrapper (vendor/rack/v3.1.14/lib/rack/lint.rb:44, :445)",

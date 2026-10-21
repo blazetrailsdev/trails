@@ -3,9 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "composite": false,
-    "rootDir": "src",
-    "incremental": false,
-    "types": ["@blazetrails/vitest-matchers"]
+    "incremental": false
   },
-  "include": ["src"]
+  "include": ["src", "../../vitest-matchers/src/index.ts"]
 }
