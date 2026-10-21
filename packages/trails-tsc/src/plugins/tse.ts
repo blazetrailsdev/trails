@@ -448,14 +448,14 @@ function hoistedVars(body: ts.Node): Set<string> {
   return names;
 }
 
-function isReference(node: ts.Identifier): boolean {
-  const parent = node.parent as ts.Node & {
+function isReference(node: ts.Identifier, parent: ts.Node = node.parent): boolean {
+  const p = parent as ts.Node & {
     name?: ts.Node;
     propertyName?: ts.Node;
     label?: ts.Node;
   };
-  if (ts.isShorthandPropertyAssignment(parent)) return true;
-  return parent.name !== node && parent.propertyName !== node && parent.label !== node;
+  if (ts.isShorthandPropertyAssignment(p)) return true;
+  return p.name !== node && p.propertyName !== node && p.label !== node;
 }
 
 export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
@@ -482,6 +482,7 @@ export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (conte
             names.add(decl.name.text);
         }
       }
+      const firstAssignment = new Map<string, number>();
       const assigned = (node: ts.Node): void => {
         const target =
           ts.isBinaryExpression(node) &&
@@ -495,25 +496,24 @@ export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (conte
               : ts.isForInStatement(node) || ts.isForOfStatement(node)
                 ? node.initializer
                 : undefined;
-        if (target && ts.isIdentifier(target)) names.delete(target.text);
+        if (target && ts.isIdentifier(target) && !firstAssignment.has(target.text)) {
+          firstAssignment.set(target.text, target.pos);
+        }
         ts.forEachChild(node, assigned);
       };
       assigned(fn.body);
       const visit = (node: ts.Node, parent: ts.Node, bound: ReadonlySet<string>): ts.Node => {
-        if (
-          ts.isShorthandPropertyAssignment(node) &&
-          names.has(node.name.text) &&
-          !bound.has(node.name.text)
-        ) {
+        const unbound = (name: ts.Identifier): boolean =>
+          names.has(name.text) &&
+          !bound.has(name.text) &&
+          name.pos < (firstAssignment.get(name.text) ?? Infinity);
+        if (ts.isTypeOfExpression(node) && ts.isIdentifier(unparenthesized(node.expression))) {
+          return node;
+        }
+        if (ts.isShorthandPropertyAssignment(node) && unbound(node.name)) {
           return f.createPropertyAssignment(node.name.text, lookup(node.name.text));
         }
-        if (
-          ts.isIdentifier(node) &&
-          names.has(node.text) &&
-          !bound.has(node.text) &&
-          !ts.isTypeOfExpression(parent) &&
-          isReferenceIn(node, parent)
-        ) {
+        if (ts.isIdentifier(node) && unbound(node) && isReference(node, parent)) {
           return ts.setTextRange(lookup(node.text), node);
         }
         if (ts.isTypeNode(node)) return node;
@@ -548,12 +548,9 @@ export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (conte
   };
 };
 
-function isReferenceIn(node: ts.Identifier, parent: ts.Node): boolean {
-  const p = parent as ts.Node & { name?: ts.Node; propertyName?: ts.Node; label?: ts.Node };
-  if (ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isBindingElement(parent)) {
-    return parent.name !== node;
-  }
-  return p.name !== node && p.propertyName !== node && p.label !== node;
+function unparenthesized(node: ts.Expression): ts.Expression {
+  while (ts.isParenthesizedExpression(node)) node = node.expression;
+  return node;
 }
 
 export function transpileTse(source: string): { outputText: string; sourceMapText: string } {

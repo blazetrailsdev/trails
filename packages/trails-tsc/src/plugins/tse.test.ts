@@ -466,6 +466,16 @@ describe("virtualizeTse free-name lookup", () => {
     expect(await run("<% x = 1 %><%= x %>")).toBe("1");
   });
 
+  it("raises for a read before the template's first assignment of the name", async () => {
+    await expect(run("<%= x %><% x = 1 %>")).rejects.toThrow(
+      new ReferenceError("x is not defined"),
+    );
+  });
+
+  it("reads a parenthesized typeof operand as undefined", async () => {
+    expect(await run("<%= typeof (secret) %>")).toBe("undefined");
+  });
+
   it("raises only where the undeclared name is reached", async () => {
     expect(
       await run('<%= (() => { try { return customer.name; } catch { return "Anonymous"; } })() %>'),
