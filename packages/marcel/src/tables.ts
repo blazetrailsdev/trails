@@ -1,8 +1,9 @@
 import * as RubyCompat from "@blazetrails/ruby-compat";
-import { Hash, hashAset, block as rbBlock, hashAref, Range } from "@blazetrails/ruby-compat";
+import { Hash, hashAset, hashAref, Range } from "@blazetrails/ruby-compat";
 import { Marcel as MarcelSeat } from "./namespaces.js";
+import type { MagicMatch } from "./magic.js";
 
-export const EXTENSIONS = {
+export const EXTENSIONS: Record<string, string> = {
   "123": "application/vnd.lotus-1-2-3",
   "3dml": "text/vnd.in3d.3dml",
   "3fr": "image/x-raw-hasselblad",
@@ -1252,7 +1253,7 @@ export const EXTENSIONS = {
   zstd: "application/zstd",
 };
 
-export const TYPE_EXTS = {
+export const TYPE_EXTS: Record<string, string[]> = {
   "application/andrew-inset": ["ez"],
   "application/applixware": ["aw"],
   "application/atom+xml": ["atom"],
@@ -2241,7 +2242,7 @@ export const TYPE_EXTS = {
   "x-conference/x-cooltalk": ["ice"],
 };
 
-export const TYPE_PARENTS = {
+export const TYPE_PARENTS: Record<string, string[]> = {
   "application/bizagi-modeler": ["application/zip"],
   "application/dash+xml": ["application/xml"],
   "application/dif+xml": ["application/xml"],
@@ -2502,15 +2503,7 @@ export const TYPE_PARENTS = {
   "video/x-ogm": ["video/ogg"],
 };
 
-const b = new Hash(
-  rbBlock((h: unknown, k: unknown) =>
-    hashAset(
-      h as object,
-      k,
-      Object.freeze(RubyCompat.b(k as string | Uint8Array<ArrayBufferLike>)),
-    ),
-  ),
-);
+const b = new Hash<string, string>((h, k) => hashAset(h, k, Object.freeze(RubyCompat.b(k))));
 
 export const MAGIC = [
   ["image/jpeg", [[0, hashAref(b, "\udcff\udcd8\udcff")]]],
@@ -4810,6 +4803,6 @@ export const MAGIC = [
       [0, hashAref(b, "#!/usr/bin/env make")],
     ],
   ],
-];
+] as [string, MagicMatch[]][];
 
 export const Marcel = MarcelSeat;

@@ -1,14 +1,10 @@
 import { TYPE_EXTS, TYPE_PARENTS, EXTENSIONS, MAGIC } from "./tables.js";
 import {
-  Enumerator,
   Pathname,
   compact,
   isEmpty,
   deleteIf,
-  rbEqual,
-  aryDelete,
-  hashDelete,
-  rbObjClass,
+  aryDeleteIf,
   rbObjAsString,
   Range,
   File,
@@ -17,15 +13,23 @@ import {
   StringIO,
   Encoding,
   encode,
-  rbFSend,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
 import { Marcel as MarcelSeat } from "./namespaces.js";
 
+export type MagicMatch = [number | Range<number>, string | null, MagicMatch[]?];
+
+interface MagicIO {
+  read(length: number, buffer?: string | Uint8Array): string | null;
+  rewind(): unknown;
+  binmode(): unknown;
+  setEncoding(encoding: Encoding): unknown;
+}
+
 export class Magic {
-  declare _type: unknown;
-  declare _mediatype: unknown;
-  declare _subtype: unknown;
+  declare _type: string;
+  declare _mediatype: string | undefined;
+  declare _subtype: string | undefined;
 
   static toString(): string {
     return "Marcel::Magic";
@@ -43,61 +47,63 @@ export class Magic {
     return this._subtype ?? null;
   }
 
-  constructor(type: unknown) {
+  constructor(type: string) {
     this._type = type;
-    const i = (type as string).indexOf("/");
-    [this._mediatype, this._subtype] =
-      i < 0 ? [type] : [(type as string).slice(0, i), (type as string).slice(i + 1)];
+    const i = type.indexOf("/");
+    [this._mediatype, this._subtype] = i < 0 ? [type] : [type.slice(0, i), type.slice(i + 1)];
   }
 
   static add(
     type: string,
-    options:
-      | { extensions: string; parents: string }
-      | { extensions: unknown; magic: unknown; parents: unknown },
+    options: {
+      extensions?: string | string[] | null;
+      parents?: string | string[] | null;
+      magic?: MagicMatch[] | null;
+    },
   ) {
-    const extensions = compact([options.extensions].flat(Infinity));
+    const extensions = compact([options.extensions].flat());
     TYPE_EXTS[type] = extensions;
-    const parents = compact([options.parents].flat(Infinity));
+    const parents = compact([options.parents].flat());
     if (!isEmpty(parents)) {
       TYPE_PARENTS[type] = parents;
     }
     for (const ext of extensions) {
       EXTENSIONS[ext] = type;
     }
-    if (options.magic != null && options.magic !== false) {
-      return MAGIC.unshift([type, options.magic]);
+    if (options.magic) {
+      MAGIC.unshift([type, options.magic]);
+      return MAGIC;
     }
     return null;
   }
 
   static remove(type: string) {
-    deleteIf(EXTENSIONS, (ext, t) => rbEqual(t, type));
-    deleteIf(MAGIC, (t, _m) => rbEqual(t, type));
-    hashDelete(TYPE_EXTS, type);
-    return Array.isArray(TYPE_PARENTS)
-      ? aryDelete(TYPE_PARENTS, type)
-      : hashDelete(TYPE_PARENTS, type);
+    deleteIf(EXTENSIONS, (ext, t) => t === type);
+    aryDeleteIf(MAGIC, ([t, _m]) => t === type);
+    delete TYPE_EXTS[type];
+    const parents = TYPE_PARENTS[type] ?? null;
+    delete TYPE_PARENTS[type];
+    return parents;
   }
 
   isText() {
-    return rbEqual(this.mediatype, "text") || this.isChildOf("text/plain");
+    return this.mediatype === "text" || this.isChildOf("text/plain");
   }
 
   isImage() {
-    return rbEqual(this.mediatype, "image");
+    return this.mediatype === "image";
   }
 
   isAudio() {
-    return rbEqual(this.mediatype, "audio");
+    return this.mediatype === "audio";
   }
 
   isVideo() {
-    return rbEqual(this.mediatype, "video");
+    return this.mediatype === "video";
   }
 
   isChildOf(parent: string) {
-    return (rbObjClass(this) as unknown as typeof Magic).isChild(this.type, parent);
+    return (this.constructor as typeof Magic).isChild(this.type, parent);
   }
 
   extensions() {
@@ -111,25 +117,22 @@ export class Magic {
   static byExtension(ext: string) {
     ext = rbObjAsString(ext).toLowerCase();
     const mime = ext.slice(0, 1) === "." ? EXTENSIONS[ext.slice(1)] : EXTENSIONS[ext];
-    return mime != null && mime !== false ? new this(mime) : mime;
+    return mime != null ? new this(mime) : null;
   }
 
   static byPath(path: string | Pathname) {
-    return this.byExtension(File.extname(path));
+    return this.byExtension(File.extname(String(path)));
   }
 
   static byMagic(io: unknown) {
-    const mime = this.magicMatch(io, "find");
-    return mime != null && mime !== false ? new this(mime[0]) : mime;
+    const mime = this.magicMatch(io, "find") as [string, MagicMatch[]] | undefined;
+    return mime ? new this(mime[0]) : null;
   }
 
   static allByMagic(io: unknown) {
-    return ((x) =>
-      x instanceof globalThis.Set || x instanceof globalThis.Map || x instanceof Enumerator
-        ? [...x]
-        : Object.getPrototypeOf(x) === Object.prototype
-          ? Object.entries(x as object)
-          : (x as unknown[]))(this.magicMatch(io, "select")).map((mime) => new this(mime[0]));
+    return (this.magicMatch(io, "select") as [string, MagicMatch[]][]).map(
+      (mime) => new this(mime[0]),
+    );
   }
 
   toString(): string {
@@ -137,7 +140,7 @@ export class Magic {
   }
 
   isEql(other: unknown) {
-    return rbEqual(this.type, rbObjAsString(other));
+    return this.type === rbObjAsString(other);
   }
 
   hash() {
@@ -148,82 +151,42 @@ export class Magic {
     return this.isEql(other);
   }
 
-  static isChild(child: unknown, parent: string) {
-    return (
-      rbEqual(child, parent) ||
-      ((x) =>
-        x == null
-          ? x
-          : x instanceof globalThis.Set || x instanceof globalThis.Map || x instanceof Enumerator
-            ? [...x]
-            : Object.getPrototypeOf(x) === Object.prototype
-              ? Object.entries(x as object)
-              : (x as unknown[]))(TYPE_PARENTS[child])?.some((p: unknown) =>
-        this.isChild(p, parent),
-      )
-    );
+  static isChild(child: string, parent: string): boolean {
+    return child === parent || (TYPE_PARENTS[child]?.some((p) => this.isChild(p, parent)) ?? false);
   }
 
-  static magicMatch(io: unknown, method: string): unknown {
+  static magicMatch(io: unknown, method: "find" | "select"): unknown {
     if (!rbObjRespondTo(io, "read")) {
       return this.magicMatch(new StringIO(rbObjAsString(io)), method);
     }
-    if (rbObjRespondTo(io, "binmode")) {
-      io.binmode();
+    const io_ = io as MagicIO;
+    if (rbObjRespondTo(io_, "binmode")) {
+      io_.binmode();
     }
-    if (rbObjRespondTo(io, "setEncoding")) {
-      io.setEncoding(Encoding.BINARY);
+    if (rbObjRespondTo(io_, "setEncoding")) {
+      io_.setEncoding(Encoding.BINARY);
     }
     const buffer = encode("", Encoding.BINARY);
-    return rbFSend(MAGIC, method, (x: unknown) =>
-      ((type?: unknown, matches?: unknown) => this.magicMatchIo(io, matches, buffer))(
-        ...(Array.isArray(x) ? x : [x]),
-      ),
-    );
+    const block = ([_type, matches]: [string, MagicMatch[]]) =>
+      this.magicMatchIo(io_, matches, buffer);
+    return method === "find" ? MAGIC.find(block) : MAGIC.filter(block);
   }
 
-  static magicMatchIo(
-    io: unknown,
-    matches: unknown,
-    buffer: string | Uint8Array<ArrayBufferLike>,
-  ): unknown {
-    return (
-      matches instanceof globalThis.Map
-        ? [...matches]
-        : Array.isArray(matches)
-          ? matches
-          : Object.entries(matches ?? {})
-    ).some(([offset, value, children]): unknown => {
-      let x;
-      const match = (() => {
-        if (value != null && value !== false) {
-          if (offset instanceof Range) {
-            io.read(offset.begin, buffer);
-            x = io.read(
-              (offset.end as number) - (offset.begin as number) + (value as string).length,
-              buffer,
-            );
-            return x != null && x !== false
-              ? (x instanceof globalThis.Set ||
-                x instanceof globalThis.Map ||
-                x instanceof Enumerator
-                  ? [...x]
-                  : Object.getPrototypeOf(x) === Object.prototype
-                    ? Object.entries(x as object)
-                    : (x as unknown[])
-                ).includes(value)
-              : x;
-          } else {
-            io.read(offset, buffer);
-            return rbEqual(io.read((value as string).length, buffer), value);
-          }
+  static magicMatchIo(io: MagicIO, matches: MagicMatch[], buffer: string | Uint8Array): boolean {
+    return matches.some(([offset, value, children]) => {
+      let match: boolean | null = null;
+      if (value != null) {
+        if (offset instanceof Range) {
+          io.read(offset.begin!, buffer);
+          const x = io.read(offset.end! - offset.begin! + value.length, buffer);
+          match = x != null && x.includes(value);
+        } else {
+          io.read(offset, buffer);
+          match = io.read(value.length, buffer) === value;
         }
-        return null;
-      })();
+      }
       io.rewind();
-      return match != null && match !== false
-        ? !(children != null && children !== false) || this.magicMatchIo(io, children, buffer)
-        : match;
+      return !!match && (!children || this.magicMatchIo(io, children, buffer));
     });
   }
 }

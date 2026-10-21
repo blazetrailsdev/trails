@@ -5,8 +5,8 @@ import { expect, it, describe } from "vitest";
 
 describe("MagicTest", () => {
   eachContentTypeFixture("magic", (file, name, contentType) => {
-    it(`gets type for ${contentType ?? ""} by using only magic bytes ${name ?? ""}`, async () => {
-      expect(await MimeType.for(file)).toEqualRuby(contentType);
+    it(`gets type for ${contentType} by using only magic bytes ${name}`, async () => {
+      expect(await MimeType.for(file)).toEqual(contentType);
     });
   });
   it("add and remove type", async () => {
@@ -14,11 +14,11 @@ describe("MagicTest", () => {
     await Magic.remove("application/x-my-thing");
   });
   it("#extensions", async () => {
-    const json = await Magic.byExtension("json");
-    expect(await json.extensions()).toEqual(["json"]);
+    const json = Magic.byExtension("json")!;
+    expect(json.extensions()).toEqual(["json"]);
   });
   it(".child?", async () => {
-    expect(await Magic.isChild("text/csv", "text/plain")).toBeRubyTruthy();
-    expect(await Magic.isChild("text/plain", "text/csv")).toBeRubyFalsy();
+    expect(await Magic.isChild("text/csv", "text/plain")).toBe(true);
+    expect(await Magic.isChild("text/plain", "text/csv")).toBe(false);
   });
 });

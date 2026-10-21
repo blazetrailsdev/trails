@@ -1,50 +1,23 @@
-import { File, Enumerator } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { MimeType } from "./mime-type.js";
 import { eachContentTypeFixture } from "./test-helpers/test-helper.js";
 import { expect, it, describe } from "vitest";
 
 describe("ExtensionTest", () => {
-  it("ignores case and any preceding dot", async () => {
-    expect(await MimeType.for(undefined, { extension: "PDF" })).toEqual("application/pdf");
-    expect(await MimeType.for(undefined, { extension: ".PDF" })).toEqual("application/pdf");
-    expect(await MimeType.for(undefined, { extension: "pdf" })).toEqual("application/pdf");
-    expect(await MimeType.for(undefined, { extension: ".pdf" })).toEqual("application/pdf");
+  it("ignores case and any preceding dot", () => {
+    expect(MimeType.for(undefined, { extension: "PDF" })).toEqual("application/pdf");
+    expect(MimeType.for(undefined, { extension: ".PDF" })).toEqual("application/pdf");
+    expect(MimeType.for(undefined, { extension: "pdf" })).toEqual("application/pdf");
+    expect(MimeType.for(undefined, { extension: ".pdf" })).toEqual("application/pdf");
   });
-  let extensions: unknown = [];
-  eachContentTypeFixture("name", (file, name, contentType): unknown => {
-    const extension = File.extname(name as string);
-    it.skipIf(
-      !!(
-        extensions instanceof globalThis.Set ||
-        extensions instanceof globalThis.Map ||
-        extensions instanceof Enumerator
-          ? [...extensions]
-          : Object.getPrototypeOf(extensions) === Object.prototype
-            ? Object.entries(extensions as object)
-            : (extensions as unknown[])
-      ).includes(extension),
-    )(`gets type for ${contentType ?? ""} given file extension ${extension ?? ""}`, async () => {
-      expect(await MimeType.for(undefined, { extension: extension })).toEqualRuby(contentType);
+  const extensions = new Map<string, string>();
+  eachContentTypeFixture("name", (file, name, contentType) => {
+    const extension = File.extname(name);
+    if (!extensions.has(extension)) extensions.set(extension, contentType);
+  });
+  for (const [extension, contentType] of extensions) {
+    it(`gets type for ${contentType} given file extension ${extension}`, () => {
+      expect(MimeType.for(undefined, { extension: extension })).toEqual(contentType);
     });
-    if (
-      !(
-        extensions instanceof globalThis.Set ||
-        extensions instanceof globalThis.Map ||
-        extensions instanceof Enumerator
-          ? [...extensions]
-          : Object.getPrototypeOf(extensions) === Object.prototype
-            ? Object.entries(extensions as object)
-            : (extensions as unknown[])
-      ).includes(extension)
-    ) {
-      extensions =
-        typeof extensions === "string"
-          ? extensions + extension
-          : Array.isArray(extensions)
-            ? (extensions.push(extension), extensions)
-            : extensions instanceof globalThis.Set
-              ? extensions.add(extension)
-              : extensions.append(extension);
-    }
-  });
+  }
 });

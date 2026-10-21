@@ -448,10 +448,6 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
-    devDependencies:
-      '@blazetrails/vitest-matchers':
-        specifier: workspace:*
-        version: link:../vitest-matchers
 
   packages/msgpack:
     dependencies:

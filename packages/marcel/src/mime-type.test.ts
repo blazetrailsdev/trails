@@ -1,10 +1,7 @@
 import {
-  rbObjAsString,
   File,
   Pathname,
-  Enumerator,
   RUBY_ENGINE,
-  rbEqual,
   ObjectSpace,
   Tempfile,
   StringIO,
@@ -14,58 +11,34 @@ import { files } from "./test-helpers/test-helper.js";
 import { beforeEach, expect, it, describe } from "vitest";
 
 describe("MimeTypeTest", () => {
-  let path: unknown;
-  beforeEach(async () => {
-    path = await rbObjAsString(files("image.gif"));
+  let path: string;
+  beforeEach(() => {
+    path = files("image.gif").toString();
   });
   it("gets content type from Files", async () => {
-    const contentType = await File.open(
-      path as string,
-      undefined,
-      undefined,
-      async (file) => await MimeType.for(file),
-    );
+    const contentType = await File.open(path, undefined, (file) => MimeType.for(file));
     expect(contentType).toEqual("image/gif");
   });
   it("gets content type from Pathnames", async () => {
-    const contentType = await MimeType.for(
-      new Pathname(path as string | Uint8Array<ArrayBufferLike> | { toPath(): string }),
-    );
+    const contentType = await MimeType.for(new Pathname(path));
     expect(contentType).toEqual("image/gif");
   });
-  it.skipIf(RUBY_ENGINE === "jruby")("closes Pathname files after use", async () => {
-    const openFiles = await ((x) =>
-      x instanceof globalThis.Set || x instanceof globalThis.Map || x instanceof Enumerator
-        ? [...x]
-        : Object.getPrototypeOf(x) === Object.prototype
-          ? Object.entries(x as object)
-          : (x as unknown[]))(await ObjectSpace.eachObject(File)).filter(
-      (...xs: unknown[][]) =>
-        !(
-          ((((x: unknown) => x.isClosed()) as (...a: unknown[]) => unknown)(...xs) ?? false) !==
-          false
-        ),
-    );
-    expect(
-      await (async (self, g) => {
-        const xs: unknown[] = self;
-        for (const x of xs) {
-          const v = await g(x);
-          if (v != null && v !== false) return false;
-        }
-        return true;
-      })(openFiles, async (f: unknown) => rbEqual(await f.path(), path)),
-    ).toBeRubyTruthy();
+  it.skipIf(RUBY_ENGINE() === "jruby")("closes Pathname files after use", async () => {
+    const openFiles: File[] = [];
+    ObjectSpace.eachObject(File, (f) => {
+      if (!(f as File).isClosed()) openFiles.push(f as File);
+    });
+    expect(openFiles.some((f) => f.path() === path)).toBe(false);
   });
   it("gets content type from Tempfiles", async () => {
-    await Tempfile.open("Marcel", undefined, async (tempfile) => {
-      await tempfile.write(await File.read(path as string));
+    await Tempfile.open("Marcel", undefined, async (tempfile: Tempfile) => {
+      await tempfile.write(await File.read(path));
       const contentType = await MimeType.for(tempfile);
       return expect(contentType).toEqual("image/gif");
     });
   });
   it("gets content type from IOs", async () => {
-    const io = new StringIO(await File.read(path as string));
+    const io = new StringIO(await File.read(path));
     const contentType = await MimeType.for(io);
     expect(contentType).toEqual("image/gif");
   });

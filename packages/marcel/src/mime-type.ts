@@ -1,13 +1,12 @@
 import {
   rbFArray,
   uniq,
-  rbEqual,
   Pathname,
   block as rbBlock,
   compact,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
-import { Magic } from "./magic.js";
+import { Magic, type MagicMatch } from "./magic.js";
 import { Marcel as MarcelSeat } from "./namespaces.js";
 import { TYPE_EXTS, TYPE_PARENTS } from "./tables.js";
 
@@ -16,27 +15,34 @@ export class MimeType {
     return "Marcel::MimeType";
   }
 
-  static BINARY: unknown = "application/octet-stream";
+  static BINARY = "application/octet-stream";
 
   static extend(
     type: string,
-    options: { extensions?: unknown; parents?: unknown; magic?: unknown } = {},
+    {
+      extensions = [],
+      parents = [],
+      magic = null,
+    }: {
+      extensions?: string | string[] | null;
+      parents?: string | string[] | null;
+      magic?: MagicMatch[] | null;
+    } = {},
   ) {
-    let { extensions = [], parents = [] } = options;
-    const { magic = null } = options;
-    extensions = uniq([...rbFArray(extensions), ...rbFArray(TYPE_EXTS[type])]);
-    parents = uniq([...rbFArray(parents), ...rbFArray(TYPE_PARENTS[type])]);
+    extensions = uniq([...rbFArray(extensions), ...rbFArray(TYPE_EXTS[type])] as string[]);
+    parents = uniq([...rbFArray(parents), ...rbFArray(TYPE_PARENTS[type])] as string[]);
     return Magic.add(type, { extensions: extensions, magic: magic, parents: parents });
   }
 
   static for(
     pathnameOrIo: unknown = null,
-    options: { name?: unknown; extension?: unknown; declaredType?: unknown } = {},
+    {
+      name = null,
+      extension = null,
+      declaredType = null,
+    }: { name?: string | null; extension?: string | null; declaredType?: string | null } = {},
   ) {
-    let _t;
-    const { name = null, extension = null, declaredType = null } = options;
-    const filenameType =
-      ((_t = this.forName(name)) ?? false) !== false ? _t : this.forExtension(extension);
+    const filenameType = this.forName(name) ?? this.forExtension(extension);
     return this.mostSpecificType(
       this.forData(pathnameOrIo),
       this.forDeclaredType(declaredType),
@@ -49,8 +55,8 @@ export class MimeType {
     if (pathnameOrIo != null && pathnameOrIo !== false) {
       return this.withIo(pathnameOrIo, (io) => {
         let magic;
-        if (((magic = Magic.byMagic(io)) ?? false) !== false) {
-          return (magic.type as string).toLowerCase();
+        if ((magic = Magic.byMagic(io))) {
+          return magic.type.toLowerCase();
         }
         return null;
       });
@@ -58,50 +64,48 @@ export class MimeType {
     return null;
   }
 
-  static forName(name: unknown) {
+  static forName(name: string | null) {
     let magic;
-    if (name != null && name !== false) {
-      if (((magic = Magic.byPath(name)) ?? false) !== false) {
-        return (magic.type as string).toLowerCase();
+    if (name != null) {
+      if ((magic = Magic.byPath(name))) {
+        return magic.type.toLowerCase();
       }
       return null;
     }
     return null;
   }
 
-  static forExtension(extension: unknown) {
+  static forExtension(extension: string | null) {
     let magic;
-    if (extension != null && extension !== false) {
-      if (((magic = Magic.byExtension(extension)) ?? false) !== false) {
-        return (magic.type as string).toLowerCase();
+    if (extension != null) {
+      if ((magic = Magic.byExtension(extension))) {
+        return magic.type.toLowerCase();
       }
       return null;
     }
     return null;
   }
 
-  static forDeclaredType(declaredType: unknown) {
+  static forDeclaredType(declaredType: string | null) {
     const type = this.parseMediaType(declaredType);
-    if (!rbEqual(type, MimeType.BINARY)) {
+    if (type !== MimeType.BINARY) {
       return type;
     }
     return null;
   }
 
-  static withIo(pathnameOrIo: unknown, block?: (...args: unknown[]) => unknown) {
+  static withIo<R>(pathnameOrIo: unknown, block: (io: unknown) => R): R {
     if (pathnameOrIo instanceof Pathname) {
-      return pathnameOrIo.open(
-        ...((block != null ? [rbBlock(block)] : []) as Parameters<typeof pathnameOrIo.open>),
-      );
+      return pathnameOrIo.open(rbBlock(block)) as R;
     } else {
       return block(pathnameOrIo);
     }
   }
 
-  static parseMediaType(contentType: unknown) {
+  static parseMediaType(contentType: string | null) {
     let result;
-    if (contentType != null && contentType !== false) {
-      result = (contentType as string).toLowerCase().split(/[;,\s]/, 2)[0];
+    if (contentType != null) {
+      result = contentType.toLowerCase().split(/[;,\s]/, 2)[0];
       if (result != null && result.includes("/")) {
         return result;
       }
@@ -110,17 +114,11 @@ export class MimeType {
     return null;
   }
 
-  static mostSpecificType(...candidates: unknown[]) {
-    return ((x) =>
-      x.length === 0
-        ? null
-        : x.reduce((type, candidate) => {
-            if (Magic.isChild(candidate, type)) {
-              return candidate;
-            } else {
-              return type;
-            }
-          }))(uniq(compact(candidates)));
+  static mostSpecificType(...candidates: (string | null)[]) {
+    const x = uniq(compact(candidates));
+    return x.length === 0
+      ? null
+      : x.reduce((type, candidate) => (Magic.isChild(candidate, type) ? candidate : type));
   }
 }
 rbModConstSet(MarcelSeat, "MimeType", MimeType);
