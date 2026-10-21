@@ -194,6 +194,17 @@ describe("BacktraceCleanerKindTest", () => {
     expect(cleaner.cleanFrame("/gems/rack-1.0/lib/rack.rb", "all")).toBe("[gem] lib/rack.rb");
     expect(cleaner.cleanFrame("/app/foo.rb", "all")).toBe("/app/foo.rb");
   });
+
+  it("cleanFrame converts a non-string frame to a string before filtering", () => {
+    const cleaner = build();
+    class Location {
+      toString(): string {
+        return "/gems/rack-1.0/lib/rack.rb";
+      }
+    }
+    const location = new Location();
+    expect(cleaner.cleanFrame(location, "all")).toBe("[gem] lib/rack.rb");
+  });
 });
 
 describe("BacktraceCleanerFilterAndSilencerTest", () => {
