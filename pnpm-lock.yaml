@@ -697,6 +697,9 @@ importers:
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@blazetrails/marcel':
+        specifier: workspace:*
+        version: link:../../packages/marcel
       '@blazetrails/msgpack':
         specifier: workspace:*
         version: link:../../packages/msgpack
