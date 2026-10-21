@@ -49,7 +49,7 @@
   },
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"require('fs').cpSync('src/generators/active-record/migration/templates', 'dist/generators/active-record/migration/templates', { recursive: true })\""
+    "build:templates": "node -e \"require('fs').cpSync('src/generators/active-record/migration/templates', 'dist/generators/active-record/migration/templates', { recursive: true }); require('fs').cpSync('src/templates/rails', 'dist/templates/rails', { recursive: true })\" && trails-tsc-views build --views dist/templates/rails --in-place"
   },
   "files": [
     "dist",

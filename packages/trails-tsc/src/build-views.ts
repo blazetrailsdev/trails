@@ -10,6 +10,7 @@ import {
   type LineMapping,
 } from "@blazetrails/tse-compiler";
 import {
+  tseLookupTransformer,
   virtualizeTseWithDeltas,
   parseLocalsSignature,
   localsParamType,
@@ -883,9 +884,15 @@ function emitRegistryAugmentation(entries: Array<{ key: string; localsType: stri
 }
 
 function emitViews(program: ts.Program, host: ts.CompilerHost, outViews: string): void {
-  const emitResult = program.emit(undefined, (fileName, ...rest) => {
-    if (path.resolve(fileName).startsWith(outViews + path.sep)) host.writeFile(fileName, ...rest);
-  });
+  const emitResult = program.emit(
+    undefined,
+    (fileName, ...rest) => {
+      if (path.resolve(fileName).startsWith(outViews + path.sep)) host.writeFile(fileName, ...rest);
+    },
+    undefined,
+    undefined,
+    { before: [tseLookupTransformer] },
+  );
   if (emitResult.emitSkipped) {
     const diagnostics = [...ts.getPreEmitDiagnostics(program), ...emitResult.diagnostics];
     const formatted = ts.formatDiagnostics(ts.sortAndDeduplicateDiagnostics(diagnostics), host);
