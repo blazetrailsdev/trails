@@ -6,7 +6,6 @@ import {
   rbModConstSet,
   rbObjClass,
   rbObjIsProc,
-  rtest,
 } from "@blazetrails/ruby-compat";
 import { ActiveJob, QueueAdapters } from "../namespaces.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
@@ -52,7 +51,7 @@ export class TestAdapter extends AbstractAdapter {
     return await this.performOrEnqueue(
       this.performEnqueuedJobs != null &&
         this.performEnqueuedJobs !== false &&
-        !rtest(this.isFiltered(job)),
+        !this.isFiltered(job),
       job,
       jobData,
     );
@@ -63,7 +62,7 @@ export class TestAdapter extends AbstractAdapter {
     return await this.performOrEnqueue(
       this.performEnqueuedAtJobs != null &&
         this.performEnqueuedAtJobs !== false &&
-        !rtest(this.isFiltered(job)),
+        !this.isFiltered(job),
       job,
       jobData,
     );
@@ -92,18 +91,13 @@ export class TestAdapter extends AbstractAdapter {
       this.performedJobs.push(jobData);
       return await ActiveJob.Base.execute(job.serialize());
     } else {
-      this.enqueuedJobs.push(jobData);
-      return this.enqueuedJobs;
+      return this.enqueuedJobs.push(jobData);
     }
   }
 
   /** @internal */
   private isFiltered(job: TestAdapterJob): unknown {
-    const filteredQueue = this.isFilteredQueue(job);
-    if (rtest(filteredQueue)) return filteredQueue;
-    const filteredJobClass = this.isFilteredJobClass(job);
-    if (rtest(filteredJobClass)) return filteredJobClass;
-    return this.isFilteredTime(job);
+    return this.isFilteredQueue(job) || this.isFilteredJobClass(job) || this.isFilteredTime(job);
   }
 
   /** @internal */
@@ -124,7 +118,7 @@ export class TestAdapter extends AbstractAdapter {
   /** @internal */
   private isFilteredJobClass(job: TestAdapterJob): unknown {
     if (this.filter != null) {
-      return !rtest(this.filterAsProc(this.filter)(job));
+      return !this.filterAsProc(this.filter)(job);
     } else if (this.reject != null) {
       return this.filterAsProc(this.reject)(job);
     }

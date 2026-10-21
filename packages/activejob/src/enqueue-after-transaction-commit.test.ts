@@ -102,7 +102,7 @@ describe("EnqueueAfterTransactionCommitTest", () => {
       async () => {
         const job = (await EnqueueAfterCommitJob.performLater()) as EnqueueAfterCommitJob;
         expect(job).toBeInstanceOf(EnqueueAfterCommitJob);
-        expect(job.isSuccessfullyEnqueued()).toBe(true);
+        expect(job.isSuccessfullyEnqueued()).toBeRubyTruthy();
       },
       { exists: false },
     );
@@ -122,9 +122,9 @@ describe("EnqueueAfterTransactionCommitTest", () => {
             expect(yieldedJob).toBeInstanceOf(EnqueueAfterCommitJob);
           }),
         )) as EnqueueAfterCommitJob;
-        expect(called, "#perform_later yielded the job").toBe(true);
+        expect(called, "#perform_later yielded the job").toBeTruthy();
         expect(job).toBeInstanceOf(EnqueueAfterCommitJob);
-        expect(job.isSuccessfullyEnqueued()).toBe(true);
+        expect(job.isSuccessfullyEnqueued()).toBeRubyTruthy();
       },
       { exists: false },
     );
@@ -139,10 +139,10 @@ describe("EnqueueAfterTransactionCommitTest", () => {
       async () => {
         const job = (await ErrorEnqueueAfterCommitJob.performLater()) as ErrorEnqueueAfterCommitJob;
         expect(job).toBeInstanceOf(ErrorEnqueueAfterCommitJob);
-        expect(job.isSuccessfullyEnqueued()).toBe(true);
+        expect(job.isSuccessfullyEnqueued()).toBeRubyTruthy();
 
         await fakeActiveRecord.runAfterCommitCallbacks();
-        expect(job.isSuccessfullyEnqueued()).toBe(false);
+        expect(job.isSuccessfullyEnqueued()).toBeRubyFalsy();
       },
       { exists: false },
     );
