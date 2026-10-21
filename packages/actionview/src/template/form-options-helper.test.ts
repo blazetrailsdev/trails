@@ -1247,7 +1247,7 @@ describe("FormOptionsHelperTest", () => {
   it("select under fields for with index", () => {
     newPost("<mus>");
     const outputBuffer = view.fieldsFor("post", view.post, { index: 108 }, (f: any) => {
-      view.concat(f.select("category", abeMusHest));
+      (view as any).concat(f.select("category", abeMusHest));
     });
     assertDomEqual(
       postCategory(
@@ -1262,7 +1262,7 @@ describe("FormOptionsHelperTest", () => {
     newPost("<mus>");
     view.post.toParam = () => 108;
     const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: any) => {
-      view.concat(f.select("category", abeMusHest));
+      (view as any).concat(f.select("category", abeMusHest));
     });
     assertDomEqual(
       postCategory(
@@ -1280,7 +1280,7 @@ describe("FormOptionsHelperTest", () => {
       '<option value="abe">abe</option><option value="mus">mus</option><option value="hest">hest</option>',
     );
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      view.concat(f.select("category", options, { prompt: "The prompt" }));
+      (view as any).concat(f.select("category", options, { prompt: "The prompt" }));
     });
     assertDomEqual(postCategory(`<option value="">The prompt</option>\n${options}`), outputBuffer);
   });
@@ -1289,9 +1289,9 @@ describe("FormOptionsHelperTest", () => {
   it.skip("select under fields for with block", () => {
     view.post = new Post();
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      view.concat(
+      (view as any).concat(
         f.select("category", null, {}, {}, () => {
-          view.concat(view.contentTag("option", "hello world"));
+          (view as any).concat(view.contentTag("option", "hello world"));
         }),
       );
     });
@@ -1302,7 +1302,7 @@ describe("FormOptionsHelperTest", () => {
   it.skip("select under fields for with block without options", () => {
     view.post = new Post();
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      view.concat(f.select("category", null, {}, {}, () => {}));
+      (view as any).concat(f.select("category", null, {}, {}, () => {}));
     });
     assertDomEqual(postCategory(""), outputBuffer);
   });
