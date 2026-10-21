@@ -3,7 +3,9 @@ import "../test-helpers/abstract-unit.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError, Struct, block, sprintf } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, Time } from "@blazetrails/date";
+import { inTimeZone } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
 import {
+  Duration,
   TimeZone,
   assertPredicate,
   isHtmlSafe,
@@ -76,6 +78,317 @@ function add(base: Date, ms: number): Date {
 }
 
 const from = new Date(Date.UTC(2004, 5, 6, 21, 45, 0));
+
+function assertDistanceOfTimeInWords(from: any, to: any = null) {
+  to ??= from;
+
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(0)), { includeSeconds: true })).toBe(
+    "less than 5 seconds",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(4)), { includeSeconds: true })).toBe(
+    "less than 5 seconds",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(5)), { includeSeconds: true })).toBe(
+    "less than 10 seconds",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(9)), { includeSeconds: true })).toBe(
+    "less than 10 seconds",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(10)), { includeSeconds: true })).toBe(
+    "less than 20 seconds",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(19)), { includeSeconds: true })).toBe(
+    "less than 20 seconds",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(20)), { includeSeconds: true })).toBe(
+    "half a minute",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(39)), { includeSeconds: true })).toBe(
+    "half a minute",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(40)), { includeSeconds: true })).toBe(
+    "less than a minute",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(59)), { includeSeconds: true })).toBe(
+    "less than a minute",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(60)), { includeSeconds: true })).toBe(
+    "1 minute",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(89)), { includeSeconds: true })).toBe(
+    "1 minute",
+  );
+
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(0)), { includeSeconds: false })).toBe(
+    "less than a minute",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(4)), { includeSeconds: false })).toBe(
+    "less than a minute",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(5)), { includeSeconds: false })).toBe(
+    "less than a minute",
+  );
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(9)), { includeSeconds: false })).toBe(
+    "less than a minute",
+  );
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.seconds(10)), { includeSeconds: false }),
+  ).toBe("less than a minute");
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.seconds(19)), { includeSeconds: false }),
+  ).toBe("less than a minute");
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.seconds(20)), { includeSeconds: false }),
+  ).toBe("less than a minute");
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.seconds(39)), { includeSeconds: false }),
+  ).toBe("1 minute");
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.seconds(40)), { includeSeconds: false }),
+  ).toBe("1 minute");
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.seconds(59)), { includeSeconds: false }),
+  ).toBe("1 minute");
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.seconds(60)), { includeSeconds: false }),
+  ).toBe("1 minute");
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.seconds(89)), { includeSeconds: false }),
+  ).toBe("1 minute");
+
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(0)))).toBe("less than a minute");
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(29)))).toBe("less than a minute");
+  expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(30)))).toBe("1 minute");
+  expect(distanceOfTimeInWords(from, to.plus(Duration.minutes(1)).plus(Duration.seconds(29)))).toBe(
+    "1 minute",
+  );
+
+  expect(distanceOfTimeInWords(from, to.plus(Duration.minutes(1)).plus(Duration.seconds(30)))).toBe(
+    "2 minutes",
+  );
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.minutes(44)).plus(Duration.seconds(29))),
+  ).toBe("44 minutes");
+
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.minutes(44)).plus(Duration.seconds(30))),
+  ).toBe("about 1 hour");
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.minutes(89)).plus(Duration.seconds(29))),
+  ).toBe("about 1 hour");
+
+  expect(
+    distanceOfTimeInWords(from, to.plus(Duration.minutes(89)).plus(Duration.seconds(30))),
+  ).toBe("about 2 hours");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.hours(23)).plus(Duration.minutes(59)).plus(Duration.seconds(29)),
+    ),
+  ).toBe("about 24 hours");
+
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.hours(23)).plus(Duration.minutes(59)).plus(Duration.seconds(30)),
+    ),
+  ).toBe("1 day");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.hours(41)).plus(Duration.minutes(59)).plus(Duration.seconds(29)),
+    ),
+  ).toBe("1 day");
+
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.hours(41)).plus(Duration.minutes(59)).plus(Duration.seconds(30)),
+    ),
+  ).toBe("2 days");
+  expect(distanceOfTimeInWords(from, to.plus(Duration.days(2)).plus(Duration.hours(12)))).toBe(
+    "3 days",
+  );
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to
+        .plus(Duration.days(29))
+        .plus(Duration.hours(23))
+        .plus(Duration.minutes(59))
+        .plus(Duration.seconds(29)),
+    ),
+  ).toBe("30 days");
+
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to
+        .plus(Duration.days(29))
+        .plus(Duration.hours(23))
+        .plus(Duration.minutes(59))
+        .plus(Duration.seconds(30)),
+    ),
+  ).toBe("about 1 month");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to
+        .plus(Duration.days(44))
+        .plus(Duration.hours(23))
+        .plus(Duration.minutes(59))
+        .plus(Duration.seconds(29)),
+    ),
+  ).toBe("about 1 month");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to
+        .plus(Duration.days(44))
+        .plus(Duration.hours(23))
+        .plus(Duration.minutes(59))
+        .plus(Duration.seconds(30)),
+    ),
+  ).toBe("about 2 months");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to
+        .plus(Duration.days(59))
+        .plus(Duration.hours(23))
+        .plus(Duration.minutes(59))
+        .plus(Duration.seconds(29)),
+    ),
+  ).toBe("about 2 months");
+
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to
+        .plus(Duration.days(59))
+        .plus(Duration.hours(23))
+        .plus(Duration.minutes(59))
+        .plus(Duration.seconds(30)),
+    ),
+  ).toBe("2 months");
+  expect(distanceOfTimeInWords(from, to.plus(Duration.years(1)).minus(Duration.seconds(31)))).toBe(
+    "12 months",
+  );
+
+  expect(distanceOfTimeInWords(from, to.plus(Duration.years(1)).minus(Duration.seconds(30)))).toBe(
+    "about 1 year",
+  );
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(1)).plus(Duration.months(3)).minus(Duration.days(1)),
+    ),
+  ).toBe("about 1 year");
+  expect(distanceOfTimeInWords(from, to.plus(Duration.years(1)).plus(Duration.months(6)))).toBe(
+    "over 1 year",
+  );
+
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(2)).minus(Duration.months(3)).plus(Duration.days(1)),
+    ),
+  ).toBe("almost 2 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(2)).plus(Duration.months(3)).minus(Duration.days(1)),
+    ),
+  ).toBe("about 2 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(2)).plus(Duration.months(3)).plus(Duration.days(1)),
+    ),
+  ).toBe("over 2 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(2)).plus(Duration.months(9)).minus(Duration.days(1)),
+    ),
+  ).toBe("over 2 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(2)).plus(Duration.months(9)).plus(Duration.days(1)),
+    ),
+  ).toBe("almost 3 years");
+
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(5)).minus(Duration.months(3)).plus(Duration.days(1)),
+    ),
+  ).toBe("almost 5 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(5)).plus(Duration.months(3)).minus(Duration.days(1)),
+    ),
+  ).toBe("about 5 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(5)).plus(Duration.months(3)).plus(Duration.days(1)),
+    ),
+  ).toBe("over 5 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(5)).plus(Duration.months(9)).minus(Duration.days(1)),
+    ),
+  ).toBe("over 5 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(5)).plus(Duration.months(9)).plus(Duration.days(1)),
+    ),
+  ).toBe("almost 6 years");
+
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(10)).minus(Duration.months(3)).plus(Duration.days(1)),
+    ),
+  ).toBe("almost 10 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(10)).plus(Duration.months(3)).minus(Duration.days(1)),
+    ),
+  ).toBe("about 10 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(10)).plus(Duration.months(3)).plus(Duration.days(1)),
+    ),
+  ).toBe("over 10 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(10)).plus(Duration.months(9)).minus(Duration.days(1)),
+    ),
+  ).toBe("over 10 years");
+  expect(
+    distanceOfTimeInWords(
+      from,
+      to.plus(Duration.years(10)).plus(Duration.months(9)).plus(Duration.days(1)),
+    ),
+  ).toBe("almost 11 years");
+
+  expect(distanceOfTimeInWords(from.plus(Duration.hours(4)), to)).toBe("about 4 hours");
+  expect(distanceOfTimeInWords(from.plus(Duration.seconds(19)), to, { includeSeconds: true })).toBe(
+    "less than 20 seconds",
+  );
+  expect(
+    distanceOfTimeInWords(from.plus(Duration.seconds(19)), to, { includeSeconds: false }),
+  ).toBe("less than a minute");
+}
 
 describe("DateHelperTest", () => {
   it("distance in words", () => {
@@ -150,6 +463,17 @@ describe("DateHelperTest", () => {
     expect(timeAgoInWords(past, { includeSeconds: false })).toBe("less than a minute");
   });
 
+  it("distance in words with time zones", () => {
+    const from = Time.mktime(2004, 6, 6, 21, 45, 0);
+    assertDistanceOfTimeInWords(inTimeZone(from, "Alaska"));
+    assertDistanceOfTimeInWords(inTimeZone(from, "Hawaii"));
+  });
+
+  it("distance in words with different time zones", () => {
+    const from = Time.mktime(2004, 6, 6, 21, 45, 0);
+    assertDistanceOfTimeInWords(inTimeZone(from, "Alaska"), inTimeZone(from, "Hawaii"));
+  });
+
   it("distance in words with dates", () => {
     const startDate = new Date(Date.UTC(1975, 0, 31));
     const endDate = new Date(Date.UTC(1977, 0, 31));
@@ -168,6 +492,39 @@ describe("DateHelperTest", () => {
     expect(distanceOfTimeInWords(60 * 60, 0)).toBe("about 1 hour");
     expect(distanceOfTimeInWords(10 ** 8)).toBe("about 3 years");
     expect(distanceOfTimeInWords(0, 10 ** 8)).toBe("about 3 years");
+  });
+
+  // BLOCKED: date-helper-normalize-distance-admits-duration-as-numeric
+  it.skip("distance in words with times", () => {
+    expect(distanceOfTimeInWords(Duration.seconds(30) as any)).toBe("1 minute");
+    expect(distanceOfTimeInWords(Duration.seconds(59) as any)).toBe("1 minute");
+    expect(distanceOfTimeInWords(Duration.seconds(119) as any)).toBe("2 minutes");
+    expect(distanceOfTimeInWords(Duration.minutes(1).plus(Duration.seconds(59)) as any)).toBe(
+      "2 minutes",
+    );
+    expect(distanceOfTimeInWords(Duration.minutes(2).plus(Duration.seconds(30)) as any)).toBe(
+      "3 minutes",
+    );
+    expect(distanceOfTimeInWords(Duration.minutes(44).plus(Duration.seconds(29)) as any)).toBe(
+      "44 minutes",
+    );
+    expect(distanceOfTimeInWords(Duration.minutes(44).plus(Duration.seconds(30)) as any)).toBe(
+      "about 1 hour",
+    );
+    expect(distanceOfTimeInWords(Duration.minutes(60) as any)).toBe("about 1 hour");
+
+    expect(distanceOfTimeInWords(Duration.seconds(39) as any, 0, { includeSeconds: true })).toBe(
+      "half a minute",
+    );
+    expect(distanceOfTimeInWords(Duration.seconds(40) as any, 0, { includeSeconds: true })).toBe(
+      "less than a minute",
+    );
+    expect(distanceOfTimeInWords(Duration.seconds(59) as any, 0, { includeSeconds: true })).toBe(
+      "less than a minute",
+    );
+    expect(distanceOfTimeInWords(Duration.seconds(60) as any, 0, { includeSeconds: true })).toBe(
+      "1 minute",
+    );
   });
 
   it("time ago in words", () => {
