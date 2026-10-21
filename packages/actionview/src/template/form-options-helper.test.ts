@@ -1737,7 +1737,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.category = "<mus>";
 
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: FormBuilder) => {
-      (view as any).concat(f.select("category", ["abe", "<mus>", "hest"]));
+      view.concat(f.select("category", ["abe", "<mus>", "hest"]));
     });
 
     assertDomEqual(
@@ -1750,7 +1750,7 @@ describe("FormOptionsHelperTest", () => {
     const map = new Map();
 
     const outputBuffer = view.fieldsFor("map", map, {}, (f: FormBuilder) => {
-      (view as any).concat(f.select("category", ["abe", "<mus>", "hest"]));
+      view.concat(f.select("category", ["abe", "<mus>", "hest"]));
     });
 
     assertDomEqual(
