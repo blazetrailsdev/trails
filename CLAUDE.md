@@ -1738,9 +1738,10 @@ awaited step happens once, and every reader afterwards is as synchronous as
 Ruby's. A `load_path` set after boot, or a development reload, is awaited where
 Rails lazily loads inside the first lookup.
 
-**`translate` is never made async.** Its 31 call sites sit in 26 members
-across five packages, and **every one of those members is synchronous today**.
-The count is not the reason — the shapes are. Each of these returns a String
+**`translate` is never made async.** It has 30 call sites across five
+packages — the command that lists them, with the member each sits in, is in
+the decision history — and **every member they sit in is synchronous today**.
+The count is not the reason, the shapes are. Each of these returns a String
 where Rails returns a String, and an async `translate` makes it return a
 `Promise`:
 
@@ -1755,8 +1756,9 @@ where Rails returns a String, and an async `translate` makes it return a
   rendered.
 - `Inflector#ordinal` / `#ordinalize`
   (`packages/activesupport/src/inflector.ts:256`, `:260`), `Array#to_sentence`
-  (`array-utils.ts:63`), `NumberConverter#execute`
-  (`number-helper/number-converter.ts:100`) and
+  (`array-utils.ts:63`), `NumberConverter`'s `i18n_format_options` /
+  `translate_number_value_with_default`
+  (`number-helper/number-converter.ts:155`, `:177`) and
   `HtmlSafeTranslation.translate` (`html-safe-translation.ts:11`).
 - Every helper that renders a translated string:
   `ActionView::Helpers::TranslationHelper#translate` / `#localize`
@@ -1801,13 +1803,20 @@ As a consequence:
   instance is `translate caching backend`
   (`vendor/rails/v8.0.2/actionview/test/template/translation_helper_test.rb:390-410`),
   at `packages/actionview/src/template/translation-helper.test.ts`. Its body is
-  empty rather than Rails', because the Rails body names
-  `I18n::Backend::Cache`, which this section leaves unported: a kept body would
-  not type-check, so the receipt carries the citation instead.
-- A backend whose lookup is genuinely I/O — `Backend::KeyValue` over a store —
-  is served by an awaited load into the same table, not by an async
-  `translate`. A store-backed backend whose contents cannot be loaded ahead of
-  the lookup is not ported.
+  empty rather than Rails', because that body names two things the port does
+  not define: `I18n::Backend::Cache`, which this section leaves unported, and
+  the `I18n.cache_store` accessor it is configured through (`cache.rb:44-74`,
+  with no counterpart in `packages/i18n/src/i18n.ts`). Its
+  `ActiveSupport::Cache.lookup_store(:memory_store)` call does resolve
+  (`packages/activesupport/src/cache.ts:16`), so the two i18n names are the
+  whole blocker. The receipt carries the citation instead.
+- `Backend::KeyValue` is unaffected, because the gem already requires a
+  synchronous store there: Ruby's store answers `[]`, `[]=` and `keys`
+  (`vendor/i18n/v1.14.8/lib/i18n/backend/key_value.rb:26-30`), and the ported
+  `Store` interface is those three methods, synchronous
+  (`packages/i18n/src/backend/key-value.ts:17-21`). A store whose reads are
+  async does not satisfy that interface, in Ruby or here. How such a store
+  would be adapted is not decided by this section.
 
 This is a genuine language shortcoming — JS has no synchronous await — and it
 is ratified repo-wide here by the repo owner on 2026-10-21. A new instance is

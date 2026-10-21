@@ -334,18 +334,34 @@ rejected by the owner: an entry another process wrote after the warm is not
 seen, and a failed store write cannot reach the `translate` caller. It is also
 the invented lazy machinery the owner has pushed back on elsewhere.
 
-**An async `translate` was measured and rejected on 2026-10-21.** The call was
-resolved mechanically — every `I18n.translate` / `t` / `localize` / `l` site in
-`packages/*/src/**/*.ts` outside i18n and outside tests, with each site's
-enclosing member — and came to 31 sites in 26 members across actionpack,
-actionview, activemodel, activerecord and activesupport. Every one of those
-members is synchronous, two of them (`activemodel/validations.ts:339`,
-`activerecord/validations.ts:29`) are constructors, which cannot await at all,
-and two more (`Error#message`, `#full_message`) are getters. So the change
-would not make i18n async; it would make ActiveModel's error messages and
-ActiveSupport's string helpers async, where Rails returns a String. CLAUDE.md
-§ "Serialization's dual sync/async hash" had already refused that trade in the
-same direction for `as_json`.
+**An async `translate` was measured and rejected on 2026-10-21.** The call
+sites are what this command lists, run from the repo root:
+
+```bash
+grep -rnE 'I18n\.(translate|localize|t|l)\(' packages/*/src --include='*.ts' \
+  | grep -v '\.test\.ts:' | grep -v '^packages/i18n/'
+```
+
+30 sites in 17 files across actionpack (1), actionview (12), activemodel (6),
+activerecord (1) and activesupport (10). The reviewer of trails#9180 got 30
+from an independent pattern; an earlier hand-built count said 31 because
+`html-safe-translation.ts:28` carries `Parameters<typeof I18n.translate>[1]`,
+a type reference and not a call. The trailing `\(` is what excludes it.
+
+Every member those sites sit in is synchronous. Two are constructors
+(`activemodel/validations.ts:339`, `activerecord/validations.ts:29`), which
+cannot await at all; two more are getters (`Error#message`, `#full_message`).
+So the change would not make i18n async; it would make ActiveModel's error
+messages and ActiveSupport's string helpers async, where Rails returns a
+String. CLAUDE.md § "Serialization's dual sync/async hash" had already refused
+that trade in the same direction for `as_json`.
+
+The member count is deliberately not stated as a number in the ratified
+section: resolving a call's enclosing member by text is a heuristic — it reads
+a nested call such as `assertValidKeys(...)` as a declaration unless the
+pattern excludes it — so a hardcoded count is a figure a reader cannot check
+from the section. The command above is checkable, and the claim that carries
+the ruling is that every one of those members is synchronous.
 
 **A dual-shape return was rejected as impossible, not merely costly.**
 `thenableHash` works because a Hash can be a Proxy; a Proxy cannot be a string
