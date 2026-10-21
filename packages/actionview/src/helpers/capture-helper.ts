@@ -10,15 +10,36 @@ export interface CaptureHelperHost {
 
 export function capture<TArgs extends unknown[]>(
   this: CaptureHelperHost,
+  block: (...args: TArgs) => PromiseLike<unknown>,
+  ...args: TArgs
+): Promise<SafeBuffer | null>;
+export function capture<TArgs extends unknown[]>(
+  this: CaptureHelperHost,
   block: (...args: TArgs) => unknown,
   ...args: TArgs
-): SafeBuffer | null {
+): SafeBuffer | null;
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm then — PERMANENT
+ */
+export function capture<TArgs extends unknown[]>(
+  this: CaptureHelperHost,
+  block: (...args: TArgs) => unknown,
+  ...args: TArgs
+): SafeBuffer | null | Promise<SafeBuffer | null> {
   let value: unknown = null;
   if (!this.outputBuffer) this.outputBuffer = new OutputBuffer();
   const buf = this.outputBuffer;
-  const buffer = buf.capture(() => {
-    value = block(...args);
-  });
+  const buffer = buf.capture(() => (value = block(...args)));
+  if (buffer instanceof Promise) {
+    return buffer.then(async (buffer) => {
+      const resolved = await value;
+      return capture.call(this, () => {
+        buf.safeConcat(buffer);
+        return resolved;
+      });
+    });
+  }
 
   let string: unknown;
   if (buf === value) {
