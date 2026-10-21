@@ -85,7 +85,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
     expect(params["submit-name"]).toBe("Larry");
     expect(params["files"]["filename"]).toBe("foo.txt");
     expect((files as unknown as { pos: number }).pos).toBe(0);
-    expect(params["files"]["tempfile"].read()).toBe(files.tempfile.read());
+    expect(params["files"]["tempfile"].read()).toEqual(files.tempfile.read());
   });
 
   it("handles uploaded files not responding to set_encoding as empty", () => {
@@ -108,8 +108,10 @@ describe("Rack::Test::Utils.build_multipart", () => {
     const params = parseData(data);
     expect(params["submit-name"]).toBe("Larry");
     expect(params["files"]).toBeUndefined();
-    expect(b(data)).toContain('content-disposition: form-data; name="files"; filename=""');
-    expect(b(data)).toContain("content-length: 0");
+    expect(new TextDecoder().decode(data)).toContain(
+      'content-disposition: form-data; name="files"; filename=""',
+    );
+    expect(new TextDecoder().decode(data)).toContain("content-length: 0");
   });
 
   it("builds multipart bodies from array of files", () => {
@@ -123,10 +125,10 @@ describe("Rack::Test::Utils.build_multipart", () => {
     expect(params["submit-name"]).toBe("Larry");
 
     expect(params["files"][0]["filename"]).toBe("foo.txt");
-    expect(params["files"][0]["tempfile"].read()).toBe("bar\n");
+    expect(params["files"][0]["tempfile"].read()).toEqual(b("bar\n"));
 
     expect(params["files"][1]["filename"]).toBe("bar.txt");
-    expect(params["files"][1]["tempfile"].read()).toBe("baz\n");
+    expect(params["files"][1]["tempfile"].read()).toEqual(b("baz\n"));
   });
 
   it("builds multipart bodies from mixed array of a file and a primitive", () => {
@@ -136,7 +138,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
     const params = parseData(data);
 
     expect(params["files"][0]["filename"]).toBe("foo.txt");
-    expect(params["files"][0]["tempfile"].read()).toBe("bar\n");
+    expect(params["files"][0]["tempfile"].read()).toEqual(b("bar\n"));
 
     expect(params["files"][1]).toBe("baz");
   });
@@ -151,7 +153,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
     const params = parseData(data);
     expect(params["people"][0]["submit-name"]).toBe("Larry");
     expect(params["people"][0]["files"]["filename"]).toBe("foo.txt");
-    expect(params["people"][0]["files"]["tempfile"].read()).toBe("bar\n");
+    expect(params["people"][0]["files"]["tempfile"].read()).toEqual(b("bar\n"));
     expect(params["foo"]).toEqual(["1", "2"]);
   });
 
@@ -163,9 +165,9 @@ describe("Rack::Test::Utils.build_multipart", () => {
     })!;
 
     let params = parseData(data);
-    expect(b(params["people"][0]["submit-name"])).toBe(b("ሴ"));
+    expect(b(params["people"][0]["submit-name"])).toEqual(b("ሴ"));
     expect(params["people"][0]["files"]["filename"]).toBe("mb.txt");
-    expect(params["people"][0]["files"]["tempfile"].read()).toBe(b("⍅"));
+    expect(params["people"][0]["files"]["tempfile"].read()).toEqual(b("⍅"));
     expect(params["foo"]).toEqual(["1", "2"]);
 
     files = new UploadedFile(multipartFile("mb.txt"));
@@ -175,9 +177,9 @@ describe("Rack::Test::Utils.build_multipart", () => {
     })!;
 
     params = parseData(data);
-    expect(b(params["people"][0]["submit-name"])).toBe(b("ሴ"));
+    expect(b(params["people"][0]["submit-name"])).toEqual(b("ሴ"));
     expect(params["people"][0]["files"]["filename"]).toBe("mb.txt");
-    expect(params["people"][0]["files"]["tempfile"].read()).toBe(b("⍅"));
+    expect(params["people"][0]["files"]["tempfile"].read()).toEqual(b("⍅"));
     expect(params["foo"]).toEqual(["1", "2"]);
   });
 
@@ -193,7 +195,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
 
     const params = parseData(data);
     expect(params["files"]["filename"]).toBe("foo.txt");
-    expect(params["files"]["tempfile"].read()).toBe("bar\n");
+    expect(params["files"]["tempfile"].read()).toEqual(b("bar\n"));
     expect(params["foo"]).toEqual([
       { id: "1", name: "Dave" },
       { id: "2", name: "Steve" },
@@ -221,7 +223,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
 
     const params = parseData(data);
     expect(params["files"]["filename"]).toBe("foo.txt");
-    expect(params["files"]["tempfile"].read()).toBe("bar\n");
+    expect(params["files"]["tempfile"].read()).toEqual(b("bar\n"));
     expect(params["foo"]).toEqual({
       bar: [
         { id: "1", name: "Dave" },
@@ -243,7 +245,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
 
     const params = parseData(data);
     expect(params["files"][0]["filename"]).toBe("foo.txt");
-    expect(params["files"][0]["tempfile"].read()).toBe("bar\n");
+    expect(params["files"][0]["tempfile"].read()).toEqual(b("bar\n"));
     expect(params["foo"][0]).toBe("1");
     expect(params["bar"][0]).toEqual({ qux: "2" });
   });
@@ -260,7 +262,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
     const params = parseData(data);
     expect(params["foo"][0]["id"]).toBe("1");
     expect(params["foo"][0]["data"]["filename"]).toBe("foo.txt");
-    expect(params["foo"][0]["data"]["tempfile"].read()).toBe("bar\n");
+    expect(params["foo"][0]["data"]["tempfile"].read()).toEqual(b("bar\n"));
     expect(params["foo"][1]).toEqual({ id: "2", data: ["3", "4"] });
   });
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, it, expect } from "vitest";
-import { StringIO, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { StringIO, b, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { RewindableInput } from "./rewindable-input.js";
 import { RACK_INPUT } from "./constants.js";
 
@@ -21,64 +21,64 @@ function rewindableIo(): any {
 }
 
 it("be able to handle to read()", () => {
-  expect(rio!.read()).toBe("hello world");
+  expect(rio!.read()).toEqual(b("hello world"));
 });
 
 it("be able to handle to read(nil)", () => {
-  expect(rio!.read(null)).toBe("hello world");
+  expect(rio!.read(null)).toEqual(b("hello world"));
 });
 
 it("be able to handle to read(length)", () => {
-  expect(rio!.read(1)).toBe("h");
+  expect(rio!.read(1)).toEqual(b("h"));
 });
 
 it("be able to handle to read(length, buffer)", () => {
   const buffer = new Uint8Array(1);
   const result = rio!.read(1, buffer);
-  expect(result).toBe("h");
+  expect(result).toEqual(b("h"));
   expect(buffer[0]).toBe("h".charCodeAt(0));
 });
 
 it("be able to handle to read(nil, buffer)", () => {
   const buffer = new Uint8Array(11);
   const result = rio!.read(null, buffer);
-  expect(result).toBe("hello world");
+  expect(result).toEqual(b("hello world"));
   expect(new TextDecoder().decode(buffer)).toBe("hello world");
 });
 
 it("rewind to the beginning when #rewind is called", () => {
   rio!.rewind();
-  expect(rio!.read(1)).toBe("h");
+  expect(rio!.read(1)).toEqual(b("h"));
   rio!.rewind();
-  expect(rio!.read()).toBe("hello world");
+  expect(rio!.read()).toEqual(b("hello world"));
 });
 
 it("be able to handle gets", () => {
-  expect(rio!.gets()).toBe("hello world");
+  expect(rio!.gets()).toEqual(b("hello world"));
   rio!.rewind();
-  expect(rio!.gets()).toBe("hello world");
+  expect(rio!.gets()).toEqual(b("hello world"));
 });
 
 it("be able to handle size", () => {
   expect(rio!.size()).toBe("hello world".length);
   expect(rio!.size()).toBe("hello world".length);
   rio!.rewind();
-  expect(rio!.gets()).toBe("hello world");
+  expect(rio!.gets()).toEqual(b("hello world"));
 });
 
 it("be able to handle each", () => {
-  let array: string[] = [];
+  let array: (string | Uint8Array)[] = [];
   rio!.each((data) => {
     array.push(data);
   });
-  expect(array).toEqual(["hello world"]);
+  expect(array).toEqual([b("hello world")]);
 
   rio!.rewind();
   array = [];
   rio!.each((data) => {
     array.push(data);
   });
-  expect(array).toEqual(["hello world"]);
+  expect(array).toEqual([b("hello world")]);
 });
 
 it("not buffer into a Tempfile if no data has been read yet", () => {

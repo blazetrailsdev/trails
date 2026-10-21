@@ -107,16 +107,34 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * `u`-only `len > 63` clamp (`pack.c:676`) is not reachable without that
  * directive.
  *
+ * The result is an ASCII-8BIT String, a `Uint8Array`, unless every directive
+ * is `m`, `M`, `u` or `U` (`enc_info`, `pack.c:298-310`, `:771-777`), when it
+ * is US-ASCII or UTF-8 text.
+ *
  * @noRailsEquivalent PERMANENT — Ruby core `Array#pack`
  * (`vendor/ruby/v3.3.11/pack.c:197`).
  */
-export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string): string {
+export function pack(
+  ary: ReadonlyArray<string | Uint8Array | number | bigint>,
+  fmt: `${"m" | "M" | "u" | "U"}${string}`,
+): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#pack` (`vendor/ruby/v3.3.11/pack.c:197`). */
+export function pack(
+  ary: ReadonlyArray<string | Uint8Array | number | bigint>,
+  fmt: string,
+): Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#pack` (`vendor/ruby/v3.3.11/pack.c:197`). */
+export function pack(
+  ary: ReadonlyArray<string | Uint8Array | number | bigint>,
+  fmt: string,
+): string | Uint8Array {
   const res: string[] = [];
+  let encInfo = 1;
   let p = 0;
   const pend = fmt.length;
   let idx = 0;
 
-  const nextfrom = (): string | number | bigint => {
+  const nextfrom = (): string | Uint8Array | number | bigint => {
     if (idx >= ary.length) throw new ArgumentError(toofew);
     return ary[idx++];
   };
@@ -130,6 +148,19 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
         p++;
       }
       continue;
+    }
+
+    switch (type) {
+      case "U":
+        if (encInfo === 1) encInfo = 2;
+        break;
+      case "m":
+      case "M":
+      case "u":
+        break;
+      default:
+        encInfo = 0;
+        break;
     }
 
     let explicitEndian = "";
@@ -216,9 +247,10 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
     }
     if (type !== "m") unknownDirective("pack", type, fmt);
 
-    const from = nextfrom() as string;
-    const s = new Uint8Array(from.length);
-    for (let i = 0; i < from.length; i++) s[i] = from.charCodeAt(i) & 0xff;
+    const from = nextfrom() as string | Uint8Array;
+    const s = from instanceof Uint8Array ? from : new Uint8Array(from.length);
+    if (typeof from === "string")
+      for (let i = 0; i < from.length; i++) s[i] = from.charCodeAt(i) & 0xff;
     let ptr = 0;
     let plen = s.length;
 
@@ -236,7 +268,9 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
     }
   }
 
-  return res.join("");
+  const str = res.join("");
+  if (encInfo !== 0) return str;
+  return Uint8Array.from(str, (c) => c.charCodeAt(0));
 }
 
 /**

@@ -7,7 +7,8 @@ import { NilClass } from "../nil-class.js";
 import { NoMethodError } from "../no-method-error.js";
 import { rbCString, rbObjClassname, rtest } from "../object.js";
 import { Range } from "../range.js";
-import { rbEqual } from "../rb-equal.js";
+import { rbEqual, rbEql } from "../rb-equal.js";
+import { EncodingError } from "../encoding-error.js";
 import { rbHash } from "../rb-hash.js";
 import { TypeError } from "../type-error.js";
 import {
@@ -24,6 +25,7 @@ import {
   rbStrUpto,
 } from "./each.js";
 import {
+  byteslice,
   rbStrByteindexM,
   rbStrByterindexM,
   rbStrBytesplice,
@@ -236,6 +238,54 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
   } satisfies Record<string, Method>,
 );
 
+/**
+ * The {@link STRING_METHOD_TABLE} entries an ASCII-8BIT String, a `Uint8Array`
+ * (CLAUDE.md, "A String has no encoding tag either"), answers: `==` and
+ * `eql?` compare bytes (`rb_str_equal`, `vendor/ruby/v3.3.11/string.c:3742`;
+ * `rb_str_eql`, `:3773`), `bytesize` counts them (`rb_str_bytesize`,
+ * `:2225`), `empty?` asks whether there are any, `byteslice` slices them,
+ * `start_with?` compares a prefix of them,
+ * and `+` joins them.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const BINARY_METHOD_TABLE: Record<
+  string,
+  (self: Uint8Array, ...args: unknown[]) => unknown
+> = {
+  equals: (self, other) => rbEqual(self, other),
+  caseEquals: (self, other) => rbEqual(self, other),
+  eql: (self, other) => rbEql(self, other),
+  plus: (self, str2) => rbStrPlus(self, str2),
+  bytesize: (self) => self.length,
+  isEmpty: (self) => self.length === 0,
+  byteslice: (self, ...args) => byteslice(self, ...args),
+  isStartWith: (self, ...prefixes) => rbStrStartWith(self, ...prefixes),
+};
+
+/**
+ * `String#+` (`vendor/ruby/v3.3.11/string.c:2259` `rb_str_plus`) with an
+ * ASCII-8BIT receiver. `rb_enc_check` (`encoding.c:1038`) admits a UTF-8
+ * operand only where one side is 7-bit, and the result takes the encoding of
+ * the side that is not.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#+`
+ * (`vendor/ruby/v3.3.11/string.c:2259`).
+ */
+export function rbStrPlus(str1: Uint8Array, str2: unknown): Uint8Array | string {
+  if (str2 instanceof Uint8Array) {
+    const str3 = new Uint8Array(str1.length + str2.length);
+    str3.set(str1);
+    str3.set(str2, str1.length);
+    return str3;
+  }
+  const text = stringValue(str2);
+  // eslint-disable-next-line no-control-regex -- `rb_enc_str_asciionly_p` (encoding.c:1038)
+  if (/^[\x00-\x7f]*$/.test(text)) return rbStrPlus(str1, new TextEncoder().encode(text));
+  if (str1.every((byte) => byte < 0x80)) return new TextDecoder().decode(str1) + text;
+  throw new EncodingError("incompatible character encodings: ASCII-8BIT and UTF-8");
+}
+
 const stringClasses = new WeakSet<object>();
 const RSTRING_PTR = Symbol("RSTRING_PTR");
 
@@ -249,6 +299,7 @@ function isTString(value: unknown): boolean {
 }
 
 function rbStrEql(str1: string, str2: unknown): boolean {
+  if (str2 instanceof Uint8Array) return rbEql(str1, str2);
   if (!isTString(str2)) return false;
   return str1 === String(str2);
 }
@@ -320,7 +371,28 @@ const JS_STRING_METHODS = new Set(Object.getOwnPropertyNames(String.prototype));
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbStrSend(str: string, method: string, ...args: unknown[]): [unknown, string] {
+export function rbStrSend(str: string, method: string, ...args: unknown[]): [unknown, string];
+/** @noRailsEquivalent PERMANENT — `rb_f_send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`). */
+export function rbStrSend(
+  str: Uint8Array,
+  method: string,
+  ...args: unknown[]
+): [unknown, Uint8Array];
+/** @noRailsEquivalent PERMANENT — `rb_f_send` (`vendor/ruby/v3.3.11/vm_eval.c:1330`). */
+export function rbStrSend(
+  str: string | Uint8Array,
+  method: string,
+  ...args: unknown[]
+): [unknown, string | Uint8Array] {
+  if (str instanceof Uint8Array) {
+    const binaryEntry = Object.hasOwn(BINARY_METHOD_TABLE, method)
+      ? BINARY_METHOD_TABLE[method]
+      : undefined;
+    if (!binaryEntry) {
+      throw new NoMethodError(`undefined method '${method}' for an instance of String`);
+    }
+    return [binaryEntry(str, ...args), str];
+  }
   const entry = STRING_METHOD_TABLE[method];
   if (entry) {
     const self = { string: str };

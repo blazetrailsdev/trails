@@ -115,7 +115,7 @@ describe("MessagePack::Packer", () => {
     pk.writeNil();
     pk.flush();
     expect(pk.toS()).toEqual(new Uint8Array(0));
-    expect(io.string()).toEqual("\xc0");
+    expect(io.string()).toEqual("\udcc0");
   });
 
   it("to_msgpack returns String", () => {

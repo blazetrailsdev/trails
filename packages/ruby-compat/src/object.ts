@@ -5,7 +5,7 @@ import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.js";
 import { rbPlus } from "./numeric.js";
-import { STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
+import { BINARY_METHOD_TABLE, STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
@@ -644,6 +644,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     return true;
   }
   if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
+  if (obj instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) return true;
   if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
   if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
   if (temporalMethod(obj, mid) !== undefined) return true;
@@ -1152,6 +1153,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   const bound = temporalMethod(recv, mid);
   if (bound !== undefined) return bound(recv, ...args);
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
+    return rbStrSend(recv, mid, ...args)[0];
+  }
+  if (recv instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
   }
   if (mid === "call" && rbObjIsProc(recv)) return recv(...args);

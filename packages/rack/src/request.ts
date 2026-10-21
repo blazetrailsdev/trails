@@ -523,7 +523,8 @@ export abstract class Helpers {
           this.setHeader(RACK_REQUEST_FORM_PAIRS, pairs);
           this.setHeader(RACK_REQUEST_FORM_HASH, this.expandParamPairs(pairs));
         } else {
-          let formVars: string = this.getHeader(RACK_INPUT).read();
+          const input: string | Uint8Array = this.getHeader(RACK_INPUT).read();
+          let formVars = typeof input === "string" ? input : new TextDecoder().decode(input);
 
           if (formVars.endsWith("\0")) formVars = formVars.slice(0, -1);
 

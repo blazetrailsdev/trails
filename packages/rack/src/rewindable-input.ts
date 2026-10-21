@@ -27,17 +27,19 @@ export class RewindableInput {
     this.unlinked = false;
   }
 
-  gets(): string | null {
+  gets(): string | Uint8Array | null {
     if (!this.rewindableIo) this.makeRewindable();
     return this.rewindableIo!.gets();
   }
 
-  read(...args: [] | [number | null] | [number | null, Uint8Array | null]): string | null {
+  read(
+    ...args: [] | [number | null] | [number | null, Uint8Array | null]
+  ): string | Uint8Array | null {
     if (!this.rewindableIo) this.makeRewindable();
     return this.rewindableIo!.read(...(args as [number | null, Uint8Array | null]));
   }
 
-  each(block: (line: string) => void): Tempfile {
+  each(block: (line: string | Uint8Array) => void): Tempfile {
     if (!this.rewindableIo) this.makeRewindable();
     return this.rewindableIo!.each(block);
   }

@@ -420,7 +420,7 @@ export class ExceptionWrapper {
     const fullPath = new Pathname(TopLevel.Trails!.root()!).join(path).toString();
     if (File.isExist(fullPath)) {
       return File.open(fullPath, "r", (file) =>
-        this.extractSourceFragmentLines(file.eachLine(), line),
+        this.extractSourceFragmentLines(file.eachLine() as Generator<string>, line),
       );
     }
     return null;

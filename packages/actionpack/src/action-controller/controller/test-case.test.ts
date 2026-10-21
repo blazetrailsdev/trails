@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { forceEncoding, registerConstant } from "@blazetrails/ruby-compat";
 import { htmlSafe } from "@blazetrails/activesupport";
 import {
   assert,
@@ -85,7 +85,7 @@ class TestController extends Base {
 
   async renderRawPost() {
     if (isBlank(this.request.rawPost)) throw new Assertion("#raw_post is blank");
-    await this.render({ plain: this.request.rawPost });
+    await this.render({ plain: forceEncoding(this.request.rawPost, "UTF-8") as string });
   }
 
   async renderBody() {

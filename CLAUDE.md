@@ -1246,6 +1246,19 @@ only. A Rails body that branches on a String's encoding ports the UTF-8 arm,
 and a test asserting `str.encoding` is permanently unportable for that
 assertion.
 
+**An ASCII-8BIT String is a `Uint8Array`, end to end.** `String#b`,
+`IO#read` and `StringIO#read`'s length arm, a binmode or binary-tagged
+stream's whole read, `IO.binread`, `Marshal.dump`, `Zlib::Deflate.deflate` and
+a binary-directive `Array#pack` answer one, and `bytesize` is its `length`. An encoding-aware `bytesize` over a one-character-per-byte string
+was rejected: without a tag, `"\xD0\xCF".b` and the UTF-8 text `"ÐÏ"` are the
+same JS string, so any rule telling them apart is a guess, and the guess
+answers 4 for `"café".bytesize` where Ruby answers 5. A call site that reads a
+`.b` result as a JS string (interpolation, `===`, a regex) converges at that
+site, as Ruby keeps binary and text apart there too. A JS regex cannot match
+bytes, so where Ruby scans a binary String with one (`Multipart::Parser`,
+`Migration.copy`'s `sub!`), the bytes are read one character per byte for the
+scan and written back as bytes. Ruled by the repo owner on 2026-10-21.
+
 ## Runtime facts Node does not expose
 
 Each of these is a Ruby or C-library fact with no Node source. They are

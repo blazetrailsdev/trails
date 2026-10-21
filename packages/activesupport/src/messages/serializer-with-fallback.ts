@@ -5,6 +5,8 @@ import {
   fetch,
   Marshal,
   RuntimeError,
+  rbRegMatchP,
+  rbStrStartWith,
 } from "@blazetrails/ruby-compat";
 
 import { Notifications } from "../notifications.js";
@@ -39,17 +41,17 @@ export class Thrown extends Error {
 export interface Serializer {
   key: Format;
   format(): Format;
-  dump(object: unknown): string;
-  _load(dumped: string): unknown;
-  dumped(dumped: string): boolean;
-  load(dumped: string): unknown;
+  dump(object: unknown): string | Uint8Array;
+  _load(dumped: string | Uint8Array): unknown;
+  dumped(dumped: string | Uint8Array): boolean;
+  load(dumped: string | Uint8Array): unknown;
   /** @internal */
-  detectFormat(dumped: string): Format | undefined;
+  detectFormat(dumped: string | Uint8Array): Format | undefined;
   /** @internal */
   fallback(format: Format): boolean;
 }
 
-function load(this: Serializer, dumped: string): unknown {
+function load(this: Serializer, dumped: string | Uint8Array): unknown {
   const format = this.detectFormat(dumped);
 
   if (format === this.format()) {
@@ -71,7 +73,7 @@ function load(this: Serializer, dumped: string): unknown {
 }
 
 /** @internal */
-function detectFormat(dumped: string): Format | undefined {
+function detectFormat(dumped: string | Uint8Array): Format | undefined {
   if (messagePackWithFallback.dumped(dumped)) {
     return "message_pack";
   } else if (marshalWithFallback.dumped(dumped)) {
@@ -102,16 +104,16 @@ const marshalWithFallback: Serializer = {
     return "marshal";
   },
 
-  dump(object: unknown): string {
+  dump(object: unknown): Uint8Array {
     return Marshal.dump(object);
   },
 
-  _load(dumped: string): unknown {
+  _load(dumped: string | Uint8Array): unknown {
     return Marshal.load(dumped);
   },
 
-  dumped(dumped: string): boolean {
-    return dumped.startsWith(MARSHAL_SIGNATURE);
+  dumped(dumped: string | Uint8Array): boolean {
+    return rbStrStartWith(dumped, MARSHAL_SIGNATURE);
   },
 };
 
@@ -125,18 +127,18 @@ const jsonWithFallback: Serializer = {
   },
 
   dump(object: unknown): string {
-    return Buffer.from(ActiveSupportJSON.encode(object), "utf8").toString("latin1");
+    return ActiveSupportJSON.encode(object);
   },
 
-  _load(dumped: string): unknown {
-    return ActiveSupportJSON.decode(Buffer.from(dumped, "latin1").toString("utf8"));
+  _load(dumped: string | Uint8Array): unknown {
+    return ActiveSupportJSON.decode(dumped);
   },
 
-  dumped(dumped: string): boolean {
-    return JSON_START_WITH.test(dumped);
+  dumped(dumped: string | Uint8Array): boolean {
+    return rbRegMatchP(JSON_START_WITH, dumped);
   },
 
-  detectFormat(dumped: string): Format | undefined {
+  detectFormat(dumped: string | Uint8Array): Format | undefined {
     return detectFormat(dumped) ?? "json";
   },
 };
@@ -154,16 +156,16 @@ const messagePackWithFallback: Serializer = {
     return "message_pack";
   },
 
-  dump(object: unknown): string {
-    return Buffer.from(ActiveSupport.MessagePack!.dump(object)).toString("latin1");
+  dump(object: unknown): Uint8Array {
+    return ActiveSupport.MessagePack!.dump(object);
   },
 
-  _load(dumped: string): unknown {
-    return ActiveSupport.MessagePack!.load(Buffer.from(dumped, "latin1"));
+  _load(dumped: string | Uint8Array): unknown {
+    return ActiveSupport.MessagePack!.load(dumped);
   },
 
-  dumped(dumped: string): boolean {
-    return isAvailable() && ActiveSupport.MessagePack!.isSignature(Buffer.from(dumped, "latin1"));
+  dumped(dumped: string | Uint8Array): boolean {
+    return isAvailable() && ActiveSupport.MessagePack!.isSignature(dumped);
   },
 };
 

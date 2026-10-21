@@ -101,7 +101,7 @@ describe("Pathname#open", () => {
           "rb",
           block((f: File) => f.read()),
         ),
-      ).toBe("\xff\xd8\xff");
+      ).toEqual(Uint8Array.of(0xff, 0xd8, 0xff));
       const text = join(dir, "text");
       writeFileSync(text, "hello");
       expect(new Pathname(text).open(block((f: File) => f.read()))).toBe("hello");

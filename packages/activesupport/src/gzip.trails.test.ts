@@ -1,3 +1,4 @@
+import { b } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Stream } from "./gzip.js";
 
@@ -8,8 +9,8 @@ describe("GzipTest", () => {
     stream.write("world");
     stream.rewind();
 
-    expect(stream.read()).toBe("hello world");
-    expect(stream.string()).toBe("hello world");
+    expect(stream.read()).toEqual(b("hello world"));
+    expect(stream.string()).toEqual(b("hello world"));
   });
 
   it("stream close rewinds instead of closing", () => {
@@ -18,6 +19,6 @@ describe("GzipTest", () => {
     stream.close();
 
     expect(stream.closed).toBe(false);
-    expect(stream.read()).toBe("compress me!");
+    expect(stream.read()).toEqual(b("compress me!"));
   });
 });

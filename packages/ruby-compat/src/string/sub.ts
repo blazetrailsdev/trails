@@ -1,4 +1,5 @@
 import { MatchData } from "../match-data.js";
+import { b } from "./b.js";
 import { rbObjAsString } from "../object.js";
 import {
   blockArg,
@@ -313,11 +314,18 @@ export function rbStrRpartition(str: string, sep: unknown): [string, string, str
 /**
  * `String#start_with?` (`vendor/ruby/v3.3.11/string.c:10651` `rb_str_start_with`); a
  * Regexp prefix must match at the start (`rb_reg_start_with_p`,
- * `vendor/ruby/v3.3.11/re.c:1818`).
+ * `vendor/ruby/v3.3.11/re.c:1818`). An ASCII-8BIT receiver, a `Uint8Array`,
+ * compares its bytes with the prefix's.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbStrStartWith(str: string, ...prefixes: unknown[]): boolean {
+export function rbStrStartWith(str: string | Uint8Array, ...prefixes: unknown[]): boolean {
+  if (str instanceof Uint8Array) {
+    return prefixes.some((prefix) => {
+      const p = prefix instanceof Uint8Array ? prefix : b(stringValue(prefix));
+      return p.length <= str.length && p.every((byte, i) => byte === str[i]);
+    });
+  }
   for (const prefix of prefixes) {
     if (prefix instanceof RegExp) {
       const sticky = rbRegexp(prefix, "y");

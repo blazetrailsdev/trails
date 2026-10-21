@@ -1,4 +1,4 @@
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { File, FileUtils, rbEqual } from "@blazetrails/ruby-compat";
 import { migrationExists } from "../migration-lookup.js";
 
 export interface CreateMigrationHost {
@@ -58,7 +58,7 @@ export class CreateMigration {
   async identical(): Promise<boolean> {
     const existing = this.existingMigration();
     if (!existing) return false;
-    return File.binread(existing) === (await this.render());
+    return rbEqual(File.binread(existing), await this.render());
   }
 
   relativeExistingMigration(): string {

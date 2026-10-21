@@ -7,21 +7,14 @@ import { bytes } from "./bytes.js";
  * receiver itself untouched, which is the whole difference from
  * {@link forceEncoding}'s in-place `rb_str_force_encoding`.
  *
- * A JS string carries no encoding tag, so an ASCII-8BIT String is spelled here
- * as one character per byte with every code unit below `0x100` — the
- * convention `IO#write` (`io.ts`) and {@link forceEncoding} already read. The
- * receiver's bytes are therefore its UTF-8 bytes, trails' external encoding,
- * and a receiver that is already in byte form is 7-bit ASCII in every call
- * site Rails makes, where the transcoding is the identity. An invalid byte
- * carried as a lone surrogate (`bytes.ts`) answers that byte. A `Uint8Array`
- * receiver is a String held as its bytes, and answers them in byte form.
+ * An ASCII-8BIT String is a `Uint8Array` (CLAUDE.md, "A String has no
+ * encoding tag either"), so the copy is the receiver's bytes: a JS string's
+ * UTF-8 bytes, trails' external encoding, with an invalid byte carried as a
+ * lone surrogate (`bytes.ts`) answering that byte, and a `Uint8Array`'s own.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#b`
  * (`vendor/ruby/v3.3.11/string.c:10955` `rb_str_b`).
  */
-export function b(str: string | Uint8Array): string {
-  let str2 = "";
-  for (const byte of str instanceof Uint8Array ? str : bytes(String(str)))
-    str2 += String.fromCharCode(byte);
-  return str2;
+export function b(str: string | Uint8Array): Uint8Array {
+  return Uint8Array.from(str instanceof Uint8Array ? str : bytes(String(str)));
 }

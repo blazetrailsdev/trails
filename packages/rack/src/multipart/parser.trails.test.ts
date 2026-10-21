@@ -40,7 +40,9 @@ describe("Rack::Multipart::Parser encodings", () => {
 
     const file = parseBody(body, Parser.TEMPFILE_FACTORY).params!["file"];
     file.tempfile.close();
-    expect(File.binread(file.tempfile.path())).toBe(bytes);
+    expect(File.binread(file.tempfile.path())).toEqual(
+      Uint8Array.from(bytes, (c) => c.charCodeAt(0)),
+    );
   });
 
   it("decodes a text part's bytes under its charset", () => {
@@ -101,7 +103,7 @@ describe("Parser#tag_multipart_encoding", () => {
     const input = `--AaB03x\r\nContent-Disposition: form-data; name="${nameBytes}"\r\n\r\nvalue\r\n--AaB03x--\r\n`;
     const env = MockRequest.envFor("/", {
       ":method": "POST",
-      ":input": input,
+      ":input": Buffer.from(input, "latin1"),
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
     });
     expect(new Request(env).POST).toEqual({ Iñtërnâtiônàlizætiøn: "value" });

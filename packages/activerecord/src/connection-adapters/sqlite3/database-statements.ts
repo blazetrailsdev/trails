@@ -1,6 +1,6 @@
 import * as Arel from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { b, first, StandardError } from "@blazetrails/ruby-compat";
+import { b, first, rbRegMatchP, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
@@ -19,7 +19,7 @@ export function isWriteQuery(sql: string | null): boolean {
     return !READ_QUERY.test(sql as string);
   } catch (error) {
     if (!(error instanceof ArgumentError)) throw error;
-    return !READ_QUERY.test(b(sql as string));
+    return !rbRegMatchP(READ_QUERY, b(sql as string));
   }
 }
 

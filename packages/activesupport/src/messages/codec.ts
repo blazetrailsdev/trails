@@ -1,4 +1,4 @@
-import type { Bytes } from "@blazetrails/ruby-compat";
+import { b, type Bytes } from "@blazetrails/ruby-compat";
 import { Metadata } from "./metadata.js";
 import {
   ArgumentError,
@@ -10,7 +10,7 @@ import {
 /** @noRailsEquivalent PERMANENT */
 export interface MessageSerializer {
   dump(value: unknown): unknown;
-  load(dumped: string): unknown;
+  load(dumped: string | Uint8Array): unknown;
 }
 
 export interface CodecOptions {
@@ -44,16 +44,16 @@ export class Codec extends Metadata {
     data: string | Bytes,
     { urlSafe = this.urlSafe }: { urlSafe?: boolean } = {},
   ): string {
-    const buf = typeof data === "string" ? Buffer.from(data, "latin1") : data;
+    const buf = Buffer.from(typeof data === "string" ? b(data) : data);
     return urlSafe ? buf.toString("base64url") : buf.toString("base64");
   }
 
   protected override decode(
-    encoded: string,
+    encoded: string | Uint8Array,
     { urlSafe = this.urlSafe }: { urlSafe?: boolean } = {},
   ): Buffer {
     try {
-      let str = encoded;
+      let str = typeof encoded === "string" ? encoded : new TextDecoder().decode(encoded);
       if (urlSafe && !str.endsWith("=") && str.length % 4 !== 0) {
         str = str.padEnd((str.length + 3) & ~3, "=");
       }
@@ -72,7 +72,7 @@ export class Codec extends Metadata {
     return this.serializer.dump(data);
   }
 
-  protected override deserialize(serialized: string): unknown {
+  protected override deserialize(serialized: string | Uint8Array): unknown {
     try {
       return this.serializer.load(serialized);
     } catch (error) {

@@ -16,12 +16,14 @@ import { BadRequest } from "../../action-controller/metal/exceptions.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
 
-export type ParameterParser = (rawPost: string) => Record<string, unknown> | Hash<string, unknown>;
+export type ParameterParser = (
+  rawPost: string | Uint8Array,
+) => Record<string, unknown> | Hash<string, unknown>;
 
 export type ParameterParsers = Record<string, ParameterParser>;
 
 export const DEFAULT_PARSERS: ParameterParsers = {
-  [Mime.get(":json")!.symbol!]: (rawPost: string) => {
+  [Mime.get(":json")!.symbol!]: (rawPost: string | Uint8Array) => {
     const data = ActiveSupportJSON.decode(rawPost);
     if (data !== null && typeof data === "object" && !Array.isArray(data)) {
       return data as Record<string, unknown>;
@@ -46,7 +48,7 @@ export interface ParametersHost {
   requestParameters: Record<string, unknown>;
   contentLength: number;
   contentMimeType: MimeType | null;
-  rawPost: string;
+  rawPost: string | Uint8Array;
   logger?: { debug(message: string): void } | null;
 }
 

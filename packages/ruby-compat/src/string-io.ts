@@ -1,6 +1,8 @@
 import { Encoding } from "./encoding.js";
 import { EOFError } from "./eof-error.js";
 import { print as ioPrint, puts as ioPuts } from "./io.js";
+import { b } from "./string/b.js";
+import { strNew } from "./string/bytes.js";
 import { rbStrEnumerateLines } from "./string/each.js";
 
 /**
@@ -9,32 +11,36 @@ import { rbStrEnumerateLines } from "./string/each.js";
  * and `Rack::MockRequest` hand to their callers. Only the members Ruby code in
  * this repo sends are ported.
  *
- * The buffer is a Ruby binary String — one character per byte — which is what
- * `Base64.decode64` returns (`xml_mini.rb:180-181`) and what a request body
- * already is, so `size`, `read`'s length and `write`'s return value count bytes
- * exactly as Ruby's do. A caller holding text encodes it before writing, as
- * Ruby does.
+ * The buffer holds bytes, so `size`, `read`'s length and `write`'s return
+ * value count bytes exactly as Ruby's do. A StringIO opened on an ASCII-8BIT
+ * String, a `Uint8Array`, answers its whole-buffer reads as one, and every
+ * other answers them as the UTF-8 text the bytes spell; `read`'s length arm
+ * answers a `Uint8Array` whatever the buffer, as `strio_read`
+ * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1539`) tags it ASCII-8BIT.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `StringIO`
  * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1432`) ships with the interpreter, so
  * no Rails file defines it and no port can remove the need for it while
  * `_parse_file` and `Rack::MockRequest` hand callers an IO.
  */
-export class StringIO {
-  private _string: string;
+export class StringIO<S extends string | Uint8Array = string> {
+  private _string: Uint8Array;
+  private _binary: boolean;
   private _pos = 0;
   private _closed = false;
   /** `ptr->enc` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1823`). */
   private enc: Encoding | null = null;
 
-  constructor(string: string | Uint8Array = "") {
-    this._string = "";
+  constructor(string: S = "" as S) {
+    this._string = new Uint8Array(0);
+    this._binary = string instanceof Uint8Array;
     this.write(string);
     this._pos = 0;
   }
 
-  string(): string {
-    return this._string;
+  string(): S {
+    const bytes = this._string.slice();
+    return (this._binary ? bytes : strNew(Array.from(bytes))) as S;
   }
 
   size(): number {
@@ -53,37 +59,35 @@ export class StringIO {
    * truncates. That deviation is recorded once there; this is the same fact
    * about the same buffer.
    */
-  read(): string;
-  read(length: number, str?: Uint8Array | null): string | null;
-  read(length?: number, str?: Uint8Array | null): string | null {
+  read(): S;
+  read(length: number, str?: Uint8Array | null): Uint8Array | null;
+  read(length?: number, str?: Uint8Array | null): S | Uint8Array | null {
     if (length == null) {
       const rest = this._string.slice(this._pos);
       this._pos = this._string.length;
-      return rest;
+      return (this._binary ? rest : strNew(Array.from(rest))) as S;
     }
     if (this.isEof()) {
       if (str) str.fill(0);
-      return length === 0 ? "" : null;
+      return length === 0 ? new Uint8Array(0) : null;
     }
     const chunk = this._string.slice(this._pos, this._pos + length);
     this._pos += chunk.length;
-    if (str)
-      for (let i = 0; i < Math.min(chunk.length, str.length); i++) str[i] = chunk.charCodeAt(i);
+    if (str) str.set(chunk.subarray(0, str.length));
     return chunk;
   }
 
   write(string: string | Uint8Array): number {
-    if (typeof string !== "string") {
-      let chars = "";
-      for (let i = 0; i < string.length; i += 0x8000) {
-        chars += String.fromCharCode(...string.subarray(i, i + 0x8000));
-      }
-      string = chars;
+    const bytes = typeof string === "string" ? b(string) : string;
+    const end = this._pos + bytes.length;
+    if (end > this._string.length) {
+      const grown = new Uint8Array(end);
+      grown.set(this._string);
+      this._string = grown;
     }
-    this._string =
-      this._string.slice(0, this._pos) + string + this._string.slice(this._pos + string.length);
-    this._pos += string.length;
-    return string.length;
+    this._string.set(bytes, this._pos);
+    this._pos = end;
+    return bytes.length;
   }
 
   /**
@@ -143,15 +147,15 @@ export class StringIO {
   /**
    * `strio_binmode` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1863`) — it records
    * ASCII-8BIT on the stream and, when the StringIO is writable, associates it
-   * with the buffer String, then answers the StringIO. The buffer already IS a
-   * Ruby binary String (see the class comment), so the association is the
-   * identity here, exactly as it is in {@link setEncoding}.
+   * with the buffer String, then answers the StringIO, whose whole-buffer reads
+   * then answer a `Uint8Array` (see the class comment).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#binmode`
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1879`).
    */
   binmode(): this {
     this.enc = Encoding.ASCII_8BIT;
+    this._binary = true;
     return this;
   }
 
@@ -162,9 +166,8 @@ export class StringIO {
    * (`stringio.c:1823-1826`); it answers the StringIO. `int_enc` and `opt` are
    * ignored by MRI itself (`stringio.c:1796-1797`), so neither is ported.
    *
-   * The buffer already IS a Ruby binary String — one character per byte, see
-   * the class comment — so the association `rb_enc_associate` performs is the
-   * identity here, and the recorded encoding is what
+   * Associated with `BINARY`, the buffer's whole-buffer reads answer a
+   * `Uint8Array` (see the class comment), and the recorded encoding is what
    * `Rack::Test::Utils.build_file_part`'s `set_encoding(Encoding::BINARY)`
    * (`vendor/rack-test/v2.2.0/lib/rack/test/utils.rb:148`) is asking for.
    *
@@ -181,6 +184,7 @@ export class StringIO {
    */
   setEncoding(extEnc: Encoding | string): this {
     this.enc = Encoding.find(extEnc) ?? Encoding.BINARY;
+    this._binary = this.enc === Encoding.BINARY;
     return this;
   }
 
@@ -196,7 +200,7 @@ export class StringIO {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#readpartial`
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1949`).
    */
-  readpartial(maxlen: number, outbuf?: Uint8Array | null): string {
+  readpartial(maxlen: number, outbuf?: Uint8Array | null): Uint8Array {
     const ret = this.read(maxlen, outbuf);
     if (ret === null) throw new EOFError("end of file reached");
     return ret;
@@ -210,9 +214,9 @@ export class StringIO {
    */
   gets(): string | null {
     if (this.isEof()) return null;
-    const newline = this._string.indexOf("\n", this._pos);
+    const newline = this._string.indexOf(0x0a, this._pos);
     const end = newline === -1 ? this._string.length : newline + 1;
-    const line = this._string.slice(this._pos, end);
+    const line = strNew(Array.from(this._string.subarray(this._pos, end)));
     this._pos = end;
     return line;
   }
@@ -224,7 +228,9 @@ export class StringIO {
    * @noRailsEquivalent PERMANENT
    */
   each(block: (line: string) => void): this {
-    for (const line of rbStrEnumerateLines(this.read(), [])) block(line);
+    const rest = this._string.subarray(this._pos);
+    this._pos = this._string.length;
+    for (const line of rbStrEnumerateLines(strNew(Array.from(rest)), [])) block(line);
     return this;
   }
 

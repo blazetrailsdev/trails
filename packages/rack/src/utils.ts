@@ -24,6 +24,7 @@ import {
   rbInspect,
   stringToSym,
   symbolToS,
+  b as rbB,
 } from "@blazetrails/ruby-compat";
 
 export { ArgumentError };
@@ -427,11 +428,13 @@ export function getByteRanges(
   return ranges;
 }
 
-export function secureCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+export function secureCompare(a: string | Uint8Array, b: string | Uint8Array): boolean {
+  const l = rbB(a);
+  const r = rbB(b);
+  if (l.length !== r.length) return false;
   let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < l.length; i++) {
+    result |= l[i] ^ r[i];
   }
   return result === 0;
 }
