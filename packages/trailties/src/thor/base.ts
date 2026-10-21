@@ -188,8 +188,8 @@ export interface BaseClass {
   commandScopeMember(name: string, options?: { for?: string }): unknown;
 }
 
-ThorBase.attrReader("options", "parentOptions", "args");
-ThorBase.attrWriter("options", "parentOptions", "args");
+rbModAttrReader({ prototype: ThorBase }, "options", "parentOptions", "args");
+rbModAttrWriter({ prototype: ThorBase }, "options", "parentOptions", "args");
 
 function subclasses(this: object): BaseClass[] {
   return ((this as { _subclasses?: BaseClass[] })._subclasses ||= []);
@@ -746,4 +746,12 @@ export function fromSuperclass(
   include(base as { prototype: object }, Shell);
 };
 
-export const Base = Object.assign(ThorBase, { ClassMethods, subclasses, registerKlassFile });
+export const Base = Object.defineProperties(ThorBase, {
+  ClassMethods: { value: ClassMethods },
+  subclasses: { value: subclasses },
+  registerKlassFile: { value: registerKlassFile },
+}) as typeof ThorBase & {
+  ClassMethods: typeof ClassMethods;
+  subclasses: typeof subclasses;
+  registerKlassFile: typeof registerKlassFile;
+};

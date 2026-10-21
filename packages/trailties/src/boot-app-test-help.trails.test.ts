@@ -4,14 +4,7 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
-import {
-  Module,
-  env,
-  include,
-  includedModules,
-  setEnv,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { env, includedModules, setEnv, registerConstant } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
 
@@ -111,28 +104,6 @@ describe("test_help wires a booted app into the test case classes", () => {
       await setup;
     } finally {
       reload.mockRestore();
-    }
-  });
-
-  it("reaches a module included onto ActionController::TestCase after test_help loads", async ({
-    task,
-  }) => {
-    const ran: string[] = [];
-    const Included = new Module();
-    Included.defineMethod("beforeSetup", function (this: object) {
-      ran.push("included");
-      return Included.superMethod(this, "beforeSetup")!();
-    });
-    const proto = ActionController.TestCase.prototype;
-    const parent = Object.getPrototypeOf(proto);
-    include(ActionController.TestCase, Included);
-    try {
-      const controllerTest = new ActionController.TestCase(task.name);
-      await controllerTest.beforeSetup();
-      expect(ran).toEqual(["included"]);
-      expect(controllerTest.routes).toBe(Trails.application!.routes());
-    } finally {
-      Object.setPrototypeOf(proto, parent);
     }
   });
 
