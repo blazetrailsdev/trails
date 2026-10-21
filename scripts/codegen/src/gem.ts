@@ -77,7 +77,7 @@ export const ORACLE_PATH = path.join(
 export const SYNTH_SEATS = path.join(GEN_DIR, "namespaces.synth.ts");
 function seatsFile(): string {
   const hand = path.join(PKG_DIR, "src/namespaces.ts");
-  return existsSync(hand) ? hand : SYNTH_SEATS;
+  return GEM.hand !== false && existsSync(hand) ? hand : SYNTH_SEATS;
 }
 
 let seatFqnsMemo: Map<string, string> | undefined;

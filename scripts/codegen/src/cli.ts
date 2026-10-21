@@ -353,7 +353,7 @@ index.finish((f) => resolver.tsFileOf(f));
 // files (marcel's `Marcel`, in marcel.rb and tables.rb) is seated on a
 // namespace object here instead (CLAUDE.md, "Call-time constant resolution").
 rmSync(SYNTH_SEATS, { force: true });
-if (!existsSync(path.join(PKG_DIR, "src/namespaces.ts"))) {
+if (GEM.hand === false || !existsSync(path.join(PKG_DIR, "src/namespaces.ts"))) {
   const mods = [...index.scopes.values()]
     .filter((s) => s.kind === "module" && s.files.size > 1 && !s.fqn.includes("::"))
     .map((s) => s.fqn)
@@ -463,9 +463,8 @@ for (const [ts, texts] of byTs) {
     p,
     texts
       .join("\n")
-      // eslint-disable-next-line no-control-regex
       .replace(
-        /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g,
+        /[^\t\n\r\x20-\x7E\xA0-\uFFFF]/g,
         (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
       ),
   );
@@ -484,7 +483,9 @@ writeFileSync(path.join(outDir, "codegen-declined.ts"), DECLINED_SHIM);
 // resolution") have no Ruby file; generated files import the gem namespace from it.
 {
   const seats = path.join(PKG_DIR, "src/namespaces.ts");
-  const from = existsSync(seats) ? seats : SYNTH_SEATS;
+  // A gem with no hand port (marcel) has only generated files in src/: its own
+  // earlier output, never a seat file to start from.
+  const from = GEM.hand !== false && existsSync(seats) ? seats : SYNTH_SEATS;
   if (existsSync(from))
     writeFileSync(path.join(outDir, "namespaces.ts"), readFileSync(from, "utf8"));
 }
