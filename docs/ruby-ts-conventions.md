@@ -204,8 +204,8 @@ parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
-- `OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its raw String (buffers.rb:27), and `Handlers::ERB#valid_encoding` (template/handlers/erb.rb:95-105) forces and checks a source's encoding. Each reads or rewrites a String's encoding tag, which a JS string does not have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.
-  - `encoding`, `encode!`, `force_encoding`, `valid_encoding` (only in: `buffers.rb`, `template/handlers/erb.rb`)
+- `OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its raw String (buffers.rb:27). Each reads or rewrites a String's encoding tag, which a JS string does not have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.
+  - `encoding`, `encode!`, `force_encoding` (only in: `buffers.rb`)
 - `Template#offset` and `#locals_code` (template.rb:541-576) build the `module_eval` line offset and the Ruby locals binding of `compiled_source`, which `virtualizeTse` writes as TypeScript at build time; `#find_node_by_id` (template.rb:405-415) walks the Prism tree `spot` parses, and `spot` is line-based (CLAUDE.md § "Templates are precompiled"). PERMANENT.
   - `offset`, `locals_code`, `find_node_by_id` (only in: `template.rb`)
 - `Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs Thorfiles) is not ported, and these `Thor::Util` members exist only for it: `namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside `Thor::Sandbox` (util.rb:58-70, :153-166), and `user_home`, `thor_root`, `thor_root_glob` and `globs_for` (util.rb:168-216) locate the Thorfiles installed under `~/.thor`. railties never reaches them. Scoped to thor's util.rb.

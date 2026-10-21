@@ -55,7 +55,7 @@ export class PathSet implements Iterable<PathSetResolver> {
   }
 
   each(block: (resolver: PathSetResolver) => void): ReadonlyArray<PathSetResolver> {
-    for (const resolver of this.paths) block(resolver);
+    this.paths.forEach(block);
     return this.paths;
   }
 

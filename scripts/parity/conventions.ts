@@ -690,12 +690,11 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
       "`OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its " +
-      "raw String (buffers.rb:27), and `Handlers::ERB#valid_encoding` " +
-      "(template/handlers/erb.rb:95-105) forces and checks a source's encoding. " +
+      "raw String (buffers.rb:27). " +
       "Each reads or rewrites a String's encoding tag, which a JS string does not " +
       'have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.',
-    names: ["encoding", "encode!", "force_encoding", "valid_encoding"],
-    rubyFiles: ["buffers.rb", "template/handlers/erb.rb"],
+    names: ["encoding", "encode!", "force_encoding"],
+    rubyFiles: ["buffers.rb"],
     packages: ["actionview"],
   },
   {
