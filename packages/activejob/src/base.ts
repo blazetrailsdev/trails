@@ -7,13 +7,16 @@ import {
   rbObjClass,
   SecureRandom,
 } from "@blazetrails/ruby-compat";
+import { Callbacks } from "./callbacks.js";
 import { ClassMethods, Core } from "./core.js";
+import { ClassMethods as EnqueuingClassMethods } from "./enqueuing.js";
+import { ClassMethods as ExecutionClassMethods, Execution } from "./execution.js";
 import { ActiveJob } from "./namespaces.js";
 import { ClassMethods as QueueNameClassMethods, QueueName } from "./queue-name.js";
 import { ClassMethods as QueuePriorityClassMethods, QueuePriority } from "./queue-priority.js";
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-export interface Base extends Core {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Base extends Core, Execution {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
@@ -33,6 +36,10 @@ export class Base {
   declare static defaultPriority: unknown;
   declare static queueWithPriority: typeof QueuePriorityClassMethods.queueWithPriority;
   declare static priority: unknown;
+  declare static jobOrInstantiate: typeof EnqueuingClassMethods.jobOrInstantiate;
+  declare static performNow: typeof ExecutionClassMethods.performNow;
+  declare static execute: typeof ExecutionClassMethods.execute;
+  declare static rescueFrom: (...args: unknown[]) => void;
 
   /**
    * @inventedArm if — PERMANENT
@@ -63,6 +70,9 @@ include(Base, Core);
 include(Base, QueueName);
 include(Base, QueuePriority);
 extend(Base, ClassMethods);
+extend(Base, EnqueuingClassMethods);
+include(Base, Execution);
+include(Base, Callbacks);
 rbModConstSet(ActiveJob, "Base", Base);
 
 runLoadHooks("active_job", Base);

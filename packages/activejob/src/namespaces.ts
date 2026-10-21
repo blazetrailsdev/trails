@@ -8,6 +8,8 @@ import type { DurationSerializer } from "./serializers/duration-serializer.js";
 import type { ModuleSerializer } from "./serializers/module-serializer.js";
 import type { RangeSerializer } from "./serializers/range-serializer.js";
 import type { SymbolSerializer } from "./serializers/symbol-serializer.js";
+import type { Callbacks } from "./callbacks.js";
+import type { Execution } from "./execution.js";
 import type { QueueName } from "./queue-name.js";
 import type { QueuePriority } from "./queue-priority.js";
 import type { ObjectSerializer } from "./serializers/object-serializer.js";
@@ -41,6 +43,8 @@ export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
   SerializationError: typeof ArgumentsModule.SerializationError;
   QueueAdapters: typeof QueueAdapters;
   QueueName: typeof QueueName;
+  Callbacks: typeof Callbacks;
+  Execution: typeof Execution;
   QueuePriority: typeof QueuePriority;
   Serializers: typeof Serializers;
 };
