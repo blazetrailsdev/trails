@@ -42,8 +42,13 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   }
   if (cmd === "build") {
     try {
-      const { count } = await buildViews(opts);
+      const { count, skipped } = await buildViews(opts);
       process.stdout.write(`trails-tsc-views: built ${count} view${count === 1 ? "" : "s"}\n`);
+      for (const file of skipped) {
+        process.stderr.write(
+          `trails-tsc-views: skipped ${file} — no registered template handler for its extension\n`,
+        );
+      }
       return 0;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

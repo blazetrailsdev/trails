@@ -30,6 +30,7 @@ export interface BuildViewsOptions {
 export interface BuildViewsResult {
   count: number;
   files: readonly string[];
+  skipped: readonly string[];
 }
 
 export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildViewsResult> {
@@ -40,7 +41,10 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const { Base, PathParser, TemplateHandlers, TseHandler, UnboundTemplate, WrongEncodingError } =
     await import("@blazetrails/actionview");
   const pathParser = new PathParser();
-  const files = await walkTemplates(viewsDir, TemplateHandlers.templateHandlerExtensions());
+  const { files, skipped } = await walkTemplates(
+    viewsDir,
+    TemplateHandlers.templateHandlerExtensions(),
+  );
   if (!opts.inPlace) await clearOutViews(cwd, outDir, outViews);
   const registryMap = new Map<string, string[]>();
   const appDir = path.dirname(viewsDir);
@@ -60,8 +64,9 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
     if (!(template.handler instanceof TseHandler)) {
       const code = template.handler.call(template, source);
       if (/\p{Surrogate}/u.test(code)) throw new WrongEncodingError(code, Encoding.defaultInternal);
-      handled.push({ rel, src: source, outBase });
-      await writeHandlerShim(handled[handled.length - 1], code, viewsDir);
+      const shim = { rel, src: source, outBase };
+      handled.push(shim);
+      await writeHandlerShim(shim, code, viewsDir);
       continue;
     }
     const src = template.handler.stripTrailingNewlines ? chomp(source) : source;
@@ -120,14 +125,14 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
         await fs.rm(view.outBase + ext, { force: true });
       }
     }
-    return { count: files.length, files };
+    return { count: files.length, files, skipped };
   }
   await fs.mkdir(outDir, { recursive: true });
   await fs.writeFile(
     path.join(outDir, "template-registry-augmentation.d.ts"),
     emitRegistryAugmentation(registryEntries),
   );
-  return { count: files.length, files };
+  return { count: files.length, files, skipped };
 }
 
 async function clearOutViews(cwd: string, outDir: string, outViews: string): Promise<void> {
@@ -164,21 +169,25 @@ async function deepestExisting(p: string): Promise<string> {
   return cur;
 }
 
-async function walkTemplates(dir: string, extensions: readonly string[]): Promise<string[]> {
-  if (!(await exists(dir))) return [];
-  const out: string[] = [];
+async function walkTemplates(
+  dir: string,
+  extensions: readonly string[],
+): Promise<{ files: string[]; skipped: string[] }> {
+  if (!(await exists(dir))) return { files: [], skipped: [] };
+  const files: string[] = [];
+  const skipped: string[] = [];
   const entries = await fs.readdir(dir, { recursive: true, withFileTypes: true });
   for (const e of entries) {
-    const dot = e.name.lastIndexOf(".");
-    if (!e.isFile() || dot === -1 || !extensions.includes(e.name.slice(dot + 1))) continue;
+    if (!e.isFile()) continue;
     const parent =
       (e as Dirent & { parentPath?: string }).parentPath ??
       (e as Dirent & { path?: string }).path ??
       dir;
-    const full = path.join(parent, e.name);
-    out.push(path.relative(dir, full).split(path.sep).join("/"));
+    const rel = path.relative(dir, path.join(parent, e.name)).split(path.sep).join("/");
+    const dot = e.name.lastIndexOf(".");
+    (dot !== -1 && extensions.includes(e.name.slice(dot + 1)) ? files : skipped).push(rel);
   }
-  return out.sort();
+  return { files: files.sort(), skipped: skipped.sort() };
 }
 
 async function allHelpersFromPath(helpersDir: string): Promise<string[]> {
