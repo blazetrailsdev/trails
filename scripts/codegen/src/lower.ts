@@ -1719,12 +1719,15 @@ export class Lowerer {
           if (!p.name) ctx.scope.locals.add("rest");
           break;
         case "key":
-          kwType.push(`${jsIdent(p.name!)}?: unknown`);
+          // A keyword the body reassigns takes whatever it is given there.
+          kwType.push(
+            `${jsIdent(p.name!)}?: ${this.assignCount(ctx, p.name!) > 0 ? "unknown" : this.kwParamType(ctx.defName, p.name!, p.default)}`,
+          );
           kw.push(`${jsIdent(p.name!)} = ${this.expr(p.default!, ctx)}`);
           this.noteParamType(ctx, p.name!, p.default!);
           break;
         case "keyreq":
-          kwType.push(`${jsIdent(p.name!)}: unknown`);
+          kwType.push(`${jsIdent(p.name!)}: ${this.kwParamType(ctx.defName, p.name!, undefined)}`);
           kw.push(jsIdent(p.name!));
           kwRequired = true;
           break;
@@ -1754,22 +1757,11 @@ export class Lowerer {
       // A method takes them as one `options` parameter and unpacks it first,
       // as the hand port writes keywords (`Column`'s constructor); a block
       // destructures in place.
-      const taken = params.some((p) => p.name === "options");
-      if (isBlock || taken) out.push(`{ ${kw.join(", ")} }: ${t} = {}`);
-      else {
-        out.push(`options: ${t} = {}`);
-        // A keyword the body reassigns (`extensions = (Array(extensions) + …)`,
-        // marcel mime_type.rb:9) is a `let`.
-        const reassigned = params.some(
-          (p) =>
-            (p.kind === "key" || p.kind === "keyreq") &&
-            p.name &&
-            this.assignCount(ctx, p.name) > 0,
-        );
-        (ctx.prologue ??= []).push(
-          `${reassigned ? "let" : "const"} { ${kw.join(", ")} } = options;`,
-        );
-      }
+      // Destructured in the parameter list, defaults included, as a hand port
+      // writes Ruby keywords (marcel's `MimeType.for`); a keyword the body
+      // reassigns (`extensions = (Array(extensions) + …)`, mime_type.rb:9) is a
+      // parameter binding, which JS lets it reassign.
+      out.push(`{ ${kw.join(", ")} }: ${t} = {}`);
     }
     void kwRequired;
     const blk = params.find((p) => p.kind === "block");
@@ -4402,6 +4394,61 @@ export class Lowerer {
   intRanges = true;
 
   /** Record whether `file` builds a Range with a non-Integer (or computed) bound. */
+  /**
+   * Per method name, per keyword: the TS types of the literal values the gem's
+   * own calls pass for it, or null once any call passes a non-literal.
+   */
+  kwargTypes = new Map<string, Map<string, Set<string> | null>>();
+
+  /** The TS type a literal argument has, or null for anything else. */
+  literalType(v: N): string | null {
+    if (!v) return null;
+    if (v.k === "str" || v.k === "dstr" || v.k === "sym" || v.k === "xstr") return "string";
+    if (v.k === "int" || v.k === "float") return "number";
+    if (v.k === "true" || v.k === "false") return "boolean";
+    if (v.k === "nil") return "null";
+    if (v.k === "array" && v.elems.length) {
+      const el = new Set(v.elems.map((e: N) => this.literalType(e)));
+      if (el.size === 1 && [...el][0] && ![...el][0]!.endsWith("[]")) return `${[...el][0]}[]`;
+    }
+    return null;
+  }
+
+  noteKwargs(body: N): void {
+    walk([body], (n) => {
+      if (n.k !== "call") return;
+      const kw = n.args?.find((a: N) => a?.k === "kwargs");
+      if (!kw) return;
+      const byKey = this.kwargTypes.get(n.name) ?? new Map<string, Set<string> | null>();
+      this.kwargTypes.set(n.name, byKey);
+      for (const p of kw.pairs) {
+        if (!p.key || p.key.k !== "sym") continue;
+        const t = this.literalType(p.value);
+        const cur = byKey.has(p.key.value) ? byKey.get(p.key.value)! : new Set<string>();
+        if (cur === null) continue;
+        if (t === null) byKey.set(p.key.value, null);
+        else byKey.set(p.key.value, cur.add(t));
+      }
+    });
+  }
+
+  /** A keyword parameter's type: what the gem's calls pass, and its default. */
+  kwParamType(method: string | undefined, key: string, def: N | undefined): string {
+    const seen = method ? this.kwargTypes.get(method)?.get(key) : undefined;
+    if (seen === null || seen === undefined) return "unknown";
+    const ts = new Set(seen);
+    if (def) {
+      const d = this.literalType(def);
+      // `[]`: an Array of what the calls pass (`extensions: []` with
+      // `extensions: "mtg"` callers is `string | string[]`).
+      if (def.k === "array" && !def.elems.length) {
+        for (const t of [...ts]) if (!t.endsWith("[]") && t !== "null") ts.add(`${t}[]`);
+      } else if (d === null) return "unknown";
+      else ts.add(d);
+    }
+    return ts.size ? [...ts].join(" | ") : "unknown";
+  }
+
   noteRanges(body: N): void {
     // A Range written straight into `[]` (`content_type[-content_type.size..-1]`)
     // slices and is gone; it never reaches a `begin` / `end`.

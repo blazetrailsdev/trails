@@ -283,6 +283,7 @@ export class Emitter {
   register(file: IrFile): void {
     this.irByFile.set(file.file, file);
     this.lw.noteRanges(file.body);
+    this.lw.noteKwargs(file.body);
     const tsFile = rubyFileToTsAr(file.file);
     const taken = new Set<string>();
     for (const u of collectUnits(file)) {
