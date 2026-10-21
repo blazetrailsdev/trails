@@ -1354,6 +1354,9 @@ describe("CI runs every tooling test suite", () => {
     expect(cableOnly.actioncable_only).toBe("true");
     expect(cableOnly.thor_only).toBe("false");
     expect(cableOnly.actioncable_affected).toBe("true");
+    expect(
+      (await runGate("scripts/parity/unported-files/actioncable.ts")).actioncable_affected,
+    ).toBe("true");
     expect(cableOnly.unit_tests_affected).toBe("true");
     expect(cableOnly.activerecord_affected).toBe("false");
     expect(cableOnly.actionpack_affected).toBe("false");
@@ -1416,6 +1419,9 @@ describe("CI runs every tooling test suite", () => {
       );
     }
     expect(aggregate.split('|| [ "$ACTIONCABLE_ONLY" = "true" ]; }').length - 1).toBe(2);
+    expect(flat(wf.jobs["trailties-tests"].if)).toContain(
+      "needs.changes.outputs.trailties_affected == 'true' || needs.changes.outputs.actioncable_only == 'true'",
+    );
     expect(aggregate).toContain(
       '[ "$TRAILS_TSC_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }',
     );
