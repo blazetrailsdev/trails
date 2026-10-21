@@ -10,12 +10,18 @@ export { Template } from "./template.js";
 export { TopLevel } from "@blazetrails/activesupport";
 export type { BacktraceLocation, Spot } from "./template/handlers/tse.js";
 
-export { FileSystemResolver, Resolver } from "./template/resolver.js";
+export { FileSystemResolver, PathParser, Resolver } from "./template/resolver.js";
+export { UnboundTemplate } from "./unbound-template.js";
 export { FixtureResolver, NullResolver } from "./testing/resolvers.js";
 
 export { LookupContext, DetailsKey } from "./lookup-context.js";
 
-export { MissingTemplate, StrictLocalsError, TemplateError } from "./template/error.js";
+export {
+  MissingTemplate,
+  StrictLocalsError,
+  TemplateError,
+  WrongEncodingError,
+} from "./template/error.js";
 
 export { PathRegistry } from "./path-registry.js";
 export { ViewReloader } from "./cache-expiry.js";

@@ -210,4 +210,27 @@ describe("TSE stand-in scope", () => {
       ReferenceError,
     );
   });
+
+  const render = async (source: string): Promise<string> => {
+    const v = view();
+    return String(((await standIn(source).call(v, v, {})) as OutputBuffer).toString());
+  };
+
+  it("binds a for-of target that names nothing per render", async () => {
+    expect(await render("<% for (item of [1, 2]) { %><%= item %><% } %>")).toBe("12");
+  });
+
+  it("binds destructuring targets that name nothing per render", async () => {
+    expect(await render("<% [a, { b, c = 3 }] = [1, { b: 2 }] %><%= a + b + c %>")).toBe("6");
+  });
+
+  it("binds an assignment made inside a nested function", async () => {
+    expect(await render("<% (() => { count = 5; })() %><%= count %>")).toBe("5");
+  });
+
+  it("does not overwrite a global the template assigns", async () => {
+    const fetch = globalThis.fetch;
+    expect(await render("<% fetch = 1 %><%= fetch %>")).toBe("1");
+    expect(globalThis.fetch).toBe(fetch);
+  });
 });

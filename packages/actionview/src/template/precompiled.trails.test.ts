@@ -102,7 +102,7 @@ describe("Templates are precompiled", () => {
     Base.annotateRenderedViewWithFilenames = true;
     Tse.tseTrimMode = "<>";
     Tse.stripTrailingNewlines = true;
-    Tse.escapeIgnoreList = [String(Template.Types.get(":text"))];
+    Tse.escapeIgnoreList = [Template.Types.get(":text") as unknown as string];
     try {
       await buildViews({ cwd: root });
       const rendered: Record<string, string> = {};
@@ -112,14 +112,19 @@ describe("Templates are precompiled", () => {
         rendered[name] = String(await template.render(view()));
         setTemplateCompiler(testCompiler!);
         testCompiler = undefined;
-        const fromString = new Template(template.source, template.identifier, new Tse(), {
-          locals: [],
-          format: template.format,
-        });
+        const fromString = new Template(
+          template.source,
+          template.identifier.slice(root.length + 1),
+          new Tse(),
+          {
+            locals: [],
+            format: template.format,
+          },
+        );
         expect(rendered[name], name).toBe(String(await fromString.render(view())));
       }
       expect(rendered["annotated"]).toBe(
-        `<!-- BEGIN ${root}/app/views/opts/annotated.html.tse --><p>hi</p><!-- END ${root}/app/views/opts/annotated.html.tse -->`,
+        `<!-- BEGIN app/views/opts/annotated.html.tse --><p>hi</p><!-- END app/views/opts/annotated.html.tse -->`,
       );
       expect(rendered["stripped"]).toContain("-->line\n<!-- END");
       expect(rendered["escaped"]).toBe("<b>");

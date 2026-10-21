@@ -2,6 +2,7 @@ import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import ts from "typescript-5";
+import { Encoding } from "@blazetrails/ruby-compat";
 import { camelize, chomp, dasherize, pluralize, underscore } from "@blazetrails/activesupport";
 import {
   decodeLineMappings,
@@ -36,7 +37,9 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const outDir = path.resolve(cwd, opts.outDir ?? ".trails");
   const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
-  const { Base, Template, TemplateHandlers } = await import("@blazetrails/actionview");
+  const { Base, PathParser, TemplateHandlers, TseHandler, UnboundTemplate, WrongEncodingError } =
+    await import("@blazetrails/actionview");
+  const pathParser = new PathParser();
   const files = await walkTemplates(viewsDir, TemplateHandlers.templateHandlerExtensions());
   if (!opts.inPlace) await clearOutViews(cwd, outDir, outViews);
   const registryMap = new Map<string, string[]>();
@@ -48,32 +51,36 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   for (const rel of files) {
     const source = await fs.readFile(path.join(viewsDir, rel), "utf8");
     const outBase = path.join(outViews, rel);
-    const segments = path.basename(rel).split(".");
-    const format = segments.slice(1, -1).find((s) => Template.Types.symbols().includes(`:${s}`));
-    const template = new Template(
-      source,
-      path.join(viewsDir, rel),
-      TemplateHandlers.handlerForExtension(segments.at(-1))!,
-      { locals: [], format: format === undefined ? null : `:${format}` },
-    );
+    const parsed = pathParser.parse(rel);
+    const template = new UnboundTemplate(source, path.join(viewsDir, rel), {
+      details: parsed.details,
+      virtualPath: parsed.path.virtual,
+    }).bindLocals([]);
     await fs.mkdir(path.dirname(outBase), { recursive: true });
-    if (!rel.endsWith(".tse")) {
+    if (!(template.handler instanceof TseHandler)) {
+      const code = template.handler.call(template, source);
+      if (/\p{Surrogate}/u.test(code)) throw new WrongEncodingError(code, Encoding.defaultInternal);
       handled.push({ rel, src: source, outBase });
-      await writeHandlerShim(
-        handled[handled.length - 1],
-        template.handler.call(template, source),
-        viewsDir,
-      );
+      await writeHandlerShim(handled[handled.length - 1], code, viewsDir);
       continue;
     }
-    const handler = template.handler as { stripTrailingNewlines?: boolean };
-    const src = handler.stripTrailingNewlines ? chomp(source) : source;
+    const src = template.handler.stripTrailingNewlines ? chomp(source) : source;
     const ast = parse(src);
     views.push({
       rel,
       src,
       outBase,
-      handlerScope: tseHandlerScope(template, Base.annotateRenderedViewWithFilenames),
+      handlerScope: tseHandlerScope(
+        {
+          handler: template.handler,
+          format: template.format,
+          get type() {
+            return template.type;
+          },
+          shortIdentifier: path.relative(cwd, template.identifier).split(path.sep).join("/"),
+        },
+        Base.annotateRenderedViewWithFilenames,
+      ),
       strictLocals: ast.localsSignature !== null,
       resolved: false,
       ...(await templateScope(appDir, rel, path.dirname(outBase), helpers, controllers)),

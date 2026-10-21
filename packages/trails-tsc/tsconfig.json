@@ -8,6 +8,7 @@
   "include": ["src"],
   "references": [
     { "path": "../activesupport" },
+    { "path": "../ruby-compat" },
     { "path": "../tse-compiler" },
     { "path": "../actionview" }
   ]

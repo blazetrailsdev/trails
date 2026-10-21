@@ -1,4 +1,5 @@
 import ts from "typescript-5";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import {
   ARROW_BLOCK_RE,
   awaitFlowReads,
@@ -260,8 +261,7 @@ export function tseHandlerScope(
   };
   const options: Pick<TseScope, "escapeIgnore" | "trim" | "preamble" | "postamble"> = {
     escapeIgnore:
-      template.format != null &&
-      ctor.escapeIgnoreList.some((type) => type === String(template.type)),
+      template.format != null && ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
     trim: ctor.tseTrimMode === "-",
   };
   if (
@@ -353,8 +353,9 @@ function scopeLines(
   if (free.length === 0) return [];
   return [
     "  const __own: Record<string, unknown> = Object.create(null);",
-    `  const __lookup = (name: string, guarded = false): any => { for (const scope of [...${scopes}, globalThis, __own] as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; throw new ReferenceError(name + " is not defined"); };`,
-    `  const __assign = (name: string, value: unknown): any => { for (const scope of [...${scopes}, globalThis] as object[]) if (name in scope) { Reflect.set(scope, name, value); return value; } __own[name] = value; return value; }; void __assign;`,
+    `  const __lookup = (name: string, guarded = false): any => { for (const scope of [...${scopes}, __own, globalThis] as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; throw new ReferenceError(name + " is not defined"); };`,
+    `  const __assign = (name: string, value: unknown): any => { for (const scope of ${scopes} as object[]) if (name in scope) { Reflect.set(scope, name, value); return value; } __own[name] = value; return value; }; void __assign;`,
+    "  const __sink: any = new Proxy({}, { set: (_target, name, value) => (__assign(name as string, value), true) }); void __sink;",
     ...free.map((name) => {
       const key = JSON.stringify(name);
       return `  let ${name} = __lookup(${key}, true) as ${type(key)};`;
@@ -446,6 +447,7 @@ const UNDECLARABLE = new Set([
   "__lookup",
   "__assign",
   "__own",
+  "__sink",
 ]);
 
 function freeIdentifiers(body: readonly string[]): string[] {
@@ -570,6 +572,8 @@ export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (conte
       f.createStringLiteral(name),
       ...(guarded ? [f.createTrue()] : []),
     ]);
+  const sink = (name: string): ts.Expression =>
+    f.createPropertyAccessExpression(f.createIdentifier("__sink"), name);
   const assign = (name: string, value: ts.Expression): ts.Expression =>
     f.createCallExpression(f.createIdentifier("__assign"), undefined, [
       f.createStringLiteral(name),
@@ -606,6 +610,74 @@ export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (conte
         }
         if (ts.isShorthandPropertyAssignment(node) && free(node.name)) {
           return f.createPropertyAssignment(node.name.text, lookup(node.name.text));
+        }
+        const pattern = (target: ts.Expression): ts.Expression => {
+          if (free(target)) return sink(target.text);
+          if (ts.isArrayLiteralExpression(target)) {
+            return f.updateArrayLiteralExpression(
+              target,
+              target.elements.map((el) =>
+                ts.isSpreadElement(el)
+                  ? f.updateSpreadElement(el, pattern(el.expression))
+                  : pattern(el),
+              ),
+            );
+          }
+          if (ts.isObjectLiteralExpression(target)) {
+            return f.updateObjectLiteralExpression(
+              target,
+              target.properties.map((p) => {
+                if (ts.isShorthandPropertyAssignment(p) && free(p.name)) {
+                  const value = p.objectAssignmentInitializer
+                    ? f.createAssignment(sink(p.name.text), child(p.objectAssignmentInitializer))
+                    : sink(p.name.text);
+                  return f.createPropertyAssignment(p.name.text, value);
+                }
+                if (ts.isPropertyAssignment(p)) {
+                  return f.updatePropertyAssignment(p, p.name, pattern(p.initializer));
+                }
+                if (ts.isSpreadAssignment(p)) {
+                  return f.updateSpreadAssignment(p, pattern(p.expression));
+                }
+                return visit(p, target, bound) as ts.ObjectLiteralElementLike;
+              }),
+            );
+          }
+          if (
+            ts.isBinaryExpression(target) &&
+            target.operatorToken.kind === ts.SyntaxKind.EqualsToken
+          ) {
+            return f.updateBinaryExpression(
+              target,
+              pattern(target.left),
+              target.operatorToken,
+              child(target.right),
+            );
+          }
+          return child(target);
+        };
+        if (
+          (ts.isForOfStatement(node) || ts.isForInStatement(node)) &&
+          !ts.isVariableDeclarationList(node.initializer)
+        ) {
+          const initializer = pattern(node.initializer);
+          const expression = child(node.expression);
+          const statement = visit(node.statement, node, bound) as ts.Statement;
+          return ts.isForOfStatement(node)
+            ? f.updateForOfStatement(node, node.awaitModifier, initializer, expression, statement)
+            : f.updateForInStatement(node, initializer, expression, statement);
+        }
+        if (
+          ts.isBinaryExpression(node) &&
+          node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+          (ts.isArrayLiteralExpression(node.left) || ts.isObjectLiteralExpression(node.left))
+        ) {
+          return f.updateBinaryExpression(
+            node,
+            pattern(node.left),
+            node.operatorToken,
+            child(node.right),
+          );
         }
         if (ts.isBinaryExpression(node) && free(node.left)) {
           const name = node.left.text;
