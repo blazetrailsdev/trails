@@ -1,5 +1,5 @@
 import { Concern, SafeBuffer, extend, htmlSafe, mattrAccessor } from "@blazetrails/activesupport";
-import { HTML4 } from "@blazetrails/html-sanitizer";
+import { ActionView as RailsHtmlSanitizer, HTML4 } from "@blazetrails/html-sanitizer";
 
 export interface Sanitizer {
   sanitize(
@@ -65,63 +65,58 @@ export function stripLinks(
   return (this.constructor as SanitizeHelperClass).linkSanitizer.sanitize(html);
 }
 
-export const ClassMethods = {
-  set fullSanitizer(value: Sanitizer) {
-    (this as unknown as SanitizeHelperClass)._fullSanitizer = value;
-  },
+export const ClassMethods = Object.defineProperties(
+  RailsHtmlSanitizer.Helpers.SanitizeHelper.ClassMethods,
+  Object.getOwnPropertyDescriptors({
+    set fullSanitizer(value: Sanitizer) {
+      (this as unknown as SanitizeHelperClass)._fullSanitizer = value;
+    },
 
-  set linkSanitizer(value: Sanitizer) {
-    (this as unknown as SanitizeHelperClass)._linkSanitizer = value;
-  },
+    set linkSanitizer(value: Sanitizer) {
+      (this as unknown as SanitizeHelperClass)._linkSanitizer = value;
+    },
 
-  set safeListSanitizer(value: Sanitizer) {
-    (this as unknown as SanitizeHelperClass)._safeListSanitizer = value;
-  },
+    set safeListSanitizer(value: Sanitizer) {
+      (this as unknown as SanitizeHelperClass)._safeListSanitizer = value;
+    },
 
-  get sanitizerVendor(): SanitizerVendor {
-    return SanitizeHelper.sanitizerVendor;
-  },
+    get sanitizerVendor(): SanitizerVendor {
+      return SanitizeHelper.sanitizerVendor;
+    },
 
-  sanitizedAllowedTags(this: SanitizeHelperClass): Iterable<string> {
-    return this.sanitizerVendor.safeListSanitizer.allowedTags;
-  },
+    sanitizedAllowedTags(this: SanitizeHelperClass): Iterable<string> {
+      return this.sanitizerVendor.safeListSanitizer.allowedTags;
+    },
 
-  sanitizedAllowedAttributes(this: SanitizeHelperClass): Iterable<string> {
-    return this.sanitizerVendor.safeListSanitizer.allowedAttributes;
-  },
+    sanitizedAllowedAttributes(this: SanitizeHelperClass): Iterable<string> {
+      return this.sanitizerVendor.safeListSanitizer.allowedAttributes;
+    },
 
-  setSanitizedAllowedTags(this: SanitizeHelperClass, tags: Iterable<string>): void {
-    this.sanitizerVendor.safeListSanitizer.allowedTags = tags;
-  },
+    get fullSanitizer(): Sanitizer {
+      const self = this as unknown as SanitizeHelperClass;
+      if (!Object.hasOwn(self, "_fullSanitizer") || self._fullSanitizer == null) {
+        self._fullSanitizer = new self.sanitizerVendor.fullSanitizer();
+      }
+      return self._fullSanitizer;
+    },
 
-  setSanitizedAllowedAttributes(this: SanitizeHelperClass, attributes: Iterable<string>): void {
-    this.sanitizerVendor.safeListSanitizer.allowedAttributes = attributes;
-  },
+    get linkSanitizer(): Sanitizer {
+      const self = this as unknown as SanitizeHelperClass;
+      if (!Object.hasOwn(self, "_linkSanitizer") || self._linkSanitizer == null) {
+        self._linkSanitizer = new self.sanitizerVendor.linkSanitizer();
+      }
+      return self._linkSanitizer;
+    },
 
-  get fullSanitizer(): Sanitizer {
-    const self = this as unknown as SanitizeHelperClass;
-    if (!Object.hasOwn(self, "_fullSanitizer") || self._fullSanitizer == null) {
-      self._fullSanitizer = new self.sanitizerVendor.fullSanitizer();
-    }
-    return self._fullSanitizer;
-  },
-
-  get linkSanitizer(): Sanitizer {
-    const self = this as unknown as SanitizeHelperClass;
-    if (!Object.hasOwn(self, "_linkSanitizer") || self._linkSanitizer == null) {
-      self._linkSanitizer = new self.sanitizerVendor.linkSanitizer();
-    }
-    return self._linkSanitizer;
-  },
-
-  get safeListSanitizer(): Sanitizer {
-    const self = this as unknown as SanitizeHelperClass;
-    if (!Object.hasOwn(self, "_safeListSanitizer") || self._safeListSanitizer == null) {
-      self._safeListSanitizer = new self.sanitizerVendor.safeListSanitizer();
-    }
-    return self._safeListSanitizer;
-  },
-};
+    get safeListSanitizer(): Sanitizer {
+      const self = this as unknown as SanitizeHelperClass;
+      if (!Object.hasOwn(self, "_safeListSanitizer") || self._safeListSanitizer == null) {
+        self._safeListSanitizer = new self.sanitizerVendor.safeListSanitizer();
+      }
+      return self._safeListSanitizer;
+    },
+  }),
+);
 
 export class SanitizeHelper {
   static ClassMethods = ClassMethods;
