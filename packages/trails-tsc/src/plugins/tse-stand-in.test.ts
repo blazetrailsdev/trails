@@ -103,6 +103,14 @@ const SCENARIOS: Record<string, (view: Base) => unknown> = {
       { partial: "test/layout_for_partial", locals: { name: "Josh" } },
       () => "from block",
     ),
+  "test/render_template_with_ivar": (view) => {
+    Object.assign(view, { secret: "in the sauce" });
+    return view.render({ template: "test/render_template_with_ivar" });
+  },
+  "test/dot.directory/render_template_with_ivar": (view) => {
+    Object.assign(view, { secret: "in the sauce" });
+    return view.render({ template: "test/dot.directory/render_template_with_ivar" });
+  },
   "test/list": (view) => {
     Object.assign(view, { customers: [customer("david"), customer("mary")] });
     return view.render({ template: "test/list" });
