@@ -41,6 +41,7 @@ export const GATED_PACKAGES = [
   "bcrypt",
   "did-you-mean",
   "globalid",
+  "marcel",
   "rack",
   "trailties",
 ] as const;

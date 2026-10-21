@@ -1,7 +1,7 @@
 import { MimeType } from "./mime-type.js";
 import { expect, it, describe } from "vitest";
 
-describe("DeclaredTypeTest", () => {
+describe("Marcel::MimeType::DeclaredTypeTest", () => {
   it("prefers declared type over filename extension", async () => {
     expect(await MimeType.for(undefined, { name: "file.txt", declaredType: "text/html" })).toEqual(
       "text/html",

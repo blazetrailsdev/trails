@@ -163,6 +163,7 @@ export const ROWLESS_PACKAGES = [
   "bcrypt",
   "did-you-mean",
   "globalid",
+  "marcel",
   "rack",
   "rack-session",
   "rack-test",

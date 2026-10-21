@@ -16,8 +16,12 @@ export function eachContentTypeFixture(
   return FileUtils.chdir(fixturePath(folder), () =>
     Dir.glob("**/*.*").map((name) => {
       if (File.isFile(name)) {
-        const [, contentType] = name.match(/^([^/]+\/[^/]*)\/?(.*)\.(\w+)$/)!;
-        return block(files(`${folder}/${name}`), name, contentType);
+        let [, contentType, extra] = name.match(/^([^/]+\/[^/]*)\/?(.*)\.(\w+)$/)! as (
+          | string
+          | null
+        )[];
+        if (contentType!.slice(-contentType!.length) === extra) extra = null;
+        return block(files(`${folder}/${name}`), name, contentType!);
       }
       return null;
     }),
