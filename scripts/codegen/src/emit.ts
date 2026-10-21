@@ -842,6 +842,16 @@ export class Emitter {
     return why;
   }
 
+  /** A spec's `describe` argument as a vitest title: a String, or a constant's name. */
+  specTitle(arg: N, ctx: Ctx): string {
+    if (arg.k === "str") return JSON.stringify(arg.value);
+    if (arg.k === "const") return JSON.stringify(arg.path.filter((x: string) => x).join("::"));
+    return this.lw.expr(arg, ctx);
+  }
+
+  /** Minitest classes a test helper may reopen to give every spec its helpers. */
+  static SPEC_SUPPORT = ["Minitest::Test", "Minitest::Spec"];
+
   /** Minitest's own class-level DSL, which vitest's `describe` / `it` / hooks replace. */
   static MINITEST_DSL = new Set(["setup", "teardown", "test"]);
 
@@ -854,6 +864,10 @@ export class Emitter {
     const sc = this.index.scopes.get(fqn);
     if (!sc || sc.kind !== "class") return false;
     if (![...sc.files].every((x) => x.startsWith("test/"))) return false;
+    // Minitest's own classes reopened by a test helper (image_processing's
+    // test_helper.rb: `class Minitest::Test; def fixture_image`): every spec's
+    // helpers.
+    if (Emitter.SPEC_SUPPORT.includes(fqn)) return true;
     const sp = (sc.superclassPath ?? []).filter((x) => x).join("::");
     if (!["Minitest::Test", "ActiveSupport::TestCase"].includes(sp)) return false;
     if ([...sc.defs.keys()].some((k) => k.startsWith("test_"))) return false;
@@ -963,8 +977,8 @@ export class Emitter {
    * `let` the `describe` declares, each helper `def` a function in it, and the
    * gem's test support functions imported. No test case instance.
    */
-  emitNativeTest(u: Unit, f: FileCtx, supFqn: string | null): string {
-    const short = u.fqn.split("::").pop()!;
+  emitNativeTest(u: Unit, f: FileCtx, supFqn: string | null | string[], title?: string): string {
+    const short = title ?? u.fqn.split("::").pop()!;
     const hctx = this.baseCtx(u, f, {});
     const vitest = (x: string) => this.lw.imp(hctx, "vitest", x);
     // Ivars: one `let` each, named for the ivar unless a local of the class has that name.
@@ -987,27 +1001,27 @@ export class Emitter {
     for (const s of [...u.body, ...u.sbody])
       if (s.k === "def" && !/^test_/.test(s.name) && !["setup", "teardown"].includes(s.name))
         helpers.set(s.name, s);
-    const sup = supFqn ? this.supportFns(supFqn) : null;
-    const fnInfo = new Map<string, { name: string; async: boolean }>();
-    for (const [k, a] of sup?.fns ?? []) fnInfo.set(k, { name: "", async: a });
+    const impFrom = (file: string, k: string) =>
+      this.lw.imp(hctx, `@root/${file.replace(/\.ts$/, ".js")}`, tsMethodName(k));
+    const sups = (Array.isArray(supFqn) ? supFqn : supFqn ? [supFqn] : [])
+      .map((x) => this.supportFns(x))
+      .filter((x): x is NonNullable<typeof x> => !!x);
     const helperAsync = new Map<string, boolean>([...helpers.keys()].map((k) => [k, false]));
-    const imp = (k: string) =>
-      this.lw.imp(hctx, `@root/${sup!.file.replace(/\.ts$/, ".js")}`, tsMethodName(k));
     const testFns = (): Map<string, { name: string; async: boolean }> => {
       const m = new Map<string, { name: string; async: boolean }>();
-      for (const [k, a] of sup?.fns ?? [])
-        m.set(k, {
-          // Imported where a test calls it.
-          get name() {
-            return imp(k);
-          },
-          async: a,
-        });
+      for (const sup of sups)
+        for (const [k, a] of sup.fns)
+          m.set(k, {
+            // Imported where a test calls it.
+            get name() {
+              return impFrom(sup.file, k);
+            },
+            async: a,
+          });
       for (const [k, a] of helperAsync) m.set(k, { name: tsMethodName(k), async: a });
       m.set("skip", { name: "context.skip", async: false });
       return m;
     };
-    void fnInfo;
     const ctxFor = (over: Partial<Ctx>) =>
       this.baseCtx(u, f, {
         selfKind: "instance",
@@ -1078,7 +1092,7 @@ export class Emitter {
         if (
           s.k === "call" &&
           s.recv === null &&
-          s.name === "test" &&
+          (s.name === "test" || s.name === "it") &&
           (s.args[0]?.k === "str" || s.args[0]?.k === "dstr") &&
           s.block?.k === "block"
         ) {
@@ -1091,14 +1105,36 @@ export class Emitter {
         } else if (s.k === "def" && /^test_/.test(s.name)) {
           it(JSON.stringify(s.name.replace(/^test_/, "").replace(/_/g, " ")), s.body);
         } else if (
+          s.k === "call" &&
+          s.recv === null &&
+          s.name === "describe" &&
+          s.args.length >= 1 &&
+          s.block?.k === "block"
+        ) {
+          // Minitest::Spec's nested `describe ".valid_image?" do`: a nested
+          // vitest `describe`, its hooks scoped to it as Minitest scopes them.
+          const inner: string[] = [];
+          emitBody(this.lw.seqBody(s.block.body), inner, guard);
+          out.push(
+            `${vitest("describe")}(${this.specTitle(s.args[0], nameCtx())}, () => {`,
+            ...indent(inner),
+            "});",
+          );
+        } else if (
           (s.k === "call" &&
             s.recv === null &&
-            (s.name === "setup" || s.name === "teardown") &&
+            (s.name === "setup" ||
+              s.name === "teardown" ||
+              // Minitest::Spec `before` / `after` (`before :each` is the same).
+              ((s.name === "before" || s.name === "after") &&
+                (s.args.length === 0 || (s.args[0].k === "sym" && s.args[0].value === "each")))) &&
             s.block?.k === "block") ||
           (s.k === "def" && (s.name === "setup" || s.name === "teardown"))
         ) {
           const b = s.k === "def" ? s.body : s.block.body;
-          const hook = vitest(s.name === "setup" ? "beforeEach" : "afterEach");
+          const hook = vitest(
+            s.name === "setup" || s.name === "before" ? "beforeEach" : "afterEach",
+          );
           // A `def setup; super; …` reaches Minitest's empty `setup`.
           const stripped = {
             k: "seq",
@@ -1379,6 +1415,32 @@ export class Emitter {
       const stmts = file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : [];
       const fake = { nesting: [], fqn: undefined, body: [], sbody: [] } as unknown as Unit;
       const tctx = this.baseCtx(fake, f, {});
+      // A Minitest::Spec file (`describe "ImageProcessing::Vips" do`): each
+      // top-level `describe` is a vitest one, its helpers those the test helper
+      // reopens Minitest::Test / Minitest::Spec with.
+      for (const s of stmts) {
+        if (!(s.k === "call" && s.recv === null && s.name === "describe" && s.block?.k === "block"))
+          continue;
+        const spec = {
+          kind: "class",
+          fqn: `Spec(${s.args[0]?.value ?? s.args[0]?.path?.join("::") ?? "?"})`,
+          nesting: [],
+          superclass: null,
+          body: this.lw.seqBody(s.block.body),
+          sbody: [],
+        } as unknown as Unit;
+        const sups = Emitter.SPEC_SUPPORT.filter((x) => this.isTestSupport(x));
+        chunks.push(
+          this.emitNativeTest(
+            spec,
+            f,
+            sups,
+            this.specTitle(s.args[0], tctx).startsWith('"')
+              ? JSON.parse(this.specTitle(s.args[0], tctx))
+              : undefined,
+          ),
+        );
+      }
       if (
         stmts.some(
           (s: N) =>
