@@ -7,8 +7,8 @@
   },
   "include": ["src"],
   "references": [
-    { "path": "../activesupport" },
-    { "path": "../rack" },
-    { "path": "../ruby-compat" }
+    {
+      "path": "../ruby-compat"
+    }
   ]
 }
