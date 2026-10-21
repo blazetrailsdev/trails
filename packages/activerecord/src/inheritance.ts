@@ -136,15 +136,16 @@ export function baseClass(this: typeof Base): typeof Base {
 
 type AbstractClassHost = { _abstractClass: boolean };
 
-export const ClassMethods = {
+export const ClassMethods: ThisType<AbstractClassHost> & {
+  abstractClass: boolean;
+  isAbstractClass(this: object): boolean;
+} = {
   get abstractClass(): boolean {
-    return Object.hasOwn(this, "_abstractClass")
-      ? (this as unknown as AbstractClassHost)._abstractClass
-      : false;
+    return Object.hasOwn(this, "_abstractClass") ? this._abstractClass : false;
   },
 
   set abstractClass(value: boolean) {
-    (this as unknown as AbstractClassHost)._abstractClass = value;
+    this._abstractClass = value;
   },
 
   isAbstractClass(this: object): boolean {
