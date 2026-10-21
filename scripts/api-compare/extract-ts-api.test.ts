@@ -11,7 +11,6 @@ import * as ts from "typescript-5";
 import * as path from "path";
 import * as fs from "node:fs";
 import * as os from "node:os";
-import { collectTsFileNames, countTsInternalNames } from "./extra-surface.js";
 import {
   loopedIncludeModules,
   resolveRelModule,

@@ -1492,8 +1492,7 @@ export function extractFromProgram(
   // "./y.js"`, if ./y.js defined `X` (and we haven't already registered
   // `fromFile:X` via a local declaration), clone the class entry under
   // the re-exporting file's path so api-compare sees the class where
-  // Rails expects it. A module is not cloned: no Rails file is credited
-  // through a module clone, and every member would be counted again.
+  // Rails expects it.
   //
   // A barrel may re-export from another barrel (`index.ts` ← `foo.ts` ←
   // `foo/bar.ts`), so a single pass in file-walk order resolves the outer hop

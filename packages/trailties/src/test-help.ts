@@ -49,7 +49,11 @@ onLoad("action_controller_test_case", function (this: typeof TestCase) {
     this.routes = Trails.application!.routes();
     return rbCallSuper(this, beforeSetup);
   }
-  defineBeforeSetup(this, beforeSetup);
+  const descriptors: PropertyDescriptorMap = {
+    beforeSetup: { value: beforeSetup, writable: true, configurable: true },
+  };
+  rbSeatSuper(this.prototype, "beforeSetup", beforeSetup, descriptors);
+  Object.defineProperties(this.prototype, descriptors);
 });
 
 onLoad("action_dispatch_integration_test", function (this: typeof TestCase) {
@@ -58,13 +62,9 @@ onLoad("action_dispatch_integration_test", function (this: typeof TestCase) {
     await Trails.application!.reloadRoutesUnlessLoaded();
     return rbCallSuper(this, beforeSetup);
   }
-  defineBeforeSetup(this, beforeSetup);
-});
-
-function defineBeforeSetup(klass: typeof TestCase, beforeSetup: () => unknown): void {
   const descriptors: PropertyDescriptorMap = {
     beforeSetup: { value: beforeSetup, writable: true, configurable: true },
   };
-  rbSeatSuper(klass.prototype, "beforeSetup", beforeSetup, descriptors);
-  Object.defineProperties(klass.prototype, descriptors);
-}
+  rbSeatSuper(this.prototype, "beforeSetup", beforeSetup, descriptors);
+  Object.defineProperties(this.prototype, descriptors);
+});
