@@ -32,7 +32,7 @@ Status of each wall after re-verification:
 | 1b — resolver symlink cycle        | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased. |
 | 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                          |
 | 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                                                                                 |
-| 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship.                                                                 |
+| 3b — shape-mint abort              | **Gone** on `main` @ `20fde48d`. Re-verified 2026-10-20: 04d compiles, links and starts. Never filed; nothing to file.                                                          |
 | 3c — init-time hang at 362 modules | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
@@ -499,9 +499,17 @@ Treat only `perry compile` — and then running the binary — as a result.
 8. **The resolver symlink cycle is fixed upstream — do not re-diagnose it.**
    See the correction above: issue 12822, PR 12895, merged as `86ab1c0c8f`.
    Unreleased as of 2026-10-19, so a published Perry still hits it.
-9. **Wall 3b, the shape mint, is now the only live bug with a reproducer and
-   no filing.** Narrowed in [upstream/SHAPE-MINT.md](upstream/SHAPE-MINT.md)
-   and re-verified on from-source `main` (0.5.1662); still unfiled.
+9. **Wall 3b, the shape mint, fixed itself — and that is the lesson.**
+   Re-verified 2026-10-20 against `main` @ `20fde48d`: `04d-ruby-compat-barrel`
+   compiles, links and reaches startup, with no `static ShapeId refused`. The
+   abort path still exists (`shapes.rs:2058`) but the guard now carries a
+   `semantic_generation >> 32 == 0x8000_0000` carve-out for "a declared
+   holder's stable identity". `shapes.rs` was rewritten the week of
+   2026-10-14 ("object model step 5"). It was never filed, and it is now
+   unfileable — a week of upstream churn closed it.
+   **Do not report a Perry runtime bug without first rebuilding current
+   `main`.** The write-up in [upstream/SHAPE-MINT.md](upstream/SHAPE-MINT.md)
+   is kept only as the record of a bug that was real at 0.5.1659.
 10. **Nothing here asks trails to change for Perry's sake.** Every wall is
     Perry's and no change in this repo moves them.
 

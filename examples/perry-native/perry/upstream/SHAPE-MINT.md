@@ -1,8 +1,25 @@
 # `static ShapeId refused by the shape mint` when a class is compiled from TypeScript
 
-**Perry `main` @ `d74498b2` (0.5.1659)**, built from source, Linux x86_64,
+> **RESOLVED UPSTREAM, NOT BY US — 2026-10-20.** Re-verified against `main` @
+> `20fde48d`: `04d-ruby-compat-barrel` now compiles, links and reaches startup
+> with no `static ShapeId refused`. The abort still exists at
+> `shapes.rs:2058`, but its guard gained a
+> `semantic_generation >> 32 == 0x8000_0000` carve-out for "a declared
+> holder's stable identity", and `shapes.rs` was rewritten the week of
+> 2026-10-14 ("object model step 5"). This was never filed and there is now
+> nothing to file. Kept as the record of a bug that was real at 0.5.1659.
+>
+> 04d's remaining failure is unrelated and much more ordinary: a
+> `TypeError: Cannot convert undefined or null to object` in ruby-compat's
+> `registerProcessAdapter`, reached from `tryAutoRegisterNode` — i.e.
+> `adapter.envSnapshot()` returning undefined under Perry. A synthetic probe
+> rules out the obvious cause: `Object.create(null)` with
+> `Object.keys`/`Object.entries`, and spreading `process.env`, all behave
+> correctly under Perry.
+
+**Perry `main` @ `d74498b2` (0.5.1659)**, built from source, Linux x86*64,
 LLVM 22.1.8. Not specific to the npm build — this is current `main`, and it is
-a _different_ bug from the `prototype` one in [ISSUE.md](ISSUE.md) (which
+a \_different* bug from the `prototype` one in [ISSUE.md](ISSUE.md) (which
 `main` already fixes).
 
 A binary compiles and links, then aborts at startup:
