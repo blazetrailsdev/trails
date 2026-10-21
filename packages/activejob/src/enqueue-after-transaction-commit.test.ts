@@ -102,7 +102,7 @@ describe("EnqueueAfterTransactionCommitTest", () => {
       async () => {
         const job = (await EnqueueAfterCommitJob.performLater()) as EnqueueAfterCommitJob;
         expect(job).toBeInstanceOf(EnqueueAfterCommitJob);
-        expect(job.isSuccessfullyEnqueued()).toBeRubyTruthy();
+        expect(job.isSuccessfullyEnqueued()).toBeTruthy();
       },
       { exists: false },
     );
@@ -124,7 +124,7 @@ describe("EnqueueAfterTransactionCommitTest", () => {
         )) as EnqueueAfterCommitJob;
         expect(called, "#perform_later yielded the job").toBeTruthy();
         expect(job).toBeInstanceOf(EnqueueAfterCommitJob);
-        expect(job.isSuccessfullyEnqueued()).toBeRubyTruthy();
+        expect(job.isSuccessfullyEnqueued()).toBeTruthy();
       },
       { exists: false },
     );
@@ -139,10 +139,10 @@ describe("EnqueueAfterTransactionCommitTest", () => {
       async () => {
         const job = (await ErrorEnqueueAfterCommitJob.performLater()) as ErrorEnqueueAfterCommitJob;
         expect(job).toBeInstanceOf(ErrorEnqueueAfterCommitJob);
-        expect(job.isSuccessfullyEnqueued()).toBeRubyTruthy();
+        expect(job.isSuccessfullyEnqueued()).toBeTruthy();
 
         await fakeActiveRecord.runAfterCommitCallbacks();
-        expect(job.isSuccessfullyEnqueued()).toBeRubyFalsy();
+        expect(job.isSuccessfullyEnqueued()).toBeFalsy();
       },
       { exists: false },
     );
