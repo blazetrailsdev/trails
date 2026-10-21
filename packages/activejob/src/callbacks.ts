@@ -1,13 +1,17 @@
 import { Callbacks as ASCallbacks, Concern, extend } from "@blazetrails/activesupport";
-import { include, rbModConstSet, rbObjSingletonClass } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
+import {
+  defineModule,
+  include,
+  rbModConstSet,
+  rbObjSingletonClass,
+} from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
 interface CallbacksClass {
   defineCallbacks(...names: Array<string | Record<string, unknown>>): void;
 }
 
-export const Callbacks = new Module() as Module & {
+export const Callbacks = defineModule({}) as {
   runCallbacks(kind: string, block?: () => unknown): unknown;
 };
 extend(Callbacks, Concern);

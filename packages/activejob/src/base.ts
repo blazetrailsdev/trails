@@ -49,6 +49,7 @@ export class Base {
   declare static execute: typeof ExecutionClassMethods.execute;
   declare static rescueFrom: typeof Rescuable.ClassMethods.rescueFrom;
   declare static afterDiscardProcs: Exceptions["afterDiscardProcs"];
+  declare static isAfterDiscardProcs: () => boolean;
   declare static retryJitter: number;
   declare static rescueHandlers: unknown[][];
 
