@@ -1,4 +1,10 @@
-import { runLoadHooks, zone } from "@blazetrails/activesupport";
+import {
+  Callbacks as ASCallbacks,
+  type Included,
+  type Rescuable,
+  runLoadHooks,
+  zone,
+} from "@blazetrails/activesupport";
 import {
   extend,
   include,
@@ -16,7 +22,7 @@ import { ClassMethods as QueueNameClassMethods, QueueName } from "./queue-name.j
 import { ClassMethods as QueuePriorityClassMethods, QueuePriority } from "./queue-priority.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends Core, Execution {}
+export interface Base extends Core, Execution, Rescuable, Included<typeof ASCallbacks> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {

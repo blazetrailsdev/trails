@@ -5,7 +5,15 @@ import { ActiveJob } from "./namespaces.js";
 type JobData = Record<string, unknown>;
 
 interface ExecutionJob {
+  executions: number | null;
+  arguments: unknown[];
+  deserializeArgumentsIfNeeded(): Promise<void>;
+  rescueWithHandler(exception: unknown): unknown;
+  runAfterDiscardProcs?(exception: unknown): Promise<void>;
+  runCallbacks(kind: string, block?: () => unknown): unknown;
+  perform(...arguments_: unknown[]): unknown;
   performNow(): Promise<unknown>;
+  _performJob(): Promise<unknown>;
 }
 
 interface ExecutionClass {
@@ -30,14 +38,8 @@ export class ClassMethods {
 export class Execution {
   static readonly [classModule] = true;
   declare static ClassMethods: typeof ClassMethods;
-  declare executions: number | null;
-  declare arguments: unknown[];
-  declare deserializeArgumentsIfNeeded: () => Promise<void>;
-  declare rescueWithHandler: (exception: unknown) => unknown;
-  declare runAfterDiscardProcs: (exception: unknown) => Promise<void>;
-  declare runCallbacks: (kind: string, block?: () => unknown) => unknown;
 
-  async performNow(): Promise<unknown> {
+  async performNow(this: ExecutionJob): Promise<unknown> {
     try {
       this.executions = (this.executions ?? 0) + 1;
 
@@ -48,7 +50,7 @@ export class Execution {
       const handled = await this.rescueWithHandler(exception);
       if (handled != null && handled !== false) return handled;
 
-      await this.runAfterDiscardProcs(exception);
+      await this.runAfterDiscardProcs!(exception);
       throw exception;
     }
   }
@@ -58,7 +60,7 @@ export class Execution {
   }
 
   /** @internal */
-  private async _performJob(): Promise<unknown> {
+  async _performJob(this: ExecutionJob): Promise<unknown> {
     ExecutionContext.setKey("job", this);
     return this.runCallbacks("perform", () => this.perform(...this.arguments));
   }
