@@ -6,16 +6,19 @@ import { MockRequest } from "./mock-request.js";
 import { Lint } from "./lint.js";
 
 const length = 6;
-const app = new Lint(
-  async () =>
-    [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any,
-);
-const appWithoutLength = new Lint(async () => [200, { "content-type": "text/html" }, []] as any);
+const app = (env: any) =>
+  new Lint(
+    async () =>
+      [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any,
+  ).call(env);
+const appWithoutLength = (env: any) =>
+  new Lint(async () => [200, { "content-type": "text/html" }, []] as any).call(env);
 const appWithoutLint = async () =>
   [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any;
-const appWithZeroLength = new Lint(
-  async () => [200, { "content-type": "text/html", "content-length": "0" }, []] as any,
-);
+const appWithZeroLength = (env: any) =>
+  new Lint(
+    async () => [200, { "content-type": "text/html", "content-length": "0" }, []] as any,
+  ).call(env);
 
 it("log to rack.errors by default", async () => {
   const res = await new MockRequest((env) => new CommonLogger(app).call(env)).get("/");
