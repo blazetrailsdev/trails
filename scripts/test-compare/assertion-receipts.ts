@@ -31,6 +31,105 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actionview:template/form_helper_test.rb › FormHelperTest › explicit name": [
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1413)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1417)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1421)",
+    },
+  ],
+  "actionview:template/form_helper_test.rb › FormHelperTest › explicit id": [
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1440)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1444)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1448)",
+    },
+  ],
+  "actionview:template/form_helper_test.rb › FormHelperTest › nil id": [
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1475)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1479)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1483)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1487)",
+    },
+  ],
+  "actionview:template/form_helper_test.rb › FormHelperTest › index with nil id": [
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1533)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1537)",
+    },
+    {
+      kind: "assert_dom_equal",
+      value: null,
+      as: null,
+      reason:
+        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/form_helper_test.rb:1541)",
+    },
+  ],
   "actionview:template/form_collections_helper_test.rb › FormCollectionsHelperTest › collection radio correctly builds unique DOM IDs for float values":
     [
       {
