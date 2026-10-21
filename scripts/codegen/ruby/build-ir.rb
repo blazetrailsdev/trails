@@ -227,21 +227,22 @@ module CodegenIR
       { k: "unhandled", node: node.class.name.split("::").last, src: src(node)[0, 200], l: line(node) }
     end
 
-    # A literal that is not valid UTF-8 (`"\xFF\xD8\xFF"`) is a binary
-    # String, which ruby-compat holds as a JS string of one character per byte
-    # (string-io.ts): each byte becomes the code point of the same value.
-    def str_value(s)
-      s.valid_encoding? && s.encoding != Encoding::BINARY ? s : s.bytes.pack("U*")
-    end
-
-    def str_binary?(s)
-      !s.valid_encoding? || (s.encoding == Encoding::BINARY && !s.ascii_only?)
+    # A literal that is not valid UTF-8 (`"\377\330\377"`) cannot be written to
+    # JSON as text: its bytes travel instead, and the CLI decodes them the way
+    # ruby-compat holds such a String (string/bytes.ts), each invalid byte the
+    # lone surrogate U+DC80..U+DCFF.
+    def str_node(s, extra = {})
+      if s.valid_encoding?
+        { k: "str", value: s }.merge(extra)
+      else
+        { k: "str", value: s.scrub("?"), bytes: s.bytes }.merge(extra)
+      end
     end
 
     def str_parts(parts)
       parts.map do |p|
         case p
-        when Prism::StringNode then { k: "str", value: str_value(p.unescaped) }
+        when Prism::StringNode then str_node(p.unescaped)
         when Prism::EmbeddedStatementsNode
           body = stmts(p.statements)
           body.size == 1 ? body[0] : { k: "seq", body: body }
@@ -266,7 +267,7 @@ module CodegenIR
       when Prism::FloatNode then { k: "float", value: node.value }
       when Prism::RationalNode then { k: "rational", num: node.numerator.to_s, den: node.denominator.to_s }
       when Prism::ImaginaryNode then unhandled(node)
-      when Prism::StringNode, Prism::XStringNode then { k: "str", value: str_value(node.unescaped), binary: str_binary?(node.unescaped) || nil, frozen: node.frozen?, heredoc: node.heredoc? }.compact
+      when Prism::StringNode, Prism::XStringNode then str_node(node.unescaped, frozen: node.frozen?, heredoc: node.heredoc?)
       when Prism::InterpolatedStringNode then { k: "dstr", parts: str_parts(node.parts) }
       when Prism::InterpolatedXStringNode then { k: "dstr", parts: str_parts(node.parts) }
       when Prism::SymbolNode then { k: "sym", value: node.unescaped }

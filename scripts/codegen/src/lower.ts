@@ -3328,6 +3328,19 @@ export class Lowerer {
           }
           return call;
         }
+        // `MAGIC.send(method) { |type, matches| … }` (marcel magic.rb:131): an
+        // Array iterator yields one element, which a block of several
+        // parameters splats (vm_callee_setup_block_arg); JS's `find` / `select`
+        // pass (element, index, array).
+        if (
+          n.block?.k === "block" &&
+          n.block.params.length >= 2 &&
+          n.block.params.every((p: Param) => p.kind === "req" && p.name)
+        ) {
+          const plain = n.args.map((x: N) => this.argExpr(x, ctx));
+          const f = this.blockArg(n.block, ctx);
+          return `${rc("rbFSend")}(${[R, ...plain, `(x: unknown) => (${f})(...(Array.isArray(x) ? x : [x]))`].join(", ")})`;
+        }
         return `${rc("rbFSend")}(${R}, ${argList()})`;
       // Ruby `Range#cover?` is ruby-compat Range's `cover`.
       case "cover?":
@@ -4328,13 +4341,27 @@ export class Lowerer {
           (name === "Array" && n.recv === null)
         )
           return { k: "array", el: null };
+        // `String#split` answers Strings (string.c rb_str_split_m).
         if (
           n.recv &&
-          (((name === "keys" || name === "values") && !n.args.length) || name === "split") &&
+          name === "split" &&
+          this.typeOf(n.recv, ctx)?.k !== "gemClass" &&
+          this.typeOf(n.recv, ctx)?.k !== "class"
+        )
+          return { k: "array", el: { k: "prim", name: "string" } };
+        if (
+          n.recv &&
+          (name === "keys" || name === "values") &&
+          !n.args.length &&
           this.typeOf(n.recv, ctx)?.k !== "gemClass" &&
           this.typeOf(n.recv, ctx)?.k !== "class"
         )
           return { k: "array", el: null };
+        // `ary.first` / `ary.last` with no count: the element (or nil).
+        if (n.recv && (name === "first" || name === "last") && !n.args.length) {
+          const t = this.typeOf(n.recv, ctx);
+          if (t?.k === "array" && t.el) return { ...t.el, nullable: true } as TypeRef;
+        }
         if (
           [
             "map",
@@ -5147,7 +5174,16 @@ export class Lowerer {
       case "strip":
         return `${R}${nav}trim()`;
       case "split":
-        return `${R}${nav}split(${args().join(", ")})`;
+        // string.c rb_str_split_m: a limit keeps the remainder in the last field,
+        // trailing empty fields drop, and `" "` / no pattern split awk-style;
+        // JS `split` does none of these.
+        if (nav === "?.")
+          return this.withOnce(
+            r,
+            (x) =>
+              `(${x} == null ? ${x} : (${rc("rbStrSend")}(${[x, '"split"', ...args()].join(", ")})[0] as string[]))`,
+          );
+        return `(${rc("rbStrSend")}(${[r, '"split"', ...args()].join(", ")})[0] as string[])`;
       case "sub":
         if (!blk) return `${R}${nav}replace(${args().join(", ")})`;
         break;

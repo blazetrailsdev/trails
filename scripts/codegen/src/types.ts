@@ -132,7 +132,14 @@ export class TypeOracle {
             ? "@activesupport/"
             : null;
     const narrowed = pkg ? cands.filter((k) => k.startsWith(pkg)) : cands;
-    return narrowed.length === 1 ? narrowed[0] : undefined;
+    if (narrowed.length === 1) return narrowed[0];
+    // A bare core constant (`Range`) is Ruby core's class, ruby-compat's port
+    // of it; activesupport's core_ext declarations of the name reopen it.
+    if (path.length === 1) {
+      const core = cands.filter((k) => k.startsWith("@ruby-compat/"));
+      if (core.length === 1) return core[0];
+    }
+    return undefined;
   }
 
   /**

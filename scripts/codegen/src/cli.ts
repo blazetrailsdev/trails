@@ -44,6 +44,61 @@ const irDir = path.join(
   GEM.gem === "activerecord" ? "scripts/codegen/.ir" : `scripts/codegen/.ir-${GEM.gem}`,
 );
 
+/**
+ * A string literal's bytes (`{ k: "str", bytes }`, build-ir.rb `str_node`) as
+ * ruby-compat holds a UTF-8 String with invalid bytes: each well-formed UTF-8
+ * sequence its character, each other byte the lone surrogate `U+DC00 + byte`
+ * (ruby-compat string/bytes.ts, MRI string.c:6845).
+ */
+function decodeRubyBytes(bytes: number[]): string {
+  let out = "";
+  let i = 0;
+  while (i < bytes.length) {
+    const b0 = bytes[i];
+    const n =
+      b0 < 0x80
+        ? 1
+        : b0 >= 0xc2 && b0 <= 0xdf
+          ? 2
+          : b0 >= 0xe0 && b0 <= 0xef
+            ? 3
+            : b0 >= 0xf0 && b0 <= 0xf4
+              ? 4
+              : 0;
+    const seq = n ? bytes.slice(i, i + n) : [];
+    let ok = n > 0 && seq.length === n && seq.slice(1).every((b) => (b & 0xc0) === 0x80);
+    if (ok && n > 1) {
+      const s = Buffer.from(seq).toString("utf8");
+      ok = !s.includes("\ufffd");
+      if (ok) {
+        out += s;
+        i += n;
+        continue;
+      }
+    }
+    if (ok && n === 1) {
+      out += String.fromCharCode(b0);
+      i += 1;
+      continue;
+    }
+    out += String.fromCharCode(0xdc00 + b0);
+    i += 1;
+  }
+  return out;
+}
+
+function decodeBytes(n: unknown): void {
+  if (Array.isArray(n)) for (const x of n) decodeBytes(x);
+  else if (n && typeof n === "object") {
+    const o = n as Record<string, unknown>;
+    if (o.k === "str" && Array.isArray(o.bytes)) {
+      o.value = decodeRubyBytes(o.bytes as number[]);
+      delete o.bytes;
+    }
+    for (const v of Object.values(o)) decodeBytes(v);
+  }
+}
+
 function listJson(dir: string): string[] {
   const out: string[] = [];
   for (const e of readdirSync(dir)) {
@@ -74,7 +129,11 @@ execFileSync(
   { stdio: ["ignore", "inherit", "inherit"] },
 );
 const files: IrFile[] = listJson(irDir)
-  .map((p) => JSON.parse(readFileSync(p, "utf8")) as IrFile)
+  .map((p) => {
+    const f = JSON.parse(readFileSync(p, "utf8")) as IrFile;
+    decodeBytes(f);
+    return f;
+  })
   .sort((a, b) => a.file.localeCompare(b.file));
 
 // `--tests cases/callbacks_test.rb,…` (relative to the gem's test/): port those
@@ -128,6 +187,7 @@ const files: IrFile[] = listJson(irDir)
     );
     for (const p of listJson(testIr)) {
       const f = JSON.parse(readFileSync(p, "utf8")) as IrFile;
+      decodeBytes(f);
       f.file = `test/${f.file}`;
       files.push(f);
     }

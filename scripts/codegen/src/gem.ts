@@ -22,12 +22,20 @@ export interface GemConfig {
    * (`marcel/v1.0.4`). Omitted for a Rails framework gem.
    */
   vendor?: string;
+  /** False for a gem trails has no hand port of (marcel): no oracle of its own. */
+  hand?: false;
 }
 
 const GEMS: Record<string, GemConfig> = {
   activerecord: { gem: "activerecord", rubyRoot: "active_record", namespace: "ActiveRecord" },
   activejob: { gem: "activejob", rubyRoot: "active_job", namespace: "ActiveJob" },
-  marcel: { gem: "marcel", rubyRoot: "marcel", namespace: "Marcel", vendor: "marcel/v1.0.4" },
+  marcel: {
+    gem: "marcel",
+    rubyRoot: "marcel",
+    namespace: "Marcel",
+    vendor: "marcel/v1.0.4",
+    hand: false,
+  },
 };
 
 const name = process.env.CODEGEN_GEM ?? "activerecord";

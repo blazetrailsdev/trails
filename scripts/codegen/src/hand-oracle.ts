@@ -14,7 +14,7 @@
 import * as ts from "typescript-5";
 import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { ORACLE_PATH, PKG_DIR } from "./gem.js";
+import { GEM, ORACLE_PATH, PKG_DIR } from "./gem.js";
 
 const SRC = path.join(PKG_DIR, "src");
 
@@ -61,7 +61,14 @@ function main(): void {
   const cfgPath = path.join(PKG_DIR, "tsconfig.json");
   const cfg = ts.readConfigFile(cfgPath, ts.sys.readFile);
   const parsed = ts.parseJsonConfigFileContent(cfg.config, ts.sys, path.dirname(cfgPath));
-  const roots = parsed.fileNames.filter((f) => !/\.test\.ts$|test-helpers\/|\/support\//.test(f));
+  // A gem with no hand port (marcel) has only its dependencies to read: its
+  // src/ is the generator's own output, which must not type the generator.
+  const roots =
+    GEM.hand === false
+      ? ["ruby-compat", "activesupport"]
+          .map((dep) => path.join(PKG_DIR, "..", dep, "dist/index.d.ts"))
+          .filter((f) => existsSync(f))
+      : parsed.fileNames.filter((f) => !/\.test\.ts$|test-helpers\/|\/support\//.test(f));
   // Dependencies the generated code may call that the hand port never imports
   // (`GlobalID::Locator.locate`, async in trails): read their entry points too.
   for (const dep of ["globalid", "i18n", "date"]) {
@@ -258,7 +265,7 @@ function main(): void {
 
   for (const sf of program.getSourceFiles()) {
     const fk = fileKey(sf);
-    const ours = sf.fileName.startsWith(SRC + "/");
+    const ours = GEM.hand !== false && sf.fileName.startsWith(SRC + "/");
     const dep =
       /packages\/(arel|activemodel|activesupport|ruby-compat|globalid|i18n|date|trailties)\//.test(
         sf.fileName,
