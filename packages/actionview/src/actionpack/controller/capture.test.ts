@@ -107,7 +107,7 @@ describe("CaptureTest", () => {
   });
 
   it.skip("non erb block content for", async () => {
-    // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
+    // BLOCKED: port-builder-template-handler
     await tc.get("nonErbBlockContentFor");
     expect(tc.response.body).toBe(tc.expectedContentForOutput());
   });

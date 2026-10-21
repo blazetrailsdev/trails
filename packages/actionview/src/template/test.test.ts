@@ -1,80 +1,76 @@
-import { describe, it } from "vitest";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { beforeEach, describe, it } from "vitest";
 import { Naming } from "@blazetrails/activemodel";
 import { assertEqual, extend } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
-import { ActionView } from "../namespaces.js";
+import { registerConstant } from "@blazetrails/ruby-compat";
+import "../test-helpers/abstract-unit.js";
+import { TestCase } from "../test-case.js";
 
-type DrawSet = { draw(block: (this: { get(path: string, options: object): void }) => void): void };
+type Tc = Record<string, any>;
+type TestCaseClass = typeof TestCase & Record<string, any>;
 
-interface TestCaseHost {
-  title(text: string): string;
-  homepagePath(): string;
-  homepageUrl(): string;
-  linkToPerson(person: unknown): string;
-  withRouting(block: (set: DrawSet) => Promise<void> | void): Promise<void>;
-  contentTag(name: string, content: string): string;
-  peoplePath(): string;
-  peopleUrl(): string;
-  linkTo(name: unknown, options: unknown): string;
-  extend(mod: Module): void;
-}
+const PeopleHelper = {
+  title(this: Tc, text: string) {
+    return this.contentTag("h1", text);
+  },
 
-type TestCaseClass = {
-  new (name: string): TestCaseHost;
-  tests(helper: unknown): void;
-  helperClass: unknown;
+  homepagePath(this: Tc) {
+    return this.peoplePath();
+  },
+
+  homepageUrl(this: Tc) {
+    return this.peopleUrl();
+  },
+
+  linkToPerson(this: Tc, person: { name: string }) {
+    return this.linkTo(person.name, person);
+  },
 };
+registerConstant("PeopleHelper", PeopleHelper);
+registerConstant("Minitest", {});
 
-const { TestCase } = ActionView as unknown as { TestCase: TestCaseClass };
-
-const PeopleHelper = new Module();
-PeopleHelper.defineMethod("title", function (this: TestCaseHost, text: string) {
-  return this.contentTag("h1", text);
-});
-PeopleHelper.defineMethod("homepagePath", function (this: TestCaseHost) {
-  return this.peoplePath();
-});
-PeopleHelper.defineMethod("homepageUrl", function (this: TestCaseHost) {
-  return this.peopleUrl();
-});
-PeopleHelper.defineMethod("linkToPerson", function (this: TestCaseHost, person: { name: string }) {
-  return this.linkTo(person.name, person);
-});
-
-async function withTestRouteSet(tc: TestCaseHost, block: () => void): Promise<void> {
-  await tc.withRouting((set) => {
-    set.draw(function () {
-      this.get("people", { to: "people#index", as: "people" });
-    });
-    block();
+function testCase(klass: TestCaseClass): () => Tc {
+  let tc: Tc;
+  beforeEach(async ({ task }) => {
+    tc = new klass(task.name) as unknown as Tc;
+    await tc.beforeSetup();
+    tc.setup();
   });
+  return () => tc;
 }
 
-// BLOCKED: port-template-test-case-test
-describe("PeopleHelperTest", () => {
-  const tc = () => new TestCase("PeopleHelperTest");
+class PeopleHelperTest extends TestCase {}
 
-  it.skip("title", () => {
+describe("PeopleHelperTest", () => {
+  const tc = testCase(PeopleHelperTest as TestCaseClass);
+
+  async function withTestRouteSet(block: () => void): Promise<void> {
+    await tc().withRouting((set: any) => {
+      set.draw(function (this: any) {
+        this.get("people", { to: "people#index", as: "people" });
+      });
+      block();
+    });
+  }
+
+  it("title", () => {
     assertEqual("<h1>Ruby on Rails</h1>", tc().title("Ruby on Rails"));
   });
 
-  it.skip("homepage path", async () => {
-    const t = tc();
-    await withTestRouteSet(t, () => {
-      assertEqual("/people", t.homepagePath());
+  it("homepage path", async () => {
+    await withTestRouteSet(() => {
+      assertEqual("/people", tc().homepagePath());
     });
   });
 
-  it.skip("homepage url", async () => {
-    const t = tc();
-    await withTestRouteSet(t, () => {
-      assertEqual("http://test.host/people", t.homepageUrl());
+  it("homepage url", async () => {
+    await withTestRouteSet(() => {
+      assertEqual("http://test.host/people", tc().homepageUrl());
     });
   });
 
-  it.skip("link to person", async () => {
-    const t = tc();
-    await withTestRouteSet(t, () => {
+  it("link to person", async () => {
+    await withTestRouteSet(() => {
       class Person {
         static {
           extend(this, Naming);
@@ -93,50 +89,41 @@ describe("PeopleHelperTest", () => {
       const person = new Person("David");
 
       let theModel: unknown = null;
-      const mod = new Module();
-      mod.defineMethod("minitestMockPath", (model: unknown) => {
-        theModel = model;
-        return "/people/1";
+      extend(tc(), {
+        minitestMockPath(model: unknown) {
+          theModel = model;
+          return "/people/1";
+        },
       });
-      t.extend(mod);
-      assertEqual('<a href="/people/1">David</a>', t.linkToPerson(person));
+      assertEqual('<a href="/people/1">David</a>', tc().linkToPerson(person));
       assertEqual(person, theModel);
     });
   });
 });
 
-// BLOCKED: port-template-test-case-test
+class ManuallySetHelperTest extends TestCase {}
+(ManuallySetHelperTest as TestCaseClass).tests(PeopleHelper);
+
 describe("ManuallySetHelperTest", () => {
-  it.skip("helper class can be set manually not just inferred", () => {
-    class ManuallySetHelperTest extends TestCase {
-      static {
-        this.tests(PeopleHelper);
-      }
-    }
-    assertEqual(PeopleHelper, ManuallySetHelperTest.helperClass);
+  it("helper class can be set manually not just inferred", () => {
+    assertEqual(PeopleHelper, (ManuallySetHelperTest as TestCaseClass).helperClass);
   });
 });
 
-// BLOCKED: port-template-test-case-test
+class ManuallySetSymbolHelperTest extends TestCase {}
+(ManuallySetSymbolHelperTest as TestCaseClass).tests("people");
+
 describe("ManuallySetSymbolHelperTest", () => {
-  it.skip("set helper class using symbol", () => {
-    class ManuallySetSymbolHelperTest extends TestCase {
-      static {
-        this.tests(":people");
-      }
-    }
-    assertEqual(PeopleHelper, ManuallySetSymbolHelperTest.helperClass);
+  it("set helper class using symbol", () => {
+    assertEqual(PeopleHelper, (ManuallySetSymbolHelperTest as TestCaseClass).helperClass);
   });
 });
 
-// BLOCKED: port-template-test-case-test
+class ManuallySetStringHelperTest extends TestCase {}
+(ManuallySetStringHelperTest as TestCaseClass).tests("people");
+
 describe("ManuallySetStringHelperTest", () => {
-  it.skip("set helper class using string", () => {
-    class ManuallySetStringHelperTest extends TestCase {
-      static {
-        this.tests("people");
-      }
-    }
-    assertEqual(PeopleHelper, ManuallySetStringHelperTest.helperClass);
+  it("set helper class using string", () => {
+    assertEqual(PeopleHelper, (ManuallySetStringHelperTest as TestCaseClass).helperClass);
   });
 });
