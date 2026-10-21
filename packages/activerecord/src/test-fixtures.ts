@@ -1,13 +1,13 @@
 import {
   Dir,
   Hash,
+  Module,
   File as RubyFile,
   NoMethodError,
   RuntimeError,
   StandardError,
   isEmpty,
   isSymbol,
-  rbCallSuper,
   rbEql,
   rbObjClassname,
   strUminus,
@@ -164,12 +164,12 @@ export interface TestFixtures {
 
 async function beforeSetup(this: TestFixtures): Promise<void> {
   await this.setupFixtures();
-  await rbCallSuper(this, beforeSetup);
+  await TestFixtures.superMethod(this, "beforeSetup")!();
 }
 
 async function afterTeardown(this: TestFixtures): Promise<void> {
   try {
-    await rbCallSuper(this, afterTeardown);
+    await TestFixtures.superMethod(this, "afterTeardown")!();
   } finally {
     await this.teardownFixtures();
   }
@@ -453,62 +453,69 @@ function accessFixture(this: TestFixtures, fsName: string, ...fixtureNames: unkn
   return returnSingleRecord ? instances[0] : instances;
 }
 
-export const TestFixtures = {
-  beforeSetup,
-  afterTeardown,
-  fixture,
-  isRunInTransaction,
-  setupFixtures,
-  teardownFixtures,
-  setupAsynchronousQueriesSession,
-  teardownAsynchronousQueriesSession,
-  invalidateAlreadyLoadedFixtures,
-  setupTransactionalFixtures,
-  teardownTransactionalFixtures,
-  setupSharedConnectionPool,
-  teardownSharedConnectionPool,
-  loadFixtures,
-  instantiateFixtures,
-  isLoadInstances,
-  methodMissing,
-  respondToMissing,
-  activeRecordFixture,
-  accessFixture,
-};
-extend(TestFixtures, Concern);
+export const TestFixtures = new Module((mod) => {
+  extend(mod, Concern);
 
-(
-  TestFixtures as unknown as { included(base: null, block: (this: TestCaseClass) => void): void }
-).included(null, function (this: TestCaseClass) {
-  classAttribute.call(this, "fixturePaths", { instanceWriter: false, default: [] });
-  classAttribute.call(this, "fixtureTableNames", { default: [] });
-  classAttribute.call(this, "fixtureClassNames", { default: {} });
-  classAttribute.call(this, "useTransactionalTests", { default: true });
-  classAttribute.call(this, "useInstantiatedFixtures", { default: false });
-  classAttribute.call(this, "preLoadedFixtures", { default: false });
-  classAttribute.call(this, "lockThreads", { default: true });
-  classAttribute.call(this, "fixtureSets", { default: {} });
+  (mod as unknown as { included(base: null, block: (this: TestCaseClass) => void): void }).included(
+    null,
+    function (this: TestCaseClass) {
+      classAttribute.call(this, "fixturePaths", { instanceWriter: false, default: [] });
+      classAttribute.call(this, "fixtureTableNames", { default: [] });
+      classAttribute.call(this, "fixtureClassNames", { default: {} });
+      classAttribute.call(this, "useTransactionalTests", { default: true });
+      classAttribute.call(this, "useInstantiatedFixtures", { default: false });
+      classAttribute.call(this, "preLoadedFixtures", { default: false });
+      classAttribute.call(this, "lockThreads", { default: true });
+      classAttribute.call(this, "fixtureSets", { default: {} });
 
-  runLoadHooks("active_record_fixtures", this);
+      runLoadHooks("active_record_fixtures", this);
 
-  Object.setPrototypeOf(
-    this.prototype,
-    new Proxy(Object.create(Object.getPrototypeOf(this.prototype) as object) as object, {
-      get(target, prop, receiver: TestFixtures) {
-        const value = Reflect.get(target, prop, receiver);
-        if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
-          return value;
-        }
-        if (receiver.respondToMissing(prop, true)) {
-          return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
-        }
-        return value;
-      },
-    }),
+      const link = Object.getPrototypeOf(this.prototype) as object;
+      Object.setPrototypeOf(
+        link,
+        new Proxy(Object.create(Object.getPrototypeOf(link) as object) as object, {
+          get(target, prop, receiver: TestFixtures) {
+            const value = Reflect.get(target, prop, receiver);
+            if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
+              return value;
+            }
+            if (receiver.respondToMissing(prop, true)) {
+              return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+            }
+            return value;
+          },
+        }),
+      );
+    },
   );
-});
 
-(TestFixtures as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
+  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
+
+  mod.moduleEval((m) => {
+    Object.assign(m, {
+      beforeSetup,
+      afterTeardown,
+      fixture,
+      isRunInTransaction,
+      setupFixtures,
+      teardownFixtures,
+      setupAsynchronousQueriesSession,
+      teardownAsynchronousQueriesSession,
+      invalidateAlreadyLoadedFixtures,
+      setupTransactionalFixtures,
+      teardownTransactionalFixtures,
+      setupSharedConnectionPool,
+      teardownSharedConnectionPool,
+      loadFixtures,
+      instantiateFixtures,
+      isLoadInstances,
+      methodMissing,
+      respondToMissing,
+      activeRecordFixture,
+      accessFixture,
+    });
+  });
+});
 
 function deferConnectionPoolPin(this: TestFixtures, pool: ConnectionPool): void {
   this._pendingPins.push(

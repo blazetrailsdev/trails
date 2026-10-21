@@ -90,11 +90,7 @@ export class TestCase extends ActiveSupportTestCase {
   }
 
   override async afterTeardown(): Promise<void> {
-    try {
-      await super.afterTeardown();
-    } finally {
-      await this.teardownFixtures();
-    }
+    await super.afterTeardown();
     await this.checkConnectionLeaks();
   }
 

@@ -79,7 +79,7 @@ export class V7_0 extends V7_1 {
     }
   };
 
-  static TableDefinition: Record<string, any> = {
+  static TableDefinition: Record<string, (...args: never[]) => unknown> = {
     column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, _skipValidateOptions: true };
       return rbCallSuper(this, V7_0.TableDefinition.column, name, type, options);
@@ -272,7 +272,7 @@ export class V6_1 extends V7_0 {
     await super.changeColumn(tableName, columnName, type, options);
   }
 
-  static override TableDefinition: Record<string, any> = {
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     newColumnDefinition(
       this: { conn: AbstractAdapter },
       name: string,
@@ -311,7 +311,7 @@ export class V6_0 extends V6_1 {
     }
   };
 
-  static override TableDefinition: Record<string, any> = {
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       let options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
@@ -361,7 +361,7 @@ export class V6_0 extends V6_1 {
 }
 
 export class V5_2 extends V6_0 {
-  static override TableDefinition: Record<string, any> = {
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     timestamps(this: object, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
       return rbCallSuper(this, V5_2.TableDefinition.timestamps, options);
@@ -379,7 +379,7 @@ export class V5_2 extends V6_0 {
     raiseOnDuplicateColumn(_name: string): void {},
   };
 
-  static override CommandRecorder: Record<string, any> = {
+  static override CommandRecorder: Record<string, (...args: never[]) => unknown> = {
     invertTransaction(args: unknown[], block?: (...args: unknown[]) => unknown) {
       return ["transaction", args, block];
     },
@@ -464,7 +464,7 @@ export class V5_1 extends V5_2 {
 }
 
 export class V5_0 extends V5_1 {
-  static override TableDefinition: Record<string, any> = {
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     primaryKey(name: string, type: ColumnType = "primary_key", options: Options = {}) {
       if (type === "primary_key") type = "integer";
       return rbCallSuper(this, V5_0.TableDefinition.primaryKey, name, type, options);
@@ -573,7 +573,7 @@ export class V5_0 extends V5_1 {
 type RemoveIndexOptions = { column?: string | string[]; name?: string; ifExists?: boolean };
 
 export class V4_2 extends V5_0 {
-  static override TableDefinition: Record<string, any> = {
+  static override TableDefinition: Record<string, (...args: never[]) => unknown> = {
     references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;

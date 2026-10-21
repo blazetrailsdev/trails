@@ -169,12 +169,12 @@ export interface ConnectionPoolConfiguration {
 }
 
 export const ConnectionPoolConfiguration: ThisType<ConnectionPoolConfigurationHost> &
-  Record<string, any> = {
+  Record<string, unknown> = {
   checkoutAndVerify: async function checkoutAndVerify(
     this: ConnectionPoolConfigurationHost,
     connection: QueryCacheHost,
   ): Promise<QueryCacheHost> {
-    await rbCallSuper(this, ConnectionPoolConfiguration.checkoutAndVerify, connection);
+    await rbCallSuper(this, checkoutAndVerify, connection);
     connection._queryCache ||= this.queryCache;
     return connection;
   },

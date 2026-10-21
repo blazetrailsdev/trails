@@ -222,9 +222,10 @@ describe("TestFixtures#before_setup / #after_teardown", () => {
     ))();
   });
 
-  it("copies the module onto the includer's prototype", () => {
+  it("splices the module beneath the includer's prototype", () => {
     const proto = Object.getPrototypeOf(testCase) as object;
-    expect(Object.hasOwn(proto, "beforeSetup")).toBe(true);
+    expect(Object.hasOwn(proto, "beforeSetup")).toBe(false);
+    expect(Object.hasOwn(Object.getPrototypeOf(proto), "beforeSetup")).toBe(true);
   });
 
   it("before_setup sets up fixtures, then calls super", async () => {
@@ -247,6 +248,26 @@ describe("TestFixtures#before_setup / #after_teardown", () => {
     ))();
     await expect(testCase.afterTeardown()).rejects.toThrow("super raised");
     expect(calls).toEqual(["teardown_fixtures"]);
+  });
+
+  it("an includer's own before_setup outranks the module's and reaches it through super", async () => {
+    class Parent {
+      async beforeSetup(): Promise<void> {
+        calls.push("super before_setup");
+      }
+    }
+    const k = class extends Parent {
+      async beforeSetup(): Promise<void> {
+        calls.push("own before_setup");
+        await super.beforeSetup();
+      }
+      async setupFixtures() {
+        calls.push("setup_fixtures");
+      }
+    };
+    include(k, TestFixtures);
+    await new k().beforeSetup();
+    expect(calls).toEqual(["own before_setup", "setup_fixtures", "super before_setup"]);
   });
 
   it("a subclass's before_setup reaches the module through the includer", async () => {
