@@ -29,6 +29,8 @@ export interface GemConfig {
    * emitted `it.skip` under a `PERMANENT-SKIP:` line giving the reason.
    */
   skipTests?: Record<string, string>;
+  /** The package directory under `packages/`, where it differs from `gem` (`image-processing`). */
+  pkg?: string;
 }
 
 const GEMS: Record<string, GemConfig> = {
@@ -46,6 +48,17 @@ const GEMS: Record<string, GemConfig> = {
   },
 };
 
+// image_processing (janko/image_processing v1.14.0, vendor/rails/v8.0.2/Gemfile.lock:289),
+// RFC 0202: no hand port yet.
+GEMS.image_processing = {
+  gem: "image_processing",
+  rubyRoot: "image_processing",
+  namespace: "ImageProcessing",
+  vendor: "image_processing/v1.14.0",
+  hand: false,
+  pkg: "image-processing",
+};
+
 const name = process.env.CODEGEN_GEM ?? "activerecord";
 const cfg = GEMS[name];
 if (!cfg) throw new Error(`CODEGEN_GEM=${name}: known gems are ${Object.keys(GEMS).join(", ")}`);
@@ -57,7 +70,7 @@ const GEM_ROOT = GEM.vendor ?? `rails/v8.0.2/${GEM.gem}`;
 /** `vendor/rails/v8.0.2/<gem>/lib`. */
 export const GEM_LIB = path.join(ROOT, "vendor", GEM_ROOT, "lib");
 /** `packages/<gem>`, the hand port. */
-export const PKG_DIR = path.join(ROOT, "packages", GEM.gem);
+export const PKG_DIR = path.join(ROOT, "packages", GEM.pkg ?? GEM.gem);
 /** `packages/<gem>/codegen-out`, where a run writes. */
 export const GEN_DIR = path.join(PKG_DIR, "codegen-out");
 /** The `@inlinedFrom` citation prefix for a `def` in this gem. */

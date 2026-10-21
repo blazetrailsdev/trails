@@ -1,0 +1,30 @@
+{
+  "name": "@blazetrails/image-processing",
+  "version": "0.1.0",
+  "description": "Image processing for Trails, mirroring the image_processing gem",
+  "type": "module",
+  "main": "dist/image-processing.js",
+  "types": "dist/image-processing.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/image-processing.d.ts",
+      "default": "./dist/image-processing.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

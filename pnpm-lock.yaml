@@ -447,6 +447,12 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
+  packages/image-processing:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/marcel:
     dependencies:
       '@blazetrails/ruby-compat':
