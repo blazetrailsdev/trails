@@ -2097,6 +2097,18 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
     if (key === "constructor") continue;
     const descriptor = Object.getOwnPropertyDescriptor(source, key);
     if (descriptor && (typeof mod === "function" || descriptor.enumerable)) {
+      const shadowed = Reflect.get(klass.prototype, key) as unknown;
+      if (
+        typeof shadowed === "function" &&
+        "value" in descriptor &&
+        shadowed !== descriptor.value
+      ) {
+        let slot = superSlots.get(descriptor.value as AnyFunction);
+        if (slot === undefined) {
+          superSlots.set(descriptor.value as AnyFunction, (slot = Symbol(`super:${key}`)));
+        }
+        Object.defineProperty(klass.prototype, slot, { value: shadowed, configurable: true });
+      }
       Object.defineProperty(klass.prototype, key, descriptor);
     }
   }
@@ -2189,7 +2201,12 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   }
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
   const owners = new Map<string, object>();
-  if (isClassModule) {
+  if (isClassModule && Object.hasOwn(mod, classModule)) {
+    const proto = (mod as AnyClass).prototype as object;
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      if (key !== "constructor") owners.set(key, proto);
+    }
+  } else if (isClassModule) {
     for (const key of Object.getOwnPropertyNames(mod)) {
       if (!STATIC_CLASS_KEYS.has(key)) owners.set(key, mod);
     }
