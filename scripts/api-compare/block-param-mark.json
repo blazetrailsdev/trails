@@ -54,6 +54,10 @@
     "total": 0,
     "byFile": {}
   },
+  "marcel": {
+    "total": 0,
+    "byFile": {}
+  },
   "rack": {
     "total": 5,
     "byFile": {
