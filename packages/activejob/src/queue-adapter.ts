@@ -1,6 +1,7 @@
 import {
   Concern,
   classAttribute,
+  delegate,
   demodulize,
   extend,
   tryCall,
@@ -25,7 +26,6 @@ interface QueueAdapterClass {
   isQueueAdapter(object: unknown): boolean;
 }
 
-/** @internal */
 export function adapterName(adapter: unknown): string {
   if (rbObjRespondTo(adapter, "queueAdapterName")) {
     return (adapter as { queueAdapterName: string }).queueAdapterName;
@@ -83,9 +83,7 @@ export class QueueAdapter {
   static readonly [classModule] = true;
   declare static ClassMethods: typeof ClassMethods;
 
-  get queueAdapter(): unknown {
-    return (rbObjClass(this) as unknown as QueueAdapterClass).queueAdapter;
-  }
+  declare queueAdapter: unknown;
 }
 extend(QueueAdapter, Concern);
 Object.defineProperty(QueueAdapter, "ClassMethods", { value: ClassMethods });
@@ -100,6 +98,8 @@ Object.defineProperty(QueueAdapter, "ClassMethods", { value: ClassMethods });
       instanceAccessor: false,
       instancePredicate: false,
     });
+
+    delegate.call((this as { prototype: object }).prototype, "queueAdapter", { to: "class" });
   },
 );
 

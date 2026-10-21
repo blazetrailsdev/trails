@@ -3,6 +3,7 @@ import { NameError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { QueueAdapters } from "./namespaces.js";
 import { InlineAdapter } from "./queue-adapters/inline-adapter.js";
+import "./test-helpers/helper.js";
 import { isAdapterIs } from "./test-helpers/helper.js";
 
 describe("QueueAdapters", () => {

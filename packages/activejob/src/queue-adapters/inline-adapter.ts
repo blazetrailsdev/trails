@@ -7,12 +7,10 @@ export class InlineAdapter extends AbstractAdapter {
     return "ActiveJob::QueueAdapters::InlineAdapter";
   }
 
-  /** @internal */
   override async enqueue(job: { serialize(): Record<string, unknown> }): Promise<unknown> {
     return await ActiveJob.Base.execute(job.serialize());
   }
 
-  /** @internal */
   override enqueueAt(..._args: unknown[]): never {
     throw new NotImplementedError(
       "Use a queueing backend to enqueue jobs in the future. Read more at https://guides.rubyonrails.org/active_job_basics.html",

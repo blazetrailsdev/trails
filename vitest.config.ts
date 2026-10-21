@@ -411,7 +411,6 @@ const otherSetupFiles = [
   "./packages/activesupport/src/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
   "./packages/actionview/src/test-helpers/setup-compile-template.ts",
-  "./packages/activejob/src/test-helpers/helper.ts",
 ];
 
 export default defineConfig({
@@ -484,7 +483,6 @@ export default defineConfig({
             "./packages/activerecord/src/cases/helper.ts",
             "./packages/bcrypt/src/index.ts",
             "./packages/actionview/src/test-helpers/setup-compile-template.ts",
-            "./packages/activejob/src/test-helpers/helper.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
