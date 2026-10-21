@@ -65,58 +65,62 @@ export function stripLinks(
   return (this.constructor as SanitizeHelperClass).linkSanitizer.sanitize(html);
 }
 
-export const ClassMethods = Object.defineProperties(
-  RailsHtmlSanitizer.Helpers.SanitizeHelper.ClassMethods,
-  Object.getOwnPropertyDescriptors({
-    set fullSanitizer(value: Sanitizer) {
-      (this as unknown as SanitizeHelperClass)._fullSanitizer = value;
-    },
+export const ClassMethods = {
+  set fullSanitizer(value: Sanitizer) {
+    (this as unknown as SanitizeHelperClass)._fullSanitizer = value;
+  },
 
-    set linkSanitizer(value: Sanitizer) {
-      (this as unknown as SanitizeHelperClass)._linkSanitizer = value;
-    },
+  set linkSanitizer(value: Sanitizer) {
+    (this as unknown as SanitizeHelperClass)._linkSanitizer = value;
+  },
 
-    set safeListSanitizer(value: Sanitizer) {
-      (this as unknown as SanitizeHelperClass)._safeListSanitizer = value;
-    },
+  set safeListSanitizer(value: Sanitizer) {
+    (this as unknown as SanitizeHelperClass)._safeListSanitizer = value;
+  },
 
-    get sanitizerVendor(): SanitizerVendor {
-      return SanitizeHelper.sanitizerVendor;
-    },
+  get sanitizerVendor(): SanitizerVendor {
+    return SanitizeHelper.sanitizerVendor;
+  },
 
-    sanitizedAllowedTags(this: SanitizeHelperClass): Iterable<string> {
-      return this.sanitizerVendor.safeListSanitizer.allowedTags;
-    },
+  sanitizedAllowedTags(this: SanitizeHelperClass): Iterable<string> {
+    return this.sanitizerVendor.safeListSanitizer.allowedTags;
+  },
 
-    sanitizedAllowedAttributes(this: SanitizeHelperClass): Iterable<string> {
-      return this.sanitizerVendor.safeListSanitizer.allowedAttributes;
-    },
+  sanitizedAllowedAttributes(this: SanitizeHelperClass): Iterable<string> {
+    return this.sanitizerVendor.safeListSanitizer.allowedAttributes;
+  },
 
-    get fullSanitizer(): Sanitizer {
-      const self = this as unknown as SanitizeHelperClass;
-      if (!Object.hasOwn(self, "_fullSanitizer") || self._fullSanitizer == null) {
-        self._fullSanitizer = new self.sanitizerVendor.fullSanitizer();
-      }
-      return self._fullSanitizer;
-    },
+  get fullSanitizer(): Sanitizer {
+    const self = this as unknown as SanitizeHelperClass;
+    if (!Object.hasOwn(self, "_fullSanitizer") || self._fullSanitizer == null) {
+      self._fullSanitizer = new self.sanitizerVendor.fullSanitizer();
+    }
+    return self._fullSanitizer;
+  },
 
-    get linkSanitizer(): Sanitizer {
-      const self = this as unknown as SanitizeHelperClass;
-      if (!Object.hasOwn(self, "_linkSanitizer") || self._linkSanitizer == null) {
-        self._linkSanitizer = new self.sanitizerVendor.linkSanitizer();
-      }
-      return self._linkSanitizer;
-    },
+  get linkSanitizer(): Sanitizer {
+    const self = this as unknown as SanitizeHelperClass;
+    if (!Object.hasOwn(self, "_linkSanitizer") || self._linkSanitizer == null) {
+      self._linkSanitizer = new self.sanitizerVendor.linkSanitizer();
+    }
+    return self._linkSanitizer;
+  },
 
-    get safeListSanitizer(): Sanitizer {
-      const self = this as unknown as SanitizeHelperClass;
-      if (!Object.hasOwn(self, "_safeListSanitizer") || self._safeListSanitizer == null) {
-        self._safeListSanitizer = new self.sanitizerVendor.safeListSanitizer();
-      }
-      return self._safeListSanitizer;
-    },
-  }),
+  get safeListSanitizer(): Sanitizer {
+    const self = this as unknown as SanitizeHelperClass;
+    if (!Object.hasOwn(self, "_safeListSanitizer") || self._safeListSanitizer == null) {
+      self._safeListSanitizer = new self.sanitizerVendor.safeListSanitizer();
+    }
+    return self._safeListSanitizer;
+  },
+};
+
+Object.defineProperties(
+  ClassMethods,
+  Object.getOwnPropertyDescriptors(RailsHtmlSanitizer.Helpers.SanitizeHelper.ClassMethods),
 );
+RailsHtmlSanitizer.Helpers.SanitizeHelper.ClassMethods = ClassMethods as typeof ClassMethods &
+  typeof RailsHtmlSanitizer.Helpers.SanitizeHelper.ClassMethods;
 
 export class SanitizeHelper {
   static ClassMethods = ClassMethods;
