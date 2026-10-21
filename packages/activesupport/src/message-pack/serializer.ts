@@ -5,7 +5,7 @@ import { delegate } from "../module-ext.js";
 import { Extensions } from "./extensions.js";
 
 const SIGNATURE = Uint8Array.of(0xcc, 0x80);
-const SIGNATURE_INT = 128;
+export const SIGNATURE_INT = 128;
 
 export interface Serializer {
   dump(object: unknown): Uint8Array;
@@ -16,7 +16,7 @@ export interface Serializer {
   warmup(): void;
 }
 
-type SerializerHost = Serializer & {
+export type SerializerHost = Serializer & {
   _messagePackFactory?: Factory;
   _messagePackPool?: Pool | null;
   messagePackPool(): Pool;

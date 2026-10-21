@@ -730,8 +730,6 @@ export function extractFromProgram(
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
           for (const nested of staticModuleInstances(node, classInfo.name)) {
-            // A nested Ruby module seated as a plain object
-            // (`static TableDefinition = { column() {...} }`, RFC 0197).
             const literal = unwrapAssertions(nested.init);
             const instanceMethods =
               ts.isObjectLiteralExpression(literal) &&
@@ -4229,8 +4227,6 @@ export function harvestObjectLiteralMethods(
     const propMissingRailsCalls = missingRailsCallTags(prop);
     const propMissingRailsArgs = missingRailsArgsTags(prop);
     const propMissingRailsNames = missingRailsNameTags(prop);
-    // An includer harvesting a module declared elsewhere must not carry that
-    // module's arm receipts: they are compared, and judged, at the declaring file.
     const declaredHere =
       file === "" || prop.getSourceFile().fileName.replace(/\\/g, "/").endsWith(`/${file}`);
     const propInventedArms = declaredHere ? inventedArmTags(prop) : undefined;
