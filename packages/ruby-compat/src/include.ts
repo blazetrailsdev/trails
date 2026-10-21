@@ -1714,12 +1714,21 @@ export function rbModAppendFeatures(
       const modDesc = Object.getOwnPropertyDescriptor(proto, key);
       if (!modDesc) continue;
       const existing = Object.getOwnPropertyDescriptor(klass.prototype, key);
+      const existingIsMixin = installed.has(key);
+      if (typeof modDesc.value === "function" && (!existing || existingIsMixin)) {
+        const shadowed = Reflect.get(klass.prototype, key) as unknown;
+        if (typeof shadowed === "function" && shadowed !== modDesc.value) {
+          descriptors[superSlot(modDesc.value as AnyFunction, key)] = {
+            value: shadowed,
+            configurable: true,
+          };
+        }
+      }
       if (!existing) {
         descriptors[key] = modDesc;
         installed.add(key);
         continue;
       }
-      const existingIsMixin = installed.has(key);
       const isAccessorPair =
         ("get" in modDesc || "set" in modDesc) && ("get" in existing || "set" in existing);
       if (isAccessorPair) {

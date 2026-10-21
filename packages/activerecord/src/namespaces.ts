@@ -1,5 +1,5 @@
 import { Autoload, extend, type Extended, TopLevel } from "@blazetrails/activesupport";
-import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationRelation as AssociationRelationClass } from "./association-relation.js";
 import type { AliasTracker } from "./associations/alias-tracker.js";
 import type { AssociationScope } from "./associations/association-scope.js";
@@ -412,6 +412,6 @@ Encryption.eagerAutoload(() => {
 
 export const Railties = { name: "ActiveRecord::Railties" } as {
   name: string;
-  ControllerRuntime?: Module;
+  ControllerRuntime?: object;
 };
 rbModConstSet(ActiveRecord, "Railties", Railties);
