@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, it } from "vitest";
 import { Naming } from "@blazetrails/activemodel";
 import { assertEqual, extend } from "@blazetrails/activesupport";
@@ -6,8 +5,28 @@ import { registerConstant } from "@blazetrails/ruby-compat";
 import "../test-helpers/abstract-unit.js";
 import { TestCase } from "../test-case.js";
 
-type Tc = Record<string, any>;
-type TestCaseClass = typeof TestCase & Record<string, any>;
+interface Tc {
+  contentTag(name: string, content: string): string;
+  peoplePath(): string;
+  peopleUrl(): string;
+  linkTo(name: unknown, options: unknown): string;
+  title(text: string): string;
+  homepagePath(): string;
+  homepageUrl(): string;
+  linkToPerson(person: unknown): string;
+  withRouting(block: (set: DrawSet) => void): Promise<void>;
+  beforeSetup(): Promise<void>;
+  setup(): void;
+}
+
+interface DrawSet {
+  draw(block: (this: { get(path: string, options: object): void }) => void): void;
+}
+
+type TestCaseClass = (new (name: string) => TestCase) & {
+  tests(helperClass: unknown): void;
+  helperClass: unknown;
+};
 
 const PeopleHelper = {
   title(this: Tc, text: string) {
@@ -42,11 +61,11 @@ function testCase(klass: TestCaseClass): () => Tc {
 class PeopleHelperTest extends TestCase {}
 
 describe("PeopleHelperTest", () => {
-  const tc = testCase(PeopleHelperTest as TestCaseClass);
+  const tc = testCase(PeopleHelperTest as unknown as TestCaseClass);
 
   async function withTestRouteSet(block: () => void): Promise<void> {
-    await tc().withRouting((set: any) => {
-      set.draw(function (this: any) {
+    await tc().withRouting((set) => {
+      set.draw(function () {
         this.get("people", { to: "people#index", as: "people" });
       });
       block();
@@ -102,28 +121,34 @@ describe("PeopleHelperTest", () => {
 });
 
 class ManuallySetHelperTest extends TestCase {}
-(ManuallySetHelperTest as TestCaseClass).tests(PeopleHelper);
+(ManuallySetHelperTest as unknown as TestCaseClass).tests(PeopleHelper);
 
 describe("ManuallySetHelperTest", () => {
   it("helper class can be set manually not just inferred", () => {
-    assertEqual(PeopleHelper, (ManuallySetHelperTest as TestCaseClass).helperClass);
+    assertEqual(PeopleHelper, (ManuallySetHelperTest as unknown as TestCaseClass).helperClass);
   });
 });
 
 class ManuallySetSymbolHelperTest extends TestCase {}
-(ManuallySetSymbolHelperTest as TestCaseClass).tests(":people");
+(ManuallySetSymbolHelperTest as unknown as TestCaseClass).tests(":people");
 
 describe("ManuallySetSymbolHelperTest", () => {
   it("set helper class using symbol", () => {
-    assertEqual(PeopleHelper, (ManuallySetSymbolHelperTest as TestCaseClass).helperClass);
+    assertEqual(
+      PeopleHelper,
+      (ManuallySetSymbolHelperTest as unknown as TestCaseClass).helperClass,
+    );
   });
 });
 
 class ManuallySetStringHelperTest extends TestCase {}
-(ManuallySetStringHelperTest as TestCaseClass).tests("people");
+(ManuallySetStringHelperTest as unknown as TestCaseClass).tests("people");
 
 describe("ManuallySetStringHelperTest", () => {
   it("set helper class using string", () => {
-    assertEqual(PeopleHelper, (ManuallySetStringHelperTest as TestCaseClass).helperClass);
+    assertEqual(
+      PeopleHelper,
+      (ManuallySetStringHelperTest as unknown as TestCaseClass).helperClass,
+    );
   });
 });

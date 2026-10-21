@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, it } from "vitest";
 import "../test-helpers/abstract-unit.js";
 import "../test-helpers/active-record-unit.js";
@@ -11,17 +10,26 @@ import { Renderer } from "../renderer.js";
 import { TestCase } from "../test-case.js";
 import { Project } from "../test-helpers/fixtures/project.js";
 
-type Tc = Record<string, any>;
+interface Tc {
+  viewRenderer: Renderer;
+  virtualPath: string;
+  currentTemplate: unknown;
+  controller: { cacheStore: MemoryStore };
+  cache(name: unknown, options: Record<string, unknown>, block: () => void): Promise<null>;
+  concat(string: string): void;
+  beforeSetup(): Promise<void>;
+  setup(): void;
+}
 
 class RelationCacheTest extends TestCase {
   static {
-    (this as any).tests(CacheHelper);
+    (this as unknown as { tests(helperClass: unknown): void }).tests(CacheHelper);
   }
 
   override setup(): void {
     super.setup();
-    const self = this as Tc;
-    const viewPaths = (ActionController.Base as any).viewPaths();
+    const self = this as unknown as Tc;
+    const viewPaths = ActionController.Base.viewPaths();
     const lookupContext = new LookupContext(viewPaths, {}, ["test"]);
     self.viewRenderer = new Renderer(lookupContext);
     self.virtualPath = "path";
