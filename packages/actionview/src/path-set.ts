@@ -54,6 +54,11 @@ export class PathSet implements Iterable<PathSetResolver> {
     return this.paths.includes(resolver);
   }
 
+  each(block: (resolver: PathSetResolver) => void): ReadonlyArray<PathSetResolver> {
+    for (const resolver of this.paths) block(resolver);
+    return this.paths;
+  }
+
   /** @noRailsEquivalent PERMANENT */
   *[Symbol.iterator](): IterableIterator<PathSetResolver> {
     for (const r of this.paths) yield r;

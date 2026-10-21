@@ -349,10 +349,24 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
     return this._viewPaths.exists(base, pfxs, partial, details, key, keys);
   }
 
+  isTemplateExists(
+    name: string,
+    prefixes: ReadonlyArray<string> = [],
+    partial = false,
+    keys: ReadonlyArray<string> = [],
+    options: Record<string, DetailValue> = {},
+  ): boolean {
+    return this.isExists(name, prefixes, partial, keys, options);
+  }
+
   isAny(name: string, prefixes: ReadonlyArray<string> = [], partial = false): boolean {
     const [base, pfxs] = this.normalizeName(name, prefixes);
     const [details, key] = this.detailArgsForAny();
     return this._viewPaths.exists(base, pfxs, partial, details, key, []);
+  }
+
+  isAnyTemplates(name: string, prefixes: ReadonlyArray<string> = [], partial = false): boolean {
+    return this.isAny(name, prefixes, partial);
   }
 
   /** @internal */

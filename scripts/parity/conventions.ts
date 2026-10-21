@@ -689,6 +689,29 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "`OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its " +
+      "raw String (buffers.rb:27), and `Handlers::ERB#valid_encoding` " +
+      "(template/handlers/erb.rb:95-105) forces and checks a source's encoding. " +
+      "Each reads or rewrites a String's encoding tag, which a JS string does not " +
+      'have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.',
+    names: ["encoding", "encode!", "force_encoding", "valid_encoding"],
+    rubyFiles: ["buffers.rb", "template/handlers/erb.rb"],
+    packages: ["actionview"],
+  },
+  {
+    reason:
+      "`Template#offset` and `#locals_code` (template.rb:541-576) build the " +
+      "`module_eval` line offset and the Ruby locals binding of `compiled_source`, " +
+      "which `virtualizeTse` writes as TypeScript at build time; " +
+      "`#find_node_by_id` (template.rb:405-415) walks the Prism tree `spot` " +
+      'parses, and `spot` is line-based (CLAUDE.md § "Templates are ' +
+      'precompiled"). PERMANENT.',
+    names: ["offset", "locals_code", "find_node_by_id"],
+    rubyFiles: ["template.rb"],
+    packages: ["actionview"],
+  },
+  {
+    reason:
       "`Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs " +
       "Thorfiles) is not ported, and these `Thor::Util` members exist only for it: " +
       "`namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside " +
@@ -1691,7 +1714,14 @@ function rubyMethodToTsWithoutUnderscore(
     // moves.
     const collides = siblingRubyNames?.has(base) === true;
     const literal = collides ? [snakeToCamel(base) + "?"] : [];
-    const isPrefixed = "is" + camel.replace(/^./, (c) => c.toUpperCase());
+    // A leading underscore marks a private Ruby predicate (`_include_layout?`)
+    // and stays in front of the `is`, so the candidate is `_isIncludeLayout`.
+    // `is_includeLayout` is what `classAttribute` still generates for an
+    // underscored attribute, kept until that spelling converges.
+    const lead = /^_*/.exec(camel)![0];
+    const isPrefixed = lead + "is" + camel.slice(lead.length).replace(/^./, (c) => c.toUpperCase());
+    const generatedIsPrefixed =
+      lead === "" ? [] : ["is" + camel.replace(/^./, (c) => c.toUpperCase())];
     // Names already starting with `is_` collapse to one candidate so
     // `is_number?` → ["isNumber"] (not ["isIsNumber", "isNumber"]).
     // The `isPrefixed` form is intentionally NOT offered as a fallback
@@ -1719,7 +1749,13 @@ function rubyMethodToTsWithoutUnderscore(
       return [...literal, isPrefixed, camel, containment];
     }
     const hasAlias = HAS_PREDICATE_ALIASES.get(name) ?? PLURAL_PREDICATE_ALIASES.get(name);
-    return [...literal, isPrefixed, camel, ...(hasAlias === undefined ? [] : [hasAlias])];
+    return [
+      ...literal,
+      isPrefixed,
+      ...generatedIsPrefixed,
+      camel,
+      ...(hasAlias === undefined ? [] : [hasAlias]),
+    ];
   }
 
   if (name.endsWith("!")) {

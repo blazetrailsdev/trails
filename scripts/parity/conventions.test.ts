@@ -394,6 +394,10 @@ describe("rubyMethodToTs predicates", () => {
     expect(bareCandidates("is_hexadecimal_literal?")).toEqual(["isHexadecimalLiteral"]);
   });
 
+  it("keeps a private predicate's leading underscore in front of the is", () => {
+    expect(rubyMethodToTs("_include_layout?")).toContain("_isIncludeLayout");
+  });
+
   it("keeps prepending is for predicates that don't already start with one of the allowlisted prefixes", () => {
     expect(bareCandidates("number?")).toEqual(["isNumber", "number"]);
     expect(bareCandidates("blank?")).toEqual(["isBlank", "blank"]);
