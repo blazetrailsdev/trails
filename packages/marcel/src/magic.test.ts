@@ -19,6 +19,6 @@ describe("MagicTest", () => {
   });
   it(".child?", async () => {
     expect(await Magic.isChild("text/csv", "text/plain")).toBe(true);
-    expect(await Magic.isChild("text/plain", "text/csv")).toBe(false);
+    expect(await Magic.isChild("text/plain", "text/csv")).toBeFalsy();
   });
 });

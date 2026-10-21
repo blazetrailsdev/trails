@@ -151,8 +151,8 @@ export class Magic {
     return this.isEql(other);
   }
 
-  static isChild(child: string, parent: string): boolean {
-    return child === parent || (TYPE_PARENTS[child]?.some((p) => this.isChild(p, parent)) ?? false);
+  static isChild(child: string, parent: string): boolean | null {
+    return child === parent || (TYPE_PARENTS[child]?.some((p) => this.isChild(p, parent)) ?? null);
   }
 
   static magicMatch(io: unknown, method: "find" | "select"): unknown {
