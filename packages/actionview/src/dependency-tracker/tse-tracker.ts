@@ -131,9 +131,9 @@ export class TSETracker {
           if (!("partial" in options)) continue;
         }
 
-        const spacer =
-          options.spacerTemplate != null ? TSETracker.STRING.exec(options.spacerTemplate) : null;
-        if (spacer?.index === 0 && spacer[0].length === options.spacerTemplate.length) {
+        const spacerTemplate = options.spacerTemplate;
+        const spacer = spacerTemplate != null ? TSETracker.STRING.exec(spacerTemplate) : null;
+        if (spacer?.index === 0 && spacer[0].length === spacerTemplate!.length) {
           this.addStaticDependency(dependencies, spacer.groups?.static, spacer.groups?.quote);
         }
         this.addDependencies(dependencies, args, TSETracker.LAYOUT_DEPENDENCY);
@@ -144,7 +144,7 @@ export class TSETracker {
     return dependencies;
   }
 
-  private renderCallOptions(code: string): Record<string, string> | null {
+  private renderCallOptions(code: string): Record<string, string | null> | null {
     let source = code.trimStart();
     if (source.startsWith("(")) source = source.slice(1);
 
@@ -162,9 +162,9 @@ export class TSETracker {
     }
     const length = arguments_.length;
 
-    let options: Record<string, string> | null = null;
+    let options: Record<string, string | null> | null = null;
     if ((length === 1 || length === 2) && !isKeywordHash(arguments_[0])) {
-      options = { partial: arguments_[0], locals: arguments_[1] ?? "" };
+      options = { partial: arguments_[0], locals: arguments_[1] ?? null };
     } else if (length === 1 && arguments_[0].startsWith("{")) {
       const elements = argumentList(arguments_[0].slice(1)).filter((e) => e.length > 0);
       const pairs = elements.map((element) =>
