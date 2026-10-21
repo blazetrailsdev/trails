@@ -127,6 +127,6 @@ describe("QueuingTest", () => {
       await performAllLater(jobs);
     });
 
-    expect(called).toBe(true);
+    expect(called).toBeTruthy();
   });
 });
