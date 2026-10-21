@@ -3023,7 +3023,10 @@ export class Emitter {
     }
     if (!members.some((m) => /^static toString\(/.test(m)))
       members.unshift(`static toString(): string {\n  return ${JSON.stringify(u.fqn)};\n}`);
-    members.unshift(`static readonly [${this.lw.rc(ctxStatic, "classModule")}] = true;`);
+    // A `ClassMethods` holder is `extend`ed: its methods are statics, which
+    // `extend` copies from an unmarked class (a marked one gives its prototype's).
+    if (!/(^|::)ClassMethods$/.test(u.fqn))
+      members.unshift(`static readonly [${this.lw.rc(ctxStatic, "classModule")}] = true;`);
     const sig = this.ivarDecls(u, f, members);
     // What `extend(M, Concern)` gives it, and the `ClassMethods` constant that
     // `rbModConstSet` seats on it: declared, so they type-check.
