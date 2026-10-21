@@ -90,7 +90,7 @@ describe("PeopleHelperTest", () => {
 
       let theModel: unknown = null;
       extend(tc(), {
-        minitestMockPath(model: unknown) {
+        minitestMockPath(model: unknown, ..._args: unknown[]) {
           theModel = model;
           return "/people/1";
         },
@@ -111,7 +111,7 @@ describe("ManuallySetHelperTest", () => {
 });
 
 class ManuallySetSymbolHelperTest extends TestCase {}
-(ManuallySetSymbolHelperTest as TestCaseClass).tests("people");
+(ManuallySetSymbolHelperTest as TestCaseClass).tests(":people");
 
 describe("ManuallySetSymbolHelperTest", () => {
   it("set helper class using symbol", () => {

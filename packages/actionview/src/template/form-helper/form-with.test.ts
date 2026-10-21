@@ -8,6 +8,7 @@ import {
   assertMatch,
   assertNotIncludes,
   extend,
+  isBlank,
   isPlainObject,
   isPresent,
 } from "@blazetrails/activesupport";
@@ -275,6 +276,9 @@ Routes.draw(function () {
       this.resources("comments");
     });
   });
+
+  this.get("/foo", { to: "controller#action" });
+  this.root({ to: "main#index" });
 });
 
 describe("FormWithActsLikeFormForTest", () => {
@@ -289,12 +293,15 @@ describe("FormWithActsLikeFormForTest", () => {
 
   beforeEach(() => {
     view = buildView();
-    view.urlFor = function (this: Base, options: unknown): string {
-      if (isPlainObject(options)) {
-        urlForOptions = options as Record<string, unknown>;
-        return "/";
+    view.urlFor = function (this: Base, object: unknown): string {
+      urlForOptions = object as Record<string, unknown>;
+
+      if (isPlainObject(object) && isBlank(object["useRoute"]) && isBlank(object["controller"])) {
+        object["controller"] = "main";
+        object["action"] = "index";
       }
-      return (Object.getPrototypeOf(this) as Base).urlFor.call(this, options);
+
+      return (Object.getPrototypeOf(this) as Base).urlFor.call(this, object);
     } as typeof view.urlFor;
     include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
 
