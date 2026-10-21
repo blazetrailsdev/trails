@@ -98,6 +98,10 @@ export class Results {
 type MissingTemplatePath = { allTemplatePaths?(): readonly TemplatePath[] } | null | undefined;
 
 export class MissingTemplate extends ActionViewError {
+  static {
+    include(this, Correctable);
+  }
+
   static Results = Results;
 
   readonly path: string;
@@ -200,7 +204,6 @@ export class MissingTemplate extends ActionViewError {
     }
   }
 }
-include(MissingTemplate, Correctable);
 
 export class TemplateError extends ActionViewError {
   static readonly SOURCE_CODE_RADIUS = 3;

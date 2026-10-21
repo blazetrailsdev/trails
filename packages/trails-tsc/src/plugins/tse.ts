@@ -392,7 +392,7 @@ function freeIdentifiers(body: readonly string[]): { names: string[]; guarded: S
     const next = inner.size === 0 ? bound : new Set([...bound, ...inner]);
     ts.forEachChild(node, (child) => visit(child, next));
   };
-  visit(fn.body!, new Set());
+  visit(fn, new Set());
   return { names: [...names].sort(), guarded };
 }
 
@@ -402,14 +402,22 @@ function scopeBindings(node: ts.Node): Set<string> {
     if (ts.isIdentifier(name)) bound.add(name.text);
     else for (const el of name.elements) if (!ts.isOmittedExpression(el)) add(el.name);
   };
-  if (ts.isFunctionLike(node)) for (const param of node.parameters) add(param.name);
+  if (ts.isFunctionLike(node)) {
+    for (const param of node.parameters) add(param.name);
+    if ((ts.isFunctionExpression(node) || ts.isClassExpression(node)) && node.name) {
+      bound.add(node.name.text);
+    }
+    const body = (node as { body?: ts.Node }).body;
+    if (body !== undefined) for (const name of hoistedVars(body)) bound.add(name);
+  }
+  if (ts.isClassExpression(node) && node.name) bound.add(node.name.text);
   if (ts.isCatchClause(node) && node.variableDeclaration) add(node.variableDeclaration.name);
   if (ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node)) {
     const init = node.initializer;
     if (init && ts.isVariableDeclarationList(init))
       for (const decl of init.declarations) add(decl.name);
   }
-  if (ts.isBlock(node) || ts.isSourceFile(node) || ts.isCaseBlock(node)) {
+  if (ts.isBlock(node) || ts.isCaseBlock(node)) {
     const statements = ts.isCaseBlock(node)
       ? node.clauses.flatMap((clause) => [...clause.statements])
       : node.statements;
@@ -422,6 +430,26 @@ function scopeBindings(node: ts.Node): Set<string> {
     }
   }
   return bound;
+}
+
+function hoistedVars(body: ts.Node): Set<string> {
+  const names = new Set<string>();
+  const add = (name: ts.BindingName): void => {
+    if (ts.isIdentifier(name)) names.add(name.text);
+    else for (const el of name.elements) if (!ts.isOmittedExpression(el)) add(el.name);
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node) || ts.isClassLike(node)) return;
+    if (
+      ts.isVariableDeclarationList(node) &&
+      (node.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const | ts.NodeFlags.Using)) === 0
+    ) {
+      for (const decl of node.declarations) add(decl.name);
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(body, visit);
+  return names;
 }
 
 function isReference(node: ts.Identifier): boolean {

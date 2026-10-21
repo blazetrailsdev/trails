@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import ts from "typescript-5";
 import { TseLocalsSignatureError, virtualizeTse, virtualizeTseWithDeltas } from "./tse.js";
 import { diagnose } from "./tse-diagnose.js";
 
@@ -387,5 +388,77 @@ describe("virtualizeTse", () => {
       expect(lines[m.genLine].slice(m.genCol)).toMatch(/^"sidebar"/);
       expect(src.slice(m.srcCol)).toMatch(/^"sidebar"/);
     });
+  });
+});
+
+describe("virtualizeTse free-name lookup", () => {
+  const scope = { view: "{}" };
+  const lookups = (source: string): string[] =>
+    [
+      ...virtualizeTse(source, scope).matchAll(
+        /^ {2}let (\w+) = __lookup\(("\w+"(?:, true)?)\)/gmu,
+      ),
+    ].map((m) => `${m[1]}:${m[2]}`);
+  const run = async (source: string, view: object = {}): Promise<string> => {
+    const { outputText } = ts.transpileModule(virtualizeTse(source, scope), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    });
+    const exports: { default?: (...a: unknown[]) => Promise<unknown> } = {};
+    const modules: Record<string, unknown> = {
+      "@blazetrails/actionview": { TopLevel: {} },
+      "@blazetrails/activesupport": { htmlSafe: (s: string) => s },
+    };
+    new Function("exports", "require", outputText)(exports, (id: string) => modules[id]);
+    const out: string[] = [];
+    const context = Object.assign(Object.create(view), {
+      outputBuffer: {
+        append(v: unknown) {
+          out.push(String(v));
+        },
+        safeAppend(v: unknown) {
+          out.push(String(v));
+        },
+        toString: () => out.join(""),
+      },
+    });
+    await exports.default!.call(context, context, {});
+    return out.join("");
+  };
+
+  it("does not look up a block parameter or a const declared in a code tag", () => {
+    expect(lookups("<% [1].forEach((n) => { %><%= n %><% }) %>")).toEqual([]);
+    expect(lookups("<% { const inner = 1; %><%= inner %><% } %>")).toEqual([]);
+  });
+
+  it("does not look up a var hoisted out of a nested block or a named function expression", () => {
+    expect(lookups("<% if (true) { var v = 1; } %><%= v %>")).toEqual([]);
+    expect(lookups("<% const f = function g() { return g; }; %>")).toEqual([]);
+  });
+
+  it("guards a name read under typeof", () => {
+    expect(lookups('<%= typeof secret !== "undefined" ? 1 : 2 %>')).toEqual([
+      'secret:"secret", true',
+    ]);
+    expect(lookups("<%= secret %>")).toEqual(['secret:"secret"']);
+  });
+
+  it("raises ReferenceError when an undeclared name is used", async () => {
+    await expect(run("<%= doesnt_exist.name %>")).rejects.toThrow(
+      new ReferenceError("doesnt_exist is not defined"),
+    );
+    await expect(run("<%= typeof secret %><%= secret.name %>")).rejects.toThrow(TypeError);
+  });
+
+  it("reads an undeclared name under typeof as undefined", async () => {
+    expect(await run("<%= typeof secret %>")).toBe("undefined");
+    expect(
+      await run('<%= typeof secret !== "undefined" && secret != null ? secret : "one" %>'),
+    ).toBe("one");
+  });
+
+  it("raises only where the undeclared name is reached", async () => {
+    expect(
+      await run('<%= (() => { try { return customer.name; } catch { return "Anonymous"; } })() %>'),
+    ).toBe("Anonymous");
   });
 });
