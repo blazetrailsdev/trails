@@ -645,28 +645,22 @@ export function aryPop<T>(ary: T[], n: number): T[] {
 }
 
 /**
- * A non-Array receiver answers `first` / `last` itself (`rb_funcallv`,
- * `vendor/ruby/v3.3.11/vm_eval.c:1080`): a method is called, a reader property is read.
- */
-function dispatchReader(recv: object, name: "first" | "last"): unknown {
-  const member = (recv as Record<string, unknown>)[name];
-  return typeof member === "function" ? (member as () => unknown).call(recv) : member;
-}
-
-/**
  * Ruby `Array#first` with no argument (`vendor/ruby/v3.3.11/array.c:1901` `ary_first`):
  * the first element, or `nil` for an empty array. Any other enumerable is
  * `Enumerable#first` (`vendor/ruby/v3.3.11/enum.c:1284` `enum_first`), whose
  * `first_i` (`enum.c:1245`) breaks out of `each` at the first element. A
- * receiver that is neither raises `NoMethodError` (`rb_method_missing`,
+ * receiver that is neither answers its own `first` (`rb_funcallv`,
+ * `vendor/ruby/v3.3.11/vm_eval.c:1080`), a method called or a reader read, or raises `NoMethodError` (`rb_method_missing`,
  * `vendor/ruby/v3.3.11/vm_eval.c:869`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export function first<T>(ary: Iterable<T>): T | null {
   if (Array.isArray(ary)) return ary.length === 0 ? null : ary[0];
-  if (ary != null && "first" in Object(ary)) return dispatchReader(ary, "first") as T | null;
   if (typeof (ary as Partial<Iterable<T>> | null)?.[Symbol.iterator] !== "function") {
+    const member = (ary as { first?: unknown } | null)?.first;
+    if (member !== undefined)
+      return (typeof member === "function" ? member.call(ary) : member) as T;
     throw new NoMethodError(
       ary == null
         ? "undefined method 'first' for nil"
@@ -683,7 +677,8 @@ export function first<T>(ary: Iterable<T>): T | null {
  * Ruby `Array#last` (`vendor/ruby/v3.3.11/array.c:1914` `rb_ary_last`): the last
  * element, or `nil` for an empty array (`ary_last`, `array.c:1907`); with `n`,
  * the last `n` elements in order. `n` past the length takes them all, and a
- * negative `n` raises (`ary_take_first_or_last_n`, `array.c:1292-1307`).
+ * negative `n` raises (`ary_take_first_or_last_n`, `array.c:1292-1307`). A
+ * non-Array receiver answers its own `last` (`rb_funcallv`, `vendor/ruby/v3.3.11/vm_eval.c:1080`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -692,8 +687,12 @@ export function last<T>(ary: readonly T[]): T | null;
 export function last<T>(ary: readonly T[], n: number): T[];
 /** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
 export function last<T>(ary: readonly T[], n?: number): T | null | T[] {
-  if (n === undefined && !Array.isArray(ary) && ary != null && "last" in Object(ary))
-    return dispatchReader(ary, "last") as T | null;
+  if (!Array.isArray(ary)) {
+    const member = (ary as { last?: unknown }).last;
+    return (
+      typeof member === "function" ? member.call(ary, ...(n === undefined ? [] : [n])) : member
+    ) as T;
+  }
   const len = ary.length;
   if (n === undefined) return len === 0 ? null : ary[len - 1];
   n = num2long(n);

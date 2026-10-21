@@ -30,6 +30,7 @@ class Firm {
 }
 
 class FakeZone {
+  caseEquals?: () => never;
   constructor(public name: string) {}
   toString(): string {
     return this.name;
@@ -766,7 +767,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm = new Firm("D");
 
     for (const tz of fakeTimezones) {
-      (tz as any).caseEquals = () => {
+      tz.caseEquals = () => {
         throw new Error();
       };
     }
