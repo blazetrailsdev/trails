@@ -89,6 +89,21 @@ describe("walkTsFiles", () => {
   it("returns no files for a missing directory", async () => {
     expect(await walkTsFiles(path.join(root, "missing"), COMMITTED_TS_FILES)).toEqual([]);
   });
+
+  it("lists a root whose skipped subtree cannot be read", async () => {
+    const pruned = path.join(root, "pruned");
+    const deps = path.join(pruned, "node_modules");
+    await fs.mkdir(deps, { recursive: true });
+    await fs.writeFile(path.join(pruned, "kept.ts"), "");
+    await fs.chmod(deps, 0o000);
+    try {
+      expect(
+        (await walkTsFiles(pruned, COMMITTED_TS_FILES)).map((f) => path.relative(pruned, f)),
+      ).toEqual(["kept.ts"]);
+    } finally {
+      await fs.chmod(deps, 0o755);
+    }
+  });
 });
 
 describe("walkPackageTsFiles", () => {

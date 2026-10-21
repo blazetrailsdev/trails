@@ -64,18 +64,35 @@ export function walkTsFilesSync(
 /** Every file of `population` under `dir`, recursively, in `readdir` order.
  *  The flat async counterpart to `walkTsFilesSync`, for roots with no
  *  `<pkg>/src` layer (`parity:api:detached` walks `scripts/` with it). A missing
- *  directory yields no files rather than throwing. */
+ *  directory yields no files rather than throwing.
+ *
+ *  `skipDirs` is pruned *during* the descent, not filtered out of a finished
+ *  listing. A single `readdir(dir, { recursive: true })` cannot prune, so it
+ *  enumerated every path under a skipped subtree before discarding it: 2.2M
+ *  entries under `scripts/`, whose per-workspace `node_modules` the walk never
+ *  wanted, which is several hundred MB of path strings at once and reached
+ *  `parity:api:detached`'s 4GB heap limit on CI. The same descent also made a
+ *  dangling symlink inside one of those trees throw, and the `catch` below
+ *  reads a throw as "no files" — so the whole of `scripts/` silently left the
+ *  lint's population in any worktree whose nested `node_modules` held one. */
 export async function walkTsFiles(dir: string, population: TsFilePopulation): Promise<string[]> {
-  let names: string[];
+  let entries: fs.Dirent[];
   try {
-    names = await fsPromises.readdir(dir, { recursive: true });
+    entries = await fsPromises.readdir(dir, { withFileTypes: true });
   } catch {
     return [];
   }
-  return names
-    .filter((name) => population.includeFile(path.basename(name)))
-    .filter((name) => !name.split(path.sep).some((seg) => population.skipDirs.has(seg)))
-    .map((name) => path.join(dir, name));
+  const results: string[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (population.skipDirs.has(entry.name)) continue;
+      results.push(...(await walkTsFiles(fullPath, population)));
+    } else if (population.includeFile(entry.name)) {
+      results.push(fullPath);
+    }
+  }
+  return results;
 }
 
 /** Every file of `population` under `<packagesDir>/<pkg>/src`, sorted for
