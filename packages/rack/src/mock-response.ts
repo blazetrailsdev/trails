@@ -22,7 +22,7 @@ export class MockResponse extends Response {
     super(body, status, headers);
     this.originalHeaders = headers;
 
-    if (errors) {
+    if (errors != null && errors !== false) {
       this._errors = rbObjRespondTo(errors, "string") ? errors : null;
     } else {
       this._errors = "";
@@ -32,6 +32,7 @@ export class MockResponse extends Response {
     this.bufferedBodyBang();
   }
 
+  /** @inventedArm if — PERMANENT */
   get errors(): string | null {
     return rbObjRespondTo(this._errors, "string") ? this._errors.string() : this._errors;
   }

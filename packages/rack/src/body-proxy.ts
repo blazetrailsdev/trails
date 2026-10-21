@@ -97,6 +97,7 @@ export class BodyProxy {
     return typeof this.body?.[methodName] === "function";
   }
 
+  /** @inventedArm if — PERMANENT */
   methodMissing(methodName: string, ...args: unknown[]): any {
     if (methodName === "toStr" || methodName === "to_str") {
       throw new Error("NoMethodError: undefined method 'to_str'");
