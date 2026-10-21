@@ -94,6 +94,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "did-you-mean",
   "globalid",
   "i18n",
+  "marcel",
   "msgpack",
   "mysql2",
   "pg",

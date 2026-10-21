@@ -203,6 +203,7 @@ describe("vendor/sources.ts", () => {
       "msgpack",
       "mysql2",
       "pg",
+      "marcel",
       "thor",
       "i18n",
     ]);
@@ -378,6 +379,7 @@ describe("vendor/sources.ts", () => {
         "did-you-mean",
         "globalid",
         "i18n",
+        "marcel",
         "msgpack",
         "mysql2",
         "pg",
@@ -422,6 +424,7 @@ describe("vendor/sources.ts", () => {
         "did-you-mean",
         "globalid",
         "i18n",
+        "marcel",
         "msgpack",
         "rack",
         "rack-session",

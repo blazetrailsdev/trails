@@ -11,10 +11,6 @@ import { Marcel as MarcelSeat } from "./namespaces.js";
 import { TYPE_EXTS, TYPE_PARENTS } from "./tables.js";
 
 export class MimeType {
-  static toString(): string {
-    return "Marcel::MimeType";
-  }
-
   static BINARY = "application/octet-stream";
 
   static extend(

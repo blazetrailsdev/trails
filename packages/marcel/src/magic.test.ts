@@ -3,7 +3,7 @@ import { MimeType } from "./mime-type.js";
 import { eachContentTypeFixture } from "./test-helpers/test-helper.js";
 import { expect, it, describe } from "vitest";
 
-describe("MagicTest", () => {
+describe("Marcel::MimeType::MagicTest", () => {
   eachContentTypeFixture("magic", (file, name, contentType) => {
     it(`gets type for ${contentType} by using only magic bytes ${name}`, async () => {
       expect(await MimeType.for(file)).toEqual(contentType);
@@ -22,7 +22,7 @@ describe("MagicTest", () => {
   });
 
   it(".child?", async () => {
-    expect(await Magic.isChild("text/csv", "text/plain")).toBe(true);
+    expect(await Magic.isChild("text/csv", "text/plain")).toBeTruthy();
     expect(await Magic.isChild("text/plain", "text/csv")).toBeFalsy();
   });
 });

@@ -10,7 +10,7 @@ import { MimeType } from "./mime-type.js";
 import { files } from "./test-helpers/test-helper.js";
 import { beforeEach, expect, it, describe } from "vitest";
 
-describe("MimeTypeTest", () => {
+describe("Marcel::MimeTypeTest", () => {
   let path: string;
 
   beforeEach(() => {
@@ -35,7 +35,7 @@ describe("MimeTypeTest", () => {
       if (!(f as File).isClosed()) openFiles.push(f as File);
     });
 
-    expect(openFiles.some((f) => f.path() === path)).toBe(false);
+    expect(!openFiles.some((f) => f.path() === path)).toBeTruthy();
   });
 
   it("gets content type from Tempfiles", async () => {

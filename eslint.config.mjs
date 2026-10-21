@@ -1043,6 +1043,20 @@ export default defineConfig(
     },
   },
 
+  {
+    files: ["packages/marcel/src/extension.test.ts"],
+    rules: {
+      "vitest/no-conditional-tests": "off",
+    },
+  },
+  {
+    files: ["packages/marcel/src/test-helpers/test-helper.ts"],
+    rules: {
+      "no-useless-assignment": "off",
+      "prefer-const": ["error", { destructuring: "all" }],
+    },
+  },
+
   // ── activerecord: no-conditional-tests and no-conditional-in-test are
   // clean. no-conditional-expect still has outstanding violations; enable
   // it in a follow-up PR as the sites are driven to zero.
