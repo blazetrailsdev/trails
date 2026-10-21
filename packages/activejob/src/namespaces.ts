@@ -11,6 +11,11 @@ import type { BigDecimalSerializer } from "./serializers/big-decimal-serializer.
 import type { DurationSerializer } from "./serializers/duration-serializer.js";
 import type { ModuleSerializer } from "./serializers/module-serializer.js";
 import type { RangeSerializer } from "./serializers/range-serializer.js";
+import type { TimeObjectSerializer } from "./serializers/time-object-serializer.js";
+import type { DateTimeSerializer } from "./serializers/date-time-serializer.js";
+import type { DateSerializer } from "./serializers/date-serializer.js";
+import type { TimeWithZoneSerializer } from "./serializers/time-with-zone-serializer.js";
+import type { TimeSerializer } from "./serializers/time-serializer.js";
 import type { SymbolSerializer } from "./serializers/symbol-serializer.js";
 import type { Callbacks } from "./callbacks.js";
 import type { ConfiguredJob } from "./configured-job.js";
@@ -41,6 +46,14 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
   "active_job/queue_adapters/inline_adapter": () => import("./queue-adapters/inline-adapter.js"),
   "active_job/queue_adapters/test_adapter": () => import("./queue-adapters/test-adapter.js"),
   "active_job/serializers/object_serializer": () => import("./serializers/object-serializer.js"),
+  "active_job/serializers/time_object_serializer": () =>
+    import("./serializers/time-object-serializer.js"),
+  "active_job/serializers/date_time_serializer": () =>
+    import("./serializers/date-time-serializer.js"),
+  "active_job/serializers/date_serializer": () => import("./serializers/date-serializer.js"),
+  "active_job/serializers/time_with_zone_serializer": () =>
+    import("./serializers/time-with-zone-serializer.js"),
+  "active_job/serializers/time_serializer": () => import("./serializers/time-serializer.js"),
   "active_job/serializers/symbol_serializer": () => import("./serializers/symbol-serializer.js"),
   "active_job/serializers/duration_serializer": () =>
     import("./serializers/duration-serializer.js"),
@@ -107,6 +120,11 @@ export const Serializers = { name: "ActiveJob::Serializers", loadPath } as Autol
   serializers: typeof SerializersModule.serializers;
   addSerializers: typeof SerializersModule.addSerializers;
   ObjectSerializer: typeof ObjectSerializer;
+  TimeObjectSerializer: typeof TimeObjectSerializer;
+  DateTimeSerializer: typeof DateTimeSerializer;
+  DateSerializer: typeof DateSerializer;
+  TimeWithZoneSerializer: typeof TimeWithZoneSerializer;
+  TimeSerializer: typeof TimeSerializer;
   SymbolSerializer: typeof SymbolSerializer;
   DurationSerializer: typeof DurationSerializer;
   ModuleSerializer: typeof ModuleSerializer;
