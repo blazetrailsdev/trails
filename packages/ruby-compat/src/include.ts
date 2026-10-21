@@ -1756,11 +1756,10 @@ export function rbModAppendFeatures(
         if (typeof key === "string" && "value" in modDesc) {
           const shadowed = Reflect.get(klass.prototype, key) as unknown;
           if (typeof shadowed === "function" && shadowed !== modDesc.value) {
-            let slot = superSlots.get(modDesc.value as AnyFunction);
-            if (slot === undefined) {
-              superSlots.set(modDesc.value as AnyFunction, (slot = Symbol(`super:${key}`)));
-            }
-            descriptors[slot] = { value: shadowed, configurable: true };
+            descriptors[superSlot(modDesc.value as AnyFunction, key)] = {
+              value: shadowed,
+              configurable: true,
+            };
           }
         }
       }
@@ -1771,6 +1770,12 @@ export function rbModAppendFeatures(
 }
 
 const superSlots = new WeakMap<AnyFunction, symbol>();
+
+function superSlot(method: AnyFunction, key: string): symbol {
+  let slot = superSlots.get(method);
+  if (slot === undefined) superSlots.set(method, (slot = Symbol(`super:${key}`)));
+  return slot;
+}
 
 /**
  * Mirrors: Ruby's `super` — vendor/ruby/v3.3.11/vm_eval.c:366 `rb_call_super`.
@@ -2103,11 +2108,10 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
         "value" in descriptor &&
         shadowed !== descriptor.value
       ) {
-        let slot = superSlots.get(descriptor.value as AnyFunction);
-        if (slot === undefined) {
-          superSlots.set(descriptor.value as AnyFunction, (slot = Symbol(`super:${key}`)));
-        }
-        Object.defineProperty(klass.prototype, slot, { value: shadowed, configurable: true });
+        Object.defineProperty(klass.prototype, superSlot(descriptor.value as AnyFunction, key), {
+          value: shadowed,
+          configurable: true,
+        });
       }
       Object.defineProperty(klass.prototype, key, descriptor);
     }
@@ -2238,6 +2242,17 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
     const descriptor: PropertyDescriptor = modIsAccessor
       ? { get: modDesc.get, set: modDesc.set, configurable: true, enumerable: false }
       : { value: modDesc.value, writable: true, configurable: true, enumerable: false };
+    const shadowed = modIsAccessor ? undefined : (Reflect.get(klass, key) as unknown);
+    if (
+      typeof shadowed === "function" &&
+      shadowed !== modDesc.value &&
+      (!existing || getterIsMixin)
+    ) {
+      Object.defineProperty(klass, superSlot(modDesc.value as AnyFunction, key), {
+        value: shadowed,
+        configurable: true,
+      });
+    }
     if (!existing) {
       Object.defineProperty(klass, key, descriptor);
       defined.set(key, owner);

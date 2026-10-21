@@ -16,7 +16,8 @@ import {
   rbDeclareIvar,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
-import { exceptBang, underscore, isBlank, wrap } from "@blazetrails/activesupport";
+import { exceptBang, underscore, isBlank, kernelArray, wrap } from "@blazetrails/activesupport";
+import { zip } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import type { Association } from "./association.js";
@@ -136,6 +137,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /**
    * @internal
    * @missingRailsName class — PERMANENT
+   * @inlinedFrom ActiveRecord::Associations::ThroughAssociation#build_record rails/v8.0.2/activerecord/lib/active_record/associations/through_association.rb:116-129
    */
   override buildRecord(
     attributes?: Record<string, unknown> | PermittedAttributes,
@@ -144,7 +146,21 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     this.ensureNotNested();
     this._throughScope = this.scope();
     try {
-      const record = super.buildRecord((attributes ??= {}), block)!;
+      attributes ??= {};
+      if (this.sourceReflection().isCollection()) {
+        const inverse = this.sourceReflection().inverseOf();
+        const target = this.throughAssociation().target;
+
+        if (inverse != null && target != null && !globalThis.Array.isArray(target)) {
+          zip(kernelArray(target.id), kernelArray(inverse.foreignKey())).map(
+            ([primaryKeyValue, foreignKeyColumn]) => {
+              (attributes as Record<string, unknown>)[foreignKeyColumn as string] = primaryKeyValue;
+            },
+          );
+        }
+      }
+
+      const record = super.buildRecord(attributes, block)!;
 
       const inverse = this.sourceReflection().isPolymorphic()
         ? this.sourceReflection().polymorphicInverseOf(record.constructor)

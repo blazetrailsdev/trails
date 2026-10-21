@@ -13,7 +13,6 @@ import {
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import {
   hashAref,
-  Module,
   rbClassSuperclass,
   rbModName,
   rbObjRespondTo,
@@ -137,15 +136,15 @@ export function baseClass(this: typeof Base): typeof Base {
 
 type AbstractClassHost = { _abstractClass: boolean };
 
-export const ClassMethods = new Module().include({
+export const ClassMethods = {
   get abstractClass(): boolean {
     return Object.hasOwn(this, "_abstractClass")
-      ? (this as AbstractClassHost)._abstractClass
+      ? (this as unknown as AbstractClassHost)._abstractClass
       : false;
   },
 
   set abstractClass(value: boolean) {
-    (this as AbstractClassHost)._abstractClass = value;
+    (this as unknown as AbstractClassHost)._abstractClass = value;
   },
 
   isAbstractClass(this: object): boolean {
@@ -155,7 +154,7 @@ export const ClassMethods = new Module().include({
       Object.hasOwn(this, "_abstractClass") && (this as AbstractClassHost)._abstractClass === true
     );
   },
-});
+};
 
 /** @internal */
 export function findStiClass(this: typeof Base, typeName: string): typeof Base {
@@ -230,19 +229,19 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
 }
 
 export function dup(this: typeof Base): typeof Base {
-  const other = ClassMethods.superMethod(this, "dup")!() as typeof Base;
+  const other = rbCallSuper(this, dup) as typeof Base;
   setBaseClass(other);
   return other;
 }
 
-ClassMethods.defineMethod("dup", dup);
+Object.assign(ClassMethods, { dup });
 
 export function initializeClone(this: typeof Base, other: unknown): void {
-  ClassMethods.superMethod(this, "initializeClone")!(other);
+  rbCallSuper(this, initializeClone, other);
   setBaseClass(this);
 }
 
-ClassMethods.defineMethod("initializeClone", initializeClone);
+Object.assign(ClassMethods, { initializeClone });
 
 export function initializeDup(this: Base, other: unknown): void {
   rbCallSuper(this, initializeDup, other);
