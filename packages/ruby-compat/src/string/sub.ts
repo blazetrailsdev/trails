@@ -1,4 +1,5 @@
 import { MatchData } from "../match-data.js";
+import { EncodingError } from "../encoding-error.js";
 import { b } from "./b.js";
 import { rbObjAsString } from "../object.js";
 import {
@@ -315,7 +316,9 @@ export function rbStrRpartition(str: string, sep: unknown): [string, string, str
  * `String#start_with?` (`vendor/ruby/v3.3.11/string.c:10651` `rb_str_start_with`); a
  * Regexp prefix must match at the start (`rb_reg_start_with_p`,
  * `vendor/ruby/v3.3.11/re.c:1818`). An ASCII-8BIT receiver, a `Uint8Array`,
- * compares its bytes with the prefix's.
+ * compares its bytes with the prefix's, after `rb_enc_check`
+ * (`vendor/ruby/v3.3.11/encoding.c:1038`) admits a UTF-8 prefix only where one
+ * side is 7-bit.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -323,6 +326,13 @@ export function rbStrStartWith(str: string | Uint8Array, ...prefixes: unknown[])
   if (str instanceof Uint8Array) {
     return prefixes.some((prefix) => {
       const p = prefix instanceof Uint8Array ? prefix : b(stringValue(prefix));
+      if (
+        !(prefix instanceof Uint8Array) &&
+        !p.every((byte) => byte < 0x80) &&
+        !str.every((byte) => byte < 0x80)
+      ) {
+        throw new EncodingError("incompatible character encodings: ASCII-8BIT and UTF-8");
+      }
       return p.length <= str.length && p.every((byte, i) => byte === str[i]);
     });
   }

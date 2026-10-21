@@ -3,7 +3,6 @@ import { EOFError } from "./eof-error.js";
 import { print as ioPrint, puts as ioPuts } from "./io.js";
 import { b } from "./string/b.js";
 import { strNew } from "./string/bytes.js";
-import { rbStrEnumerateLines } from "./string/each.js";
 
 /**
  * Ruby's `StringIO` (stdlib), the readable/writable in-memory IO that
@@ -212,13 +211,13 @@ export class StringIO<S extends string | Uint8Array = string> {
    *
    * @noRailsEquivalent PERMANENT
    */
-  gets(): string | null {
+  gets(): S | null {
     if (this.isEof()) return null;
     const newline = this._string.indexOf(0x0a, this._pos);
     const end = newline === -1 ? this._string.length : newline + 1;
-    const line = strNew(Array.from(this._string.subarray(this._pos, end)));
+    const bytes = this._string.slice(this._pos, end);
     this._pos = end;
-    return line;
+    return (this._binary ? bytes : strNew(Array.from(bytes))) as S;
   }
 
   /**
@@ -227,10 +226,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    *
    * @noRailsEquivalent PERMANENT
    */
-  each(block: (line: string) => void): this {
-    const rest = this._string.subarray(this._pos);
-    this._pos = this._string.length;
-    for (const line of rbStrEnumerateLines(strNew(Array.from(rest)), [])) block(line);
+  each(block: (line: S) => void): this {
+    while (!this.isEof()) block(this.gets()!);
     return this;
   }
 

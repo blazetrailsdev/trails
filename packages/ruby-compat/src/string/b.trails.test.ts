@@ -69,3 +69,21 @@ describe("an ASCII-8BIT String's methods", () => {
     expect(rbEqual(read, Uint8Array.of(0xd0, 0xcf))).toBe(true);
   });
 });
+
+describe("an ASCII-8BIT String against UTF-8 text", () => {
+  it("raises from start_with? when neither side is 7-bit", () => {
+    expect(() => rbFSend(Uint8Array.of(0xff), "isStartWith", "é")).toThrow(EncodingError);
+    expect(rbFSend(b("ab"), "isStartWith", "é")).toBe(false);
+  });
+
+  it("answers length and getbyte by byte", () => {
+    expect(rbFSend(Uint8Array.of(0xff, 0xfe), "length")).toBe(2);
+    expect(rbFSend(Uint8Array.of(0xff), "getbyte", 0)).toBe(255);
+  });
+
+  it("is what gets answers on a binary StringIO", () => {
+    const io = new StringIO(Uint8Array.of(0x61, 0x0a, 0xff));
+    expect(io.gets()).toEqual(Uint8Array.of(0x61, 0x0a));
+    expect(io.gets()).toEqual(Uint8Array.of(0xff));
+  });
+});

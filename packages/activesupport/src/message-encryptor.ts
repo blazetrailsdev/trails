@@ -174,7 +174,7 @@ export class MessageEncryptor extends Codec {
 
   private decrypt(encryptedMessage: string | Uint8Array): Uint8Array {
     const cipher = this.newCipher();
-    const [encryptedData, iv, authTag] = this.extractParts(encryptedMessage);
+    const [encryptedData, iv, authTag] = this.extractParts(b(encryptedMessage));
 
     if (this.aeadMode && authTag.length !== AUTH_TAG_LENGTH) {
       throw new Thrown("invalid_message_format", "truncated auth_tag");
@@ -218,24 +218,20 @@ export class MessageEncryptor extends Codec {
     return parts.map((part) => this.encode(part)).join(SEPARATOR);
   }
 
-  private extractPart(
-    encryptedMessage: string | Uint8Array,
-    rindex: number,
-    length: number,
-  ): string | Uint8Array {
+  private extractPart(encryptedMessage: Uint8Array, rindex: number, length: number): Uint8Array {
     const index = rindex - length;
 
     if (
-      rbEqual(byteslice(b(encryptedMessage), index - SEPARATOR.length, SEPARATOR.length), SEPARATOR)
+      rbEqual(byteslice(encryptedMessage, index - SEPARATOR.length, SEPARATOR.length), SEPARATOR)
     ) {
-      return byteslice(b(encryptedMessage), index, length)!;
+      return byteslice(encryptedMessage, index, length)!;
     } else {
       throw new Thrown("invalid_message_format", "missing separator");
     }
   }
 
-  private extractParts(encryptedMessage: string | Uint8Array): Bytes[] {
-    const parts: (string | Uint8Array)[] = [];
+  private extractParts(encryptedMessage: Uint8Array): Bytes[] {
+    const parts: Uint8Array[] = [];
     let rindex = encryptedMessage.length;
 
     if (this.aeadMode) {
@@ -246,7 +242,7 @@ export class MessageEncryptor extends Codec {
     parts.push(this.extractPart(encryptedMessage, rindex, this.lengthOfEncodedIv()));
     rindex -= SEPARATOR.length + this.lengthOfEncodedIv();
 
-    parts.push(byteslice(b(encryptedMessage), 0, rindex)!);
+    parts.push(byteslice(encryptedMessage, 0, rindex)!);
 
     return parts.reverse().map((part) => this.decode(part));
   }

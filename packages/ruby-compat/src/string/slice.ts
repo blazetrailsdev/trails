@@ -50,30 +50,35 @@ export function sliceBang(
     if (text == null || span == null) return [null, string];
     return [text, string.slice(0, span[0]) + string.slice(span[1])];
   }
-  const chars = string instanceof Uint8Array ? Array.from(string) : [...string];
-  const n = chars.length;
+  const indx = arg as number | Range<number | null>;
+  const chars = typeof string === "string" ? [...string] : [];
+  const n = typeof string === "string" ? chars.length : string.length;
   let start: number;
   let len: number;
-  if (arg instanceof Range) {
-    start = arg.begin ?? 0;
-    let end = arg.end ?? -1;
+  if (indx instanceof Range) {
+    start = indx.begin ?? 0;
+    let end = indx.end ?? -1;
     if (start < 0) start += n;
     if (start < 0 || start > n) return [null, string];
     if (end < 0) end += n;
-    if (arg.excludeEnd && arg.end !== null) end -= 1;
+    if (indx.excludeEnd && indx.end !== null) end -= 1;
     len = Math.max(end - start + 1, 0);
   } else if (arg2 !== undefined) {
-    start = (arg as number) < 0 ? (arg as number) + n : (arg as number);
+    start = indx < 0 ? indx + n : indx;
     len = arg2 as number;
     if (start < 0 || start > n || len < 0) return [null, string];
   } else {
-    start = (arg as number) < 0 ? (arg as number) + n : (arg as number);
+    start = indx < 0 ? indx + n : indx;
     if (start < 0 || start >= n) return [null, string];
     len = 1;
   }
-  const sliced = chars.splice(start, len);
-  if (string instanceof Uint8Array) {
-    return [Uint8Array.from(sliced as number[]), Uint8Array.from(chars as number[])];
+  if (typeof string !== "string") {
+    const end = Math.min(start + len, n);
+    const rest = new Uint8Array(n - (end - start));
+    rest.set(string.subarray(0, start));
+    rest.set(string.subarray(end), start);
+    return [string.slice(start, end), rest];
   }
-  return [sliced.join(""), chars.join("")];
+  const sliced = chars.splice(start, len).join("");
+  return [sliced, chars.join("")];
 }

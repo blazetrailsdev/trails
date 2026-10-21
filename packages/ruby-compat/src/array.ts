@@ -116,13 +116,18 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  */
 export function pack(
   ary: ReadonlyArray<string | Uint8Array | number | bigint>,
-  fmt: `${"m" | "M" | "u" | "U"}${string}`,
+  fmt: "m" | "m0" | "M" | "u" | "U" | "U*",
 ): string;
 /** @noRailsEquivalent PERMANENT — Ruby core `Array#pack` (`vendor/ruby/v3.3.11/pack.c:197`). */
 export function pack(
   ary: ReadonlyArray<string | Uint8Array | number | bigint>,
-  fmt: string,
+  fmt: `${"a" | "A" | "Z" | "b" | "B" | "h" | "H" | "c" | "C" | "s" | "S" | "l" | "L" | "q" | "Q" | "j" | "J" | "i" | "I" | "n" | "N" | "v" | "V" | "f" | "F" | "e" | "E" | "d" | "D" | "g" | "G" | "x" | "X" | "@" | "w" | "p" | "P"}${string}`,
 ): Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `Array#pack` (`vendor/ruby/v3.3.11/pack.c:197`). */
+export function pack(
+  ary: ReadonlyArray<string | Uint8Array | number | bigint>,
+  fmt: string,
+): string | Uint8Array;
 /** @noRailsEquivalent PERMANENT — Ruby core `Array#pack` (`vendor/ruby/v3.3.11/pack.c:197`). */
 export function pack(
   ary: ReadonlyArray<string | Uint8Array | number | bigint>,

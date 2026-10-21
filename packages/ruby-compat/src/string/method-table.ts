@@ -243,7 +243,8 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
  * (CLAUDE.md, "A String has no encoding tag either"), answers: `==` and
  * `eql?` compare bytes (`rb_str_equal`, `vendor/ruby/v3.3.11/string.c:3742`;
  * `rb_str_eql`, `:3773`), `bytesize` counts them (`rb_str_bytesize`,
- * `:2225`), `empty?` asks whether there are any, `byteslice` slices them,
+ * `:2225`), as `length` and `size` do (one character per byte), `getbyte`
+ * reads one, `empty?` asks whether there are any, `byteslice` slices them,
  * `start_with?` compares a prefix of them,
  * and `+` joins them.
  *
@@ -257,7 +258,10 @@ export const BINARY_METHOD_TABLE: Record<
   caseEquals: (self, other) => rbEqual(self, other),
   eql: (self, other) => rbEql(self, other),
   plus: (self, str2) => rbStrPlus(self, str2),
+  length: (self) => self.length,
+  size: (self) => self.length,
   bytesize: (self) => self.length,
+  getbyte: (self, index) => rbStrGetbyte(self, index),
   isEmpty: (self) => self.length === 0,
   byteslice: (self, ...args) => byteslice(self, ...args),
   isStartWith: (self, ...prefixes) => rbStrStartWith(self, ...prefixes),
