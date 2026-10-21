@@ -266,7 +266,6 @@ export class YAMLTree {
     let tag: string | null = null;
     let o = typeof str === "string" ? str : new TextDecoder().decode(str);
 
-    // `binary?` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:390`)
     if (str instanceof Uint8Array && !str.every((byte) => byte < 0x80)) {
       o = pack([str], "m0");
       tag = "!binary";
