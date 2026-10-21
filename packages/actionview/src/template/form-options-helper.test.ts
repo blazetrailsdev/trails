@@ -606,7 +606,7 @@ describe("FormOptionsHelperTest", () => {
   });
 
   it("time zone options returns html safe string", () => {
-    expect(isHtmlSafe(view.timeZoneOptionsForSelect())).toBe(true);
+    expect(isHtmlSafe(view.timeZoneOptionsForSelect())).toBeTruthy();
   });
 
   it("time zone select", () => {
@@ -1152,7 +1152,7 @@ describe("FormOptionsHelperTest", () => {
           "dk",
         ),
       ),
-    ).toBe(true);
+    ).toBeTruthy();
   });
 
   it("grouped options for select with array and html attributes", () => {
@@ -1198,9 +1198,9 @@ describe("FormOptionsHelperTest", () => {
   });
 
   it("grouped options for select returns html safe string", () => {
-    expect(isHtmlSafe(groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]]))).toBe(
-      true,
-    );
+    expect(
+      isHtmlSafe(groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]])),
+    ).toBeTruthy();
   });
 
   it("grouped options for select with prompt returns html escaped string", () => {
@@ -1235,10 +1235,6 @@ describe("FormOptionsHelperTest", () => {
   };
   const requiredExpected = (inner: string, attrs = "") =>
     `<select id="post_category" name="post[category]" required="required"${attrs}>${inner}<option value="abe">abe</option>\n<option value="mus">mus</option>\n<option value="hest">hest</option></select>`;
-  const assertRequiredSelect = (expected: string, options: object, htmlOptions: object) => {
-    assertDomEqual(expected, select("post", "category", ["abe", "mus", "hest"], {}, htmlOptions));
-    assertDomEqual(expected, select("post", "category", ["abe", "mus", "hest"], options));
-  };
 
   it("select under fields for with index", () => {
     newPost("<mus>");
@@ -1496,28 +1492,37 @@ describe("FormOptionsHelperTest", () => {
   });
 
   it("required select display size equals to one", () => {
-    assertRequiredSelect(
+    assertDomEqual(
       requiredExpected('<option value="" label=" "></option>\n', ' size="1"'),
-      { required: true, size: 1 },
-      { required: true, size: 1 },
+      select("post", "category", ["abe", "mus", "hest"], {}, { required: true, size: 1 }),
+    );
+    assertDomEqual(
+      requiredExpected('<option value="" label=" "></option>\n', ' size="1"'),
+      select("post", "category", ["abe", "mus", "hest"], { required: true, size: 1 }),
     );
   });
 
   it("required select with display size bigger than one", () => {
-    assertRequiredSelect(
+    assertDomEqual(
       requiredExpected("", ' size="2"'),
-      { required: true, size: 2 },
-      { required: true, size: 2 },
+      select("post", "category", ["abe", "mus", "hest"], {}, { required: true, size: 2 }),
+    );
+    assertDomEqual(
+      requiredExpected("", ' size="2"'),
+      select("post", "category", ["abe", "mus", "hest"], { required: true, size: 2 }),
     );
   });
 
   it("required select with multiple option", () => {
     const expected =
       '<input name="post[category][]" type="hidden" value="" autocomplete="off"/><select id="post_category" multiple="multiple" name="post[category][]" required="required"><option value="abe">abe</option>\n<option value="mus">mus</option>\n<option value="hest">hest</option></select>';
-    assertRequiredSelect(
+    assertDomEqual(
       expected,
-      { required: true, multiple: true },
-      { required: true, multiple: true },
+      select("post", "category", ["abe", "mus", "hest"], {}, { required: true, multiple: true }),
+    );
+    assertDomEqual(
+      expected,
+      select("post", "category", ["abe", "mus", "hest"], { required: true, multiple: true }),
     );
   });
 
