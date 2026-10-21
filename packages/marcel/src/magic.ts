@@ -22,7 +22,6 @@ import {
   rbFSend,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
-import { rbBinop } from "./codegen-runtime.js";
 import { Marcel as MarcelSeat } from "./namespaces.js";
 
 export class Magic {
@@ -208,7 +207,9 @@ export class Magic {
           if (offset instanceof Range) {
             io.read(offset.begin, buffer);
             x = io.read(
-              rbBinop(rbBinop(offset.end, "-", offset.begin), "+", rbStrSend(value, "bytesize")[0]),
+              (offset.end as number) -
+                (offset.begin as number) +
+                (rbStrSend(value, "bytesize")[0] as number),
               buffer,
             );
             return x != null && x !== false
