@@ -646,9 +646,9 @@ export class Wrapper {
     }
   }
 
-  async verifyToPath(): Promise<void> {
+  verifyToPath(): void {
     if (rbObjRespondTo(this._body, "toPath")) {
-      if (!(await File.isExistAsync(this._body.toPath()))) {
+      if (!File.isExist(this._body.toPath())) {
         throw new LintError("The file identified by body.to_path does not exist");
       }
     }
