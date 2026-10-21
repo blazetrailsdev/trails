@@ -8,7 +8,7 @@ import {
   isPlainObject,
   kernelArray as Array,
   wrap,
-  type SafeBuffer,
+  SafeBuffer,
 } from "@blazetrails/activesupport";
 import {
   fetch,
@@ -126,7 +126,7 @@ export function optionsForSelect(
   container: unknown,
   selected: unknown = null,
 ): SafeBuffer | string {
-  if (typeof container === "string") return container;
+  if (typeof container === "string" || container instanceof SafeBuffer) return container;
 
   const [selectedValues, disabled] = extractSelectedAndDisabled(selected).map((r) =>
     Array(r).map(rbObjAsString),
@@ -351,12 +351,8 @@ export function optionTextAndValue(option: unknown): [unknown, unknown] {
     rbObjRespondTo(option, "first") &&
     rbObjRespondTo(option, "last")
   ) {
-    if (globalThis.Array.isArray(option)) {
-      option = option.filter((e) => !isPlainObject(e)) as unknown[];
-      return [first(option as unknown[]), last(option as unknown[])];
-    }
-    const { first: optionFirst, last: optionLast } = option as { first: unknown; last: unknown };
-    return [optionFirst, optionLast];
+    if (globalThis.Array.isArray(option)) option = option.filter((e) => !isPlainObject(e));
+    return [first(option as unknown[]), last(option as unknown[])];
   } else {
     return [option, option];
   }

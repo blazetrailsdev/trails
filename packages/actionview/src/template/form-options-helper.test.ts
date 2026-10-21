@@ -8,6 +8,7 @@ import { Errors } from "@blazetrails/activemodel";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
+import type { TextHelperHost } from "../helpers/text-helper.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
 const Post = Struct.new(
@@ -38,7 +39,7 @@ class FakeZone {
   }
 }
 
-type View = Base & Record<string, any>;
+type View = Base & TextHelperHost & Record<string, any>;
 
 describe("FormOptionsHelperTest", () => {
   let view: View;
@@ -214,9 +215,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.author_name = "Babe";
 
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      (view as any).concat(
-        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
-      );
+      view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
     });
 
     assertDomEqual(
@@ -230,9 +229,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.author_name = "Babe";
 
     const outputBuffer = view.fieldsFor("post", view.post, { index: 815 }, (f: any) => {
-      (view as any).concat(
-        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
-      );
+      view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
     });
 
     assertDomEqual(
@@ -247,9 +244,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.toParam = () => 815;
 
     const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: any) => {
-      (view as any).concat(
-        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
-      );
+      view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
     });
 
     assertDomEqual(
@@ -442,7 +437,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.origin = "dk";
 
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      (view as any).concat(
+      view.concat(
         f.groupedCollectionSelect(
           "origin",
           dummyContinents(),
@@ -529,7 +524,7 @@ describe("FormOptionsHelperTest", () => {
     view.digest = new Digest();
 
     const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
-      (view as any).concat(f.weekdaySelect("send_day"));
+      view.concat(f.weekdaySelect("send_day"));
     });
 
     assertDomEqual(
@@ -543,7 +538,7 @@ describe("FormOptionsHelperTest", () => {
     view.digest.send_day = "Monday";
 
     const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
-      (view as any).concat(f.weekdaySelect("send_day"));
+      view.concat(f.weekdaySelect("send_day"));
     });
 
     assertDomEqual(
@@ -626,7 +621,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm = new Firm("D");
 
     const outputBuffer = view.fieldsFor("firm", view.firm, {}, (f: any) => {
-      (view as any).concat(f.timeZoneSelect("time_zone"));
+      view.concat(f.timeZoneSelect("time_zone"));
     });
 
     assertDomEqual(
@@ -639,7 +634,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm = new Firm("D");
 
     const outputBuffer = view.fieldsFor("firm", view.firm, { index: 305 }, (f: any) => {
-      (view as any).concat(f.timeZoneSelect("time_zone"));
+      view.concat(f.timeZoneSelect("time_zone"));
     });
 
     assertDomEqual(
@@ -653,7 +648,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm.toParam = () => 305;
 
     const outputBuffer = view.fieldsFor("firm[]", view.firm, {}, (f: any) => {
-      (view as any).concat(f.timeZoneSelect("time_zone"));
+      view.concat(f.timeZoneSelect("time_zone"));
     });
 
     assertDomEqual(
@@ -1247,7 +1242,7 @@ describe("FormOptionsHelperTest", () => {
   it("select under fields for with index", () => {
     newPost("<mus>");
     const outputBuffer = view.fieldsFor("post", view.post, { index: 108 }, (f: any) => {
-      (view as any).concat(f.select("category", abeMusHest));
+      view.concat(f.select("category", abeMusHest));
     });
     assertDomEqual(
       postCategory(
@@ -1262,7 +1257,7 @@ describe("FormOptionsHelperTest", () => {
     newPost("<mus>");
     view.post.toParam = () => 108;
     const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: any) => {
-      (view as any).concat(f.select("category", abeMusHest));
+      view.concat(f.select("category", abeMusHest));
     });
     assertDomEqual(
       postCategory(
@@ -1273,36 +1268,33 @@ describe("FormOptionsHelperTest", () => {
     );
   });
 
-  // BLOCKED: select-tag-treats-safe-buffer-choices-as-string
-  it.skip("select under fields for with string and given prompt", () => {
+  it("select under fields for with string and given prompt", () => {
     view.post = new Post();
     const options = view.raw(
       '<option value="abe">abe</option><option value="mus">mus</option><option value="hest">hest</option>',
     );
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      (view as any).concat(f.select("category", options, { prompt: "The prompt" }));
+      view.concat(f.select("category", options, { prompt: "The prompt" }));
     });
     assertDomEqual(postCategory(`<option value="">The prompt</option>\n${options}`), outputBuffer);
   });
 
-  // BLOCKED: select-tag-treats-safe-buffer-choices-as-string
-  it.skip("select under fields for with block", () => {
+  it("select under fields for with block", () => {
     view.post = new Post();
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      (view as any).concat(
+      view.concat(
         f.select("category", null, {}, {}, () => {
-          (view as any).concat(view.contentTag("option", "hello world"));
+          view.concat(view.contentTag("option", "hello world"));
         }),
       );
     });
     assertDomEqual(postCategory("<option>hello world</option>"), outputBuffer);
   });
 
-  // BLOCKED: select-tag-treats-safe-buffer-choices-as-string
-  it.skip("select under fields for with block without options", () => {
+  it("select under fields for with block without options", () => {
     view.post = new Post();
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      (view as any).concat(f.select("category", null, {}, {}, () => {}));
+      view.concat(f.select("category", null, {}, {}, () => {}));
     });
     assertDomEqual(postCategory(""), outputBuffer);
   });

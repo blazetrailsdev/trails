@@ -645,6 +645,15 @@ export function aryPop<T>(ary: T[], n: number): T[] {
 }
 
 /**
+ * A non-Array receiver answers `first` / `last` itself (`rb_funcallv`,
+ * `vendor/ruby/v3.3.11/vm_eval.c:1080`): a method is called, a reader property is read.
+ */
+function dispatchReader(recv: object, name: "first" | "last"): unknown {
+  const member = (recv as Record<string, unknown>)[name];
+  return typeof member === "function" ? (member as () => unknown).call(recv) : member;
+}
+
+/**
  * Ruby `Array#first` with no argument (`vendor/ruby/v3.3.11/array.c:1901` `ary_first`):
  * the first element, or `nil` for an empty array. Any other enumerable is
  * `Enumerable#first` (`vendor/ruby/v3.3.11/enum.c:1284` `enum_first`), whose
@@ -656,6 +665,7 @@ export function aryPop<T>(ary: T[], n: number): T[] {
  */
 export function first<T>(ary: Iterable<T>): T | null {
   if (Array.isArray(ary)) return ary.length === 0 ? null : ary[0];
+  if (ary != null && "first" in Object(ary)) return dispatchReader(ary, "first") as T | null;
   if (typeof (ary as Partial<Iterable<T>> | null)?.[Symbol.iterator] !== "function") {
     throw new NoMethodError(
       ary == null
@@ -682,6 +692,8 @@ export function last<T>(ary: readonly T[]): T | null;
 export function last<T>(ary: readonly T[], n: number): T[];
 /** @noRailsEquivalent PERMANENT — Ruby core `Array#last` (`vendor/ruby/v3.3.11/array.c:1914`). */
 export function last<T>(ary: readonly T[], n?: number): T | null | T[] {
+  if (n === undefined && !Array.isArray(ary) && ary != null && "last" in Object(ary))
+    return dispatchReader(ary, "last") as T | null;
   const len = ary.length;
   if (n === undefined) return len === 0 ? null : ary[len - 1];
   n = num2long(n);

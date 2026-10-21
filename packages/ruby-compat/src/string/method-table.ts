@@ -292,6 +292,10 @@ export function stringSuperclass<M extends keyof StringInstance>(
     toString(): string {
       return (this as unknown as Record<symbol, string>)[RSTRING_PTR] ?? "";
     }
+
+    [Symbol.iterator](): Iterator<string> {
+      return this.toString()[Symbol.iterator]();
+    }
   };
   stringClasses.add(klass.prototype);
   for (const method of methods) {
