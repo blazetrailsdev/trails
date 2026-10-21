@@ -1,3 +1,7 @@
+import { toEnum } from "./enumerator.js";
+import { IO, ioObjects } from "./io.js";
+import { NotImplementedError } from "./not-implemented-error.js";
+
 const finalizers = new FinalizationRegistry<() => void>((aProc) => aProc());
 
 type WeakmapEntry<K extends object> = { key: WeakRef<K>; val: unknown };
@@ -48,6 +52,25 @@ export const ObjectSpace = {
   defineFinalizer(obj: object, aProc: () => void): [number, () => void] {
     finalizers.register(obj, aProc);
     return [0, aProc];
+  },
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/gc.c:4209 */
+  eachObject(of: { prototype: object; name: string }, block?: (obj: object) => unknown) {
+    if (!block) return toEnum(ObjectSpace, "eachObject", of);
+    if ((of as unknown) !== IO && !(of.prototype instanceof IO)) {
+      throw new NotImplementedError(`ObjectSpace.each_object(${of.name}) is not supported`);
+    }
+    let num = 0;
+    for (const ref of ioObjects) {
+      const obj = ref.deref();
+      if (obj === undefined) {
+        ioObjects.delete(ref);
+        continue;
+      }
+      if (!Object.prototype.isPrototypeOf.call(of.prototype, obj)) continue;
+      block(obj);
+      num++;
+    }
+    return num;
   },
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/weakmap.c:1125 */
   WeakMap,
