@@ -3457,6 +3457,26 @@ export class Lowerer {
           }
           return call;
         }
+        // `MAGIC.send(method) { … }` where `method` is a parameter every call of
+        // this method passes a literal Symbol (`magic_match(io, :find)` /
+        // `(io, :select)`, magic.rb:87, :94): the call each one names.
+        if (n.args[0]?.k === "lvar" && ctx.defName) {
+          const i = (ctx.defParams ?? []).findIndex((p) => p.name === n.args[0].name);
+          const syms = i >= 0 ? this.posSyms.get(ctx.defName)?.get(i) : null;
+          if (syms && syms.size >= 1 && syms.size <= 3) {
+            const v = this.expr(n.args[0], ctx);
+            const arms = [...syms].map((sym) => ({
+              sym,
+              code: this.expr({ ...n, name: sym, args: n.args.slice(1) }, ctx),
+            }));
+            return arms
+              .slice(0, -1)
+              .reduceRight(
+                (acc, a) => `${v} === ${JSON.stringify(a.sym)} ? ${a.code} : ${acc}`,
+                arms.at(-1)!.code,
+              );
+          }
+        }
         // `MAGIC.send(method) { |type, matches| … }` (marcel magic.rb:131): an
         // Array iterator yields one element, which a block of several
         // parameters splats (vm_callee_setup_block_arg); JS's `find` / `select`
@@ -4417,6 +4437,41 @@ export class Lowerer {
     return null;
   }
 
+  /**
+   * Per method name, per positional index: the Symbols the gem's calls pass
+   * there, or null once a call passes anything else. A method forwarding its
+   * own parameter to itself (`magic_match(StringIO.new(io.to_s), method)`)
+   * passes nothing new.
+   */
+  posSyms = new Map<string, Map<number, Set<string> | null>>();
+
+  notePositionalSyms(body: N): void {
+    const forwarded = new Set<N>();
+    walk([body], (d) => {
+      if (d.k !== "def") return;
+      const names: (string | undefined)[] = (d.params ?? []).map((p: Param) =>
+        p.kind === "req" || p.kind === "opt" ? p.name : undefined,
+      );
+      walk([d.body], (c) => {
+        if (c.k !== "call" || c.name !== d.name) return;
+        c.args.forEach((a: N, i: number) => {
+          if (a?.k === "lvar" && a.name === names[i]) forwarded.add(a);
+        });
+      });
+    });
+    walk([body], (n) => {
+      if (n.k !== "call" || !n.args?.length) return;
+      const byIdx = this.posSyms.get(n.name) ?? new Map<number, Set<string> | null>();
+      this.posSyms.set(n.name, byIdx);
+      n.args.forEach((a: N, i: number) => {
+        if (!a || a.k === "kwargs" || a.k === "blockpass" || forwarded.has(a)) return;
+        const cur = byIdx.has(i) ? byIdx.get(i)! : new Set<string>();
+        if (cur === null) return;
+        byIdx.set(i, a.k === "sym" ? cur.add(a.value) : null);
+      });
+    });
+  }
+
   noteKwargs(body: N): void {
     walk([body], (n) => {
       if (n.k !== "call") return;
@@ -4452,7 +4507,18 @@ export class Lowerer {
     return ts.size ? [...ts].join(" | ") : "unknown";
   }
 
+  /** A constant the gem assigns a Hash literal (`TYPE_PARENTS = { … }`), by name. */
+  constHashes = new Map<string, N>();
+  /** A constant the gem assigns an Array literal (`MAGIC = [ … ]`), by name. */
+  constArrays = new Set<string>();
+
   noteRanges(body: N): void {
+    walk([body], (n) => {
+      if (n.k === "casgn" && n.path && n.value?.k === "hash")
+        this.constHashes.set(n.path.filter((x: string) => x).at(-1), n.value);
+      if (n.k === "casgn" && n.path && n.value?.k === "array")
+        this.constArrays.add(n.path.filter((x: string) => x).at(-1));
+    });
     // A Range written straight into `[]` (`content_type[-content_type.size..-1]`)
     // slices and is gone; it never reaches a `begin` / `end`.
     const slices = new Set<N>();
@@ -4478,6 +4544,20 @@ export class Lowerer {
   typeOf(n: N | null | undefined, ctx: Ctx): TypeRef {
     if (!n) return null;
     const T = this.resolver.types;
+    if (n.k === "const" && this.constArrays.has(n.path.filter((x: string) => x).at(-1)))
+      return { k: "array", el: null };
+    // `CONST[key]` on a constant assigned a Hash literal whose values are all
+    // Strings, or all Arrays of Strings (marcel's `TYPE_PARENTS`).
+    if (n.k === "call" && n.name === "[]" && n.recv?.k === "const" && n.args.length === 1) {
+      const h = this.constHashes.get(n.recv.path.filter((x: string) => x).at(-1));
+      const vt = h ? new Set(h.pairs.map((p: any) => this.literalType(p.value))) : null;
+      if (vt?.size === 1) {
+        const [t] = [...vt];
+        if (t === "string") return { k: "prim", name: "string", nullable: true };
+        if (t === "string[]")
+          return { k: "array", el: { k: "prim", name: "string" }, nullable: true };
+      }
+    }
     // `to_s`, `downcase`, `upcase` answer a String (any receiver's `to_s`,
     // string.c rb_str_downcase / rb_str_upcase).
     if (
@@ -5236,9 +5316,13 @@ export class Lowerer {
     const E =
       recvType?.k === "array"
         ? R
-        : /^[\w$]+(\.[\w$]+)*$/.test(r)
-          ? `(${enumOf(r)})`
-          : `((x) => ${enumOf("x")})(${r})`;
+        : // `x.each_object(File)` and its kin without a block answer an
+          // Enumerator (enumerator.c rb_enumeratorize): its elements.
+          recvNode?.k === "call" && /^each(_|$)/.test(recvNode.name) && !recvNode.block
+          ? `[...(${r} as Iterable<unknown>)]`
+          : /^[\w$]+(\.[\w$]+)*$/.test(r)
+            ? `(${enumOf(r)})`
+            : `((x) => ${enumOf("x")})(${r})`;
     switch (name) {
       case "clear":
         // Array#clear / Hash#clear (array.c rb_ary_clear, hash.c rb_hash_clear)
@@ -5277,6 +5361,12 @@ export class Lowerer {
         if (blk) return `${E}${nav}filter(${fn()})`;
         break;
       case "reject":
+        // `reject(&:closed?)`: the predicate sent to each element; a Ruby
+        // predicate's value is a boolean in practice, as `cond` treats it.
+        if (blk?.k === "symproc" && /\?$/.test(blk.name)) {
+          const m = this.callName(blk.name);
+          return `${E}${nav}filter((x) => !x.${m}())`;
+        }
         // Typed variadic so forwarding `...xs` into a one-parameter block type-checks.
         if (blk)
           return `${E}${nav}filter((...xs: any[]) => !${this.truthy(`((${fn()}) as (...a: any[]) => unknown)(...xs)`, true)})`;
@@ -5305,15 +5395,16 @@ export class Lowerer {
           const m = n.name === "all?" ? "every" : "some";
           return `${n.name === "none?" ? "!" : ""}${this.entries(r, ctx, recvNode)}.${m}(${this.arrow(one, blk.body, ctx)})`;
         }
+        // `x&.any? { }` is nil for a nil `x`, where `?.` reads `undefined`.
         if (n.name === "all?") {
-          if (blk) return `${E}${nav}every(${fn()})`;
+          if (blk) return nav ? `(${E}${nav}every(${fn()}) ?? null)` : `${E}.every(${fn()})`;
           break;
         }
         if (n.name === "none?") {
-          if (blk) return `!${E}${nav}some(${fn()})`;
+          if (blk && !nav) return `!${E}.some(${fn()})`;
           break;
         }
-        if (blk) return `${E}${nav}some(${fn()})`;
+        if (blk) return nav ? `(${E}${nav}some(${fn()}) ?? null)` : `${E}.some(${fn()})`;
         if (n.args.length === 0) return `${E}${nav}some((x: any) => x != null && x !== false)`;
         break;
       case "each":
