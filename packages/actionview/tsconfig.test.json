@@ -12,9 +12,10 @@
       "@blazetrails/trails-tsc": ["../trails-tsc/src/index.ts"]
     }
   },
-  "include": ["src/**/*.test.ts", "src/test-helpers/**/*.ts", "src/test-case.ts"],
+  "include": ["src/**/*.test.ts", "src/test-helpers/**/*.ts"],
   "references": [
     { "path": "./tsconfig.json" },
+    { "path": "./tsconfig.test-case.json" },
     { "path": "../actionpack" },
     { "path": "../activemodel" },
     { "path": "../activerecord" },
