@@ -10,6 +10,7 @@ import {
 import {
   ArgumentError,
   classModule,
+  deleteSuffix,
   rbModConstSet,
   rbModName,
   rbObjClass,
@@ -26,6 +27,7 @@ interface QueueAdapterClass {
   isQueueAdapter(object: unknown): boolean;
 }
 
+/** @missingRailsArgs delete_suffix — PERMANENT */
 export function adapterName(adapter: unknown): string {
   if (rbObjRespondTo(adapter, "queueAdapterName")) {
     return (adapter as { queueAdapterName: string }).queueAdapterName;
@@ -33,7 +35,7 @@ export function adapterName(adapter: unknown): string {
 
   const adapterClass = typeof adapter === "function" ? adapter : rbObjClass(adapter);
   const name = demodulize(rbModName(adapterClass as object) as string);
-  return `${name.endsWith("Adapter") ? name.slice(0, -"Adapter".length) : name}`;
+  return `${deleteSuffix(name, "Adapter")}`;
 }
 Object.assign(ActiveJob, { adapterName });
 

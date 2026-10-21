@@ -407,6 +407,7 @@ export { sliceBang } from "./string/slice.js";
 export { strCount } from "./string/tr.js";
 export {
   center,
+  deleteSuffix,
   lastMatchGetter,
   matchOperator,
   rbDefineMethod,

@@ -520,8 +520,12 @@ function deletePrefix(str: string, prefix: unknown): string {
   return str.startsWith(p) ? str.slice(p.length) : str;
 }
 
-/** `String#delete_suffix` (`vendor/ruby/v3.3.11/string.c:10878` `rb_str_delete_suffix`). */
-function deleteSuffix(str: string, suffix: unknown): string {
+/**
+ * `String#delete_suffix` (`vendor/ruby/v3.3.11/string.c:10878` `rb_str_delete_suffix`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function deleteSuffix(str: string, suffix: unknown): string {
   const s = stringValue(suffix);
   return s.length && str.endsWith(s) ? str.slice(0, -s.length) : str;
 }
