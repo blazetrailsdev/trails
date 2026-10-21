@@ -507,6 +507,18 @@ if (!process.argv.includes("--no-types"))
 // parameter or member takes `!` (nonnull-pass.ts). `--no-nonnull` skips it.
 if (!process.argv.includes("--no-nonnull"))
   report.nonNullAssertions = nonNullPass(outDir, path.join(PKG_DIR, "tsconfig.json"));
+// Formatted as a commit would store it (the repo's prettier and its config),
+// so the tree diffs against a hand port by content, not layout.
+// `--no-prettier` skips it.
+if (!process.argv.includes("--no-prettier")) {
+  const t = Date.now();
+  execFileSync(
+    path.join(ROOT, "node_modules/.bin/prettier"),
+    ["--write", "--log-level", "warn", `${outDir}/**/*.ts`],
+    { cwd: ROOT, stdio: "inherit" },
+  );
+  report.prettierMs = Date.now() - t;
+}
 report.unseatedConstants = emitter.unseated;
 report.wanted = Object.fromEntries([...resolver.wanted].sort((a, b) => b[1] - a[1]));
 report.unresolvedConsts = Object.fromEntries(
