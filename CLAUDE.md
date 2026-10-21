@@ -1353,8 +1353,9 @@ pattern binds and destructures through `deconstruct` / `deconstruct_keys` and
 raises `NoMatchingPatternKeyError` on a miss. JS has no pattern syntax, and a
 pattern written as data or a predicate is a new mini-language Rails readers
 would not recognise. **trails does not port Ruby pattern matching**: Minitest's
-`assert_pattern` / `refute_pattern` have no trails counterpart, and
-`deconstruct` / `deconstruct_keys` are not ported on any class. A Rails test
+`assert_pattern` / `refute_pattern` have no trails counterpart, and the
+`deconstruct_keys` members already ported (`Date`, `GlobalID`, `URI::GID`,
+ruby-compat's `Hash`) stay as plain methods. A Rails test
 whose assertions are patterns (`PatternMatchingTestCases`,
 `vendor/rails/v8.0.2/actionview/test/template/test_case_test.rb:490-516`) is
 parked as `it.skip` under a `PERMANENT-SKIP:` line citing this section. Ruled by
