@@ -1,5 +1,6 @@
 import { ActionController, ActionDispatch, RouteSet, UrlFor } from "@blazetrails/actionpack";
 import { RoutingUrlFor } from "../routing-url-for.js";
+import { I18n } from "@blazetrails/activesupport";
 import { File, include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 
 type DrawCallback = Parameters<RouteSet["draw"]>[0];
@@ -19,6 +20,10 @@ declare module "@blazetrails/actionpack" {
 }
 
 const __dir__ = decodeURIComponent(new URL(".", import.meta.url).pathname);
+
+I18n.setEnforceAvailableLocales(false);
+
+export const ORIGINAL_LOCALES = I18n.availableLocales().map(String).sort();
 
 export const FIXTURE_LOAD_PATH = File.expandPath("fixtures", __dir__);
 
