@@ -173,6 +173,12 @@ interface Ctx {
   blockVar?: string;
   /** Inside an arrow function body (block). `next` → return. */
   inBlock: boolean;
+  /**
+   * Inside the block of an iterator that unwinds on `IterBreak`
+   * (`Thread.each_caller_location`): a `return v` is the method's, so it is
+   * `rbIterBreakValue(v)` and the iterator call answers `v`.
+   */
+  iterBreak?: boolean;
   /** Inside a JS loop body (while / for-of) at the current function level. */
   inLoop: boolean;
   defName?: string;
@@ -468,7 +474,21 @@ export class Lowerer {
   /** Lower a statement list. `tail` marks the last statement as the value. */
   block(nodes: N[], ctx: Ctx, tail: boolean): string[] {
     const out: string[] = [];
-    nodes.forEach((n, i) => out.push(...this.stmt(n, ctx, tail && i === nodes.length - 1)));
+    const last = nodes.length - 1;
+    for (let i = 0; i <= last; i++) {
+      const n = nodes[i];
+      // `each_caller_location { … return v … }` then an implicit or explicit
+      // `nil`: the method answers the iterator's value (`null` on no return).
+      if (
+        tail &&
+        this.isIterBreakCall(n) &&
+        (i === last || (i === last - 1 && nodes[last].k === "nil"))
+      ) {
+        out.push(`return ${this.expr(n, this.child(ctx, { iterBreak: true }))};`);
+        break;
+      }
+      out.push(...this.stmt(n, ctx, tail && i === last));
+    }
     if (tail && nodes.length === 0) {
       /* implicit nil */
     }
@@ -485,6 +505,16 @@ export class Lowerer {
     let t = node;
     while (t && t.k === "or") t = t.right;
     return t?.k === "call" && t.safe ? `${v} ?? null` : v;
+  }
+
+  isIterBreakCall(n: N): boolean {
+    return (
+      n.k === "call" &&
+      n.name === "each_caller_location" &&
+      n.block?.k === "block" &&
+      n.recv?.k === "const" &&
+      n.recv.path.filter((x: string) => x !== "").join("::") === "Thread"
+    );
   }
 
   seqBody(n: N | null | undefined): N[] {
@@ -556,6 +586,10 @@ export class Lowerer {
       case "begin":
         return this.beginStmt(n, ctx, tail);
       case "return": {
+        if (ctx.inBlock && ctx.iterBreak)
+          return [
+            `${this.rc(ctx, "rbIterBreakValue")}(${n.value ? this.expr(n.value, ctx) : "null"});`,
+          ];
         if (ctx.inBlock) {
           this.stat(ctx, "return-in-block");
         }
