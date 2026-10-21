@@ -9,7 +9,6 @@ import {
   Tempfile,
   StringIO,
 } from "@blazetrails/ruby-compat";
-import { declined } from "./codegen-declined.js";
 import { MimeType } from "./mime-type.js";
 import { files } from "./test-helpers/test-helper.js";
 import { beforeEach, expect, it, describe } from "vitest";
@@ -71,14 +70,5 @@ describe("MimeTypeTest", () => {
     expect(contentType).toEqual("image/gif");
   });
   // PERMANENT-SKIP: Rack::Lint::InputWrapper is rack 2 (marcel.gemspec:25 `rack ~> 2.0`); trails ports rack 3.1.14, where it is Rack::Lint::Wrapper::InputWrapper (vendor/rack/v3.1.14/lib/rack/lint.rb:44, :445)
-  it.skip("gets content type from sources that conform to Rack::Lint::InputWrapper", async () => {
-    const io = new StringIO(await File.read(path as string));
-    const wrapper = new (declined(
-      "test/mime_type_test.rb:0",
-      "const-unresolved",
-      "Rack::Lint::InputWrapper",
-    ))(io);
-    const contentType = await MimeType.for(wrapper);
-    expect(contentType).toEqual("image/gif");
-  });
+  it.skip("gets content type from sources that conform to Rack::Lint::InputWrapper", () => {});
 });
