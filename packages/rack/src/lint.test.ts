@@ -23,30 +23,6 @@ function env(options: Record<string, any> = {}): Record<string, any> {
   return MockRequest.envFor("/", options);
 }
 
-function validEnv(overrides: Record<string, any> = {}): Record<string, any> {
-  return {
-    REQUEST_METHOD: "GET",
-    SERVER_NAME: "example.org",
-    SERVER_PORT: "80",
-    SERVER_PROTOCOL: "HTTP/1.1",
-    QUERY_STRING: "",
-    PATH_INFO: "/",
-    SCRIPT_NAME: "",
-    "rack.url_scheme": "http",
-    "rack.input": {
-      read() {
-        return "";
-      },
-      gets() {
-        return null;
-      },
-      each() {},
-    },
-    "rack.errors": { puts() {}, write() {}, flush() {} },
-    ...overrides,
-  };
-}
-
 it("pass valid request", async () => {
   expect((await new Lint(validApp).call(env({})))[0]).toBe(200);
 });
@@ -410,8 +386,8 @@ it("notice header errors", async () => {
 
 it("notice rack.early_hints errors", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const env = validEnv({ "rack.early_hints": "not a function" });
-  await expect(app.call(env)).rejects.toThrow(LintError);
+  const e = env({ "rack.early_hints": "not a function" });
+  await expect(app.call(e)).rejects.toThrow(LintError);
 });
 
 it("notice content-type errors", async () => {
@@ -470,7 +446,7 @@ it("handles body.to_path returning nil", async () => {
     },
   };
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, body]);
-  const [status] = await app.call(validEnv());
+  const [status] = await app.call(env({}));
   expect(status).toBe(200);
 });
 
@@ -703,34 +679,34 @@ it("notices when request env doesn't have a valid rack.hijack callback", async (
 
 it("handles valid rack.hijack env", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const env = validEnv({ "rack.hijack?": true, "rack.hijack": () => ({}) });
-  const [status] = await app.call(env);
+  const e = env({ "rack.hijack?": true, "rack.hijack": () => ({}) });
+  const [status] = await app.call(e);
   expect(status).toBe(200);
 });
 
 it("notices when rack.hijack env entry does not respond to #call", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const env = validEnv({ "rack.hijack?": true, "rack.hijack": 42 });
-  await expect(app.call(env)).rejects.toThrow(LintError);
+  const e = env({ "rack.hijack?": true, "rack.hijack": 42 });
+  await expect(app.call(e)).rejects.toThrow(LintError);
 });
 
 it("notices when rack.hijack env entry does not return an IO", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const env = validEnv({ "rack.hijack?": true, "rack.hijack": () => "not-io" });
-  const [status] = await app.call(env);
+  const e = env({ "rack.hijack?": true, "rack.hijack": () => "not-io" });
+  const [status] = await app.call(e);
   expect(status).toBe(200);
 });
 
 it("handles valid rack.hijack response header", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const [status] = await app.call(validEnv({ "rack.hijack?": true, "rack.hijack": () => ({}) }));
+  const [status] = await app.call(env({ "rack.hijack?": true, "rack.hijack": () => ({}) }));
   expect(status).toBe(200);
 });
 
 it("allows non-hijack responses when server supports hijacking", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const env = validEnv({ "rack.hijack?": true, "rack.hijack": () => ({}) });
-  const [status] = await app.call(env);
+  const e = env({ "rack.hijack?": true, "rack.hijack": () => ({}) });
+  const [status] = await app.call(e);
   expect(status).toBe(200);
 });
 
@@ -750,7 +726,7 @@ it("notices when the response headers don't have a valid rack.hijack callback", 
 
 it("notices when the response headers has a rack.hijack callback with hijacking being supported", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const env = validEnv({
+  const e = env({
     "rack.hijack?": true,
     "rack.hijack": () => ({
       read() {
@@ -758,14 +734,14 @@ it("notices when the response headers has a rack.hijack callback with hijacking 
       },
     }),
   });
-  const [status] = await app.call(env);
+  const [status] = await app.call(e);
   expect(status).toBe(200);
 });
 
 it("notices rack.response_finished errors", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const env = validEnv({ "rack.response_finished": "not an array" });
-  await expect(app.call(env)).rejects.toThrow(LintError);
+  const e = env({ "rack.response_finished": "not an array" });
+  await expect(app.call(e)).rejects.toThrow(LintError);
 });
 
 it("pass valid rack.response_finished", async () => {
@@ -791,7 +767,7 @@ it("notices when the response protocol is not an array of strings", async () => 
     { "content-type": "text/plain", "rack.protocol": "h2" },
     ["OK"],
   ]);
-  await expect(app.call(validEnv())).rejects.toThrow(LintError);
+  await expect(app.call(env({}))).rejects.toThrow(LintError);
 });
 
 it("notices when the response protocol is specified in the response but not in the request", async () => {
