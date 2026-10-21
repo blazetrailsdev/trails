@@ -18,3 +18,5 @@ export { QueueAdapter } from "./queue-adapter.js";
 export { QueueAdapters } from "./namespaces.js";
 export { AbstractAdapter } from "./queue-adapters/abstract-adapter.js";
 export { InlineAdapter } from "./queue-adapters/inline-adapter.js";
+export { EnqueueError, Enqueuing, performAllLater } from "./enqueuing.js";
+export { ConfiguredJob } from "./configured-job.js";
