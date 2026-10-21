@@ -21,6 +21,7 @@ const Post = Struct.new(
 );
 const Continent = Struct.new("continent_name", "countries");
 const Country = Struct.new("country_id", "country_name");
+const Album = Struct.new("id", "title", "genre");
 const Digest = Struct.new("send_day");
 
 class Firm {
@@ -812,6 +813,416 @@ describe("FormOptionsHelperTest", () => {
     assertDomEqual(
       '<select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
       html,
+    );
+  });
+
+  const optionsFromCollectionForSelect = (...args: unknown[]) =>
+    view.optionsFromCollectionForSelect(...args);
+  const optionGroupsFromCollectionForSelect = (...args: unknown[]) =>
+    view.optionGroupsFromCollectionForSelect(...args);
+  const groupedOptionsForSelect = (...args: unknown[]) => view.groupedOptionsForSelect(...args);
+  const abeBabeCabe = (abe: string, babe: string, cabe: string) =>
+    `<option value="&lt;Abe&gt;"${abe}>&lt;Abe&gt; went home</option>\n<option value="Babe"${babe}>Babe went home</option>\n<option value="Cabe"${cabe}>Cabe went home</option>`;
+  const SEL = ' selected="selected"';
+  const DIS = ' disabled="disabled"';
+  const continentsHtml =
+    '<optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>\n<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option value="dk" selected="selected">Denmark</option>\n<option value="ie">Ireland</option></optgroup>';
+
+  it("collection options", () => {
+    assertDomEqual(
+      abeBabeCabe("", "", ""),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title"),
+    );
+  });
+
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
+  it.skip("collection options with private value method", async () => {
+    const e = await assertRaises([Error], {}, () =>
+      optionsFromCollectionForSelect(dummyPosts(), "secret", "title"),
+    );
+    assertMatch(/private method/, e.message);
+  });
+
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
+  it.skip("collection options with private text method", async () => {
+    const e = await assertRaises([Error], {}, () =>
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "secret"),
+    );
+    assertMatch(/private method/, e.message);
+  });
+
+  it("collection options with preselected value", () => {
+    assertDomEqual(
+      abeBabeCabe("", SEL, ""),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", "Babe"),
+    );
+  });
+
+  it("collection options with preselected value array", () => {
+    assertDomEqual(
+      abeBabeCabe("", SEL, SEL),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", ["Babe", "Cabe"]),
+    );
+  });
+
+  it("collection options with proc for selected", () => {
+    assertDomEqual(
+      abeBabeCabe("", SEL, ""),
+      optionsFromCollectionForSelect(
+        dummyPosts(),
+        "author_name",
+        "title",
+        (p: any) => p.author_name === "Babe",
+      ),
+    );
+  });
+
+  it("collection options with disabled value", () => {
+    assertDomEqual(
+      abeBabeCabe("", DIS, ""),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", { disabled: "Babe" }),
+    );
+  });
+
+  it("collection options with disabled array", () => {
+    assertDomEqual(
+      abeBabeCabe("", DIS, DIS),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", {
+        disabled: ["Babe", "Cabe"],
+      }),
+    );
+  });
+
+  it("collection options with preselected and disabled value", () => {
+    assertDomEqual(
+      abeBabeCabe("", DIS, SEL),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", {
+        selected: "Cabe",
+        disabled: "Babe",
+      }),
+    );
+  });
+
+  it("collection options with proc for disabled", () => {
+    assertDomEqual(
+      abeBabeCabe("", DIS, DIS),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", {
+        disabled: (p: any) => ["Babe", "Cabe"].includes(p.author_name),
+      }),
+    );
+  });
+
+  it("collection options with proc for value method", () => {
+    assertDomEqual(
+      abeBabeCabe("", "", ""),
+      optionsFromCollectionForSelect(dummyPosts(), (p: any) => p.author_name, "title"),
+    );
+  });
+
+  it("collection options with proc for text method", () => {
+    assertDomEqual(
+      abeBabeCabe("", "", ""),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", (p: any) => p.title),
+    );
+  });
+
+  it("collection options with element attributes", () => {
+    assertDomEqual(
+      '<option value="USA" class="bold">USA</option>',
+      optionsFromCollectionForSelect([["USA", "USA", { class: "bold" }]], "first", "second"),
+    );
+  });
+
+  it("string options for select", () => {
+    const options =
+      '<option value="Denmark">Denmark</option><option value="USA">USA</option><option value="Sweden">Sweden</option>';
+    assertDomEqual(options, optionsForSelect(options));
+  });
+
+  it("array options for select with custom defined selected", () => {
+    assertDomEqual(
+      '<option selected="selected" type="Coach" value="1">Richard Bandler</option>\n<option type="Coachee" value="1">Richard Bandler</option>',
+      optionsForSelect([
+        ["Richard Bandler", 1, { type: "Coach", selected: "selected" }],
+        ["Richard Bandler", 1, { type: "Coachee" }],
+      ]),
+    );
+  });
+
+  it("array options for select with custom defined disabled", () => {
+    assertDomEqual(
+      '<option disabled="disabled" type="Coach" value="1">Richard Bandler</option>\n<option type="Coachee" value="1">Richard Bandler</option>',
+      optionsForSelect([
+        ["Richard Bandler", 1, { type: "Coach", disabled: "disabled" }],
+        ["Richard Bandler", 1, { type: "Coachee" }],
+      ]),
+    );
+  });
+
+  it("array options for select with selection array", () => {
+    assertDomEqual(
+      '<option value="Denmark">Denmark</option>\n<option value="&lt;USA&gt;" selected="selected">&lt;USA&gt;</option>\n<option value="Sweden" selected="selected">Sweden</option>',
+      optionsForSelect(["Denmark", "<USA>", "Sweden"], ["<USA>", "Sweden"]),
+    );
+  });
+
+  it("array options for select with disabled value", () => {
+    assertDomEqual(
+      '<option value="Denmark">Denmark</option>\n<option value="&lt;USA&gt;" disabled="disabled">&lt;USA&gt;</option>\n<option value="Sweden">Sweden</option>',
+      optionsForSelect(["Denmark", "<USA>", "Sweden"], { disabled: "<USA>" }),
+    );
+  });
+
+  it("array options for select with disabled array", () => {
+    assertDomEqual(
+      '<option value="Denmark">Denmark</option>\n<option value="&lt;USA&gt;" disabled="disabled">&lt;USA&gt;</option>\n<option value="Sweden" disabled="disabled">Sweden</option>',
+      optionsForSelect(["Denmark", "<USA>", "Sweden"], { disabled: ["<USA>", "Sweden"] }),
+    );
+  });
+
+  it("array options for select with selection and disabled value", () => {
+    assertDomEqual(
+      '<option value="Denmark" selected="selected">Denmark</option>\n<option value="&lt;USA&gt;" disabled="disabled">&lt;USA&gt;</option>\n<option value="Sweden">Sweden</option>',
+      optionsForSelect(["Denmark", "<USA>", "Sweden"], { selected: "Denmark", disabled: "<USA>" }),
+    );
+  });
+
+  it("boolean array options for select with selection and disabled value", () => {
+    assertDomEqual(
+      '<option value="true">true</option>\n<option value="false" selected="selected">false</option>',
+      optionsForSelect([true, false], { selected: false, disabled: null }),
+    );
+  });
+
+  it("array options for string include in other string bug fix", () => {
+    assertDomEqual(
+      '<option value="ruby">ruby</option>\n<option value="rubyonrails" selected="selected">rubyonrails</option>',
+      optionsForSelect(["ruby", "rubyonrails"], "rubyonrails"),
+    );
+    assertDomEqual(
+      '<option value="ruby" selected="selected">ruby</option>\n<option value="rubyonrails">rubyonrails</option>',
+      optionsForSelect(["ruby", "rubyonrails"], "ruby"),
+    );
+    assertDomEqual(
+      '<option value="ruby" selected="selected">ruby</option>\n<option value="rubyonrails">rubyonrails</option>\n<option value=""></option>',
+      optionsForSelect(["ruby", "rubyonrails", null], "ruby"),
+    );
+  });
+
+  it("ducktyped options for select", () => {
+    const quack = Struct.new("first", "last");
+    assertDomEqual(
+      '<option value="&lt;Kroner&gt;">&lt;DKR&gt;</option>\n<option value="Dollar">$</option>',
+      optionsForSelect([new quack("<DKR>", "<Kroner>"), new quack("$", "Dollar")]),
+    );
+    assertDomEqual(
+      '<option value="&lt;Kroner&gt;">&lt;DKR&gt;</option>\n<option value="Dollar" selected="selected">$</option>',
+      optionsForSelect([new quack("<DKR>", "<Kroner>"), new quack("$", "Dollar")], "Dollar"),
+    );
+    assertDomEqual(
+      '<option value="&lt;Kroner&gt;" selected="selected">&lt;DKR&gt;</option>\n<option value="Dollar" selected="selected">$</option>',
+      optionsForSelect(
+        [new quack("<DKR>", "<Kroner>"), new quack("$", "Dollar")],
+        ["Dollar", "<Kroner>"],
+      ),
+    );
+  });
+
+  it("collection options with preselected value as string and option value is integer", () => {
+    const albums = [new Album(1, "first", "rap"), new Album(2, "second", "pop")];
+    assertDomEqual(
+      '<option selected="selected" value="1">rap</option>\n<option value="2">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { selected: "1" }),
+    );
+  });
+
+  it("collection options with preselected value as integer and option value is string", () => {
+    const albums = [new Album("1", "first", "rap"), new Album("2", "second", "pop")];
+    assertDomEqual(
+      '<option selected="selected" value="1">rap</option>\n<option value="2">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { selected: 1 }),
+    );
+  });
+
+  it("collection options with preselected value as string and option value is float", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+    ];
+    assertDomEqual(
+      '<option value="1.0">rap</option>\n<option value="2.0" selected="selected">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { selected: "2.0" }),
+    );
+  });
+
+  it("collection options with preselected value as nil", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+    ];
+    assertDomEqual(
+      '<option value="1.0">rap</option>\n<option value="2.0">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { selected: null }),
+    );
+  });
+
+  it("collection options with disabled value as nil", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+    ];
+    assertDomEqual(
+      '<option value="1.0">rap</option>\n<option value="2.0">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { disabled: null }),
+    );
+  });
+
+  it("collection options with disabled value as array", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+    ];
+    assertDomEqual(
+      '<option disabled="disabled" value="1.0">rap</option>\n<option disabled="disabled" value="2.0">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { disabled: ["1.0", new Number(2.0)] }),
+    );
+  });
+
+  it("collection options with preselected values as string array and option value is float", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+      new Album(new Number(3.0), "third", "country"),
+    ];
+    assertDomEqual(
+      '<option value="1.0" selected="selected">rap</option>\n<option value="2.0">pop</option>\n<option value="3.0" selected="selected">country</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", ["1.0", "3.0"]),
+    );
+  });
+
+  it("option groups from collection for select", () => {
+    assertDomEqual(
+      continentsHtml,
+      optionGroupsFromCollectionForSelect(
+        dummyContinents(),
+        "countries",
+        "continent_name",
+        "country_id",
+        "country_name",
+        "dk",
+      ),
+    );
+  });
+
+  it("option groups from collection for select with callable group method", () => {
+    const groupProc = (c: any) => c.countries;
+    assertDomEqual(
+      continentsHtml,
+      optionGroupsFromCollectionForSelect(
+        dummyContinents(),
+        groupProc,
+        "continent_name",
+        "country_id",
+        "country_name",
+        "dk",
+      ),
+    );
+  });
+
+  it("option groups from collection for select with callable group label method", () => {
+    const labelProc = (c: any) => c.continent_name;
+    assertDomEqual(
+      continentsHtml,
+      optionGroupsFromCollectionForSelect(
+        dummyContinents(),
+        "countries",
+        labelProc,
+        "country_id",
+        "country_name",
+        "dk",
+      ),
+    );
+  });
+
+  it("option groups from collection for select returns html safe string", () => {
+    expect(
+      isHtmlSafe(
+        optionGroupsFromCollectionForSelect(
+          dummyContinents(),
+          "countries",
+          "continent_name",
+          "country_id",
+          "country_name",
+          "dk",
+        ),
+      ),
+    ).toBe(true);
+  });
+
+  it("grouped options for select with array and html attributes", () => {
+    assertDomEqual(
+      '<optgroup label="North America" data-foo="bar"><option value="US">United States</option>\n<option value="Canada">Canada</option></optgroup><optgroup label="Europe" disabled="disabled"><option value="GB">Great Britain</option>\n<option value="Germany">Germany</option></optgroup>',
+      groupedOptionsForSelect([
+        ["North America", [["United States", "US"], "Canada"], { data: { foo: "bar" } }],
+        ["Europe", [["Great Britain", "GB"], "Germany"], { disabled: "disabled" }],
+      ]),
+    );
+  });
+
+  it("grouped options for select with optional divider", () => {
+    assertDomEqual(
+      '<optgroup label="----------"><option value="US">US</option>\n<option value="Canada">Canada</option></optgroup><optgroup label="----------"><option value="GB">GB</option>\n<option value="Germany">Germany</option></optgroup>',
+      groupedOptionsForSelect(
+        [
+          ["US", "Canada"],
+          ["GB", "Germany"],
+        ],
+        null,
+        { divider: "----------" },
+      ),
+    );
+  });
+
+  it("grouped options for select with selected and prompt", () => {
+    assertDomEqual(
+      '<option value="">Choose a product...</option><optgroup label="Hats"><option value="Baseball Cap">Baseball Cap</option>\n<option selected="selected" value="Cowboy Hat">Cowboy Hat</option></optgroup>',
+      groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]], "Cowboy Hat", {
+        prompt: "Choose a product...",
+      }),
+    );
+  });
+
+  it("grouped options for select with selected and prompt true", () => {
+    assertDomEqual(
+      '<option value="">Please select</option><optgroup label="Hats"><option value="Baseball Cap">Baseball Cap</option>\n<option selected="selected" value="Cowboy Hat">Cowboy Hat</option></optgroup>',
+      groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]], "Cowboy Hat", {
+        prompt: true,
+      }),
+    );
+  });
+
+  it("grouped options for select returns html safe string", () => {
+    expect(isHtmlSafe(groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]]))).toBe(
+      true,
+    );
+  });
+
+  it("grouped options for select with prompt returns html escaped string", () => {
+    assertDomEqual(
+      '<option value="">&lt;Choose One&gt;</option><optgroup label="Hats"><option value="Baseball Cap">Baseball Cap</option>\n<option value="Cowboy Hat">Cowboy Hat</option></optgroup>',
+      groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]], null, {
+        prompt: "<Choose One>",
+      }),
+    );
+  });
+
+  it("optgroups with with options with hash", () => {
+    assertDomEqual(
+      '<optgroup label="North America"><option value="United States">United States</option>\n<option value="Canada">Canada</option></optgroup><optgroup label="Europe"><option value="Denmark">Denmark</option>\n<option value="Germany">Germany</option></optgroup>',
+      groupedOptionsForSelect({
+        "North America": ["United States", "Canada"],
+        Europe: ["Denmark", "Germany"],
+      }),
     );
   });
 });
