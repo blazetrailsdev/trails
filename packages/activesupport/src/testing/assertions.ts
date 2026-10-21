@@ -310,17 +310,17 @@ export function assertNot(object: unknown, message?: string | (() => string) | n
   return assert(!(object != null && object !== false), message);
 }
 
-export async function assertRaises(
-  exp: (new (...args: any[]) => Error)[],
+export async function assertRaises<K extends new (...args: any[]) => Error>(
+  exp: K[],
   { match }: { match?: RegExp | string | null } = {},
   block?: () => unknown,
-): Promise<Error> {
-  let error: Error | undefined;
+): Promise<InstanceType<K>> {
+  let error: InstanceType<K> | undefined;
   try {
     await block?.();
   } catch (e) {
     if (!exp.some((klass) => e instanceof klass) && e instanceof Assertion) throw e;
-    error = e as Error;
+    error = e as InstanceType<K>;
   }
   if (!error)
     throw new Assertion(`${exp.map((e) => e.name).join(", ")} expected but nothing was raised`);
@@ -332,11 +332,11 @@ export async function assertRaises(
   return error;
 }
 
-export async function assertRaise(
-  exp: (new (...args: any[]) => Error)[],
+export async function assertRaise<K extends new (...args: any[]) => Error>(
+  exp: K[],
   options: { match?: RegExp | string | null } = {},
   block?: () => unknown,
-): Promise<Error> {
+): Promise<InstanceType<K>> {
   return assertRaises(exp, options, block);
 }
 

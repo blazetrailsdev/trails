@@ -277,37 +277,37 @@ describe("NumberHelperTest", () => {
     let exception = await assertRaises([InvalidNumberError], {}, () =>
       numberToHuman("x", { raise: true }),
     );
-    expect((exception as InvalidNumberError).number).toBe("x");
+    expect(exception.number).toBe("x");
 
     exception = await assertRaises([InvalidNumberError], {}, () =>
       numberToHumanSize("x", { raise: true }),
     );
-    expect((exception as InvalidNumberError).number).toBe("x");
+    expect(exception.number).toBe("x");
 
     exception = await assertRaises([InvalidNumberError], {}, () =>
       numberWithPrecision("x", { raise: true }),
     );
-    expect((exception as InvalidNumberError).number).toBe("x");
+    expect(exception.number).toBe("x");
 
     exception = await assertRaises([InvalidNumberError], {}, () =>
       numberToCurrency("x", { raise: true }),
     );
-    expect((exception as InvalidNumberError).number).toBe("x");
+    expect(exception.number).toBe("x");
 
     exception = await assertRaises([InvalidNumberError], {}, () =>
       numberToPercentage("x", { raise: true }),
     );
-    expect((exception as InvalidNumberError).number).toBe("x");
+    expect(exception.number).toBe("x");
 
     exception = await assertRaises([InvalidNumberError], {}, () =>
       numberWithDelimiter("x", { raise: true }),
     );
-    expect((exception as InvalidNumberError).number).toBe("x");
+    expect(exception.number).toBe("x");
 
     exception = await assertRaises([InvalidNumberError], {}, () =>
       numberToPhone("x", { raise: true }),
     );
-    expect((exception as InvalidNumberError).number).toBe("x");
+    expect(exception.number).toBe("x");
   });
 
   it("number helpers should not raise error if valid when specified", () => {
