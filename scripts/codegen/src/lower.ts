@@ -475,6 +475,18 @@ export class Lowerer {
     return out;
   }
 
+  /**
+   * A value that ends in a short-circuited `&.` (`Time.zone&.name`, or
+   * `x || Time.zone&.name`) is nil in Ruby and `undefined` in JS; where it is
+   * held (an ivar, a writer's argument) it is written `?? null`, so a later
+   * read sees the nil.
+   */
+  heldNil(node: N | undefined, v: string): string {
+    let t = node;
+    while (t && t.k === "or") t = t.right;
+    return t?.k === "call" && t.safe ? `${v} ?? null` : v;
+  }
+
   seqBody(n: N | null | undefined): N[] {
     if (!n) return [];
     if (n.k === "seq") return n.body;
@@ -1107,7 +1119,7 @@ export class Lowerer {
       n.name !== "[]="
     ) {
       const recv = n.recv ? this.nonNullRecv(n.recv, this.expr(n.recv, ctx), ctx) : ctx.selfExpr;
-      const v = this.expr(n.args[0], ctx);
+      const v = this.heldNil(n.args[0], this.expr(n.args[0], ctx));
       // A writer `def x=` in a module is the function `setX` (CLAUDE.md's
       // `setX()` spelling), not a property: `self.queue_adapter = :async` calls it.
       const w = this.resolver.member(n, n.recv ?? { k: "self" }, ctx, this);
@@ -1750,8 +1762,9 @@ export class Lowerer {
       }
       case "ivar":
         return this.ivar(n.name, ctx);
-      case "iasgn":
-        return `(${this.ivar(n.name, ctx)} = ${this.expr(n.value, ctx)})`;
+      case "iasgn": {
+        return `(${this.ivar(n.name, ctx)} = ${this.heldNil(n.value, this.expr(n.value, ctx))})`;
+      }
       case "cvar":
         return this.cvar(n.name, ctx);
       case "cvasgn":

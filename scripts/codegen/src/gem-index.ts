@@ -40,6 +40,8 @@ export interface ScopeInfo {
   /** `prepend`ed module paths: also in `includes` for method lookup, but ahead of the class in Ruby's ancestors. */
   prepends: string[][];
   extends: string[][];
+  /** `ruby2_keywords(:m)`: methods whose trailing Hash argument is flagged as keywords. */
+  ruby2Keywords?: Set<string>;
   consts: Set<string>;
   concern: boolean;
   /** `module_function` (no arguments) or `extend self`: a module of functions. */
@@ -340,6 +342,8 @@ export class GemIndex {
         for (const a of node.args) if (a.k === "const") s.includes.push(a.path);
         if (name === "prepend")
           for (const a of node.args) if (a.k === "const") s.prepends.push(a.path);
+      } else if (name === "ruby2_keywords" && !singleton) {
+        for (const a of node.args) if (a.k === "sym") (s.ruby2Keywords ??= new Set()).add(a.value);
       } else if (name === "extend") {
         if (!singleton && node.args.some((a: N) => a.k === "self")) s.moduleFunction = true;
         for (const a of node.args) {

@@ -432,13 +432,29 @@ export class Emitter {
     // is parked as `it.skip` under a `PERMANENT-SKIP:` line, its body kept.
     const permanentSkip = (stmts: N[]): string | null => {
       let why: string | null = null;
+      let stringSub = false;
+      let namesString = false;
       walk(stmts, (n) => {
         if (why) return false;
         if (n.k === "const") {
           const fqn = n.path.filter((x: string) => x).join("::");
           if (PERMANENT_CONSTS[fqn]) why = PERMANENT_CONSTS[fqn];
+          // A subclass of Ruby's String (`class StringWithoutSerializer < String`):
+          // a trails String is a JS primitive, which no class extends…
+          const hit = this.index.resolveConst(n.path, [
+            ...lexicalChain(this.index, this.index.scopes.get(u.fqn)?.lexicalParent),
+            u.fqn,
+          ]);
+          const sc = hit?.kind === "scope" ? this.index.scopes.get(hit.fqn) : undefined;
+          const sp = sc?.superclassPath?.filter((x: string) => x).join("::");
+          if (sc && !sc.superclassFqn && sp === "String") stringSub = true;
+          if (fqn === "String") namesString = true;
         }
       });
+      // …and only where the test asserts String-ness of it (`assert_instance_of
+      // String, deserialized`); a round-trip through its own serializer ports.
+      if (!why && stringSub && namesString)
+        why = 'CLAUDE.md "Ruby Strings are JS string primitives (no mutable String carrier)"';
       return why;
     };
     const testHead = (stmts: N[], guard: string | null, nm: string): string[] => {
@@ -1212,6 +1228,21 @@ export class Emitter {
     const writer = /^(\w+|\[\])=$/.test(d.name);
     let body = this.lw.block(this.lw.seqBody(d.body), ctx, !isCtor && !writer);
     if (ctx.prologue) body = [...ctx.prologue, ...body];
+    // `ruby2_keywords(:initialize)`: a trailing Hash passed as keywords is
+    // flagged (`Hash.ruby2_keywords_hash?` answers true for it), so ActiveJob's
+    // serializer can tell `perform(a, b: 1)` from `perform(a, { b: 1 })`.
+    const r2kOwner = opts.inlinedHead?.module ?? u.fqn;
+    const rest = (d.params as Param[]).find((p) => p.kind === "rest" && p.name);
+    if (rest && this.index.scopes.get(r2kOwner)?.ruby2Keywords?.has(d.name)) {
+      const r = jsIdent(rest.name!);
+      const flag = this.lw.rc(ctx, "rbHashSRuby2KeywordsHash");
+      body = [
+        `const last = ${r}[${r}.length - 1];`,
+        `if (typeof last === "object" && last !== null && Object.getPrototypeOf(last) === Object.prototype)`,
+        `  ${r}[${r}.length - 1] = ${flag}(last);`,
+        ...body,
+      ];
+    }
     const hoisted: Set<string> | undefined = ctx.scope.hoisted;
     if (hoisted?.size)
       body = [`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`, ...body];
@@ -1614,7 +1645,9 @@ export class Emitter {
           attrNames.add(a.value);
           const js = propName(a.value);
           if (s.name !== "attr_writer")
-            members.push(`get ${js}(): any {\n  return this._${js.replace(/^_/, "")};\n}`);
+            members.push(
+              `get ${js}(): any {\n  return this._${js.replace(/^_/, "")}${this.unsetNil(u.fqn, a.value)};\n}`,
+            );
           if (s.name !== "attr_reader" && s.name !== "attr")
             members.push(`set ${js}(value: any) {\n  this._${js.replace(/^_/, "")} = value;\n}`);
           defs++;
@@ -1720,7 +1753,9 @@ export class Emitter {
           if (a.k !== "sym") continue;
           const js = propName(a.value);
           if (s.name !== "attr_writer")
-            members.push(`static get ${js}(): any {\n  return this._${js.replace(/^_/, "")};\n}`);
+            members.push(
+              `static get ${js}(): any {\n  return this._${js.replace(/^_/, "")} ?? null;\n}`,
+            );
           if (s.name !== "attr_reader")
             members.push(
               `static set ${js}(value: any) {\n  this._${js.replace(/^_/, "")} = value;\n}`,
@@ -1873,6 +1908,21 @@ export class Emitter {
   }
 
   hostMemo?: Map<string, string[]>;
+
+  /**
+   * ` ?? null` for a reader of `@name` unless the scope's own `initialize`
+   * assigns it: an ivar never set reads nil in Ruby and `undefined` in JS.
+   */
+  unsetNil(fqn: string, name: string): string {
+    const init = this.index.scopes.get(fqn)?.defs.get("initialize")?.node;
+    let set = false;
+    if (init)
+      walk(init.body ?? null, (n: N) => {
+        if (set) return false;
+        if (n.k === "iasgn" && n.name.replace(/^@/, "") === name) set = true;
+      });
+    return set ? "" : " ?? null";
+  }
 
   /** Whether class scope `s` is `extend`ed with `mod` or a module including it. */
   extendsModule(s: ScopeInfo, mod: string): boolean {
@@ -2364,10 +2414,12 @@ export class Emitter {
       );
     const isConcern = !!this.index.scopes.get(u.fqn)?.concern;
     let includedBlock: N | null = null;
-    const accessor = (js: string, kind: string, isStatic: boolean) => {
+    const accessor = (js: string, kind: string, isStatic: boolean, rb?: string) => {
       const st = isStatic ? "static " : "";
       const field = `this._${js.replace(/^_/, "")}`;
-      if (kind !== "attr_writer") members.push(`${st}get ${js}(): any {\n  return ${field};\n}`);
+      const nil = isStatic || !rb ? " ?? null" : this.unsetNil(u.fqn, rb);
+      if (kind !== "attr_writer")
+        members.push(`${st}get ${js}(): any {\n  return ${field}${nil};\n}`);
       if (kind !== "attr_reader" && kind !== "attr")
         members.push(`${st}set ${js}(value: any) {\n  ${field} = value;\n}`);
     };
@@ -2393,7 +2445,7 @@ export class Emitter {
       ) {
         for (const a of s.args)
           if (a.k === "sym") {
-            accessor(propName(a.value), s.name, allStatic);
+            accessor(propName(a.value), s.name, allStatic, a.value);
             defs++;
           }
       } else if (
