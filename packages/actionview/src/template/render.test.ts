@@ -784,13 +784,13 @@ describe("CachedViewRenderTest", () => {
     assertEqual("1:    <%= foo(", (e as TemplateError).annotatedSourceCode()[0].trim());
   });
 
-  // BLOCKED: tse-undefined-local-raises-template-error
+  // BLOCKED: render-runtime-error-spot-tests-reach-source-map-location
   it.skip("render runtime error", () => {});
 
-  // BLOCKED: tse-undefined-local-raises-template-error
+  // BLOCKED: render-runtime-error-spot-tests-reach-source-map-location
   it.skip("render location conditional append", () => {});
 
-  // BLOCKED: tse-undefined-local-raises-template-error
+  // BLOCKED: render-runtime-error-spot-tests-reach-source-map-location
   it.skip("render location conditional append 2", () => {});
 
   it("render renderable does not mask nomethoderror from within render in", async () => {

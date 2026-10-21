@@ -1,5 +1,5 @@
 import { attrInternal, delegate } from "@blazetrails/activesupport";
-import { basicObjRespondTo, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, classModule, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export interface ControllerHelperHost {
   _controller: ControllerLike | null;
@@ -60,7 +60,9 @@ export function isRespondTo(
   return basicObjRespondTo(this, methodName, !includePrivate);
 }
 
-export class ControllerHelper {}
+export class ControllerHelper {
+  static readonly [classModule] = true;
+}
 
 attrInternal.call(ControllerHelper.prototype, "controller", "request");
 

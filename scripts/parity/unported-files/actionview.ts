@@ -13,6 +13,20 @@ import type { UnportedFile } from "./types.js";
 
 export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
   {
+    pattern: "template/handlers/erb/erubi.rb",
+    package: "actionview",
+    reason:
+      "`Handlers::ERB::Erubi` (erubi.rb:9-83) is the Erubi step, and root CLAUDE.md " +
+      '§ "Templates are precompiled" rules that `compileJs` in `@blazetrails/tse-compiler` ' +
+      "is that step. Its members answer them in `tse-compiler/src/emit-js.ts`: `initialize`'s " +
+      "`bufvar` / `preamble` / `postamble` / `escapefunc` are `EmitJsOptions` read by `emit`; " +
+      "`add_text` is `emitNode`'s `text` arm (`safeAppend`); `add_expression` is its `expr` / " +
+      "`rawExpr` arms and `emit`'s `blockExpr` arm (`BLOCK_EXPR`); `add_code` is the `code` " +
+      "arm; `add_postamble` is `emit`'s `options.postamble`. `flush_newline_if_pending` has no " +
+      "member: `emit`'s `push` pads to each node's source line, which is what Rails' pending " +
+      "newlines keep, so the backtrace line matches the template's.",
+  },
+  {
     pattern: "template/handlers/builder.rb",
     package: "actionview",
     reason:

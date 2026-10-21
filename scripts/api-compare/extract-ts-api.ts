@@ -3535,7 +3535,8 @@ function isClassAttributeCallee(expr: ts.Expression): boolean {
     ts.isIdentifier(expr.expression) &&
     (expr.name.text === "call"
       ? attributeMacro(expr.expression.text) !== undefined ||
-        attrInternalMacro(expr.expression.text) !== undefined
+        attrInternalMacro(expr.expression.text) !== undefined ||
+        expr.expression.text === "delegate"
       : attrMacro(expr.name.text) !== undefined)
   );
 }
@@ -3546,6 +3547,9 @@ function readClassAttributeCall(
 ): ClassAttributeCall | null {
   if (isConfigAccessorCallee(node.expression)) return readConfigAccessorCall(node, sourceFile);
   const callee = node.expression as ts.PropertyAccessExpression;
+  if (callee.name.text === "call" && (callee.expression as ts.Identifier).text === "delegate") {
+    return readPrototypeDelegateCall(node, sourceFile);
+  }
   const internal =
     callee.name.text === "call"
       ? attrInternalMacro(importedName(callee.expression as ts.Identifier, sourceFile))
@@ -3558,6 +3562,7 @@ function readClassAttributeCall(
     if (names.length === 0 || names.length !== args.length) return null;
     const enclosing = enclosingEntity(node);
     const recv = internal !== undefined ? node.arguments[0] : callee.expression;
+    const prototypeOf = recv !== undefined ? prototypeReceiver(recv) : undefined;
     return {
       ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
       ...(internal !== undefined && enclosing?.seatsModule === true
@@ -3565,6 +3570,7 @@ function readClassAttributeCall(
         : {}),
       ...(internal !== undefined && internalStatement(node) ? { internal: true } : {}),
       ...(ts.isIdentifier(recv) ? { receiver: importedName(recv, sourceFile) } : {}),
+      ...(internal !== undefined && prototypeOf !== undefined ? { receiver: prototypeOf } : {}),
       names,
       reader: false,
       writer: false,
@@ -3598,6 +3604,43 @@ function readClassAttributeCall(
     instanceReader: macro.reader && (optionBool(options, "instanceReader") ?? instanceAccessor),
     instanceWriter: macro.writer && (optionBool(options, "instanceWriter") ?? instanceAccessor),
     instancePredicate: macro.predicate && (optionBool(options, "instancePredicate") ?? true),
+    line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+  };
+}
+
+/** `Klass.prototype`, a top-level macro's receiver for a class module's instance side. */
+function prototypeReceiver(expr: ts.Expression): string | undefined {
+  return ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === "prototype" &&
+    ts.isIdentifier(expr.expression)
+    ? expr.expression.text
+    : undefined;
+}
+
+/**
+ * `delegate.call(Klass.prototype, "m", …, { to: "target" })` at a file's top level —
+ * Ruby's `delegate :m, to: :target` in a class module's body
+ * (`core_ext/module/delegation.rb:171`), which defines instance readers only.
+ */
+function readPrototypeDelegateCall(
+  node: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): ClassAttributeCall | null {
+  const [recv, ...rest] = node.arguments;
+  const receiver = recv !== undefined ? prototypeReceiver(recv) : undefined;
+  if (receiver === undefined || enclosingEntity(node) !== undefined) return null;
+  const opts = rest.at(-1);
+  const args = opts !== undefined && ts.isObjectLiteralExpression(opts) ? rest.slice(0, -1) : rest;
+  const names = args.filter(ts.isStringLiteralLike).map((arg) => arg.text);
+  if (names.length === 0 || names.length !== args.length) return null;
+  return {
+    receiver,
+    names,
+    reader: false,
+    writer: false,
+    instanceReader: true,
+    instanceWriter: false,
+    instancePredicate: false,
     line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
   };
 }
