@@ -10,10 +10,11 @@ describe("module-count", () => {
       '} from "@blazetrails/ruby-compat";',
       'import { type Module as M } from "@blazetrails/ruby-compat";',
       'import { ModuleError } from "@blazetrails/ruby-compat";',
-      "const mod = new Module();",
-      'mod.superMethod(this, "foo")!();',
+      'export { Module } from "@blazetrails/ruby-compat";',
+      "const mod = new Module(), other = new Module<T>();",
+      'mod.superMethod(this, "foo")!(); mod?.superMethod (this, "bar");',
     ].join("\n");
-    expect(countText(text)).toEqual({ newModule: 1, superMethod: 1, moduleImport: 2 });
+    expect(countText(text)).toEqual({ newModule: 2, superMethod: 2, moduleImport: 3 });
   });
 
   it("flags a rise, including a package with no mark row", () => {

@@ -4,7 +4,14 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
-import { env, includedModules, setEnv, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  env,
+  include,
+  includedModules,
+  rbCallSuper,
+  setEnv,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
 
@@ -105,6 +112,24 @@ describe("test_help wires a booted app into the test case classes", () => {
     } finally {
       reload.mockRestore();
     }
+  });
+
+  // PERMANENT-SKIP: a method a class defines itself is not overwritten by a later include's copy (CLAUDE.md, "A Ruby module is a plain object or a class module", the include-time `super` seat).
+  it.skip("reaches a module included onto ActionController::TestCase after test_help loads", async ({
+    task,
+  }) => {
+    const ran: string[] = [];
+    const Included = {
+      beforeSetup(this: object) {
+        ran.push("included");
+        return rbCallSuper(this, Included.beforeSetup);
+      },
+    };
+    include(ActionController.TestCase, Included);
+    const controllerTest = new ActionController.TestCase(task.name);
+    await controllerTest.beforeSetup();
+    expect(ran).toEqual(["included"]);
+    expect(controllerTest.routes).toBe(Trails.application!.routes());
   });
 
   it("renders a view through ActionController::TestCase", async ({ task }) => {

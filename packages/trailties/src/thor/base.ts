@@ -746,8 +746,7 @@ export function fromSuperclass(
   include(base as { prototype: object }, Shell);
 };
 
-export const Base = Object.defineProperties(ThorBase, {
-  ClassMethods: { value: ClassMethods },
+export const Base = Object.defineProperties(Object.assign(ThorBase, { ClassMethods }), {
   subclasses: { value: subclasses },
   registerKlassFile: { value: registerKlassFile },
 }) as typeof ThorBase & {

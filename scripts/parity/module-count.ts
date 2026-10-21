@@ -1,16 +1,14 @@
 /**
  * The ruby-compat `Module` ratchet (RFC 0197).
  *
- * Counts, per package outside ruby-compat, the `.ts` lines under its `src`
- * (tests included) that build a `new Module(`, call `.superMethod(`, or import
- * `Module` from `@blazetrails/ruby-compat`, and fails when any count is above
- * its mark in `module-count-mark.json`. The marks only go down: `--tighten`
+ * Counts, per package outside ruby-compat, the `new Module` expressions,
+ * `superMethod(` calls, and `import` / `export … from` statements naming
+ * `Module` from `@blazetrails/ruby-compat` in the `.ts` files under its `src`
+ * (tests included), and fails when any count is above its mark in
+ * `module-count-mark.json`, or below it (a stale mark). The marks only go down: `--tighten`
  * writes each one DOWN to the current count and never up, and there is no
  * reseed. The file is deleted together with the class
  * (`delete-ruby-compat-module-class-final`).
- *
- * Line-based: an import whose `Module` specifier sits on its own line is read
- * through the whole import statement, so a multi-line import still counts once.
  *
  * Hard rules: no node:* imports, no process.*, async fs only, no third-party
  * runtime deps. The entry point throws on failure, which is the exit status.
@@ -28,17 +26,16 @@ export type Kind = (typeof KINDS)[number];
 export type Counts = Record<Kind, number>;
 export type Marks = Record<string, Counts>;
 
-const NEW_MODULE_RE = /\bnew Module\(/;
-const SUPER_METHOD_RE = /\.superMethod\(/;
-const IMPORT_RE = /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*"@blazetrails\/ruby-compat"/g;
+const NEW_MODULE_RE = /\bnew\s+Module\b/g;
+const SUPER_METHOD_RE = /\bsuperMethod\s*\(/g;
+const IMPORT_RE =
+  /(?:import|export)\s+(?:type\s+)?\{([^}]*)\}\s*from\s*"@blazetrails\/ruby-compat"/g;
 const MODULE_SPECIFIER_RE = /^(?:type\s+)?Module(?:\s+as\s+\w+)?$/;
 
 export function countText(text: string): Counts {
   const counts: Counts = { newModule: 0, superMethod: 0, moduleImport: 0 };
-  for (const line of text.split("\n")) {
-    if (NEW_MODULE_RE.test(line)) counts.newModule++;
-    if (SUPER_METHOD_RE.test(line)) counts.superMethod++;
-  }
+  counts.newModule = text.match(NEW_MODULE_RE)?.length ?? 0;
+  counts.superMethod = text.match(SUPER_METHOD_RE)?.length ?? 0;
   for (const [, specifiers] of text.matchAll(IMPORT_RE)) {
     if (specifiers.split(",").some((s) => MODULE_SPECIFIER_RE.test(s.trim()))) {
       counts.moduleImport++;
@@ -128,9 +125,11 @@ export async function main(args: string[] = [], root = ROOT_DIR): Promise<string
         grew.map((v) => `  ${v.pkg} ${v.kind}: ${v.mark} → ${v.current}`).join("\n"),
     );
   }
-  const stale = JSON.stringify(tighten(marks, current)) !== JSON.stringify(marks);
-  return (
-    `module-count gate: OK` +
-    (stale ? " (some marks are above the count: run `pnpm parity:modules:tighten`)" : "")
-  );
+  if (JSON.stringify(tighten(marks, current)) !== JSON.stringify(marks)) {
+    throw new Error(
+      "module-count gate: STALE high-water mark (a count fell below its mark). " +
+        "Run `pnpm parity:modules:tighten` and commit the mark file.",
+    );
+  }
+  return "module-count gate: OK";
 }

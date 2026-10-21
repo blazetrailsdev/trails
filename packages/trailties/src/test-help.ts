@@ -4,7 +4,7 @@ import "@blazetrails/activesupport/testing/autorun";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { TestFixtures, type ClassMethods } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
-import { abort, rbCallSuper, rbSeatSuper } from "@blazetrails/ruby-compat";
+import { abort, rbCallSuper, rbModDefineMethod } from "@blazetrails/ruby-compat";
 import { Trails } from "./rails.js";
 
 declare module "@blazetrails/activesupport/test-case" {
@@ -49,11 +49,7 @@ onLoad("action_controller_test_case", function (this: typeof TestCase) {
     this.routes = Trails.application!.routes();
     return rbCallSuper(this, beforeSetup);
   }
-  const descriptors: PropertyDescriptorMap = {
-    beforeSetup: { value: beforeSetup, writable: true, configurable: true },
-  };
-  rbSeatSuper(this.prototype, "beforeSetup", beforeSetup, descriptors);
-  Object.defineProperties(this.prototype, descriptors);
+  rbModDefineMethod(this, "beforeSetup", beforeSetup);
 });
 
 onLoad("action_dispatch_integration_test", function (this: typeof TestCase) {
@@ -62,9 +58,5 @@ onLoad("action_dispatch_integration_test", function (this: typeof TestCase) {
     await Trails.application!.reloadRoutesUnlessLoaded();
     return rbCallSuper(this, beforeSetup);
   }
-  const descriptors: PropertyDescriptorMap = {
-    beforeSetup: { value: beforeSetup, writable: true, configurable: true },
-  };
-  rbSeatSuper(this.prototype, "beforeSetup", beforeSetup, descriptors);
-  Object.defineProperties(this.prototype, descriptors);
+  rbModDefineMethod(this, "beforeSetup", beforeSetup);
 });

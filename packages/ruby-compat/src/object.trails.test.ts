@@ -32,8 +32,8 @@ import {
   OBJECT_METHOD_TABLE,
   rbFPublicSend,
   rbModAttrReader,
-  rbModAttrWriter,
   rbModDefineMethod,
+  rbModAttrWriter,
   rbModMethodDefined,
   rbFSend,
   toS as toSSend,
@@ -734,6 +734,20 @@ describe("rbModDefineMethod", () => {
 });
 
 describe("rbModAttrReader / rbModAttrWriter / rbModMethodDefined", () => {
+  it("defines a plain-object module's reader where include() copies it", () => {
+    const mod = {};
+    rbModAttrReader({ prototype: mod }, "x");
+    class K {
+      _x = 1;
+    }
+    include(K, mod);
+    expect(new K() as unknown as { x: number }).toHaveProperty("x", 1);
+
+    class C {}
+    rbModAttrReader(C, "x");
+    expect(Object.getOwnPropertyDescriptor(C.prototype, "x")!.enumerable).toBe(false);
+  });
+
   it("defines a reader and a writer over one ivar, each keeping the other half", () => {
     class Person {}
     expect(rbModMethodDefined(Person, "name")).toBe(false);

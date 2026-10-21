@@ -236,7 +236,6 @@ export {
   rbObjDup,
   include,
   rbCallSuper,
-  rbSeatSuper,
   included,
   prepended,
   initialize,

@@ -60,6 +60,8 @@ import {
   rbModToS,
   UNDEF_METHOD_TABLES,
   reopened,
+  rbSeatSuper,
+  superSlots,
 } from "./object.js";
 import { isSymbol } from "./symbol.js";
 
@@ -1762,44 +1764,6 @@ export function rbModAppendFeatures(
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
-}
-
-const superSlots = new WeakMap<AnyFunction, { slot: symbol; key: string }>();
-
-/**
- * Seats on `target`, in `descriptors`, the `key` method `method` is about to
- * shadow, for {@link rbCallSuper}. A function keeps the key it was first
- * installed under, as MRI's `super` searches by the method's `original_id`
- * (`vendor/ruby/v3.3.11/vm_insnhelper.c:4680`, `vm_search_super_method`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbSeatSuper(
-  target: object,
-  key: string,
-  method: unknown,
-  descriptors: PropertyDescriptorMap,
-): void {
-  if (typeof method !== "function") return;
-  let shadowed: unknown;
-  for (
-    let link: object | null = target;
-    link;
-    link = Object.getPrototypeOf(link) as object | null
-  ) {
-    const desc = Object.getOwnPropertyDescriptor(link, key);
-    if (desc) {
-      shadowed = desc.value;
-      break;
-    }
-  }
-  if (typeof shadowed !== "function" || shadowed === method) return;
-  let entry = superSlots.get(method as AnyFunction);
-  if (entry === undefined) {
-    superSlots.set(method as AnyFunction, (entry = { slot: Symbol(`super:${key}`), key }));
-  }
-  if (Object.hasOwn(descriptors, entry.slot)) return;
-  descriptors[entry.slot] = { value: shadowed, configurable: true };
 }
 
 /**
