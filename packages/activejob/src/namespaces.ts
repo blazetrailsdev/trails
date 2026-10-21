@@ -12,6 +12,9 @@ import type { ModuleSerializer } from "./serializers/module-serializer.js";
 import type { RangeSerializer } from "./serializers/range-serializer.js";
 import type { SymbolSerializer } from "./serializers/symbol-serializer.js";
 import type { Callbacks } from "./callbacks.js";
+import type { ConfiguredJob } from "./configured-job.js";
+import type * as EnqueuingModule from "./enqueuing.js";
+import type * as InstrumentationModule from "./instrumentation.js";
 import type { Exceptions } from "./exceptions.js";
 import type { Execution } from "./execution.js";
 import type { QueueName } from "./queue-name.js";
@@ -24,6 +27,7 @@ export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 export const loadPath: Record<string, () => Promise<unknown>> = {
   "active_job/base": () => import("./base.js"),
+  "active_job/configured_job": () => import("./configured-job.js"),
   "active_job/arguments": () => import("./arguments.js"),
   "active_job/serializers": () => import("./serializers.js"),
   "active_job/queue_adapter": () => import("./queue-adapter.js"),
@@ -57,6 +61,11 @@ export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
   adapterName: typeof QueueAdapterModule.adapterName;
   QueueName: typeof QueueName;
   Callbacks: typeof Callbacks;
+  ConfiguredJob: typeof ConfiguredJob;
+  EnqueueError: typeof EnqueuingModule.EnqueueError;
+  Enqueuing: typeof EnqueuingModule.Enqueuing;
+  performAllLater: typeof EnqueuingModule.performAllLater;
+  instrumentEnqueueAll: typeof InstrumentationModule.instrumentEnqueueAll;
   Exceptions: typeof Exceptions;
   Execution: typeof Execution;
   QueuePriority: typeof QueuePriority;
