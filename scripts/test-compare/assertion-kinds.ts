@@ -254,8 +254,6 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toMatchObject: "match",
   toThrow: "raises",
   toThrowError: "raises",
-  // `instanceof` walks the prototype chain, so it is `kind_of?`; an exact
-  // class (`instance_of?`) is `expect(o.constructor).toBe(cls)`.
   toBeInstanceOf: "kindOf",
   toHaveLength: "length",
   toBeGreaterThan: "operator",
