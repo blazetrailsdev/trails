@@ -17,7 +17,9 @@ export function wrap<T>(object: T | T[] | null | undefined): T[] {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function kernelArray<T>(value: T | T[] | null | undefined): T[] {
+export function kernelArray<T>(value: T | T[] | null | undefined): T[];
+export function kernelArray<T>(value: Iterable<T> | null | undefined): T[];
+export function kernelArray<T>(value: T | T[] | Iterable<T> | null | undefined): T[] {
   if (value === null || value === undefined) return [];
   if (Array.isArray(value)) return value;
   if (typeof value === "object" && typeof (value as any)[Symbol.iterator] === "function") {

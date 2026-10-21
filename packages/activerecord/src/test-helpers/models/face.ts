@@ -32,7 +32,7 @@ export class Face extends Base {
     });
 
     this.validate((face: Face) => {
-      void (face as any).human;
+      void face.human;
     });
   }
 }

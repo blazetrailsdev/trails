@@ -22,6 +22,7 @@ import * as DdlHelper from "../../support/ddl-helper.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Name } from "../../connection-adapters/postgresql/utils.js";
 import { ConnectionBad } from "../../pg/exceptions.js";
+import type { PGConnection } from "../../pg/connection.js";
 
 let adapter: PostgreSQLAdapter;
 
@@ -593,7 +594,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
         await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
       });
-      await assertRaises([ConnectionFailed], {}, () => adapter.execute("SELECT 1"));
+      (adapter._rawConnection as PGConnection).sendQuery("SELECT 1");
+
+      await assertRaises([ConnectionNotEstablished], {}, () => adapter.execute("SELECT 1"));
     });
 
     it("reload type map for newly defined types", async () => {

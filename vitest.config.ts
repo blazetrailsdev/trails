@@ -412,6 +412,7 @@ const otherSetupFiles = [
   "./packages/activesupport/src/testing/autorun.ts",
   "./packages/activesupport/src/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
+  "./packages/actionview/src/test-helpers/setup-compile-template.ts",
 ];
 
 export default defineConfig({
@@ -482,6 +483,7 @@ export default defineConfig({
             "./packages/activesupport/src/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
             "./packages/bcrypt/src/index.ts",
+            "./packages/actionview/src/test-helpers/setup-compile-template.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
@@ -547,6 +549,7 @@ export default defineConfig({
             "vendor/*.test.ts",
           ],
           exclude: ["packages/activerecord/**", "packages/trailties/**", ...SHARED_EXCLUDE],
+          globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
           setupFiles: otherSetupFiles,
         },
       },

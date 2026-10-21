@@ -93,7 +93,8 @@ export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
     return rbEqual(other, await this.records());
   }
 
-  protected override async execQueries(block?: (record: T) => void): Promise<T[]> {
+  /** @internal */
+  override async execQueries(block?: (record: T) => void): Promise<T[]> {
     const association = this.proxyAssociation.owner.association(
       this.proxyAssociation.reflection.name,
     );

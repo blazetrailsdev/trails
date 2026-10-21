@@ -195,9 +195,7 @@ export class ExplainProxy<T extends Base> {
   }
 
   inspect(): Promise<string> {
-    return this.execExplain(() =>
-      (this._relation as unknown as { execQueries(): Promise<T[]> }).execQueries(),
-    );
+    return this.execExplain(() => this._relation.execQueries());
   }
 
   average(columnName: string | ArelNode): Promise<string> {
@@ -678,7 +676,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     return [...(await this.records())];
   }
 
-  protected async execQueries(block?: (record: T) => void): Promise<T[]> {
+  /** @internal */
+  async execQueries(block?: (record: T) => void): Promise<T[]> {
     return this.skipQueryCacheIfNecessary(async () => {
       await this._model.ensureSchemaLoaded();
 

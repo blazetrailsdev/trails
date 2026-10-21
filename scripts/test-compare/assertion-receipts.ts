@@ -31,6 +31,40 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actionview:template/form_collections_helper_test.rb › FormCollectionsHelperTest › collection radio correctly builds unique DOM IDs for float values":
+    [
+      {
+        kind: "assert_select",
+        value: "s:label[for=user_name_1_0]",
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:57)',
+      },
+      {
+        kind: "assert_select",
+        value: 's:input#user_name_1_0[type=radio][value="1.0"]',
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:59)',
+      },
+    ],
+  "actionview:template/form_collections_helper_test.rb › FormCollectionsHelperTest › collection check boxes correctly builds unique DOM IDs for float values":
+    [
+      {
+        kind: "assert_select",
+        value: "s:label[for=user_name_1_0]",
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:326)',
+      },
+      {
+        kind: "assert_select",
+        value: 's:input#user_name_1_0[type=checkbox][value="1.0"]',
+        as: null,
+        reason:
+          'Ruby `1.0.to_s` is "1.0" (`numeric.c:1059`); `1.0` and `1` are one JS number, so the helper renders `1` and no `user_name_1_0` element exists to select (template/form_collections_helper_test.rb:328)',
+      },
+    ],
   "actionview:template/date_helper_test.rb › DateHelperTest › object select html safety": [
     {
       kind: "assert_predicate",
@@ -589,6 +623,44 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           "library/yaml/to_yaml_spec.rb:105 `(0.0).to_yaml` is `--- 0.0` — `0.0` and `0` are one JS number, so no Float exists to dump with a fraction",
       },
     ],
+  "rack:spec_request.rb › RackRequestTest › return values for the keys in the order given from values_at":
+    [
+      {
+        kind: "assert_output",
+        value: "x:nil",
+        as: "assert_match",
+        reason:
+          "spec_request.rb:802 `assert_output(nil, /deprecated/)` swaps `$stderr` for a StringIO; Node's stderr is a stream with no reassignable global, so the port captures the `Kernel#warn` call that writes it and matches its message",
+      },
+    ],
+  "rack:spec_request.rb › RackRequestTest › TestProxyRequest › return values for the keys in the order given from values_at":
+    [
+      {
+        kind: "assert_output",
+        value: "x:nil",
+        as: "assert_match",
+        reason:
+          "spec_request.rb:802 `assert_output(nil, /deprecated/)` swaps `$stderr` for a StringIO; Node's stderr is a stream with no reassignable global, so the port captures the `Kernel#warn` call that writes it and matches its message",
+      },
+    ],
+  "rack:spec_multipart.rb › parses multipart/mixed": [
+    {
+      kind: "must_be_instance_of",
+      value: null,
+      as: "must_equal",
+      reason:
+        'spec_multipart.rb:517 `must_be_instance_of String` — a Ruby String is a JS string primitive, which is not `instanceof String`, so its `typeof` is asserted (CLAUDE.md, "Ruby Strings are JS string primitives")',
+    },
+  ],
+  "rack:spec_multipart.rb › falls back to content-type for the name": [
+    {
+      kind: "must_equal",
+      value: "n:26473",
+      as: null,
+      reason:
+        'spec_multipart.rb:1030 `f.length` is the byte size of an image/png part that tag_multipart_encoding re-tags UTF-8 (parser.rb:483); with no tag to set, forceEncoding must decode, and invalid UTF-8 cannot survive as a JS string (CLAUDE.md, "A String has no encoding tag either")',
+    },
+  ],
 };
 
 interface ReceiptableTestCase {

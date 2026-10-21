@@ -1,15 +1,18 @@
 {
   "abstractcontroller": 33,
-  "actioncontroller": 213,
-  "actiondispatch": 804,
+  "actioncontroller": 182,
+  "actiondispatch": 777,
   "actionpackversion": 0,
-  "activemodel": 253,
-  "activerecord": 2427,
+  "activemodel": 240,
+  "activerecord": 2222,
   "arel": 288,
+  "bcrypt": 2,
   "did-you-mean": 8,
-  "globalid": 37,
-  "i18n": 102,
+  "globalid": 36,
+  "i18n": 99,
   "rack": 219,
+  "rack-session": 60,
+  "rack-test": 45,
   "ruby-compat": 933,
-  "thor": 176
+  "thor": 175
 }

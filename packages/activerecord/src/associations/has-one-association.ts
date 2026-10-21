@@ -17,7 +17,7 @@ import { queryConstraintsList } from "../persistence.js";
 import { assertAssignedSynchronously, type PermittedAttributes } from "@blazetrails/activemodel";
 
 export class HasOneAssociation extends SingularAssociation {
-  /** @noRailsEquivalent CONVERGEABLE has-many-through-has-one-inverse-sends-writer */
+  /** @noRailsEquivalent CONVERGEABLE base-constructor-assigns-associations-through-writer */
   syncWrite(record: Base | null): void {
     assertAssignedSynchronously(this.replace(record, false), `${this.reflection.name}=`);
   }
@@ -66,7 +66,7 @@ export class HasOneAssociation extends SingularAssociation {
         case "destroyAsync": {
           let primaryKeyColumn: string | string[];
           let id: unknown;
-          const klass = target.constructor as typeof Base;
+          const klass = target.constructor;
           if (queryConstraintsList.call(klass)) {
             primaryKeyColumn = queryConstraintsList.call(klass)!;
             id = primaryKeyColumn.map((col) => rbFPublicSend(target, col));
@@ -266,7 +266,7 @@ export class HasOneAssociation extends SingularAssociation {
 
   private nullifyOwnerAttributes(record: Base): void {
     for (const foreignKeyColumn of kernelArray(this.reflection.foreignKey())) {
-      if (!kernelArray((record.constructor as typeof Base).primaryKey).includes(foreignKeyColumn)) {
+      if (!kernelArray(record.constructor.primaryKey).includes(foreignKeyColumn)) {
         record.writeAttribute(foreignKeyColumn, null);
       }
     }

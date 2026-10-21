@@ -72,7 +72,7 @@ export interface Owner {
 export class InvalidOwner extends Owner {
   static {
     this.validate(function (this: InvalidOwner) {
-      (this as any).errors.add("base", ":invalid");
+      this.errors.add("base", ":invalid");
     });
   }
 }

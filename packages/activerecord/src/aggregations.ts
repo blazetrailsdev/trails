@@ -6,30 +6,28 @@ import { include, isModuleIncluded, Module, NoMethodError } from "@blazetrails/r
 
 export const Aggregations = new Module();
 
+type AggregationsHost = Base & {
+  _aggregationCache: Map<string, unknown>;
+  clearAggregationCache(): void;
+};
+
 /** @internal */
-function clearAggregationCache(this: Base): void {
-  const self = this as any;
-  if (self._aggregationCache && this.isPersisted()) {
-    (self._aggregationCache as Map<string, unknown>).clear();
+function clearAggregationCache(this: AggregationsHost): void {
+  if (this._aggregationCache && this.isPersisted()) {
+    this._aggregationCache.clear();
   }
 }
 
-interface ComposedOfOptions {
+type ComposedOfOptions = {
   className?: string;
   mapping?: [string, string][] | [string, string];
   constructorFn?: ((...args: any[]) => any) | string;
   converter?: (value: unknown) => unknown;
   allowNil?: boolean;
-}
+};
 
 export function composedOf(this: typeof Base, partId: string, options: ComposedOfOptions): void {
-  assertValidKeys(options as unknown as Record<string, unknown>, [
-    "className",
-    "mapping",
-    "allowNil",
-    "constructorFn",
-    "converter",
-  ]);
+  assertValidKeys(options, ["className", "mapping", "allowNil", "constructorFn", "converter"]);
 
   if (!isModuleIncluded(this, Aggregations)) include(this, Aggregations);
 
@@ -44,13 +42,7 @@ export function composedOf(this: typeof Base, partId: string, options: ComposedO
   readerMethod.call(this, name, className, mapping as [string, string][], allowNil, constructor);
   writerMethod.call(this, name, className, mapping as [string, string][], allowNil, converter);
 
-  const reflection = create(
-    "composedOf",
-    partId,
-    null,
-    options as unknown as Record<string, unknown>,
-    this,
-  );
+  const reflection = create("composedOf", partId, null, options, this);
   addAggregateReflection(this, partId, reflection);
 }
 
@@ -70,8 +62,8 @@ function readerMethod(
   const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
   Object.defineProperty(this.prototype, name, {
     enumerable: existing?.enumerable ?? false,
-    get(this: Base): unknown {
-      const cache: Map<string, unknown> = (this as any)._aggregationCache;
+    get(this: AggregationsHost): unknown {
+      const cache = this._aggregationCache;
       if (
         cache.get(name) == null &&
         (!allowNil || mapping.some(([key]) => this.readAttribute(key) != null))
@@ -104,9 +96,9 @@ function writerMethod(
   Object.defineProperty(this.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get: existing?.get,
-    set(this: Base, part: unknown): void {
+    set(this: AggregationsHost, part: unknown): void {
       const klass = constantize(className) as new (...args: any[]) => any;
-      const cache: Map<string, unknown> = (this as any)._aggregationCache;
+      const cache = this._aggregationCache;
 
       if (!(part instanceof klass || converter == null || part == null)) {
         part = converter(part);
@@ -147,20 +139,20 @@ function writerMethod(
 
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
 
-export function initializeDup(this: Base, other: unknown): void {
-  (this as any)._aggregationCache = new Map((this as any)._aggregationCache);
+export function initializeDup(this: AggregationsHost, other: unknown): void {
+  this._aggregationCache = new Map(this._aggregationCache);
   Aggregations.superMethod(this, "initializeDup")!(other);
 }
 
-export function reload(this: Base, options?: ReloadOptions): Promise<Base> {
-  (this as any).clearAggregationCache();
+export function reload(this: AggregationsHost, options?: ReloadOptions): Promise<Base> {
+  this.clearAggregationCache();
   return Aggregations.superMethod(this, "reload")!(options) as Promise<Base>;
 }
 
 /** @internal */
-function initInternals(this: Base): void {
+function initInternals(this: AggregationsHost): void {
   Aggregations.superMethod(this, "initInternals")!();
-  (this as any)._aggregationCache = new Map<string, unknown>();
+  this._aggregationCache = new Map<string, unknown>();
 }
 
 Aggregations.defineMethod("initializeDup", initializeDup);

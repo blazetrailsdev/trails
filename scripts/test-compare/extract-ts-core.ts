@@ -499,6 +499,7 @@ export function extractTestsFromSource(
   const registrars = testRegisteringHelpers(sourceFile, helpers);
   const deferredBodies = new Map<string, ts.Node>();
   const callSiteGates = new Map<string, (TestGate | undefined)[]>();
+  const callSiteAncestors = new Map<string, string[][]>();
   // An `it()` whose title stays dynamic inside an expanded `for...of` is
   // visited once per element, but the skeleton is the same every time, so it
   // is recorded once — the Ruby extractor records one row per `test` call
@@ -656,6 +657,9 @@ export function extractTestsFromSource(
           const gates = callSiteGates.get(funcName) ?? [];
           gates.push(activeGate());
           callSiteGates.set(funcName, gates);
+          const sites = callSiteAncestors.get(funcName) ?? [];
+          sites.push([...currentAncestors]);
+          callSiteAncestors.set(funcName, sites);
         }
 
         if (ADAPTER_SUITE_WRAPPERS.has(funcName)) {
@@ -782,6 +786,20 @@ export function extractTestsFromSource(
 
   visit(sourceFile);
   for (const [name, body] of deferredBodies) {
+    const sites = callSiteAncestors.get(name) ?? [];
+    if (sites.some((outer) => sites.some((inner) => extendsSuite(inner, outer)))) {
+      sites.forEach((site, i) => {
+        const siteGate = callSiteGates.get(name)![i];
+        const seen = new Set(dynamicSites);
+        currentAncestors.push(...site);
+        if (siteGate) gateStack.push(siteGate);
+        visit(body);
+        for (const node of dynamicSites) if (!seen.has(node)) dynamicSites.delete(node);
+        if (siteGate) gateStack.pop();
+        currentAncestors.length -= site.length;
+      });
+      continue;
+    }
     const gate = agreedGate(callSiteGates.get(name));
     if (gate) gateStack.push(gate);
     visit(body);
@@ -789,6 +807,11 @@ export function extractTestsFromSource(
   }
   fileInfo.testCount = fileInfo.testCases.length;
   return fileInfo;
+}
+
+/** Is suite path `inner` nested strictly inside suite path `outer`? */
+function extendsSuite(inner: readonly string[], outer: readonly string[]): boolean {
+  return inner.length > outer.length && outer.every((title, i) => inner[i] === title);
 }
 
 /**

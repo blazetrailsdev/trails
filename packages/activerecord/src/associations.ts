@@ -126,7 +126,7 @@ export function registerModel(
 
 /** @internal */
 export function _cacheSingularTarget(record: Base, assocName: string, target: Base | null): void {
-  const macro = (record.constructor as typeof Base)._reflectOnAssociation?.(assocName)?.macro;
+  const macro = record.constructor._reflectOnAssociation?.(assocName)?.macro;
   if (macro === "belongsTo" || macro === "hasOne") {
     const assoc = record.association(assocName);
     assoc.inversedFrom(target);
@@ -139,84 +139,89 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
 
 export class Associations {
   static belongsTo(
+    this: typeof Base,
     name: string,
-    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
     options: AssociationOptions = {},
   ): void {
+    if (typeof scope === "object" && scope !== null) {
+      options = scope;
+      scope = null;
+    }
     const reflection = BelongsToBuilder.build(
       this,
       name,
-      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
+      scope,
       options as Record<string, unknown>,
     );
-    Reflection.addReflection(this as any, name, reflection);
+    Reflection.addReflection(this, name, reflection);
   }
 
   static hasOne(
+    this: typeof Base,
     name: string,
-    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
     options: AssociationOptions = {},
   ): void {
-    const reflection = HasOneBuilder.build(
-      this,
-      name,
-      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
-      options as Record<string, unknown>,
-    );
-    Reflection.addReflection(this as any, name, reflection);
+    if (typeof scope === "object" && scope !== null) {
+      options = scope;
+      scope = null;
+    }
+    const reflection = HasOneBuilder.build(this, name, scope, options as Record<string, unknown>);
+    Reflection.addReflection(this, name, reflection);
   }
 
   static hasMany(
+    this: typeof Base,
     name: string,
-    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = {},
+    scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
     options: AssociationOptions = {},
     extension?: (mod: Module) => void,
   ): void {
+    if (typeof scope === "object" && scope !== null) {
+      options = scope;
+      scope = null;
+    }
     const reflection = HasManyBuilder.build(
       this,
       name,
-      scope as ((...args: any[]) => any) | Record<string, unknown> | null,
+      scope,
       options as Record<string, unknown>,
       extension,
     );
-    Reflection.addReflection(this as any, name, reflection);
+    Reflection.addReflection(this, name, reflection);
   }
 
   static hasAndBelongsToMany(
+    this: typeof Base,
     name: string,
     scope:
       | ((this: Relation<any>, ...args: any[]) => any)
       | (AssociationOptions & { joinTable?: string })
-      | null = {},
+      | null = null,
     options: AssociationOptions & { joinTable?: string } = {},
     extension?: (mod: Module) => void,
   ): void {
-    if (
-      typeof scope === "object" &&
-      scope !== null &&
-      !Array.isArray(scope) &&
-      !(scope instanceof Function)
-    ) {
+    if (typeof scope === "object" && scope !== null) {
       options = scope;
       scope = null;
     }
-    const self = this as any;
     const habtmReflection = new Reflection.HasAndBelongsToManyReflection(
       name,
-      scope as ((...args: any[]) => any) | null,
+      scope,
       options as Record<string, unknown>,
-      self,
+      this,
     );
 
-    const builder = new HabtmBuilder(name, self, options as Record<string, unknown>);
+    const builder = new HabtmBuilder(name, this, options as Record<string, unknown>);
 
     const joinModel = builder.throughModel();
 
-    rbModConstSet(self, joinModel.name, joinModel);
+    rbModConstSet(this, joinModel.name, joinModel);
 
     const middleReflection = builder.middleReflection(joinModel);
-    HasManyBuilder.defineCallbacks(self, middleReflection);
-    Reflection.addReflection(self, middleReflection.name, middleReflection);
+    HasManyBuilder.defineCallbacks(this, middleReflection);
+    Reflection.addReflection(this, middleReflection.name, middleReflection);
     middleReflection.parentReflection = habtmReflection;
 
     include(
@@ -250,7 +255,7 @@ export class Associations {
     }
 
     this.hasMany(name, scope as ((...args: any[]) => any) | null, hmOptions, extension);
-    (self._reflections as Record<string, { parentReflection?: unknown }>)[name].parentReflection =
+    (this._reflections as Record<string, { parentReflection?: unknown }>)[name].parentReflection =
       habtmReflection;
   }
 }
@@ -276,18 +281,16 @@ export function _buildAssociationInstance(
   switch (assocDef.macro) {
     case "belongsTo":
       if (opts.polymorphic)
-        return new AssociationsNamespace.BelongsToPolymorphicAssociation(this, assocDef as any);
-      return new AssociationsNamespace.BelongsToAssociation(this, assocDef as any);
+        return new AssociationsNamespace.BelongsToPolymorphicAssociation(this, assocDef);
+      return new AssociationsNamespace.BelongsToAssociation(this, assocDef);
     case "hasOne":
-      if (opts.through)
-        return new AssociationsNamespace.HasOneThroughAssociation(this, assocDef as any);
-      return new AssociationsNamespace.HasOneAssociation(this, assocDef as any);
+      if (opts.through) return new AssociationsNamespace.HasOneThroughAssociation(this, assocDef);
+      return new AssociationsNamespace.HasOneAssociation(this, assocDef);
     case "hasMany":
-      if (opts.through)
-        return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef as any);
-      return new AssociationsNamespace.HasManyAssociation(this, assocDef as any);
+      if (opts.through) return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef);
+      return new AssociationsNamespace.HasManyAssociation(this, assocDef);
     default:
-      return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef as any);
+      return new AssociationsNamespace.HasManyThroughAssociation(this, assocDef);
   }
 }
 
@@ -301,7 +304,7 @@ export function association(this: Base, name: string): AssociationInstance {
   const existing = associationInstanceGet.call(this, name) as AssociationInstance | null;
   if (existing) return existing;
 
-  const ctor = this.constructor as typeof Base;
+  const ctor = this.constructor;
   const assocDef = ctor._reflectOnAssociation?.(name) as unknown as
     | AssociationDefinition
     | undefined;

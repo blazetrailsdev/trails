@@ -41,7 +41,14 @@ import {
   QueryParser,
   unescape,
 } from "./utils.js";
-import { block as rbBlock, fetch, hashDelete, include, warn } from "@blazetrails/ruby-compat";
+import {
+  block as rbBlock,
+  fetch,
+  hashDelete,
+  include,
+  rbObjDup,
+  warn,
+} from "@blazetrails/ruby-compat";
 import { MediaType } from "./media-type.js";
 import * as Multipart from "./multipart.js";
 
@@ -112,6 +119,54 @@ const trustedProxies = new RegExp(
   "i",
 );
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `module Env` (`rack/request.rb:82`); the class/interface merge is how the module's host state surfaces on the type side. */
+export interface Env {
+  env: Record<string, any>;
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
+export abstract class Env {
+  hasHeader(name: string): boolean {
+    return Object.hasOwn(this.env, name);
+  }
+
+  getHeader(name: string): any {
+    return this.env[name];
+  }
+
+  fetchHeader(name: string): any;
+  fetchHeader(name: string, block: (key: string) => any): any;
+  fetchHeader(name: string, block?: (key: string) => any): any {
+    return block === undefined ? fetch(this.env, name) : fetch(this.env, name, rbBlock(block));
+  }
+
+  eachHeader(callback: (key: string, value: any) => void): void {
+    for (const [k, v] of Object.entries(this.env)) callback(k, v);
+  }
+
+  setHeader(name: string, v: any): any {
+    return (this.env[name] = v);
+  }
+
+  addHeader(key: string, v: string | null): any {
+    if (v == null) {
+      return this.getHeader(key);
+    } else if (this.hasHeader(key)) {
+      return this.setHeader(key, `${this.getHeader(key)},${v}`);
+    } else {
+      return this.setHeader(key, v);
+    }
+  }
+
+  deleteHeader(name: string): any {
+    return hashDelete(this.env, name);
+  }
+
+  initializeCopy(other: Env): Record<string, any> {
+    return (this.env = rbObjDup(other.env));
+  }
+}
+
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers`; the class/interface merge is how the module's host state surfaces on the type side. */
 export interface Helpers {
   readonly env: Record<string, any>;
@@ -123,7 +178,7 @@ export interface Helpers {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
 export abstract class Helpers {
   get body(): any {
-    return this.getHeader(RACK_INPUT);
+    return this.getHeader(RACK_INPUT) ?? null;
   }
 
   get scriptName(): string {
@@ -542,8 +597,9 @@ export abstract class Helpers {
   }
 
   valuesAt(...keys: string[]): any[] {
-    console.warn(
+    warn(
       "Request#values_at is deprecated and will be removed in a future version of Rack. Please use request.params.values_at instead",
+      { uplevel: 1 },
     );
 
     return keys.map((key) => this.params[key]);
@@ -733,42 +789,6 @@ export class Request {
     return new (this.constructor as typeof Request)({ ...this.env });
   }
 
-  hasHeader(name: string): boolean {
-    return name in this.env;
-  }
-
-  getHeader(name: string): any {
-    return this.env[name];
-  }
-
-  addHeader(key: string, v: string | null): any {
-    if (v == null) {
-      return this.getHeader(key);
-    } else if (this.hasHeader(key)) {
-      return this.setHeader(key, `${this.getHeader(key)},${v}`);
-    } else {
-      return this.setHeader(key, v);
-    }
-  }
-
-  deleteHeader(name: string): any {
-    return hashDelete(this.env, name);
-  }
-
-  fetchHeader(name: string): any;
-  fetchHeader(name: string, block: (key: string) => any): any;
-  fetchHeader(name: string, block?: (key: string) => any): any {
-    return block === undefined ? fetch(this.env, name) : fetch(this.env, name, rbBlock(block));
-  }
-
-  setHeader(name: string, v: any): any {
-    return (this.env[name] = v);
-  }
-
-  eachHeader(callback: (key: string, value: any) => void): void {
-    for (const [k, v] of Object.entries(this.env)) callback(k, v);
-  }
-
   /** @noRailsEquivalent CONVERGEABLE port-rack-request-form-pairs */
   get formPairs(): [string, any][] {
     void this.POST;
@@ -791,6 +811,8 @@ export class Request {
   }
 }
 
+include(Request, Env);
 include(Request, Helpers);
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/request.rb:790`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface Request extends Omit<Helpers, "env" | "getHeader" | "setHeader" | "fetchHeader"> {}
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/request.rb:790`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Request
+  extends Env, Omit<Helpers, "env" | "getHeader" | "setHeader" | "fetchHeader"> {}

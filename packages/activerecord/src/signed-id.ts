@@ -23,8 +23,10 @@ export const SignedId = {
 };
 
 export class ClassMethods {
+  declare private static _signedIdVerifier: MessageVerifier | undefined;
+
   static get signedIdVerifier(): MessageVerifier {
-    return ((this as any)._signedIdVerifier ??= (() => {
+    return (this._signedIdVerifier ??= (() => {
       let secret = (this as any).signedIdVerifierSecret as
         | string
         | (() => string | null | undefined)
@@ -43,7 +45,7 @@ export class ClassMethods {
   }
 
   static set signedIdVerifier(verifier: MessageVerifier) {
-    (this as any)._signedIdVerifier = verifier;
+    this._signedIdVerifier = verifier;
   }
 }
 
@@ -64,7 +66,7 @@ export function signedId(
 ): string {
   if (instance.isNewRecord()) throw new ArgumentError("Cannot get a signed_id for a new record");
 
-  const klass = instance.constructor as typeof Base;
+  const klass = instance.constructor;
   return klass.signedIdVerifier.generate(instance.id, {
     expiresIn,
     expiresAt,

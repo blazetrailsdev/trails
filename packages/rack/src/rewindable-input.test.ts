@@ -98,7 +98,7 @@ it("close the underlying tempfile upon calling #close", () => {
   rio!.read(1);
   const tempfile = rewindableIo();
   rio!.close();
-  expect(tempfile.isClosed()).toBe(true);
+  expect(tempfile.isClosed()).toBeTruthy();
 });
 
 it("handle partial writes to tempfile", () => {
@@ -113,7 +113,7 @@ it("handle partial writes to tempfile", () => {
   rio!.read(1);
   const tempfile = rewindableIo();
   rio!.close();
-  expect(tempfile.isClosed()).toBe(true);
+  expect(tempfile.isClosed()).toBeTruthy();
 });
 
 it("close the underlying tempfile upon calling #close when not using posix semantics", () => {
@@ -121,7 +121,7 @@ it("close the underlying tempfile upon calling #close when not using posix seman
   rio!.read(1);
   const tempfile = rewindableIo();
   rio!.close();
-  expect(tempfile.isClosed()).toBe(true);
+  expect(tempfile.isClosed()).toBeTruthy();
 });
 
 it("be possible to call #close when no data has been buffered yet", () => {

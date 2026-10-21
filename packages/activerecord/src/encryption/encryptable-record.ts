@@ -11,6 +11,7 @@ import {
 import { Module, include } from "@blazetrails/ruby-compat";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Encryption } from "../encryption.js";
+import type { Base } from "../base.js";
 
 /**
  * Mirrors Rails' EncryptableRecord#global_previous_schemes_for.
@@ -47,7 +48,7 @@ export class EncryptableRecord {
     });
   }
 
-  static loadSchemaBang(this: typeof EncryptableRecord, superFn: () => void): void {
+  static loadSchemaBang(this: typeof Base, superFn: () => void): void {
     superFn();
 
     if (Encryption.config.validateColumnSize) {
@@ -57,7 +58,7 @@ export class EncryptableRecord {
 }
 
 /** @internal */
-export function addLengthValidationForEncryptedColumns(this: any): void {
+export function addLengthValidationForEncryptedColumns(this: typeof Base): void {
   const attrs: Set<string> = this.encryptedAttributes ?? new Set<string>();
   for (const name of attrs) {
     validateColumnSize.call(this, name);
@@ -69,7 +70,7 @@ export function addLengthValidationForEncryptedColumns(this: any): void {
  * @inventedArm generatedAttributeMethods — PERMANENT
  */
 export function overrideAccessorsToPreserveOriginal(
-  this: any,
+  this: typeof Base,
   name: string,
   originalAttributeName: string,
 ): void {
@@ -102,14 +103,14 @@ export function overrideAccessorsToPreserveOriginal(
 }
 
 /** @internal */
-export function validateColumnSize(this: any, attributeName: string): void {
+export function validateColumnSize(this: typeof Base, attributeName: string): void {
   const limit = this.columnsHash()[attributeName]?.limit;
   if (limit != null) {
     this.validatesLengthOf(attributeName, { maximum: limit });
   }
 }
 
-export function encrypts(this: any, ...names: unknown[]): void {
+export function encrypts(this: typeof Base, ...names: unknown[]): void {
   const options: SchemeOptions = extractOptionsBang(names);
   this.encryptedAttributes ||= new Set<string>();
 
@@ -118,7 +119,7 @@ export function encrypts(this: any, ...names: unknown[]): void {
   }
 }
 
-export function deterministicEncryptedAttributes(this: any): string[] | undefined {
+export function deterministicEncryptedAttributes(this: typeof Base): string[] | undefined {
   return (
     Object.getOwnPropertyDescriptor(this, "_deterministicEncryptedAttributes")?.value ||
     (this._deterministicEncryptedAttributes =
@@ -140,16 +141,18 @@ export function sourceAttributeFromPreservedAttribute(
 }
 
 /** @internal */
-export function isEncryptedAttribute(this: any, attributeName: string): boolean {
-  const name = this.constructor.attributeAliases?.[attributeName] ?? attributeName;
-  if (!(this.constructor.encryptedAttributes ?? new Set<string>()).has(name)) return false;
-  const type = this.constructor.typeForAttribute(name) as EncryptedAttributeType;
+export function isEncryptedAttribute(this: Base, attributeName: string): boolean {
+  const klass = this.constructor;
+  const name = klass.attributeAliases?.[attributeName] ?? attributeName;
+  if (!(klass.encryptedAttributes ?? new Set<string>()).has(name)) return false;
+  const type = klass.typeForAttribute(name) as EncryptedAttributeType;
   return type.isEncrypted(this.readAttributeBeforeTypeCast?.(name));
 }
 
 /** @internal */
-export function ciphertextFor(this: any, attributeName: string): unknown {
-  attributeName = this.constructor.attributeAliases?.[attributeName] ?? attributeName;
+export function ciphertextFor(this: Base, attributeName: string): unknown {
+  const klass = this.constructor;
+  attributeName = klass.attributeAliases?.[attributeName] ?? attributeName;
   if (isEncryptedAttribute.call(this, attributeName)) {
     return this.readAttributeBeforeTypeCast?.(attributeName);
   }
@@ -157,28 +160,28 @@ export function ciphertextFor(this: any, attributeName: string): unknown {
 }
 
 /** @internal */
-export async function encrypt(this: any): Promise<boolean | undefined> {
+export async function encrypt(this: Base): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
     return await encryptAttributes.call(this);
   }
 }
 
 /** @internal */
-export async function decrypt(this: any): Promise<boolean | undefined> {
+export async function decrypt(this: Base): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
     return await decryptAttributes.call(this);
   }
 }
 
 /** @internal */
-export async function encryptAttributes(this: any): Promise<boolean> {
+export async function encryptAttributes(this: Base): Promise<boolean> {
   validateEncryptionAllowed.call(this);
 
   return await this.updateColumns(buildEncryptAttributeAssignments.call(this));
 }
 
 /** @internal */
-export async function decryptAttributes(this: any): Promise<boolean> {
+export async function decryptAttributes(this: Base): Promise<boolean> {
   validateEncryptionAllowed.call(this);
 
   const decryptAttributeAssignments = buildDecryptAttributeAssignments.call(this);
@@ -186,36 +189,39 @@ export async function decryptAttributes(this: any): Promise<boolean> {
 }
 
 /** @internal */
-export function validateEncryptionAllowed(this: any): void {
+export function validateEncryptionAllowed(this: unknown): void {
   if (Encryption.context.frozenEncryption) {
     throw new Configuration("can't be modified because it is encrypted");
   }
 }
 
 /** @internal */
-export function hasEncryptedAttributes(this: any): boolean {
-  return (this.constructor.encryptedAttributes ?? new Set<string>()).size > 0;
+export function hasEncryptedAttributes(this: Base): boolean {
+  const klass = this.constructor;
+  return (klass.encryptedAttributes ?? new Set<string>()).size > 0;
 }
 
 /** @internal */
 export async function _createRecord(
-  this: any,
+  this: Base,
   attributeNames: string[] | undefined,
   superFn: (attributeNames: string[]) => Promise<unknown>,
 ): Promise<unknown> {
+  const klass = this.constructor;
   attributeNames ??= this.attributeNames();
   if (hasEncryptedAttributes.call(this)) {
     attributeNames = [
-      ...new Set([...attributeNames!, ...[...this.constructor.encryptedAttributes].map(String)]),
+      ...new Set([...attributeNames, ...[...klass.encryptedAttributes!].map(String)]),
     ];
   }
-  return superFn(attributeNames!);
+  return superFn(attributeNames);
 }
 
 /** @internal */
-export function buildEncryptAttributeAssignments(this: any): Record<string, unknown> {
+export function buildEncryptAttributeAssignments(this: Base): Record<string, unknown> {
+  const klass = this.constructor;
   return Object.fromEntries(
-    Array<string>(this.constructor.encryptedAttributes).map((attributeName) => [
+    Array<string>(klass.encryptedAttributes).map((attributeName) => [
       attributeName,
       this.readAttribute(attributeName),
     ]),
@@ -223,10 +229,11 @@ export function buildEncryptAttributeAssignments(this: any): Record<string, unkn
 }
 
 /** @internal */
-export function buildDecryptAttributeAssignments(this: any): Record<string, unknown> {
+export function buildDecryptAttributeAssignments(this: Base): Record<string, unknown> {
+  const klass = this.constructor;
   return Object.fromEntries(
-    Array<string>(this.constructor.encryptedAttributes).map((attributeName) => {
-      const type = this.constructor.typeForAttribute(attributeName) as EncryptedAttributeType;
+    Array<string>(klass.encryptedAttributes).map((attributeName) => {
+      const type = klass.typeForAttribute(attributeName) as EncryptedAttributeType;
       const encryptedValue = ciphertextFor.call(this, attributeName);
       const newValue = type.deserialize(encryptedValue);
       return [attributeName, newValue];
@@ -235,16 +242,20 @@ export function buildDecryptAttributeAssignments(this: any): Record<string, unkn
 }
 
 /** @internal */
-export function encryptAttribute(this: any, name: string, options: SchemeOptions = {}): void {
+export function encryptAttribute(
+  this: typeof Base,
+  name: string,
+  options: SchemeOptions = {},
+): void {
   const modelClass = this;
-  modelClass.encryptedAttributes.add(name);
+  modelClass.encryptedAttributes!.add(name);
 
-  modelClass.decorateAttributes([name], (name: string, castType: ValueType) => {
+  modelClass.decorateAttributes([name], (name: string, castType: ValueType | null) => {
     const scheme = schemeFor(options);
 
     return new EncryptedAttributeType({
       scheme,
-      castType,
+      castType: castType!,
       default: modelClass.columnsHash()[name]?.default ?? undefined,
     });
   });
@@ -260,7 +271,7 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
  * @internal
  * @inventedArm if — CONVERGEABLE preserve-original-encrypted-skips-its-column-check-on-a-cold-schema-cache
  */
-export function preserveOriginalEncrypted(this: any, name: string): void {
+export function preserveOriginalEncrypted(this: typeof Base, name: string): void {
   const originalAttributeName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
 
   const columnNames: string[] = this.columnNames();
@@ -277,8 +288,9 @@ export function preserveOriginalEncrypted(this: any, name: string): void {
 }
 
 /** @internal */
-export function cantModifyEncryptedAttributesWhenFrozen(this: any): void {
-  for (const attribute of this.constructor.encryptedAttributes) {
+export function cantModifyEncryptedAttributesWhenFrozen(this: Base): void {
+  const klass = this.constructor;
+  for (const attribute of klass.encryptedAttributes!) {
     if (this.changedAttributes.include(attribute)) {
       this.errors.add(attribute, "can't be modified because it is encrypted");
     }

@@ -349,11 +349,15 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
     return this._viewPaths.exists(base, pfxs, partial, details, key, keys);
   }
 
+  declare isTemplateExists: LookupContext["isExists"];
+
   isAny(name: string, prefixes: ReadonlyArray<string> = [], partial = false): boolean {
     const [base, pfxs] = this.normalizeName(name, prefixes);
     const [details, key] = this.detailArgsForAny();
     return this._viewPaths.exists(base, pfxs, partial, details, key, []);
   }
+
+  declare isAnyTemplates: LookupContext["isAny"];
 
   /** @internal */
   detailArgsFor(options: Record<string, DetailValue>): [DetailsMap, Requested | null] {
@@ -399,6 +403,8 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
     return new (DetailsKey.viewContextClass())(this, {}, null);
   }
 }
+LookupContext.prototype.isTemplateExists = LookupContext.prototype.isExists;
+LookupContext.prototype.isAnyTemplates = LookupContext.prototype.isAny;
 
 (LookupContext as { DetailsKey: typeof DetailsKey }).DetailsKey = DetailsKey;
 LookupContext.Accessors = Accessors;

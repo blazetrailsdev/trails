@@ -1914,7 +1914,7 @@ export class AbstractAdapter implements Quoting {
     if (this.preparedStatements) {
       return new Collectors.Composite(new Collectors.SQLString(), new Collectors.Bind());
     }
-    return new Collectors.SubstituteBinds(this as any, new Collectors.SQLString());
+    return new Collectors.SubstituteBinds(this, new Collectors.SQLString());
   }
 
   /** @internal */

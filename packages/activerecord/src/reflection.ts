@@ -1629,7 +1629,7 @@ export function addReflection(
 ): void {
   clearReflectionsCache(ar);
   (ar as any)._reflections = Object.assign(
-    except((ar as any)._reflections as Record<string, unknown>, name),
+    except(ar._reflections as Record<string, unknown>, name),
     { [name]: reflection },
   );
 }

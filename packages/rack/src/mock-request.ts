@@ -19,6 +19,7 @@ import {
   OPTIONS,
 } from "./constants.js";
 import {
+  Encoding,
   type Generic,
   isSymbol,
   rbFSend,
@@ -166,6 +167,7 @@ export class MockRequest {
     }
 
     if (rackInput != null && rackInput !== false) {
+      if (rbObjRespondTo(rackInput, "setEncoding")) rackInput.setEncoding(Encoding.BINARY);
       env[RACK_INPUT] = rackInput;
 
       if (rbObjRespondTo(env[RACK_INPUT], "size"))

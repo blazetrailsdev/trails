@@ -44,7 +44,7 @@ export interface ViewContext {
 
 export interface RenderOptions {
   template?: string | RenderableTemplate;
-  partial?: string | object;
+  partial?: string | object | null;
   inline?: string;
   body?: string;
   plain?: string;
@@ -62,7 +62,7 @@ export interface RenderOptions {
         keys: readonly string[],
       ) => RenderOptions["layout"]);
   locals?: Record<string, unknown>;
-  collection?: readonly unknown[];
+  collection?: Iterable<unknown> | null;
   as?: string | false | null;
   spacerTemplate?: string;
   object?: unknown;

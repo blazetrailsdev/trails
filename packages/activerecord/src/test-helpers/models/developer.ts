@@ -189,7 +189,7 @@ export class Developer extends Base {
     this.validates("name", { length: { in: new Range(3, 20) } });
 
     this.beforeCreate(async function (developer: Developer) {
-      (developer as any).auditLogs.build({ message: "Computer created" });
+      developer.auditLogs.build({ message: "Computer created" });
     });
 
     this.attribute("last_name");
@@ -204,7 +204,7 @@ export class Developer extends Base {
   }
 
   set log(message: string) {
-    (this as any).auditLogs.build({ message });
+    this.auditLogs.build({ message });
   }
 }
 registerModel(Developer);
@@ -292,7 +292,7 @@ export class DeveloperWithBeforeDestroyRaise extends Base {
       foreignKey: "developer_id",
     });
     this.beforeDestroy(async function (developer: DeveloperWithBeforeDestroyRaise) {
-      const projects = await (developer as any).projects;
+      const projects = await developer.projects;
       if (projects.length === 0) throw new RuntimeError("unhandled exception");
     });
   }
@@ -494,7 +494,7 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
       return this.where({ name: "David" });
     });
     this.defaultScope(function () {
-      return (LazyBlockReferencingScopeDeveloperCalledDavid as any).david();
+      return LazyBlockReferencingScopeDeveloperCalledDavid.david();
     });
   }
 }

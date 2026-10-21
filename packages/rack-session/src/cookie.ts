@@ -13,7 +13,6 @@ import {
   rbFCaller,
   rbStrRpartition,
   registerConstant,
-  strlen,
   warn,
 } from "@blazetrails/ruby-compat";
 
@@ -23,9 +22,8 @@ import {
   type PersistedRequest,
   SessionId as SessionSessionId,
 } from "./abstract/id.js";
+import { RACK_SESSION_UNPACKED_COOKIE_DATA } from "./constants.js";
 import { Encryptor, type EncryptorOptions } from "./encryptor.js";
-
-export const RACK_SESSION_UNPACKED_COOKIE_DATA = "rack.session.unpacked_cookie_data";
 
 interface Coder {
   encode(str: unknown): unknown;
@@ -246,7 +244,7 @@ export class Cookie extends PersistedSecure {
     session = { ...session, session_id: sessionId };
     const sessionData = this.encodeSessionData(session) as string;
 
-    if (strlen(sessionData) > 4096 - strlen(this.key)) {
+    if (sessionData.length > 4096 - this.key.length) {
       (req.getHeader(RACK_ERRORS) as unknown as RackErrors).puts(
         "Warning! Rack::Session::Cookie data size exceeds 4K.",
       );

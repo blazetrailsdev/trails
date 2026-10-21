@@ -1746,6 +1746,51 @@ describe("Module#include of an accessor", () => {
   });
 });
 
+describe("Module#include of a plain module", () => {
+  it("keeps a prepended Module's plain module between the Module and the class", () => {
+    class Host {
+      who() {
+        return "host";
+      }
+    }
+    Object.defineProperty(Host.prototype, "Version", { value: "host", configurable: true });
+    const plain = { who: () => "plain", only: () => "only", Version: "plain" };
+    const mod = new Module((m) => m.include(plain));
+    prepend(Host, mod);
+    const host = new Host() as unknown as DynMethods;
+    expect(host.who()).toBe("plain");
+    expect(host.only()).toBe("only");
+    expect(Object.getOwnPropertyDescriptor(Host.prototype, "Version")?.value).toBe("host");
+  });
+
+  it("lets an object extended later outrank a Module's plain module on extend", () => {
+    const base = new Module((m) => m.include({ greet: () => "base" }));
+    const later = new Module((m) => m.defineMethod("greet", () => "later"));
+    class Klass {}
+    extend(Klass, base);
+    extend(Klass, later);
+    expect((Klass as unknown as DynMethods).greet()).toBe("later");
+  });
+
+  it("resumes super past the plain module that defines the calling method", () => {
+    class Parent {
+      greet() {
+        return "parent";
+      }
+    }
+    const mod: Module = new Module((m) =>
+      m.include({
+        greet(this: object) {
+          return `plain>${mod.superMethod(this, "greet")!() as string}`;
+        },
+      }),
+    );
+    class Child extends Parent {}
+    include(Child, mod);
+    expect(new Child().greet()).toBe("plain>parent");
+  });
+});
+
 describe("Module#include of a Module", () => {
   it("splices the included module beneath the includer, live", () => {
     const inner = new Module();
@@ -2115,6 +2160,50 @@ describe("extend on an object", () => {
     expect(rbClassOf(obj)).not.toBe(Object);
     expect(rbClassInheritedP(rbClassOf(obj), Mod)).toBe(true);
     expect(obj.constructor).toBe(Object);
+  });
+
+  it("includes a plain module into the object's singleton class", async () => {
+    const { defineModule, extend, rbClassInheritedP } = await import("./include.js");
+    const { rbClassOf } = await import("./object.js");
+    const Mod = defineModule({ m: () => 1 });
+    const obj = extend({}, Mod);
+    expect(rbClassInheritedP(rbClassOf(obj), Mod)).toBe(true);
+  });
+
+  it("keeps the object's own prototype beneath its singleton class", async () => {
+    const { defineModule, extend } = await import("./include.js");
+    const proto = { inherited: () => 2 };
+    const obj = extend(Object.create(proto) as { inherited: () => number }, defineModule({}));
+    expect(obj.inherited()).toBe(2);
+  });
+
+  it("extends a null-prototype object, a Hash, through a Hash singleton class", async () => {
+    const { defineModule, extend, rbClassInheritedP } = await import("./include.js");
+    const { rbClassOf, rbObjClass } = await import("./object.js");
+    const { Hash } = await import("./hash.js");
+    const Mod = defineModule({ m: () => 1 });
+    const obj = extend(Object.create(null) as object, Mod);
+    expect(rbClassInheritedP(rbClassOf(obj), Mod)).toBe(true);
+    expect(rbObjClass(obj)).toBe(Hash);
+  });
+
+  it("puts a class module a plain module includes on the singleton class", async () => {
+    const { classModule, defineModule, extend, include, rbClassInheritedP, rbModAncestors } =
+      await import("./include.js");
+    const { rbClassOf } = await import("./object.js");
+    class Nested {
+      static readonly [classModule] = true;
+      n(): number {
+        return 3;
+      }
+    }
+    const Mod = defineModule({});
+    include(Mod, Nested);
+    const obj = extend({}, Mod);
+    expect(rbClassInheritedP(rbClassOf(obj), Nested)).toBe(true);
+    expect(rbModAncestors(rbClassOf(obj)).some((m) => m !== Nested && Object.hasOwn(m, "n"))).toBe(
+      false,
+    );
   });
 
   it("raises FrozenError for a frozen object", async () => {

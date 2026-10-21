@@ -1,6 +1,15 @@
+import type { Base } from "../../base.js";
+import type { ScopeOn } from "../../scoping/named.js";
+import type { Account } from "./account.js";
 import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Topic, Web, WebTopic } from "./topic.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    open: ScopeOn<T, Account | Reply>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reply extends Topic {
@@ -31,7 +40,7 @@ export class Reply extends Topic {
   }
 
   static open() {
-    return (this as any).approved();
+    return this.approved();
   }
 }
 registerModel(Reply);
@@ -74,42 +83,42 @@ export class WrongReply extends Reply {
   }
 
   checkEmptyTitle() {
-    if (!(this as any).attributePresent("title")) {
-      (this as any).errors.add("title", "Empty");
+    if (!this.attributePresent("title")) {
+      this.errors.add("title", "Empty");
     }
   }
 
   errorsOnEmptyContent() {
-    if (!(this as any).attributePresent("content")) {
-      (this as any).errors.add("content", "Empty");
+    if (!this.attributePresent("content")) {
+      this.errors.add("content", "Empty");
     }
   }
 
   checkContentMismatch() {
     if (
-      (this as any).attributePresent("title") &&
-      (this as any).attributePresent("content") &&
-      (this as any).content === "Mismatch"
+      this.attributePresent("title") &&
+      this.attributePresent("content") &&
+      this.content === "Mismatch"
     ) {
-      (this as any).errors.add("title", "is Content Mismatch");
+      this.errors.add("title", "is Content Mismatch");
     }
   }
 
   titleIsWrongCreate() {
-    if ((this as any).attributePresent("title") && (this as any).title === "Wrong Create") {
-      (this as any).errors.add("title", "is Wrong Create");
+    if (this.attributePresent("title") && this.title === "Wrong Create") {
+      this.errors.add("title", "is Wrong Create");
     }
   }
 
   checkWrongUpdate() {
-    if ((this as any).attributePresent("title") && (this as any).title === "Wrong Update") {
-      (this as any).errors.add("title", "is Wrong Update");
+    if (this.attributePresent("title") && this.title === "Wrong Update") {
+      this.errors.add("title", "is Wrong Update");
     }
   }
 
   checkAuthorNameIsSecret() {
-    if ((this as any).author_name !== "secret") {
-      (this as any).errors.add("author_name", "Invalid");
+    if (this.author_name !== "secret") {
+      this.errors.add("author_name", "Invalid");
     }
   }
 }

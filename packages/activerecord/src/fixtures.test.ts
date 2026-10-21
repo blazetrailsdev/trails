@@ -931,7 +931,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
   it("resets to min pk with specified pk and sequence", async () => {
     for (const instance of instances) {
-      const model = instance.constructor as typeof Base;
+      const model = instance.constructor;
       await model.deleteAll();
       const connection = (await model.leaseConnection()) as unknown as {
         resetPkSequenceBang(
@@ -953,7 +953,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
   it("resets to min pk with default pk and sequence", async () => {
     for (const instance of instances) {
-      const model = instance.constructor as typeof Base;
+      const model = instance.constructor;
       await model.deleteAll();
       const connection = (await model.leaseConnection()) as unknown as {
         resetPkSequenceBang(table: string): Promise<void>;
@@ -967,7 +967,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
   it("create fixtures resets sequences when not cached", async () => {
     for (const instance of instances) {
-      const model = instance.constructor as typeof Base;
+      const model = instance.constructor;
       const maxId = Object.entries(
         (await self().createFixtures(model.tableName!))[0].fixtures,
       ).reduce((_maxId, [, fixture]) => {

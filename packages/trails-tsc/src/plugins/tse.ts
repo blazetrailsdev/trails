@@ -22,23 +22,35 @@ export { LocalsSignatureError as TseLocalsSignatureError };
 export function localsParamType(ast: TseAst, locals: LocalEntry[]): string {
   if (ast.typesAnnotation !== null) return ast.typesAnnotation;
   if (ast.localsSignature === null) return "Record<string, unknown>";
-  if (locals.length === 0) return "NoExtraKeys<Record<string, never>>";
-  const fields = locals.map((l) => `${l.name}${l.defaultExpr ? "?" : ""}: unknown`);
+  const keyrest = locals.some((l) => l.rest);
+  const keywords = locals.filter((l) => !l.rest);
+  if (keywords.length === 0) {
+    return keyrest ? "Record<string, unknown>" : "NoExtraKeys<Record<string, never>>";
+  }
+  const fields = keywords.map((l) => `${l.name}${l.defaultExpr ? "?" : ""}: unknown`);
+  if (keyrest) return `{ ${fields.join("; ")}; [key: string]: unknown }`;
   return `NoExtraKeys<{ ${fields.join("; ")} }>`;
 }
 
 function destructureLines(locals: LocalEntry[]): string[] {
-  if (locals.length === 0) return [];
-  const pieces = locals.map((l) =>
-    l.defaultExpr === null ? l.name : `${l.name} = ${l.defaultExpr}`,
-  );
-  const voids = `  ${locals.map((l) => `void ${l.name};`).join(" ")}`;
+  const bound = locals.filter((l) => l.bound !== false);
+  if (bound.length === 0) return [];
+  const keywords = locals.filter((l) => !l.rest);
+  const rest = bound.find((l) => l.rest);
+  const pieces = keywords
+    .filter((l) => l.bound !== false || rest)
+    .map((l) => {
+      const target = l.bound === false ? `${JSON.stringify(l.name)}: __${l.name}` : l.name;
+      return l.defaultExpr === null ? target : `${target} = ${l.defaultExpr}`;
+    });
+  if (rest) pieces.push(`...${rest.name}`);
+  const voids = `  ${bound.map((l) => `void ${l.name};`).join(" ")}`;
   return [`  const { ${pieces.join(", ")} } = locals;`, voids];
 }
 
 type EmittedLine = [code: string, node: TseAst["nodes"][number]];
 
-function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
+function emitNodes(nodes: TseAst["nodes"], escapeIgnore = false): EmittedLine[] {
   const lines: EmittedLine[] = [];
   const innerDepths: number[] = [];
   const innerCallExprParens: number[] = [];
@@ -69,7 +81,7 @@ function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
         lines.push([`  ${closer}${suffix}`, node]);
       } else {
         innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        lines.push([emitNode(node, bufRef, false), node]);
+        lines.push([emitNode(node, bufRef, false, escapeIgnore), node]);
       }
     } else {
       if (node.kind === "code") {
@@ -82,7 +94,7 @@ function emitNodes(nodes: TseAst["nodes"]): EmittedLine[] {
         }
         if (FUNCTION_BLOCK_RE.test(node.value.trimEnd())) functionDepths.push(braceDepth);
       }
-      lines.push([emitNode(node, bufRef, awaits), node]);
+      lines.push([emitNode(node, bufRef, awaits, escapeIgnore), node]);
     }
   }
   if (innerDepths.length > 0) {
@@ -130,12 +142,35 @@ function lineMappings(genLine: number, code: string, node: TseAst["nodes"][numbe
 
 function contextYield(value: string): string {
   const m = YIELD_EXPR_RE.exec(value);
-  if (m === null) return value;
+  if (m === null) return embeddedYields(value);
   const section = m[1] ?? m[2] ?? "";
   return `context.yield(${section.trim()})`;
 }
 
-function emitNode(node: TseAst["nodes"][number], bufRef: string, awaits: boolean): string {
+function embeddedYields(value: string): string {
+  const sf = ts.createSourceFile("expr.ts", `(${value})`, ts.ScriptTarget.ESNext, true);
+  const sites: [start: number, end: number, called: boolean][] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isIdentifier(node) && node.text === "yield" && isReference(node)) {
+      const called = ts.isCallExpression(node.parent) && node.parent.expression === node;
+      sites.push([node.getStart(sf) - 1, node.getEnd() - 1, called]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  let out = value;
+  for (const [start, end, called] of sites.reverse()) {
+    out = `${out.slice(0, start)}${called ? "context.yield" : "context.yield()"}${out.slice(end)}`;
+  }
+  return out;
+}
+
+function emitNode(
+  node: TseAst["nodes"][number],
+  bufRef: string,
+  awaits: boolean,
+  escapeIgnore: boolean,
+): string {
   if (node.kind !== "text") node = { ...node, value: node.value.trim() };
   const value = (expr: string): string => (awaits ? `await (${awaitFlowReads(expr)})` : expr);
   switch (node.kind) {
@@ -147,7 +182,7 @@ function emitNode(node: TseAst["nodes"][number], bufRef: string, awaits: boolean
       return `  ${awaits ? awaitFlowReads(node.value) : node.value}${needsSemi ? ";" : ""}`;
     }
     case "expr":
-      return `  ${bufRef}.append(${value(contextYield(node.value))});`;
+      return `  ${bufRef}.${escapeIgnore ? "safeExprAppend" : "append"}(${value(contextYield(node.value))});`;
     case "rawExpr":
       return `  ${bufRef}.safeExprAppend(${value(contextYield(node.value))});`;
     case "blockExpr":
@@ -201,6 +236,8 @@ export interface TseScope {
   view: string;
   locals?: string;
   resolved?: boolean;
+  escapeIgnore?: boolean;
+  localsSignature?: string | null;
 }
 
 export function virtualizeTse(source: string, scope?: TseScope): string {
@@ -209,10 +246,11 @@ export function virtualizeTse(source: string, scope?: TseScope): string {
 
 export function virtualizeTseWithDeltas(source: string, scope?: TseScope): VirtualizeTseResult {
   const ast = parse(source);
+  ast.localsSignature ??= scope?.localsSignature ?? null;
   const locals = ast.localsSignature === null ? [] : parseLocalsSignature(ast.localsSignature);
   const localsType = localsParamType(ast, locals);
   const needsNoExtraKeys = localsType.includes("NoExtraKeys");
-  const emitted = emitNodes(ast.nodes);
+  const emitted = emitNodes(ast.nodes, scope?.escapeIgnore === true);
   const body = emitted.map(([code]) => code);
 
   const header: string[] = [buildPreamble(needsNoExtraKeys, scope !== undefined)];
@@ -224,26 +262,33 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
     ...(scope === undefined ? [] : ["  this: View,"]),
     "  context: RenderContext,",
     `  locals: ${localsType},`,
-    "  _?: (...name: [] | [string]) => unknown,",
+    "  __block?: (...name: [] | [string]) => unknown,",
     "): Promise<SafeString> {",
     "  void context; void locals;",
+    "  const localAssigns = locals; void localAssigns;",
     "  const __view = context;",
-    '  context = Object.create(__view, { yield: { value: (...name: [] | [string]) => (name.length > 0 ? _!(...name) : _ !== undefined ? _() : Reflect.get(__view, "yield")) } });',
+    '  context = Object.create(__view, { yield: { value: (...name: [] | [string]) => (name.length > 0 ? __block!(...name) : __block !== undefined ? __block() : Reflect.get(__view, "yield")) } });',
     "  const _ob = context.outputBuffer;",
   );
   for (const line of destructureLines(locals)) header.push(line);
   if (scope !== undefined) {
     const declared = new Set(locals.map((l) => l.name));
-    const free = freeIdentifiers(body).filter((name) => !declared.has(name));
+    const names = freeIdentifiers(body);
+    const free = names.filter((name) => !declared.has(name));
+    for (const [name, line] of Object.entries(INJECTED)) {
+      if (!free.includes(name)) continue;
+      free.splice(free.indexOf(name), 1);
+      header.unshift(line);
+    }
     if (free.length > 0) {
       const scopes = ast.localsSignature === null ? "[locals, this, TopLevel]" : "[this, TopLevel]";
       header.push(
-        `  const __lookup = (name: string): any => { for (const scope of ${scopes} as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } return Reflect.get(globalThis, name); };`,
+        `  const __lookup = (name: string, guarded = false): any => { for (const scope of ${scopes} as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded || name in globalThis) return Reflect.get(globalThis, name); throw new ReferenceError(name + " is not defined"); };`,
       );
     }
     for (const name of free) {
       const key = JSON.stringify(name);
-      header.push(`  let ${name} = __lookup(${key}) as Scope<${key}>;`);
+      header.push(`  let ${name} = __lookup(${key}, true) as Scope<${key}>;`);
     }
   }
   const footer = ["  return _ob;", "}", ""];
@@ -298,17 +343,27 @@ export function shimScope(shim: string): TseScope | undefined {
   };
 }
 
+const INJECTED: Record<string, string> = {
+  htmlSafe: 'import { htmlSafe } from "@blazetrails/activesupport";',
+  RubyCompat: 'import * as RubyCompat from "@blazetrails/ruby-compat";',
+  ArgumentError: 'import { ArgumentError } from "@blazetrails/ruby-compat";',
+};
+
 const UNDECLARABLE = new Set([
   "undefined",
   "NaN",
   "Infinity",
   "globalThis",
+  "Object",
+  "Reflect",
+  "TopLevel",
   "arguments",
   "eval",
   "context",
   "locals",
   "_ob",
-  "_",
+  "__block",
+  "localAssigns",
   "__view",
   "__lookup",
 ]);
@@ -322,35 +377,191 @@ function freeIdentifiers(body: readonly string[]): string[] {
   );
   const fn = sf.statements[0] as ts.FunctionDeclaration;
   const names = new Set<string>();
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node, bound: ReadonlySet<string>): void => {
     if (ts.isTypeNode(node)) return;
     if (ts.isIdentifier(node) && isReference(node) && !UNDECLARABLE.has(node.text)) {
-      names.add(node.text);
+      if (!bound.has(node.text)) {
+        names.add(node.text);
+      }
     }
-    ts.forEachChild(node, visit);
+    const inner = scopeBindings(node);
+    const next = inner.size === 0 ? bound : new Set([...bound, ...inner]);
+    ts.forEachChild(node, (child) => visit(child, next));
   };
-  ts.forEachChild(fn.body!, visit);
-  for (const stmt of fn.body!.statements) {
-    if (ts.isVariableStatement(stmt)) {
-      for (const decl of stmt.declarationList.declarations) deleteBound(decl.name, names);
-    } else if ((ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) && stmt.name) {
-      names.delete(stmt.name.text);
-    }
-  }
+  visit(fn, new Set());
   return [...names].sort();
 }
 
-function deleteBound(name: ts.BindingName, names: Set<string>): void {
-  if (ts.isIdentifier(name)) names.delete(name.text);
-  else for (const el of name.elements) if (!ts.isOmittedExpression(el)) deleteBound(el.name, names);
+function scopeBindings(node: ts.Node): Set<string> {
+  const bound = new Set<string>();
+  const add = (name: ts.BindingName): void => {
+    if (ts.isIdentifier(name)) bound.add(name.text);
+    else for (const el of name.elements) if (!ts.isOmittedExpression(el)) add(el.name);
+  };
+  if (ts.isFunctionLike(node)) {
+    for (const param of node.parameters) add(param.name);
+    if ((ts.isFunctionExpression(node) || ts.isClassExpression(node)) && node.name) {
+      bound.add(node.name.text);
+    }
+    const body = (node as { body?: ts.Node }).body;
+    if (body !== undefined) for (const name of hoistedVars(body)) bound.add(name);
+  }
+  if (ts.isClassExpression(node) && node.name) bound.add(node.name.text);
+  if (ts.isCatchClause(node) && node.variableDeclaration) add(node.variableDeclaration.name);
+  if (ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node)) {
+    const init = node.initializer;
+    if (init && ts.isVariableDeclarationList(init))
+      for (const decl of init.declarations) add(decl.name);
+  }
+  if (ts.isBlock(node) || ts.isCaseBlock(node)) {
+    const statements = ts.isCaseBlock(node)
+      ? node.clauses.flatMap((clause) => [...clause.statements])
+      : node.statements;
+    for (const stmt of statements) {
+      if (ts.isVariableStatement(stmt)) {
+        for (const decl of stmt.declarationList.declarations) add(decl.name);
+      } else if ((ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) && stmt.name) {
+        bound.add(stmt.name.text);
+      }
+    }
+  }
+  return bound;
 }
 
-function isReference(node: ts.Identifier): boolean {
-  const parent = node.parent as ts.Node & {
+function hoistedVars(body: ts.Node): Set<string> {
+  const names = new Set<string>();
+  const add = (name: ts.BindingName): void => {
+    if (ts.isIdentifier(name)) names.add(name.text);
+    else for (const el of name.elements) if (!ts.isOmittedExpression(el)) add(el.name);
+  };
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionLike(node) || ts.isClassLike(node)) return;
+    if (
+      ts.isVariableDeclarationList(node) &&
+      (node.flags & (ts.NodeFlags.Let | ts.NodeFlags.Const | ts.NodeFlags.Using)) === 0
+    ) {
+      for (const decl of node.declarations) add(decl.name);
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(body, visit);
+  return names;
+}
+
+function isReference(node: ts.Identifier, parent: ts.Node = node.parent): boolean {
+  const p = parent as ts.Node & {
     name?: ts.Node;
     propertyName?: ts.Node;
     label?: ts.Node;
   };
-  if (ts.isShorthandPropertyAssignment(parent)) return true;
-  return parent.name !== node && parent.propertyName !== node && parent.label !== node;
+  if (ts.isShorthandPropertyAssignment(p)) return true;
+  return p.name !== node && p.propertyName !== node && p.label !== node;
+}
+
+export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
+  const f = context.factory;
+  const lookup = (name: string): ts.Expression =>
+    f.createCallExpression(f.createIdentifier("__lookup"), undefined, [
+      f.createStringLiteral(name),
+    ]);
+  return (sf) => {
+    const rewrite = (fn: ts.FunctionLikeDeclaration & { body: ts.Block }): ts.Block => {
+      const names = new Set<string>();
+      for (const stmt of fn.body.statements) {
+        if (!ts.isVariableStatement(stmt)) continue;
+        for (const decl of stmt.declarationList.declarations) {
+          let init = decl.initializer;
+          while (init && ts.isAsExpression(init)) init = init.expression;
+          if (
+            init &&
+            ts.isCallExpression(init) &&
+            ts.isIdentifier(init.expression) &&
+            init.expression.text === "__lookup" &&
+            ts.isIdentifier(decl.name)
+          )
+            names.add(decl.name.text);
+        }
+      }
+      const firstAssignment = new Map<string, number>();
+      const assigned = (node: ts.Node): void => {
+        const target =
+          ts.isBinaryExpression(node) &&
+          node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+          node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+            ? node.left
+            : (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+                (node.operator === ts.SyntaxKind.PlusPlusToken ||
+                  node.operator === ts.SyntaxKind.MinusMinusToken)
+              ? node.operand
+              : ts.isForInStatement(node) || ts.isForOfStatement(node)
+                ? node.initializer
+                : undefined;
+        if (target && ts.isIdentifier(target) && !firstAssignment.has(target.text)) {
+          firstAssignment.set(target.text, target.pos);
+        }
+        ts.forEachChild(node, assigned);
+      };
+      assigned(fn.body);
+      const visit = (node: ts.Node, parent: ts.Node, bound: ReadonlySet<string>): ts.Node => {
+        const unbound = (name: ts.Identifier): boolean =>
+          names.has(name.text) &&
+          !bound.has(name.text) &&
+          name.pos < (firstAssignment.get(name.text) ?? Infinity);
+        if (ts.isTypeOfExpression(node) && ts.isIdentifier(unparenthesized(node.expression))) {
+          return node;
+        }
+        if (ts.isShorthandPropertyAssignment(node) && unbound(node.name)) {
+          return f.createPropertyAssignment(node.name.text, lookup(node.name.text));
+        }
+        if (ts.isIdentifier(node) && unbound(node) && isReference(node, parent)) {
+          return ts.setTextRange(lookup(node.text), node);
+        }
+        if (ts.isTypeNode(node)) return node;
+        const inner = scopeBindings(node);
+        const next = inner.size === 0 ? bound : new Set([...bound, ...inner]);
+        return ts.visitEachChild(node, (child) => visit(child, node, next), context);
+      };
+      const top = new Set(
+        [...scopeBindings(fn), ...scopeBindings(fn.body)].filter((n) => !names.has(n)),
+      );
+      return f.updateBlock(
+        fn.body,
+        fn.body.statements.map((stmt) => visit(stmt, fn.body, top) as ts.Statement),
+      );
+    };
+    const visitTop = (node: ts.Node): ts.Node => {
+      if (ts.isFunctionDeclaration(node) && node.name?.text === "render" && node.body) {
+        return f.updateFunctionDeclaration(
+          node,
+          node.modifiers,
+          node.asteriskToken,
+          node.name,
+          node.typeParameters,
+          node.parameters,
+          node.type,
+          rewrite(node as ts.FunctionDeclaration & { body: ts.Block }),
+        );
+      }
+      return node;
+    };
+    return ts.visitEachChild(sf, visitTop, context);
+  };
+};
+
+function unparenthesized(node: ts.Expression): ts.Expression {
+  while (ts.isParenthesizedExpression(node)) node = node.expression;
+  return node;
+}
+
+export function transpileTse(source: string): { outputText: string; sourceMapText: string } {
+  const { outputText, sourceMapText } = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+      isolatedModules: true,
+      sourceMap: true,
+    },
+    transformers: { before: [tseLookupTransformer] },
+  });
+  return { outputText, sourceMapText: sourceMapText! };
 }

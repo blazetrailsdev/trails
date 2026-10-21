@@ -3,6 +3,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Date as RubyDate } from "@blazetrails/date";
 import {
   selectDate,
+  selectTime,
   distanceOfTimeInWords,
   distanceOfTimeInWordsToNow,
   timeAgoInWords,
@@ -34,5 +35,11 @@ describe("DateHelperTest", () => {
     const discarded = String(selectDate(date, { discardDay: true }));
     expect(discarded).toContain('name="date[day]" value="1"');
     expect(discarded).toContain('<option value="6" selected="selected">June</option>');
+  });
+
+  it("select_time reads a Date's private zero hour and minute", () => {
+    const html = String(selectTime(new RubyDate(2003, 8, 16)));
+    expect(html).toContain('<option value="00" selected="selected">00</option>');
+    expect(html).not.toContain('<option value="01" selected="selected">');
   });
 });

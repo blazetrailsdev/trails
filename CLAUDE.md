@@ -150,12 +150,18 @@ port a body:
   so a caller forwarding an absent kwarg silently gets the default where Ruby
   would have seen `nil`. Match Ruby's kwarg semantics explicitly when it matters.
 - **An optional positional before trailing options or a block.** Ruby tells
-  `remove_foreign_key(from_table, to_table = nil, **options)` apart by syntax;
-  JS has only position. Keep every Rails parameter in its own slot, with the
-  Rails default, and have the caller pass `undefined` for a positional it
-  skips: `removeForeignKey("astronauts", undefined, { column: "rocket_id" })`,
-  `withExampleTable(connection, "ex", undefined, block)`. Never overload the
-  slot on `typeof`, which is an arm Rails does not have.
+  `has_many(name, scope = nil, **options)` apart by syntax; JS has only
+  position. Keep every Rails parameter in its own slot, with the Rails default
+  (`scope = null`). Where the skipped positional and the options hash are told
+  apart by type (a callable or `nil` against a plain object), the method may
+  take the options in the positional's slot and move them across at the top of
+  its body, as Ruby's signature does, so `hasMany("posts", { dependent:
+"destroy" })` keeps working. Where they cannot be told apart (both hashes,
+  both strings), the caller passes `undefined` for the skipped positional:
+  `removeForeignKey("astronauts", undefined, { column: "rocket_id" })`,
+  `withExampleTable(connection, "ex", undefined, block)`. The move-across lives
+  in the method whose Ruby signature does the split, never in a helper it
+  calls. Ruled by the repo owner on 2026-10-20.
 - **Predicates.** A Ruby predicate returns a value, not necessarily a boolean;
   a value-returning predicate ported as a `boolean` breaks every call site that
   used the value.
@@ -1040,7 +1046,10 @@ As a consequence:
   (`attribute_methods.rb:528-533`) are still ported as two calls.
 - `rbFPublicSend` dispatches a defined method exactly as `rbFSend` does. It still
   raises `NoMethodError` for an undefined name and still goes to `methodMissing`,
-  so a Rails `public_send` keeps its `rbFPublicSend` spelling and its rescue.
+  so a Rails `public_send` that survives § "A dispatch by name is spelled
+  directly" keeps its `rbFPublicSend` spelling and its rescue — visibility is
+  not what decides between the two spellings, and neither spelling is a reason
+  to keep a send where the name is a literal.
   `rbModPublicMethodDefined` (`Module#public_method_defined?`) answers "defined".
 - A Rails test whose assertions turn on private / protected visibility at run
   time is permanently unportable for that arm: `assert_not_respond_to` on a
@@ -1311,6 +1320,89 @@ backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
 `domTestingDefaultHtmlVersion`, and the `:html4` arm of `chooseHtmlParser` raises
 `NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
 the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
+
+## A dispatch by name is spelled directly (`send`, `public_send`)
+
+`rbFSend` / `rbFPublicSend` are the ports of `Kernel#send` / `#public_send`
+(`rb_f_send`, `vendor/ruby/v3.3.11/vm_eval.c:1330`; `rb_f_public_send`,
+`:1350`), and they stay — but they are the last
+shape to reach for, not the first. A string-keyed send throws away everything
+the call site knew: no TS type checks the receiver or the target, the Ruby name
+has to be guessed into a TS spelling (`camelized`, `writerSpelling` and
+`RELOPS` inside `sendInternal`, `packages/ruby-compat/src/object.ts`), and a
+direct property read becomes a prototype walk plus a table lookup. By
+repo-owner ruling on 2026-10-20:
+
+**Write the member call directly.** Wherever the name is known where the call
+is written, spell it — `app.call(env)`, with `app` typed. An `rbFSend` with a
+string literal for a name, or one standing in for a cast the author did not
+want to write, is a direct call with the types discarded. This is not a
+preference between shapes: it is the answer at nearly every call site in the
+repo that reaches for a send today, and "the Rails body says `send`" is not a
+reason to keep one where Rails' own name is a literal.
+
+Two fallbacks exist, and both are last resorts:
+
+- **An explicit registry**, where the name genuinely varies at run time but its
+  set is closed — a format, a pragma, a config option, an association's writer,
+  a visitor's node kind, a Thor instruction. A registry is a declared map from
+  the Ruby-visible name to a real, typed function, read at the call site;
+  ruby-compat's own `OBJECT_METHOD_TABLE` and `TEMPORAL_METHOD_TABLE`
+  (`packages/ruby-compat/src/object.ts`) are that shape. Reach for it only once the
+  direct spelling is genuinely impossible, and keep it module-private where
+  nothing outside the file reads it — a table is extra surface like any other
+  name, and a registry written where a direct call would have done is its own
+  invented indirection (§ "Fidelity is the job").
+- **`rbFSend` / `rbFPublicSend`**, where the dispatched name is
+  caller-supplied and the set it comes from is open — extended by application
+  code, so no table the framework writes can enumerate it. `Object#try`'s
+  `public_send(*args, &block)`
+  (`vendor/rails/v8.0.2/activesupport/lib/active_support/core_ext/object/try.rb:14-15`)
+  takes any name its caller passes. `MimeResponds::Collector#any`'s
+  `args.each { |type| send(type, &block) }`
+  (`vendor/rails/v8.0.2/actionpack/lib/action_controller/metal/mime_responds.rb:262-264`)
+  dispatches a registered Mime symbol, and `Mime::Type.register` appends to
+  `SET` at run time
+  (`vendor/rails/v8.0.2/actionpack/lib/action_dispatch/http/mime_type.rb:186-193`),
+  which is why the collector is a Proxy in the first place (§ "Ruby protocol
+  methods with a different JS mechanism"). `Channel::Base#dispatch_action`'s
+  `public_send action, data`
+  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/channel/base.rb:280-286`)
+  dispatches a client-supplied string gated by `action_methods`, which is the
+  USER subclass's public instance methods less `Base`'s (`:128-134`) — a set
+  the framework cannot see. A gate on a set application code supplies is not a
+  table trails can write, so the send IS the ported method, and it stays.
+
+Two corollaries:
+
+- **Do not widen the send machinery's name guessing** to make one new call site
+  work. A snake_case Ruby name, an `is…`-spelled predicate, a writer spelling,
+  a Ruby operator name — each is a reason to spell that call site directly, not
+  to teach `sendInternal` another heuristic for every receiver in the repo.
+- **A story does not propose a send.** When filing or sizing work, name the
+  direct call in the acceptance criteria. Finding an `rbFSend` next to your
+  work is a reason to converge it (§ "A documented deviation is debt, not
+  permission"), not to match it.
+
+One gate holds the line. `pnpm parity:api:sends` counts, per non-test file,
+the sends whose name argument is a string literal, and fails on any file above
+its count at the merge-base with `origin/main` — only-shrink, with no mark file
+to seed or tighten, on trails#9129's reasoning that the base tree IS the mark.
+It is a floor, not the rule: it is line-based, so a name on a continuation
+line is uncounted, as is one whose receiver nests parentheses more than one
+deep, and a computed name it never sees is still governed by the order above.
+
+The call gates do not help, which is why the order above has to be a rule.
+For the call SET, `extract-ts-api.ts` credits
+`rbFSend(recv, "literalName")` as a call to `literalName` itself
+(`collectCalls`), so spelling one out changes nothing there. The ARGUMENT
+stream does not follow it: `callSiteName` has no send arm, so the site is
+recorded under `rbFSend` with the receiver and the name occupying argument
+slots — it can never pair with Rails' own `literalName(…)` site, and
+converging it can only improve that pairing. A computed name is credited as
+Ruby's own `send` / `publicSend`, and both sit in `SKIP_CALLS`
+(`scripts/api-compare/lint-calls.ts`), so a send converged onto a direct call
+or a registry needs no baseline row and no `@missingRailsCall` receipt.
 
 ## Ruby protocol methods with a different JS mechanism
 
@@ -1640,3 +1732,68 @@ The decision is unchanged; the heading stays here so code citing it still
 resolves. The one-line rule: every `async_*` reader returns a native promise,
 `promise.rb` is not ported, and a `Promise.new` / `Promise.wrap` call is
 omitted without a receipt.
+
+## Templates are precompiled (`Template#compile`'s `module_eval`)
+
+Rails compiles a template at its first render: `compiled_source`
+(`vendor/rails/v8.0.2/actionview/lib/action_view/template.rb:443-486`) wraps
+the handler's Ruby in a `def`, and `compile` (`:500-539`) hands it to
+`mod.module_eval(compiled_source, identifier, offset)`. JS can only evaluate
+source text through `eval`, `new Function` or `vm`, each of which runs code
+that was never type-checked, and a `with` scope chain is sloppy-mode only, so
+it cannot appear in an ES module. By repo-owner ruling (2026-10-19,
+2026-10-20), **file-backed `.tse` templates are precompiled in every
+environment, and shipped code has no eval pipeline.** The split is:
+
+- **`compileJs` is the Erubi step.** `@blazetrails/tse-compiler` turns TSE
+  into JS, as Erubi turns ERB into Ruby.
+- **The typed stand-in is `compiled_source`.** `virtualizeTse`
+  (`packages/trails-tsc/src/plugins/tse.ts`) writes the method body, its
+  locals binding (Rails' `locals_code`) and its strict-locals signature as a
+  TypeScript module, and `build-views` (`trails-tsc-views build`) writes one
+  for every `.tse` file, partials and unused templates included, into
+  `.trails/views/` (`--in-place` beside the file, for a package's own
+  templates).
+- **`tsc` is the compiler.** `build-views` emits `<template>.js` with a source
+  map chained back to the `.tse` file, so a backtrace names the template's own
+  line (Rails' `identifier, offset`) when Node runs with source maps enabled.
+
+The loader reads a template's module from where `build-views` writes it by
+default: an identifier under `<root>/app/views/` loads
+`<root>/.trails/views/<path>.js`, and any other identifier loads
+`<identifier>.js`, which is where `--in-place` writes. A build with a custom
+`--out` (`BuildViewsOptions.outDir`) or a views directory not named
+`app/views` and not built in place is for type-checking only, and rendering
+from it raises `LoadError`.
+
+`Template#compile` keeps its name and call site. It loads the emitted module
+with an awaited `import()` under a URL no earlier load used (the `rbFLoad`
+shape), names the method after `method_name`, and seats it on
+`mod._compiledMethods`; Rails' `SyntaxError` rescue and non-keyword strict
+locals check follow as written. A JS function has no keyword parameters, so
+the seated method raises Ruby's `missing keyword` / `unknown keyword` /
+`no keywords accepted` `ArgumentError`s itself before it calls the module's
+default export. ESM never evicts a module record, so each
+compile keeps its module for the life of the process where Rails' redefined
+method is collected. That growth is bounded by the number of compiles: a
+template compiles once per `Template` object, and only a cleared template
+cache (a development reload) compiles it again. A file-backed template with no emitted module
+raises `LoadError` ("cannot load such file -- <path>"), and a string-source
+template (`Template::Inline`, `render inline:`, a `Template` built from a
+string) raises `NotImplementedError` from the same loader in
+`packages/actionview/src/template.ts`. Test code compiles from source instead:
+`packages/actionview/src/test-helpers/compile-template.ts` builds the same
+stand-in, runs `transpileModule` and evaluates it, and the `other` vitest
+project's setup installs it through `setTemplateCompiler`.
+
+**`Template#spot` is line-based.** Rails' `spot`
+(`vendor/rails/v8.0.2/actionview/lib/action_view/template.rb:231-246`) parses
+`compiled_source` with Prism to find the failing node's span. trails builds no
+second compiler, by repo-owner ruling (2026-10-19), so no in-process JS parser
+stands in for Prism: `spot` answers the backtrace line of `compiled_source`,
+from the reported column to the end of that line, and carries
+`@missingRailsCall parse — PERMANENT` against this section.
+
+This is a genuine language shortcoming, ratified repo-wide here. Code that
+serves it cites this section, and a new instance is not a new decision to
+argue.

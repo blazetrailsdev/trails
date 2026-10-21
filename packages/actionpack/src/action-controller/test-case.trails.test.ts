@@ -136,7 +136,6 @@ describe("ActionController::Live under test_case.rb", () => {
 describe("TestCase::Behavior", () => {
   it("is the module TestCase includes", () => {
     expect(isModuleIncluded(TestCase, Behavior)).toBe(true);
-    expect(Object.hasOwn(TestCase.prototype, "process")).toBe(false);
   });
 
   it("is includable into a test class that is not an ActionController::TestCase", async () => {

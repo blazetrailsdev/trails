@@ -6715,7 +6715,15 @@ export class DateTime extends DateWithoutParseStatics {
     return dfToTime(this.mLocalDf())[1];
   }
 
+  get minute(): number {
+    return dfToTime(this.mLocalDf())[1];
+  }
+
   get sec(): number {
+    return dfToTime(this.mLocalDf())[2];
+  }
+
+  get second(): number {
     return dfToTime(this.mLocalDf())[2];
   }
 
@@ -6795,7 +6803,10 @@ rbDefineAllocFunc(
 );
 
 /** @internal */
-function dLiteZero(): number {
+function dLiteZero(_self: unknown, ...argv: unknown[]): number {
+  if (argv.length !== 0) {
+    throw new ArgumentError(`wrong number of arguments (given ${argv.length}, expected 0)`);
+  }
   return 0;
 }
 
@@ -6803,6 +6814,14 @@ Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], {
   marshalDump: (self: Temporal.PlainDate) => new Date(self).marshalDump(),
   iso8601: (self: Temporal.PlainDate) => new Date(self).iso8601(),
   xmlschema: (self: Temporal.PlainDate) => new Date(self).xmlschema(),
+  hour: dLiteZero,
+  min: dLiteZero,
+  minute: dLiteZero,
+  sec: dLiteZero,
+  second: dLiteZero,
+});
+
+Object.assign(TEMPORAL_METHOD_TABLE.rbCDate, {
   hour: dLiteZero,
   min: dLiteZero,
   minute: dLiteZero,

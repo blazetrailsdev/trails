@@ -117,6 +117,16 @@ ported operator sorts into its Rails slot and does not read as extra surface.
 The pin is per-class on purpose: `<<` is `bitwiseShiftLeft` on `Arel::Math` and
 means _append_ on the collectors, so a global entry would mis-credit them.
 
+## Reserved-word locals
+
+A Ruby local, parameter, or kwarg binding whose name is a JS reserved word
+(`throw`, `default`, `class`, …; `JS_RESERVED_WORDS`) cannot be a TS
+binding name. It is ported with a trailing underscore: `translate(key = nil,
+throw: false, …)` (`i18n.rb:212`) destructures `{ throw: throw_ = false }`
+and passes `throw_` on. `parity:api:calls:args` reads `throw_` as Ruby
+`throw`. Any other spelling (`throwOption`) is a
+rename the gate reports.
+
 ## Token renames
 
 Applied to every identifier before camelization (and the equivalent applies to
@@ -250,6 +260,10 @@ a genuine gap:
   - `to_ary` (only in: `core.rb`, `base.rb`)
 - `ActiveRecord::Relation#then` (relation.rb:1157-1165) chains a block onto the relation's `@future_result`, else falls to `Kernel#then`. A trails relation is evaluated by an async query, so `Relation.prototype` carries the `then` / `catch` / `finally` that `await rel` calls, installed by `applyThenable` and declared on the class without a body (packages/activerecord/CLAUDE.md § "`Relation` is evaluated by an async query"). Scoped to relation.rb so `FutureResult#then` and any other definition stay scored.
   - `then` (only in: `relation.rb`)
+- `OutputBuffer` delegates `encoding`, `encode!` and `force_encoding` to its raw String (buffers.rb:27). Each reads or rewrites a String's encoding tag, which a JS string does not have (CLAUDE.md § "A String has no encoding tag either"). PERMANENT.
+  - `encoding`, `encode!`, `force_encoding` (only in: `buffers.rb`)
+- `Template#offset` and `#locals_code` (template.rb:541-576) build the `module_eval` line offset and the Ruby locals binding of `compiled_source`, which `virtualizeTse` writes as TypeScript at build time; `#find_node_by_id` (template.rb:405-415) walks the Prism tree `spot` parses, and `spot` is line-based (CLAUDE.md § "Templates are precompiled"). PERMANENT.
+  - `offset`, `locals_code`, `find_node_by_id` (only in: `template.rb`)
 
 ## Ruby-only classes
 

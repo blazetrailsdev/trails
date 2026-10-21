@@ -135,6 +135,14 @@ describe("collection replace diffs instead of clearing", () => {
     expect(await Client.where({ client_of: companies("first_firm").id })).toEqual([]);
   });
 
+  it("refuses assignAttributes on a persisted owner's collection", async () => {
+    const firm = await Firm.find(companies("first_firm").id);
+    expect(() => firm.assignAttributes({ clients: [] })).toThrow(
+      CollectionPersistedAssignmentError,
+    );
+    expect((await Client.where({ client_of: firm.id })).length).toBeGreaterThan(0);
+  });
+
   it("refuses a mass-assigned replace that owes the database", async () => {
     const id = companies("first_firm").id;
     expect(() => new Firm({ id, clients: [] })).toThrow(CollectionPersistedAssignmentError);

@@ -1591,11 +1591,19 @@ export function extractFromProgram(
       const hostInfo = info.classes[hostKey];
       if (!hostInfo) return;
 
-      const pushMethods = (methods: MethodInfo[]): void => {
+      const pushMethods = (methods: MethodInfo[], from?: ts.Node): void => {
+        const fromFile =
+          from === undefined
+            ? hostInfo.file
+            : path.relative(srcDir, from.getSourceFile().fileName).replace(/\\/g, "/");
         for (const m of methods) {
           if (m.name === "[initialize]") continue;
           if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
-          hostInfo.instanceMethods.push({ ...m, file: hostInfo.file });
+          hostInfo.instanceMethods.push({
+            ...m,
+            file: hostInfo.file,
+            ...(fromFile !== hostInfo.file ? { declaredIn: fromFile } : {}),
+          });
         }
       };
 
@@ -1625,6 +1633,7 @@ export function extractFromProgram(
           ) {
             pushMethods(
               harvestObjectLiteralMethods(propDecl.initializer, checker, hostInfo.file ?? ""),
+              propDecl,
             );
           }
           return;
@@ -1653,7 +1662,10 @@ export function extractFromProgram(
           // (b): const object literal → harvest directly, then fall through to
           // also push the name onto extends for compare.ts resolution.
           for (const literal of moduleObjectLiterals(sym, checker)) {
-            pushMethods(harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""));
+            pushMethods(
+              harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""),
+              literal,
+            );
           }
 
           // (a): class / interface / module — push name for later resolution.
@@ -3523,7 +3535,8 @@ function isClassAttributeCallee(expr: ts.Expression): boolean {
     ts.isIdentifier(expr.expression) &&
     (expr.name.text === "call"
       ? attributeMacro(expr.expression.text) !== undefined ||
-        attrInternalMacro(expr.expression.text) !== undefined
+        attrInternalMacro(expr.expression.text) !== undefined ||
+        importedName(expr.expression, expr.getSourceFile()) === "delegate"
       : attrMacro(expr.name.text) !== undefined)
   );
 }
@@ -3534,6 +3547,12 @@ function readClassAttributeCall(
 ): ClassAttributeCall | null {
   if (isConfigAccessorCallee(node.expression)) return readConfigAccessorCall(node, sourceFile);
   const callee = node.expression as ts.PropertyAccessExpression;
+  if (
+    callee.name.text === "call" &&
+    importedName(callee.expression as ts.Identifier, sourceFile) === "delegate"
+  ) {
+    return readPrototypeDelegateCall(node, sourceFile);
+  }
   const internal =
     callee.name.text === "call"
       ? attrInternalMacro(importedName(callee.expression as ts.Identifier, sourceFile))
@@ -3546,6 +3565,7 @@ function readClassAttributeCall(
     if (names.length === 0 || names.length !== args.length) return null;
     const enclosing = enclosingEntity(node);
     const recv = internal !== undefined ? node.arguments[0] : callee.expression;
+    const prototypeOf = recv !== undefined ? prototypeReceiver(recv) : undefined;
     return {
       ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
       ...(internal !== undefined && enclosing?.seatsModule === true
@@ -3553,6 +3573,7 @@ function readClassAttributeCall(
         : {}),
       ...(internal !== undefined && internalStatement(node) ? { internal: true } : {}),
       ...(ts.isIdentifier(recv) ? { receiver: importedName(recv, sourceFile) } : {}),
+      ...(internal !== undefined && prototypeOf !== undefined ? { receiver: prototypeOf } : {}),
       names,
       reader: false,
       writer: false,
@@ -3586,6 +3607,77 @@ function readClassAttributeCall(
     instanceReader: macro.reader && (optionBool(options, "instanceReader") ?? instanceAccessor),
     instanceWriter: macro.writer && (optionBool(options, "instanceWriter") ?? instanceAccessor),
     instancePredicate: macro.predicate && (optionBool(options, "instancePredicate") ?? true),
+    line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+  };
+}
+
+/** `Klass.prototype`, a top-level macro's receiver for a class module's instance side. */
+function prototypeReceiver(expr: ts.Expression): string | undefined {
+  return ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === "prototype" &&
+    ts.isIdentifier(expr.expression)
+    ? expr.expression.text
+    : undefined;
+}
+
+/** A same-file `const NAME = ["a", "b"] as const`'s strings, for a `...NAME` macro argument. */
+function sameFileConstStrings(name: string, sourceFile: ts.SourceFile): string[] | undefined {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || decl.name.text !== name || !decl.initializer) continue;
+      const init = unwrapAssertions(decl.initializer);
+      if (!ts.isArrayLiteralExpression(init)) return undefined;
+      if (!init.elements.every(ts.isStringLiteralLike)) return undefined;
+      return init.elements.map((e) => (e as ts.StringLiteralLike).text);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * `delegate.call(Klass.prototype, "m", …, { to: "target" })` at a file's top level —
+ * Ruby's `delegate :m, to: :target` in a class module's body
+ * (`core_ext/module/delegation.rb:171`), which defines instance readers only.
+ */
+function readPrototypeDelegateCall(
+  node: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): ClassAttributeCall | null {
+  const [recv, ...rest] = node.arguments;
+  const receiver = recv !== undefined ? prototypeReceiver(recv) : undefined;
+  if (receiver === undefined || enclosingEntity(node) !== undefined) return null;
+  const opts = rest.at(-1);
+  const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
+  if (
+    options === undefined ||
+    options.properties.some(
+      (p) =>
+        !ts.isPropertyAssignment(p) ||
+        !ts.isIdentifier(p.name) ||
+        (p.name.text !== "to" && p.name.text !== "allowNil"),
+    )
+  ) {
+    return null;
+  }
+  const names: string[] = [];
+  for (const arg of rest.slice(0, -1)) {
+    if (ts.isStringLiteralLike(arg)) names.push(arg.text);
+    else if (ts.isSpreadElement(arg) && ts.isIdentifier(arg.expression)) {
+      const spread = sameFileConstStrings(arg.expression.text, sourceFile);
+      if (spread === undefined) return null;
+      names.push(...spread);
+    } else return null;
+  }
+  if (names.length === 0) return null;
+  return {
+    receiver,
+    names,
+    reader: false,
+    writer: false,
+    instanceReader: true,
+    instanceWriter: false,
+    instancePredicate: false,
     line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
   };
 }

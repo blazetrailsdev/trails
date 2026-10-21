@@ -69,7 +69,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   protected targetReflectionHasAssociatedRecord(): boolean {
-    const throughAssoc = (this.owner.constructor as typeof Base)._reflectOnAssociation(
+    const throughAssoc = this.owner.constructor._reflectOnAssociation(
       this.reflection.options.through!,
     ) as AssociationDefinition | null;
     if (!throughAssoc) return true;
@@ -147,7 +147,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       const record = super.buildRecord((attributes ??= {}), block)!;
 
       const inverse = this.sourceReflection().isPolymorphic()
-        ? this.sourceReflection().polymorphicInverseOf(record.constructor as typeof Base)
+        ? this.sourceReflection().polymorphicInverseOf(record.constructor)
         : this.sourceReflection().inverseOf();
 
       if (inverse) {
@@ -156,7 +156,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
             this.buildThroughRecord(record),
           );
         } else if (inverse.isHasOne()) {
-          (record.association(inverse.name) as HasOneAssociation).syncWrite(
+          void (record.association(inverse.name) as HasOneAssociation).writer(
             this.buildThroughRecord(record),
           );
         }

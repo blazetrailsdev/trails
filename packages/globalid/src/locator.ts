@@ -17,9 +17,7 @@ export interface LocatorModel {
   name: string;
   primaryKey?: string | string[];
   find(id: unknown): Promise<unknown> | unknown;
-  where?(conditions: Record<string, unknown>): {
-    toArray?(): Promise<unknown[]> | unknown[];
-  };
+  where?(conditions: Map<string | string[], unknown>): PromiseLike<unknown[]> | unknown[];
   includes?(includes: unknown): LocatorModel;
   /** @internal */
   unscoped?<R>(block: () => R | Promise<R>): R | Promise<R>;
@@ -65,11 +63,13 @@ export class BaseLocator {
 
     const byClassAndId = new Map<string, Map<string, unknown>>();
     for (const [klass, ids] of idsByClass) {
-      const records = await this.findRecords(klass, ids, options);
+      const records = await this.findRecords(klass, ids, {
+        ignoreMissing: options.ignoreMissing,
+        includes: options.includes,
+      });
       const byId = new Map<string, unknown>();
-      const pkProp = recordIdProp(this.primaryKey(klass));
       for (const rec of records) {
-        byId.set(idKey((rec as Record<string, unknown>)[pkProp]), rec);
+        byId.set(idKey((rec as { id: unknown }).id), rec);
       }
       byClassAndId.set(klass.name, byId);
     }
@@ -88,19 +88,12 @@ export class BaseLocator {
     ids: unknown[],
     options: LocateOptions,
   ): Promise<unknown[]> {
-    const pk = this.primaryKey(modelClass);
-    if (options.ignoreMissing && modelClass.where && !Array.isArray(pk)) {
-      const rel = modelClass.where({ [pk]: ids });
-      if (!rel.toArray) {
-        throw new Error(
-          "LocatorModel.where() returned a relation without .toArray() — required for ignoreMissing.",
-        );
-      }
-      const records = await rel.toArray();
-      return Array.isArray(records) ? records : [];
+    if (options.includes) modelClass = modelClass.includes!(options.includes);
+    if (options.ignoreMissing) {
+      return modelClass.where!(new Map([[this.primaryKey(modelClass), ids]]));
+    } else {
+      return modelClass.find(ids) as Promise<unknown[]>;
     }
-    const result = await modelClass.find(ids);
-    return Array.isArray(result) ? result : [result];
   }
 
   /** @internal */
@@ -269,10 +262,6 @@ export function _resetLocators(): void {
 }
 
 type Ctor = new (...args: never[]) => unknown;
-
-function recordIdProp(pk: string | string[]): string {
-  return Array.isArray(pk) ? "id" : pk;
-}
 
 function idKey(id: unknown): string {
   return Array.isArray(id) ? JSON.stringify(id.map(String)) : String(id);

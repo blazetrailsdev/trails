@@ -647,7 +647,7 @@ export class Cookies {
       }
     }
 
-    return (response instanceof Response ? response.toArray() : response) as RackResponse;
+    return rbFSend(response, "toA") as RackResponse;
   }
 }
 

@@ -138,6 +138,7 @@ export const Core = {
 
 import { ActiveRecord } from "./namespaces.js";
 import type { Base } from "./base.js";
+import type { Relation } from "./relation.js";
 import {
   actionOnStrictLoadingViolation,
   applicationRecordClass,
@@ -215,7 +216,7 @@ export class ClassMethods {
     const host = this as unknown as CoreHost;
     return (
       (Object.hasOwn(host, "_arelTable") ? host._arelTable : undefined) ||
-      (host._arelTable = new Table((this as any).tableName, { klass: this as any }))
+      (host._arelTable = new Table(host.tableName!, { klass: this as unknown as typeof Base }))
     );
   }
 
@@ -224,7 +225,7 @@ export class ClassMethods {
     return (
       (Object.hasOwn(host, "_predicateBuilder") ? host._predicateBuilder : undefined) ||
       (host._predicateBuilder = new PredicateBuilder(
-        new TableMetadata(this as any, (this as any).arelTable),
+        new TableMetadata(this as unknown as typeof Base, host.arelTable),
       ))
     );
   }
@@ -383,7 +384,7 @@ export function initWith(
   block?: (record: Base) => void,
 ): void {
   coder = LegacyYamlAdapter.convert(coder);
-  const attributes = (this.constructor as typeof Base).yamlEncoder().decode(coder);
+  const attributes = this.constructor.yamlEncoder().decode(coder);
   for (const name of attributes.keys()) {
     if (!basicObjRespondTo(this, name, false)) {
       (
@@ -444,7 +445,7 @@ export function encodeWith(
   this: Base & { _attributes: AttributeSet; isNewRecord(): boolean },
   coder: Record<string, unknown>,
 ): void {
-  (this.constructor as typeof Base).yamlEncoder().encode(this._attributes, coder);
+  this.constructor.yamlEncoder().encode(this._attributes, coder);
   coder["new_record"] = this.isNewRecord();
   coder["active_record_yaml_version"] = 2;
 }
@@ -489,6 +490,8 @@ interface CoreHost {
   typeForAttribute(name: string): { cast(value: unknown): unknown } | null;
   ensureSchemaLoaded(): Promise<void>;
   generatedAttributeMethods(): Module;
+  attributeAliases?: Record<string, string>;
+  where(...args: unknown[]): Relation<Base>;
 }
 
 function parentClass(klass: CoreHost): CoreHost | null {
@@ -783,7 +786,7 @@ export function initInternals(
   this._markedForDestruction = false;
   this._destroyedByAssociation = null;
   this._startTransactionState = null;
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   this._primaryKey = klass.primaryKey;
   this._strictLoading = klass.strictLoadingByDefault ?? false;
   this._strictLoadingMode = klass.strictLoadingMode;
@@ -862,7 +865,7 @@ export function inspectWithAttributes(this: Base, attributesToList: string[]): s
 }
 
 export function attributesForInspect(this: Base): string[] {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   return klass.attributesForInspect === ":all"
     ? allAttributesForInspect.call(this)
     : klass.attributesForInspect;
@@ -917,7 +920,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
   }
   const keys = Object.keys(conditions);
   await this.ensureSchemaLoaded();
-  const aliases: Record<string, string> = (this as any).attributeAliases ?? {};
+  const aliases: Record<string, string> = this.attributeAliases ?? {};
   const resolvedKeys: (string | string[])[] = [];
   const values: unknown[] = [];
 
@@ -990,7 +993,7 @@ async function cachedFindBy(
           wheres.set(key, params.bind());
         }
       }
-      return (this as any).where(wheres).limit(1);
+      return this.where(wheres).limit(1);
     });
     try {
       const records = await statement.execute(values.flat(), connection, { allowRetry: true });

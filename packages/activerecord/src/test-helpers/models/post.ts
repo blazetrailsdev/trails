@@ -1,3 +1,4 @@
+import type { ScopeOn } from "../../scoping/named.js";
 import { kernelThrow, Module, registerConstant } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
@@ -30,6 +31,12 @@ import { registerModel } from "../../associations.js";
 import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    orderedByPostId: ScopeOn<T, Comment | Post>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CategoryPost extends Base {
@@ -635,7 +642,7 @@ export class Post extends Base {
     this.hasMany("lazyPeople", { through: "lazyReaders", source: "person" });
     this.hasMany(
       "lazyReadersUnscopeSkimmers",
-      function (this: any) {
+      function () {
         return this.skimmersOrNot();
       },
       {
@@ -910,7 +917,7 @@ export class PostThatLoadsCommentsInAnAfterSaveHook extends Base {
       className: "CommentThatAutomaticallyAltersPostBody",
       foreignKey: "post_id",
     });
-    this.afterSave(async function (this: any) {
+    this.afterSave(async function (this: PostThatLoadsCommentsInAnAfterSaveHook) {
       await this.comments.load();
     });
   }
@@ -926,7 +933,7 @@ export class PostWithAfterCreateCallback extends Base {
     this._tableName = "posts";
     this.hasMany("comments", { foreignKey: "post_id" });
     this.hasAndBelongsToMany("categories", { foreignKey: "post_id" });
-    this.afterCreate(async function (this: any) {
+    this.afterCreate(async function (this: PostWithAfterCreateCallback) {
       const firstComment = await this.comments.first();
       await this.updateAttribute("author_id", firstComment?.id);
     });
@@ -984,7 +991,7 @@ export class PostWithDestroyCallback extends Base {
   static {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
-    this.beforeDestroy(function (this: any) {
+    this.beforeDestroy(function (this: PostWithDestroyCallback) {
       if (Number(this.id) === 1) kernelThrow(":abort");
     });
   }

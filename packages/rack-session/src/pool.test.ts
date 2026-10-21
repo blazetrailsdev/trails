@@ -21,7 +21,7 @@ describe("Rack::Session::Pool", () => {
     const session = env["rack.session"] as SessionHash;
     if (session.get("counter") == null) session.set("counter", 0);
     session.set("counter", (session.get("counter") as number) + 1);
-    return new Response(session.inspect()).toArray();
+    return new Response(session.inspect()).toA();
   };
 
   const lint =
@@ -30,10 +30,10 @@ describe("Rack::Session::Pool", () => {
       new Lint(app).call(env) as Promise<RackResponse>;
 
   const getSessionId = lint(async (env: RackEnv) =>
-    new Response((env["rack.session"] as SessionHash).inspect()).toArray(),
+    new Response((env["rack.session"] as SessionHash).inspect()).toA(),
   );
 
-  const nothing = lint(async () => new Response("Nothing").toArray());
+  const nothing = lint(async () => new Response("Nothing").toA());
 
   const dropSession = lint(async (env: RackEnv) => {
     (env[RACK_SESSION_OPTIONS] as Record<string, unknown>)["drop"] = true;

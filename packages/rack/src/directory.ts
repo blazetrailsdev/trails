@@ -1,4 +1,4 @@
-import { Dir, File, rbObjMethod, sprintf } from "@blazetrails/ruby-compat";
+import { Dir, File, rbObjMethod, sprintf, stringSplit } from "@blazetrails/ruby-compat";
 import type { FsStatResult } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH, PATH_INFO, SCRIPT_NAME } from "./constants.js";
 import { escapeHtml, escapePath, unescapePath, validPath } from "./utils.js";
@@ -147,7 +147,7 @@ export class Directory {
     path: string,
     scriptName: string,
   ): [number, Record<string, any>, any] {
-    const urlHead = [...scriptName.split("/"), ...pathInfo.split("/")].map((part) =>
+    const urlHead = [...stringSplit(scriptName, "/"), ...stringSplit(pathInfo, "/")].map((part) =>
       escapePath(part),
     );
 

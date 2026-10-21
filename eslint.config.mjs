@@ -139,6 +139,7 @@ export default defineConfig(
       "packages/actionpack/src/test-helpers/fixtures/public/**",
       "packages/actionpack/src/test-helpers/fixtures/公共/**",
       "**/dist-test/**",
+      "**/.trails/**",
       "packages/website/static/**",
       "packages/website/build/**",
       // Vite/Vitest config files outside any tsconfig program — the typed

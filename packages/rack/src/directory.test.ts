@@ -1,162 +1,200 @@
-import { it, expect, beforeAll, afterAll } from "vitest";
-import { Directory } from "./directory.js";
-import { MockRequest } from "./mock-request.js";
-import { Lint } from "./lint.js";
+import { it, expect, beforeEach } from "vitest";
+import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import { Directory } from "./directory.js";
+import { MockRequest, type RackApp } from "./mock-request.js";
+import { Lint } from "./lint.js";
+import { Builder } from "./builder.js";
+import { escape, escapeHtml, escapePath } from "./utils.js";
 
-let tmpDir: string;
+const DOCROOT = File.expandPath(File.join(__dirname, "..", "test"));
+const FILE_CATCH: RackApp = () => [
+  200,
+  { "content-type": "text/plain", "content-length": "7" },
+  ["passed!"],
+];
 
-beforeAll(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "rack-dir-"));
-  fs.mkdirSync(path.join(tmpDir, "sub dir+plus"));
-  fs.writeFileSync(path.join(tmpDir, "test.txt"), "hello");
-  fs.writeFileSync(path.join(tmpDir, "sub dir+plus", "file.txt"), "nested");
-  fs.mkdirSync(path.join(tmpDir, "subdir"));
-  fs.writeFileSync(path.join(tmpDir, "subdir", "page.html"), "<html>page</html>");
-  fs.writeFileSync(path.join(tmpDir, "spaced file.txt"), "spaced");
-  fs.writeFileSync(path.join(tmpDir, "quoted'file.txt"), "quoted");
+let app: Lint;
+
+beforeEach(() => {
+  app = new Lint(new Directory(DOCROOT, FILE_CATCH));
 });
 
-afterAll(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-});
-
-function makeApp() {
-  return new Directory(tmpDir);
+async function withTmpdir(block: (dir: string) => Promise<void>): Promise<void> {
+  const dir = Dir.mktmpdir();
+  try {
+    await block(dir);
+  } finally {
+    FileUtils.rmRf(dir);
+  }
 }
 
 it("serves directories with + in the name", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/sub%20dir%2Bplus/");
-  expect(res.status).toBe(200);
-  expect(res.body).toContain("file.txt");
+  await withTmpdir(async (dir) => {
+    const plusDir = "foo+bar";
+    const fullDir = File.join(dir, plusDir);
+    FileUtils.mkdirP(fullDir);
+    FileUtils.touch(File.join(fullDir, "omg.txt"));
+    const app = new Directory(dir, FILE_CATCH);
+    const env = MockRequest.envFor(`/${plusDir}/`);
+    const [status, , body] = await app.call(env);
+    expect(status).toBe(200);
+    let str = "";
+    body.each((x: string) => (str += x));
+    expect(str).toMatch("foo+bar");
+  });
 });
 
 it("serve root directory index", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/");
-  expect(res.status).toBe(200);
-  expect(res.body).toContain("test.txt");
-  expect(res.body).toContain("subdir");
+  const res = await new MockRequest(new Lint(app)).get("/");
+  expect(res.isOk).toBeTruthy();
+  expect(res.body).toContain("<html><head>");
+  expect(res.body).toContain("href='cgi");
 });
 
 it("serve directory indices", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/subdir/");
-  expect(res.status).toBe(200);
-  expect(res.body).toContain("page.html");
+  const res = await new MockRequest(new Lint(app)).get("/cgi/");
+  expect(res.isOk).toBeTruthy();
+  expect(res.body).toContain("<html><head>");
+  expect(res.body).toContain("rackup_stub.rb");
 });
 
 it("return 404 for pipes", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/nonexistent_pipe");
+  const res = await new MockRequest(new Lint(app)).get("/cgi/fifo");
   expect(res.status).toBe(404);
 });
 
 it("serve directory indices with bad symlinks", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/");
-  expect(res.status).toBe(200);
+  try {
+    await fs.promises.symlink("foo", File.join(DOCROOT, "cgi", "foo"));
+    const res = await new MockRequest(new Lint(app)).get("/cgi/");
+    expect(res.isOk).toBeTruthy();
+    expect(res.body).toMatch(/<html><head>/);
+  } finally {
+    File.delete(File.join(DOCROOT, "cgi", "foo"));
+  }
 });
 
 it("return 404 for unreadable directories", async () => {
   try {
-    fs.writeFileSync(path.join(tmpDir, "unreadable"), "");
-    fs.chmodSync(path.join(tmpDir, "unreadable"), 0);
-    const app = makeApp();
-    const res = await new MockRequest(new Lint((env: any) => app.call(env))).get("/unreadable");
-
+    File.write(File.join(DOCROOT, "cgi", "unreadable"), "");
+    File.chmod(0, File.join(DOCROOT, "cgi", "unreadable"));
+    const res = await new MockRequest(new Lint(app)).get("/cgi/unreadable");
     expect(res.status).toBe(404);
   } finally {
-    fs.rmSync(path.join(tmpDir, "unreadable"));
+    File.delete(File.join(DOCROOT, "cgi", "unreadable"));
   }
 });
 
 it("pass to app if file found", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("hello");
+  const res = await new MockRequest(new Lint(app)).get("/cgi/test");
+  expect(res.isOk).toBeTruthy();
+  expect(res.body).toMatch(/passed!/);
 });
 
 it("serve uri with URL encoded filenames", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/spaced%20file.txt");
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("spaced");
+  let res = await new MockRequest(new Lint(app)).get("/%63%67%69/");
+  expect(res.isOk).toBeTruthy();
+  expect(res.body).toMatch(/<html><head>/);
+  res = await new MockRequest(new Lint(app)).get("/cgi/%74%65%73%74");
+  expect(res.isOk).toBeTruthy();
+  expect(res.body).toMatch(/passed!/);
 });
 
 it("serve uri with URL encoded null byte (%00) in filenames", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/test%00.txt");
-  expect(res.status).toBe(400);
+  const res = await new MockRequest(new Lint(app)).get("/cgi/test%00");
+  expect(res.isBadRequest).toBeTruthy();
 });
 
 it("allow directory traversal inside root directory", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/subdir/../test.txt");
-  expect(res.status).toBe(200);
+  let res = await new MockRequest(new Lint(app)).get("/cgi/../rackup");
+  expect(res.isOk).toBeTruthy();
+  res = await new MockRequest(new Lint(app)).get("/cgi/%2E%2E/rackup");
+  expect(res.isOk).toBeTruthy();
 });
 
 it("not allow directory traversal", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/../../../etc/passwd");
-  expect(res.status).toBe(403);
-});
-
-it("not allow directory traversal via root prefix bypass", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/%2E%2E/%2E%2E/etc/passwd");
-  expect(res.status).toBe(403);
+  let res = await new MockRequest(new Lint(app)).get("/cgi/../../lib");
+  expect(res.isForbidden).toBeTruthy();
+  res = await new MockRequest(new Lint(app)).get("/cgi/%2E%2E/%2E%2E/lib");
+  expect(res.isForbidden).toBeTruthy();
 });
 
 it("not allow dir globs", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/*.txt");
-  expect(res.status).toBe(404);
+  await withTmpdir(async (dir) => {
+    const weirds = "uploads/.?/.?";
+    const fullDir = File.join(dir, weirds);
+    FileUtils.mkdirP(fullDir);
+    FileUtils.touch(File.join(dir, "secret.txt"));
+    const app = new Directory(File.join(dir, "uploads"));
+    const res = await new MockRequest(app).get("/.%3F");
+    expect(res.body).not.toMatch("secret.txt");
+  });
 });
 
 it("404 if it can't find the file", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/nonexistent.txt");
-  expect(res.status).toBe(404);
+  const res = await new MockRequest(new Lint(app)).get("/cgi/blubb");
+  expect(res.isNotFound).toBeTruthy();
 });
 
 it("uri escape path parts", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/");
-  expect(res.status).toBe(200);
-  expect(res.body).toContain("href=");
+  const mr = new MockRequest(new Lint(app));
+  let res = await mr.get("/cgi/test%2bdirectory");
+  expect(res.isOk).toBeTruthy();
+  expect(res.body).toMatch(new RegExp(escapeHtml("/cgi/test\\+directory/test\\+file")));
+  res = await mr.get("/cgi/test%2bdirectory/test%2bfile");
+  expect(res.isOk).toBeTruthy();
 });
 
 it("correctly escape script name with spaces", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/", { SCRIPT_NAME: "/my app" });
-  expect(res.status).toBe(200);
-  expect(res.body).toContain("/my%20app/");
+  await withTmpdir(async (dir) => {
+    const spaceDir = "foo bar";
+    const fullDir = File.join(dir, spaceDir);
+    FileUtils.mkdirP(fullDir);
+    FileUtils.touch(File.join(fullDir, "omg omg.txt"));
+    const app = new Directory(dir, FILE_CATCH);
+    const env = MockRequest.envFor(escapePath(`/${spaceDir}/`));
+    const [status, , body] = await app.call(env);
+    expect(status).toBe(200);
+    let str = "";
+    body.each((x: string) => (str += x));
+    expect(str).toMatch(escapeHtml("/foo%20bar/omg%20omg.txt"));
+  });
 });
 
 it("correctly escape script name with '", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/", { SCRIPT_NAME: "/it's" });
-  expect(res.status).toBe(200);
-  expect(res.body).toContain("&#39;");
+  await withTmpdir(async (dir) => {
+    const quoteDir = "foo'bar";
+    const fullDir = File.join(dir, quoteDir);
+    FileUtils.mkdirP(fullDir);
+    FileUtils.touch(File.join(fullDir, "omg'omg.txt"));
+    const app = new Directory(dir, FILE_CATCH);
+    const env = MockRequest.envFor(escape(`/${quoteDir}/`));
+    const [status, , body] = await app.call(env);
+    expect(status).toBe(200);
+    let str = "";
+    body.each((x: string) => (str += x));
+    expect(str).toMatch(escapeHtml("/foo'bar/omg'omg.txt"));
+  });
 });
 
 it("correctly escape script name", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
-    SCRIPT_NAME: "/test<script>",
+  const _app = app;
+  const app2 = new Builder(null, {}, (b) => {
+    b.map("/script-path", (b) => {
+      b.run(_app);
+    });
   });
-  expect(res.status).toBe(200);
-  expect(res.body).not.toContain("<script>");
-  expect(res.body).toContain("/test%3Cscript%3E/");
+  const mr = new MockRequest(new Lint(app2));
+  let res = await mr.get("/script-path/cgi/test%2bdirectory");
+  expect(res.isOk).toBeTruthy();
+  expect(res.body).toMatch(new RegExp(escapeHtml("/script-path/cgi/test\\+directory/test\\+file")));
+  res = await mr.get("/script-path/cgi/test+directory/test+file");
+  expect(res.isOk).toBeTruthy();
 });
 
 it("return error when file not found for head request", async () => {
-  const app = makeApp();
-  const res = await new MockRequest((env) => app.call(env)).head("/nonexistent.txt");
-  expect(res.status).toBe(404);
+  const res = await new MockRequest(new Lint(app)).head("/cgi/missing");
+  expect(res.isNotFound).toBeTruthy();
+  expect(res.body.length === 0).toBeTruthy();
 });

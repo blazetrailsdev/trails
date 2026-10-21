@@ -198,10 +198,11 @@ describe("inlinedFromFindings on a method inlining module super", () => {
   });
 
   it("flags a module method whose Rails body calls no super", () => {
-    expect(
-      methodMessages([tag("ActiveRecord::Inheritance#save", `${AR}/inheritance.rb:90-92`)]),
-    ).toEqual([
-      "save ActiveRecord::Inheritance#save names a module method whose Rails body calls no `super`",
+    const INHERITANCE_SAVE = tag("ActiveRecord::Inheritance#save", `${AR}/inheritance.rb:90-92`);
+    expect(methodMessages([CORE_SAVE, INHERITANCE_SAVE])).toEqual([]);
+    expect(methodMessages([INHERITANCE_SAVE, CORE_SAVE])).toEqual([
+      "save ActiveRecord::Inheritance#save names a module method whose Rails body calls no `super`, ending the chain",
+      "save ActiveRecord::Core#save is out of chain order: Rails runs it before ActiveRecord::Inheritance#save",
     ]);
   });
 });

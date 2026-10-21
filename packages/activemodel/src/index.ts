@@ -26,6 +26,7 @@ export type { PermittedAttributes } from "./forbidden-attributes-protection.js";
 export {
   assignAttributes,
   assertAssignedSynchronously,
+  assigningSynchronously,
   attributeWriterMissing,
   ArgumentError,
   NoMethodError,

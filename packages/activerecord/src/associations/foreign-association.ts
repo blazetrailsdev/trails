@@ -39,10 +39,7 @@ export function setOwnerAttributes(this: ForeignAssociationHost, record: Base): 
   }
 
   if (this.reflection.type != null) {
-    record._writeAttribute(
-      this.reflection.type,
-      (this.owner.constructor as typeof Base).polymorphicName(),
-    );
+    record._writeAttribute(this.reflection.type, this.owner.constructor.polymorphicName());
   }
 }
 

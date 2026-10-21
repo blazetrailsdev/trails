@@ -732,7 +732,7 @@ export function _findRecord(
   this: Base,
   options?: { lock?: boolean | string; allQueries?: boolean | null },
 ): Promise<unknown> {
-  const ctor = this.constructor as typeof Base;
+  const ctor = this.constructor;
   const preloads = strictLoadedAssociations.call(this);
   let scope = ctor.all({ allQueries: options?.allQueries ?? null });
   if (preloads.length > 0) scope = scope.preload(...preloads);
@@ -742,10 +742,10 @@ export function _findRecord(
 
 /** @internal */
 export function _inMemoryQueryConstraintsHash(this: Base): Record<string, unknown> {
-  if (queryConstraintsList.call(this.constructor as typeof Base) == null) {
+  if (queryConstraintsList.call(this.constructor) == null) {
     return { [this._primaryKey as string]: this.id };
   } else {
-    return indexWith(queryConstraintsList.call(this.constructor as typeof Base)!, (columnName) =>
+    return indexWith(queryConstraintsList.call(this.constructor)!, (columnName) =>
       this.attribute(columnName),
     );
   }
@@ -755,17 +755,17 @@ export function _inMemoryQueryConstraintsHash(this: Base): Record<string, unknow
 export function isApplyScoping(this: Base, options?: { unscoped?: boolean } | null): unknown {
   return (
     !(options && options.unscoped) &&
-    (isDefaultScopes.call(this.constructor as typeof Base, { allQueries: true }) ||
-      (this.constructor as typeof Base).globalCurrentScope())
+    (isDefaultScopes.call(this.constructor, { allQueries: true }) ||
+      this.constructor.globalCurrentScope())
   );
 }
 
 /** @internal */
 export function _queryConstraintsHash(this: Base): Record<string, unknown> {
-  if (queryConstraintsList.call(this.constructor as typeof Base) == null) {
+  if (queryConstraintsList.call(this.constructor) == null) {
     return { [this._primaryKey as string]: this.idInDatabase };
   } else {
-    return indexWith(queryConstraintsList.call(this.constructor as typeof Base)!, (columnName) =>
+    return indexWith(queryConstraintsList.call(this.constructor)!, (columnName) =>
       this.attributeInDatabase(columnName),
     );
   }
@@ -781,7 +781,7 @@ export function destroyRow(this: Base): Promise<number> {
 
 /** @internal */
 export function _deleteRow(this: Base): Promise<number> {
-  return (this.constructor as typeof Base)._deleteRecord(this._queryConstraintsHash());
+  return this.constructor._deleteRecord(this._queryConstraintsHash());
 }
 
 export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
@@ -792,7 +792,7 @@ export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
   let attributeNames: readonly string[] = this.timestampAttributesForUpdateInModel();
   attributeNames = union(attributeNames, names as string[]).map((name) => {
     name = String(name);
-    name = (this.constructor as typeof Base).attributeAliases[name] || name;
+    name = this.constructor.attributeAliases[name] || name;
     this.verifyReadonlyAttribute(name);
     return name;
   });
@@ -826,7 +826,7 @@ export function _updateRow(
   attributeNames: readonly string[],
   _attemptedAction = "update",
 ): Promise<number> {
-  return (this.constructor as typeof Base)._updateRecord(
+  return this.constructor._updateRecord(
     attributesWithValues.call(this, attributeNames),
     this._queryConstraintsHash(),
   );
@@ -890,13 +890,11 @@ export async function _createRecord(
 ): Promise<unknown> {
   attributeNames = this.attributesForCreate(attributeNames);
 
-  await (this.constructor as typeof Base).withConnection(async (connection: any) => {
-    const returningColumns = await (this.constructor as typeof Base)._returningColumnsForInsert(
-      connection,
-    );
+  await this.constructor.withConnection(async (connection: any) => {
+    const returningColumns = await this.constructor._returningColumnsForInsert(connection);
 
     const returningValues = (await _insertRecord.call(
-      this.constructor as typeof Base,
+      this.constructor,
       connection,
       this.attributesWithValues(attributeNames),
       returningColumns,
@@ -924,7 +922,7 @@ export async function _createRecord(
 
 /** @internal */
 export function verifyReadonlyAttribute(this: Base, name: string): void {
-  if ((this.constructor as typeof Base).isReadonlyAttribute(name)) {
+  if (this.constructor.isReadonlyAttribute(name)) {
     throw new ActiveRecordError(`${name} is marked as readonly`);
   }
 }
@@ -932,7 +930,7 @@ export function verifyReadonlyAttribute(this: Base, name: string): void {
 /** @internal */
 export function _raiseRecordNotDestroyed(this: Base): never {
   this._associationDestroyException ??= null;
-  const key = (this.constructor as typeof Base).primaryKey;
+  const key = this.constructor.primaryKey;
   try {
     throw (
       this._associationDestroyException ??

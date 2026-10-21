@@ -29,7 +29,7 @@ import {
   staticClassExpressions,
   tsLiteralValue,
 } from "./extract-ts-api.js";
-import { collectTsFileNames } from "./extra-surface.js";
+import { collectTsFileNames, countTsInternalNames } from "./extra-surface.js";
 import { partitionNegatedCalls, significantCallsForReceivers } from "./compare.js";
 import { CALL_ARG_DESCRIPTOR_VOCABULARY } from "./extractor-skew.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
@@ -3397,6 +3397,41 @@ export function classAttribute(this: any, ...attrs: any[]): void {}`,
 }
 
 describe("extractFromProgram — include() detection", () => {
+  it("counts a plain module's members in the module's file, not the includer's", () => {
+    const info = extractFromFiles("/p", {
+      "autosave.ts": `
+        export const Autosave = {
+          /** @internal */
+          saveBelongsTo(): void {},
+        };
+      `,
+      "persistence.ts": `
+        /** @internal */
+        export function createOrUpdate(): void {}
+        export const Persistence = { createOrUpdate };
+      `,
+      "base.ts": `
+        import { include } from "@blazetrails/activesupport";
+        import { Autosave } from "./autosave.js";
+        import { Persistence } from "./persistence.js";
+        export class Base {}
+        include(Base, Autosave);
+        include(Base, Persistence);
+      `,
+    });
+    const classes = Object.values(info.classes);
+    const modules = Object.values(info.modules);
+    const internal = (file: string): number =>
+      countTsInternalNames(file, classes, modules, info.fileFunctions?.[file], []);
+    expect(classOf(info, "Base").instanceMethods.map((m) => [m.name, m.declaredIn])).toEqual([
+      ["saveBelongsTo", "autosave.ts"],
+      ["createOrUpdate", "persistence.ts"],
+    ]);
+    expect([internal("base.ts"), internal("autosave.ts"), internal("persistence.ts")]).toEqual([
+      0, 1, 1,
+    ]);
+  });
+
   it("records `export const X = { ... }` as a module with method names", () => {
     const info = extractFromFiles("/p", {
       "predications.ts": `
@@ -7817,6 +7852,28 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
       true,
       true,
     ]);
+  });
+
+  it("credits top-level attrInternal and delegate on a class's prototype", () => {
+    const info = extractFromFiles("/p", {
+      "controller-helper.ts": `
+        import { attrInternal, delegate } from "@blazetrails/activesupport";
+        const DELEGATES = ["params", "session"] as const;
+        export class ControllerHelper {}
+        attrInternal.call(ControllerHelper.prototype, "controller");
+        delegate.call(ControllerHelper.prototype, ...DELEGATES, { to: "controller" });
+        delegate.call(ControllerHelper.prototype, "flash", { to: "controller", prefix: true });
+      `,
+    });
+    const klass = info.classes["controller-helper.ts:ControllerHelper"];
+    const seats = (name: string) =>
+      [...klass.classMethods, ...klass.instanceMethods]
+        .filter((m) => m.name === name)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats("controller")).toEqual(["instance", "instance writer"]);
+    expect(seats("params")).toEqual(["instance"]);
+    expect(seats("session")).toEqual(["instance"]);
+    expect(seats("flash")).toEqual([]);
   });
 
   it("seats a cattrAccessor inside an onLoad block on the hook's module", () => {

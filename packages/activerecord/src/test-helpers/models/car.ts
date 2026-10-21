@@ -85,7 +85,7 @@ export class Car extends Base {
     );
     this.hasMany(
       "awesomeBulbs",
-      function (this: any) {
+      function () {
         return this.awesome();
       },
       { className: "Bulb" },

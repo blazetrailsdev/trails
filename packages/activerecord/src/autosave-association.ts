@@ -9,6 +9,10 @@ import {
   zip,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
+import type { Association } from "./associations/association.js";
+import type { BelongsToAssociation } from "./associations/belongs-to-association.js";
+import type { CollectionAssociation } from "./associations/collection-association.js";
+import type { HasOneAssociation } from "./associations/has-one-association.js";
 import { RecordInvalid } from "./validations.js";
 import { Rollback } from "./errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
@@ -79,6 +83,7 @@ export interface AutosaveAssociation {
     typeof isInversePolymorphicAssociationChanged
   >;
   saveBelongsToAssociation: OmitThisParameter<typeof saveBelongsToAssociation>;
+  _alreadyCalled?: Record<string, boolean> | null;
 }
 
 export const AutosaveAssociation = new Module().include({
@@ -157,7 +162,10 @@ export async function saveCollectionAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const association = associationInstanceGet.call(this, reflection.name) as any;
+  const association = associationInstanceGet.call(
+    this,
+    reflection.name,
+  ) as CollectionAssociation | null;
   if (!association) return;
   const autosave = reflection.options?.autosave;
 
@@ -208,11 +216,17 @@ export async function saveCollectionAssociation(
 }
 
 /** @internal */
-export async function saveHasOneAssociation(this: AutosaveAssociationHost, reflection: any) {
-  const association = associationInstanceGet.call(this, reflection.name) as any;
+export async function saveHasOneAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): Promise<unknown> {
+  const association = associationInstanceGet.call(
+    this,
+    reflection.name,
+  ) as HasOneAssociation | null;
   if (!(association && association.isLoaded())) return;
 
-  const record = await association.loadTarget();
+  const record = (await association.loadTarget()) as Base | null;
   if (!(record && !record.isDestroyed())) return;
 
   const autosave = reflection.options.autosave;
@@ -253,10 +267,13 @@ export async function saveHasOneAssociation(this: AutosaveAssociationHost, refle
 
 /** @internal */
 export async function saveBelongsToAssociation(this: AutosaveAssociationHost, reflection: any) {
-  const association = associationInstanceGet.call(this, reflection.name) as any;
+  const association = associationInstanceGet.call(
+    this,
+    reflection.name,
+  ) as BelongsToAssociation | null;
   if (!(association && association.isLoaded() && !association.isStaleTarget())) return;
 
-  const record = await association.loadTarget();
+  const record = (await association.loadTarget()) as Base | null;
   if (record && !record.isDestroyed()) {
     const autosave = reflection.options.autosave;
 
@@ -326,7 +343,10 @@ export function isNestedRecordsChangedForAutosave(this: AutosaveAssociationHost)
     this._nestedRecordsChangedForAutosaveAlreadyCalled = true;
     return Object.values<any>(this.constructor._reflections).some((reflection) => {
       if (reflection.options.autosave) {
-        const association = associationInstanceGet.call(this, reflection.name) as any;
+        const association = associationInstanceGet.call(
+          this,
+          reflection.name,
+        ) as Association | null;
         return (
           association && wrap(association.target).some((record: any) => record.changedForAutosave())
         );
@@ -343,7 +363,10 @@ export async function validateHasOneAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const association = associationInstanceGet.call(this, reflection.name) as any;
+  const association = associationInstanceGet.call(
+    this,
+    reflection.name,
+  ) as HasOneAssociation | null;
   const record = association && (await association.reader);
   if (!(record && (record.changedForAutosave() || this.customValidationContext()))) return;
 
@@ -364,7 +387,10 @@ export async function validateBelongsToAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const association = associationInstanceGet.call(this, reflection.name) as any;
+  const association = associationInstanceGet.call(
+    this,
+    reflection.name,
+  ) as BelongsToAssociation | null;
   const record = association && (await association.reader);
   if (!(record && (record.changedForAutosave() || this.customValidationContext()))) return;
 
@@ -382,7 +408,10 @@ export async function validateCollectionAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
 ): Promise<void> {
-  const association = associationInstanceGet.call(this, reflection.name) as any;
+  const association = associationInstanceGet.call(
+    this,
+    reflection.name,
+  ) as CollectionAssociation | null;
   if (association) {
     const records = associatedRecordsToValidateOrSave.call(
       this,
@@ -505,20 +534,24 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
 }
 
 /** @internal */
-export function defineNonCyclicMethod(this: any, name: string, block: (this: any) => any): void {
+export function defineNonCyclicMethod(
+  this: typeof Base,
+  name: string,
+  block: (this: Base) => any,
+): void {
   if (rbModMethodDefined(this, name, false)) return;
 
-  rbModDefineMethod(this, name, function (this: any) {
+  rbModDefineMethod(this, name, function (this: Base) {
     let result: any = true;
     this._alreadyCalled ||= {};
     if (!this._alreadyCalled[name]) {
       result = rbEnsure(
         () => {
-          this._alreadyCalled[name] = true;
+          this._alreadyCalled![name] = true;
           return block.call(this);
         },
         () => {
-          this._alreadyCalled[name] = false;
+          this._alreadyCalled![name] = false;
         },
       );
     }
@@ -528,25 +561,25 @@ export function defineNonCyclicMethod(this: any, name: string, block: (this: any
 }
 
 /** @internal */
-export function addAutosaveAssociationCallbacks(this: any, reflection: any): void {
+export function addAutosaveAssociationCallbacks(this: typeof Base, reflection: any): void {
   const saveMethod = `:autosaveAssociatedRecordsFor_${reflection.name}`;
 
   if (reflection.isCollection()) {
     this.aroundSave(":aroundSaveCollectionAssociation");
 
-    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: any) {
+    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: Base) {
       return this.saveCollectionAssociation(reflection);
     });
     this.afterCreate(saveMethod);
     this.afterUpdate(saveMethod);
   } else if (reflection.isHasOne()) {
-    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: any) {
+    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: Base) {
       return this.saveHasOneAssociation(reflection);
     });
     this.afterCreate(saveMethod);
     this.afterUpdate(saveMethod);
   } else {
-    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: any) {
+    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: Base) {
       if ((await this.saveBelongsToAssociation(reflection)) === false) kernelThrow(":abort");
     });
     this.beforeSave(saveMethod);
@@ -556,7 +589,7 @@ export function addAutosaveAssociationCallbacks(this: any, reflection: any): voi
 }
 
 /** @internal */
-export function defineAutosaveValidationCallbacks(this: any, reflection: any): void {
+export function defineAutosaveValidationCallbacks(this: typeof Base, reflection: any): void {
   const validationMethod = `:validateAssociatedRecordsFor_${reflection.name}`;
   if (reflection.isValidate() && !rbModMethodDefined(this, validationMethod.slice(1))) {
     let method: string;
@@ -568,7 +601,7 @@ export function defineAutosaveValidationCallbacks(this: any, reflection: any): v
       method = "validateBelongsToAssociation";
     }
 
-    defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: any) {
+    defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: Base) {
       return rbFSend(this, method, reflection);
     });
     this.validate(validationMethod);

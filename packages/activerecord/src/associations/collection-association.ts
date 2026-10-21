@@ -620,7 +620,7 @@ export abstract class CollectionAssociation extends Association {
       if (memRecord != null) {
         const memAttributeNames = new Set(memRecord.attributeNames());
         const changedAttributeNamesToSave = new Set(memRecord.changedAttributeNamesToSave);
-        const attrReadonly = (memRecord.constructor as typeof Base)._attrReadonly;
+        const attrReadonly = memRecord.constructor._attrReadonly;
         for (const name of record
           .attributeNames()
           .filter((name) => memAttributeNames.has(name))

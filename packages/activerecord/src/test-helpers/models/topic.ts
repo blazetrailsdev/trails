@@ -133,7 +133,7 @@ export class Topic extends Base {
     );
     this.hasMany(
       "openReplies",
-      function (this: any) {
+      function () {
         return this.open();
       },
       {
@@ -149,25 +149,25 @@ export class Topic extends Base {
     this.aliasAttribute("heading", "title");
 
     this.beforeCreate(async (record: Topic) => {
-      await (record as any).defaultWrittenOn();
+      await record.defaultWrittenOn();
     });
     this.beforeDestroy(async (record: Topic) => {
-      await (record as any).destroyChildren();
+      await record.destroyChildren();
     });
-    this.beforeValidation((record: Topic) => (record as any).beforeValidationForTransaction());
-    this.beforeSave((record: Topic) => (record as any).beforeSaveForTransaction());
-    this.beforeDestroy((record: Topic) => (record as any).beforeDestroyForTransaction());
-    this.afterSave((record: Topic) => (record as any).afterSaveForTransaction());
-    this.afterCreate((record: Topic) => (record as any).afterCreateForTransaction());
+    this.beforeValidation((record: Topic) => record.beforeValidationForTransaction());
+    this.beforeSave((record: Topic) => record.beforeSaveForTransaction());
+    this.beforeDestroy((record: Topic) => record.beforeDestroyForTransaction());
+    this.afterSave((record: Topic) => record.afterSaveForTransaction());
+    this.afterCreate((record: Topic) => record.afterCreateForTransaction());
     this.afterInitialize((record: Topic) => {
-      (record as any).setEmailAddress();
+      record.setEmailAddress();
     });
   }
 
   changeApprovedBeforeSave: boolean | null | undefined;
 
   static {
-    this.beforeSave((record: Topic) => (record as any).changeApprovedCallback());
+    this.beforeSave((record: Topic) => record.changeApprovedCallback());
   }
 
   static afterInitializeCalled: boolean | null = null;
@@ -213,19 +213,19 @@ export class Topic extends Base {
   }
 
   topicId() {
-    return (this as any).id;
+    return this.id;
   }
 
   /** @internal */
   private async defaultWrittenOn() {
-    if (!(this as any).attributePresent("written_on")) {
+    if (!this.attributePresent("written_on")) {
       this.writeAttribute("written_on", RubyTime.now());
     }
   }
 
   /** @internal */
   private async destroyChildren() {
-    await Topic.deleteBy({ parent_id: (this as any).id });
+    await Topic.deleteBy({ parent_id: this.id });
   }
 
   /** @internal */

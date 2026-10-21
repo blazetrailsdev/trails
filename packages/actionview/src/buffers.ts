@@ -186,17 +186,31 @@ export class StreamingBuffer {
     return this.safeAppend(value);
   }
 
-  capture(fn: () => void): SafeBuffer {
+  capture(fn: () => PromiseLike<unknown>): Promise<SafeBuffer>;
+  capture(fn: () => unknown): SafeBuffer;
+  capture(fn: () => unknown): SafeBuffer | Promise<SafeBuffer> {
     let buffer = "";
     const previous = this._block;
     this._block = (value: string) => {
       buffer += value;
     };
+    let pending = false;
     try {
-      fn();
+      const result = fn();
+      if (result != null && typeof (result as PromiseLike<unknown>).then === "function") {
+        pending = true;
+        return (async () => {
+          try {
+            await result;
+            return htmlSafe(buffer);
+          } finally {
+            this._block = previous;
+          }
+        })();
+      }
       return htmlSafe(buffer);
     } finally {
-      this._block = previous;
+      if (!pending) this._block = previous;
     }
   }
 

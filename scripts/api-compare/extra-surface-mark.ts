@@ -160,9 +160,12 @@ export const ROWLESS_PACKAGES = [
   "activemodel",
   "activerecord",
   "arel",
+  "bcrypt",
   "did-you-mean",
   "globalid",
   "rack",
+  "rack-session",
+  "rack-test",
 ] as const;
 
 /**

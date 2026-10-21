@@ -273,7 +273,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   marshalLoad(data: [string, [string, unknown][]]): void {
     const [reflectionName, ivars] = data;
     for (const [name, val] of ivars) rbObjIvarSet(this, name, val);
-    this.reflection = (this.owner.constructor as typeof Base)._reflectOnAssociation(
+    this.reflection = this.owner.constructor._reflectOnAssociation(
       reflectionName,
     ) as AssociationDefinition;
   }
@@ -496,7 +496,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   }
 
   protected enqueueDestroyAssociation(options: Record<string, unknown>): void {
-    const jobClass = (this.owner.constructor as typeof Base).destroyAssociationAsyncJob;
+    const jobClass = this.owner.constructor.destroyAssociationAsyncJob;
     if (jobClass) {
       this.owner._afterCommitJobs.push([jobClass, options]);
     }

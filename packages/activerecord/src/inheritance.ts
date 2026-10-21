@@ -131,22 +131,28 @@ export function polymorphicName(modelClass: typeof Base): string {
 
 export function baseClass(this: typeof Base): typeof Base {
   if (!Object.hasOwn(this, "_computedBaseClass")) setBaseClass(this);
-  return (this as any)._computedBaseClass as typeof Base;
+  return (this as typeof Base & { _computedBaseClass: typeof Base })._computedBaseClass;
 }
+
+type AbstractClassHost = { _abstractClass: boolean };
 
 export const ClassMethods = new Module().include({
   get abstractClass(): boolean {
-    return Object.hasOwn(this, "_abstractClass") ? (this as any)._abstractClass : false;
+    return Object.hasOwn(this, "_abstractClass")
+      ? (this as AbstractClassHost)._abstractClass
+      : false;
   },
 
   set abstractClass(value: boolean) {
-    (this as any)._abstractClass = value;
+    (this as AbstractClassHost)._abstractClass = value;
   },
 
   isAbstractClass(this: object): boolean {
     const field = Object.getOwnPropertyDescriptor(this, "abstractClass");
     if (field && "value" in field) return field.value === true;
-    return Object.hasOwn(this, "_abstractClass") && (this as any)._abstractClass === true;
+    return (
+      Object.hasOwn(this, "_abstractClass") && (this as AbstractClassHost)._abstractClass === true
+    );
   },
 });
 
@@ -167,11 +173,13 @@ export function findStiClass(this: typeof Base, typeName: string): typeof Base {
   return subclass;
 }
 
-export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
+export function isFinderNeedsTypeCondition(
+  modelClass: typeof Base & { _finderNeedsTypeCondition?: boolean },
+): boolean {
   if (!Object.hasOwn(modelClass, "_finderNeedsTypeCondition")) {
-    (modelClass as any)._finderNeedsTypeCondition = !modelClass.isDescendsFromActiveRecord();
+    modelClass._finderNeedsTypeCondition = !modelClass.isDescendsFromActiveRecord();
   }
-  return (modelClass as any)._finderNeedsTypeCondition === true;
+  return modelClass._finderNeedsTypeCondition === true;
 }
 
 export function __resetPrimaryAbstractClass(): void {
@@ -185,7 +193,7 @@ export function primaryAbstractClass(modelClass: typeof Base): void {
         "There can only be one `primary_abstract_class` in an application.",
     );
   }
-  (modelClass as any).abstractClass = true;
+  modelClass.abstractClass = true;
   setApplicationRecordClass(modelClass);
 }
 
@@ -252,7 +260,7 @@ Inheritance.defineMethod("initializeInternalsCallback", initializeInternalsCallb
 
 /** @internal */
 export function ensureProperType(this: Base): void {
-  const klass = this.constructor as typeof Base;
+  const klass = this.constructor;
   if (klass.isFinderNeedsTypeCondition()) {
     this._writeAttribute(klass.inheritanceColumn as string, klass.stiName());
   }
@@ -282,16 +290,13 @@ export function usingSingleTableInheritance(
 }
 
 /** @internal */
-export function typeCondition(
-  modelClass: typeof Base,
-  table: any = (modelClass as any).arelTable,
-): any {
+export function typeCondition(modelClass: typeof Base, table: any = modelClass.arelTable): any {
   const stiColumn = table.get(modelClass.inheritanceColumn);
   const stiNames = ([modelClass] as (typeof Base)[])
     .concat(modelClass.descendants)
     .map((klass) => stiName(klass));
 
-  return (modelClass as any).predicateBuilder.build(stiColumn, stiNames);
+  return modelClass.predicateBuilder.build(stiColumn, stiNames);
 }
 
 /** @internal */

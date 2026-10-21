@@ -118,10 +118,7 @@ export function generatesTokenFor(
 }
 
 export function generateTokenFor(this: Base, purpose: string): string {
-  return fetch<TokenDefinition>(
-    (this.constructor as typeof Base).tokenDefinitions,
-    purpose,
-  ).generateToken(this);
+  return fetch<TokenDefinition>(this.constructor.tokenDefinitions, purpose).generateToken(this);
 }
 
 export async function findByTokenFor(

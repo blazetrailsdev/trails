@@ -14,7 +14,7 @@ import { Member } from "../test-helpers/models/member.js";
 import { MemberType } from "../test-helpers/models/member-type.js";
 
 function djasScope(owner: Base, assocName: string): any {
-  const ctor = owner.constructor as typeof Base;
+  const ctor = owner.constructor;
   const reflection = (ctor as any)._reflectOnAssociation?.(assocName);
   if (!reflection) throw new Error(`No reflection found for ${assocName}`);
   const klass = reflection.klass;

@@ -15,12 +15,12 @@ export class DlKeyedBelongsToSoftDelete extends Base {
   }
 
   isDeleted() {
-    return (this as any).deleted;
+    return this.deleted;
   }
 
   async destroy(): Promise<this | false> {
-    await (this as any).update({ deleted: true });
-    await (this as any).runCallbacks("destroy", () => {});
+    await this.update({ deleted: true });
+    await this.runCallbacks("destroy", () => {});
     return this;
   }
 }

@@ -190,7 +190,7 @@ describe("instantiate override types for absent keys (trails)", () => {
   }
   const seedAttrs = async (): Promise<Record<string, unknown>> => {
     class Topic extends Base {}
-    const seed = await Topic.create({ title: "The First Topic" } as Partial<Topic>);
+    const seed = await Topic.create({ title: "The First Topic" });
     const attrs = {
       ...(seed as unknown as AttrProbe & { attributes: Record<string, unknown> }).attributes,
     };

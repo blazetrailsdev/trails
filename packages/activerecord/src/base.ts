@@ -3,10 +3,7 @@ import {
   block as rbBlock,
   fetch,
   hasKey,
-  eachPair,
   hashAref,
-  isEmpty,
-  keys,
   rbDeclareIvar,
   rbModConstSet,
   rbModName,
@@ -68,7 +65,6 @@ import {
   _registerAssociationBuilderExtension,
 } from "./autosave-association.js";
 import { Association as AssociationBuilder } from "./associations/builder/association.js";
-import { idsName as _idsName } from "./associations/builder/collection-association.js";
 import {
   isValid as validationsIsValid,
   defaultValidationContext,
@@ -119,7 +115,6 @@ import {
 } from "./callbacks.js";
 import {
   Access,
-  sanitizeForMassAssignment,
   type PermittedAttributes,
   assertAssignedSynchronously,
   type DirtyOptions,
@@ -437,88 +432,6 @@ function expandCallbackSourcesWithHelpers(
     }
   }
   return result;
-}
-
-/** @internal */
-interface _AssociationDefLike {
-  name: string;
-  macro: string;
-}
-
-/** @internal */
-interface _PendingAssociationAttr {
-  name: string;
-  value: unknown;
-  assoc: _AssociationDefLike;
-  idsKey: boolean;
-}
-
-/** @internal */
-function _collectionIdsKeyOwner(
-  defs: _AssociationDefLike[],
-  key: string,
-): _AssociationDefLike | undefined {
-  if (!key.endsWith("Ids")) return undefined;
-  return defs.find(
-    (a) => (a.macro === "hasMany" || a.macro === "hasAndBelongsToMany") && _idsName(a.name) === key,
-  );
-}
-
-/** @internal */
-function _extractAssociationAttrs(
-  ctor: typeof Base,
-  attrs: Record<string, unknown> | Map<string, unknown>,
-): {
-  rest: Record<string, unknown>;
-  assocs: _PendingAssociationAttr[];
-} | null {
-  const defs = Object.values(ctor._reflections);
-  if (defs.length === 0) return null;
-  let assocs: _PendingAssociationAttr[] | null = null;
-  for (const k of keys(attrs)) {
-    const named = defs.find((a) => a.name === k);
-    if (named) {
-      (assocs ??= []).push({ name: k, value: hashAref(attrs, k), assoc: named, idsKey: false });
-      continue;
-    }
-    const idsOwner = _collectionIdsKeyOwner(defs, k);
-    if (idsOwner) {
-      (assocs ??= []).push({ name: k, value: hashAref(attrs, k), assoc: idsOwner, idsKey: true });
-    }
-  }
-  if (!assocs) return null;
-  const rest = Object.create(null) as Record<string, unknown>;
-  const assocNames = new Set(assocs.map((a) => a.name));
-  eachPair(attrs, (k, v) => {
-    if (!assocNames.has(k)) rest[k] = v;
-  });
-  return { rest, assocs };
-}
-
-/** @internal */
-function _dispatchAssociationAttrs(record: Base, assocs: _PendingAssociationAttr[]): void {
-  for (const { value, assoc, idsKey } of assocs) {
-    const proxy = (
-      record as unknown as { association(n: string): _ConstructorAssociationWriter | null }
-    ).association(assoc.name);
-    if (!proxy) continue;
-    if (idsKey) {
-      proxy.syncIdsWrite?.(value as unknown[]);
-    } else if (assoc.macro === "hasMany" || assoc.macro === "hasAndBelongsToMany") {
-      proxy.syncWrite?.(value as unknown[]);
-    } else if (assoc.macro === "hasOne") {
-      proxy.syncWrite?.(value);
-    } else if (assoc.macro === "belongsTo") {
-      proxy.writer?.(value);
-    }
-  }
-}
-
-/** @internal */
-interface _ConstructorAssociationWriter {
-  writer?: (v: unknown) => void;
-  syncWrite?: (v: unknown) => void;
-  syncIdsWrite?: (v: unknown[]) => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -975,6 +888,8 @@ export class Base extends Model {
   }
 
   declare static encryptedAttributes: Set<string> | undefined;
+  /** @internal */
+  declare static _deterministicEncryptedAttributes: string[] | undefined;
   declare static readonly isEncryptedAttributes: boolean;
   declare static _attrReadonly: string[];
   declare static is_attrReadonly: boolean;
@@ -1456,10 +1371,6 @@ export class Base extends Model {
         }
       }
     }
-    const assocPending =
-      attributes == null || isEmpty(attributes)
-        ? null
-        : _extractAssociationAttrs(new.target, sanitizeForMassAssignment(attributes));
     super(null);
 
     if (!allocating) {
@@ -1473,11 +1384,8 @@ export class Base extends Model {
     this.initInternals();
     if (!allocating) this.initializeInternalsCallback();
 
-    if (attributes != null) this.assignAttributes(assocPending?.rest ?? attributes);
+    if (attributes != null) this.assignAttributes(attributes);
 
-    if (assocPending) {
-      _dispatchAssociationAttrs(this, assocPending.assocs);
-    }
     if (!allocating) {
       initBlock?.(this);
       this._runInitializeCallbacks();
@@ -1542,12 +1450,12 @@ export class Base extends Model {
 
   declare static validatesUniquenessOf: typeof _Validations.validatesUniquenessOf;
 
-  private _touchRecord: boolean | null = null;
+  _touchRecord: boolean | null = null;
   declare recordTimestamps: boolean;
 
   /** @internal */
   private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
-    const ctor = this.constructor as typeof Base;
+    const ctor = this.constructor;
     if (typeof this.association !== "function") return;
     const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
     if (!opaque && sources.length === 0) return;
@@ -1622,6 +1530,7 @@ export class Base extends Model {
   declare hasAttribute: (attrName: string) => boolean;
   declare attributePresent: (attrName: string) => boolean;
   declare readAttributeBeforeTypeCast: (attrName: string) => unknown;
+  declare readAttributeForDatabase: (attrName: string) => unknown;
   declare attributes: Record<string, unknown>;
   declare attributesBeforeTypeCast: () => Record<string, unknown> | Hash<string, unknown>;
   declare attributesForDatabase: () => Record<string, unknown> | Hash<string, unknown>;
@@ -1805,7 +1714,7 @@ export class Base extends Model {
     fn: (tx: any) => Promise<R>,
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
   ): Promise<R | undefined> {
-    return (this.constructor as typeof Base).transaction(fn, options);
+    return this.constructor.transaction(fn, options);
   }
 
   static transaction<R>(
@@ -1901,7 +1810,15 @@ rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
 rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
+export interface Base
+  extends
+    AutosaveAssociation,
+    JSONSerializer,
+    AMDirty,
+    Pick<ThisParameterType<typeof Timestamp.initInternals>, "allTimestampAttributesInModel"> {
+  constructor: typeof Base;
+  _touchAttrNames: Set<string> | null;
+  _skipDirtyTracking: boolean | null;
   /** @internal */
   strictLoadedAssociations: OmitThisParameter<typeof _Persistence.strictLoadedAssociations>;
   /** @internal */
@@ -2464,7 +2381,7 @@ for (const [name, fn] of [
   [
     "createOrUpdate",
     function (this: Base, touch = true, block?: (record: Base) => void): Promise<boolean> {
-      return Timestamp.createOrUpdate.call(this as any, touch, () =>
+      return Timestamp.createOrUpdate.call(this, touch, () =>
         callbacksCreateOrUpdate.call(this, () => _Persistence.createOrUpdate.call(this, block)),
       );
     },
@@ -2476,7 +2393,7 @@ for (const [name, fn] of [
       attributeNames?: string[],
       block?: (record: Base) => void,
     ): Promise<boolean> {
-      return Timestamp._createRecord.call(this as any, () =>
+      return Timestamp._createRecord.call(this, () =>
         callbacksCreateRecord.call(this, attributeNames, block),
       ) as Promise<boolean>;
     },
@@ -2494,12 +2411,12 @@ for (const [name, fn] of [
     "_touchRow",
     function (this: Base, attributeNames: string[], time: unknown): Promise<number> {
       return _DirtyModule._touchRow.call(
-        this as any,
+        this,
         attributeNames,
         time,
         (dirtyNames: string[], dirtyTime: unknown) =>
           LockingOptimistic._touchRow.call(
-            this as any,
+            this,
             dirtyNames,
             dirtyTime,
             (lockNames: string[], lockTime: unknown) =>
@@ -2512,8 +2429,8 @@ for (const [name, fn] of [
     "destroyRow",
     function (this: Base): Promise<number> {
       return Promise.resolve(
-        LockingOptimistic.destroyRow.call(this as any, () =>
-          CounterCache.destroyRow.call(this as any, () => _Persistence.destroyRow.call(this)),
+        LockingOptimistic.destroyRow.call(this, () =>
+          CounterCache.destroyRow.call(this, () => _Persistence.destroyRow.call(this)),
         ),
       );
     },
@@ -2521,7 +2438,7 @@ for (const [name, fn] of [
   [
     "_queryConstraintsHash",
     function (this: Base): Record<string, unknown> {
-      return LockingOptimistic._queryConstraintsHash.call(this as any, () =>
+      return LockingOptimistic._queryConstraintsHash.call(this, () =>
         _Persistence._queryConstraintsHash.call(this),
       );
     },
@@ -2530,7 +2447,7 @@ for (const [name, fn] of [
     "_updateRow",
     function (this: Base, attributeNames: string[], attemptedAction = "update"): Promise<number> {
       return LockingOptimistic._updateRow.call(
-        this as any,
+        this,
         attributeNames,
         attemptedAction,
         (names: string[], action: string) => _Persistence._updateRow.call(this, names, action),
@@ -2544,7 +2461,7 @@ for (const [name, fn] of [
       attributeNames?: string[],
       block?: (record: Base) => void,
     ): Promise<unknown> {
-      return Timestamp._updateRecord.call(this as any, () =>
+      return Timestamp._updateRecord.call(this, () =>
         callbacksUpdateRecord.call(this, attributeNames, block),
       );
     },

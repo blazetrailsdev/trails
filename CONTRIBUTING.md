@@ -299,57 +299,32 @@ pinned by an only-shrink ratchet (RFC 0025):
 
 ```sh
 pnpm parity:test:assertions          # gate
-pnpm parity:test:assertions:reseed   # lower the mark after convergence
 ```
 
-The high-water mark is `scripts/test-compare/assertion-mismatch-mark.json`: one
-entry per package, three counters each. **A `0` there means converged only
-because every package is measured.** While the counters were scoped to a subset,
-a package outside it carried a 0/0/0 mark that read as convergence and was
-really "never measured": its three counters had a single increment site each,
-all behind the scoping guard, so the zero was produced by construction. RFC 0105
-left six packages in that state — abstractcontroller, actioncontroller,
-actiondispatch, actionview, rack and trailties — and because `--write` only
-lowers, reseeding could not correct them; the six marks had to be written up to
-their first real measurement by hand, once, when the scoping set was removed. CI runs the gate in the
-`rails-comparison` job ("Assertion-mismatch ratchet"). Like the call-mismatch
-unreviewed counter, the arm is **aggregate** — the guarantee is "assertion-level
-debt never grows", not that every remaining mismatch has been reviewed.
-Converging one test while porting another that asserts less is a neutral trade
-the gate lets through; the reviewer of the diff enforces the stronger rule.
-Shrinkage is auto-acknowledged: `--write` (the `:reseed` script) lowers each
-counter to its current value and never raises one, so a run that grew a counter
-cannot buy headroom by reseeding.
-
-**A reseed is refused while `scripts/test-compare/assertion-mismatch-mark.freeze`
-exists**, and the marker's own text says which campaign froze the mark and which
-story lifts it. `--write` is not scoped — it rewrites every package in the
-artifact — so during a convergence campaign whose stories all land in one
-package, a single reflexive reseed both serializes those stories onto this file
-and tightens unrelated packages in a diff nobody asked for. Freezing costs
-nothing the gate was providing: the mark only shrinks, so one sitting above the
-measurement stays green, and the campaign lowers it in one pass at the end. What
-it does cost is ENFORCEMENT on the ground already converged: a regression inside
-the accumulated slack does not fail the gate. So a freeze is scoped to one
-campaign and deleted with it, and while it is up every gate run over a
-complete artifact prints the slack it is carrying, per package and per counter —
-including a run that FAILS on some other counter — the protection currently suspended,
-stated in the run that is not enforcing it. Those numbers only ever fall; one
-that rises is a regression the gate deliberately let through, and the reviewer of
-the converging PR is who catches it. RFC 0132 (ar-closure-assertion-parity) held the one freeze to
-date; its closing story deleted the marker and reseeded once, so no freeze is up
-now.
+Nothing is committed (RFC 0127). Main's CI uploads
+`convention-comparison.json` as the artifact `parity-outputs-<sha>`, and the
+gate compares each package's three counters against that artifact for its base
+— the merge commit's first parent under CI, `origin/main` locally
+(`scripts/parity/main-artifact.ts`). When main has no artifact for that commit
+the gate recomputes it on a detached worktree of the base. A counter above its
+base count, or a package the base never measured, fails the gate; shrinkage
+needs no write, so there is no reseed, no freeze and no mark to conflict on.
+CI runs the gate in the `rails-comparison` job ("Assertion-mismatch ratchet").
+The arm is **aggregate** — the guarantee is "assertion-level debt never grows",
+not that every remaining mismatch has been reviewed. Converging one test while
+porting another that asserts less is a neutral trade the gate lets through; the
+reviewer of the diff enforces the stronger rule.
 
 **The stale-artifact trap**: the counts are read from
 `scripts/test-compare/output/convention-comparison.json` — no second extractor.
 Gating a file written before a sibling PR's tests landed reports movement that
-never happened, and reseeding would commit that fiction as the new mark. So a
-plain local run regenerates the artifact itself (`pnpm parity:test --json`)
-before gating. `--no-regen` (what CI uses, since it writes the artifact in the
-preceding step) gates whatever is on disk. A partial-scope run is caught
-separately: if a package in the mark is missing from the artifact — a
-`--package` filter, an unfetched vendor source — the lint fails rather than
-letting the reseed drop that package's mark.
+never happened, so a plain local run regenerates the artifact itself
+(`pnpm parity:test --json`) before gating. `--no-regen` (what CI uses, since it
+writes the artifact in the preceding step) gates whatever is on disk. Locally
+the base is your `origin/main` ref, so `git fetch` first or the gate compares
+against an old base. A partial-scope run is caught separately: if a package in
+the base is missing from the artifact — a `--package` filter, an unfetched
+vendor source — the lint fails rather than reading it as converged.
 
 Once the counters are pinned their burn rate is measurable, which is what the
 ActiveRecord release estimate needs to price promoting this from a ratchet to a

@@ -110,7 +110,7 @@ export class Branch {
     if (this.isDone()) {
       const seen = new Set<typeof Base>();
       return (await this.preloadedRecords())
-        .map((r) => r.constructor as typeof Base)
+        .map((r) => r.constructor)
         .filter((k) => {
           if (seen.has(k)) return false;
           seen.add(k);
@@ -173,9 +173,7 @@ export class Branch {
     const polymorphicParent = !this.isRoot() && (await this.parent!.isPolymorphic());
 
     for (const record of await this.sourceRecords()) {
-      const reflection = (record.constructor as typeof Base)._reflectOnAssociation(
-        this.association!,
-      );
+      const reflection = record.constructor._reflectOnAssociation(this.association!);
 
       if ((polymorphicParent && !reflection) || !record.association(this.association!).klass) {
         continue;
@@ -221,9 +219,7 @@ export class Branch {
     if (this._polymorphic !== undefined) return this._polymorphic;
 
     this._polymorphic = (await this.sourceRecords()).some((record) => {
-      const reflection = (record.constructor as typeof Base)._reflectOnAssociation(
-        this.association!,
-      );
+      const reflection = record.constructor._reflectOnAssociation(this.association!);
       return reflection != null && reflection.isPolymorphic();
     });
     return this._polymorphic;

@@ -11,10 +11,7 @@ export class Batch {
 
   constructor(preloaders: Preloader[], availableRecords: (Base | Base[])[] = []) {
     this._preloaders = preloaders;
-    this._availableRecords = groupBy(
-      availableRecords.flat(),
-      (r) => (r.constructor as typeof Base).baseClass,
-    );
+    this._availableRecords = groupBy(availableRecords.flat(), (r) => r.constructor.baseClass);
   }
 
   async call(): Promise<void> {

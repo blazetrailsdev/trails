@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { TseLocalsSignatureError, virtualizeTse, virtualizeTseWithDeltas } from "./tse.js";
+import {
+  TseLocalsSignatureError,
+  transpileTse,
+  virtualizeTse,
+  virtualizeTseWithDeltas,
+} from "./tse.js";
 import { diagnose } from "./tse-diagnose.js";
 
 describe("virtualizeTse", () => {
@@ -39,10 +44,6 @@ describe("virtualizeTse", () => {
   it("does not split commas inside string or template literals", () => {
     const ts = virtualizeTse("<%# locals: (a: \"x, y\", b: 'p, q', c: `t, ${x}, u`) %>");
     expect(ts).toContain("const { a = \"x, y\", b = 'p, q', c = `t, ${x}, u` } = locals;");
-  });
-
-  it("throws on a malformed locals entry (no colon)", () => {
-    expect(() => virtualizeTse("<%# locals: (user) %>")).toThrow(TseLocalsSignatureError);
   });
 
   it("shields unused destructured locals with `void name;`", () => {
@@ -97,19 +98,26 @@ describe("virtualizeTse", () => {
     );
   });
 
-  it("rejects TS reserved words as local names", () => {
-    expect(() => virtualizeTse("<%# locals: (default: 1) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (await: 1) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (eval:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (arguments:) %>")).toThrow(/invalid local name/);
+  it("leaves positional and block parameters to Template#compile's non-keyword check", () => {
+    const out = virtualizeTse("<%# locals: (user, count = {a: 1}, *rest, &block) %>");
+    expect(out).not.toContain("} = locals;");
   });
 
-  it("rejects emitter-reserved names that would produce duplicate-declaration SyntaxErrors", () => {
-    expect(() => virtualizeTse("<%# locals: (context:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (locals:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (_ob:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (__allowedKeys:) %>")).toThrow(/invalid local name/);
-    expect(() => virtualizeTse("<%# locals: (__extraKeys:) %>")).toThrow(/invalid local name/);
+  it("still rejects a locals entry compile would not read as a parameter", () => {
+    expect(() => virtualizeTse("<%# locals: (foo bar) %>")).toThrow(TseLocalsSignatureError);
+    expect(() => virtualizeTse("<%# locals: (user user:) %>")).toThrow(/invalid local name/);
+  });
+
+  it("types a reserved-word keyword local without binding it", () => {
+    const out = virtualizeTse("<%# locals: (class:, context:) %>");
+    expect(out).toContain("locals: NoExtraKeys<{ class: unknown; context: unknown }>");
+    expect(out).not.toContain("} = locals;");
+  });
+
+  it("collects a named keyrest local with an object rest", () => {
+    const out = virtualizeTse("<%# locals: (message: 'Hi', **kwargs) %>");
+    expect(out).toContain("const { message = 'Hi', ...kwargs } = locals;");
+    expect(out).toContain("locals: { message?: unknown; [key: string]: unknown }");
   });
 
   it("dispatches expression sites and preserves code chunks raw", () => {
@@ -311,8 +319,10 @@ describe("virtualizeTse", () => {
         scope,
       );
       expect(out).toContain("  this: View,");
-      expect(out).toContain('  let readingTime = __lookup("readingTime") as Scope<"readingTime">;');
-      expect(out).toContain('  let post = __lookup("post") as Scope<"post">;');
+      expect(out).toContain(
+        '  let readingTime = __lookup("readingTime", true) as Scope<"readingTime">;',
+      );
+      expect(out).toContain('  let post = __lookup("post", true) as Scope<"post">;');
       expect(out).not.toContain('Scope<"n">');
       expect(out).not.toContain('Scope<"model">');
       expect(out).not.toContain('Scope<"x">');
@@ -384,5 +394,91 @@ describe("virtualizeTse", () => {
       expect(lines[m.genLine].slice(m.genCol)).toMatch(/^"sidebar"/);
       expect(src.slice(m.srcCol)).toMatch(/^"sidebar"/);
     });
+  });
+});
+
+describe("virtualizeTse free-name lookup", () => {
+  const scope = { view: "{}" };
+  const lookups = (source: string): string[] =>
+    [
+      ...virtualizeTse(source, scope).matchAll(
+        /^ {2}let (\w+) = __lookup\(("\w+"(?:, true)?)\)/gmu,
+      ),
+    ].map((m) => `${m[1]}:${m[2]}`);
+  const run = async (source: string, view: object = {}): Promise<string> => {
+    const { outputText } = transpileTse(virtualizeTse(source, scope));
+    const exports: { default?: (...a: unknown[]) => Promise<unknown> } = {};
+    const modules: Record<string, unknown> = {
+      "@blazetrails/actionview": { TopLevel: {} },
+      "@blazetrails/activesupport": { htmlSafe: (s: string) => s },
+    };
+    new Function("exports", "require", outputText)(exports, (id: string) => modules[id]);
+    const out: string[] = [];
+    const context = Object.assign(Object.create(view), {
+      outputBuffer: {
+        append(v: unknown) {
+          out.push(String(v));
+        },
+        safeAppend(v: unknown) {
+          out.push(String(v));
+        },
+        toString: () => out.join(""),
+      },
+    });
+    await exports.default!.call(context, context, {});
+    return out.join("");
+  };
+
+  it("does not look up a block parameter or a const declared in a code tag", () => {
+    expect(lookups("<% [1].forEach((n) => { %><%= n %><% }) %>")).toEqual([]);
+    expect(lookups("<% { const inner = 1; %><%= inner %><% } %>")).toEqual([]);
+  });
+
+  it("does not look up a var hoisted out of a nested block or a named function expression", () => {
+    expect(lookups("<% if (true) { var v = 1; } %><%= v %>")).toEqual([]);
+    expect(lookups("<% const f = function g() { return g; }; %>")).toEqual([]);
+  });
+
+  it("binds every free name without raising at the header", () => {
+    expect(lookups("<%= secret %>")).toEqual(['secret:"secret", true']);
+  });
+
+  it("raises ReferenceError when an undeclared name is used", async () => {
+    await expect(run("<%= doesnt_exist.name %>")).rejects.toThrow(
+      new ReferenceError("doesnt_exist is not defined"),
+    );
+    await expect(run("<%= typeof secret %><%= secret %>")).rejects.toThrow(
+      new ReferenceError("secret is not defined"),
+    );
+    for (const use of ['x ?? "d"', 'x || ""', "!x", "x == null", "x ? 1 : 2", "{ x }"]) {
+      await expect(run(`<%= ${use} %>`)).rejects.toThrow(new ReferenceError("x is not defined"));
+    }
+  });
+
+  it("reads an undeclared name under typeof as undefined", async () => {
+    expect(await run("<%= typeof secret %>")).toBe("undefined");
+    expect(
+      await run('<%= typeof secret !== "undefined" && secret != null ? secret : "one" %>'),
+    ).toBe("one");
+  });
+
+  it("reads a name the template assigns from its binding", async () => {
+    expect(await run("<% x = 1 %><%= x %>")).toBe("1");
+  });
+
+  it("raises for a read before the template's first assignment of the name", async () => {
+    await expect(run("<%= x %><% x = 1 %>")).rejects.toThrow(
+      new ReferenceError("x is not defined"),
+    );
+  });
+
+  it("reads a parenthesized typeof operand as undefined", async () => {
+    expect(await run("<%= typeof (secret) %>")).toBe("undefined");
+  });
+
+  it("raises only where the undeclared name is reached", async () => {
+    expect(
+      await run('<%= (() => { try { return customer.name; } catch { return "Anonymous"; } })() %>'),
+    ).toBe("Anonymous");
   });
 });

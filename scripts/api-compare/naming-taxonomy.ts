@@ -15,7 +15,11 @@
  *
  * Hard rules: no node:* imports, no process.*, async fs.
  */
-import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
+import {
+  JS_RESERVED_WORDS,
+  rubyMethodToTsIgnoringSkip,
+  snakeToCamel,
+} from "@blazetrails/parity/conventions";
 import { RUBY_COMPAT_EXPORTS } from "../parity/ruby-compat.js";
 import { IDENTIFIER_STRING, RECEIVER_DROPPING_CONVERSIONS } from "./call-args.js";
 
@@ -186,15 +190,6 @@ export const BLOCK_IDIOM_RUBY_REFS = new Set(["instance_exec", "instanceExec", "
  *                            attribute.rb:55-60 and :165
  */
 export const IVAR_METHOD_COLLISION_RUBY_REFS = new Set(["value_for_database", "valueForDatabase"]);
-
-/** Identifiers a TS parameter or local cannot be named (`arguments`/`eval` are unusable in strict mode). */
-export const JS_RESERVED_WORDS = new Set(
-  (
-    "arguments await break case catch class const continue debugger default delete do else " +
-    "enum eval export extends false finally for function if import in instanceof new null " +
-    "return super switch this throw true try typeof var void while with yield"
-  ).split(" "),
-);
 
 /**
  * Ruby constructs whose TS spelling is the JS builtin doing the same work,

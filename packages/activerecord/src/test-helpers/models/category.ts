@@ -1,3 +1,5 @@
+import type { Club } from "./club.js";
+import type { ScopeOn } from "../../scoping/named.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
@@ -9,6 +11,12 @@ import type { Post } from "./post.js";
 import type { SpecialCategorization } from "./categorization.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    general: ScopeOn<T, Club | Category>;
+  }
+}
 
 export class Category extends Base {
   declare posts: AssociationProxy<Post>;

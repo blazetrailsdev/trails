@@ -10,6 +10,7 @@ import { dropWeakCalls, significantMissingCalls } from "./compare.js";
 import { compareArms, type SkeletonRow } from "./report-arms.js";
 import {
   blockRidesZsuper,
+  inlinedHookBody,
   inlinedHookCreditedBy,
   inlinedHookTags,
   inlinedRubyBody,
@@ -285,6 +286,39 @@ describe("same-file module bodies join by convention", () => {
     const bare = { packages: { m: { classes: {}, modules: { A: entity("a.rb", [], [api]) } } } };
     expect(() => taggedBodies(bare as unknown as ApiManifest, [tag("A")], [], at)).toThrow(
       /@inlinedFrom cannot be checked: .* has no vendorFile/,
+    );
+  });
+
+  it("checks a method-level tag's citation against the def span", () => {
+    const save = body(["with_transaction_returning_status", "super"], {
+      name: "save",
+      line: 360,
+      endLine: 362,
+      vendorFile: "rails/v8.0.2/activerecord/lib/active_record/transactions.rb",
+    });
+    const manifest = {
+      packages: {
+        activerecord: {
+          classes: {},
+          modules: {
+            "ActiveRecord::Transactions": entity("transactions.rb", [], [save]),
+          },
+        },
+      },
+    } as unknown as ApiManifest;
+    const methodTag = (lastLine: number): InlinedFrom => ({
+      module: "ActiveRecord::Transactions",
+      hook: "save",
+      source: "rails",
+      version: "v8.0.2",
+      file: "activerecord/lib/active_record/transactions.rb",
+      firstLine: 360,
+      lastLine,
+    });
+    const where = "activerecord/base.ts Base#save";
+    expect(inlinedHookBody(manifest, methodTag(362), where)).toBe(save);
+    expect(() => inlinedHookBody(manifest, methodTag(363), where)).toThrow(
+      /@inlinedFrom citation is stale: .*\/transactions\.rb:360-362\./,
     );
   });
 

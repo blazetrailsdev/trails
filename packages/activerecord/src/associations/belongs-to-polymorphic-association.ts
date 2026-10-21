@@ -8,8 +8,7 @@ import { BelongsToAssociation } from "./belongs-to-association.js";
 export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   override get klass(): typeof Base {
     const type = this.owner.readAttribute(this.reflection.foreignType!) as string | null;
-    return (presence(type) &&
-      (this.owner.constructor as typeof Base).polymorphicClassFor(type!)) as typeof Base;
+    return (presence(type) && this.owner.constructor.polymorphicClassFor(type!)) as typeof Base;
   }
 
   override isTargetChanged(): boolean | undefined {
@@ -46,7 +45,7 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   ): void {
     super.replaceKeys(record, { force });
 
-    const targetType = record ? (record.constructor as typeof Base).polymorphicName() : null;
+    const targetType = record ? record.constructor.polymorphicName() : null;
 
     if (force || this.owner._readAttribute(this.reflection.foreignType!) !== targetType) {
       this.owner.set(this.reflection.foreignType!, targetType);
@@ -57,9 +56,7 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   protected override inverseReflectionFor(
     record: Base,
   ): AssociationReflection | ThroughReflection | null {
-    return (this.reflection as AssociationReflection).polymorphicInverseOf(
-      record.constructor as typeof Base,
-    );
+    return (this.reflection as AssociationReflection).polymorphicInverseOf(record.constructor);
   }
 }
 

@@ -1,6 +1,7 @@
 import { Encoding } from "./encoding.js";
 import { EOFError } from "./eof-error.js";
 import { print as ioPrint, puts as ioPuts } from "./io.js";
+import { rbStrEnumerateLines } from "./string/each.js";
 
 /**
  * Ruby's `StringIO` (stdlib), the readable/writable in-memory IO that
@@ -188,6 +189,17 @@ export class StringIO {
     const ret = this.read(maxlen, outbuf);
     if (ret === null) throw new EOFError("end of file reached");
     return ret;
+  }
+
+  /**
+   * `strio_each` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1366`) with no
+   * separator argument: yields each remaining line and leaves the stream at EOF.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  each(block: (line: string) => void): this {
+    for (const line of rbStrEnumerateLines(this.read(), [])) block(line);
+    return this;
   }
 
   isEof(): boolean {

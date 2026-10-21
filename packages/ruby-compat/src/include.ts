@@ -358,7 +358,29 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   instanceMethod(name: string): PropertyDescriptor | undefined {
-    return Object.getOwnPropertyDescriptor(carrierOf(this), name);
+    for (const ancestor of this.ancestors()) {
+      if (ancestor instanceof Module) {
+        const entry = Object.getOwnPropertyDescriptor(carrierOf(ancestor), name);
+        if (entry !== undefined) return entry;
+        continue;
+      }
+      if (name === "constructor" || /^[A-Z]/.test(name)) continue;
+      const members = (
+        typeof ancestor === "function" ? (ancestor as AnyClass).prototype : ancestor
+      ) as Record<string, unknown>;
+      const descriptor = Object.getOwnPropertyDescriptor(members, name);
+      if (descriptor === undefined || (typeof ancestor !== "function" && !descriptor.enumerable)) {
+        continue;
+      }
+      const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
+      if (!("value" in descriptor) && namespace !== "Module") {
+        return { get: descriptor.get, set: descriptor.set, configurable: true };
+      }
+      if (typeof members[name] === "function") {
+        return { value: members[name], writable: true, configurable: true };
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -440,7 +462,8 @@ export class Module<I extends object = Record<never, never>> {
     const carrier = carrierOf(this);
     try {
       for (const name of names) {
-        if (!Object.hasOwn(carrier, name) || isUndefEntry(carrier, name)) {
+        const entry = this.instanceMethod(name);
+        if (entry === undefined || ("value" in entry && entry.value === undefined)) {
           throw new NameError(`undefined method '${name}' for module '#<Module>'`, name);
         }
         trackedKeys(carrier).delete(name);
@@ -463,7 +486,7 @@ export class Module<I extends object = Record<never, never>> {
    * @noRailsEquivalent PERMANENT
    */
   aliasMethod(newName: string, oldName: string): string {
-    const descriptor = Object.getOwnPropertyDescriptor(carrierOf(this), oldName);
+    const descriptor = this.instanceMethod(oldName);
     if (!descriptor) {
       throw new NameError(`undefined method '${oldName}' for module '#<Module>'`, oldName);
     }
@@ -560,7 +583,17 @@ export class Module<I extends object = Record<never, never>> {
       prependOrigins.set(proto, origin);
       Object.setPrototypeOf(proto, origin);
     }
-    for (const key of Object.getOwnPropertyNames(source)) {
+    const keys = new Set(Object.getOwnPropertyNames(source));
+    for (const mod of nestedModules.get(this) ?? []) {
+      if (!(mod instanceof Module)) {
+        for (const key of typeof mod === "function"
+          ? Object.getOwnPropertyNames((mod as AnyClass).prototype)
+          : Object.keys(mod)) {
+          if (this.instanceMethod(key) !== undefined) keys.add(key);
+        }
+      }
+    }
+    for (const key of keys) {
       const descriptor = Object.getOwnPropertyDescriptor(proto, key);
       if (descriptor === undefined) continue;
       if (!descriptor.configurable) {
@@ -577,6 +610,9 @@ export class Module<I extends object = Record<never, never>> {
     UNDEF_METHOD_TABLES.add(link);
     Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(proto, link);
+    for (const mod of nestedModules.get(this) ?? []) {
+      if (!(mod instanceof Module)) splicePlainModule(link, mod);
+    }
   }
 
   /**
@@ -617,7 +653,6 @@ export class Module<I extends object = Record<never, never>> {
     }
     for (const mod of nestedModules.get(this) ?? []) {
       if (mod instanceof Module) Module.prototype.extendObject.call(mod, obj);
-      else extend(obj, mod);
     }
     const holder: object = typeof obj === "function" ? obj : rbObjSingletonClass(obj).prototype;
     trackIncludedModule(holder, this);
@@ -636,6 +671,9 @@ export class Module<I extends object = Record<never, never>> {
     singletonReaper.register(link, { mod: this, ref });
     Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(holder, link);
+    for (const mod of nestedModules.get(this) ?? []) {
+      if (!(mod instanceof Module)) splicePlainModule(link, mod);
+    }
   }
 
   /**
@@ -665,7 +703,16 @@ export class Module<I extends object = Record<never, never>> {
       if (isLinkOf(this, proto)) {
         const writer = name.endsWith("=");
         const key = writer ? name.slice(0, -1) : name;
-        for (let next = Object.getPrototypeOf(proto) as object | null; next; ) {
+        const nested = nestedModules.get(this) ?? [];
+        let start = Object.getPrototypeOf(proto) as object | null;
+        while (
+          start &&
+          !Object.hasOwn(carrierOf(this), key) &&
+          nested.includes((start as Record<symbol, ModuleObject>)[T_ICLASS])
+        ) {
+          start = Object.getPrototypeOf(start) as object | null;
+        }
+        for (let next = start; next; ) {
           const descriptor = Object.getOwnPropertyDescriptor(next, key);
           next = Object.getPrototypeOf(next) as object | null;
           if (descriptor === undefined) continue;
@@ -750,35 +797,8 @@ export class Module<I extends object = Record<never, never>> {
 }
 
 function appendPlainFeatures(base: Module, mod: ModuleObject): void {
-  const carrier = carrierOf(base);
-  if (!isModuleMethodTablePresent({ prototype: carrier }, mod)) {
-    if (Object.hasOwn(mod, moduleIncludesKey)) return recordPlainModule(base, mod);
-    trackIncludedModule(carrier, mod);
-    const installed = trackedKeys(carrier);
-    const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
-      string,
-      unknown
-    >;
-    const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
-    for (const key of typeof mod === "function"
-      ? Object.getOwnPropertyNames(members)
-      : Object.keys(members)) {
-      if (key === "constructor") continue;
-      const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
-      const accessor = !("value" in descriptor) && namespace !== "Module";
-      if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
-      if (Object.hasOwn(carrier, key) && !installed.has(key)) continue;
-      installed.add(key);
-      Object.defineProperty(
-        carrier,
-        key,
-        accessor
-          ? { get: descriptor.get, set: descriptor.set, configurable: true }
-          : { value: members[key], writable: true, configurable: true },
-      );
-    }
-    relinkIncluders(base);
-  }
+  if (!isModuleMethodTablePresent({ prototype: carrierOf(base) }, mod))
+    recordPlainModule(base, mod);
 }
 
 function recordPlainModule(base: Module, mod: ModuleObject): void {
@@ -796,7 +816,8 @@ function recordPlainModule(base: Module, mod: ModuleObject): void {
 
 function splicePlainModule(proto: object, mod: ModuleObject): void {
   function iclass() {}
-  iclass.prototype = Object.create(Object.getPrototypeOf(proto)) as object;
+  iclass.prototype = iclassBeneath(proto, Object.getPrototypeOf(proto) as object | null);
+  Object.defineProperty(iclass.prototype, T_ICLASS, { value: mod });
   rbModAppendFeatures(iclass, mod);
   Object.setPrototypeOf(proto, iclass.prototype);
 }
@@ -2089,6 +2110,11 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
       extendObject(klass, table);
       (klass as Record<symbol, Set<object>>)[includedModulesKey].delete(table);
       trackIncludedModule(klass, nested);
+      if (typeof klass !== "function") {
+        const singleton = rbObjSingletonClass(klass).prototype as Record<symbol, Set<object>>;
+        singleton[includedModulesKey].delete(table);
+        trackIncludedModule(singleton, nested);
+      }
     }
   }
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
@@ -2155,6 +2181,7 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
   }
 
   trackIncludedModule(klass, mod);
+  if (typeof klass !== "function") trackIncludedModule(rbObjSingletonClass(klass).prototype, mod);
   if (typeof (mod as ModuleHooks)[extended] === "function") {
     (mod as ModuleHooks)[extended]!(klass);
   }

@@ -3,7 +3,8 @@
 import { buildViews, type BuildViewsOptions } from "./build-views.js";
 import { watchViews, type WatchHandle } from "./watch-views.js";
 
-const USAGE = "usage: trails-tsc-views <build|dev> [--cwd <dir>] [--views <dir>] [--out <dir>]\n";
+const USAGE =
+  "usage: trails-tsc-views <build|dev> [--cwd <dir>] [--views <dir>] [--out <dir>] [--in-place]\n";
 
 const VALUE_FLAGS = new Set(["--cwd", "--views", "--out"]);
 
@@ -20,6 +21,10 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   const opts: BuildViewsOptions = {};
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
+    if (a === "--in-place") {
+      opts.inPlace = true;
+      continue;
+    }
     if (VALUE_FLAGS.has(a)) {
       const v = argv[i + 1];
       if (v === undefined) {

@@ -1,5 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
+import type { ScopeOn } from "../../scoping/named.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Author } from "./author.js";
 import type { Citation } from "./citation.js";
@@ -9,6 +10,13 @@ import type { Subscriber } from "./subscriber.js";
 import type { Subscription } from "./subscription.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
+
+declare module "../../relation.js" {
+  interface RelationScopes<T extends Base> {
+    unread: ScopeOn<T, Book>;
+    reading: ScopeOn<T, Book>;
+  }
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Book extends Base {

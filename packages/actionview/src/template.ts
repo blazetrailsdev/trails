@@ -1,23 +1,17 @@
-import {
-  htmlSafe,
-  Notifications,
-  pluralize,
-  SafeBuffer,
-  toSentence,
-  TopLevel,
-} from "@blazetrails/activesupport";
+import { Notifications, pluralize, SafeBuffer, toSentence } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   Encoding,
   forceEncoding,
   isValidEncoding,
+  LoadError,
+  NotImplementedError,
   rbModConstSet,
   rbInspect,
   rbModName,
   rbObjRespondTo,
   rbStrEnumerateLines,
 } from "@blazetrails/ruby-compat";
-import * as RubyCompat from "@blazetrails/ruby-compat";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer, StreamingBuffer } from "./buffers.js";
@@ -50,50 +44,57 @@ const LEADING_ENCODING_REGEXP = new RegExp(`^${ENCODING_FLAG}`);
 const VARIABLE_FROM_BASENAME = /^_?(.*?)(?:\.\w+)*$/;
 const NONE = Symbol("Template::NONE");
 
-const JS_RESERVED_KEYWORDS = [
-  "await",
-  "break",
-  "case",
-  "catch",
-  "class",
-  "const",
-  "continue",
-  "debugger",
-  "default",
-  "delete",
-  "do",
-  "else",
-  "enum",
-  "export",
-  "extends",
-  "false",
-  "finally",
-  "for",
-  "function",
-  "if",
-  "import",
-  "in",
-  "instanceof",
-  "new",
-  "null",
-  "return",
-  "super",
-  "switch",
-  "this",
-  "throw",
-  "true",
-  "try",
-  "typeof",
-  "var",
-  "void",
-  "while",
-  "with",
-  "yield",
-];
-
-const VALID_LOCAL_NAME = /^(?![A-Z0-9])[\p{L}\p{N}_]+$/u;
-
 let nextObjectId = 0;
+let loads = 0;
+
+type StandIn = (
+  this: Base,
+  context: Base,
+  locals: Record<string, unknown>,
+  block?: (...name: unknown[]) => unknown,
+) => unknown;
+
+type TemplateCompiler = (
+  template: Template,
+  methodName: string,
+  source: string,
+  file: boolean,
+) => Promise<{ default: StandIn }>;
+
+let templateCompiler: TemplateCompiler = async (template, methodName, _source, file) => {
+  if (!file) {
+    // @nie disposition=TODO
+    throw new NotImplementedError(
+      `${template.inspect()} has no compiled module: templates are precompiled by build-views, and a template built from a string is compiled only in test code`,
+    );
+  }
+  const { identifier } = template;
+  const at = identifier.lastIndexOf("/app/views/");
+  const compiled =
+    at === -1
+      ? `${identifier}.js`
+      : `${identifier.slice(0, at)}/.trails/views/${identifier.slice(at + "/app/views/".length)}.js`;
+  const url = new URL(compiled, "file:///");
+  url.search = `?${methodName}-${(loads += 1)}`;
+  try {
+    return (await import(url.href)) as { default: StandIn };
+  } catch (error) {
+    if (
+      (error as { code?: string }).code !== "ERR_MODULE_NOT_FOUND" ||
+      !(error as Error).message.includes(compiled)
+    ) {
+      throw error;
+    }
+    throw new LoadError(`cannot load such file -- ${compiled}`);
+  }
+};
+
+/** @noRailsEquivalent PERMANENT */
+export function setTemplateCompiler(compiler: TemplateCompiler): TemplateCompiler {
+  const previous = templateCompiler;
+  templateCompiler = compiler;
+  return previous;
+}
 
 export interface TemplateOptions {
   locals: readonly string[];
@@ -223,7 +224,7 @@ export class Template {
    * @missingRailsCall parse — PERMANENT
    */
   spot(location: BacktraceLocation): Spot | null {
-    const scriptLines = rbStrEnumerateLines(this.compiledSource(), []);
+    const scriptLines = rbStrEnumerateLines(this.compiledSource().source, []);
     const found = scriptLines[location.lineno - 1];
     if (found === undefined) return null;
 
@@ -307,7 +308,7 @@ export class Template {
     const streaming = buffer instanceof StreamingBuffer;
     try {
       return await this.instrumentRenderTemplate<Promise<string | SafeBuffer | null>>(async () => {
-        this.compileBang(view, streaming);
+        await this.compileBang(view, streaming);
 
         if (this.isStrictLocals() && this._strictLocalKeys && implicitLocals.length > 0) {
           const localsToIgnore = implicitLocals.filter((l) => !this._strictLocalKeys!.includes(l));
@@ -363,14 +364,12 @@ export class Template {
    * @internal
    * @missingRailsArgs compile — PERMANENT
    */
-  private compileBang(view: Base, streaming = false): void {
+  private async compileBang(view: Base, streaming = false): Promise<void> {
     if (streaming ? this._compiledStreaming : this._compiled) return;
 
     const mod = view.compiledMethodContainer();
 
-    this.instrument<void>("!compile_template", () => {
-      this.compile(mod, streaming);
-    });
+    await this.instrument<Promise<void>>("!compile_template", () => this.compile(mod, streaming));
 
     if (streaming) this._compiledStreaming = true;
     else this._compiled = true;
@@ -381,12 +380,13 @@ export class Template {
     return `${this.methodName()}_streaming`;
   }
 
-  /** @internal */
-  private compiledSource(streaming = false): string {
+  /**
+   * @internal
+   * @missingRailsCall call — PERMANENT
+   */
+  private compiledSource(): { source: string; methodArguments: string } {
     const setStrictLocals = this.strictLocalsBang();
-    let source = this.encodeBang();
-    const handler = this.handler;
-    const code = handler.call(this, source);
+    const source = this.encodeBang();
 
     let methodArguments: string;
     if (setStrictLocals != null) {
@@ -398,54 +398,79 @@ export class Template {
     } else {
       methodArguments = "local_assigns, output_buffer, &_";
     }
-    const parameters = methodParameters(methodArguments);
-    const scope = setStrictLocals != null ? "__strictLocals" : "localAssigns";
-
-    source = `Object.assign(async function ${streaming ? this.streamingMethodName() : this.methodName()}(localAssigns, outputBuffer, __kwargs = {}, _) {${setStrictLocals != null ? kwargsCode(parameters) : ""} this.virtualPath = ${JSON.stringify(this.virtualPath)}; const __yield = _ ? { get yield() { return _(); } } : {}; with (TopLevel) { with (this) { with (__yield) { with (${scope}) {${this.localsCode()} ${code}
-  } } } }
-}, { parameters: ${JSON.stringify(parameters.map(([type, name]) => (name === undefined ? [type] : [type, name])))} })`;
 
     if (/\p{Surrogate}/u.test(source)) {
       throw new WrongEncodingError(source, Encoding.defaultInternal);
     }
 
-    return source;
+    return { source, methodArguments };
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs compiled_source — PERMANENT
-   */
-  protected compile(mod: CompiledMethodContainer, streaming = false): void {
+  /** @internal */
+  protected async compile(mod: CompiledMethodContainer, streaming = false): Promise<void> {
     const methodName = streaming ? this.streamingMethodName() : this.methodName();
-    const compiledSource = this.compiledSource(streaming);
-    let factory: (
-      argumentError: typeof ArgumentError,
-      safe: typeof htmlSafe,
-      outputBuffer: typeof OutputBuffer,
-      topLevel: typeof TopLevel,
-      rubyCompat: typeof RubyCompat,
-    ) => CompiledMethod;
-    try {
-      factory = (0, eval)(
-        `(function (ArgumentError, htmlSafe, OutputBuffer, TopLevel, RubyCompat) { return ${compiledSource}; })\n//# sourceURL=${this.identifier.replace(/[\r\n\u2028\u2029]/g, "")}`,
-      ) as (
-        argumentError: typeof ArgumentError,
-        safe: typeof htmlSafe,
-        outputBuffer: typeof OutputBuffer,
-        topLevel: typeof TopLevel,
-        rubyCompat: typeof RubyCompat,
-      ) => CompiledMethod;
-    } catch (error) {
-      throw new SyntaxErrorInTemplate(this, this.source, error as Error);
-    }
+    const { source: compiledSource, methodArguments } = this.compiledSource();
+    const strictLocals = this.isStrictLocals();
 
-    const method = factory(ArgumentError, htmlSafe, OutputBuffer, TopLevel, RubyCompat);
+    let render: StandIn;
+    let signature: Parameter[];
+    try {
+      signature = methodParameters(methodArguments);
+      ({ default: render } = await templateCompiler(
+        this,
+        methodName,
+        compiledSource,
+        this._source instanceof SourcesFile,
+      ));
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      throw new SyntaxErrorInTemplate(this, compiledSource, error);
+    }
+    Object.defineProperty(render, "name", { value: methodName });
+
+    const virtualPath = this.virtualPath;
+    const keyreq = signature.filter(([type]) => type === "keyreq").map(([, name]) => name!);
+    const keywords = signature
+      .filter(([type]) => type === "keyreq" || type === "key")
+      .map(([, name]) => name!);
+    const nokey = signature.some(([type]) => type === "nokey");
+    const keyrest = signature.find(([type]) => type === "keyrest");
+    const method: CompiledMethod = function (
+      this: Base,
+      localAssigns,
+      _outputBuffer,
+      kwargs = {},
+      _,
+    ) {
+      if (strictLocals) {
+        const missing = keyreq.filter((k) => !Object.hasOwn(kwargs, k));
+        if (missing.length > 0) {
+          throw new ArgumentError(
+            `missing keyword${missing.length > 1 ? "s" : ""}: ${missing.map((k) => `:${k}`).join(", ")}`,
+          );
+        }
+        if (nokey) {
+          if (Object.keys(kwargs).length > 0) throw new ArgumentError("no keywords accepted");
+        } else if (!keyrest) {
+          const unknown = Object.keys(kwargs).filter((k) => !keywords.includes(k));
+          if (unknown.length > 0) {
+            throw new ArgumentError(
+              `unknown keyword${unknown.length > 1 ? "s" : ""}: ${unknown.map((k) => `:${k}`).join(", ")}`,
+            );
+          }
+        }
+      }
+      this.virtualPath = virtualPath;
+      return render.call(this, this, strictLocals ? kwargs : localAssigns, _);
+    };
+    method.parameters = signature.map(([type, name]) =>
+      name === undefined ? [type] : [type, name],
+    );
     mod._compiledMethods.set(methodName, method);
 
     if (!this.isStrictLocals()) return;
 
-    const parameters = method.parameters!.filter(
+    const parameters = method.parameters.filter(
       ([type, name]) => !(type === "req" && (name === "local_assigns" || name === "output_buffer")),
     );
 
@@ -478,20 +503,6 @@ export class Template {
     } else {
       throw new TemplateError(this, e instanceof Error ? e : new Error(String(e)));
     }
-  }
-
-  /** @internal */
-  private localsCode(): string {
-    if (this.isStrictLocals()) return "";
-
-    let locals = this._locals.filter((l) => !JS_RESERVED_KEYWORDS.includes(l));
-
-    locals = locals.filter((l) => VALID_LOCAL_NAME.test(l));
-
-    return locals.reduce(
-      (code, key) => `${code}${key} = localAssigns[${JSON.stringify(key)}]; ${key} = ${key};`,
-      "",
-    );
   }
 
   private identifierMethodName(): string {
@@ -560,50 +571,6 @@ function methodParameters(methodArguments: string): Parameter[] {
       if (/^\w+$/.test(arg)) return ["req", arg];
       throw new SyntaxError(`invalid locals signature argument: ${arg}`);
     });
-}
-
-function kwargsCode(parameters: Parameter[]): string {
-  const keyreq = parameters.filter(([type]) => type === "keyreq").map(([, name]) => name!);
-  const keywords = parameters
-    .filter(([type]) => type === "keyreq" || type === "key")
-    .map(([, name]) => name!);
-  const keyrest = parameters.find(([type]) => type === "keyrest");
-  const lines: string[] = [];
-
-  if (keyreq.length > 0) {
-    lines.push(
-      `const __missing = ${JSON.stringify(keyreq)}.filter((k) => !Object.hasOwn(__kwargs, k));`,
-      'if (__missing.length > 0) throw new ArgumentError(`missing keyword${__missing.length > 1 ? "s" : ""}: ${__missing.map((k) => ":" + k).join(", ")}`);',
-    );
-  }
-  if (parameters.some(([type]) => type === "nokey")) {
-    lines.push(
-      'if (Object.keys(__kwargs).length > 0) throw new ArgumentError("no keywords accepted");',
-    );
-  } else if (!keyrest) {
-    lines.push(
-      `const __unknown = Object.keys(__kwargs).filter((k) => !${JSON.stringify(keywords)}.includes(k));`,
-      'if (__unknown.length > 0) throw new ArgumentError(`unknown keyword${__unknown.length > 1 ? "s" : ""}: ${__unknown.map((k) => ":" + k).join(", ")}`);',
-    );
-  }
-
-  lines.push("const __strictLocals = {};");
-  for (const [type, name, defaultExpr] of parameters) {
-    const key = JSON.stringify(name);
-    if (type === "keyreq") lines.push(`__strictLocals[${key}] = __kwargs[${key}];`);
-    if (type === "key") {
-      lines.push(
-        `__strictLocals[${key}] = Object.hasOwn(__kwargs, ${key}) ? __kwargs[${key}] : (${defaultExpr});`,
-      );
-    }
-  }
-  if (keyrest && keyrest[1] !== "**") {
-    lines.push(
-      `__strictLocals[${JSON.stringify(keyrest[1])}] = Object.fromEntries(Object.entries(__kwargs).filter(([k]) => !${JSON.stringify(keywords)}.includes(k)));`,
-    );
-  }
-
-  return lines.map((line) => ` ${line}`).join("");
 }
 
 function stringHash(value: string): number {

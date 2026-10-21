@@ -1,43 +1,89 @@
-import { describe, it, expect } from "vitest";
-import { Request } from "./request.js";
+import { describe, it, expect, vi } from "vitest";
+import { Env, Helpers, Request } from "./request.js";
+import {
+  InvalidParameterError,
+  ParameterTypeError,
+  Params,
+  ParamsTooDeepError,
+  QueryParser,
+} from "./query-parser.js";
 import { EmptyContentError } from "./multipart/parser.js";
 import { MockRequest } from "./mock-request.js";
-import { StringIO, strNew } from "@blazetrails/ruby-compat";
-import { setMultipartFileLimit, setMultipartTotalPartLimit } from "./utils.js";
+import { Lint } from "./lint.js";
+import { RACK_MULTIPART_TEMPFILE_FACTORY } from "./constants.js";
+import {
+  EOFError,
+  File,
+  StringIO,
+  Tempfile,
+  include,
+  isEmpty,
+  rbInspect,
+  strNew,
+  warn,
+} from "@blazetrails/ruby-compat";
+import {
+  escape,
+  paramDepthLimit,
+  setMultipartFileLimit,
+  setMultipartTotalPartLimit,
+  setParamDepthLimit,
+} from "./utils.js";
 import { MultipartPartLimitError, MultipartTotalPartLimitError } from "./multipart.js";
+
+vi.mock("@blazetrails/ruby-compat", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@blazetrails/ruby-compat")>();
+  return { ...actual, warn: vi.fn(actual.warn) };
+});
+
+function captureWarnings(yieldBlock: (warnings: unknown[][]) => void): void {
+  const warnings: unknown[][] = [];
+  vi.mocked(warn).mockImplementation((...args: unknown[]) => {
+    warnings.push(args);
+  });
+  try {
+    yieldBlock(warnings);
+  } finally {
+    vi.mocked(warn).mockReset();
+  }
+}
+
+function assertEmpty(obj: object) {
+  expect(Object.keys(obj)).toHaveLength(0);
+}
 
 function makeEnv(overrides: Record<string, any> = {}): Record<string, any> {
   return MockRequest.envFor("/", overrides);
 }
 
-function makeReq(uri = "/", overrides: Record<string, any> = {}): Request {
-  return new Request(MockRequest.envFor(uri, overrides));
-}
-
 const IPV6 = "2620:0:1c00:0:812c:9583:754b:ca11";
 const PRIVATE_IPV6 = "fd5b:982e:9130:247f:0000:0000:0000:0000";
 
-function ip(overrides: Record<string, any>): string | null {
-  return makeReq("/", overrides).ip;
-}
+function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void {
+  function makeReq(uri = "/", overrides: Record<string, any> = {}): Request {
+    return makeRequest(MockRequest.envFor(uri, overrides));
+  }
 
-describe("RackRequestTest", () => {
-  it("copies the env when duping", () => {
-    const req = makeReq();
-    const dup = req.dup();
-    expect(dup.env).not.toBe(req.env);
-    expect(dup.env["REQUEST_METHOD"]).toBe(req.env["REQUEST_METHOD"]);
+  function ip(overrides: Record<string, any>): string | null {
+    return makeReq("/", overrides).ip;
+  }
+
+  it("copies the env when duping", (ctx) => {
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+
+    ctx.skip(req.isDelegate(), "delegate requests don't dup environments");
+
+    expect(req.dup().env).not.toBe(req.env);
   });
 
   it("can check if something has been set", () => {
-    const req = makeReq();
-    expect(req.hasHeader("REQUEST_METHOD")).toBe(true);
-    expect(req.hasHeader("NONEXISTENT")).toBe(false);
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+    expect(req.hasHeader("FOO")).toBeFalsy();
   });
 
   it("can get a key from the env", () => {
-    const req = makeReq();
-    expect(req.getHeader("REQUEST_METHOD")).toBe("GET");
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+    expect(req.getHeader("SERVER_NAME")).toBe("example.com");
   });
 
   it("can calculate the authority", () => {
@@ -56,38 +102,29 @@ describe("RackRequestTest", () => {
   });
 
   it("can calculate the server authority", () => {
-    let req = new Request({ SERVER_NAME: "example.com" });
+    let req = makeRequest({ SERVER_NAME: "example.com" });
     expect(req.serverAuthority).toBe("example.com");
-    req = new Request({ SERVER_NAME: "example.com", SERVER_PORT: 8080 });
+    req = makeRequest({ SERVER_NAME: "example.com", SERVER_PORT: 8080 });
     expect(req.serverAuthority).toBe("example.com:8080");
   });
 
   it("can calculate the port without an authority", () => {
-    let req = new Request({ SERVER_PORT: 8080 });
+    let req = makeRequest({ SERVER_PORT: 8080 });
     expect(req.port).toBe(8080);
-    req = new Request({ HTTPS: "on" });
+    req = makeRequest({ HTTPS: "on" });
     expect(req.port).toBe(443);
   });
 
   it("yields to the block if no value has been set", () => {
-    const req = makeReq();
-    let capturedKey: string | undefined;
-    req.fetchHeader("FOO", (k) => {
-      capturedKey = k;
-      req.setHeader("FOO", "bar");
-      return "bar";
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+    let yielded = false;
+    req.fetchHeader("FOO", () => {
+      yielded = true;
+      return req.setHeader("FOO", "bar");
     });
-    expect(capturedKey).toBe("FOO");
+
+    expect(yielded).toBeTruthy();
     expect(req.getHeader("FOO")).toBe("bar");
-    const err = (() => {
-      try {
-        req.fetchHeader("MISSING");
-      } catch (e) {
-        return e as Error;
-      }
-    })()!;
-    expect(err.name).toBe("KeyError");
-    expect(err.message).toMatch("MISSING");
   });
 
   it("can iterate over values", () => {
@@ -101,73 +138,265 @@ describe("RackRequestTest", () => {
   });
 
   it("can set values in the env", () => {
-    const req = makeReq();
-    req.setHeader("X_CUSTOM", "val");
-    expect(req.env["X_CUSTOM"]).toBe("val");
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+    req.setHeader("FOO", "BAR");
+    expect(req.getHeader("FOO")).toBe("BAR");
   });
 
   it("can add to multivalued headers in the env", () => {
-    const req = makeReq();
-    req.setHeader("HTTP_X_MULTI", "a");
-    req.addHeader("HTTP_X_MULTI", "b");
-    expect(req.env["HTTP_X_MULTI"]).toBe("a,b");
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+
+    expect(req.addHeader("FOO", "1")).toBe("1");
+    expect(req.getHeader("FOO")).toBe("1");
+
+    expect(req.addHeader("FOO", "2")).toBe("1,2");
+    expect(req.getHeader("FOO")).toBe("1,2");
+
+    expect(req.addHeader("FOO", null)).toBe("1,2");
+    expect(req.getHeader("FOO")).toBe("1,2");
   });
 
   it("can delete env values", () => {
-    const req = makeReq();
-    req.setHeader("HTTP_X_DEL", "val");
-    const deleted = req.deleteHeader("HTTP_X_DEL");
-    expect(deleted).toBe("val");
-    expect(req.hasHeader("HTTP_X_DEL")).toBe(false);
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+    req.setHeader("foo", "bar");
+    expect(req.hasHeader("foo")).toBeTruthy();
+    req.deleteHeader("foo");
+    expect(req.hasHeader("foo")).toBeFalsy();
   });
 
   it("wrap the rack variables", () => {
-    const req = makeReq("http://example.org:8080/foo?bar=baz");
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+
+    expect(req.body).toBeNull();
+    expect(req.scheme).toBe("http");
     expect(req.requestMethod).toBe("GET");
-    expect(req.pathInfo).toBe("/foo");
-    expect(req.queryString).toBe("bar=baz");
+
+    expect(req.isGet()).toBeTruthy();
+    expect(req.isPost()).toBeFalsy();
+    expect(req.isPut()).toBeFalsy();
+    expect(req.isDelete()).toBeFalsy();
+    expect(req.isHead()).toBeFalsy();
+    expect(req.isPatch()).toBeFalsy();
+
+    expect(req.scriptName).toBe("");
+    expect(req.pathInfo).toBe("/");
+    expect(req.queryString).toBe("");
+
+    expect(req.host).toBe("example.com");
+    expect(req.port).toBe(8080);
+
+    expect(req.contentLength).toBeNull();
+    expect(req.contentType).toBeNull();
   });
 
   it("figure out the correct host", () => {
-    expect(makeReq("/", { HTTP_HOST: "example.com" }).host).toBe("example.com");
-    expect(makeReq("/", { HTTP_HOST: "example.com:8080" }).host).toBe("example.com");
-    expect(makeReq("http://foo.example.com/").host).toBe("foo.example.com");
+    let req;
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "www2.example.org" }));
+    expect(req.host).toBe("www2.example.org");
+    expect(req.hostname).toBe("www2.example.org");
 
-    for (const httpHost of [
-      "www2.example.org",
-      "123foo.example.com",
-      "\u2661.com",
-      "nic.\u8c37\u6b4c",
-    ]) {
-      const req = makeReq("/", { HTTP_HOST: httpHost });
-      expect(req.host).toBe(httpHost);
-      expect(req.hostname).toBe(httpHost);
-    }
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "123foo.example.com" }));
+    expect(req.host).toBe("123foo.example.com");
+    expect(req.hostname).toBe("123foo.example.com");
 
-    for (const httpHost of ["\u2661.com:80", "nic.\u8c37\u6b4c:80"]) {
-      const req = makeReq("/", { HTTP_HOST: httpHost });
-      expect(req.host).toBe(httpHost.slice(0, -3));
-      expect(req.hostname).toBe(httpHost.slice(0, -3));
-    }
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "\u2661.com" }));
+    expect(req.host).toBe("\u2661.com");
+    expect(req.hostname).toBe("\u2661.com");
 
-    for (const httpHost of [
-      "technically_invalid.example.com",
-      "technically_invalid.example.com:80",
-    ]) {
-      const req = makeReq("/", { HTTP_HOST: httpHost });
-      expect(req.host).toBe("technically_invalid.example.com");
-      expect(req.hostname).toBe("technically_invalid.example.com");
-    }
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "\u2661.com:80" }));
+    expect(req.host).toBe("\u2661.com");
+    expect(req.hostname).toBe("\u2661.com");
 
-    for (const httpHost of ["trailing_newline.com\n", "really\nbad\ninput"]) {
-      const req = makeReq("/", { HTTP_HOST: httpHost });
-      expect(req.host).toBeNull();
-      expect(req.hostname).toBeNull();
-    }
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "nic.\u8c37\u6b4c" }));
+    expect(req.host).toBe("nic.\u8c37\u6b4c");
+    expect(req.hostname).toBe("nic.\u8c37\u6b4c");
 
-    const someService = makeReq("/", { HTTP_HOST: "some_service:3001" });
-    expect(someService.host).toBe("some_service");
-    expect(someService.hostname).toBe("some_service");
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "nic.\u8c37\u6b4c:80" }));
+    expect(req.host).toBe("nic.\u8c37\u6b4c");
+    expect(req.hostname).toBe("nic.\u8c37\u6b4c");
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "technically_invalid.example.com" }));
+    expect(req.host).toBe("technically_invalid.example.com");
+    expect(req.hostname).toBe("technically_invalid.example.com");
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "technically_invalid.example.com:80" }));
+    expect(req.host).toBe("technically_invalid.example.com");
+    expect(req.hostname).toBe("technically_invalid.example.com");
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "trailing_newline.com\n" }));
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "really\nbad\ninput" }));
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "some_service:3001" }));
+    expect(req.host).toBe("some_service");
+    expect(req.hostname).toBe("some_service");
+
+    req = makeRequest(MockRequest.envFor("/", { SERVER_NAME: "example.org", SERVER_PORT: "9292" }));
+    expect(req.host).toBe("example.org");
+    expect(req.hostname).toBe("example.org");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_FORWARDED: "host=example.org:9292",
+      }),
+    );
+    expect(req.host).toBe("example.org");
+
+    req = makeRequest(
+      MockRequest.envFor("/", { HTTP_HOST: "localhost:81", HTTP_FORWARDED: "host=ObFuScaTeD" }),
+    );
+    expect(req.host).toBe("ObFuScaTeD");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_FORWARDED: "host=example.com; host=example.org:9292",
+      }),
+    );
+    expect(req.host).toBe("example.org");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "example.org:9292",
+        HTTP_FORWARDED: "host=example.com",
+      }),
+    );
+    expect(req.host).toBe("example.com");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "example.org:9292",
+      }),
+    );
+    expect(req.host).toBe("example.org");
+    expect(req.hostname).toBe("example.org");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "[2001:db8:cafe::17]:47011",
+      }),
+    );
+    expect(req.host).toBe("[2001:db8:cafe::17]");
+    expect(req.hostname).toBe("2001:db8:cafe::17");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "2001:db8:cafe::17",
+      }),
+    );
+    expect(req.host).toBe("[2001:db8:cafe::17]");
+    expect(req.hostname).toBe("2001:db8:cafe::17");
+
+    req = makeRequest(
+      MockRequest.envFor("/", { HTTP_HOST: "localhost:81", HTTP_X_FORWARDED_HOST: "[::]:47011" }),
+    );
+    expect(req.host).toBe("[::]");
+    expect(req.hostname).toBe("::");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "[1111:2222:3333:4444:5555:6666:123.123.123.123]",
+      }),
+    );
+    expect(req.host).toBe("[1111:2222:3333:4444:5555:6666:123.123.123.123]");
+    expect(req.hostname).toBe("1111:2222:3333:4444:5555:6666:123.123.123.123");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "[1111:2222:3333:4444:5555:6666:123.123.123.123]:47011",
+      }),
+    );
+    expect(req.host).toBe("[1111:2222:3333:4444:5555:6666:123.123.123.123]");
+    expect(req.hostname).toBe("1111:2222:3333:4444:5555:6666:123.123.123.123");
+
+    req = makeRequest(
+      MockRequest.envFor("/", { HTTP_HOST: "localhost:81", HTTP_X_FORWARDED_HOST: "0.0.0.0" }),
+    );
+    expect(req.host).toBe("0.0.0.0");
+    expect(req.hostname).toBe("0.0.0.0");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "0.0.0.0:47011",
+      }),
+    );
+    expect(req.host).toBe("0.0.0.0");
+    expect(req.hostname).toBe("0.0.0.0");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "255.255.255.255",
+      }),
+    );
+    expect(req.host).toBe("255.255.255.255");
+    expect(req.hostname).toBe("255.255.255.255");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "255.255.255.255:47011",
+      }),
+    );
+    expect(req.host).toBe("255.255.255.255");
+    expect(req.hostname).toBe("255.255.255.255");
+
+    req = makeRequest(MockRequest.envFor("/", { HTTP_HOST: "really\nbad\ninput" }));
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(
+      MockRequest.envFor("/", { HTTP_HOST: "localhost:81", HTTP_X_FORWARDED_HOST: "[0]" }),
+    );
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(
+      MockRequest.envFor("/", { HTTP_HOST: "localhost:81", HTTP_X_FORWARDED_HOST: "[:::]" }),
+    );
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "[1111:2222:3333:4444:5555:6666:7777:88888]",
+      }),
+    );
+    expect(req.host).toBeNull();
+    expect(req.hostname).toBeNull();
+
+    req = makeRequest(
+      MockRequest.envFor("/", { HTTP_HOST: "localhost:81", HTTP_X_FORWARDED_HOST: "0.0..0.0" }),
+    );
+    expect(req.host).toBe("0.0..0.0");
+    expect(req.hostname).toBe("0.0..0.0");
+
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        HTTP_HOST: "localhost:81",
+        HTTP_X_FORWARDED_HOST: "255.255.255.0255",
+      }),
+    );
+    expect(req.host).toBe("255.255.255.0255");
+    expect(req.hostname).toBe("255.255.255.0255");
+
+    const env = MockRequest.envFor("/");
+    delete env["SERVER_NAME"];
+    req = makeRequest(env);
+    expect(req.host).toBeNull();
   });
 
   it("figure out the correct port", () => {
@@ -210,7 +439,7 @@ describe("RackRequestTest", () => {
     const defaultProtoPriority = Request.xForwardedProtoPriority;
 
     function req(headers: Record<string, string>): Request {
-      return new Request(MockRequest.envFor("/", headers));
+      return makeRequest(MockRequest.envFor("/", headers));
     }
 
     try {
@@ -423,45 +652,82 @@ describe("RackRequestTest", () => {
   });
 
   it("parse the query string", () => {
-    const req = makeReq("/?foo=bar&baz=qux");
-    expect(req.GET).toEqual({ foo: "bar", baz: "qux" });
+    const request = makeRequest(MockRequest.envFor("/?foo=bar&quux=bla&nothing&empty="));
+    expect(request.queryString).toBe("foo=bar&quux=bla&nothing&empty=");
+    expect(request.GET).toEqual({ foo: "bar", quux: "bla", nothing: null, empty: "" });
+    expect(isEmpty(request.POST)).toBeTruthy();
+    expect(request.params).toEqual({ foo: "bar", quux: "bla", nothing: null, empty: "" });
   });
 
   it("handles invalid unicode in query string value", () => {
-    const req = makeReq("/?foo=%81E");
-    expect(req.queryString).toBe("foo=%81E");
-    expect(req.GET).toEqual({ foo: strNew([0x81, 0x45]) });
-    expect(req.POST).toEqual({});
-    expect(req.params).toEqual({ foo: strNew([0x81, 0x45]) });
+    const request = makeRequest(MockRequest.envFor("/?foo=%81E"));
+    expect(request.queryString).toBe("foo=%81E");
+    expect(request.GET).toEqual({ foo: strNew([0x81, 0x45]) });
+    expect(isEmpty(request.POST)).toBeTruthy();
+    expect(request.params).toEqual({ foo: strNew([0x81, 0x45]) });
   });
 
   it("handles invalid unicode in query string key", () => {
-    const req = makeReq("/?foo%81E=1");
-    expect(req.queryString).toBe("foo%81E=1");
-    expect(req.GET).toEqual({ [strNew([0x66, 0x6f, 0x6f, 0x81, 0x45])]: "1" });
-    expect(req.POST).toEqual({});
-    expect(req.params).toEqual({ [strNew([0x66, 0x6f, 0x6f, 0x81, 0x45])]: "1" });
+    const request = makeRequest(MockRequest.envFor("/?foo%81E=1"));
+    expect(request.queryString).toBe("foo%81E=1");
+    expect(request.GET).toEqual({ [strNew([0x66, 0x6f, 0x6f, 0x81, 0x45])]: "1" });
+    expect(isEmpty(request.POST)).toBeTruthy();
+    expect(request.params).toEqual({ [strNew([0x66, 0x6f, 0x6f, 0x81, 0x45])]: "1" });
   });
 
   it("not truncate query strings containing semi-colons #543 only in POST", () => {
-    const req = makeReq("/?foo=bar;baz=qux");
-    expect(req.GET["foo"]).toBe("bar;baz=qux");
+    const mr = MockRequest.envFor("/", { REQUEST_METHOD: "POST", ":input": "foo=bar&quux=b;la" });
+    const req = makeRequest(mr);
+    expect(req.queryString).toBe("");
+    expect(isEmpty(req.GET)).toBeTruthy();
+    expect(req.POST).toEqual({ foo: "bar", quux: "b;la" });
+    expect(req.params).toEqual({ ...req.GET, ...req.POST });
   });
 
   it("should use the query_parser for query parsing", () => {
-    const req = makeReq("/?foo=bar&baz=qux");
-    expect(req.GET).toEqual({ foo: "bar", baz: "qux" });
-    expect(req.parseQuery("a=1&b=2")).toEqual({ a: "1", b: "2" });
+    const parser = new QueryParser(Params, 100);
+    const c = class extends Request {
+      override queryParser = (): QueryParser => parser;
+    };
+    const req = new c(MockRequest.envFor("/?foo=bar&quux=bla"));
+    expect(req.GET["foo"]).toBe("bar");
+    expect(req.GET["quux"]).toBe("bla");
+    expect(req.params["foo"]).toBe("bar");
+    expect(req.params["quux"]).toBe("bla");
   });
 
   it("does not use semi-colons as separators for query strings in GET", () => {
-    const req = makeReq("/?a=1;b=2");
-    expect(req.GET["a"]).toBe("1;b=2");
+    const req = makeRequest(MockRequest.envFor("/?foo=bar&quux=b;la;wun=duh"));
+    expect(req.queryString).toBe("foo=bar&quux=b;la;wun=duh");
+    expect(req.GET).toEqual({ foo: "bar", quux: "b;la;wun=duh" });
+    expect(isEmpty(req.POST)).toBeTruthy();
+    expect(req.params).toEqual({ foo: "bar", quux: "b;la;wun=duh" });
   });
 
   it("limit the allowed parameter depth when parsing parameters", () => {
-    const req = makeReq("/?a[a][a]=b");
-    expect(req.GET["a"]["a"]["a"]).toBe("b");
+    let env = MockRequest.envFor(`/?a${"[a]".repeat(40)}=b`);
+    let req = makeRequest(env);
+    expect(() => req.GET).toThrow(ParamsTooDeepError);
+
+    env = MockRequest.envFor(`/?a${"[a]".repeat(30)}=b`);
+    req = makeRequest(env);
+    let params = req.GET;
+    for (let i = 0; i < 30; i++) params = params["a"];
+    expect(params["a"]).toBe("b");
+
+    const old = paramDepthLimit();
+    setParamDepthLimit(3);
+    try {
+      env = MockRequest.envFor("/?a[a][a]=b");
+      req = makeRequest(env);
+      expect(req.GET["a"]["a"]["a"]).toBe("b");
+
+      env = MockRequest.envFor("/?a[a][a][a]=b");
+      req = makeRequest(env);
+      expect(() => makeRequest(env).GET).toThrow(ParamsTooDeepError);
+    } finally {
+      setParamDepthLimit(old);
+    }
   });
 
   it("not unify GET and POST when calling params", () => {
@@ -476,32 +742,47 @@ describe("RackRequestTest", () => {
   });
 
   it("use the query_parser's params_class for multipart params", () => {
-    const boundary = "AaB03x";
-    const body = `--${boundary}\r\ncontent-disposition: form-data; name="reply"\r\n\r\nyes\r\n--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(body),
+    const parser = new QueryParser(Params, 100);
+    const c = class extends Request {
+      override queryParser = (): QueryParser => parser;
     };
-    const req = new Request(env);
-    expect(typeof req.POST).toBe("object");
-    expect(req.POST["reply"]).toBe("yes");
+    const mr = MockRequest.envFor("/?foo=quux", {
+      REQUEST_METHOD: "POST",
+      ":input": "foo=bar&quux=bla",
+    });
+    const req = new c(mr);
+
+    void req.params;
+
+    expect(req.GET["foo"]).toBe("quux");
+    expect(req.POST["foo"]).toBe("bar");
+    expect(req.POST["quux"]).toBe("bla");
+    expect(req.params["foo"]).toBe("bar");
+    expect(req.params["quux"]).toBe("bla");
   });
 
   it("raise if input params has invalid %-encoding", () => {
-    const req = makeReq("/?foo=quux", {
-      ":method": "POST",
+    const mr = MockRequest.envFor("/?foo=quux", {
+      REQUEST_METHOD: "POST",
       ":input": "a%=1",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
-    expect(() => req.POST).toThrow();
+    const req = makeRequest(mr);
+
+    let error: Error | undefined;
+    expect(() => {
+      try {
+        return req.POST;
+      } catch (e) {
+        error = e as Error;
+        throw e;
+      }
+    }).toThrow(InvalidParameterError);
+    expect(error!.message).toBe("invalid %-encoding (a%)");
   });
 
   it("return empty POST data if rack.input is missing", () => {
-    const env = makeEnv();
-    delete env["rack.input"];
-    const req = new Request(env);
-    expect(req.POST).toEqual({});
+    const req = makeRequest({});
+    assertEmpty(req.POST);
   });
 
   it("parse POST data when method is POST and no content-type given", () => {
@@ -515,21 +796,36 @@ describe("RackRequestTest", () => {
   });
 
   it("parse POST data with explicit content type regardless of method", () => {
-    const req = makeReq("/", {
-      ":method": "PUT",
-      ":input": "foo=bar",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    expect(req.POST["foo"]).toBe("bar");
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "application/x-www-form-urlencoded;foo=bar",
+        ":input": "foo=bar&quux=bla",
+      }),
+    );
+    expect(req.contentType).toBe("application/x-www-form-urlencoded;foo=bar");
+    expect(req.mediaType).toBe("application/x-www-form-urlencoded");
+    expect(req.mediaTypeParams["foo"]).toBe("bar");
+    expect(req.POST).toEqual({ foo: "bar", quux: "bla" });
+    expect(req.params).toEqual({ foo: "bar", quux: "bla" });
   });
 
   it("not parse POST data when media type is not form-data", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": '{"foo":"bar"}',
-      CONTENT_TYPE: "application/json",
-    });
-    expect(req.POST).toEqual({});
+    const req = makeRequest(
+      MockRequest.envFor("/?foo=quux", {
+        REQUEST_METHOD: "POST",
+        CONTENT_TYPE: "text/plain;charset=utf-8",
+        ":input": "foo=bar&quux=bla",
+      }),
+    );
+    expect(req.contentType).toBe("text/plain;charset=utf-8");
+    expect(req.mediaType).toBe("text/plain");
+    expect(req.mediaTypeParams["charset"]).toBe("utf-8");
+    expect(req.contentCharset).toBe("utf-8");
+    const post = req.POST;
+    assertEmpty(post);
+    expect(req.POST).toBe(post);
+    expect(req.params).toEqual({ foo: "quux" });
+    expect(req.body.read()).toBe("foo=bar&quux=bla");
   });
 
   it("parse POST data on PUT when media type is form-data", () => {
@@ -542,12 +838,18 @@ describe("RackRequestTest", () => {
   });
 
   it("safely accepts POST requests with empty body", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": "",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
+    const mr = MockRequest.envFor("/", {
+      REQUEST_METHOD: "POST",
+      CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+      CONTENT_LENGTH: "0",
+      ":input": null,
     });
-    expect(req.POST).toEqual({});
+
+    const req = makeRequest(mr);
+    expect(req.queryString).toBe("");
+    expect(isEmpty(req.GET)).toBeTruthy();
+    expect(isEmpty(req.POST)).toBeTruthy();
+    expect(req.params).toEqual({});
   });
 
   it("clean up Safari's ajax POST body", () => {
@@ -559,189 +861,26 @@ describe("RackRequestTest", () => {
     expect(req.POST).toEqual({});
   });
 
-  it("limit POST body read to bytesize_limit when parsing url-encoded data", () => {
-    const reads: any[] = [];
-    const mockInput = {
-      read(len?: number) {
-        reads.push(len);
-        return "foo=bar";
-      },
-    };
-    const env = {
-      ...makeEnv(),
-      REQUEST_METHOD: "POST",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-      "rack.input": mockInput,
-    };
-    const req = new Request(env);
-    expect(req.POST).toEqual({ foo: "bar" });
-  });
-
-  it("truncate POST body at bytesize_limit when parsing url-encoded data", () => {
-    const largeBody = "a=1&".repeat(1000);
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": largeBody,
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    expect(req.POST["a"]).toBeDefined();
-  });
-
-  it("clean up Safari's ajax POST body with limited read", () => {
-    const mockInput = {
-      read() {
-        return "foo=bar\0";
-      },
-    };
-    const env = {
-      ...makeEnv(),
-      REQUEST_METHOD: "POST",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-      "rack.input": mockInput,
-    };
-    const req = new Request(env);
-    expect(req.POST["foo"]).toBeDefined();
-  });
-
-  it("return form_pairs for url-encoded POST data", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": "foo=bar&baz=qux",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    expect(req.formPairs).toEqual([
-      ["foo", "bar"],
-      ["baz", "qux"],
-    ]);
-  });
-
-  it("preserve duplicate keys in form_pairs", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": "foo=1&foo=2",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    expect(req.formPairs).toEqual([
-      ["foo", "1"],
-      ["foo", "2"],
-    ]);
-  });
-
-  it("handle empty values in form_pairs", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": "foo=&bar=baz",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    expect(req.formPairs).toEqual([
-      ["foo", ""],
-      ["bar", "baz"],
-    ]);
-  });
-
-  it("return empty array for form_pairs with no POST data", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": "",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    expect(req.formPairs).toEqual([]);
-  });
-
-  it("return empty array for form_pairs with non-form content type", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": '{"a":1}',
-      CONTENT_TYPE: "application/json",
-    });
-    expect(req.formPairs).toEqual([]);
-  });
-
-  it("raise same error for form_pairs as POST with invalid encoding", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": "a%=1",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    expect(() => req.formPairs).toThrow();
-  });
-
-  it("return form_pairs for multipart form data", () => {
-    const boundary = "AaB03x";
-    const body = `--${boundary}\r\ncontent-disposition: form-data; name="reply"\r\n\r\nyes\r\n--${boundary}\r\ncontent-disposition: form-data; name="name"\r\n\r\nJohn\r\n--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(body),
-    };
-    const req = new Request(env);
-    const pairs = req.formPairs;
-    expect(pairs).toEqual([
-      ["reply", "yes"],
-      ["name", "John"],
-    ]);
-  });
-
-  it("preserve duplicate keys in multipart form_pairs", () => {
-    const boundary = "AaB03x";
-    const body = `--${boundary}\r\ncontent-disposition: form-data; name="item"\r\n\r\nfirst\r\n--${boundary}\r\ncontent-disposition: form-data; name="item"\r\n\r\nsecond\r\n--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(body),
-    };
-    const req = new Request(env);
-    const _post = req.POST;
-    expect(req.formPairs.length).toBeGreaterThan(0);
-  });
-
-  it("include file uploads in multipart form_pairs", () => {
-    const boundary = "AaB03x";
-    const body = `--${boundary}\r\ncontent-disposition: form-data; name="reply"\r\n\r\nyes\r\n--${boundary}\r\ncontent-disposition: form-data; name="fileupload"; filename="test.txt"\r\ncontent-type: text/plain\r\n\r\nfile content\r\n--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(body),
-    };
-    const req = new Request(env);
-    const pairs = req.formPairs;
-    expect(pairs.length).toBe(2);
-    expect(pairs[0]).toEqual(["reply", "yes"]);
-    expect(pairs[1][0]).toBe("fileupload");
-    expect(pairs[1][1].filename).toBe("test.txt");
-  });
-
-  it("return empty array for empty multipart form_pairs", () => {
-    const boundary = "AaB03x";
-    const body = `--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(body),
-    };
-    const req = new Request(env);
-    expect(req.formPairs).toEqual([]);
-  });
-
   it("extract referrer correctly", () => {
-    const req = makeReq("/", { HTTP_REFERER: "http://example.com/page" });
-    expect(req.referrer).toBe("http://example.com/page");
-    expect(req.referer).toBe("http://example.com/page");
+    let req = makeRequest(MockRequest.envFor("/", { HTTP_REFERER: "/some/path" }));
+    expect(req.referer).toBe("/some/path");
 
-    const req2 = makeReq("/");
-    expect(req2.referer).toBeNull();
-    expect(req2.referrer).toBeNull();
+    req = makeRequest(MockRequest.envFor("/"));
+    expect(req.referer).toBeNull();
   });
 
   it("extract user agent correctly", () => {
-    const req = makeReq("/", { HTTP_USER_AGENT: "Mozilla/5.0" });
-    expect(req.userAgent).toBe("Mozilla/5.0");
+    let req = makeRequest(MockRequest.envFor("/", { HTTP_USER_AGENT: "Mozilla/4.0 (compatible)" }));
+    expect(req.userAgent).toBe("Mozilla/4.0 (compatible)");
+
+    req = makeRequest(MockRequest.envFor("/"));
+    expect(req.userAgent).toBeNull();
   });
 
   it("treat missing content type as nil", () => {
     const env = makeEnv();
     delete env["CONTENT_TYPE"];
-    expect(new Request(env).contentType).toBeNull();
+    expect(makeRequest(env).contentType).toBeNull();
   });
 
   it("treat empty content type as nil", () => {
@@ -755,77 +894,80 @@ describe("RackRequestTest", () => {
   });
 
   it("figure out if called via XHR", () => {
-    expect(makeReq("/", { HTTP_X_REQUESTED_WITH: "XMLHttpRequest" }).xhr).toBe(true);
-    expect(makeReq("/").xhr).toBe(false);
+    let req = makeRequest(MockRequest.envFor(""));
+    expect(req.xhr).toBeFalsy();
+
+    req = makeRequest(MockRequest.envFor("", { HTTP_X_REQUESTED_WITH: "XMLHttpRequest" }));
+    expect(req.xhr).toBeTruthy();
   });
 
   it("ssl detection", () => {
     let request = makeReq("/");
     expect(request.scheme).toBe("http");
-    expect(request.ssl).toBe(false);
+    expect(request.ssl).toBeFalsy();
 
     request = makeReq("/", { HTTP_X_FORWARDED_SCHEME: "ws" });
     expect(request.scheme).toBe("ws");
-    expect(request.ssl).toBe(false);
+    expect(request.ssl).toBeFalsy();
 
     request = makeReq("/", { HTTP_X_FORWARDED_PROTO: "ws" });
     expect(request.scheme).toBe("ws");
 
     request = makeReq("/", { HTTP_FORWARDED: "proto=https" });
     expect(request.scheme).toBe("https");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { HTTP_FORWARDED: "proto=https, proto=http" });
     expect(request.scheme).toBe("http");
-    expect(request.ssl).toBe(false);
+    expect(request.ssl).toBeFalsy();
 
     request = makeReq("/", { HTTP_FORWARDED: "proto=http, proto=https" });
     expect(request.scheme).toBe("https");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { HTTPS: "on" });
     expect(request.scheme).toBe("https");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { "rack.url_scheme": "https" });
     expect(request.scheme).toBe("https");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { "rack.url_scheme": "wss" });
     expect(request.scheme).toBe("wss");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { HTTP_HOST: "www.example.org:8080" });
     expect(request.scheme).toBe("http");
-    expect(request.ssl).toBe(false);
+    expect(request.ssl).toBeFalsy();
 
     request = makeReq("/", { HTTP_HOST: "www.example.org:8443", HTTPS: "on" });
     expect(request.scheme).toBe("https");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { HTTP_HOST: "www.example.org:8443", HTTP_X_FORWARDED_SSL: "on" });
     expect(request.scheme).toBe("https");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { HTTP_X_FORWARDED_SCHEME: "https" });
     expect(request.scheme).toBe("https");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { HTTP_X_FORWARDED_SCHEME: "wss" });
     expect(request.scheme).toBe("wss");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { HTTP_X_FORWARDED_PROTO: "https" });
     expect(request.scheme).toBe("https");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
 
     request = makeReq("/", { HTTP_X_FORWARDED_PROTO: "https, http, http" });
     expect(request.scheme).toBe("http");
-    expect(request.ssl).toBe(false);
+    expect(request.ssl).toBeFalsy();
 
     request = makeReq("/", { HTTP_X_FORWARDED_PROTO: "wss" });
     expect(request.scheme).toBe("wss");
-    expect(request.ssl).toBe(true);
+    expect(request.ssl).toBeTruthy();
   });
 
   it("prevents scheme abuse", () => {
@@ -836,93 +978,130 @@ describe("RackRequestTest", () => {
   });
 
   it("parse cookies", () => {
-    const req = makeReq("/", { HTTP_COOKIE: "foo=bar; baz=qux" });
-    expect(req.cookies).toEqual({ foo: "bar", baz: "qux" });
+    const req = makeRequest(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar;quux=h&m" }));
+    expect(req.cookies).toEqual({ foo: "bar", quux: "h&m" });
+    req.deleteHeader("HTTP_COOKIE");
+    expect(req.cookies).toEqual({});
   });
 
   it("always return the same hash object", () => {
-    const req = makeReq("/", { HTTP_COOKIE: "foo=bar" });
-    expect(req.cookies).toBe(req.cookies);
+    const req = makeRequest(MockRequest.envFor("", { HTTP_COOKIE: "foo=bar;quux=h&m" }));
+    const hash = req.cookies;
+    delete req.env["HTTP_COOKIE"];
+    expect(req.cookies).toEqual(hash);
+    req.env["HTTP_COOKIE"] = "zoo=m";
+    expect(req.cookies).toEqual(hash);
   });
 
   it("modify the cookies hash in place", () => {
-    const req = makeReq("/", { HTTP_COOKIE: "foo=bar" });
-    req.cookies["new"] = "val";
-    expect(req.cookies["new"]).toBe("val");
+    const req = makeRequest(MockRequest.envFor(""));
+    expect(req.cookies).toEqual({});
+    req.cookies["foo"] = "bar";
+    expect(req.cookies).toEqual({ foo: "bar" });
   });
 
-  it("not modify the params hash in place", () => {
+  it("not modify the params hash in place", (ctx) => {
     const e = MockRequest.envFor("");
-    const req1 = new Request(e);
+    const req1 = makeRequest(e);
+    ctx.skip(
+      req1.isDelegate(),
+      "delegate requests don't cache params, so mutations have no impact",
+    );
     expect(req1.params).toEqual({});
     req1.params["foo"] = "bar";
     expect(req1.params).toEqual({ foo: "bar" });
-    const req2 = new Request(e);
+    const req2 = makeRequest(e);
     expect(req2.params).toEqual({});
   });
 
   it("modify params hash if param is in GET", () => {
-    const req = makeReq("/?foo=bar");
-    req.GET["foo"] = "modified";
-    expect(req.params["foo"]).toBe("modified");
+    const e = MockRequest.envFor("?foo=duh");
+    const req1 = makeRequest(e);
+    expect(req1.params).toEqual({ foo: "duh" });
+    req1.updateParam("foo", "bar");
+    expect(req1.params).toEqual({ foo: "bar" });
+    const req2 = makeRequest(e);
+    expect(req2.params).toEqual({ foo: "bar" });
   });
 
   it("modify params hash if param is in POST", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": "foo=bar",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    req.POST["foo"] = "modified";
-    expect(req.params["foo"]).toBe("modified");
+    const e = MockRequest.envFor("", { REQUEST_METHOD: "POST", ":input": "foo=duh" });
+    const req1 = makeRequest(e);
+    expect(req1.params).toEqual({ foo: "duh" });
+    req1.updateParam("foo", "bar");
+    expect(req1.params).toEqual({ foo: "bar" });
+    const req2 = makeRequest(e);
+    expect(req2.params).toEqual({ foo: "bar" });
   });
 
   it("modify params hash, even if param didn't exist before", () => {
-    const req = makeReq("/");
-    req.GET["new"] = "val";
-    expect(req.params["new"]).toBe("val");
+    const e = MockRequest.envFor("");
+    const req1 = makeRequest(e);
+    expect(req1.params).toEqual({});
+    req1.updateParam("foo", "bar");
+    expect(req1.params).toEqual({ foo: "bar" });
+    const req2 = makeRequest(e);
+    expect(req2.params).toEqual({ foo: "bar" });
   });
 
   it("modify params hash by changing only GET", () => {
-    const req = makeReq("/?foo=bar");
-    req.GET["foo"] = "updated";
-    expect(req.GET["foo"]).toBe("updated");
+    const e = MockRequest.envFor("?foo=duhget");
+    const req = makeRequest(e);
+    expect(req.GET).toEqual({ foo: "duhget" });
+    expect(req.POST).toEqual({});
+    req.updateParam("foo", "bar");
+    expect(req.GET).toEqual({ foo: "bar" });
+    expect(req.POST).toEqual({});
   });
 
   it("modify params hash by changing only POST", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": "foo=bar",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    req.POST["foo"] = "updated";
-    expect(req.POST["foo"]).toBe("updated");
+    const e = MockRequest.envFor("", { REQUEST_METHOD: "POST", ":input": "foo=duhpost" });
+    const req = makeRequest(e);
+    expect(req.GET).toEqual({});
+    expect(req.POST).toEqual({ foo: "duhpost" });
+    req.updateParam("foo", "bar");
+    expect(req.GET).toEqual({});
+    expect(req.POST).toEqual({ foo: "bar" });
   });
 
   it("modify params hash, even if param is defined in both POST and GET", () => {
-    const req = makeReq("/?foo=get", {
-      ":method": "POST",
-      ":input": "foo=post",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
+    const e = MockRequest.envFor("?foo=duhget", {
+      REQUEST_METHOD: "POST",
+      ":input": "foo=duhpost",
     });
-    req.POST["foo"] = "new_post";
-    expect(req.params["foo"]).toBe("new_post");
+    const req1 = makeRequest(e);
+    expect(req1.GET).toEqual({ foo: "duhget" });
+    expect(req1.POST).toEqual({ foo: "duhpost" });
+    expect(req1.params).toEqual({ foo: "duhpost" });
+    req1.updateParam("foo", "bar");
+    expect(req1.GET).toEqual({ foo: "bar" });
+    expect(req1.POST).toEqual({ foo: "bar" });
+    expect(req1.params).toEqual({ foo: "bar" });
+    const req2 = makeRequest(e);
+    expect(req2.GET).toEqual({ foo: "bar" });
+    expect(req2.POST).toEqual({ foo: "bar" });
+    expect(req2.params).toEqual({ foo: "bar" });
+    expect(req2.params).toEqual({ foo: "bar" });
   });
 
   it("allow deleting from params hash if param is in GET", () => {
-    const req = makeReq("/?foo=bar");
-    req.deleteParam("foo");
-    expect(req.GET["foo"]).toBeUndefined();
+    const e = MockRequest.envFor("?foo=bar");
+    const req1 = makeRequest(e);
+    expect(req1.params).toEqual({ foo: "bar" });
+    expect(req1.deleteParam("foo")).toBe("bar");
+    expect(req1.params).toEqual({});
+    const req2 = makeRequest(e);
+    expect(req2.params).toEqual({});
   });
 
   it("allow deleting from params hash if param is in POST", () => {
-    const req = makeReq("/", {
-      ":method": "POST",
-      ":input": "foo=bar",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-    });
-    req.deleteParam("foo");
-    expect(req.POST["foo"]).toBeUndefined();
+    const e = MockRequest.envFor("", { REQUEST_METHOD: "POST", ":input": "foo=bar" });
+    const req1 = makeRequest(e);
+    expect(req1.params).toEqual({ foo: "bar" });
+    expect(req1.deleteParam("foo")).toBe("bar");
+    expect(req1.params).toEqual({});
+    const req2 = makeRequest(e);
+    expect(req2.params).toEqual({});
   });
 
   it("pass through non-uri escaped cookies as-is", () => {
@@ -941,126 +1120,226 @@ describe("RackRequestTest", () => {
   });
 
   it("provide setters", () => {
-    const req = makeReq();
-    req.scriptName = "/app";
-    req.pathInfo = "/page";
-    expect(req.scriptName).toBe("/app");
-    expect(req.pathInfo).toBe("/page");
+    const e = MockRequest.envFor("");
+    const req = makeRequest(e);
+    expect(req.scriptName).toBe("");
+    req.scriptName = "/foo";
+    expect(req.scriptName).toBe("/foo");
+    expect(e["SCRIPT_NAME"]).toBe("/foo");
+
+    expect(req.pathInfo).toBe("/");
+    req.pathInfo = "/foo";
+    expect(req.pathInfo).toBe("/foo");
+    expect(e["PATH_INFO"]).toBe("/foo");
   });
 
   it("provide the original env", () => {
-    const env = makeEnv();
-    const req = new Request(env);
-    expect(req.env).toBe(env);
+    const e = MockRequest.envFor("");
+    const req = makeRequest(e);
+    expect(req.env).toEqual(e);
   });
 
   it("restore the base URL", () => {
-    const req = makeReq("http://example.org:8080/app/page?q=1", { ":script_name": "/app" });
-    expect(req.baseUrl).toContain("example.org");
+    expect(makeRequest(MockRequest.envFor("")).baseUrl).toBe("http://example.org");
+    expect(makeRequest(MockRequest.envFor("", { SCRIPT_NAME: "/foo" })).baseUrl).toBe(
+      "http://example.org",
+    );
   });
 
   it("restore the URL", () => {
-    const req = makeReq("http://example.org/page?q=1");
-    expect(req.url).toContain("example.org");
-    expect(req.url).toContain("page");
-    expect(req.url).toContain("q=1");
+    expect(makeRequest(MockRequest.envFor("")).url).toBe("http://example.org/");
+    expect(makeRequest(MockRequest.envFor("", { SCRIPT_NAME: "/foo" })).url).toBe(
+      "http://example.org/foo/",
+    );
+    expect(makeRequest(MockRequest.envFor("/foo")).url).toBe("http://example.org/foo");
+    expect(makeRequest(MockRequest.envFor("?foo")).url).toBe("http://example.org/?foo");
+    expect(makeRequest(MockRequest.envFor("http://example.org:8080/")).url).toBe(
+      "http://example.org:8080/",
+    );
+    expect(makeRequest(MockRequest.envFor("https://example.org/")).url).toBe(
+      "https://example.org/",
+    );
+    expect(makeRequest(MockRequest.envFor("coffee://example.org/")).url).toBe(
+      "coffee://example.org/",
+    );
+    expect(makeRequest(MockRequest.envFor("coffee://example.org:443/")).url).toBe(
+      "coffee://example.org:443/",
+    );
+    expect(makeRequest(MockRequest.envFor("https://example.com:8080/foo?foo")).url).toBe(
+      "https://example.com:8080/foo?foo",
+    );
   });
 
   it("restore the full path", () => {
-    const req = makeReq("/page?q=1");
-    expect(req.fullpath).toBe("/page?q=1");
+    expect(makeRequest(MockRequest.envFor("")).fullpath).toBe("/");
+    expect(makeRequest(MockRequest.envFor("", { SCRIPT_NAME: "/foo" })).fullpath).toBe("/foo/");
+    expect(makeRequest(MockRequest.envFor("/foo")).fullpath).toBe("/foo");
+    expect(makeRequest(MockRequest.envFor("?foo")).fullpath).toBe("/?foo");
+    expect(makeRequest(MockRequest.envFor("http://example.org:8080/")).fullpath).toBe("/");
+    expect(makeRequest(MockRequest.envFor("https://example.org/")).fullpath).toBe("/");
+
+    expect(makeRequest(MockRequest.envFor("https://example.com:8080/foo?foo")).fullpath).toBe(
+      "/foo?foo",
+    );
   });
 
   it("handle multiple media type parameters", () => {
-    const req = makeReq("/", { CONTENT_TYPE: "text/plain; charset=utf-8; boundary=something" });
-    expect(req.mediaType).toBe("text/plain");
-    expect(req.mediaTypeParams["charset"]).toBe("utf-8");
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE:
+          'text/plain; foo=BAR,baz=bizzle dizzle;BLING=bam;blong="boo";zump="zoo\\"o";weird=lol"',
+      }),
+    );
+    expect(req.formData).toBeFalsy();
+    expect(Object.keys(req.mediaTypeParams)).toContain("foo");
+    expect(req.mediaTypeParams["foo"]).toBe("BAR");
+    expect(Object.keys(req.mediaTypeParams)).toContain("baz");
+    expect(req.mediaTypeParams["baz"]).toBe("bizzle dizzle");
+    expect(Object.keys(req.mediaTypeParams)).not.toContain("BLING");
+    expect(Object.keys(req.mediaTypeParams)).toContain("bling");
+    expect(req.mediaTypeParams["bling"]).toBe("bam");
+    expect(req.mediaTypeParams["blong"]).toBe("boo");
+    expect(req.mediaTypeParams["zump"]).toBe('zoo\\"o');
+    expect(req.mediaTypeParams["weird"]).toBe('lol"');
   });
 
   it("returns the same error for invalid post inputs", () => {
     const env = {
       REQUEST_METHOD: "POST",
       PATH_INFO: "/foo",
-      "rack.input": {
-        read() {
-          return "invalid=bar&invalid[foo]=bar";
-        },
-      },
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
+      "rack.input": new StringIO("invalid=bar&invalid[foo]=bar"),
+      HTTP_CONTENT_TYPE: "application/x-www-form-urlencoded",
     };
-    expect(() => new Request(env).POST).toThrow();
-    expect(() => new Request(env).POST).toThrow();
+
+    for (let i = 0; i < 2; i++) {
+      expect(() => new Request(env).POST).toThrow(ParameterTypeError);
+    }
   });
 
   it("parse with junk before boundary", () => {
-    const boundary = "AaB03x";
-    const input = `blah blah\r\n\r\n--${boundary}\r\ncontent-disposition: form-data; name="reply"\r\n\r\nyes\r\n--${boundary}\r\ncontent-disposition: form-data; name="fileupload"; filename="dj.jpg"\r\ncontent-type: image/jpeg\r\ncontent-transfer-encoding: base64\r\n\r\n/9j/4AAQSkZJRgABAQAAAQABAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg\r\n--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(input),
-    };
-    const req = new Request(env);
+    const input = `blah blah\r
+\r
+--AaB03x\r
+content-disposition: form-data; name="reply"\r
+\r
+yes\r
+--AaB03x\r
+content-disposition: form-data; name="fileupload"; filename="dj.jpg"\r
+content-type: image/jpeg\r
+content-transfer-encoding: base64\r
+\r
+/9j/4AAQSkZJRgABAQAAAQABAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg\r
+--AaB03x--\r
+`;
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
     expect(Object.keys(req.POST)).toContain("fileupload");
     expect(Object.keys(req.POST)).toContain("reply");
 
-    expect(req.formData).toBe(true);
+    expect(req.formData).toBeTruthy();
+    expect(req.contentLength).toBe(input.length);
     expect(req.mediaType).toBe("multipart/form-data");
+    expect(Object.keys(req.mediaTypeParams)).toContain("boundary");
     expect(req.mediaTypeParams["boundary"]).toBe("AaB03x");
 
     expect(req.POST["reply"]).toBe("yes");
 
     const f = req.POST["fileupload"];
+    expect(f).toBeInstanceOf(Object);
     expect(f.type).toBe("image/jpeg");
     expect(f.filename).toBe("dj.jpg");
-    expect(f.tempfile).toBeDefined();
+    expect(Object.keys(f)).toContain("tempfile");
+    expect(f.tempfile.size()).toBe(76);
   });
 
   it("not infinite loop with a malformed HTTP request", () => {
-    const boundary = "AaB03x";
-    const input = `--${boundary}\ncontent-disposition: form-data; name="reply"\n\nyes\n--${boundary}\ncontent-disposition: form-data; name="fileupload"; filename="dj.jpg"\ncontent-type: image/jpeg\n\n/9j/4AAQ\n--${boundary}--\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(input),
-    };
-    const req = new Request(env);
-    try {
-      void req.POST;
-    } catch {
-      /** @empty */
-    }
+    const input = `--AaB03x
+content-disposition: form-data; name="reply"
+
+yes
+--AaB03x
+content-disposition: form-data; name="fileupload"; filename="dj.jpg"
+content-type: image/jpeg
+content-transfer-encoding: base64
+
+/9j/4AAQSkZJRgABAQAAAQABAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg
+--AaB03x--
+`;
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
+    expect(() => req.POST).toThrow(EOFError);
   });
 
   it("parse multipart form data", () => {
-    const boundary = "AaB03x";
-    const input = `--${boundary}\r\ncontent-disposition: form-data; name="reply"\r\n\r\nyes\r\n--${boundary}\r\ncontent-disposition: form-data; name="fileupload"; filename="dj.jpg"\r\ncontent-type: image/jpeg\r\ncontent-transfer-encoding: base64\r\n\r\n/9j/4AAQSkZJRgABAQAAAQABAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg\r\n--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(input),
-    };
-    const req = new Request(env);
-    expect(req.POST["reply"]).toBe("yes");
-    expect(req.POST["fileupload"]).toBeDefined();
-    expect(req.POST["fileupload"].filename).toBe("dj.jpg");
-    expect(req.POST["fileupload"].type).toBe("image/jpeg");
-    expect(req.formData).toBe(true);
+    const input = `--AaB03x\r
+content-disposition: form-data; name="reply"\r
+\r
+yes\r
+--AaB03x\r
+content-disposition: form-data; name="fileupload"; filename="dj.jpg"\r
+content-type: image/jpeg\r
+content-transfer-encoding: base64\r
+\r
+/9j/4AAQSkZJRgABAQAAAQABAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg\r
+--AaB03x--\r
+`;
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
+    expect(Object.keys(req.POST)).toContain("fileupload");
+    expect(Object.keys(req.POST)).toContain("reply");
+
+    expect(req.formData).toBeTruthy();
+    expect(req.contentLength).toBe(input.length);
     expect(req.mediaType).toBe("multipart/form-data");
+    expect(Object.keys(req.mediaTypeParams)).toContain("boundary");
     expect(req.mediaTypeParams["boundary"]).toBe("AaB03x");
+
+    expect(req.POST["reply"]).toBe("yes");
+
+    const f = req.POST["fileupload"];
+    expect(f).toBeInstanceOf(Object);
+    expect(f.type).toBe("image/jpeg");
+    expect(f.filename).toBe("dj.jpg");
+    expect(Object.keys(f)).toContain("tempfile");
+    expect(f.tempfile.size()).toBe(76);
+
+    expect(req.env["rack.request.form_pairs"]).toEqual([
+      ["reply", "yes"],
+      ["fileupload", f],
+    ]);
   });
 
   it("parse multipart delimiter-only boundary", () => {
-    const boundary = "AaB03x";
-    const input = `--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(input),
-    };
-    const req = new Request(env);
-    expect(req.POST).toEqual({});
-    expect(req.GET).toEqual({});
+    const input = `--AaB03x--\r
+`;
+    const mr = MockRequest.envFor("/", {
+      CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+      CONTENT_LENGTH: input.length,
+      ":input": input,
+    });
+
+    const req = makeRequest(mr);
+    expect(req.queryString).toBe("");
+    expect(isEmpty(req.GET)).toBeTruthy();
+    expect(isEmpty(req.POST)).toBeTruthy();
     expect(req.params).toEqual({});
   });
 
@@ -1081,7 +1360,7 @@ describe("RackRequestTest", () => {
     };
     setMultipartFileLimit(5);
     try {
-      const req = new Request(env);
+      const req = makeRequest(env);
       expect(() => req.POST).toThrow(MultipartPartLimitError);
     } finally {
       setMultipartFileLimit(128);
@@ -1103,7 +1382,7 @@ describe("RackRequestTest", () => {
     };
     setMultipartTotalPartLimit(5);
     try {
-      const req = new Request(env);
+      const req = makeRequest(env);
       expect(() => req.POST).toThrow(MultipartTotalPartLimitError);
     } finally {
       setMultipartTotalPartLimit(4096);
@@ -1111,76 +1390,129 @@ describe("RackRequestTest", () => {
   });
 
   it("closes tempfiles it created in the case of too many created", () => {
-    const boundary = "AaB03x";
-    const parts = [];
-    for (let i = 0; i < 10; i++) {
-      parts.push(
-        `--${boundary}\r\ncontent-disposition: form-data; name="f${i}"; filename="f${i}.txt"\r\ncontent-type: text/plain\r\n\r\ndata\r\n`,
-      );
-    }
-    parts.push(`--${boundary}--\r\n`);
-    const body = parts.join("");
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(body),
+    const hex = (): string =>
+      Array.from({ length: 10 }, () =>
+        Math.floor(Math.random() * 256)
+          .toString(16)
+          .padStart(2, "0"),
+      ).join("");
+    let data = Array.from(
+      { length: 10000 },
+      () =>
+        `--AaB03x\r\ncontent-type: text/plain\r\ncontent-disposition: attachment; name=${hex()}; filename=${hex()}\r\n\r\ncontents\r\n`,
+    ).join("\r\n");
+    data += "--AaB03x--\r";
+
+    const files: Tempfile[] = [];
+    const options = {
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+      CONTENT_LENGTH: String(data.length),
+      [RACK_MULTIPART_TEMPFILE_FACTORY]: (filename: string, _contentType: string) => {
+        const file = Tempfile.new(["RackMultipart", File.extname(filename)]);
+        files.push(file);
+        return file;
+      },
+      ":input": new StringIO(data),
     };
-    setMultipartFileLimit(5);
-    try {
-      const req = new Request(env);
-      expect(() => req.POST).toThrow(MultipartPartLimitError);
-    } finally {
-      setMultipartFileLimit(128);
-    }
+
+    const request = makeRequest(MockRequest.envFor("/", options));
+    expect(() => request.POST).toThrow(MultipartPartLimitError);
+    expect(files.length === 0).toBeFalsy();
+    files.forEach((f) => expect(f.isClosed()).toBeTruthy());
   });
 
   it("parse big multipart form data", () => {
-    const boundary = "AaB03x";
-    const bigData = "x".repeat(32768);
-    const input = `--${boundary}\r\ncontent-disposition: form-data; name="huge"; filename="huge"\r\n\r\n${bigData}\r\n--${boundary}\r\ncontent-disposition: form-data; name="mean"; filename="mean"\r\n\r\n--AaB03xha\r\n--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(input),
-    };
-    const req = new Request(env);
-    expect(req.POST["huge"].tempfile.read().length).toBe(32768);
-    req.POST["huge"].tempfile.rewind();
+    const input = `--AaB03x\r
+content-disposition: form-data; name="huge"; filename="huge"\r
+\r
+${"x".repeat(32768)}\r
+--AaB03x\r
+content-disposition: form-data; name="mean"; filename="mean"\r
+\r
+--AaB03xha\r
+--AaB03x--\r
+`;
+    const req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
+    expect(req.POST["huge"].tempfile.size()).toBe(32768);
+    expect(req.POST["mean"].tempfile.size()).toBe(10);
     expect(req.POST["mean"].tempfile.read()).toBe("--AaB03xha");
   });
 
   it("record tempfiles from multipart form data in env[rack.tempfiles]", () => {
-    const boundary = "AaB03x";
-    const input = `--${boundary}\r\ncontent-disposition: form-data; name="f1"; filename="foo.jpg"\r\ncontent-type: image/jpeg\r\n\r\ndata1\r\n--${boundary}\r\ncontent-disposition: form-data; name="f2"; filename="bar.jpg"\r\ncontent-type: image/jpeg\r\n\r\ndata2\r\n--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(input),
-    };
-    const req = new Request(env);
-    void req.POST;
-    expect(req.POST["f1"].filename).toBe("foo.jpg");
-    expect(req.POST["f2"].filename).toBe("bar.jpg");
+    const input = `--AaB03x\r
+content-disposition: form-data; name="fileupload"; filename="foo.jpg"\r
+content-type: image/jpeg\r
+content-transfer-encoding: base64\r
+\r
+/9j/4AAQSkZJRgABAQAAAQABAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg\r
+--AaB03x\r
+content-disposition: form-data; name="fileupload"; filename="bar.jpg"\r
+content-type: image/jpeg\r
+content-transfer-encoding: base64\r
+\r
+/9j/4AAQSkZJRgABAQAAAQABAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg\r
+--AaB03x--\r
+`;
+    const env = MockRequest.envFor("/", {
+      CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+      CONTENT_LENGTH: input.length,
+      ":input": input,
+    });
+    const req = makeRequest(env);
+    void req.params;
+    expect(env["rack.tempfiles"].length).toBe(2);
   });
 
   it("detect invalid multipart form data", () => {
-    const boundary = "AaB03x";
-    const input = `--${boundary}\r\ncontent-disposition: form-data; name="huge"; filename="huge"\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(input),
-    };
-    const req = new Request(env);
-    expect(() => req.POST).toThrow(EmptyContentError);
+    let input = `--AaB03x\r
+content-disposition: form-data; name="huge"; filename="huge"\r
+`;
+    let req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
 
-    const input2 = `--${boundary}\r\ncontent-disposition: form-data; name="huge"; filename="huge"\r\n\r\nfoo\r\n`;
-    const env2 = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
-      "rack.input": new StringIO(input2),
-    };
-    expect(() => new Request(env2).POST).toThrow(EmptyContentError);
+    expect(() => req.POST).toThrow(EOFError);
+
+    input = `--AaB03x\r
+content-disposition: form-data; name="huge"; filename="huge"\r
+\r
+foo\r
+`;
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
+    expect(() => req.POST).toThrow(EOFError);
+
+    input = `--AaB03x\r
+content-disposition: form-data; name="huge"; filename="huge"\r
+\r
+foo\r
+`;
+    req = makeRequest(
+      MockRequest.envFor("/", {
+        CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+        CONTENT_LENGTH: input.length,
+        ":input": input,
+      }),
+    );
+
+    expect(() => req.POST).toThrow(EOFError);
   });
 
   it("consistently raise EOFError on bad multipart form data", () => {
@@ -1191,7 +1523,7 @@ describe("RackRequestTest", () => {
       CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
       "rack.input": new StringIO(input),
     };
-    const req = new Request(env);
+    const req = makeRequest(env);
     expect(() => req.POST).toThrow(EmptyContentError);
     expect(() => req.POST).toThrow(EmptyContentError);
   });
@@ -1204,7 +1536,7 @@ describe("RackRequestTest", () => {
       CONTENT_TYPE: `multipart/related; boundary=${boundary}`,
       "rack.input": new StringIO(input),
     };
-    const req = new Request(env);
+    const req = makeRequest(env);
     expect(Object.keys(req.POST)).toEqual(["<soap-start>"]);
   });
 
@@ -1227,7 +1559,7 @@ describe("RackRequestTest", () => {
         },
       },
     };
-    const req = new Request(env);
+    const req = makeRequest(env);
     expect(req.POST["fileupload"].tempfile.read().length).toBe(4);
   });
 
@@ -1244,42 +1576,96 @@ describe("RackRequestTest", () => {
       "rack.request.form_input": rackInput,
       "rack.input": rackInput,
     };
-    const req = new Request(env);
+    const req = makeRequest(env);
     expect(req.POST).toBe(formHash);
   });
 
-  it("conform to the Rack spec", () => {
-    const boundary = "AaB03x";
-    const input = `--${boundary}\r\ncontent-disposition: form-data; name="reply"\r\n\r\nyes\r\n--${boundary}\r\ncontent-disposition: form-data; name="fileupload"; filename="dj.jpg"\r\ncontent-type: image/jpeg\r\ncontent-transfer-encoding: base64\r\n\r\n/9j/4AAQSkZJRgABAQAAAQABAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg\r\n--${boundary}--\r\n`;
-    const env = {
-      ...makeEnv(),
-      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
+  it("conform to the Rack spec", async () => {
+    const app = (env: Record<string, any>) => {
+      const content = rbInspect(makeRequest(env).POST["file"]);
+      const size = content.length;
+      return [200, { "content-type": "text/html", "content-length": String(size) }, [content]];
+    };
+
+    const input = `--AaB03x\r
+content-disposition: form-data; name="reply"\r
+\r
+yes\r
+--AaB03x\r
+content-disposition: form-data; name="fileupload"; filename="dj.jpg"\r
+content-type: image/jpeg\r
+content-transfer-encoding: base64\r
+\r
+/9j/4AAQSkZJRgABAQAAAQABAAD//gA+Q1JFQVRPUjogZ2QtanBlZyB2MS4wICh1c2luZyBJSkcg\r
+--AaB03x--\r
+`;
+    const res = await new MockRequest(new Lint(app)).get("/", {
+      CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
       CONTENT_LENGTH: String(input.length),
       "rack.input": new StringIO(input),
-    };
-    const req = new Request(env);
-    const file = req.POST["fileupload"];
-    expect(file).toBeDefined();
-    expect(file.filename).toBe("dj.jpg");
-    expect(file.type).toBe("image/jpeg");
+    });
+
+    expect(res.isOk).toBeTruthy();
   });
 
   it("parse Accept-Encoding correctly", () => {
-    const req = makeReq("/", { HTTP_ACCEPT_ENCODING: "gzip;q=1.0, deflate;q=0.5" });
-    const ae = req.acceptEncoding;
-    expect(ae).toEqual([
+    const parser = (x: string | null) =>
+      makeRequest(MockRequest.envFor("", { HTTP_ACCEPT_ENCODING: x })).acceptEncoding;
+
+    expect(parser(null)).toEqual([]);
+
+    expect(parser("compress, gzip")).toEqual([
+      ["compress", 1.0],
       ["gzip", 1.0],
-      ["deflate", 0.5],
     ]);
+    expect(parser("")).toEqual([]);
+    expect(parser("*")).toEqual([["*", 1.0]]);
+    expect(parser("compress;q=0.5, gzip;q=1.0")).toEqual([
+      ["compress", 0.5],
+      ["gzip", 1.0],
+    ]);
+    expect(parser("gzip;q=1.0, identity; q=0.5, *;q=0")).toEqual([
+      ["gzip", 1.0],
+      ["identity", 0.5],
+      ["*", 0],
+    ]);
+
+    expect(parser("gzip ; q=0.9")).toEqual([["gzip", 0.9]]);
+    expect(parser("gzip ; deflate")).toEqual([["gzip", 1.0]]);
+
+    expect(parser(", ")).toEqual([]);
+    expect(parser(", gzip")).toEqual([["gzip", 1.0]]);
+    expect(parser("gzip, ")).toEqual([["gzip", 1.0]]);
   });
 
   it("parse Accept-Language correctly", () => {
-    const req = makeReq("/", { HTTP_ACCEPT_LANGUAGE: "en;q=0.9, fr;q=0.8" });
-    const al = req.acceptLanguage;
-    expect(al).toEqual([
-      ["en", 0.9],
-      ["fr", 0.8],
+    const parser = (x: string | null) =>
+      makeRequest(MockRequest.envFor("", { HTTP_ACCEPT_LANGUAGE: x })).acceptLanguage;
+
+    expect(parser(null)).toEqual([]);
+
+    expect(parser("fr, en")).toEqual([
+      ["fr", 1.0],
+      ["en", 1.0],
     ]);
+    expect(parser("")).toEqual([]);
+    expect(parser("*")).toEqual([["*", 1.0]]);
+    expect(parser("fr;q=0.5, en;q=1.0")).toEqual([
+      ["fr", 0.5],
+      ["en", 1.0],
+    ]);
+    expect(parser("fr;q=1.0, en; q=0.5, *;q=0")).toEqual([
+      ["fr", 1.0],
+      ["en", 0.5],
+      ["*", 0],
+    ]);
+
+    expect(parser("fr ; q=0.9")).toEqual([["fr", 0.9]]);
+    expect(parser("fr")).toEqual([["fr", 1.0]]);
+
+    expect(parser(", ")).toEqual([]);
+    expect(parser(", en")).toEqual([["en", 1.0]]);
+    expect(parser("en, ")).toEqual([["en", 1.0]]);
   });
 
   it("provide ip information", () => {
@@ -1349,12 +1735,9 @@ describe("RackRequestTest", () => {
   it("uses a custom trusted proxy filter", () => {
     const oldIp = Request.ipFilter;
     Request.ipFilter = (ip: string | undefined) => ip === "foo";
-    try {
-      const req = makeReq("/");
-      expect(req.trustedProxy("foo")).toBe(true);
-    } finally {
-      Request.ipFilter = oldIp;
-    }
+    const req = makeRequest(MockRequest.envFor("/"));
+    expect(req.trustedProxy("foo")).toBeTruthy();
+    Request.ipFilter = oldIp;
   });
 
   it("regards local addresses as proxies", () => {
@@ -1399,126 +1782,191 @@ describe("RackRequestTest", () => {
   });
 
   it("sets the default session to an empty hash", () => {
-    const req = makeReq();
-    expect(req.session).toEqual({});
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+    const session = req.session;
+    expect(session).toEqual({});
+    expect(req.env["rack.session"]).toBe(session);
   });
 
   it("sets the default session options to an empty hash", () => {
-    const req = makeReq();
+    const req = makeRequest(MockRequest.envFor("http://example.com:8080/"));
+    const sessionOptions = req.sessionOptions;
+    expect(sessionOptions).toEqual({});
+    expect(req.env["rack.session.options"]).toBe(sessionOptions);
     expect(req.sessionOptions).toEqual({});
   });
 
+  class MyRequest extends Request {
+    get params(): Record<string, any> {
+      return { foo: "bar" };
+    }
+  }
+
   it("allow subclass request to be instantiated after parent request", () => {
-    class SubRequest extends Request {}
-    const env = makeEnv();
-    const _parent = new Request(env);
-    const sub = new SubRequest(env);
-    expect(sub).toBeInstanceOf(SubRequest);
-    expect(sub).toBeInstanceOf(Request);
+    const env = MockRequest.envFor("/?foo=bar");
+
+    const req1 = makeRequest(env);
+    expect(req1.GET).toEqual({ foo: "bar" });
+    expect(req1.params).toEqual({ foo: "bar" });
+
+    const req2 = new MyRequest(env);
+    expect(req2.GET).toEqual({ foo: "bar" });
+    expect(req2.params).toEqual({ foo: "bar" });
   });
 
   it("allow parent request to be instantiated after subclass request", () => {
-    class SubRequest extends Request {}
-    const env = makeEnv();
-    const _sub = new SubRequest(env);
-    const parent = new Request(env);
-    expect(parent).toBeInstanceOf(Request);
+    const env = MockRequest.envFor("/?foo=bar");
+
+    const req1 = new MyRequest(env);
+    expect(req1.GET).toEqual({ foo: "bar" });
+    expect(req1.params).toEqual({ foo: "bar" });
+
+    const req2 = makeRequest(env);
+    expect(req2.GET).toEqual({ foo: "bar" });
+    expect(req2.params).toEqual({ foo: "bar" });
   });
 
   it("raise TypeError every time if request parameters are broken", () => {
-    const req = makeReq("/?foo%5B%5D=0&foo%5Bbar%5D=1");
-    expect(() => req.GET).toThrow();
+    const brokenQuery = MockRequest.envFor("/?foo%5B%5D=0&foo%5Bbar%5D=1");
+    const req = makeRequest(brokenQuery);
+    expect(() => req.GET).toThrow(TypeError);
+    expect(() => req.params).toThrow(TypeError);
   });
 
   it("not strip '' => '' => '' escaped character from parameters when accessed as string", () => {
-    const req = makeReq("/?foo=%22bar%22");
-    expect(req.GET["foo"]).toBe('"bar"');
+    for (let a = 0x20; a < 0x7e; a++) {
+      const b = String.fromCharCode(a);
+      const c = escape(b);
+      const url = `/?foo=${c}bar${c}`;
+      const env = MockRequest.envFor(url);
+      const req2 = makeRequest(env);
+      expect(req2.GET).toEqual({ foo: `${b}bar${b}` });
+      expect(req2.params).toEqual({ foo: `${b}bar${b}` });
+    }
   });
 
   it("handles ASCII NUL input of  bytes", () => {
-    const length = 256;
-    const req = makeReq("/", {
-      ":method": "POST",
+    const length = 2 ** 24;
+    const mr = MockRequest.envFor("/", {
+      REQUEST_METHOD: "POST",
       ":input": "\0".repeat(length),
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
+    const req = makeRequest(mr);
+    expect(req.queryString).toBe("");
+    expect(isEmpty(req.GET)).toBeTruthy();
     const keys = Object.keys(req.POST);
     expect(keys.length).toBe(1);
-    expect(keys[0]).toContain("\0");
-  });
+    expect(keys[0].length).toBe(length - 1);
+    expect(keys[0]).toBe("\0".repeat(length - 1));
+  }, 60_000);
 
   it("Env sets @env on initialization", () => {
-    const env = makeEnv();
-    const req = new Request(env);
-    expect(req.env).toBe(env);
+    const c = class {
+      env: Record<string, any>;
+
+      constructor(env: Record<string, any>) {
+        this.env = env;
+      }
+    };
+    include(c, Env);
+    const h = {};
+    expect(new c(h).env).toBe(h);
   });
 
   it("return values for the keys in the order given from values_at", () => {
-    const req = makeReq("/?foo=baz&wun=der&bar=ful");
-    expect(req.valuesAt("foo")).toEqual(["baz"]);
-    expect(req.valuesAt("foo", "wun")).toEqual(["baz", "der"]);
-    expect(req.valuesAt("bar", "foo", "wun")).toEqual(["ful", "baz", "der"]);
-  });
+    const req = makeRequest(MockRequest.envFor("?foo=baz&wun=der&bar=ful"));
 
-  it("expose the HTTP_HOST as hostAuthority", () => {
-    const req = makeReq("/", { HTTP_HOST: "example.com:8080" });
-    expect(req.hostAuthority).toBe("example.com:8080");
-    expect(makeReq("/").hostAuthority).toBeNull();
-  });
-
-  it("detect parseable data media types", () => {
-    expect(makeReq("/", { CONTENT_TYPE: "multipart/related" }).isParseableData()).toBe(true);
-    expect(makeReq("/", { CONTENT_TYPE: "multipart/mixed" }).isParseableData()).toBe(true);
-    expect(makeReq("/", { CONTENT_TYPE: "multipart/form-data" }).isParseableData()).toBe(false);
-    expect(makeReq("/", { CONTENT_TYPE: "application/json" }).isParseableData()).toBe(false);
-  });
-
-  it("restore the path as scriptName + pathInfo", () => {
-    const req = makeReq("http://example.com/foo/bar?q=1");
-    req.env["SCRIPT_NAME"] = "/app";
-    expect(req.path).toBe("/app/foo/bar");
-  });
-
-  it("respond to isLink, isTrace, isUnlink", () => {
-    expect(new Request({ REQUEST_METHOD: "LINK" }).isLink()).toBe(true);
-    expect(new Request({ REQUEST_METHOD: "LINK" }).isTrace()).toBe(false);
-    expect(new Request({ REQUEST_METHOD: "TRACE" }).isTrace()).toBe(true);
-    expect(new Request({ REQUEST_METHOD: "TRACE" }).isLink()).toBe(false);
-    expect(new Request({ REQUEST_METHOD: "UNLINK" }).isUnlink()).toBe(true);
-    expect(new Request({ REQUEST_METHOD: "UNLINK" }).isLink()).toBe(false);
-  });
-
-  it("return the logger from the env", () => {
-    const fakeLogger = { info: () => {} };
-    const req = new Request({ "rack.logger": fakeLogger });
-    expect(req.logger).toBe(fakeLogger);
-
-    const req2 = new Request({});
-    expect(req2.logger).toBeNull();
-  });
-
-  it("return content_charset from media type params", () => {
-    const req = new Request({
-      REQUEST_METHOD: "POST",
-      CONTENT_TYPE: "text/plain;charset=utf-8",
+    captureWarnings((warnings) => {
+      expect(req.valuesAt("foo")).toEqual(["baz"]);
+      expect(req.valuesAt("foo", "wun")).toEqual(["baz", "der"]);
+      expect(req.valuesAt("bar", "foo", "wun")).toEqual(["ful", "baz", "der"]);
+      expect(String(warnings.at(-1)![0])).toMatch(/deprecated/);
     });
-    expect(req.contentCharset).toBe("utf-8");
 
-    const req2 = new Request({ REQUEST_METHOD: "GET" });
-    expect(req2.contentCharset).toBeNull();
+    // eslint-disable-next-line vitest/no-conditional-in-test -- mirrors spec_request.rb:808 `next if self.class == TestProxyRequest`
+    if (req.isDelegate()) return;
+
+    captureWarnings((warnings) => {
+      expect(req.valuesAt("foo")).toEqual(["baz"]);
+      expect(warnings.pop()).toEqual([
+        "Request#values_at is deprecated and will be removed in a future version of Rack. Please use request.params.values_at instead",
+        { uplevel: 1 },
+      ]);
+    });
   });
+}
+describe("RackRequestTest", () => {
+  class NonDelegate extends Request {
+    isDelegate(): boolean {
+      return false;
+    }
 
-  it("return server_name from the env", () => {
-    const req = new Request({ SERVER_NAME: "example.org", SERVER_PORT: "9292" });
-    expect(req.serverName).toBe("example.org");
+    override queryParser = (): QueryParser =>
+      QueryParser.makeDefault(paramDepthLimit(), { bytesizeLimit: 2 ** 30 });
+  }
 
-    const req2 = new Request({});
-    expect(req2.serverName).toBeNull();
-  });
+  rackRequestTests((env) => new NonDelegate(env));
 
-  it("return hostname from authority", () => {
-    expect(makeReq("/", { HTTP_HOST: "example.org" }).hostname).toBe("example.org");
-    expect(makeReq("/", { HTTP_HOST: "example.org:8080" }).hostname).toBe("example.org");
-    expect(makeReq("/", { SERVER_NAME: "myserver", SERVER_PORT: "80" }).hostname).toBe("myserver");
+  describe("TestProxyRequest", () => {
+    /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`spec_request.rb:1924`). */
+    class DelegateRequest {
+      req: Request;
+
+      constructor(req: Request) {
+        this.req = req;
+      }
+
+      get env(): Record<string, any> {
+        return this.req.env;
+      }
+
+      hasHeader(name: string): boolean {
+        return this.req.hasHeader(name);
+      }
+
+      getHeader(name: string): any {
+        return this.req.getHeader(name);
+      }
+
+      fetchHeader(name: string, block?: (key: string) => any): any {
+        return block ? this.req.fetchHeader(name, block) : this.req.fetchHeader(name);
+      }
+
+      eachHeader(callback: (key: string, value: any) => void): void {
+        this.req.eachHeader(callback);
+      }
+
+      setHeader(name: string, v: any): any {
+        return this.req.setHeader(name, v);
+      }
+
+      addHeader(key: string, v: string | null): any {
+        return this.req.addHeader(key, v);
+      }
+
+      deleteHeader(name: string): any {
+        return this.req.deleteHeader(name);
+      }
+
+      valuesAt(...keys: string[]): any[] {
+        return this.req.valuesAt(...keys);
+      }
+
+      isDelegate(): boolean {
+        return true;
+      }
+
+      queryParser(): QueryParser {
+        return QueryParser.makeDefault(paramDepthLimit(), { bytesizeLimit: 2 ** 30 });
+      }
+    }
+    include(DelegateRequest, Helpers);
+    /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- see above. */
+    interface DelegateRequest extends Omit<
+      Helpers,
+      "env" | "getHeader" | "setHeader" | "fetchHeader"
+    > {}
+
+    rackRequestTests((env) => new DelegateRequest(new NonDelegate(env)));
   });
 });
