@@ -202,6 +202,21 @@ describe("harvestObjectLiteralMethods", () => {
     ]);
   });
 
+  it("reads an unset slot beside a method as an attr_accessor", () => {
+    const methods = objectLiteralMethods(
+      `export const Behavior = {
+        controller: undefined as object | undefined,
+        rendered: null as string | null,
+        render(): void {},
+      };`,
+    );
+    expect(methods.map((m) => m.name)).toEqual(["controller", "rendered", "render"]);
+  });
+
+  it("reads a holder of unset slots alone as no module", () => {
+    expect(objectLiteralMethods(`export const _allocation = { klass: null };`)).toEqual([]);
+  });
+
   it("records a plain-object module's [initialize] hook", () => {
     const methods = objectLiteralMethods(
       `declare const initialize: unique symbol;
@@ -3430,6 +3445,25 @@ describe("extractFromProgram — include() detection", () => {
     expect([internal("base.ts"), internal("autosave.ts"), internal("persistence.ts")]).toEqual([
       0, 1, 1,
     ]);
+  });
+
+  it("credits an `included do` hook's attribute macro and `helper do` defs to the module", () => {
+    const info = extractFromFiles("/p", {
+      "translation-helper.ts": `
+        import { classAttribute } from "@blazetrails/activesupport";
+        export const TranslationHelper = { translate() {} } as { translate(): void };
+        (TranslationHelper as any).included(null, function (this: any) {
+          classAttribute.call(this, "debugMissingTranslation");
+          this.helper((helper: object) => {
+            Object.assign(helper, { isProtectAgainstForgery(): boolean { return false; } });
+          });
+        });
+      `,
+    });
+    const mod = info.modules["translation-helper.ts:TranslationHelper"];
+    expect(mod.instanceMethods.map((m) => m.name)).toEqual(
+      expect.arrayContaining(["debugMissingTranslation", "isProtectAgainstForgery"]),
+    );
   });
 
   it("records `export const X = { ... }` as a module with method names", () => {

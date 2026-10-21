@@ -2,14 +2,29 @@
 import "../test-helpers/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TimeZone, assertMatch, assertRaises, isHtmlSafe } from "@blazetrails/activesupport";
-import { ArgumentError, Range, Struct } from "@blazetrails/ruby-compat";
+import { ArgumentError, Enumerable, Hash, Range, Struct, include } from "@blazetrails/ruby-compat";
 import { Date as RubyDate } from "@blazetrails/date";
 import { Errors } from "@blazetrails/activemodel";
 
 import { Base } from "../base.js";
+import { FormBuilder } from "../helpers/form-helper.js";
 import { LookupContext } from "../lookup-context.js";
 import type { TextHelperHost } from "../helpers/text-helper.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
+
+class Map extends Hash<string, unknown> {
+  get category(): string {
+    return "<mus>";
+  }
+}
+
+class CustomEnumerable {
+  each(block: (item: string) => void): void {
+    block("one");
+    block("two");
+  }
+}
+include(CustomEnumerable, Enumerable);
 
 const Post = Struct.new(
   "title",
@@ -215,7 +230,7 @@ describe("FormOptionsHelperTest", () => {
     view.post = new Post();
     view.post.author_name = "Babe";
 
-    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: FormBuilder) => {
       view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
     });
 
@@ -229,7 +244,7 @@ describe("FormOptionsHelperTest", () => {
     view.post = new Post();
     view.post.author_name = "Babe";
 
-    const outputBuffer = view.fieldsFor("post", view.post, { index: 815 }, (f: any) => {
+    const outputBuffer = view.fieldsFor("post", view.post, { index: 815 }, (f: FormBuilder) => {
       view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
     });
 
@@ -244,7 +259,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.author_name = "Babe";
     view.post.toParam = () => 815;
 
-    const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: FormBuilder) => {
       view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
     });
 
@@ -437,7 +452,7 @@ describe("FormOptionsHelperTest", () => {
     view.post = new Post();
     view.post.origin = "dk";
 
-    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: FormBuilder) => {
       view.concat(
         f.groupedCollectionSelect(
           "origin",
@@ -524,7 +539,7 @@ describe("FormOptionsHelperTest", () => {
   it("weekday select under fields for", () => {
     view.digest = new Digest();
 
-    const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: FormBuilder) => {
       view.concat(f.weekdaySelect("send_day"));
     });
 
@@ -538,7 +553,7 @@ describe("FormOptionsHelperTest", () => {
     view.digest = new Digest();
     view.digest.send_day = "Monday";
 
-    const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: FormBuilder) => {
       view.concat(f.weekdaySelect("send_day"));
     });
 
@@ -621,7 +636,7 @@ describe("FormOptionsHelperTest", () => {
   it("time zone select under fields for", () => {
     view.firm = new Firm("D");
 
-    const outputBuffer = view.fieldsFor("firm", view.firm, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("firm", view.firm, {}, (f: FormBuilder) => {
       view.concat(f.timeZoneSelect("time_zone"));
     });
 
@@ -634,7 +649,7 @@ describe("FormOptionsHelperTest", () => {
   it("time zone select under fields for with index", () => {
     view.firm = new Firm("D");
 
-    const outputBuffer = view.fieldsFor("firm", view.firm, { index: 305 }, (f: any) => {
+    const outputBuffer = view.fieldsFor("firm", view.firm, { index: 305 }, (f: FormBuilder) => {
       view.concat(f.timeZoneSelect("time_zone"));
     });
 
@@ -648,7 +663,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm = new Firm("D");
     view.firm.toParam = () => 305;
 
-    const outputBuffer = view.fieldsFor("firm[]", view.firm, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("firm[]", view.firm, {}, (f: FormBuilder) => {
       view.concat(f.timeZoneSelect("time_zone"));
     });
 
@@ -1238,7 +1253,7 @@ describe("FormOptionsHelperTest", () => {
 
   it("select under fields for with index", () => {
     newPost("<mus>");
-    const outputBuffer = view.fieldsFor("post", view.post, { index: 108 }, (f: any) => {
+    const outputBuffer = view.fieldsFor("post", view.post, { index: 108 }, (f: FormBuilder) => {
       view.concat(f.select("category", abeMusHest));
     });
     assertDomEqual(
@@ -1253,7 +1268,7 @@ describe("FormOptionsHelperTest", () => {
   it("select under fields for with auto index", () => {
     newPost("<mus>");
     view.post.toParam = () => 108;
-    const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: FormBuilder) => {
       view.concat(f.select("category", abeMusHest));
     });
     assertDomEqual(
@@ -1270,7 +1285,7 @@ describe("FormOptionsHelperTest", () => {
     const options = view.raw(
       '<option value="abe">abe</option><option value="mus">mus</option><option value="hest">hest</option>',
     );
-    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: FormBuilder) => {
       view.concat(f.select("category", options, { prompt: "The prompt" }));
     });
     assertDomEqual(postCategory(`<option value="">The prompt</option>\n${options}`), outputBuffer);
@@ -1278,7 +1293,7 @@ describe("FormOptionsHelperTest", () => {
 
   it("select under fields for with block", () => {
     view.post = new Post();
-    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: FormBuilder) => {
       view.concat(
         f.select("category", null, {}, {}, () => {
           view.concat(view.contentTag("option", "hello world"));
@@ -1290,7 +1305,7 @@ describe("FormOptionsHelperTest", () => {
 
   it("select under fields for with block without options", () => {
     view.post = new Post();
-    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: FormBuilder) => {
       view.concat(f.select("category", null, {}, {}, () => {}));
     });
     assertDomEqual(postCategory(""), outputBuffer);
@@ -1595,5 +1610,277 @@ describe("FormOptionsHelperTest", () => {
       '<select id="post_locale" name="post[locale]"><option value="en">en</option>\n<option value="ru" selected="selected">ru</option></select>',
       select("post", "locale", ["en", "ru"], { selected: "ru" }),
     );
+  });
+
+  it("select without multiple", () => {
+    assertDomEqual(
+      '<select id="post_category" name="post[category]"></select>',
+      select("post", "category", "", {}, { multiple: false }),
+    );
+  });
+
+  it("required select with default and selected placeholder", () => {
+    assertDomEqual(
+      [
+        '<select required="required" name="post[category]" id="post_category"><option disabled="disabled" selected="selected" value="">Choose one</option>',
+        '<option value="lifestyle">lifestyle</option>',
+        '<option value="programming">programming</option>',
+        '<option value="spiritual">spiritual</option></select>',
+      ].join("\n"),
+      select(
+        "post",
+        "category",
+        ["lifestyle", "programming", "spiritual"],
+        { selected: "", disabled: "", prompt: "Choose one" },
+        { required: true },
+      ),
+    );
+  });
+
+  it("select with grouped collection as nested array", () => {
+    view.post = new Post();
+
+    const countriesByContinent = [
+      [
+        "<Africa>",
+        [
+          ["<South Africa>", "<sa>"],
+          ["Somalia", "so"],
+        ],
+      ],
+      [
+        "Europe",
+        [
+          ["Denmark", "dk"],
+          ["Ireland", "ie"],
+        ],
+      ],
+    ];
+
+    assertDomEqual(
+      [
+        '<select id="post_origin" name="post[origin]"><optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>',
+        '<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option value="dk">Denmark</option>',
+        '<option value="ie">Ireland</option></optgroup></select>',
+      ].join("\n"),
+      select("post", "origin", countriesByContinent),
+    );
+  });
+
+  it("select with grouped collection as hash", () => {
+    view.post = new Post();
+
+    const countriesByContinent = {
+      "<Africa>": [
+        ["<South Africa>", "<sa>"],
+        ["Somalia", "so"],
+      ],
+      Europe: [
+        ["Denmark", "dk"],
+        ["Ireland", "ie"],
+      ],
+    };
+
+    assertDomEqual(
+      [
+        '<select id="post_origin" name="post[origin]"><optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>',
+        '<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option value="dk">Denmark</option>',
+        '<option value="ie">Ireland</option></optgroup></select>',
+      ].join("\n"),
+      select("post", "origin", countriesByContinent),
+    );
+  });
+
+  it("select with grouped collection as nested array and html attributes", () => {
+    view.post = new Post();
+
+    const countriesByContinent = [
+      [
+        "<Africa>",
+        [
+          ["<South Africa>", "<sa>"],
+          ["Somalia", "so"],
+        ],
+        { data: { foo: "bar" } },
+      ],
+      [
+        "Europe",
+        [
+          ["Denmark", "dk"],
+          ["Ireland", "ie"],
+        ],
+        { disabled: "disabled" },
+      ],
+    ];
+
+    assertDomEqual(
+      [
+        '<select id="post_origin" name="post[origin]"><optgroup label="&lt;Africa&gt;" data-foo="bar"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>',
+        '<option value="so">Somalia</option></optgroup><optgroup label="Europe" disabled="disabled"><option value="dk">Denmark</option>',
+        '<option value="ie">Ireland</option></optgroup></select>',
+      ].join("\n"),
+      select("post", "origin", countriesByContinent),
+    );
+  });
+
+  it("select with boolean method", () => {
+    view.post = new Post();
+    view.post.allow_comments = false;
+    assertDomEqual(
+      '<select id="post_allow_comments" name="post[allow_comments]"><option value="true">true</option>\n<option value="false" selected="selected">false</option></select>',
+      select("post", "allow_comments", ["true", "false"]),
+    );
+  });
+
+  it("select under fields for", () => {
+    view.post = new Post();
+    view.post.category = "<mus>";
+
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: FormBuilder) => {
+      (view as any).concat(f.select("category", ["abe", "<mus>", "hest"]));
+    });
+
+    assertDomEqual(
+      '<select id="post_category" name="post[category]"><option value="abe">abe</option>\n<option value="&lt;mus&gt;" selected="selected">&lt;mus&gt;</option>\n<option value="hest">hest</option></select>',
+      outputBuffer,
+    );
+  });
+
+  it("fields for with record inherited from hash", () => {
+    const map = new Map();
+
+    const outputBuffer = view.fieldsFor("map", map, {}, (f: FormBuilder) => {
+      (view as any).concat(f.select("category", ["abe", "<mus>", "hest"]));
+    });
+
+    assertDomEqual(
+      '<select id="map_category" name="map[category]"><option value="abe">abe</option>\n<option value="&lt;mus&gt;" selected="selected">&lt;mus&gt;</option>\n<option value="hest">hest</option></select>',
+      outputBuffer,
+    );
+  });
+
+  it("select with prompt and selected value", () => {
+    view.post = new Post();
+    assertDomEqual(
+      '<select id="post_category" name="post[category]"><option value="one">one</option>\n<option selected="selected" value="two">two</option></select>',
+      select("post", "category", ["one", "two"], { selected: "two", prompt: true }),
+    );
+  });
+
+  it("select with disabled array", () => {
+    view.post = new Post();
+    view.post.category = "<mus>";
+    assertDomEqual(
+      '<select id="post_category" name="post[category]"><option value="abe" disabled="disabled">abe</option>\n<option value="&lt;mus&gt;" selected="selected">&lt;mus&gt;</option>\n<option value="hest" disabled="disabled">hest</option></select>',
+      select("post", "category", ["abe", "<mus>", "hest"], { disabled: ["hest", "abe"] }),
+    );
+  });
+
+  it("select with range", () => {
+    view.post = new Post();
+    view.post.category = 0;
+    assertDomEqual(
+      '<select id="post_category" name="post[category]"><option value="1">1</option>\n<option value="2">2</option>\n<option value="3">3</option></select>',
+      select("post", "category", new Range(1, 3)),
+    );
+  });
+
+  it("select with enumerable", () => {
+    view.post = new Post();
+    assertDomEqual(
+      '<select id="post_category" name="post[category]"><option value="one">one</option>\n<option value="two">two</option></select>',
+      select("post", "category", new CustomEnumerable()),
+    );
+  });
+
+  it("options for select with element attributes", () => {
+    assertDomEqual(
+      '<option value="&lt;Denmark&gt;" class="bold">&lt;Denmark&gt;</option>\n<option value="USA" onclick="alert(&#39;Hello World&#39;);">USA</option>\n<option value="Sweden">Sweden</option>\n<option value="Germany">Germany</option>',
+      optionsForSelect([
+        ["<Denmark>", { class: "bold" }],
+        ["USA", { onclick: "alert('Hello World');" }],
+        ["Sweden"],
+        "Germany",
+      ]),
+    );
+  });
+
+  it("options for select with data element", () => {
+    assertDomEqual(
+      '<option value="&lt;Denmark&gt;" data-test="bold">&lt;Denmark&gt;</option>',
+      optionsForSelect([["<Denmark>", { data: { test: "bold" } }]]),
+    );
+  });
+
+  it("options for select with data element with special characters", () => {
+    assertDomEqual(
+      '<option value="&lt;Denmark&gt;" data-test="&lt;bold&gt;">&lt;Denmark&gt;</option>',
+      optionsForSelect([["<Denmark>", { data: { test: "<bold>" } }]]),
+    );
+  });
+
+  it("options for select with element attributes and selection", () => {
+    assertDomEqual(
+      '<option value="&lt;Denmark&gt;">&lt;Denmark&gt;</option>\n<option value="USA" class="bold" selected="selected">USA</option>\n<option value="Sweden">Sweden</option>',
+      optionsForSelect(["<Denmark>", ["USA", { class: "bold" }], "Sweden"], "USA"),
+    );
+  });
+
+  it("options for select with element attributes and selection array", () => {
+    assertDomEqual(
+      '<option value="&lt;Denmark&gt;">&lt;Denmark&gt;</option>\n<option value="USA" class="bold" selected="selected">USA</option>\n<option value="Sweden" selected="selected">Sweden</option>',
+      optionsForSelect(["<Denmark>", ["USA", { class: "bold" }], "Sweden"], ["USA", "Sweden"]),
+    );
+  });
+
+  it("options for select with special characters", () => {
+    assertDomEqual(
+      '<option value="&lt;Denmark&gt;" onclick="alert(&quot;&lt;code&gt;&quot;)">&lt;Denmark&gt;</option>',
+      optionsForSelect([["<Denmark>", { onclick: 'alert("<code>")' }]]),
+    );
+  });
+
+  it("option html attributes with no array element", () => {
+    expect(view.optionHtmlAttributes("foo")).toEqual({});
+  });
+
+  it("option html attributes without hash", () => {
+    expect(view.optionHtmlAttributes(["foo", "bar"])).toEqual({});
+  });
+
+  it("option html attributes with single element hash", () => {
+    expect(view.optionHtmlAttributes(["foo", "bar", { class: "fancy" }])).toEqual({
+      class: "fancy",
+    });
+  });
+
+  it("option html attributes with multiple element hash", () => {
+    expect(
+      view.optionHtmlAttributes([
+        "foo",
+        "bar",
+        { class: "fancy", onclick: "alert('Hello World');" },
+      ]),
+    ).toEqual({ class: "fancy", onclick: "alert('Hello World');" });
+  });
+
+  it("option html attributes with multiple hashes", () => {
+    expect(
+      view.optionHtmlAttributes([
+        "foo",
+        "bar",
+        { class: "fancy" },
+        { onclick: "alert('Hello World');" },
+      ]),
+    ).toEqual({ class: "fancy", onclick: "alert('Hello World');" });
+  });
+
+  it("option html attributes with multiple hashes does not modify them", () => {
+    const options1 = { class: "fancy" };
+    const options2 = { onclick: "alert('Hello World');" };
+    view.optionHtmlAttributes(["foo", "bar", options1, options2]);
+
+    expect(options1).toEqual({ class: "fancy" });
+    expect(options2).toEqual({ onclick: "alert('Hello World');" });
   });
 });

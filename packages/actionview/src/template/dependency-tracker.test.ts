@@ -315,7 +315,7 @@ describe("RubyTrackerTests", () => {
   it("dependencies skip unknown options", () => {
     const template = new FakeTemplate(
       `
-      <%= render partial: "unknown_render_call", unknown_render_option: "yes" %>
+      <%= render({ partial: "unknown_render_call", unknownRenderOption: "yes" }) %>
     `,
       "tse",
     );
@@ -327,7 +327,7 @@ describe("RubyTrackerTests", () => {
   it("dependencies finds spacer templates", () => {
     const template = new FakeTemplate(
       `
-      <%= render partial: "messages/message", collection: books, spacer_template: "messages/message_spacer" %>
+      <%= render({ partial: "messages/message", collection: books, spacerTemplate: "messages/message_spacer" }) %>
     `,
       "tse",
     );
