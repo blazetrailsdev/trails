@@ -36,3 +36,17 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
     expect(view.urlFor({ controller: "foo", action: "other" })).toBe("/other");
   });
 });
+
+describe("ActionView::Rendering::ClassMethods#eager_load!", () => {
+  it("calls super, then builds the view context class", () => {
+    class EagerController extends ActionController.Base {}
+    const klass = EagerController as unknown as {
+      eagerLoadBang(): null;
+      _actionMethodCache?: unknown;
+      _viewContextClass?: unknown;
+    };
+    expect(klass.eagerLoadBang()).toBeNull();
+    expect(Object.hasOwn(klass, "_actionMethodCache")).toBe(true);
+    expect(Object.hasOwn(klass, "_viewContextClass")).toBe(true);
+  });
+});

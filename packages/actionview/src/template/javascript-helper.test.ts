@@ -24,6 +24,7 @@ describe("JavaScriptHelperTest", () => {
   it("escape javascript", () => {
     expect(escapeJavascript(null).toString()).toBe("");
     expect(escapeJavascript(123).toString()).toBe("123");
+    expect(escapeJavascript("en").toString()).toBe("en");
     expect(escapeJavascript(false).toString()).toBe("false");
     expect(escapeJavascript(true).toString()).toBe("true");
     expect(escapeJavascript('This "thing" is really\n netos\'').toString()).toBe(
@@ -50,19 +51,21 @@ describe("JavaScriptHelperTest", () => {
     const expectedStr = "\\'quoted\\' \\\"double-quoted\\\" new-line:\\n <\\/closed>";
     expect(escapeJavascript(given).toString()).toBe(expectedStr);
     expect(escapeJavascript(htmlSafe(given)).toString()).toBe(expectedStr);
-    const unsafeResult = escapeJavascript(given);
-    expect(unsafeResult instanceof SafeBuffer).toBe(false);
-    const safeResult = escapeJavascript(htmlSafe(given));
-    expect(safeResult instanceof SafeBuffer).toBe(true);
-    expect((safeResult as SafeBuffer).htmlSafe).toBe(true);
+    expect(Object(escapeJavascript(given))).toBeInstanceOf(String);
+    expect(escapeJavascript(new SafeBuffer(given))).toBeInstanceOf(SafeBuffer);
   });
 
   it("javascript tag", () => {
     const ctx = host();
     ctx.outputBuffer = new OutputBuffer("foo");
-    const result = javascriptTag.call(ctx, "alert('hello')").toString();
-    expect(result).toBe("<script>\n//<![CDATA[\nalert('hello')\n//]]>\n</script>");
-    expect(ctx.outputBuffer.toString().toString()).toBe("foo");
+    assertDomEqual(
+      "<script>\n//<![CDATA[\nalert('hello')\n//]]>\n</script>",
+      javascriptTag.call(ctx, "alert('hello')"),
+    );
+    expect(
+      ctx.outputBuffer.toString().toString(),
+      "javascript_tag without a block should not concat to output_buffer",
+    ).toBe("foo");
   });
 
   it("javascript include tag", () => {
@@ -80,15 +83,16 @@ describe("JavaScriptHelperTest", () => {
   });
 
   it("javascript tag with options", () => {
-    const result = javascriptTag.call(host(), "alert('hello')", { id: "the_js_tag" }).toString();
-    expect(result).toBe(
+    assertDomEqual(
       "<script id=\"the_js_tag\">\n//<![CDATA[\nalert('hello')\n//]]>\n</script>",
+      javascriptTag.call(host(), "alert('hello')", { id: "the_js_tag" }),
     );
   });
 
   it("javascript cdata section", () => {
-    expect(javascriptCdataSection("alert('hello')").toString()).toBe(
+    assertDomEqual(
       "\n//<![CDATA[\nalert('hello')\n//]]>\n",
+      javascriptCdataSection("alert('hello')"),
     );
   });
 });

@@ -1,3 +1,4 @@
+import type { Rational } from "@blazetrails/ruby-compat";
 import {
   NumberHelper as ActiveSupportNumberHelper,
   SafeBuffer,
@@ -21,7 +22,7 @@ export interface NumberHelperOptions {
   separator?: string | SafeBuffer;
   delimiter?: string | SafeBuffer;
   unit?: string | SafeBuffer;
-  units?: Record<string, string | SafeBuffer>;
+  units?: Record<string, string | SafeBuffer> | string;
   raise?: boolean;
   precision?: number;
   significant?: boolean;
@@ -32,7 +33,7 @@ export interface NumberHelperOptions {
   [key: string]: unknown;
 }
 
-type NumberLike = number | string | SafeBuffer | null | undefined;
+type NumberLike = number | bigint | Rational | string | SafeBuffer | null | undefined;
 
 const asArg = (n: NumberLike): unknown => (n instanceof SafeBuffer ? n.toString() : n);
 

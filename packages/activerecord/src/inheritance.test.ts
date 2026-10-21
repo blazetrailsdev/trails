@@ -115,7 +115,7 @@ describe("InheritanceTest", () => {
       Company.computeType("NonexistentModel");
     });
     expect(e.message).toMatch("uninitialized constant Company::NonexistentModel");
-    expect((e as NameError).constantName).toBe("Company::NonexistentModel");
+    expect(e.constantName).toBe("Company::NonexistentModel");
   });
 
   it.skip("compute type no method error", () => {

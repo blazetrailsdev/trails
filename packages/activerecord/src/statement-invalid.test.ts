@@ -30,13 +30,13 @@ describe("StatementInvalidTest", () => {
   it("message contains no sql", async () => {
     const conn = (await Base.leaseConnection()) as any;
     const sql = Book.where({ author_id: 96, cover: "hard" }).toSql();
-    const error = (await assertRaises([StatementInvalid], {}, () =>
+    const error = await assertRaises([StatementInvalid], {}, () =>
       conn.log(sql, "Book", [], [], false, () =>
         conn.withRawConnection({}, () => {
           throw mockDatabaseError();
         }),
       ),
-    )) as StatementInvalid;
+    );
     assertNot(error.message.includes("SELECT"));
   });
 
@@ -44,13 +44,13 @@ describe("StatementInvalidTest", () => {
     const conn = (await Base.leaseConnection()) as any;
     const sql = Book.where({ author_id: 96, cover: "hard" }).toSql();
     const binds = [{}, {}];
-    const error = (await assertRaises([StatementInvalid], {}, () =>
+    const error = await assertRaises([StatementInvalid], {}, () =>
       conn.log(sql, "Book", binds, [], false, () =>
         conn.withRawConnection({}, () => {
           throw mockDatabaseError();
         }),
       ),
-    )) as StatementInvalid;
+    );
     expect(error.sql).toEqual(sql);
     expect(error.binds).toEqual(binds);
   });

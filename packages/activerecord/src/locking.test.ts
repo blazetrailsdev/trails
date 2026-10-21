@@ -191,9 +191,7 @@ describe("OptimisticLockingTest", () => {
     p1.first_name = "mira3";
     await p1.saveBang();
     p2.first_name = "sue";
-    const error = (await assertRaise([StaleObjectError], {}, () =>
-      p2.saveBang(),
-    )) as StaleObjectError;
+    const error = await assertRaise([StaleObjectError], {}, () => p2.saveBang());
     expect(error.record).toBe(p2);
   });
 

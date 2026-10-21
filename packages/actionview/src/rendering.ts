@@ -10,7 +10,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { Hash, rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { include, Module } from "@blazetrails/ruby-compat/include";
+import { include, Module, rbCallSuper } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
 import { Renderer } from "./renderer.js";
@@ -132,6 +132,12 @@ export function buildViewContextClass(
     include(subclass, helpers);
   }
   return subclass;
+}
+
+export function eagerLoadBang(this: ViewContextClassMethods): null {
+  rbCallSuper(this, eagerLoadBang);
+  this.viewContextClass();
+  return null;
 }
 
 export function viewContextClass(this: ViewContextClassMethods): typeof Base {
@@ -300,6 +306,7 @@ export function _processRenderTemplateOptions(
 export const ClassMethods = {
   isInheritViewContextClass,
   buildViewContextClass,
+  eagerLoadBang,
   viewContextClass,
 };
 

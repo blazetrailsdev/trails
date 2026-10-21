@@ -74,12 +74,6 @@ const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-function add(base: Date, ms: number): Date {
-  return new Date(base.getTime() + ms);
-}
-
-const from = new Date(Date.UTC(2004, 5, 6, 21, 45, 0));
-
 function assertDistanceOfTimeInWords(
   from: Time | TimeWithZone,
   to: Time | TimeWithZone | null = null,
@@ -396,59 +390,8 @@ function assertDistanceOfTimeInWords(
 
 describe("DateHelperTest", () => {
   it("distance in words", () => {
-    expect(distanceOfTimeInWords(from, add(from, 0 * SECOND), { includeSeconds: true })).toBe(
-      "less than 5 seconds",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 4 * SECOND), { includeSeconds: true })).toBe(
-      "less than 5 seconds",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 5 * SECOND), { includeSeconds: true })).toBe(
-      "less than 10 seconds",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 9 * SECOND), { includeSeconds: true })).toBe(
-      "less than 10 seconds",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 10 * SECOND), { includeSeconds: true })).toBe(
-      "less than 20 seconds",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 19 * SECOND), { includeSeconds: true })).toBe(
-      "less than 20 seconds",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 20 * SECOND), { includeSeconds: true })).toBe(
-      "half a minute",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 39 * SECOND), { includeSeconds: true })).toBe(
-      "half a minute",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 40 * SECOND), { includeSeconds: true })).toBe(
-      "less than a minute",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 59 * SECOND), { includeSeconds: true })).toBe(
-      "less than a minute",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 60 * SECOND), { includeSeconds: true })).toBe(
-      "1 minute",
-    );
-
-    expect(distanceOfTimeInWords(from, add(from, 0 * SECOND))).toBe("less than a minute");
-    expect(distanceOfTimeInWords(from, add(from, 29 * SECOND))).toBe("less than a minute");
-    expect(distanceOfTimeInWords(from, add(from, 30 * SECOND))).toBe("1 minute");
-    expect(distanceOfTimeInWords(from, add(from, 1 * MINUTE + 29 * SECOND))).toBe("1 minute");
-    expect(distanceOfTimeInWords(from, add(from, 1 * MINUTE + 30 * SECOND))).toBe("2 minutes");
-    expect(distanceOfTimeInWords(from, add(from, 44 * MINUTE + 29 * SECOND))).toBe("44 minutes");
-    expect(distanceOfTimeInWords(from, add(from, 44 * MINUTE + 30 * SECOND))).toBe("about 1 hour");
-    expect(distanceOfTimeInWords(from, add(from, 89 * MINUTE + 29 * SECOND))).toBe("about 1 hour");
-    expect(distanceOfTimeInWords(from, add(from, 89 * MINUTE + 30 * SECOND))).toBe("about 2 hours");
-    expect(distanceOfTimeInWords(from, add(from, 23 * HOUR + 59 * MINUTE + 29 * SECOND))).toBe(
-      "about 24 hours",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 23 * HOUR + 59 * MINUTE + 30 * SECOND))).toBe(
-      "1 day",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 41 * HOUR + 59 * MINUTE + 30 * SECOND))).toBe(
-      "2 days",
-    );
-    expect(distanceOfTimeInWords(from, add(from, 2 * DAY + 12 * HOUR))).toBe("3 days");
+    const from = Time.utc(2004, 6, 6, 21, 45, 0);
+    assertDistanceOfTimeInWords(from);
   });
 
   it("distance in words with nil input", () => {

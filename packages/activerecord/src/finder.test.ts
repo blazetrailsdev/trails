@@ -1439,9 +1439,7 @@ describe("FinderTest", () => {
   });
 
   it("find one message on primary key", async () => {
-    const e = (await assertRaises([RecordNotFound], {}, () =>
-      CanonicalCar.find(0),
-    )) as RecordNotFound;
+    const e = await assertRaises([RecordNotFound], {}, () => CanonicalCar.find(0));
     expect(e.id).toBe(0);
     expect(e.primaryKey).toBe("id");
     expect(e.model).toBe("Car");

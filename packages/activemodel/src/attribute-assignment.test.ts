@@ -108,9 +108,9 @@ describe("AttributeAssignmentTest", () => {
 
   it("assign non-existing attribute", async () => {
     const model = new Model();
-    const error = (await assertRaises([UnknownAttributeError], {}, () => {
+    const error = await assertRaises([UnknownAttributeError], {}, () => {
       model.assignAttributes({ hz: 1 });
-    })) as UnknownAttributeError;
+    });
 
     expect(error.record).toEqual(model);
     expect(error.attribute).toEqual("hz");
@@ -153,9 +153,9 @@ describe("AttributeAssignmentTest", () => {
   });
 
   it("an ArgumentError is raised if a non-hash-like object is passed", async () => {
-    const err = (await assertRaises([ArgumentError], {}, () => {
+    const err = await assertRaises([ArgumentError], {}, () => {
       new Model(1);
-    })) as ArgumentError;
+    });
 
     expect(err.message).toEqual(
       "When assigning attributes, you must pass a hash as an argument, Integer passed.",

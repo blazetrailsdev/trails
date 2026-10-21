@@ -443,9 +443,9 @@ describe("FixturesTest", () => {
 
       const stub = stubMaxAllowedPacket(conn, packetSize - mysqlMargin);
       try {
-        const error = (await assertRaises([ActiveRecordError], {}, () =>
+        const error = await assertRaises([ActiveRecordError], {}, () =>
           conn.insertFixturesSet(fixtures),
-        )) as ActiveRecordError;
+        );
         expect(error.message).toMatch(new RegExp(`Fixtures set is too large ${packetSize}\\.`));
       } finally {
         stub.mockRestore();
