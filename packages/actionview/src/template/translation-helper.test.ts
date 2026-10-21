@@ -477,6 +477,6 @@ describe("TranslationHelperTest", () => {
     expect(options).toEqual({});
   });
 
-  // BLOCKED: i18n-backend-cache
+  // PERMANENT-SKIP: the assertion is that a lookup reaches `I18n.cache_store`
   it.skip("translate caching backend", () => {});
 });

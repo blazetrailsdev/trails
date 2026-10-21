@@ -257,7 +257,7 @@
     "pattern": "backend/cache.rb",
     "testFile": "backend/cache_test.rb",
     "package": "i18n",
-    "reason": "Pre-1.0: optional backend mixin — caches lookups through ActiveSupport::Cache."
+    "reason": "PERMANENT: its `_fetch` reads a cache store inside the lookup, and every ActiveSupport::Cache store read is async — CLAUDE.md § \"A translation lookup is synchronous; the load is an awaited step\". Opt-in mixin; no default configuration includes it."
   },
   {
     "pattern": "backend/cache_file.rb",

@@ -1720,6 +1720,81 @@ The one-line rule: ESM has no synchronous `require`, so
 one other `require` ported that way is `active_support/message_pack`, awaited
 at boot ([packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#active_supportmessage_pack-is-loaded-by-an-awaited-step-at-boot-serializerwithfallbacks-require)).
 
+## A translation lookup is synchronous; the load is an awaited step (`I18n.translate`)
+
+`I18n.translate` (`vendor/i18n/v1.14.8/lib/i18n.rb:212-229`) is a synchronous
+hash walk over a loaded translation table, and `Backend::Simple` lazily loads
+that table on the first lookup (`init_translations`). The load is I/O; the
+lookup is not. **trails puts the asynchrony at the load and nowhere else:**
+
+```
+I18n.setLoadPath()    async   (packages/i18n/src/i18n.ts:127)
+I18n.reloadBang()     async   (:139)
+I18n.eagerLoadBang()  async   (:144)
+I18n.translate()      sync    (:150)
+I18n.localize()       sync    (:235)
+```
+
+This is the shape of § "An adapter file is loaded by an awaited step": the
+awaited step happens once, and every reader afterwards is as synchronous as
+Ruby's. A `load_path` set after boot, or a development reload, is awaited
+where Rails lazily loads inside the first lookup.
+
+**`translate` is never made async.** The call is 31 sites across six
+packages, but the count is not the reason — the shapes are. These Rails
+members return a String, and an async `translate` makes each one return a
+`Promise`:
+
+- `ActiveModel::Error#message` and `#full_message`, which are **getters**
+  (`packages/activemodel/src/error.ts:235`, `:258`), read by
+  `errors.full_messages`, `errors.to_hash` and from there `as_json`.
+- `ActiveModel::Translation#human_attribute_name`
+  (`packages/activemodel/src/translation.ts:60`).
+- `Inflector#humanize` (`packages/activesupport/src/inflector.ts:102`) and
+  `transliterate` / `parameterize` (`:264`), which sit on the paths that
+  produce a model's human name, a titleized string and a URL slug.
+- `Array#to_sentence` (`packages/activesupport/src/array-utils.ts:63`), the
+  `NumberHelper` converters, and `distance_of_time_in_words`.
+
+So an async `translate` does not make i18n async; it makes **ActiveModel's
+error messages and ActiveSupport's inflector** async, at a more prominent
+surface than the one it fixes. § "Serialization's dual sync/async hash"
+already refused that trade in this direction for `as_json`, for the same
+reason, and this section is the same ruling for `translate`.
+
+**The dual-shape return does not apply here.** `thenableHash` works because a
+Hash can be a Proxy. A Proxy cannot be a string primitive, so a thenable
+translation breaks `` `Name ${error.message}` `` and `error.message.length`.
+There is no third shape.
+
+As a consequence:
+
+- **`I18n::Backend::Cache` is permanently unported**
+  (`vendor/i18n/v1.14.8/lib/i18n/backend/cache.rb:79-110`). Its `_fetch` reads
+  a cache store inside the lookup, and every `ActiveSupport::Cache` store's
+  `read` / `write` is async (`packages/activesupport/src/cache/store.ts`). It
+  is an opt-in mixin — an application includes it and sets `cache_store`
+  itself — so not porting it costs behaviour no default configuration has.
+  Its `unported-files` row cites this section.
+- **A prewarmed in-process copy of the cache store is not the answer.** An
+  invented copy, plus a store `write` started and not awaited, was rejected by
+  the repo owner on 2026-10-20: it answers a stale entry when another process
+  wrote one, and a failed write cannot reach the `translate` caller. Do not
+  re-file it.
+- A Rails test that depends on a lookup reaching a cache store is parked as
+  `it.skip` under a `PERMANENT-SKIP:` line citing this section. The one
+  instance is `translate caching backend`
+  (`vendor/rails/v8.0.2/actionview/test/template/translation_helper_test.rb:392-410`),
+  at `packages/actionview/src/template/translation-helper.test.ts`.
+- A backend whose lookup is genuinely I/O — `Backend::KeyValue` over a store —
+  is served by an awaited load into the same table, not by an async
+  `translate`. A store-backed backend whose contents cannot be loaded ahead of
+  the lookup is not ported.
+
+This is a genuine language shortcoming — JS has no synchronous await — and it
+is ratified repo-wide here by the repo owner on 2026-10-21. A new instance is
+not a new decision to argue, and there is no story to make `translate` async.
+
 ## A migration file is loaded by `Kernel#load` (`MigrationProxy#load_migration`)
 
 Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#a-migration-file-is-loaded-by-kernelload-migrationproxyload_migration).
