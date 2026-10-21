@@ -771,7 +771,7 @@ describe("CachedViewRenderTest", () => {
   it("render outside path", async () => {
     assert(await File.isExistAsync(File.expandPath("../test-helpers/abstract-unit.ts", __dir__)));
     await assertRaises([MissingTemplate], {}, () =>
-      view.render({ template: "../\\../test/abstract_unit.rb" }),
+      view.render({ template: "../\\../test-helpers/abstract-unit.ts" }),
     );
   });
 
