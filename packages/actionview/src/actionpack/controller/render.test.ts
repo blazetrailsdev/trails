@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
 import { ActiveModel, Conversion, Naming } from "@blazetrails/activemodel";
-import { assert, assertNothingRaised, isPresent, Logger } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertNothingRaised,
+  assertRaises,
+  isPresent,
+  Logger,
+} from "@blazetrails/activesupport";
 import { Date } from "@blazetrails/date";
 import {
   ArgumentError,
@@ -775,13 +781,7 @@ describe("RenderTest", () => {
   });
 
   test("line offset", async () => {
-    let exc: unknown;
-    try {
-      await testCase.get("renderLineOffset");
-    } catch (e) {
-      exc = e;
-    }
-    expect(exc).toBeInstanceOf(Template.Error);
+    const exc = await assertRaises([Template.Error], {}, () => testCase.get("renderLineOffset"));
     const line = (exc as InstanceType<typeof Template.Error>).backtrace()![0];
     const m = line.match(/:(\d+):/);
     assert(m);
