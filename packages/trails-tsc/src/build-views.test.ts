@@ -46,6 +46,8 @@ describe("buildViews", () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "show");
     write(cwd, "app/views/users/card.html.custom", "card");
+    write(cwd, "app/views/users/.keep", "");
+    write(cwd, "app/views/users/old.html.tse.js", "");
 
     const { files, skipped } = await buildViews({ cwd });
 

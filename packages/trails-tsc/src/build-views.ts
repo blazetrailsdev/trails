@@ -185,7 +185,8 @@ async function walkTemplates(
       dir;
     const rel = path.relative(dir, path.join(parent, e.name)).split(path.sep).join("/");
     const dot = e.name.lastIndexOf(".");
-    (dot !== -1 && extensions.includes(e.name.slice(dot + 1)) ? files : skipped).push(rel);
+    if (dot !== -1 && extensions.includes(e.name.slice(dot + 1))) files.push(rel);
+    else if (!e.name.startsWith(".") && !/\.(?:js|ts)(?:\.map)?$/u.test(e.name)) skipped.push(rel);
   }
   return { files: files.sort(), skipped: skipped.sort() };
 }
