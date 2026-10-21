@@ -1,5 +1,6 @@
 import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
 import {
+  aryCount,
   classModule,
   flatten,
   groupBy,
@@ -61,10 +62,7 @@ export async function performAllLater(...jobs: unknown[]): Promise<null> {
             job.enqueueError = e;
           }
         }
-        return adapterJobs.filter((job) => {
-          const value = job.isSuccessfullyEnqueued();
-          return value != null && value !== false;
-        }).length;
+        return aryCount(adapterJobs, (job) => job.isSuccessfullyEnqueued());
       }
     });
   }
@@ -104,7 +102,8 @@ export class Enqueuing {
 
     await this.runCallbacks("enqueue", () => this.rawEnqueue());
 
-    if (this.isSuccessfullyEnqueued() != null && this.isSuccessfullyEnqueued() !== false) {
+    const successfullyEnqueued = this.isSuccessfullyEnqueued();
+    if (successfullyEnqueued != null && successfullyEnqueued !== false) {
       return this;
     } else {
       return false;
