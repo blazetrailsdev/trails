@@ -99,6 +99,35 @@ describe("capture's callers await an async block", () => {
     expect(html).toContain('type="submit"><b>rendered</b></button>');
   });
 
+  it("an async block's nil or plain-string value renders as the sync block's does", async () => {
+    const view = makeView();
+    const tag = view.tag() as unknown as { div(block: () => unknown): unknown };
+    const callers: [string, (block: () => unknown) => unknown][] = [
+      ["content_tag", (block) => view.contentTag("div", null, null, undefined, block)],
+      ["tag builder", (block) => tag.div(block)],
+      ["field_set_tag", (block) => view.fieldSetTag("Legend", null, block)],
+      ["javascript_tag", (block) => javascriptTag.call(view as never, null, {}, block)],
+    ];
+    for (const [name, call] of callers) {
+      for (const value of [null, "<i>"]) {
+        const sync = String(call(() => value));
+        expect(String(await call(async () => value)), `${name} ${value}`).toBe(sync);
+      }
+    }
+  });
+
+  it("FormBuilder#button keeps a nil async capture", async () => {
+    const view = makeView();
+    let sync = "";
+    const html = String(
+      await view.formWith({ url: "/posts", scope: "post" }, async (f) => {
+        sync = String(f.button(null, {}, () => null));
+        view.outputBuffer!.safeAppend(await f.button(null, {}, async () => null));
+      }),
+    );
+    expect(html).toContain(sync);
+  });
+
   it("StreamingBuffer#capture awaits an async block", async () => {
     const written: string[] = [];
     const buffer = new StreamingBuffer((value) => written.push(value));

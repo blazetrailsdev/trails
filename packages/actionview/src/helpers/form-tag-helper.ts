@@ -71,8 +71,8 @@ export function formTag(
   block?: ((...args: unknown[]) => unknown) | null,
 ): SafeBuffer;
 /**
- * @inventedArm if — PERMANENT
- * @inventedArm then — PERMANENT
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
  */
 export function formTag(
   this: FormTagHelperHost,
@@ -259,8 +259,8 @@ export function imageSubmitTag(
 }
 
 /**
- * @inventedArm if — PERMANENT
- * @inventedArm then — PERMANENT
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
  */
 export function fieldSetTag(
   this: FormTagHelperHost,

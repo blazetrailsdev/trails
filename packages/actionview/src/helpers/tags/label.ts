@@ -79,8 +79,8 @@ export class Label extends Base {
   }
 
   /**
-   * @inventedArm if — PERMANENT
-   * @inventedArm then — PERMANENT
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
    */
   override render(block?: (builder: LabelBuilder) => unknown): unknown {
     const options = stringifyKeys(this._options);

@@ -201,8 +201,8 @@ export function formWith(
   block?: (builder: FormBuilder) => unknown,
 ): SafeBuffer;
 /**
- * @inventedArm if — PERMANENT
- * @inventedArm then — PERMANENT
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
  */
 export function formWith(
   this: FormHelperHost,
@@ -926,8 +926,8 @@ export class FormBuilder {
   }
 
   /**
-   * @inventedArm if — PERMANENT
-   * @inventedArm then — PERMANENT
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
    */
   button(
     value: unknown = null,
@@ -949,7 +949,20 @@ export class FormBuilder {
 
     if (block !== undefined) {
       value = this._template.capture(() => block(value));
-      if (value instanceof Promise) return value.then((value) => this.button(value, options));
+      if (value instanceof Promise) {
+        return value.then((value) => {
+          const formmethod = options["formmethod"];
+          if (
+            isPresent(formmethod) &&
+            !/post|get/i.test(String(formmethod)) &&
+            !Object.hasOwn(options, "name") &&
+            !Object.hasOwn(options, "value")
+          ) {
+            Object.assign(options, { formmethod: "post", name: "_method", value: formmethod });
+          }
+          return this._template.buttonTag(value, options);
+        });
+      }
     }
 
     const formmethod = options["formmethod"];
@@ -1040,8 +1053,8 @@ export class FormBuilder {
   }
 
   /**
-   * @inventedArm if — PERMANENT
-   * @inventedArm then — PERMANENT
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
    */
   private fieldsForNestedModel(
     name: string,

@@ -35,8 +35,8 @@ export function javascriptCdataSection(content: unknown): SafeBuffer {
 }
 
 /**
- * @inventedArm if — PERMANENT
- * @inventedArm then — PERMANENT
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
  */
 export function javascriptTag(
   this: TagHelperHost & { contentSecurityPolicyNonce(): string | null },
