@@ -1738,27 +1738,37 @@ awaited step happens once, and every reader afterwards is as synchronous as
 Ruby's. A `load_path` set after boot, or a development reload, is awaited where
 Rails lazily loads inside the first lookup.
 
-**`translate` is never made async.** It has 31 call sites across five packages,
-but the count is not the reason — the shapes are. Each of these Rails members
-returns a String, and an async `translate` makes it return a `Promise`:
+**`translate` is never made async.** Its 31 call sites sit in 26 members
+across five packages, and **every one of those members is synchronous today**.
+The count is not the reason — the shapes are. Each of these returns a String
+where Rails returns a String, and an async `translate` makes it return a
+`Promise`:
 
-- `ActiveModel::Error#message` (`packages/activemodel/src/error.ts:235`) and
-  `#full_message` (`:258`), which are **getters**, reached through
-  `Error.generateMessage` (`:142`). `errors.full_messages`, `errors.to_hash`
-  and from there `as_json` all read them.
+- `ActiveModel::Error#message` and `#full_message`
+  (`packages/activemodel/src/error.ts:235`, `:258`), which are **getters**,
+  over the statics they call (`:87`, `:148`). `Errors#full_messages`
+  (`errors.ts:233`), `#messages_for` (`:241`) and `#to_hash` (`:296`) read
+  them, and `as_json` reads `to_hash`.
 - `ActiveModel::Translation#human_attribute_name`
-  (`packages/activemodel/src/translation.ts:60`, translating at `:101`).
-- `Inflector#ordinal` and `#ordinalize`
-  (`packages/activesupport/src/inflector.ts:256`, `:260`).
-- `Array#to_sentence` (`packages/activesupport/src/array-utils.ts:63`), the
-  `NumberHelper` converters
-  (`packages/activesupport/src/number-helper/number-converter.ts`), and
-  `distance_of_time_in_words`
-  (`packages/actionview/src/helpers/date-helper.ts:49`).
+  (`packages/activemodel/src/translation.ts:60`) and `Name#human`
+  (`naming.ts:220`), which name a model and its attributes everywhere one is
+  rendered.
+- `Inflector#ordinal` / `#ordinalize`
+  (`packages/activesupport/src/inflector.ts:256`, `:260`), `Array#to_sentence`
+  (`array-utils.ts:63`), `NumberConverter#execute`
+  (`number-helper/number-converter.ts:100`) and
+  `HtmlSafeTranslation.translate` (`html-safe-translation.ts:11`).
+- Every helper that renders a translated string:
+  `ActionView::Helpers::TranslationHelper#translate` / `#localize`
+  (`packages/actionview/src/helpers/translation-helper.ts:40`, `:101`),
+  `#time_tag` (`date-helper.ts:223`), `DateTimeSelector`'s private
+  `translated_month_names` / `translated_date_order` (`:510`, `:566`),
+  `weekday_options_for_select` (`form-options-helper.ts:271`), and
+  `AbstractController::Translation#localize`
+  (`packages/actionpack/src/abstract-controller/translation.ts:56`).
 
-`transliterate` and `parameterize`
-(`packages/activesupport/src/transliterate.ts:25`) read the same table through
-`I18n.transliterate`, so they hold under the same contract.
+Two validator constructors translate as well (`activemodel/validations.ts:339`,
+`activerecord/validations.ts:29`), and a JS constructor cannot await at all.
 
 So an async `translate` does not make i18n async; it makes **ActiveModel's
 error messages and ActiveSupport's string helpers** async, at a more prominent
