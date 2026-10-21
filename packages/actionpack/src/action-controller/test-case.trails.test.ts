@@ -48,7 +48,7 @@ describe("TestRequest#assignParameters Content-Type case", () => {
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/xml");
     req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
-    expect(req.getHeader("rack.input").string()).toContain("<x>1</x>");
+    expect(new TextDecoder().decode(req.getHeader("rack.input").string())).toContain("<x>1</x>");
   });
 
   it("encodes a :json body with ActiveSupport::JSON.encode", () => {
@@ -57,7 +57,9 @@ describe("TestRequest#assignParameters Content-Type case", () => {
     req.setHeader("CONTENT_TYPE", "application/json");
     const price = new BigDecimal("1.50");
     req.assignParameters(null, "api", "create", { price, name: "<b>" }, "/api", ["price", "name"]);
-    expect(req.getHeader("rack.input").string()).toBe(`{"price":"1.5","name":"\\u003cb\\u003e"}`);
+    expect(new TextDecoder().decode(req.getHeader("rack.input").string())).toBe(
+      `{"price":"1.5","name":"\\u003cb\\u003e"}`,
+    );
   });
 });
 
@@ -77,7 +79,7 @@ describe("TestRequest#assignParameters multipart body", () => {
     req.assignParameters(null, "u", "create", { upload: file, t: "café" }, "/u", ["upload", "t"]);
     const body = req.getHeader("rack.input").string();
     expect(req.getHeader("CONTENT_LENGTH")).toBe(String(body.length));
-    expect((req.requestParameters["upload"] as HttpUploadedFile).read()).toBe(b("héllo"));
+    expect((req.requestParameters["upload"] as HttpUploadedFile).read()).toEqual(b("héllo"));
     expect(req.requestParameters["t"]).toBe("café");
   });
 });
@@ -632,7 +634,7 @@ describe("ActionController::TestRequest helpers", () => {
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/x-www-form-urlencoded");
     req.assignParameters(null, "posts", "create", { title: "Hello" }, "/posts", ["title"]);
-    const body = req.getHeader("rack.input").string();
+    const body = new TextDecoder().decode(req.getHeader("rack.input").string());
     expect(body).toContain("title=Hello");
     expect(req.requestParameters).toMatchObject({ title: "Hello" });
   });
@@ -647,14 +649,14 @@ describe("ActionController::TestRequest helpers", () => {
     const ct = req.getHeader("CONTENT_TYPE") ?? "";
     expect(ct).toContain("multipart/form-data");
     expect(ct).toContain("boundary=");
-    const body = req.getHeader("rack.input").string();
+    const body = new TextDecoder().decode(req.getHeader("rack.input").string());
     expect(body).toContain(`name="upload"; filename="hello.txt"`);
     const upload = req.requestParameters["upload"] as HttpUploadedFile;
     expect(upload).toBeInstanceOf(HttpUploadedFile);
     expect(upload).not.toBe(file);
     expect(upload.originalFilename).toBe("hello.txt");
     expect(upload.contentType).toBe("text/plain");
-    expect(upload.read()).toBe("hi");
+    expect(upload.read()).toEqual(b("hi"));
   });
 
   it("assignParameters registers custom parser for unknown content types, wired into requestParameters", () => {

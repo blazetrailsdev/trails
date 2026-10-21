@@ -32,6 +32,7 @@ import {
   rbStrByteslice,
 } from "./byte-methods.js";
 import { rbStrGetbyte, rbStrSetbyte, rbStrSum } from "./byte-methods.js";
+import { b } from "./b.js";
 import { bytes } from "./bytes.js";
 import { capitalize, casecmp, downcase, isCasecmp, swapcase, upcase } from "./case-mapping.js";
 import { chomp } from "./chomp.js";
@@ -181,7 +182,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
     intern: rbDefineMethod(0, (self) => `:${self.string}`),
     toSym: rbDefineMethod(0, (self) => `:${self.string}`),
     ord: rbDefineMethod(0, rbStrOrd),
-    isInclude: rbDefineMethod(1, (self, arg) => self.string.includes(stringValue(arg))),
+    isInclude: rbDefineMethod(1, (self, arg) => rbStrInclude(self.string, arg)),
     isStartWith: (self, ...prefixes) => rbStrStartWith(self.string, ...prefixes),
     isEndWith: (self, ...suffixes) => rbStrEndWith(self.string, ...suffixes),
     scan: rbStrScan,
@@ -245,7 +246,7 @@ export const STRING_METHOD_TABLE: Record<string, StringMethod> = Object.assign(
  * `rb_str_eql`, `:3773`), `bytesize` counts them (`rb_str_bytesize`,
  * `:2225`), as `length` and `size` do (one character per byte), `getbyte`
  * reads one, `empty?` asks whether there are any, `byteslice` slices them,
- * `start_with?` compares a prefix of them,
+ * `start_with?` compares a prefix of them, `include?` searches them,
  * and `+` joins them.
  *
  * @noRailsEquivalent PERMANENT
@@ -265,6 +266,7 @@ export const BINARY_METHOD_TABLE: Record<
   isEmpty: (self) => self.length === 0,
   byteslice: (self, ...args) => byteslice(self, ...args),
   isStartWith: (self, ...prefixes) => rbStrStartWith(self, ...prefixes),
+  isInclude: (self, arg) => rbStrInclude(self, arg),
 };
 
 /**
@@ -288,6 +290,22 @@ export function rbStrPlus(str1: Uint8Array, str2: unknown): Uint8Array | string 
   if (/^[\x00-\x7f]*$/.test(text)) return rbStrPlus(str1, new TextEncoder().encode(text));
   if (str1.every((byte) => byte < 0x80)) return new TextDecoder().decode(str1) + text;
   throw new EncodingError("incompatible character encodings: ASCII-8BIT and UTF-8");
+}
+
+/**
+ * `String#include?` (`vendor/ruby/v3.3.11/string.c:6558` `rb_str_include`). An
+ * ASCII-8BIT receiver, a `Uint8Array`, is searched by byte.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#include?`
+ * (`vendor/ruby/v3.3.11/string.c:6558`).
+ */
+export function rbStrInclude(str: string | Uint8Array, arg: unknown): boolean {
+  if (typeof str === "string") return str.includes(stringValue(arg));
+  const sub = arg instanceof Uint8Array ? arg : b(stringValue(arg));
+  for (let i = 0; i + sub.length <= str.length; i++) {
+    if (sub.every((byte, j) => byte === str[i + j])) return true;
+  }
+  return false;
 }
 
 const stringClasses = new WeakSet<object>();

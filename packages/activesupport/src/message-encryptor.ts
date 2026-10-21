@@ -174,7 +174,7 @@ export class MessageEncryptor extends Codec {
 
   private decrypt(encryptedMessage: string | Uint8Array): Uint8Array {
     const cipher = this.newCipher();
-    const [encryptedData, iv, authTag] = this.extractParts(b(encryptedMessage));
+    const [encryptedData, iv, authTag] = this.extractParts(encryptedMessage);
 
     if (this.aeadMode && authTag.length !== AUTH_TAG_LENGTH) {
       throw new Thrown("invalid_message_format", "truncated auth_tag");
@@ -230,7 +230,8 @@ export class MessageEncryptor extends Codec {
     }
   }
 
-  private extractParts(encryptedMessage: Uint8Array): Bytes[] {
+  private extractParts(encryptedMessage: string | Uint8Array): Bytes[] {
+    encryptedMessage = b(encryptedMessage);
     const parts: Uint8Array[] = [];
     let rindex = encryptedMessage.length;
 

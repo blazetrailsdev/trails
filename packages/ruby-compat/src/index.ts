@@ -414,6 +414,7 @@ export {
   rbObjNotMatch,
   rbStrMatch,
   rbStrRespondTo,
+  rbStrInclude,
   rbStrPlus,
   rbStrSend,
   rstrip,
