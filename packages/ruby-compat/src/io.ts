@@ -1135,8 +1135,9 @@ export class IO {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#<<`
-   * (`vendor/ruby/v3.3.11/io.c:15501` `rb_io_addstr`, `io.c:2323-2327`).
+   * `IO#<<` (`vendor/ruby/v3.3.11/io.c:15501` `rb_io_addstr`, `io.c:2323-2327`).
+   *
+   * @noRailsEquivalent PERMANENT
    */
   append(str: string | Uint8Array): this {
     this.write(str);
