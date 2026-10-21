@@ -21,7 +21,7 @@ import { bytes } from "./bytes.js";
  */
 export function b(str: string | Uint8Array): string {
   let str2 = "";
-  for (const byte of str instanceof Uint8Array ? str : bytes(str))
+  for (const byte of str instanceof Uint8Array ? str : bytes(String(str)))
     str2 += String.fromCharCode(byte);
   return str2;
 }
