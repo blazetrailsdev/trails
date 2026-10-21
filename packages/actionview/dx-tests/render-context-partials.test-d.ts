@@ -1,6 +1,6 @@
 import { describe, it, expectTypeOf } from "vitest";
 import type { SafeBuffer } from "@blazetrails/activesupport";
-import { TseRenderContextImpl } from "@blazetrails/actionview";
+import type { TseRenderContext } from "@blazetrails/actionview";
 import type { TemplateRegistry } from "@blazetrails/actionview";
 
 declare module "@blazetrails/actionview" {
@@ -12,7 +12,7 @@ declare module "@blazetrails/actionview" {
 }
 
 describe("TseRenderContext#render — conditional generic (Story 5.8 + follow-up)", () => {
-  const ctx = new TseRenderContextImpl();
+  const ctx = {} as TseRenderContext;
 
   it("known partial with correct locals compiles", () => {
     const r = ctx.render({ partial: "users/user", locals: { user: "Alice" } });
