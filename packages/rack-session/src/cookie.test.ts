@@ -399,8 +399,7 @@ describe("Rack::Session::Cookie", () => {
       const session = env["rack.session"] as SessionHash;
       if (session.get("counter") == null) session.set("counter", 0);
       session.set("counter", (session.get("counter") as number) + 1);
-      const errors = env[RACK_ERRORS] as StringIO;
-      errors.flush();
+      const errors = (env[RACK_ERRORS] as { flush(): StringIO }).flush();
       errors.rewind();
       return new Response(errors.read()).toA();
     };

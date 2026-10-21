@@ -192,6 +192,21 @@ export class StringIO {
   }
 
   /**
+   * `strio_gets` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1322`) with no
+   * separator argument: the next line, newline included, or `nil` at EOF.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  gets(): string | null {
+    if (this.isEof()) return null;
+    const newline = this._string.indexOf("\n", this._pos);
+    const end = newline === -1 ? this._string.length : newline + 1;
+    const line = this._string.slice(this._pos, end);
+    this._pos = end;
+    return line;
+  }
+
+  /**
    * `strio_each` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1366`) with no
    * separator argument: yields each remaining line and leaves the stream at EOF.
    *
