@@ -135,6 +135,26 @@ describe("walkTsFiles", () => {
     }
   });
 
+  it("skips a symlink chain too long to resolve", async () => {
+    const chained = path.join(root, "chained");
+    await fs.mkdir(path.join(chained, "real"), { recursive: true });
+    await fs.writeFile(path.join(chained, "real", "deep.ts"), "");
+    await fs.writeFile(path.join(chained, "kept.ts"), "");
+    await fs.symlink(path.join(chained, "real"), path.join(chained, "hop44"), "dir");
+    for (let hop = 43; hop >= 0; hop--) {
+      await fs.symlink(path.join(chained, `hop${hop + 1}`), path.join(chained, `hop${hop}`), "dir");
+    }
+
+    const files = (await walkTsFiles(chained, COMMITTED_TS_FILES)).map((f) =>
+      path.relative(chained, f),
+    );
+
+    expect(files).toContain("kept.ts");
+    expect(files).toContain(path.join("real", "deep.ts"));
+    expect(files).not.toContain(path.join("hop0", "deep.ts"));
+    expect(files).toContain(path.join("hop44", "deep.ts"));
+  });
+
   it("lists a root whose skipped subtree cannot be read", async () => {
     const pruned = path.join(root, "pruned");
     const deps = path.join(pruned, "node_modules");
