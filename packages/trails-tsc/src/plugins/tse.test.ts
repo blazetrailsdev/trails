@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import ts from "typescript-5";
-import { TseLocalsSignatureError, virtualizeTse, virtualizeTseWithDeltas } from "./tse.js";
+import {
+  TseLocalsSignatureError,
+  transpileTse,
+  virtualizeTse,
+  virtualizeTseWithDeltas,
+} from "./tse.js";
 import { diagnose } from "./tse-diagnose.js";
 
 describe("virtualizeTse", () => {
@@ -315,8 +319,10 @@ describe("virtualizeTse", () => {
         scope,
       );
       expect(out).toContain("  this: View,");
-      expect(out).toContain('  let readingTime = __lookup("readingTime") as Scope<"readingTime">;');
-      expect(out).toContain('  let post = __lookup("post") as Scope<"post">;');
+      expect(out).toContain(
+        '  let readingTime = __lookup("readingTime", true) as Scope<"readingTime">;',
+      );
+      expect(out).toContain('  let post = __lookup("post", true) as Scope<"post">;');
       expect(out).not.toContain('Scope<"n">');
       expect(out).not.toContain('Scope<"model">');
       expect(out).not.toContain('Scope<"x">');
@@ -400,9 +406,7 @@ describe("virtualizeTse free-name lookup", () => {
       ),
     ].map((m) => `${m[1]}:${m[2]}`);
   const run = async (source: string, view: object = {}): Promise<string> => {
-    const { outputText } = ts.transpileModule(virtualizeTse(source, scope), {
-      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-    });
+    const { outputText } = transpileTse(virtualizeTse(source, scope));
     const exports: { default?: (...a: unknown[]) => Promise<unknown> } = {};
     const modules: Record<string, unknown> = {
       "@blazetrails/actionview": { TopLevel: {} },
@@ -435,18 +439,20 @@ describe("virtualizeTse free-name lookup", () => {
     expect(lookups("<% const f = function g() { return g; }; %>")).toEqual([]);
   });
 
-  it("guards a name read under typeof", () => {
-    expect(lookups('<%= typeof secret !== "undefined" ? 1 : 2 %>')).toEqual([
-      'secret:"secret", true',
-    ]);
-    expect(lookups("<%= secret %>")).toEqual(['secret:"secret"']);
+  it("binds every free name without raising at the header", () => {
+    expect(lookups("<%= secret %>")).toEqual(['secret:"secret", true']);
   });
 
   it("raises ReferenceError when an undeclared name is used", async () => {
     await expect(run("<%= doesnt_exist.name %>")).rejects.toThrow(
       new ReferenceError("doesnt_exist is not defined"),
     );
-    await expect(run("<%= typeof secret %><%= secret.name %>")).rejects.toThrow(TypeError);
+    await expect(run("<%= typeof secret %><%= secret %>")).rejects.toThrow(
+      new ReferenceError("secret is not defined"),
+    );
+    for (const use of ['x ?? "d"', 'x || ""', "!x", "x == null", "x ? 1 : 2", "{ x }"]) {
+      await expect(run(`<%= ${use} %>`)).rejects.toThrow(new ReferenceError("x is not defined"));
+    }
   });
 
   it("reads an undeclared name under typeof as undefined", async () => {
@@ -454,6 +460,10 @@ describe("virtualizeTse free-name lookup", () => {
     expect(
       await run('<%= typeof secret !== "undefined" && secret != null ? secret : "one" %>'),
     ).toBe("one");
+  });
+
+  it("reads a name the template assigns from its binding", async () => {
+    expect(await run("<% x = 1 %><%= x %>")).toBe("1");
   });
 
   it("raises only where the undeclared name is reached", async () => {

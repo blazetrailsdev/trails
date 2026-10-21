@@ -273,7 +273,7 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
   for (const line of destructureLines(locals)) header.push(line);
   if (scope !== undefined) {
     const declared = new Set(locals.map((l) => l.name));
-    const { names, guarded } = freeIdentifiers(body);
+    const names = freeIdentifiers(body);
     const free = names.filter((name) => !declared.has(name));
     for (const [name, line] of Object.entries(INJECTED)) {
       if (!free.includes(name)) continue;
@@ -283,14 +283,12 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
     if (free.length > 0) {
       const scopes = ast.localsSignature === null ? "[locals, this, TopLevel]" : "[this, TopLevel]";
       header.push(
-        `  const __lookup = (name: string, guarded = false): any => { for (const scope of ${scopes} as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded || name in globalThis) return Reflect.get(globalThis, name); const raise = (): never => { throw new ReferenceError(name + " is not defined"); }; return new Proxy(raise, { get: raise, has: raise, apply: raise, construct: raise, set: raise }); };`,
+        `  const __lookup = (name: string, guarded = false): any => { for (const scope of ${scopes} as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded || name in globalThis) return Reflect.get(globalThis, name); throw new ReferenceError(name + " is not defined"); };`,
       );
     }
     for (const name of free) {
       const key = JSON.stringify(name);
-      header.push(
-        `  let ${name} = __lookup(${key}${guarded.has(name) ? ", true" : ""}) as Scope<${key}>;`,
-      );
+      header.push(`  let ${name} = __lookup(${key}, true) as Scope<${key}>;`);
     }
   }
   const footer = ["  return _ob;", "}", ""];
@@ -370,7 +368,7 @@ const UNDECLARABLE = new Set([
   "__lookup",
 ]);
 
-function freeIdentifiers(body: readonly string[]): { names: string[]; guarded: Set<string> } {
+function freeIdentifiers(body: readonly string[]): string[] {
   const sf = ts.createSourceFile(
     "body.ts",
     `async function __tse() {\n${body.join("\n")}\n}`,
@@ -379,13 +377,11 @@ function freeIdentifiers(body: readonly string[]): { names: string[]; guarded: S
   );
   const fn = sf.statements[0] as ts.FunctionDeclaration;
   const names = new Set<string>();
-  const guarded = new Set<string>();
   const visit = (node: ts.Node, bound: ReadonlySet<string>): void => {
     if (ts.isTypeNode(node)) return;
     if (ts.isIdentifier(node) && isReference(node) && !UNDECLARABLE.has(node.text)) {
       if (!bound.has(node.text)) {
         names.add(node.text);
-        if (ts.isTypeOfExpression(node.parent)) guarded.add(node.text);
       }
     }
     const inner = scopeBindings(node);
@@ -393,7 +389,7 @@ function freeIdentifiers(body: readonly string[]): { names: string[]; guarded: S
     ts.forEachChild(node, (child) => visit(child, next));
   };
   visit(fn, new Set());
-  return { names: [...names].sort(), guarded };
+  return [...names].sort();
 }
 
 function scopeBindings(node: ts.Node): Set<string> {
@@ -460,4 +456,115 @@ function isReference(node: ts.Identifier): boolean {
   };
   if (ts.isShorthandPropertyAssignment(parent)) return true;
   return parent.name !== node && parent.propertyName !== node && parent.label !== node;
+}
+
+export const tseLookupTransformer: ts.TransformerFactory<ts.SourceFile> = (context) => {
+  const f = context.factory;
+  const lookup = (name: string): ts.Expression =>
+    f.createCallExpression(f.createIdentifier("__lookup"), undefined, [
+      f.createStringLiteral(name),
+    ]);
+  return (sf) => {
+    const rewrite = (fn: ts.FunctionLikeDeclaration & { body: ts.Block }): ts.Block => {
+      const names = new Set<string>();
+      for (const stmt of fn.body.statements) {
+        if (!ts.isVariableStatement(stmt)) continue;
+        for (const decl of stmt.declarationList.declarations) {
+          let init = decl.initializer;
+          while (init && ts.isAsExpression(init)) init = init.expression;
+          if (
+            init &&
+            ts.isCallExpression(init) &&
+            ts.isIdentifier(init.expression) &&
+            init.expression.text === "__lookup" &&
+            ts.isIdentifier(decl.name)
+          )
+            names.add(decl.name.text);
+        }
+      }
+      const assigned = (node: ts.Node): void => {
+        const target =
+          ts.isBinaryExpression(node) &&
+          node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+          node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+            ? node.left
+            : (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+                (node.operator === ts.SyntaxKind.PlusPlusToken ||
+                  node.operator === ts.SyntaxKind.MinusMinusToken)
+              ? node.operand
+              : ts.isForInStatement(node) || ts.isForOfStatement(node)
+                ? node.initializer
+                : undefined;
+        if (target && ts.isIdentifier(target)) names.delete(target.text);
+        ts.forEachChild(node, assigned);
+      };
+      assigned(fn.body);
+      const visit = (node: ts.Node, parent: ts.Node, bound: ReadonlySet<string>): ts.Node => {
+        if (
+          ts.isShorthandPropertyAssignment(node) &&
+          names.has(node.name.text) &&
+          !bound.has(node.name.text)
+        ) {
+          return f.createPropertyAssignment(node.name.text, lookup(node.name.text));
+        }
+        if (
+          ts.isIdentifier(node) &&
+          names.has(node.text) &&
+          !bound.has(node.text) &&
+          !ts.isTypeOfExpression(parent) &&
+          isReferenceIn(node, parent)
+        ) {
+          return ts.setTextRange(lookup(node.text), node);
+        }
+        if (ts.isTypeNode(node)) return node;
+        const inner = scopeBindings(node);
+        const next = inner.size === 0 ? bound : new Set([...bound, ...inner]);
+        return ts.visitEachChild(node, (child) => visit(child, node, next), context);
+      };
+      const top = new Set(
+        [...scopeBindings(fn), ...scopeBindings(fn.body)].filter((n) => !names.has(n)),
+      );
+      return f.updateBlock(
+        fn.body,
+        fn.body.statements.map((stmt) => visit(stmt, fn.body, top) as ts.Statement),
+      );
+    };
+    const visitTop = (node: ts.Node): ts.Node => {
+      if (ts.isFunctionDeclaration(node) && node.name?.text === "render" && node.body) {
+        return f.updateFunctionDeclaration(
+          node,
+          node.modifiers,
+          node.asteriskToken,
+          node.name,
+          node.typeParameters,
+          node.parameters,
+          node.type,
+          rewrite(node as ts.FunctionDeclaration & { body: ts.Block }),
+        );
+      }
+      return node;
+    };
+    return ts.visitEachChild(sf, visitTop, context);
+  };
+};
+
+function isReferenceIn(node: ts.Identifier, parent: ts.Node): boolean {
+  const p = parent as ts.Node & { name?: ts.Node; propertyName?: ts.Node; label?: ts.Node };
+  if (ts.isVariableDeclaration(parent) || ts.isParameter(parent) || ts.isBindingElement(parent)) {
+    return parent.name !== node;
+  }
+  return p.name !== node && p.propertyName !== node && p.label !== node;
+}
+
+export function transpileTse(source: string): { outputText: string; sourceMapText: string } {
+  const { outputText, sourceMapText } = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+      isolatedModules: true,
+      sourceMap: true,
+    },
+    transformers: { before: [tseLookupTransformer] },
+  });
+  return { outputText, sourceMapText: sourceMapText! };
 }

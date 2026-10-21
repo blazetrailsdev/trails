@@ -1,6 +1,4 @@
-import { API, ModuleKind } from "typescript/unstable/sync";
-import { ScriptTarget } from "typescript/unstable/ast";
-import { decodeLineMappings, virtualizeTseWithDeltas } from "@blazetrails/trails-tsc";
+import { decodeLineMappings, transpileTse, virtualizeTseWithDeltas } from "@blazetrails/trails-tsc";
 import { chomp, htmlSafe, TopLevel } from "@blazetrails/activesupport";
 import * as RubyCompat from "@blazetrails/ruby-compat";
 import { ArgumentError, Encoding, rbEqual } from "@blazetrails/ruby-compat";
@@ -14,8 +12,6 @@ type StandIn = (
   locals: Record<string, unknown>,
   block?: (...name: unknown[]) => unknown,
 ) => unknown;
-
-let api: API | undefined;
 
 export async function compileTemplate(
   template: Template,
@@ -36,25 +32,17 @@ export async function compileTemplate(
   }
   const prepared = template.handler.stripTrailingNewlines ? chomp(source) : source;
   const escapeIgnore = Tse.escapeIgnoreList.some((type) => rbEqual(type, template.type));
-  api ??= new API();
   const { ts, mappings } = virtualizeTseWithDeltas(prepared, {
     view: "any",
     escapeIgnore,
     localsSignature: template.strictLocalsBang(),
   });
-  const { outputText, sourceMapText } = api.transpileModule(ts, {
-    compilerOptions: {
-      target: ScriptTarget.Latest,
-      module: ModuleKind.CommonJS,
-      isolatedModules: true,
-      sourceMap: true,
-    },
-  });
+  const { outputText, sourceMapText } = transpileTse(ts);
   const tseLine = new Map<number, number>();
   for (const m of mappings) if (!tseLine.has(m.genLine)) tseLine.set(m.genLine, m.srcLine);
   const jsToTse = new Map<number, number>();
   for (const m of decodeLineMappings(
-    (JSON.parse(sourceMapText!) as { mappings: string }).mappings,
+    (JSON.parse(sourceMapText) as { mappings: string }).mappings,
   )) {
     const line = tseLine.get(m.srcLine);
     if (line !== undefined && !jsToTse.has(m.genLine)) jsToTse.set(m.genLine, line);
