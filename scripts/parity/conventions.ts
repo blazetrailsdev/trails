@@ -1714,10 +1714,6 @@ function rubyMethodToTsWithoutUnderscore(
     // moves.
     const collides = siblingRubyNames?.has(base) === true;
     const literal = collides ? [snakeToCamel(base) + "?"] : [];
-    // A leading underscore marks a private Ruby predicate (`_include_layout?`)
-    // and stays in front of the `is`, so the candidate is `_isIncludeLayout`.
-    // `is_includeLayout` is what `classAttribute` still generates for an
-    // underscored attribute, kept until that spelling converges.
     const lead = /^_*/.exec(camel)![0];
     const isPrefixed = lead + "is" + camel.slice(lead.length).replace(/^./, (c) => c.toUpperCase());
     const generatedIsPrefixed =
