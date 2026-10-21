@@ -26,14 +26,15 @@ See [the correction](#correction-the-32gb-wall-is-resolution-not-module-count).
 
 Status of each wall after re-verification:
 
-| Wall                               | Status                                                                                                                                                                          |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — codegen memory                 | 362 modules fit in 20GB. **Still the live blocker**, and the only one: the app's 32GB exhaustion was misattributed to it — see the correction.                                  |
-| 1b — resolver symlink cycle        | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased. |
-| 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                          |
-| 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                                                                                 |
-| 3b — shape-mint abort              | **Gone** on `main` @ `20fde48d`. Re-verified 2026-10-20: 04d compiles, links and starts. Never filed; nothing to file.                                                          |
-| 3c — init-time hang at 362 modules | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                |
+| Wall                                       | Status                                                                                                                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — codegen memory                         | 362 modules fit in 20GB. **Still the live blocker**, and the only one: the app's 32GB exhaustion was misattributed to it — see the correction.                                  |
+| 1b — resolver symlink cycle                | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased. |
+| 2 — WebAssembly cannot link                | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                          |
+| 3a — `importedClass.prototype`             | **Fixed upstream**, unreleased.                                                                                                                                                 |
+| 3b — shape-mint abort                      | **Gone** on `main` @ `20fde48d`. Re-verified 2026-10-20: 04d compiles, links and starts. Never filed; nothing to file.                                                          |
+| 3c — init-time hang at 362 modules         | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                |
+| 4 — TDZ check ate a spread call's receiver | **Fixed upstream** — our patch merged as [PR 12990](https://github.com/PerryTS/perry/pull/12990) (`ccad647e7a`). Unreleased.                                                    |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
@@ -567,7 +568,7 @@ question is where between 139 and 364 modules the ceiling actually sits, and
 that is a Perry-internal threshold to bisect against a synthetic graph, not
 something a different trails entry point can route around.
 
-## 04d's new failure: `registerProcessAdapter`, and four refuted hypotheses
+## 04d: the barrel rung boots, after two Perry bugs (one fixed upstream)
 
 With wall 3b gone (above), `04d-ruby-compat-barrel` compiles, links and
 reaches startup on `main` @ `20fde48d`, then fails at runtime:
@@ -576,16 +577,36 @@ reaches startup on `main` @ `20fde48d`, then fails at runtime:
         at registerProcessAdapter (<anonymous>)
         at tryAutoRegisterNode (<anonymous>)
 
-This is a different and far more ordinary class of bug than the shape mint: a
-JS-level error in our own code's auto-registration path, not a compiler
-internal abort. `registerProcessAdapter`
+**Diagnosed and fixed upstream: [PR 12990](https://github.com/PerryTS/perry/pull/12990),
+merged as `ccad647e7a`.** It was not our code's fault. `lift_check`
+(`perry-hir/src/lower/module_tdz.rs`) hoists a TDZ check out past the access
+that reads a guarded binding — `(check, x).p` becomes `(check, x.p)` — to keep
+the access in the shape later passes recognize. It handled `Expr::Call` but
+omitted `Expr::CallSpread`, so a spread call kept the check inside its callee:
+
+    CallSpread { callee: Sequence([check, PropertyGet { property: "push" }]), .. }
+
+A `Sequence` evaluates to its last value, so the callee stopped being a member
+expression, codegen's member-aware arms in `expr/call_spread.rs` stopped
+matching, the call fell through to the closure path with no receiver, and
+`array_proto_mutator` threw on `this === undefined`. The runtime guard it hit
+is the receiver-less thunk check from #6908, which is correct — the HIR handed
+it a receiver that did exist. Hence `arr.push(x)` working while
+`arr.push(...xs)` threw, on the same array. The fix is one line, plus a
+regression test verified to fail without it.
+
+**This also corrects item 7 below.** The import cycles are implicated after
+all — not as a direct cause, but because a cycle is what forces a module-level
+binding's TDZ check to survive to runtime, which is the precondition for this
+bug. That is also why no synthetic program reproduced it. `registerProcessAdapter`
 (`ruby-compat/src/process-adapter.ts:428`) has exactly two calls that can
 raise it — `Object.keys(envInternal)` and `Object.entries(envSnapshot)` — so
 one of those receives undefined.
 
-**It is not yet diagnosed, and four plausible causes are ruled out.** Each was
+Four plausible causes were ruled out before the HIR dump located it. Each was
 tested as a synthetic program compiled by the same from-source Perry, against
-Node as the control. Perry matched Node in all four:
+Node as the control, and Perry matched Node in all four — which is what
+eventually forced the move from guessing to `perry compile --print-hir`:
 
 | Hypothesis                                                                                             | Probe                                                               | Result                                                                                  |
 | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -598,20 +619,52 @@ The last one is worth keeping in mind: Perry enforces temporal dead zones
 correctly, across an import cycle, which removes the most attractive
 explanation for a foundation-layer initialization failure.
 
-Since no synthetic program reproduces it, the next step is bisection against
-the real package rather than more guessing: instrument or narrow
-`process-adapter.ts` / `crypto-adapter.ts` under a deep import until the
-undefined value is identified. Note `crypto-adapter.ts:508` calls
-`tryAutoRegisterNode()` at module top level, so this runs during
-initialization, and `ruby-compat`'s six circular import groups (item 7) are
-real, even though a synthetic cycle behaves correctly.
+What found it: instrumenting `registerProcessAdapter` statement by statement.
+Every value was a valid non-null object or array (`Object.keys` returned 0,
+`Object.entries` 64) and the throw landed on `argvInternal.push(...argvSnapshot)`
+— a valid array receiver and a valid array argument. `--print-hir` then showed
+the `Sequence`-wrapped callee, and the adjacent `PutValueSet` in the same
+function threading an explicit `receiver` field made the asymmetry obvious.
+
+### The second bug: `RFC3986Parser`, still open
+
+With 12990 applied, 04d gets past `registerProcessAdapter` and fails at
+
+    TypeError: Super constructor is not a constructor
+        at new RFC3986Parser
+
+on a class with **zero** occurrences of `extends` or `super` in its file
+(`ruby-compat/src/uri/rfc3986-parser.ts:116`), constructed as an eager
+module-level singleton at `uri/common.ts:13`. Four reductions fail to
+reproduce it: a 3-key and a 9-key object literal in a class field initializer,
+a plain base class with initializers, and a class constructed across a true
+import cycle. Like the shape mint, it needs the populated 137-module context.
+
+Two `perry-hir` tests are **red on upstream `main`** in exactly this area, and
+may be the same defect:
+
+- `class_member_var_captures::sibling_same_named_class_bindings_construct_their_own_class`
+  (panics "the fixture constructs its class statically")
+- `issue_11298_class_expr_evaluation_identity::native_module_parent_keeps_the_shared_template`
+
+Confirmed pre-existing, not ours, by reverting our one-line fix on the same
+base. Open upstream PR 12970 ("forward references read a per-evaluation class
+through its binding") touches class bindings and is worth watching.
+
+**Workaround, if a boot is needed before this is fixed:** moving the field
+initializer into an explicit constructor avoids it. With that plus 12990, 04d
+runs natively and correctly — `[04d] a\.b\*c`, matching Node, at 137
+modules, the first time any barrel rung has booted. That workaround is **not
+committed**: it is worse TypeScript than the field initializer and exists only
+to route around a compiler defect.
 
 ### Upstream filings from this round
 
-| Issue                                                  | Subject                                                                       | State |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------- | ----- |
-| [12978](https://github.com/PerryTS/perry/issues/12978) | constraint check compares a type parameter's `TypeVar`, not its instantiation | filed |
-| [12979](https://github.com/PerryTS/perry/issues/12979) | contributor docs cannot produce a working from-source build                   | filed |
+| Issue                                                  | Subject                                                                       | State                   |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------- | ----------------------- |
+| [12978](https://github.com/PerryTS/perry/issues/12978) | constraint check compares a type parameter's `TypeVar`, not its instantiation | filed                   |
+| [12979](https://github.com/PerryTS/perry/issues/12979) | contributor docs cannot produce a working from-source build                   | filed                   |
+| [12990](https://github.com/PerryTS/perry/pull/12990)   | **PR** — lift a TDZ check out of a spread call's member callee                | **merged** `ccad647e7a` |
 
 Both re-verified against `main` @ `20fde48d` immediately before filing, and
 both duplicate-searched first. 12978's reproducer is the 23-line
