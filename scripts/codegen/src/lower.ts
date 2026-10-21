@@ -3694,7 +3694,8 @@ export class Lowerer {
         }
         // Only a receiver known to be a String: the untyped STRING_ONLY guess
         // can be another class's method of the same name (`StringScanner#scan`).
-        const rt1 = rt ? STRING_RESULT_TYPES[ts0] : undefined;
+        // `bytesize` answers an Integer on every Ruby class that defines it.
+        const rt1 = rt || ts0 === "bytesize" ? STRING_RESULT_TYPES[ts0] : undefined;
         return rt1 ? `(${send}[0] as ${rt1})` : `${send}[0]`;
       }
     }
@@ -4358,9 +4359,55 @@ export class Lowerer {
     s.types.set(name, t);
   }
 
+  /**
+   * Every Range the gem builds has Integer bounds (marcel's magic table,
+   * `[[0..1024, …]]`): no non-Integer literal endpoint and no `Range.new`.
+   * Cleared by {@link noteRanges} on the first file that builds another.
+   */
+  intRanges = true;
+
+  /** Record whether `file` builds a Range with a non-Integer (or computed) bound. */
+  noteRanges(body: N): void {
+    // A Range written straight into `[]` (`content_type[-content_type.size..-1]`)
+    // slices and is gone; it never reaches a `begin` / `end`.
+    const slices = new Set<N>();
+    walk([body], (n) => {
+      if (n.k === "call" && (n.name === "[]" || n.name === "slice"))
+        for (const a of n.args) if (a?.k === "range") slices.add(a);
+      if (
+        n.k === "range" &&
+        !slices.has(n) &&
+        [n.from, n.to].some((b: N | null) => b && b.k !== "int")
+      )
+        this.intRanges = false;
+      if (
+        n.k === "call" &&
+        n.name === "new" &&
+        n.recv?.k === "const" &&
+        n.recv.path.filter((x: string) => x).join("::") === "Range"
+      )
+        this.intRanges = false;
+    });
+  }
+
   typeOf(n: N | null | undefined, ctx: Ctx): TypeRef {
     if (!n) return null;
     const T = this.resolver.types;
+    if (n.k === "call" && n.recv && !n.args.length) {
+      // A bound of a Range, where every Range the gem builds is Integer-bounded.
+      if (this.intRanges && ["begin", "end", "first", "last", "min", "max"].includes(n.name)) {
+        const rt = this.typeOf(n.recv, ctx);
+        if (rt?.k === "class" && /(^|[#/])Range$/.test(rt.key))
+          return { k: "prim", name: "number" };
+      }
+    }
+    // Integer arithmetic answers an Integer.
+    if (n.k === "call" && n.recv && n.args.length === 1 && ["+", "-", "*", "%"].includes(n.name)) {
+      const lt = this.typeOf(n.recv, ctx);
+      const rt = this.typeOf(n.args[0], ctx);
+      if (lt?.k === "prim" && lt.name === "number" && rt?.k === "prim" && rt.name === "number")
+        return { k: "prim", name: "number" };
+    }
     // `Time.zone` / `Time.find_zone` answer an `ActiveSupport::TimeZone`
     // (time-zone-config.ts `zone()`), whose `name` is a property.
     if (

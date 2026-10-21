@@ -477,7 +477,10 @@ for (const [ts, texts] of byTs) {
   if (arg("--tests") && existsSync(fixtures))
     cpSync(fixtures, path.join(outDir, "test-helpers", "fixtures"), { recursive: true });
 }
-writeFileSync(path.join(outDir, "codegen-runtime.ts"), runtimeShim(resolver.wanted.keys()));
+// Only where some file calls a helper ruby-compat does not export.
+rmSync(path.join(outDir, "codegen-runtime.ts"), { force: true });
+if (resolver.wanted.size)
+  writeFileSync(path.join(outDir, "codegen-runtime.ts"), runtimeShim(resolver.wanted.keys()));
 writeFileSync(path.join(outDir, "codegen-declined.ts"), DECLINED_SHIM);
 // The hand port's namespace seats (`namespaces.ts`, CLAUDE.md "Call-time constant
 // resolution") have no Ruby file; generated files import the gem namespace from it.
