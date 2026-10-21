@@ -2166,9 +2166,6 @@ extend(Base, {
 extend(Base, _StoreClassMethods);
 extend(Base, _AggregationsClassMethods);
 
-include(Base, JSONSerializer);
-Base.includeRootInJson = false;
-
 include(Base, {
   writeAttribute: _writeAttributeMethod,
   isNewRecord: _Persistence.isNewRecord,
@@ -2218,7 +2215,6 @@ include(Base, {
   cacheKey: _cacheKey,
   cacheKeyWithVersion: _cacheKeyWithVersion,
   cacheVersion: _cacheVersion,
-  serializableHash: Serialization.serializableHash,
   readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
   isRespondTo: _isRespondTo,
   respondToMissing: _respondToMissing,
@@ -2246,6 +2242,9 @@ include(Base, { initAttributes: _Core.initAttributes });
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
+include(Base, JSONSerializer);
+Base.includeRootInJson = false;
+include(Base, { serializableHash: Serialization.serializableHash });
 include(Base, LockingPessimistic.Pessimistic);
 include(Base, Timestamp.Timestamp);
 include(Base, ActiveRecord.Associations);
