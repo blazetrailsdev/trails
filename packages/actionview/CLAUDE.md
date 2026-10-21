@@ -27,4 +27,6 @@ commas only, so a nested hash or a `key:` inside a string or ternary is not
 read as an option. `renderDependencies` then takes `render_calls`'
 `object:`/`collection:`-without-`partial:` skip (`:21-24`). The template
 itself is still found by `ERBTracker`'s regexes, so the answer keeps
-`ERBTracker`'s shape (no `_` prefix). No full JS parse is run.
+`ERBTracker`'s shape (no `_` prefix). No full JS parse is run, so a regex
+literal, a JS comment, or a backtick nested inside `${}` in a render call's
+arguments can still be misread.

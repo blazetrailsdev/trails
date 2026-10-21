@@ -124,7 +124,7 @@ export class TSETracker {
     for (const node of parse(this.source).nodes) {
       if (node.kind === "text") continue;
 
-      for (const args of node.value.split(/\brender\b/).slice(1)) {
+      for (const args of node.value.split(/\brender(?:ToString)?\b/).slice(1)) {
         const options = this.renderCallOptions(args);
         if (options == null) continue;
 
@@ -135,7 +135,11 @@ export class TSETracker {
 
         const spacerTemplate = options.spacerTemplate;
         const spacer = spacerTemplate != null ? TSETracker.STRING.exec(spacerTemplate) : null;
-        if (spacer?.index === 0 && spacer[0].length === spacerTemplate!.length) {
+        if (
+          spacer?.index === 0 &&
+          spacer[0].length === spacerTemplate!.length &&
+          !(spacer.groups?.quote === "`" && spacer.groups.static?.includes("${"))
+        ) {
           this.addStaticDependency(dependencies, spacer.groups?.static, spacer.groups?.quote);
         }
         const renderType = Object.keys(options).find((key) => RENDER_TYPE_KEYS.includes(key));
