@@ -1755,8 +1755,13 @@ export function rbModAppendFeatures(
         descriptors[key] = { ...modDesc, configurable: true, enumerable: false };
         if (typeof key === "string" && "value" in modDesc) {
           const shadowed = Reflect.get(klass.prototype, key) as unknown;
-          if (typeof shadowed === "function" && shadowed !== modDesc.value) {
-            descriptors[superSlot(modDesc.value as AnyFunction, key)] = {
+          const slot = superSlot(modDesc.value as AnyFunction, key);
+          if (
+            typeof shadowed === "function" &&
+            shadowed !== modDesc.value &&
+            !Object.hasOwn(descriptors, slot)
+          ) {
+            descriptors[slot] = {
               value: shadowed,
               configurable: true,
             };
@@ -2092,12 +2097,18 @@ export function prepend(
  */
 export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
   if (mod instanceof Module) return Module.prototype.prependFeatures.call(mod, klass);
+  if (Object.hasOwn(mod, moduleIncludesKey)) {
+    for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
+      if (!isModuleMethodTablePresent(klass, nested)) prepend(klass, nested);
+    }
+  }
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
     trackInstanceInitializer(klass.prototype, instanceInitializer, prependedInstanceInitializers);
   }
   const source = typeof mod === "function" ? (mod as AnyClass).prototype : mod;
+  const seated = new Set<symbol>();
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
     const descriptor = Object.getOwnPropertyDescriptor(source, key);
@@ -2108,10 +2119,11 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
         "value" in descriptor &&
         shadowed !== descriptor.value
       ) {
-        Object.defineProperty(klass.prototype, superSlot(descriptor.value as AnyFunction, key), {
-          value: shadowed,
-          configurable: true,
-        });
+        const slot = superSlot(descriptor.value as AnyFunction, key);
+        if (!seated.has(slot)) {
+          seated.add(slot);
+          Object.defineProperty(klass.prototype, slot, { value: shadowed, configurable: true });
+        }
       }
       Object.defineProperty(klass.prototype, key, descriptor);
     }
