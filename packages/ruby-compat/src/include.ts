@@ -1940,7 +1940,10 @@ function rbObjAlloc(obj: object, proto: object | null): object {
   if (obj instanceof Set) return Object.setPrototypeOf(new Set(obj), proto);
   if (obj instanceof RegExp) return Object.setPrototypeOf(new RegExp(obj), proto);
   if (ArrayBuffer.isView(obj) && !(obj instanceof DataView)) {
-    return Object.setPrototypeOf((obj as Uint8Array).slice(), proto);
+    const typedArray = (
+      globalThis as unknown as Record<string, new (src: ArrayLike<number>) => object>
+    )[(obj as Uint8Array)[Symbol.toStringTag]];
+    return Object.setPrototypeOf(new typedArray(obj as Uint8Array), proto);
   }
   return Object.create(proto);
 }
@@ -2027,6 +2030,8 @@ export function prepend(
   if (!isModuleMethodTablePresent(klass, mod)) rbModPrependFeatures(klass, mod);
   if (typeof (mod as ModuleHooks)[prepended] === "function") {
     (mod as ModuleHooks)[prepended]!(klass);
+  } else {
+    featureHook(mod, "prepended")?.(klass);
   }
 }
 

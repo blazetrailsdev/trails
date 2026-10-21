@@ -392,6 +392,15 @@ describe("prepend", () => {
     prepend(Klass, mod);
     expect(calls).toBe(2);
   });
+
+  it("fires a string-named prepended hook on a plain module", () => {
+    class Klass {}
+    const seen: unknown[] = [];
+    const mod = {};
+    Object.defineProperty(mod, "prepended", { value: (klass: unknown) => seen.push(klass) });
+    prepend(Klass, mod);
+    expect(seen).toEqual([Klass]);
+  });
 });
 
 describe("include", () => {
@@ -1607,6 +1616,11 @@ describe("rbObjClone", () => {
     copy[0] = 9;
     expect([...copy]).toEqual([9, 2]);
     expect([...bytes]).toEqual([1, 2]);
+    const buffer = Buffer.from([1, 2]);
+    const bufferCopy = rbObjClone(buffer);
+    bufferCopy[0] = 9;
+    expect([...buffer]).toEqual([1, 2]);
+    expect(bufferCopy).toBeInstanceOf(Buffer);
   });
 
   it("copies a class into a constructible class (rb_mod_init_copy)", () => {
