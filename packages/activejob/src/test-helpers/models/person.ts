@@ -1,5 +1,12 @@
 import { Identification } from "@blazetrails/globalid";
-import { include, rbModConstSet, registerConstant, StandardError } from "@blazetrails/ruby-compat";
+import {
+  include,
+  rbModConstSet,
+  registerConstant,
+  StandardError,
+  toI,
+  toS,
+} from "@blazetrails/ruby-compat";
 
 class RecordNotFound extends StandardError {}
 
@@ -13,7 +20,7 @@ export class Person {
   readonly id: unknown;
 
   static find(id: unknown): Person {
-    if (Number.parseInt(String(id), 10) === 404) {
+    if (toI(id) === 404) {
       throw new RecordNotFound("Cannot find person with ID=404");
     }
     return new this(id);
@@ -24,7 +31,7 @@ export class Person {
   }
 
   equals(otherPerson: unknown): boolean {
-    return otherPerson instanceof Person && String(this.id) === String(otherPerson.id);
+    return otherPerson instanceof Person && toS(this.id) === toS(otherPerson.id);
   }
 }
 include(Person, Identification);

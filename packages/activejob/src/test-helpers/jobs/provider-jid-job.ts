@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { JobBuffer } from "../support/job-buffer.js";
 export class ProviderJidJob extends Base {
@@ -7,7 +7,7 @@ export class ProviderJidJob extends Base {
   }
 
   perform(): void {
-    JobBuffer.add(`Provider Job ID: ${this.providerJobId}`);
+    JobBuffer.add(`Provider Job ID: ${rbObjAsString(this.providerJobId)}`);
   }
 }
 registerConstant("ProviderJidJob", ProviderJidJob);

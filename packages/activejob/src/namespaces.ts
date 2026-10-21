@@ -48,15 +48,15 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
   "active_job/serializers/object_serializer": () => import("./serializers/object-serializer.js"),
   "active_job/serializers/time_object_serializer": () =>
     import("./serializers/time-object-serializer.js"),
+  "active_job/serializers/symbol_serializer": () => import("./serializers/symbol-serializer.js"),
+  "active_job/serializers/duration_serializer": () =>
+    import("./serializers/duration-serializer.js"),
   "active_job/serializers/date_time_serializer": () =>
     import("./serializers/date-time-serializer.js"),
   "active_job/serializers/date_serializer": () => import("./serializers/date-serializer.js"),
   "active_job/serializers/time_with_zone_serializer": () =>
     import("./serializers/time-with-zone-serializer.js"),
   "active_job/serializers/time_serializer": () => import("./serializers/time-serializer.js"),
-  "active_job/serializers/symbol_serializer": () => import("./serializers/symbol-serializer.js"),
-  "active_job/serializers/duration_serializer": () =>
-    import("./serializers/duration-serializer.js"),
   "active_job/serializers/module_serializer": () => import("./serializers/module-serializer.js"),
   "active_job/serializers/range_serializer": () => import("./serializers/range-serializer.js"),
   "active_job/serializers/big_decimal_serializer": () =>
@@ -121,12 +121,12 @@ export const Serializers = { name: "ActiveJob::Serializers", loadPath } as Autol
   addSerializers: typeof SerializersModule.addSerializers;
   ObjectSerializer: typeof ObjectSerializer;
   TimeObjectSerializer: typeof TimeObjectSerializer;
+  SymbolSerializer: typeof SymbolSerializer;
+  DurationSerializer: typeof DurationSerializer;
   DateTimeSerializer: typeof DateTimeSerializer;
   DateSerializer: typeof DateSerializer;
   TimeWithZoneSerializer: typeof TimeWithZoneSerializer;
   TimeSerializer: typeof TimeSerializer;
-  SymbolSerializer: typeof SymbolSerializer;
-  DurationSerializer: typeof DurationSerializer;
   ModuleSerializer: typeof ModuleSerializer;
   RangeSerializer: typeof RangeSerializer;
   BigDecimalSerializer: typeof BigDecimalSerializer;

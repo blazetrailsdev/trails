@@ -47,12 +47,13 @@ describe("canonical job fixtures", () => {
     JobBuffer.clear();
     new KwargsJob().perform();
     new KwargsJob().perform({ argument: null });
-    expect(JobBuffer.values()).toEqual(["Job with argument: 1", "Job with argument: null"]);
+    expect(JobBuffer.values()).toEqual(["Job with argument: 1", "Job with argument: "]);
   });
 
   it("compares Person by id.to_s and raises RecordNotFound for 404", () => {
     expect(rbEqual(new Person(9), new Person("9"))).toBe(true);
     expect(rbEqual(new Person(9), 9)).toBe(false);
+    expect(rbEqual(new Person(null), new Person(""))).toBe(true);
     expect(() => Person.find("404")).toThrow(Person.RecordNotFound);
     expect(new Parameters({ a: 1 }).toH()).toEqual({ a: 1 });
   });
