@@ -11,6 +11,12 @@
     "noCounterpartFiles": 0,
     "allowed": 40
   },
+  "actionview": {
+    "novel": 0,
+    "total": 24,
+    "noCounterpartFiles": 3,
+    "allowed": 24
+  },
   "i18n": {
     "novel": 0,
     "total": 8,

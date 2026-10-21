@@ -20,6 +20,7 @@ export interface SelectorAssertionsHost {
   documentRootElement(): unknown;
 }
 
+/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export function cssSelect(this: SelectorAssertionsHost, ...args: unknown[]): NodeSet {
   if (args.length === 0) throw new ArgumentError("you at least need a selector argument");
 
@@ -28,6 +29,7 @@ export function cssSelect(this: SelectorAssertionsHost, ...args: unknown[]): Nod
   return nodeset(root).css(args[0]);
 }
 
+/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): NodeSet | undefined {
   const block = typeof args.at(-1) === "function" ? (args.pop() as (s: NodeSet) => void) : null;
   this._selected ??= null;
@@ -48,8 +50,10 @@ export function assertDom(this: SelectorAssertionsHost, ...args: unknown[]): Nod
   return matches;
 }
 
+/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export const assertSelect = assertDom;
 
+/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export function assertDomEncoded(
   this: SelectorAssertionsHost,
   element: unknown = null,
@@ -80,6 +84,7 @@ export function assertDomEncoded(
   });
 }
 
+/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export const assertSelectEncoded = assertDomEncoded;
 
 /** @internal */

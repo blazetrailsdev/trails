@@ -17,6 +17,7 @@ const handlers = new Map<string, TemplateHandler>();
 let defaultHandler: TemplateHandler | null = null;
 let cachedExtensions: string[] | null = null;
 
+/** @noRailsEquivalent CONVERGEABLE template-handlers-is-template-extended-handlers */
 export const TemplateHandlers = {
   registerTemplateHandler(...extensionsAndHandler: [...string[], TemplateHandler]): void {
     const handler = extensionsAndHandler[extensionsAndHandler.length - 1] as TemplateHandler;

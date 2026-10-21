@@ -24,17 +24,13 @@ export class OutputBuffer {
     return htmlSafe(this._raw);
   }
 
+  /** @noRailsEquivalent PERMANENT */
   toStr(): string {
     return this._raw;
   }
 
   get htmlSafe(): true {
     return true;
-  }
-
-  /** @deprecated */
-  htmlSafeBuffer(): SafeBuffer {
-    return this.toString();
   }
 
   append(value: unknown): this {
