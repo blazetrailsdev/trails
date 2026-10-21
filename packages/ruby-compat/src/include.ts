@@ -1680,31 +1680,6 @@ export function rbModAppendFeatures(
   klass: AnyClass | object,
   mod: ModuleObject | AnyClass | Module,
 ): void {
-  const seatSuper = (
-    target: object,
-    key: string,
-    method: unknown,
-    descriptors: PropertyDescriptorMap,
-  ): void => {
-    if (typeof method !== "function") return;
-    let shadowed: unknown;
-    for (
-      let link: object | null = target;
-      link;
-      link = Object.getPrototypeOf(link) as object | null
-    ) {
-      const desc = Object.getOwnPropertyDescriptor(link, key);
-      if (desc) {
-        shadowed = desc.value;
-        break;
-      }
-    }
-    if (typeof shadowed !== "function" || shadowed === method) return;
-    let slot = superSlots.get(method as AnyFunction);
-    if (slot === undefined) superSlots.set(method as AnyFunction, (slot = Symbol(`super:${key}`)));
-    if (Object.hasOwn(descriptors, slot)) return;
-    descriptors[slot] = { value: shadowed, configurable: true };
-  };
   if (!isClassReceiver(klass) && !(klass instanceof Module)) {
     return trackIncludedModule(klass, mod, moduleIncludesKey);
   }
@@ -1741,7 +1716,7 @@ export function rbModAppendFeatures(
       const existing = Object.getOwnPropertyDescriptor(klass.prototype, key);
       const existingIsMixin = installed.has(key);
       if (!existing || existingIsMixin) {
-        seatSuper(klass.prototype, key, modDesc.value, descriptors);
+        rbSeatSuper(klass.prototype, key, modDesc.value, descriptors);
       }
       if (!existing) {
         descriptors[key] = modDesc;
@@ -1781,7 +1756,7 @@ export function rbModAppendFeatures(
         }
         installed.add(key);
         descriptors[key] = { ...modDesc, configurable: true, enumerable: false };
-        if (typeof key === "string") seatSuper(klass.prototype, key, modDesc.value, descriptors);
+        if (typeof key === "string") rbSeatSuper(klass.prototype, key, modDesc.value, descriptors);
       }
       ancestor = Object.getPrototypeOf(ancestor) as object | null;
     }
@@ -1789,7 +1764,43 @@ export function rbModAppendFeatures(
   Object.defineProperties(klass.prototype, descriptors);
 }
 
-const superSlots = new WeakMap<AnyFunction, symbol>();
+const superSlots = new WeakMap<AnyFunction, { slot: symbol; key: string }>();
+
+/**
+ * Seats on `target`, in `descriptors`, the `key` method `method` is about to
+ * shadow, for {@link rbCallSuper}. A function keeps the key it was first
+ * installed under, as MRI's `super` searches by the method's `original_id`
+ * (`vendor/ruby/v3.3.11/vm_insnhelper.c:4680`, `vm_search_super_method`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbSeatSuper(
+  target: object,
+  key: string,
+  method: unknown,
+  descriptors: PropertyDescriptorMap,
+): void {
+  if (typeof method !== "function") return;
+  let shadowed: unknown;
+  for (
+    let link: object | null = target;
+    link;
+    link = Object.getPrototypeOf(link) as object | null
+  ) {
+    const desc = Object.getOwnPropertyDescriptor(link, key);
+    if (desc) {
+      shadowed = desc.value;
+      break;
+    }
+  }
+  if (typeof shadowed !== "function" || shadowed === method) return;
+  let entry = superSlots.get(method as AnyFunction);
+  if (entry === undefined) {
+    superSlots.set(method as AnyFunction, (entry = { slot: Symbol(`super:${key}`), key }));
+  }
+  if (Object.hasOwn(descriptors, entry.slot)) return;
+  descriptors[entry.slot] = { value: shadowed, configurable: true };
+}
 
 /**
  * Mirrors: Ruby's `super` — vendor/ruby/v3.3.11/vm_eval.c:366 `rb_call_super`.
@@ -1801,9 +1812,10 @@ const superSlots = new WeakMap<AnyFunction, symbol>();
  * @noRailsEquivalent PERMANENT
  */
 export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unknown[]): unknown {
-  const slot = superSlots.get(method);
+  const entry = superSlots.get(method);
+  const slot = entry?.slot;
   let next = slot === undefined ? undefined : (Reflect.get(receiver, slot) as unknown);
-  const name = slot?.description?.slice("super:".length) ?? method.name;
+  const name = entry?.key ?? method.name;
   if (next === undefined && Object.hasOwn(Kernel, name)) {
     next = Reflect.get(Kernel, name);
   }
@@ -2105,31 +2117,6 @@ export function prepend(
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
 export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
-  const seatSuper = (
-    target: object,
-    key: string,
-    method: unknown,
-    descriptors: PropertyDescriptorMap,
-  ): void => {
-    if (typeof method !== "function") return;
-    let shadowed: unknown;
-    for (
-      let link: object | null = target;
-      link;
-      link = Object.getPrototypeOf(link) as object | null
-    ) {
-      const desc = Object.getOwnPropertyDescriptor(link, key);
-      if (desc) {
-        shadowed = desc.value;
-        break;
-      }
-    }
-    if (typeof shadowed !== "function" || shadowed === method) return;
-    let slot = superSlots.get(method as AnyFunction);
-    if (slot === undefined) superSlots.set(method as AnyFunction, (slot = Symbol(`super:${key}`)));
-    if (Object.hasOwn(descriptors, slot)) return;
-    descriptors[slot] = { value: shadowed, configurable: true };
-  };
   if (mod instanceof Module) return Module.prototype.prependFeatures.call(mod, klass);
   if (Object.hasOwn(mod, moduleIncludesKey)) {
     for (const nested of (mod as Record<symbol, Set<object>>)[moduleIncludesKey]) {
@@ -2147,7 +2134,7 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
     if (key === "constructor") continue;
     const descriptor = Object.getOwnPropertyDescriptor(source, key);
     if (descriptor && (typeof mod === "function" || descriptor.enumerable)) {
-      seatSuper(klass.prototype, key, descriptor.value, seated);
+      rbSeatSuper(klass.prototype, key, descriptor.value, seated);
       Object.defineProperty(klass.prototype, key, descriptor);
     }
   }
@@ -2201,31 +2188,6 @@ export function extend<T extends AnyClass | object>(
 }
 
 function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
-  const seatSuper = (
-    target: object,
-    key: string,
-    method: unknown,
-    descriptors: PropertyDescriptorMap,
-  ): void => {
-    if (typeof method !== "function") return;
-    let shadowed: unknown;
-    for (
-      let link: object | null = target;
-      link;
-      link = Object.getPrototypeOf(link) as object | null
-    ) {
-      const desc = Object.getOwnPropertyDescriptor(link, key);
-      if (desc) {
-        shadowed = desc.value;
-        break;
-      }
-    }
-    if (typeof shadowed !== "function" || shadowed === method) return;
-    let slot = superSlots.get(method as AnyFunction);
-    if (slot === undefined) superSlots.set(method as AnyFunction, (slot = Symbol(`super:${key}`)));
-    if (Object.hasOwn(descriptors, slot)) return;
-    descriptors[slot] = { value: shadowed, configurable: true };
-  };
   const extendedHook = featureHook(mod, "extended");
   if (extendedHook) {
     extendedHook(klass);
@@ -2305,7 +2267,7 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
       : { value: modDesc.value, writable: true, configurable: true, enumerable: false };
     if (!existing || getterIsMixin) {
       const seated: PropertyDescriptorMap = {};
-      seatSuper(klass, key, modDesc.value, seated);
+      rbSeatSuper(klass, key, modDesc.value, seated);
       Object.defineProperties(klass, seated);
     }
     if (!existing) {
