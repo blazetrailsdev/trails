@@ -304,6 +304,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
       '@blazetrails/msgpack':
         specifier: workspace:*
         version: link:../msgpack

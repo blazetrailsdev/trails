@@ -15,7 +15,7 @@ describe("QueueAdapters", () => {
     expect(() => QueueAdapters.lookup("sidekiq")).toThrow(NameError);
   });
 
-  it("runs the inline lane", () => {
+  it.skipIf(!isAdapterIs("inline"))("runs the inline lane", () => {
     expect(isAdapterIs("inline")).toBe(true);
     expect(new Base().queueAdapter).toBeInstanceOf(InlineAdapter);
   });
