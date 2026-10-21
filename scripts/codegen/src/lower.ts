@@ -2962,6 +2962,9 @@ export class Lowerer {
     const out = this.callInner(n, ctx);
     // Construction is synchronous in trails (a JS constructor cannot await).
     if (n.name === "new") return out;
+    // A call to a method known to be synchronous (a gem method the async pass
+    // left sync, a dependency's typed non-async member) is not awaited.
+    if (this.knownSync(n, ctx)) return out;
     if (["lambda", "proc", "raise", "fail", "throw"].includes(n.name) && n.recv === null)
       return out;
     if (isAwaited(out) || ["[]", "==", "!=", "!", "<", ">", "<=", ">="].includes(n.name))
@@ -5055,6 +5058,19 @@ export class Lowerer {
         return `~${lhs}`;
     }
     return `${lhs}.${tsMethodName(name)}(${a.join(", ")})`;
+  }
+
+  /** Whether call `n` reaches a method known not to be async. */
+  knownSync(n: N, ctx: Ctx): boolean {
+    if (n.block) return false;
+    const m = this.resolver.member(n, n.recv, ctx, this);
+    if (m) return m.async === false;
+    const rt = n.recv ? this.typeOf(n.recv, ctx) : null;
+    if (rt?.k === "class") {
+      const r = this.resolver.types.member(rt.key, n.name, !!rt.static);
+      if (r) return !r.info.async;
+    }
+    return false;
   }
 
   /**

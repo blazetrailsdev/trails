@@ -1038,8 +1038,10 @@ export class Emitter {
         lines.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: unknown`).join(", ")};`);
       return lines;
     };
+    // `async` only where the body awaits (an `await` nested in an inner async
+    // arrow belongs to that arrow, so this can say async where it need not).
     const fnHead = (lines: string[]) =>
-      lines.some((l) => /\bcontext\.skip\(/.test(l)) ? "async (context)" : "async ()";
+      `${lines.some((l) => /\bawait\b/.test(l)) ? "async " : ""}${lines.some((l) => /\bcontext\.skip\(/.test(l)) ? "(context)" : "()"}`;
     const out: string[] = [];
     const loopLocals: string[] = [];
     // The class-level block being lowered, for counting a local's assignments.
@@ -1059,7 +1061,7 @@ export class Emitter {
         if (why) {
           out.push(
             `// PERMANENT-SKIP: ${why}`,
-            `${vitest("it")}.skip(${nm}, async () => {`,
+            `${vitest("it")}.skip(${nm}, ${fnHead(lines)} => {`,
             ...indent(lines),
             "});",
           );
@@ -1101,7 +1103,8 @@ export class Emitter {
             k: "seq",
             body: this.lw.seqBody(b).filter((x: N) => !(x.k === "super" || x.k === "zsuper")),
           };
-          out.push(`${hook}(async () => {`, ...indent(body(stripped, loopLocals)), "});");
+          const hb = body(stripped, loopLocals);
+          out.push(`${hook}(${fnHead(hb)} => {`, ...indent(hb), "});");
         } else if (s.k === "if") {
           const c = this.lw.cond(s.cond, nameCtx());
           const and = (x: string) => (guard ? `(${guard}) && ${x}` : x);
