@@ -888,6 +888,13 @@ export class Lowerer {
       n.value.k === "array"
         ? `[${n.value.elems.map((e: N) => this.expr(e, ctx)).join(", ")}]`
         : this.expr(n.value, ctx);
+    // A value already an Array (a literal, `split`) needs no conversion.
+    const vt = n.value.k === "array" ? null : this.typeOf(n.value, ctx);
+    const ensure = (v: string) =>
+      n.value.k === "array" || (vt?.k === "array" && !vt.nullable) ? v : this.aryEnsure(v, ctx);
+    // `@mediatype, @subtype = …`: the fields destructured in place.
+    if (targets.every((t) => t.k === "ivar") && !tail)
+      return [`[${targets.map((t) => this.ivar(t.name, ctx)).join(", ")}] = ${ensure(value)};`];
     if (simple && targets.every((t) => t.k === "lvar" || t.k === "splat")) {
       const names = targets.map((t) => (t.k === "splat" ? t.value?.name : t.name));
       const allNew = !ctx.nested && names.every((nm) => !nm || !this.isLocal(ctx, nm));
@@ -898,13 +905,11 @@ export class Lowerer {
         .join(", ");
       if (allNew) names.forEach((nm) => nm && this.declareLocal(ctx, nm));
       else names.forEach((nm) => nm && this.letFor(this.nest(ctx), nm));
-      const line = allNew
-        ? `let [${pat}] = ${this.aryEnsure(value, ctx)};`
-        : `[${pat}] = ${this.aryEnsure(value, ctx)};`;
+      const line = allNew ? `let [${pat}] = ${ensure(value)};` : `[${pat}] = ${ensure(value)};`;
       return tail ? [line, `return ${value};`] : [line];
     }
     const tmp = this.tmp(ctx, "values");
-    const out = [`const ${tmp} = ${this.aryEnsure(value, ctx)};`];
+    const out = [`const ${tmp} = ${ensure(value)};`];
     targets.forEach((t, i) => {
       if (t.k === "splat") {
         if (t.value) out.push(...this.assignTo(t.value, `${tmp}.slice(${i})`, ctx));
@@ -3713,6 +3718,10 @@ export class Lowerer {
 
     // ── Ruby String methods (ruby-compat STRING_METHOD_TABLE) via rbStrSend; a
     // bang method mutates in place, so a variable receiver is rebound.
+    if (r !== null && recvNode && name === "split") {
+      const sp = this.nativeSplit2(n, recvNode, r, ctx, n.safe ? "?." : "");
+      if (sp) return sp;
+    }
     if (r !== null && recvNode) {
       const ts0 = tsMethodName(name);
       const rt = this.typeOf(recvNode, ctx);
@@ -5138,6 +5147,31 @@ export class Lowerer {
         return `~${lhs}`;
     }
     return `${lhs}.${tsMethodName(name)}(${a.join(", ")})`;
+  }
+
+  /**
+   * `s.split("/", 2)`: a String separator and a limit of 2 is the text before
+   * the first separator and everything after it ([] for "", [s] with no
+   * separator), which `indexOf` and `slice` say exactly (string.c
+   * rb_str_split_m). Null for any other `split`.
+   */
+  nativeSplit2(n: N, recvNode: N, r: string, ctx: Ctx, nav: string): string | null {
+    if (
+      nav ||
+      n.args.length !== 2 ||
+      n.args[0].k !== "str" ||
+      n.args[0].value === " " ||
+      n.args[0].value === "" ||
+      n.args[1].k !== "int" ||
+      n.args[1].value !== "2"
+    )
+      return null;
+    // Only a String answers `split` (an untyped receiver is cast to one).
+    const s =
+      this.strRecv(recvNode, r, ctx) ?? (this.typeOf(recvNode, ctx) ? null : `(${r} as string)`);
+    if (!s) return null;
+    const sep = JSON.stringify(n.args[0].value);
+    return `((s: string, i = s.indexOf(${sep})) => (s === "" ? [] : i < 0 ? [s] : [s.slice(0, i), s.slice(i + ${n.args[0].value.length})]))(${s})`;
   }
 
   /** Whether call `n` reaches a method known not to be async. */
