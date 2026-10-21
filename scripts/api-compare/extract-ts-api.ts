@@ -1591,11 +1591,19 @@ export function extractFromProgram(
       const hostInfo = info.classes[hostKey];
       if (!hostInfo) return;
 
-      const pushMethods = (methods: MethodInfo[]): void => {
+      const pushMethods = (methods: MethodInfo[], from?: ts.Node): void => {
+        const fromFile =
+          from === undefined
+            ? hostInfo.file
+            : path.relative(srcDir, from.getSourceFile().fileName).replace(/\\/g, "/");
         for (const m of methods) {
           if (m.name === "[initialize]") continue;
           if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
-          hostInfo.instanceMethods.push({ ...m, file: hostInfo.file });
+          hostInfo.instanceMethods.push({
+            ...m,
+            file: hostInfo.file,
+            ...(fromFile !== hostInfo.file ? { declaredIn: fromFile } : {}),
+          });
         }
       };
 
@@ -1625,6 +1633,7 @@ export function extractFromProgram(
           ) {
             pushMethods(
               harvestObjectLiteralMethods(propDecl.initializer, checker, hostInfo.file ?? ""),
+              propDecl,
             );
           }
           return;
@@ -1653,7 +1662,10 @@ export function extractFromProgram(
           // (b): const object literal → harvest directly, then fall through to
           // also push the name onto extends for compare.ts resolution.
           for (const literal of moduleObjectLiterals(sym, checker)) {
-            pushMethods(harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""));
+            pushMethods(
+              harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""),
+              literal,
+            );
           }
 
           // (a): class / interface / module — push name for later resolution.
