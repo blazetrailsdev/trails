@@ -335,3 +335,16 @@ describe("Rack::Request.ip_filter", () => {
     expect(req.formPairs).toEqual([]);
   });
 });
+
+describe("Rack::Request#POST over a binary form body", () => {
+  it("decodes raw UTF-8 bytes in the body as text", () => {
+    const req = new Request(
+      MockRequest.envFor("/", {
+        ":method": "POST",
+        CONTENT_TYPE: "application/x-www-form-urlencoded",
+        ":input": new TextEncoder().encode("a=é&b=%C3%A9"),
+      }),
+    );
+    expect(req.POST).toEqual({ a: "é", b: "é" });
+  });
+});

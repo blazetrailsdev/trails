@@ -179,13 +179,14 @@ export class Magic {
     return matches.some(([offset, value, children]) => {
       let match: boolean | null = null;
       if (value != null) {
+        const bytesize = b(value).length;
         if (offset instanceof Range) {
           io.read(offset.begin!, buffer);
-          const x = io.read(offset.end! - offset.begin! + b(value).length, buffer);
+          const x = io.read(offset.end! - offset.begin! + bytesize, buffer);
           match = x != null && rbStrInclude(x, value);
         } else {
           io.read(offset, buffer);
-          match = rbEqual(io.read(b(value).length, buffer), value);
+          match = rbEqual(io.read(bytesize, buffer), value);
         }
       }
       io.rewind();

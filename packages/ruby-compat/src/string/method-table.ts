@@ -294,7 +294,9 @@ export function rbStrPlus(str1: Uint8Array, str2: unknown): Uint8Array | string 
 
 /**
  * `String#include?` (`vendor/ruby/v3.3.11/string.c:6558` `rb_str_include`). An
- * ASCII-8BIT receiver, a `Uint8Array`, is searched by byte.
+ * ASCII-8BIT receiver, a `Uint8Array`, is searched by byte, after `rb_enc_check`
+ * (`vendor/ruby/v3.3.11/encoding.c:1038`) admits a UTF-8 needle only where one
+ * side is 7-bit.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#include?`
  * (`vendor/ruby/v3.3.11/string.c:6558`).
@@ -302,6 +304,13 @@ export function rbStrPlus(str1: Uint8Array, str2: unknown): Uint8Array | string 
 export function rbStrInclude(str: string | Uint8Array, arg: unknown): boolean {
   if (typeof str === "string") return str.includes(stringValue(arg));
   const sub = arg instanceof Uint8Array ? arg : b(stringValue(arg));
+  if (
+    !(arg instanceof Uint8Array) &&
+    !sub.every((byte) => byte < 0x80) &&
+    !str.every((byte) => byte < 0x80)
+  ) {
+    throw new EncodingError("incompatible character encodings: ASCII-8BIT and UTF-8");
+  }
   for (let i = 0; i + sub.length <= str.length; i++) {
     if (sub.every((byte, j) => byte === str[i + j])) return true;
   }

@@ -87,3 +87,12 @@ describe("an ASCII-8BIT String against UTF-8 text", () => {
     expect(io.gets()).toEqual(Uint8Array.of(0xff));
   });
 });
+
+describe("an ASCII-8BIT String searched for UTF-8 text", () => {
+  it("raises from include? when neither side is 7-bit, and compares a text read with ==", () => {
+    expect(() => rbFSend(Uint8Array.of(0xff), "isInclude", "é")).toThrow(EncodingError);
+    expect(rbFSend(b("xab"), "isInclude", "ab")).toBe(true);
+    expect(rbEqual("é", b("é"))).toBe(false);
+    expect(rbEqual("ab", b("ab"))).toBe(true);
+  });
+});

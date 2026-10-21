@@ -48,6 +48,7 @@ import {
   include,
   rbObjDup,
   warn,
+  strNew,
 } from "@blazetrails/ruby-compat";
 import { MediaType } from "./media-type.js";
 import * as Multipart from "./multipart.js";
@@ -524,9 +525,7 @@ export abstract class Helpers {
           this.setHeader(RACK_REQUEST_FORM_HASH, this.expandParamPairs(pairs));
         } else {
           const input: string | Uint8Array = this.getHeader(RACK_INPUT).read();
-          let formVars = typeof input === "string" ? input : "";
-          if (typeof input !== "string")
-            for (const byte of input) formVars += String.fromCharCode(byte);
+          let formVars = typeof input === "string" ? input : strNew(Array.from(input));
 
           if (formVars.endsWith("\0")) formVars = formVars.slice(0, -1);
 
