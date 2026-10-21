@@ -809,16 +809,18 @@ describe("CachedViewRenderTest", () => {
     const e = await assertRaises([TemplateError], {}, () => view.render({ partial: "test/raise" }));
     assertMatch(/doesnt_exist/, e.message);
     assertEqual("", (e as TemplateError).subTemplateMessage());
+    assertEqual("1", (e as TemplateError).lineNumber());
+    assertEqual("1: <%= doesnt_exist %>", (e as TemplateError).annotatedSourceCode()[0].trim());
+    assertEqual("/test/_raise.html.tse", (e as TemplateError).fileName());
   });
 
-  // BLOCKED: tse-undefined-local-raises-template-error
-  it.skip("render error indentation", async () => {
+  it("render error indentation", async () => {
     const e = await assertRaises([TemplateError], {}, () =>
       view.render({ partial: "test/raise_indentation" }),
     );
     const errorLines = (e as TemplateError).annotatedSourceCode();
     assertMatch(/error\shere/, e.message);
-    assertEqual(11, (e as TemplateError).lineNumber());
+    assertEqual("11", (e as TemplateError).lineNumber());
     assertEqual("     9: <p>Ninth paragraph</p>", errorLines[1]);
     assertEqual("    10: <p>Tenth paragraph</p>", errorLines[2]);
   });
@@ -829,6 +831,9 @@ describe("CachedViewRenderTest", () => {
     );
     assertMatch(/doesnt_exist/, e.message);
     assertEqual("", (e as TemplateError).subTemplateMessage());
+    assertEqual("1", (e as TemplateError).lineNumber());
+    assertEqual("1: <%= doesnt_exist %>", (e as TemplateError).annotatedSourceCode()[0].trim());
+    assertEqual("/test/_raise.html.tse", (e as TemplateError).fileName());
   });
 
   it("render sub template with errors", async () => {
@@ -840,6 +845,8 @@ describe("CachedViewRenderTest", () => {
       /Trace of template inclusion: .*test\/sub_template_raise\.html\.tse/,
       (e as TemplateError).subTemplateMessage(),
     );
+    assertEqual("1", (e as TemplateError).lineNumber());
+    assertEqual("/test/_raise.html.tse", (e as TemplateError).fileName());
   });
 
   it("undefined method error references named class", async () => {
@@ -956,6 +963,10 @@ describe("CachedViewRenderTest", () => {
       controllerView.render("partial_name_local_variable"),
     );
     assertInstanceOf(ReferenceError, exception.cause);
+    assertEqual(
+      "partial_name_local_variable",
+      (exception.cause as ReferenceError).message.replace(/ is not defined$/u, ""),
+    );
   });
 
   it("render partial with non existent format and raise missing template", async () => {

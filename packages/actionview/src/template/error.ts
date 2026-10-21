@@ -211,7 +211,7 @@ export class TemplateError extends ActionViewError {
   declare cause: Error;
   readonly template: Template | string;
   private subTemplates?: Template[];
-  private _lineNumber?: number | null;
+  private _lineNumber?: string | null;
 
   constructor(template: Template | string, errinfo: Error) {
     super(errinfo.message);
@@ -243,8 +243,9 @@ export class TemplateError extends ActionViewError {
   }
 
   sourceExtract(indentation = 0): string[] {
-    const num = this.lineNumber();
+    let num: string | number | null = this.lineNumber();
     if (num == null) return [];
+    num = Number(num);
 
     const sourceCode = (this.template as Template).encodeBang().split("\n");
 
@@ -263,7 +264,7 @@ export class TemplateError extends ActionViewError {
     this.subTemplates.push(templatePath);
   }
 
-  lineNumber(): number | null {
+  lineNumber(): string | null {
     if (this._lineNumber != null) return this._lineNumber;
     this._lineNumber = null;
     const fileName = this.fileName();
@@ -274,7 +275,7 @@ export class TemplateError extends ActionViewError {
         this.backtrace()!
           .map((line) => regexp.exec(line))
           .find((m) => m !== null);
-      if (match) this._lineNumber = Number(match[1]);
+      if (match) this._lineNumber = match[1];
     }
     return this._lineNumber;
   }

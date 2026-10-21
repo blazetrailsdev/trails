@@ -61,7 +61,7 @@ describe("ExceptionWrapper template spots", () => {
     } catch (e) {
       raised = e;
     }
-    expect((raised as TemplateError).lineNumber()).toBe(2);
+    expect((raised as TemplateError).lineNumber()).toBe("2");
     const frames = ((raised as Error).cause as Error)
       .stack!.split("\n")
       .filter((l) => l.includes(template.methodName()));
