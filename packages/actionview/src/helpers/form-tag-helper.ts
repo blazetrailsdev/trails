@@ -258,15 +258,25 @@ export function imageSubmitTag(
   return tag.call(this, "input", Object.assign({ type: "image", src: src }, options)) as SafeBuffer;
 }
 
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm then — PERMANENT
+ */
 export function fieldSetTag(
   this: FormTagHelperHost,
   legend: unknown = null,
   options: Record<string, unknown> | null = null,
   block?: () => unknown,
-): SafeBuffer {
+): SafeBuffer | Promise<SafeBuffer> {
   const content: unknown[] = [];
   if (!isBlank(legend)) content.push(contentTag.call(this, "legend", legend));
-  if (block !== undefined) content.push(this.capture(block));
+  if (block !== undefined) {
+    const captured = this.capture(block);
+    if (captured instanceof Promise) {
+      return captured.then((captured) => fieldSetTag.call(this, legend, options, () => captured));
+    }
+    content.push(captured);
+  }
   return contentTag.call(this, "fieldset", this.safeJoin(content), options);
 }
 export const fieldsetTag = fieldSetTag;
