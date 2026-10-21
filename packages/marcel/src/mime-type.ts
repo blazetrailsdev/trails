@@ -1,11 +1,9 @@
 import {
   rbFArray,
   uniq,
-  rbStrSend,
   rbEqual,
   Pathname,
   block as rbBlock,
-  first,
   compact,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
@@ -52,7 +50,7 @@ export class MimeType {
       return this.withIo(pathnameOrIo, (io) => {
         let magic;
         if (((magic = Magic.byMagic(io)) ?? false) !== false) {
-          return rbStrSend(magic.type, "downcase")[0];
+          return (magic.type as string).toLowerCase();
         }
         return null;
       });
@@ -64,7 +62,7 @@ export class MimeType {
     let magic;
     if (name != null && name !== false) {
       if (((magic = Magic.byPath(name)) ?? false) !== false) {
-        return rbStrSend(magic.type, "downcase")[0];
+        return (magic.type as string).toLowerCase();
       }
       return null;
     }
@@ -75,7 +73,7 @@ export class MimeType {
     let magic;
     if (extension != null && extension !== false) {
       if (((magic = Magic.byExtension(extension)) ?? false) !== false) {
-        return rbStrSend(magic.type, "downcase")[0];
+        return (magic.type as string).toLowerCase();
       }
       return null;
     }
@@ -103,15 +101,8 @@ export class MimeType {
   static parseMediaType(contentType: unknown) {
     let result;
     if (contentType != null && contentType !== false) {
-      result = first(
-        rbStrSend(
-          rbStrSend(contentType, "downcase")[0] as string,
-          "split",
-          /[;,\s]/,
-          2,
-        )[0] as string[],
-      );
-      if (result != null && (rbStrSend(result, "index", "/")[0] ?? false) !== false) {
+      result = (contentType as string).toLowerCase().split(/[;,\s]/, 2)[0];
+      if (result != null && result.includes("/")) {
         return result;
       }
       return null;

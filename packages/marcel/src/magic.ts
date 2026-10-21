@@ -2,8 +2,6 @@ import { TYPE_EXTS, TYPE_PARENTS, EXTENSIONS, MAGIC } from "./tables.js";
 import {
   Enumerator,
   Pathname,
-  rbStrSend,
-  rbCheckArrayType,
   compact,
   isEmpty,
   deleteIf,
@@ -47,11 +45,9 @@ export class Magic {
 
   constructor(type: unknown) {
     this._type = type;
-    const values = ((x) => (x == null ? [] : (rbCheckArrayType(x) ?? [x])))(
-      rbStrSend(type as string, "split", "/", 2)[0] as string[],
-    );
-    this._mediatype = values[0];
-    this._subtype = values[1];
+    const i = (type as string).indexOf("/");
+    [this._mediatype, this._subtype] =
+      i < 0 ? [type] : [(type as string).slice(0, i), (type as string).slice(i + 1)];
   }
 
   static add(
@@ -113,11 +109,8 @@ export class Magic {
   }
 
   static byExtension(ext: string) {
-    ext = rbStrSend(rbObjAsString(ext), "downcase")[0] as string;
-    const mime =
-      rbStrSend(ext, "get", new Range(0, 0, false))[0] === "."
-        ? EXTENSIONS[rbStrSend(ext, "get", new Range(1, -1, false))[0]]
-        : EXTENSIONS[ext];
+    ext = rbObjAsString(ext).toLowerCase();
+    const mime = ext.slice(0, 1) === "." ? EXTENSIONS[ext.slice(1)] : EXTENSIONS[ext];
     return mime != null && mime !== false ? new this(mime) : mime;
   }
 
@@ -207,9 +200,7 @@ export class Magic {
           if (offset instanceof Range) {
             io.read(offset.begin, buffer);
             x = io.read(
-              (offset.end as number) -
-                (offset.begin as number) +
-                (rbStrSend(value, "bytesize")[0] as number),
+              (offset.end as number) - (offset.begin as number) + (value as string).length,
               buffer,
             );
             return x != null && x !== false
@@ -224,7 +215,7 @@ export class Magic {
               : x;
           } else {
             io.read(offset, buffer);
-            return rbEqual(io.read(rbStrSend(value, "bytesize")[0], buffer), value);
+            return rbEqual(io.read((value as string).length, buffer), value);
           }
         }
         return null;
