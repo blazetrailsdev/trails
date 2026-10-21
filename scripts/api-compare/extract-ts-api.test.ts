@@ -11,6 +11,7 @@ import * as ts from "typescript-5";
 import * as path from "path";
 import * as fs from "node:fs";
 import * as os from "node:os";
+import { collectTsFileNames, countTsInternalNames } from "./extra-surface.js";
 import {
   loopedIncludeModules,
   resolveRelModule,
@@ -4893,10 +4894,31 @@ describe("extractFromProgram — re-export attribution", () => {
     expect(info.classes["adapters.ts:AbstractAdapter"].reExportedFrom).toBe(
       "adapters/abstract-adapter.ts:AbstractAdapter",
     );
-    expect(info.modules["adapters.ts:ConnectionPool"].reExportedFrom).toBe(
-      "adapters/pool.ts:ConnectionPool",
-    );
+    expect(info.modules["adapters.ts:ConnectionPool"]).toBeUndefined();
     expect(info.classes["adapters.ts:LocalHelper"].reExportedFrom).toBeUndefined();
+  });
+
+  it("records a re-exported plain module once, at its declaring file", () => {
+    const info = extractFromFiles("/p", {
+      "connection-adapters/deduplicable.ts": `
+        export const Deduplicable = {
+          /** @internal */
+          deduplicated() {},
+        };
+      `,
+      "connection-adapters.ts": `export { Deduplicable } from "./connection-adapters/deduplicable.js";`,
+    });
+    const classes = Object.values(info.classes);
+    const modules = Object.values(info.modules);
+
+    expect(info.modules["connection-adapters.ts:Deduplicable"]).toBeUndefined();
+    expect(
+      countTsInternalNames("connection-adapters/deduplicable.ts", classes, modules, undefined, []),
+    ).toBe(1);
+    expect(countTsInternalNames("connection-adapters.ts", classes, modules, undefined, [])).toBe(0);
+    expect(
+      collectTsFileNames("connection-adapters.ts", classes, modules, undefined).has("Deduplicable"),
+    ).toBe(false);
   });
 
   it("re-syncs a clone's extendsFiles, which the include pass writes after cloning", () => {
