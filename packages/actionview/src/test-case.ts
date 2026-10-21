@@ -54,6 +54,27 @@ type Parser = ((rendered: string) => unknown) | null | undefined;
 export class TestController extends ActionController.Base {
   declare _testCase: () => TestCase;
 
+  override get request(): ActionController.Base["request"] {
+    return this._request;
+  }
+  override set request(value: ActionController.Base["request"]) {
+    this._request = value;
+  }
+
+  override get response(): ActionController.Base["response"] {
+    return this._response;
+  }
+  override set response(value: ActionController.Base["response"]) {
+    this._response = value;
+  }
+
+  override get params(): ActionController.Base["params"] {
+    return this._params as ActionController.Base["params"];
+  }
+  override set params(value: ActionController.Base["params"]) {
+    this._params = value;
+  }
+
   declare static _controllerPath: string;
 
   static override controllerPath(): string {
