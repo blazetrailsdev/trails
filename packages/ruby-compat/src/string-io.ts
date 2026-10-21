@@ -87,6 +87,16 @@ export class StringIO {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `IO::generic_writable#<<`
+   * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1955` `strio_addstr`, which is
+   * `rb_io_addstr`, `vendor/ruby/v3.3.11/io.c:2323-2327`).
+   */
+  append(str: string | Uint8Array): this {
+    this.write(str);
+    return this;
+  }
+
+  /**
    * `IO::generic_writable#puts` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1530`
    * aliases it to `rb_io_puts`, `vendor/ruby/v3.3.11/io.c:8947`), which is how
    * `Rack::Session::Abstract::Persisted#commit_session` writes to
