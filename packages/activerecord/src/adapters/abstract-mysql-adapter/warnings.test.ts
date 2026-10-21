@@ -29,7 +29,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           adapter.execute(`SELECT 1 + 'foo'`),
         );
 
-        expect((error as SQLWarning).connectionPool).toEqual(adapter.pool);
+        expect(error.connectionPool).toEqual(adapter.pool);
       });
     });
 

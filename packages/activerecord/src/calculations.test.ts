@@ -475,9 +475,9 @@ describe("CalculationsTest", () => {
   });
 
   it("count on invalid columns raises", async () => {
-    const error = (await assertRaises([StatementInvalid], {}, async () => {
+    const error = await assertRaises([StatementInvalid], {}, async () => {
       await Account.select("credit_limit, firm_name").count();
-    })) as StatementInvalid;
+    });
 
     expect(error.sql).toMatch(/accounts/i);
     expect(error.sql).toMatch("credit_limit, firm_name");

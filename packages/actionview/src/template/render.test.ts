@@ -781,7 +781,7 @@ describe("CachedViewRenderTest", () => {
       view.render({ template: "test/syntax_error" }),
     );
     assertMatch(/syntax/i, e.message);
-    assertEqual("1:    <%= foo(", (e as TemplateError).annotatedSourceCode()[0].trim());
+    assertEqual("1:    <%= foo(", e.annotatedSourceCode()[0].trim());
   });
 
   // BLOCKED: render-runtime-error-spot-tests-reach-source-map-location
@@ -808,19 +808,19 @@ describe("CachedViewRenderTest", () => {
   it("render partial with errors", async () => {
     const e = await assertRaises([TemplateError], {}, () => view.render({ partial: "test/raise" }));
     assertMatch(/doesnt_exist/, e.message);
-    assertEqual("", (e as TemplateError).subTemplateMessage());
-    assertEqual("1", (e as TemplateError).lineNumber());
-    assertEqual("1: <%= doesnt_exist %>", (e as TemplateError).annotatedSourceCode()[0].trim());
-    assertEqual("/test/_raise.html.tse", (e as TemplateError).fileName());
+    assertEqual("", e.subTemplateMessage());
+    assertEqual("1", e.lineNumber());
+    assertEqual("1: <%= doesnt_exist %>", e.annotatedSourceCode()[0].trim());
+    assertEqual("/test/_raise.html.tse", e.fileName());
   });
 
   it("render error indentation", async () => {
     const e = await assertRaises([TemplateError], {}, () =>
       view.render({ partial: "test/raise_indentation" }),
     );
-    const errorLines = (e as TemplateError).annotatedSourceCode();
+    const errorLines = e.annotatedSourceCode();
     assertMatch(/error\shere/, e.message);
-    assertEqual("11", (e as TemplateError).lineNumber());
+    assertEqual("11", e.lineNumber());
     assertEqual("     9: <p>Ninth paragraph</p>", errorLines[1]);
     assertEqual("    10: <p>Tenth paragraph</p>", errorLines[2]);
   });
@@ -830,10 +830,10 @@ describe("CachedViewRenderTest", () => {
       view.render({ template: "test/_raise" }),
     );
     assertMatch(/doesnt_exist/, e.message);
-    assertEqual("", (e as TemplateError).subTemplateMessage());
-    assertEqual("1", (e as TemplateError).lineNumber());
-    assertEqual("1: <%= doesnt_exist %>", (e as TemplateError).annotatedSourceCode()[0].trim());
-    assertEqual("/test/_raise.html.tse", (e as TemplateError).fileName());
+    assertEqual("", e.subTemplateMessage());
+    assertEqual("1", e.lineNumber());
+    assertEqual("1: <%= doesnt_exist %>", e.annotatedSourceCode()[0].trim());
+    assertEqual("/test/_raise.html.tse", e.fileName());
   });
 
   it("render sub template with errors", async () => {
@@ -843,10 +843,10 @@ describe("CachedViewRenderTest", () => {
     assertMatch(/doesnt_exist/, e.message);
     assertMatch(
       /Trace of template inclusion: .*test\/sub_template_raise\.html\.tse/,
-      (e as TemplateError).subTemplateMessage(),
+      e.subTemplateMessage(),
     );
-    assertEqual("1", (e as TemplateError).lineNumber());
-    assertEqual("/test/_raise.html.tse", (e as TemplateError).fileName());
+    assertEqual("1", e.lineNumber());
+    assertEqual("/test/_raise.html.tse", e.fileName());
   });
 
   it("undefined method error references named class", async () => {
@@ -1331,7 +1331,7 @@ describe("CachedViewRenderTest", () => {
     const e = await assertRaises([TemplateError], {}, () =>
       view.render({ template: "test/uncacheable" }),
     );
-    assertMatch("can't be fragment cached", (e.cause as Error).message);
+    assertMatch("can't be fragment cached", e.cause.message);
   });
 });
 

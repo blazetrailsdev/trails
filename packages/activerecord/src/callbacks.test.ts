@@ -458,7 +458,7 @@ describe("CallbacksTest", () => {
     expect(await david.isValid()).toBeTruthy();
     expect(await david.save()).toBeFalsy();
     const exc = await assertRaise([RecordNotSaved], {}, () => david.saveBang());
-    expect((exc as RecordNotSaved).record).toBe(david);
+    expect(exc.record).toBe(david);
 
     david = await DeveloperWithCanceledCallbacks.find(developers("david").id);
     david.salary = 10_000_000;
@@ -485,7 +485,7 @@ describe("CallbacksTest", () => {
     const david = await DeveloperWithCanceledCallbacks.find(developers("david").id);
     expect(await david.destroy()).toBeFalsy();
     const exc = await assertRaise([RecordNotDestroyed], {}, () => david.destroyBang());
-    expect((exc as RecordNotDestroyed).record).toBe(david);
+    expect(exc.record).toBe(david);
     expect(await (ImmutableDeveloper as any).findById(developers("david").id)).not.toBeNull();
 
     const someone = await CallbackHaltedDeveloper.find(developers("david").id);

@@ -473,14 +473,14 @@ describe("BasicsTest", async () => {
   });
 
   it("initialize with invalid attribute", async () => {
-    const ex = (await assertRaises([MultiparameterAssignmentErrors], {}, () => {
+    const ex = await assertRaises([MultiparameterAssignmentErrors], {}, () => {
       new Topic({
         title: "test",
         "written_on(4i)": "16",
         "written_on(5i)": "24",
         "written_on(6i)": "00",
       } as never);
-    })) as MultiparameterAssignmentErrors;
+    });
 
     expect(ex.errors.length).toEqual(1);
     expect((ex.errors[0] as AttributeAssignmentError).attribute).toEqual("written_on");

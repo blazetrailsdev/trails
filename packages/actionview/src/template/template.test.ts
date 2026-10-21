@@ -250,7 +250,7 @@ describe("TestTSETemplate", () => {
       );
       await render();
     });
-    expect((error.cause as Error).stack!.split("\n")[1]).toMatch(/at (?:\S+\.)?hello\b/);
+    expect(error.cause.stack!.split("\n")[1]).toMatch(/at (?:\S+\.)?hello\b/);
     expect(error.cause).toBeInstanceOf(ArgumentError);
   });
 

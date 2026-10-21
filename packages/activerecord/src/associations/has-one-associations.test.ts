@@ -520,10 +520,8 @@ describe("HasOneAssociationsTest", () => {
       await (firm as any).createAccount();
     });
 
-    expect((error as RecordNotSaved).message).toBe(
-      "You cannot call create unless the parent is saved",
-    );
-    expect((error as RecordNotSaved).record).toBe(firm);
+    expect(error.message).toBe("You cannot call create unless the parent is saved");
+    expect(error.record).toBe(firm);
   });
 
   it("clearing an association clears the associations inverse", async () => {
