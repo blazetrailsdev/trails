@@ -1089,7 +1089,8 @@ export class TypePass {
               ts.isMethodDeclaration(m) ||
               ts.isMethodSignature(m) ||
               ts.isPropertyDeclaration(m) ||
-              ts.isPropertySignature(m)
+              ts.isPropertySignature(m) ||
+              ts.isGetAccessorDeclaration(m)
             )
               if (!hand.has(key)) {
                 hand.set(key, m as ts.SignatureDeclaration);
@@ -1100,6 +1101,46 @@ export class TypePass {
     }
     const program = this.program();
     const gc = program.getTypeChecker();
+    const unwritableNames = new Map<string, number>();
+    // Name → generated file exporting it (null when several do).
+    const genExports = new Map<string, string | null>();
+    const genAll = new Map<string, string[]>();
+    for (const f of this.files)
+      for (const m of readFileSync(f, "utf8").matchAll(
+        /^export (?:declare )?(?:abstract )?(?:class|interface|type|enum) ([\w$]+)/gm,
+      ))
+        (genAll.get(m[1]) ?? genAll.set(m[1], []).get(m[1])!).push(f);
+    // Several files export the name (`Base`): the one named for it, shallowest.
+    const kebab = (n: string) => n.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+    for (const [name, fs] of genAll) {
+      const uniq = [...new Set(fs)];
+      if (uniq.length === 1) {
+        genExports.set(name, uniq[0]);
+        continue;
+      }
+      const named = uniq
+        .filter((f) => path.basename(f, ".ts") === kebab(name))
+        .sort((a, b) => a.split("/").length - b.split("/").length);
+      genExports.set(
+        name,
+        named.length &&
+          (named.length === 1 || named[0].split("/").length < named[1].split("/").length)
+          ? named[0]
+          : null,
+      );
+    }
+    const genExport = (name: string, genSf: ts.SourceFile): string | null => {
+      const f = genExports.get(name);
+      if (!f) return null;
+      if (f === genSf.fileName) return "#local";
+      let id = path.relative(path.dirname(genSf.fileName), f).replace(/\.ts$/, ".js");
+      if (!id.startsWith(".")) id = `./${id}`;
+      return id;
+    };
+    const depExport = (name: string): string | null => {
+      const hits = [...this.exportsOf].filter(([, names]) => names.has(name)).map(([pid]) => pid);
+      return hits.length === 1 ? hits[0] : null;
+    };
     let n = 0;
     const why: Record<string, number> = {};
     const loose = (t: ts.TypeNode | undefined) =>
@@ -1161,11 +1202,36 @@ export class TypePass {
         }
         if (!id) {
           ok = false;
+          if (process.env.CODEGEN_TIMING)
+            unwritableNames.set(name, (unwritableNames.get(name) ?? 0) + 1);
           return m0;
         }
         wanted.push([id, name]);
         return `@@type${wanted.length - 1}@@`;
       });
+      const bare = out
+        .replace(/@@type\d+@@/g, "")
+        .replace(
+          /\b(Record|Promise|Array|Map|Set|ReadonlyArray|Partial|Readonly|Pick|Omit|Exclude|Extract|NonNullable|ReturnType|Parameters|InstanceType|Iterable|IterableIterator|AsyncIterable|PromiseLike|Date|RegExp|Error|Function|Symbol|BigInt)\b/g,
+          "",
+        )
+        .match(/\b[A-Z][\w$]*\b/g);
+      // A name printed bare is one the hand file has in scope; the generated
+      // tree's own export of it, or a dependency package's, is the same type.
+      if (ok && bare) {
+        for (const b of new Set(bare)) {
+          const id = genExport(b, genSf) ?? depExport(b);
+          if (!id) {
+            if (process.env.CODEGEN_TIMING)
+              unwritableNames.set(b, (unwritableNames.get(b) ?? 0) + 1);
+            continue;
+          }
+          out = out.replace(new RegExp(`(?<![\\w$.@])${b}(?![\\w$])`, "g"), () => {
+            wanted.push([id, b]);
+            return `@@type${wanted.length - 1}@@`;
+          });
+        }
+      }
       if (
         !ok ||
         /\b[A-Z][\w$]*\b/.test(
@@ -1178,9 +1244,10 @@ export class TypePass {
         )
       )
         return null;
-      return out.replace(/@@type(\d+)@@/g, (_m, i: string) =>
-        this.typeLocal(genSf, ...wanted[Number(i)]),
-      );
+      return out.replace(/@@type(\d+)@@/g, (_m, i: string) => {
+        const [id, name] = wanted[Number(i)];
+        return id === "#local" ? name : this.typeLocal(genSf, id, name);
+      });
     };
     for (const f of this.files) {
       const sf = program.getSourceFile(f);
@@ -1263,10 +1330,35 @@ export class TypePass {
           }
         }
         if ((ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) && loose(node.type)) {
-          const twin = twinOf(node) as ts.PropertyDeclaration | undefined;
-          if (twin && ts.isPropertyDeclaration(twin) && twin.type) {
-            const t = text(hc.getTypeFromTypeNode(twin.type), sf);
-            if (t) edits.push({ pos: node.type!.getStart(sf), end: node.type!.getEnd(), text: t });
+          // `@x` behind `attr_reader :x` is the generated `_x`; the hand port's
+          // twin is the `x` it reads through (a property or a getter).
+          let twin = twinOf(node);
+          const nm = node.name;
+          if (
+            !twin &&
+            ts.isIdentifier(nm) &&
+            nm.text.startsWith("_") &&
+            ts.isClassDeclaration(node.parent)
+          ) {
+            const owner = node.parent;
+            const pub = nm.text.slice(1);
+            twin =
+              (owner.name && hand.get(`${rel}#${owner.name.text}#${pub}`)) ||
+              (byName.get(`${rel}#${pub}`) ?? undefined);
+          }
+          const tn =
+            twin &&
+            (ts.isPropertyDeclaration(twin) ||
+              ts.isPropertySignature(twin) ||
+              ts.isGetAccessorDeclaration(twin))
+              ? twin.type
+              : undefined;
+          if (tn) {
+            const t = text(hc.getTypeFromTypeNode(tn), sf);
+            if (t) {
+              edits.push({ pos: node.type!.getStart(sf), end: node.type!.getEnd(), text: t });
+              why.fields = (why.fields ?? 0) + 1;
+            }
           }
         }
         ts.forEachChild(node, visit);
@@ -1278,7 +1370,11 @@ export class TypePass {
       n += edits.length;
     }
     if (process.env.CODEGEN_TIMING)
-      console.error("type-pass fromHand skipped:", JSON.stringify(why));
+      console.error(
+        "type-pass fromHand skipped:",
+        JSON.stringify(why),
+        JSON.stringify([...unwritableNames].sort((a, b) => b[1] - a[1]).slice(0, 25)),
+      );
     return n;
   }
 
