@@ -472,33 +472,7 @@ export class Emitter {
       guard ? `${vitest("it")}.skipIf(!(${guard}))` : vitest("it");
     // A test whose body names a constant a ratified CLAUDE.md section rules out
     // is parked as `it.skip` under a `PERMANENT-SKIP:` line, its body kept.
-    const permanentSkip = (stmts: N[]): string | null => {
-      let why: string | null = null;
-      let stringSub = false;
-      let namesString = false;
-      walk(stmts, (n) => {
-        if (why) return false;
-        if (n.k === "const") {
-          const fqn = n.path.filter((x: string) => x).join("::");
-          if (PERMANENT_CONSTS[fqn]) why = PERMANENT_CONSTS[fqn];
-          // A subclass of Ruby's String (`class StringWithoutSerializer < String`):
-          // a trails String is a JS primitive, which no class extends…
-          const hit = this.index.resolveConst(n.path, [
-            ...lexicalChain(this.index, this.index.scopes.get(u.fqn)?.lexicalParent),
-            u.fqn,
-          ]);
-          const sc = hit?.kind === "scope" ? this.index.scopes.get(hit.fqn) : undefined;
-          const sp = sc?.superclassPath?.filter((x: string) => x).join("::");
-          if (sc && !sc.superclassFqn && sp === "String") stringSub = true;
-          if (fqn === "String") namesString = true;
-        }
-      });
-      // …and only where the test asserts String-ness of it (`assert_instance_of
-      // String, deserialized`); a round-trip through its own serializer ports.
-      if (!why && stringSub && namesString)
-        why = 'CLAUDE.md "Ruby Strings are JS string primitives (no mutable String carrier)"';
-      return why;
-    };
+    const permanentSkip = (stmts: N[]): string | null => this.permanentSkip(u, stmts);
     const testHead = (stmts: N[], guard: string | null, nm: string): string[] => {
       const why = permanentSkip(stmts);
       return why
@@ -786,6 +760,364 @@ export class Emitter {
     ].join("\n");
   }
 
+  /** A test whose body names a constant a ratified CLAUDE.md section rules out. */
+  permanentSkip(u: Unit, stmts: N[]): string | null {
+    let why: string | null = null;
+    let stringSub = false;
+    let namesString = false;
+    walk(stmts, (n) => {
+      if (why) return false;
+      if (n.k === "const") {
+        const fqn = n.path.filter((x: string) => x).join("::");
+        if (PERMANENT_CONSTS[fqn]) why = PERMANENT_CONSTS[fqn];
+        // A subclass of Ruby's String (`class StringWithoutSerializer < String`):
+        // a trails String is a JS primitive, which no class extends…
+        const hit = this.index.resolveConst(n.path, [
+          ...lexicalChain(this.index, this.index.scopes.get(u.fqn)?.lexicalParent),
+          u.fqn,
+        ]);
+        const sc = hit?.kind === "scope" ? this.index.scopes.get(hit.fqn) : undefined;
+        const sp = sc?.superclassPath?.filter((x: string) => x).join("::");
+        if (sc && !sc.superclassFqn && sp === "String") stringSub = true;
+        if (fqn === "String") namesString = true;
+      }
+    });
+    // …and only where the test asserts String-ness of it (`assert_instance_of
+    // String, deserialized`); a round-trip through its own serializer ports.
+    if (!why && stringSub && namesString)
+      why = 'CLAUDE.md "Ruby Strings are JS string primitives (no mutable String carrier)"';
+    return why;
+  }
+
+  /** Minitest's own class-level DSL, which vitest's `describe` / `it` / hooks replace. */
+  static MINITEST_DSL = new Set(["setup", "teardown", "test"]);
+
+  /**
+   * A gem test support class (`class Marcel::TestCase < Minitest::Test` in
+   * test/test_helper.rb): a superclass of test classes, under test/, that
+   * defines no tests of its own.
+   */
+  isTestSupport(fqn: string): boolean {
+    const sc = this.index.scopes.get(fqn);
+    if (!sc || sc.kind !== "class") return false;
+    if (![...sc.files].every((x) => x.startsWith("test/"))) return false;
+    const sp = (sc.superclassPath ?? []).filter((x) => x).join("::");
+    if (!["Minitest::Test", "ActiveSupport::TestCase"].includes(sp)) return false;
+    if ([...sc.defs.keys()].some((k) => k.startsWith("test_"))) return false;
+    return [...this.index.scopes.values()].some((x) => x.superclassFqn === fqn);
+  }
+
+  /** The defs a test support class contributes, by name: a singleton def wins its instance twin. */
+  supportDefs(u: Unit): Map<string, N> {
+    const out = new Map<string, N>();
+    for (const d of u.body) if (d.k === "def" && !d.singleton) out.set(d.name, d);
+    for (const d of [...u.sbody, ...u.body.filter((d) => d.k === "def" && d.singleton)])
+      if (d.k === "def") out.set(d.name, d);
+    for (const k of Emitter.MINITEST_DSL) out.delete(k);
+    return out;
+  }
+
+  private supportCache = new Map<string, { file: string; fns: Map<string, boolean> }>();
+
+  /**
+   * The functions a test support class exports, with which are async, found by
+   * lowering them (to a fixpoint, since one may call another).
+   */
+  supportFns(fqn: string): { file: string; fns: Map<string, boolean> } | null {
+    const hit = this.supportCache.get(fqn);
+    if (hit) return hit;
+    const sc = this.index.scopes.get(fqn);
+    const ruby = sc?.primaryFile ?? (sc ? [...sc.files][0] : undefined);
+    const file = ruby ? this.irByFile.get(ruby) : undefined;
+    const u = file ? collectUnits(file).find((x) => x.fqn === fqn) : undefined;
+    if (!u || !ruby) return null;
+    const defs = this.supportDefs(u);
+    const fns = new Map<string, boolean>([...defs.keys()].map((k) => [k, false]));
+    const scratch: FileCtx = {
+      rubyFile: ruby,
+      tsFile: rubyFileToTsAr(ruby),
+      imports: new Map(),
+      usedLocalNames: new Set(),
+      declines: [],
+      stats: {},
+    };
+    for (let changed = true, i = 0; changed && i < 5; i++) {
+      changed = false;
+      for (const [name, d] of defs) {
+        const text = this.supportFn(u, scratch, name, d, fns, false);
+        const asy = text.startsWith("async ");
+        if (asy !== fns.get(name)) {
+          fns.set(name, asy);
+          changed = true;
+        }
+      }
+    }
+    const out = { file: rubyFileToTsAr(ruby), fns };
+    this.supportCache.set(fqn, out);
+    return out;
+  }
+
+  private testFnMap(
+    names: Map<string, boolean>,
+    local: (n: string) => string,
+  ): Map<string, { name: string; async: boolean }> {
+    return new Map([...names].map(([k, a]) => [k, { name: local(k), async: a }]));
+  }
+
+  private supportFn(
+    u: Unit,
+    f: FileCtx,
+    name: string,
+    d: N,
+    fns: Map<string, boolean>,
+    exported: boolean,
+  ): string {
+    const ctx = this.baseCtx(u, f, {
+      selfKind: "top",
+      selfExpr: "this",
+      testFns: this.testFnMap(fns, (k) => tsMethodName(k)),
+    });
+    return this.lw.fnDecl(tsMethodName(name), d.params ?? [], d.body, ctx, exported);
+  }
+
+  /** A gem test support class as the functions its tests call (Minitest's DSL left to vitest). */
+  emitTestSupport(u: Unit, f: FileCtx): string {
+    const sup = this.supportFns(u.fqn);
+    if (!sup) return "";
+    return [...this.supportDefs(u)]
+      .map(([name, d]) => this.supportFn(u, f, name, d, sup.fns, true))
+      .join("\n\n");
+  }
+
+  /**
+   * Whether a test class ports as native vitest, and the support class whose
+   * functions it calls (null for none). False where it needs a dependency's
+   * test mixin (`ActiveJob::TestHelper`), which has no functional surface yet.
+   */
+  nativeTestSupport(u: Unit): string | null | false {
+    if (u.body.some((s) => s.k === "call" && s.recv === null && s.name === "include")) return false;
+    if (u.superclass?.k !== "const") return false;
+    const path = u.superclass.path.filter((x: string) => x).join("::");
+    if (path === "ActiveSupport::TestCase" || path === "Minitest::Test") return null;
+    const hit = this.index.resolveConst(u.superclass.path, u.nesting);
+    if (hit?.kind === "scope" && this.isTestSupport(hit.fqn)) return hit.fqn;
+    return false;
+  }
+
+  /**
+   * A Rails test class as plain vitest: a `describe` named after it, `it` per
+   * test, `beforeEach` / `afterEach` for `setup` / `teardown`, each `@ivar` a
+   * `let` the `describe` declares, each helper `def` a function in it, and the
+   * gem's test support functions imported. No test case instance.
+   */
+  emitNativeTest(u: Unit, f: FileCtx, supFqn: string | null): string {
+    const short = u.fqn.split("::").pop()!;
+    const hctx = this.baseCtx(u, f, {});
+    const vitest = (x: string) => this.lw.imp(hctx, "vitest", x);
+    // Ivars: one `let` each, named for the ivar unless a local of the class has that name.
+    const lvars = new Set<string>();
+    const ivars = new Set<string>();
+    walk(u.body, (n) => {
+      if (n.k === "lasgn" || n.k === "lvar") lvars.add(n.name);
+      if (n.k === "ivar" || n.k === "iasgn") ivars.add(n.name);
+    });
+    const ivarLocals = new Map<string, string>();
+    for (const iv of ivars) {
+      const base = propName(iv.slice(1)).replace(/^_/, "");
+      ivarLocals.set(
+        iv,
+        lvars.has(iv.slice(1)) ? `self${base[0].toUpperCase()}${base.slice(1)}` : base,
+      );
+    }
+    // Helper defs of the test class, and the support class's functions.
+    const helpers = new Map<string, N>();
+    for (const s of [...u.body, ...u.sbody])
+      if (s.k === "def" && !/^test_/.test(s.name) && !["setup", "teardown"].includes(s.name))
+        helpers.set(s.name, s);
+    const sup = supFqn ? this.supportFns(supFqn) : null;
+    const fnInfo = new Map<string, { name: string; async: boolean }>();
+    for (const [k, a] of sup?.fns ?? []) fnInfo.set(k, { name: "", async: a });
+    const helperAsync = new Map<string, boolean>([...helpers.keys()].map((k) => [k, false]));
+    const imp = (k: string) =>
+      this.lw.imp(hctx, `@root/${sup!.file.replace(/\.ts$/, ".js")}`, tsMethodName(k));
+    const testFns = (): Map<string, { name: string; async: boolean }> => {
+      const m = new Map<string, { name: string; async: boolean }>();
+      for (const [k, a] of sup?.fns ?? [])
+        m.set(k, {
+          // Imported where a test calls it.
+          get name() {
+            return imp(k);
+          },
+          async: a,
+        });
+      for (const [k, a] of helperAsync) m.set(k, { name: tsMethodName(k), async: a });
+      m.set("skip", { name: "context.skip", async: false });
+      return m;
+    };
+    void fnInfo;
+    const ctxFor = (over: Partial<Ctx>) =>
+      this.baseCtx(u, f, {
+        selfKind: "instance",
+        selfExpr: "this",
+        ivarLocals,
+        testFns: testFns(),
+        ...over,
+      });
+    const helperText = (): string[] => {
+      const out: string[] = [];
+      for (const [name, d] of helpers) {
+        const t = this.lw.fnDecl(tsMethodName(name), d.params ?? [], d.body, ctxFor({}), false);
+        helperAsync.set(name, t.startsWith("async "));
+        out.push(t);
+      }
+      return out;
+    };
+    for (let i = 0; i < 3; i++) helperText();
+    const helperLines = helperText();
+
+    const body = (b: N, locals: string[]): string[] => {
+      const ctx = ctxFor({ testMode: true, asyncBox: { awaits: false } });
+      for (const l of locals) ctx.scope.locals.add(l);
+      const lines = this.lw.block(this.lw.seqBody(b), ctx, false);
+      const hz: Set<string> | undefined = ctx.scope.hoisted;
+      if (hz?.size)
+        lines.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: unknown`).join(", ")};`);
+      return lines;
+    };
+    const fnHead = (lines: string[]) =>
+      lines.some((l) => /\bcontext\.skip\(/.test(l)) ? "async (context)" : "async ()";
+    const out: string[] = [];
+    const loopLocals: string[] = [];
+    const nameCtx = () => {
+      const c = ctxFor({ selfKind: "static", asyncBox: undefined });
+      for (const l of loopLocals) c.scope.locals.add(l);
+      return c;
+    };
+    const emitBody = (stmts: N[], out: string[], guard: string | null): void => {
+      const it = (nm: string, b: N) => {
+        const lines = body(b, loopLocals);
+        const why = this.permanentSkip(u, this.lw.seqBody(b));
+        if (why) {
+          out.push(
+            `// PERMANENT-SKIP: ${why}`,
+            `${vitest("it")}.skip(${nm}, async () => {`,
+            ...indent(lines),
+            "});",
+          );
+          return;
+        }
+        out.push(
+          `${guard ? `${vitest("it")}.skipIf(!(${guard}))` : vitest("it")}(${nm}, ${fnHead(lines)} => {`,
+          ...indent(lines),
+          "});",
+        );
+      };
+      for (const s of stmts) {
+        if (
+          s.k === "call" &&
+          s.recv === null &&
+          s.name === "test" &&
+          (s.args[0]?.k === "str" || s.args[0]?.k === "dstr") &&
+          s.block?.k === "block"
+        ) {
+          it(
+            s.args[0].k === "str"
+              ? JSON.stringify(s.args[0].value)
+              : this.lw.expr(s.args[0], nameCtx()),
+            s.block.body,
+          );
+        } else if (s.k === "def" && /^test_/.test(s.name)) {
+          it(JSON.stringify(s.name.replace(/^test_/, "").replace(/_/g, " ")), s.body);
+        } else if (
+          (s.k === "call" &&
+            s.recv === null &&
+            (s.name === "setup" || s.name === "teardown") &&
+            s.block?.k === "block") ||
+          (s.k === "def" && (s.name === "setup" || s.name === "teardown"))
+        ) {
+          const b = s.k === "def" ? s.body : s.block.body;
+          const hook = vitest(s.name === "setup" ? "beforeEach" : "afterEach");
+          // A `def setup; super; …` reaches Minitest's empty `setup`.
+          const stripped = {
+            k: "seq",
+            body: this.lw.seqBody(b).filter((x: N) => !(x.k === "super" || x.k === "zsuper")),
+          };
+          out.push(`${hook}(async () => {`, ...indent(body(stripped, loopLocals)), "});");
+        } else if (s.k === "if") {
+          const c = this.lw.cond(s.cond, nameCtx());
+          const and = (x: string) => (guard ? `(${guard}) && ${x}` : x);
+          emitBody(this.lw.seqBody(s.then), out, and(`(${c})`));
+          emitBody(this.lw.seqBody(s.else), out, and(`!(${c})`));
+        } else if (
+          s.k === "call" &&
+          s.name === "each" &&
+          s.recv?.k === "array" &&
+          s.block?.k === "block" &&
+          s.block.params.length === 1
+        ) {
+          const p = s.block.params[0].name;
+          const inner: string[] = [];
+          const list = this.lw.expr(s.recv, nameCtx());
+          loopLocals.push(p);
+          emitBody(this.lw.seqBody(s.block.body), inner, guard);
+          loopLocals.pop();
+          out.push(`for (const ${jsIdent(p)} of ${list}) {`, ...indent(inner), "}");
+        } else if (s.k === "def" || s.k === "sclass" || s.k === "class" || s.k === "module") {
+          continue;
+        } else if (
+          s.k === "call" &&
+          s.recv === null &&
+          ["private", "protected", "public", "require", "require_relative"].includes(s.name)
+        ) {
+          continue;
+        } else if (s.k === "call" && s.recv === null && s.block?.k === "block") {
+          // A class-level helper that defines tests from its block
+          // (`each_content_type_fixture('magic') do |file, name, content_type|`).
+          const fn = testFns().get(s.name);
+          const params: string[] = s.block.params.map((p: { name: string }) => p.name);
+          const mark = loopLocals.length;
+          loopLocals.push(...params);
+          const inner: string[] = [];
+          emitBody(this.lw.seqBody(s.block.body), inner, guard);
+          loopLocals.length = mark;
+          const args = s.args.map((a: N) => this.lw.expr(a, nameCtx()));
+          const callee =
+            fn?.name ??
+            this.lw.decline(nameCtx(), "unhandled-node", s, `test class helper ${s.name}`);
+          out.push(
+            `${callee}(${[...args, `(${params.map(jsIdent).join(", ")}) => {`].join(", ")}`,
+            ...indent(inner),
+            "});",
+          );
+        } else if (s.k === "lasgn" || (s.k === "call" && !s.block)) {
+          const lines = this.lw.stmt(s, nameCtx(), false);
+          out.push(...(guard ? [`if (${guard}) {`, ...indent(lines), "}"] : lines));
+          if (s.k === "lasgn" && !loopLocals.includes(s.name)) loopLocals.push(s.name);
+        } else {
+          out.push(
+            `${this.lw.decline(nameCtx(), "unhandled-node", s, `test class body: ${s.k} ${s.name ?? ""}`)};`,
+          );
+        }
+      }
+    };
+    emitBody(u.body, out, null);
+    const lets = [...ivarLocals.values()].map((x) => `let ${x}: unknown;`);
+    // A test class that nests constants (`SerializersTest::DummySerializer`,
+    // which a test `constantize`s by that name) is still their namespace.
+    const nests = [...this.index.scopes.keys()].some((k) => k.startsWith(`${u.fqn}::`));
+    return [
+      ...(nests
+        ? [
+            `class ${short} {}`,
+            `${this.lw.rc(hctx, "registerConstant")}(${JSON.stringify(short)}, ${short});`,
+          ]
+        : []),
+      `${vitest("describe")}(${JSON.stringify(short)}, () => {`,
+      ...indent([...lets, ...helperLines.flatMap((h) => h.split("\n")), ...out]),
+      "});",
+    ].join("\n");
+  }
+
   /** `setup` / `teardown` blocks of a reopened `ActiveSupport::TestCase` as top-level hooks. */
   emitTestHooks(u: Unit, f: FileCtx): string {
     const out: string[] = [];
@@ -893,6 +1225,7 @@ export class Emitter {
       collectUnits(file).filter((u) => this.emits(u, file.file)),
       this.index,
     );
+    const nativeUnits = new Set<string>();
     for (const u of units) {
       const exp = this.resolver.exportNames.get(u.fqn);
       if (!exp || exp.tsFile !== tsFile) {
@@ -906,12 +1239,20 @@ export class Emitter {
         chunks.push(this.emitTestHooks(u, f));
         continue;
       }
+      if (file.file.startsWith("test/") && this.isTestSupport(u.fqn)) {
+        nativeUnits.add(u.fqn);
+        chunks.push(this.emitTestSupport(u, f));
+        continue;
+      }
       if (
         file.file.startsWith("test/") &&
         u.kind === "class" &&
         /(^|::)TestCase$/.test((u.superclass?.path ?? []).join("::"))
       ) {
-        chunks.push(this.emitTestCase(u, f));
+        const native = this.nativeTestSupport(u);
+        // A native test class is a `describe`, not a constant to seat.
+        if (native !== false) nativeUnits.add(u.fqn);
+        chunks.push(native === false ? this.emitTestCase(u, f) : this.emitNativeTest(u, f, native));
         continue;
       }
       const r = u.kind === "class" ? this.emitClass(u, name, f) : this.emitModule(u, name, f);
@@ -1019,9 +1360,6 @@ export class Emitter {
           "ActiveSupportTestCase",
         );
         chunks.push(`${reg}(/(?:)/, ${host});`);
-        // The Ruby matchers' `Assertion` types (their setup is every vitest
-        // project's setupFiles).
-        chunks.unshift(`import type {} from "@blazetrails/vitest-matchers";`);
       }
       for (const s of top) chunks.push(...this.lw.stmt(s, tctx, false));
       // A top-level `def` (helper.rb's `adapter_is?`) is a method on Ruby's main
@@ -1062,7 +1400,7 @@ export class Emitter {
       const bctx = this.baseCtx(units[0] ?? ({} as Unit), f, {});
       for (const u of units) {
         const i = u.fqn.lastIndexOf("::");
-        if (i < 0) continue;
+        if (i < 0 || nativeUnits.has(u.fqn)) continue;
         const parent = u.fqn.slice(0, i);
         if (this.plainModules.has(parent)) continue;
         const seat = handNamespaceFqns().get(parent);

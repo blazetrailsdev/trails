@@ -233,6 +233,13 @@ interface Ctx {
    * async is not known here (awaiting a plain value is harmless).
    */
   testMode?: boolean;
+  /**
+   * A native vitest test file: a test class's helper `def`s and the gem's test
+   * support functions, by Ruby name, as the JS function a bare call reaches.
+   */
+  testFns?: Map<string, { name: string; async: boolean }>;
+  /** A native vitest test file: a test's `@ivar` as its `describe`-scoped `let`. */
+  ivarLocals?: Map<string, string>;
 }
 
 /** A module `initialize` a constructor can inline. */
@@ -1531,6 +1538,41 @@ export class Lowerer {
   }
 
   /**
+   * A Ruby `def` as a JS function declaration (a native vitest file's helper):
+   * `function files(name) { … }`, `async` where its body awaits. A body that
+   * `yield`s takes the block as a trailing `block` parameter.
+   */
+  fnDecl(name: string, params0: Param[], body: N, ctx: Ctx, exported: boolean): string {
+    const yields = /"k":"yield"/.test(JSON.stringify(body ?? null));
+    const params =
+      yields && !params0.some((p) => p.kind === "block")
+        ? [...params0, { kind: "block" as const, name: "block" }]
+        : params0;
+    const scope: Scope = { locals: new Set(), parent: ctx.scope, body };
+    const inner = this.child(ctx, {
+      scope,
+      paramTypes: undefined,
+      hashNewBlock: undefined,
+      fnScope: scope,
+      inBlock: false,
+      inLoop: false,
+      nested: false,
+      defName: name,
+      defParams: params,
+      blockVar: params.find((p) => p.kind === "block")?.name ?? undefined,
+      asyncBox: { awaits: false },
+    });
+    inner.prologue = undefined;
+    const ps = this.paramList(params, inner, false);
+    const stmts = [...(inner.prologue ?? []), ...this.block(this.seqBody(body), inner, true)];
+    inner.prologue = undefined;
+    const hz: Set<string> | undefined = scope.hoisted;
+    if (hz?.size) stmts.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: unknown`).join(", ")};`);
+    const asy = inner.asyncBox!.awaits ? "async " : "";
+    return `${exported ? "export " : ""}${asy}function ${name}(${ps}) {\n${indent(stmts).join("\n")}\n}`;
+  }
+
+  /**
    * A block Ruby `instance_exec`s on another object (a callback macro's block
    * runs with `self` the record / job): a `function` whose `this` is that
    * object, not an arrow closing over the defining scope's `self`.
@@ -1808,6 +1850,8 @@ export class Lowerer {
         // Ruby's `__FILE__`: the path of the file being evaluated.
         return "import.meta.filename";
       case "lvar":
+        if (!this.isLocal(ctx, n.name) && ctx.testFns?.has(n.name))
+          return this.call({ k: "call", recv: null, name: n.name, args: [], l: n.l }, ctx);
         if (!this.isLocal(ctx, n.name)) return `${ctx.selfExpr}.${this.callName(n.name)}()`;
         return jsIdent(n.name);
       case "lasgn": {
@@ -2093,6 +2137,8 @@ export class Lowerer {
   }
 
   ivar(name: string, ctx: Ctx): string {
+    const local = ctx.ivarLocals?.get(name);
+    if (local) return local;
     return `${ctx.selfExpr}._${propName(name.slice(1)).replace(/^_/, "")}`;
   }
 
@@ -2817,6 +2863,24 @@ export class Lowerer {
     ) {
       const r = this.expr(n.recv, ctx);
       return `${needsParens(r) ? `(${r})` : r}.length`;
+    }
+    // A native vitest test file: a helper `def` (`files`, `self.class.fixture_path`)
+    // is a function the test file declares or imports.
+    {
+      const r = n.recv;
+      const selfish =
+        r === null ||
+        r?.k === "self" ||
+        (r?.k === "call" && r.name === "class" && (r.recv === null || r.recv?.k === "self"));
+      const fn = selfish ? ctx.testFns?.get(n.name) : undefined;
+      if (fn) {
+        const argv = n.args.map((x: N) => this.argExpr(x, ctx));
+        if (n.block) argv.push(this.blockArg(n.block, ctx));
+        const out = `${fn.name}(${argv.join(", ")})`;
+        if (!fn.async || !ctx.asyncBox) return out;
+        ctx.asyncBox.awaits = true;
+        return `(await ${out})`;
+      }
     }
     // A top-level `def` of a test support file (helper.rb's `adapter_is?`) is
     // its exported function.
