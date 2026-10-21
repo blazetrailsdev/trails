@@ -1814,18 +1814,6 @@ describe("FormHelperTest", () => {
       '<input name="i mean it" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="post_secret" name="i mean it" type="checkbox" value="1" />',
       view.checkbox("post", "secret", { name: "i mean it" }),
     );
-    assertDomEqual(
-      view.textField("post", "title", { name: "dont guess" }),
-      view.textField("post", "title", { name: "dont guess" }),
-    );
-    assertDomEqual(
-      view.textarea("post", "body", { name: "really!" }),
-      view.textarea("post", "body", { name: "really!" }),
-    );
-    assertDomEqual(
-      view.checkbox("post", "secret", { name: "i mean it" }),
-      view.checkbox("post", "secret", { name: "i mean it" }),
-    );
   });
 
   it("explicit id", () => {
@@ -1839,18 +1827,6 @@ describe("FormHelperTest", () => {
     );
     assertDomEqual(
       '<input name="post[secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="i mean it" name="post[secret]" type="checkbox" value="1" />',
-      view.checkbox("post", "secret", { id: "i mean it" }),
-    );
-    assertDomEqual(
-      view.textField("post", "title", { id: "dont guess" }),
-      view.textField("post", "title", { id: "dont guess" }),
-    );
-    assertDomEqual(
-      view.textarea("post", "body", { id: "really!" }),
-      view.textarea("post", "body", { id: "really!" }),
-    );
-    assertDomEqual(
-      view.checkbox("post", "secret", { id: "i mean it" }),
       view.checkbox("post", "secret", { id: "i mean it" }),
     );
   });
@@ -1875,22 +1851,6 @@ describe("FormHelperTest", () => {
     assertDomEqual(
       '<select name="post[secret]"></select>',
       view.select("post", "secret", [], {}, { id: null }),
-    );
-    assertDomEqual(
-      view.textField("post", "title", { id: null }),
-      view.textField("post", "title", { id: null }),
-    );
-    assertDomEqual(
-      view.textarea("post", "body", { id: null }),
-      view.textarea("post", "body", { id: null }),
-    );
-    assertDomEqual(
-      view.checkbox("post", "secret", { id: null }),
-      view.checkbox("post", "secret", { id: null }),
-    );
-    assertDomEqual(
-      view.radioButton("post", "secret", "0", { id: null }),
-      view.radioButton("post", "secret", "0", { id: null }),
     );
   });
 
@@ -1932,18 +1892,6 @@ describe("FormHelperTest", () => {
     );
     assertDomEqual(
       '<input name="post[5][secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" name="post[5][secret]" type="checkbox" value="1" />',
-      view.checkbox("post", "secret", { index: 5, id: null }),
-    );
-    assertDomEqual(
-      view.textField("post", "title", { index: 5, id: null }),
-      view.textField("post", "title", { index: 5, id: null }),
-    );
-    assertDomEqual(
-      view.textarea("post", "body", { index: 5, id: null }),
-      view.textarea("post", "body", { index: 5, id: null }),
-    );
-    assertDomEqual(
-      view.checkbox("post", "secret", { index: 5, id: null }),
       view.checkbox("post", "secret", { index: 5, id: null }),
     );
   });
