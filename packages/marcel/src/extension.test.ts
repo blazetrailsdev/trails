@@ -10,6 +10,7 @@ describe("ExtensionTest", () => {
     expect(MimeType.for(undefined, { extension: "pdf" })).toEqual("application/pdf");
     expect(MimeType.for(undefined, { extension: ".pdf" })).toEqual("application/pdf");
   });
+
   const extensions = new Map<string, string>();
   eachContentTypeFixture("name", (file, name, contentType) => {
     const extension = File.extname(name);

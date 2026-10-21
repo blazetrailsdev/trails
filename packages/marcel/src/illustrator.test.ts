@@ -5,6 +5,7 @@ import { expect, it, describe } from "vitest";
 describe("IllustratorTest", () => {
   it(".ai uploaded as application/postscript", async () => {
     const file = files("name/application/illustrator/illustrator.ai");
+
     expect(
       await MimeType.for(file, { name: "illustrator.ai", declaredType: "application/postscript" }),
     ).toEqual("application/illustrator");
