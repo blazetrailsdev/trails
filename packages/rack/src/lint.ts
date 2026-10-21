@@ -308,7 +308,7 @@ export class Wrapper {
       }
       env[RACK_MULTIPART_TEMPFILE_FACTORY] = (filename: string, contentType: string) => {
         const io = tempfileFactory(filename, contentType);
-        if (!rbObjRespondTo(io, "<<")) {
+        if (!rbObjRespondTo(io, "append")) {
           throw new LintError("rack.multipart.tempfile_factory return value must respond to #<<");
         }
         return io;
@@ -646,9 +646,9 @@ export class Wrapper {
     }
   }
 
-  async verifyToPath(): Promise<void> {
+  verifyToPath(): void {
     if (rbObjRespondTo(this._body, "toPath")) {
-      if (!(await File.isExistAsync(this._body.toPath()))) {
+      if (!File.isExist(this._body.toPath())) {
         throw new LintError("The file identified by body.to_path does not exist");
       }
     }

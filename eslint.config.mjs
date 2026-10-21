@@ -138,6 +138,8 @@ export default defineConfig(
       // Byte-for-byte copies of vendor/rails/v8.0.2/actionpack/test/fixtures/{public,公共}.
       "packages/actionpack/src/test-helpers/fixtures/public/**",
       "packages/actionpack/src/test-helpers/fixtures/公共/**",
+      // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
+      "packages/marcel/src/test-helpers/fixtures/**",
       "**/dist-test/**",
       "**/.trails/**",
       "packages/website/static/**",

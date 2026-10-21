@@ -883,6 +883,7 @@ jobs:
           packages/globalid
           packages/html-sanitizer
           packages/i18n
+          packages/marcel
           packages/msgpack
           packages/nokogiri
           packages/ruby-compat
@@ -1073,6 +1074,7 @@ jobs:
           packages/did-you-mean
           packages/globalid
           packages/i18n
+          packages/marcel
           packages/msgpack
           packages/nokogiri
           packages/html-sanitizer
