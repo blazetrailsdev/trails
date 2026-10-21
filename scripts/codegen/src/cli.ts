@@ -456,7 +456,19 @@ for (const f of files) {
 for (const [ts, texts] of byTs) {
   const p = path.join(outDir, ts);
   mkdirSync(path.dirname(p), { recursive: true });
-  writeFileSync(p, texts.join("\n"));
+  // A raw control byte (C0 but tab/LF/CR, DEL, C1) can only sit inside a
+  // literal, where its `\u` escape means the same: grep reads the file as text
+  // (scripts/ci/check-control-bytes.sh, blazetrails/no-raw-control-bytes).
+  writeFileSync(
+    p,
+    texts
+      .join("\n")
+      // eslint-disable-next-line no-control-regex
+      .replace(
+        /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g,
+        (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+      ),
+  );
 }
 // A suite's fixture files (marcel's test/fixtures), beside the helper that
 // finds them through `File.expand_path("../fixtures/…", __FILE__)`: test/*.rb
