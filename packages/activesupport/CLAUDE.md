@@ -95,12 +95,17 @@ before the synchronous reader.** As a consequence:
   MessagePack payload is detected wherever the peer is installed, and makes
   `[]`'s raising load when the cache store names the format.
   `active_support.require_message_pack` and
-  `action_dispatch.require_message_pack` make the raising load after
-  `finisher_hook`, when `active_support.message_serializer` or
-  `action_dispatch.cookies_serializer` names it. That is where Rails reads the
-  first (`railtie.rb:148-154` is a `config.after_initialize` block), and
-  `config/initializers` have run by then. The names are not Rails': an
-  `after_initialize` block runs through `run_load_hooks`, which cannot await. With the peer absent the
+  `action_dispatch.require_message_pack` make the raising load as ordinary
+  railtie initializers, when `active_support.message_serializer` or
+  `action_dispatch.cookies_serializer` names it. Rails reads the first in a
+  `config.after_initialize` block (`railtie.rb:148-154`), but an
+  `after_initialize` block runs through `run_load_hooks`, which cannot await,
+  and an initializer declared `after: :finisher_hook` makes `tsort` emit the
+  whole Finisher chain at its own position, ahead of later railties'
+  initializers (`setup_main_autoloader` then ran before
+  `action_controller.set_helpers_path`). So a serializer named only in
+  `config/initializers` is not loaded at boot, and its first synchronous
+  reader raises `LoadError`. The names are not Rails'. With the peer absent the
   raising load prints `message_pack.rb:3-10`'s warning and raises.
 - Code outside a booted application awaits the load itself, or imports
   `@blazetrails/activesupport/message-pack`.

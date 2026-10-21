@@ -33,7 +33,9 @@ import {
   rbObjSingletonClass,
   rbStrSend,
   StandardError,
+  isSymbol,
   stringSuperclass,
+  symbolToS,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { OutputBuffer } from "./buffers.js";
@@ -51,6 +53,27 @@ type Parser = ((rendered: string) => unknown) | null | undefined;
 
 export class TestController extends ActionController.Base {
   declare _testCase: () => TestCase;
+
+  override get request(): ActionController.Base["request"] {
+    return this._request;
+  }
+  override set request(value: ActionController.Base["request"]) {
+    this._request = value;
+  }
+
+  override get response(): ActionController.Base["response"] {
+    return this._response;
+  }
+  override set response(value: ActionController.Base["response"]) {
+    this._response = value;
+  }
+
+  override get params(): ActionController.Base["params"] {
+    return this._params as ActionController.Base["params"];
+  }
+  override set params(value: ActionController.Base["params"]) {
+    this._params = value;
+  }
 
   declare static _controllerPath: string;
 
@@ -186,7 +209,9 @@ export const ClassMethods = {
   tests(this: BehaviorClass, helperClass: string | HelperModule): void {
     if (typeof helperClass === "string") {
       this.helperClass = safeConstantize(
-        camelize(`${underscore(helperClass)}_helper`),
+        camelize(
+          `${underscore(isSymbol(helperClass) ? symbolToS(helperClass) : helperClass)}_helper`,
+        ),
       ) as HelperModule | null;
     } else if (rbObjIsKindOf(helperClass, Module) || isPlainHash(helperClass)) {
       this.helperClass = helperClass;

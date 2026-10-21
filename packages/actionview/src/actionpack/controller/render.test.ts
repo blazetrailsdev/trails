@@ -301,7 +301,7 @@ class TestController extends ActionController.Base {
   }
 
   async renderTextWithResource(): Promise<void> {
-    // BLOCKED: action-controller-render-is-untyped
+    // BLOCKED: controller-render-args-type-admits-rails-shapes
     await this.render({ plain: new Customer("David") as unknown as string });
   }
 
@@ -424,7 +424,7 @@ class TestController extends ActionController.Base {
   async actionTalkToLayout(): Promise<void> {}
 
   async renderWithAssignsOption(): Promise<void> {
-    // BLOCKED: action-controller-render-is-untyped
+    // BLOCKED: controller-render-args-type-admits-rails-shapes
     await this.render({
       inline: "<%= this.hello %>",
       assigns: { hello: "world" },
@@ -496,7 +496,7 @@ class TestController extends ActionController.Base {
   }
 
   async partialWithHashlikeLocals(): Promise<void> {
-    // BLOCKED: action-controller-render-is-untyped
+    // BLOCKED: controller-render-args-type-admits-rails-shapes
     await this.render({
       partial: "customer",
       locals: new ActionController.Parameters({
@@ -622,7 +622,7 @@ class TestController extends ActionController.Base {
   }
 
   async partialWithNestedObjectShorthand(): Promise<void> {
-    // BLOCKED: action-controller-render-is-untyped
+    // BLOCKED: controller-render-args-type-admits-rails-shapes
     await this.render(new Quiz.Question("first") as unknown as string);
   }
 

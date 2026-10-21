@@ -8,7 +8,7 @@ import {
   isPlainObject,
   kernelArray as Array,
   wrap,
-  type SafeBuffer,
+  SafeBuffer,
 } from "@blazetrails/activesupport";
 import {
   fetch,
@@ -126,7 +126,7 @@ export function optionsForSelect(
   container: unknown,
   selected: unknown = null,
 ): SafeBuffer | string {
-  if (typeof container === "string") return container;
+  if (typeof container === "string" || container instanceof SafeBuffer) return container;
 
   const [selectedValues, disabled] = extractSelectedAndDisabled(selected).map((r) =>
     Array(r).map(rbObjAsString),

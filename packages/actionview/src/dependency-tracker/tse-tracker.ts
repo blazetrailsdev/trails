@@ -14,9 +14,9 @@ const ALL_KNOWN_KEYS = [
   "collection",
   "as",
   "status",
-  "content_type",
+  "contentType",
   "location",
-  "spacer_template",
+  "spacerTemplate",
 ];
 
 /** @internal */
@@ -100,11 +100,14 @@ export class TSETracker {
 
     for (const args of renderCalls) {
       const call = args.split("%>")[0];
-      if (/^\s*\(?\s*\w+:/u.test(call)) {
-        const keys = [...call.replace(/\{[^{}]*\}/gu, "").matchAll(/\b(\w+):/gu)].map((m) => m[1]);
+      if (/^\s*\(?\s*\{?\s*\w+:/u.test(call)) {
+        const options = call.replace(/^\s*\(?\s*\{?/u, "");
+        const keys = [...options.replace(/\{[^{}]*\}/gu, "").matchAll(/\b(\w+):/gu)].map(
+          (m) => m[1],
+        );
         if (keys.some((key) => !ALL_KNOWN_KEYS.includes(key))) continue;
       }
-      const spacer = new RegExp(`\\bspacer_template:\\s*${TSETracker.STRING.source}`, "su").exec(
+      const spacer = new RegExp(`\\bspacerTemplate:\\s*${TSETracker.STRING.source}`, "su").exec(
         call,
       );
       if (spacer) {

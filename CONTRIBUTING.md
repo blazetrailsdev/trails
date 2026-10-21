@@ -28,6 +28,46 @@ the `declare` / associations / enums / schema reference live in
   never raw SQL strings. Use `@blazetrails/activemodel` for
   validations/callbacks and `@blazetrails/activesupport` for inflection.
 
+## Porting a Minitest assertion
+
+A Minitest built-in assertion (`vendor/minitest/v5.27.0/lib/minitest/assertions.rb`)
+ports as a Vitest `expect`, never as a helper. The built-in matcher is the
+default. A matcher from `@blazetrails/vitest-matchers` (loaded in every vitest
+project through `@blazetrails/vitest-matchers/setup`) is used only where the
+built-in gives the wrong result for that test, and test code never calls a
+ruby-compat function to assert. In Minitest `exp` is the first argument; in
+`expect` the actual value goes in `expect(...)`, so the order flips. A `msg`
+argument becomes `expect(x, msg)`. The `refute_*` / `assert_not_*` forms
+(`refute_equal`, `refute_nil`, `assert_not_empty`, …) are the same row with
+`.not`. `scripts/test-compare/assertion-kinds.ts` credits the built-in and the
+Ruby matcher of a row with the same kind.
+
+| Minitest (`assertions.rb`)               | Built-in                                                                               | Ruby matcher                           | Use the Ruby matcher only when                                   |
+| ---------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------- |
+| `assert x` / `refute x` (`:171`, `:650`) | `toBeTruthy()` / `toBeFalsy()`                                                         | `toBeRubyTruthy()` / `toBeRubyFalsy()` | the value can be `0`, `""` or `NaN`                              |
+| `assert_predicate o, :foo?` (`:394`)     | `expect(o.isFoo()).toBe(true)`                                                         | `expect(o.foo()).toBeRubyTruthy()`     | `foo?` returns a value rather than a boolean                     |
+| `assert_equal exp, act` (`:220`)         | `expect(act).toEqual(exp)`                                                             | `expect(act).toEqualRuby(exp)`         | the value defines Ruby `==` (records, `Duration`, `BigDecimal`)  |
+| `assert_nil x` (`:305`)                  | `toBeNull()`                                                                           |                                        |                                                                  |
+| `assert_same exp, act` (`:463`)          | `expect(act).toBe(exp)`                                                                |                                        |                                                                  |
+| `assert_in_delta exp, act, d` (`:241`)   | `expect(act).toBeCloseTo(exp, digits)`                                                 | `expect(act).toBeWithinDelta(exp, d)`  | `toBeCloseTo`'s digit precision does not express the delta       |
+| `assert_empty o` (`:188`)                | `expect(o).toHaveLength(0)`                                                            | `expect(o).toBeEmpty()`                | the receiver has no `length` (`Map`, `Set`, a Hash, an `empty?`) |
+| `assert_includes c, o` (`:260`)          | `toContainEqual(o)` (Array), `toContain(o)` (String), `toHaveProperty([o])` (Hash key) |                                        |                                                                  |
+| `assert_instance_of cls, o` (`:271`)     | `expect(o).toBeInstanceOf(cls)`                                                        | `expect(o).toBeExactInstanceOf(cls)`   | the subclass distinction matters                                 |
+| `assert_kind_of cls, o` (`:282`)         | `expect(o).toBeInstanceOf(cls)`                                                        |                                        |                                                                  |
+| `assert_respond_to o, :m` (`:453`)       | `expect(typeof o.m).toBe("function")`                                                  | `expect(o).toRespondTo("m")`           | the name is answered by `respond_to_missing?`                    |
+| `assert_match m, s` (`:293`)             | `expect(s).toMatch(m)`                                                                 |                                        |                                                                  |
+| `assert_operator a, :<, b` (`:315`)      | `toBeLessThan` / `toBeGreaterThan` / `…OrEqual`                                        |                                        |                                                                  |
+| `flunk msg` (`:624`)                     | `expect.unreachable(msg)`                                                              |                                        |                                                                  |
+| `skip msg` (`:825`)                      | `ctx.skip()`, or `it.skip` under a `PERMANENT-SKIP:` line                              |                                        |                                                                  |
+
+A built-in can also wrongly _pass_: `toBeFalsy` passes on `0`, which Ruby
+treats as truthy, so a test going green is not the only signal. Check the type
+of the value under test before choosing the built-in.
+
+A Rails test that asserts on a Minitest failure message or `diff` output loses
+that assertion permanently. Record it with a row in
+`scripts/test-compare/assertion-receipts.ts`.
+
 ## Rails-private helpers and `@internal` JSDoc
 
 **Rails-private helpers must carry `@internal` JSDoc.** The website's

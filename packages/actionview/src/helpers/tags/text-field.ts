@@ -1,8 +1,9 @@
 import { Tags } from "../../namespaces.js";
 import { humanize, stringifyKeys } from "@blazetrails/activesupport";
-import { block, fetch, rbModConstSet } from "@blazetrails/ruby-compat";
+import { block, fetch, include, rbModConstSet } from "@blazetrails/ruby-compat";
 
 import { Base } from "./base.js";
+import { Placeholderable } from "./placeholderable.js";
 import { Translator } from "./translator.js";
 
 export class TextField extends Base {
@@ -60,5 +61,7 @@ export class TextField extends Base {
     return (this.constructor as typeof TextField).fieldType();
   }
 }
+
+include(TextField, Placeholderable);
 
 rbModConstSet(Tags, "TextField", TextField);

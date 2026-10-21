@@ -190,6 +190,13 @@ port a body:
   the discriminator Ruby gets from the type, and it is how the value already
   renders through `inspect`.
 
+- **Minitest assertions.** A Minitest built-in (`assert_equal`, `assert_nil`,
+  `assert_predicate`, …) ports as a Vitest `expect` by the table in
+  [CONTRIBUTING.md § "Porting a Minitest assertion"](CONTRIBUTING.md#porting-a-minitest-assertion):
+  the built-in matcher by default, and a `@blazetrails/vitest-matchers` matcher
+  only where the built-in gives the wrong result for the value under test
+  (`toBeTruthy` on a value that can be `0` or `""`).
+
 If you find a new instance, file it against the best-fit active RFC, else the
 `<package>-surfaced-deviations` bucket for the package it is about — one exists
 per package (`pnpm tasks list | grep surfaced-deviations`), and

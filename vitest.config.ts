@@ -324,6 +324,11 @@ const alias = {
   "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/src") + "/",
   "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/src/index.ts"),
   "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/src/index.ts"),
+  "@blazetrails/vitest-matchers/setup": path.resolve(
+    __dirname,
+    "packages/vitest-matchers/src/setup.ts",
+  ),
+  "@blazetrails/vitest-matchers": path.resolve(__dirname, "packages/vitest-matchers/src/index.ts"),
   "@blazetrails/date": path.resolve(__dirname, "packages/date/src/index.ts"),
   "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/src/index.ts"),
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
@@ -409,6 +414,7 @@ const otherResolve = {
 // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
 // (it runs under activerecord, where the engine is ActiveRecord::Base).
 const otherSetupFiles = [
+  "./packages/vitest-matchers/src/setup.ts",
   "./packages/activesupport/src/testing/autorun.ts",
   "./packages/activesupport/src/test-setup-abstract-unit.ts",
   "./packages/arel/src/test-setup-engine.ts",
@@ -478,6 +484,7 @@ export default defineConfig({
           globalSetup: ["./packages/activerecord/src/support/template-global-setup.ts"],
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
+            "./packages/vitest-matchers/src/setup.ts",
             // `ActiveSupport::TestCase`'s include list (test_case.rb:144-153),
             // which helper.rb picks up by requiring active_support/test_case.
             "./packages/activesupport/src/testing/autorun.ts",

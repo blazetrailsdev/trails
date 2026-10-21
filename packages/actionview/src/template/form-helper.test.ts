@@ -20,12 +20,15 @@ import {
   isHtmlSafe,
   isPlainObject,
   isPresent,
+  setZone,
   stub,
+  zone,
 } from "@blazetrails/activesupport";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
 import {
   ArgumentError,
   Hash,
+  NotImplementedError,
   Range,
   Struct,
   include,
@@ -44,6 +47,7 @@ import {
   multipleFileFieldIncludeHidden,
   setMultipleFileFieldIncludeHidden,
 } from "../helpers/form-helper.js";
+import { Base as TagsBase } from "../helpers/tags/base.js";
 import type { LabelBuilder } from "../helpers/tags/label.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 import { Cpk } from "../test-helpers/fake-models.js";
@@ -366,7 +370,23 @@ describe("FormHelperTest", () => {
       },
     });
     I18n.backend().storeTranslations("placeholder", {
-      helpers: { placeholder: { post: { title: "What is this about?" } } },
+      activemodel: {
+        attributes: {
+          post: { cost: "Total cost" },
+          "post/cost": { uk: "Pounds" },
+        },
+      },
+      helpers: {
+        placeholder: {
+          post: {
+            title: "What is this about?",
+            written_on: { spanish: "Escrito en" },
+            comments: { body: "Write body here" },
+          },
+          post_delegate: { title: "Delegate model_name title" },
+          tag: { value: "Tag" },
+        },
+      },
     });
     view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null) as View;
     include(view.constructor as new (...args: never[]) => unknown, Routes.urlHelpers());
@@ -400,6 +420,12 @@ describe("FormHelperTest", () => {
 
   afterEach(() => {
     I18n.reloadBang();
+  });
+
+  class FooTag extends TagsBase {}
+
+  it("tags base child without render method", async () => {
+    await assertRaises([NotImplementedError], {}, () => new FooTag("post", "title", view).render());
   });
 
   it("label", () => {
@@ -665,12 +691,106 @@ describe("FormHelperTest", () => {
     });
   });
 
+  it("text field placeholder with locales", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<input id="post_title" name="post[title]" placeholder="What is this about?" type="text" value="Hello World" />',
+        view.textField("post", "title", { placeholder: true }),
+      );
+    });
+  });
+
+  it("text field placeholder with locales and to model", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<input id="post_delegator_title" name="post_delegator[title]" placeholder="Delegate model_name title" type="text" value="Hello World" />',
+        view.textField("post_delegator", "title", { placeholder: true }),
+      );
+    });
+  });
+
+  it("text field placeholder with human attribute name", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<input id="post_cost" name="post[cost]" placeholder="Total cost" type="text" />',
+        view.textField("post", "cost", { placeholder: true }),
+      );
+    });
+  });
+
+  it("text field placeholder with human attribute name and to model", () => {
+    assertDomEqual(
+      '<input id="post_delegator_title" name="post_delegator[title]" placeholder="Delegate Title" type="text" value="Hello World" />',
+      view.textField("post_delegator", "title", { placeholder: true }),
+    );
+  });
+
   it("text field placeholder with string value", () => {
     I18n.withLocale("placeholder", () => {
       assertDomEqual(
         '<input id="post_cost" name="post[cost]" placeholder="HOW MUCH?" type="text" />',
         view.textField("post", "cost", { placeholder: "HOW MUCH?" }),
       );
+    });
+  });
+
+  it("text field placeholder with human attribute name and value", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<input id="post_cost" name="post[cost]" placeholder="Pounds" type="text" />',
+        view.textField("post", "cost", { placeholder: ":uk" }),
+      );
+    });
+  });
+
+  it("text field placeholder with locales and value", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<input id="post_written_on" name="post[written_on]" placeholder="Escrito en" type="text" value="2004-06-15" />',
+        view.textField("post", "written_on", { placeholder: ":spanish" }),
+      );
+    });
+  });
+
+  it("text field placeholder with locales and nested attributes", () => {
+    I18n.withLocale("placeholder", () => {
+      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+        f.fieldsFor("comments", null, null, (cf) =>
+          concat(cf.textField("body", { placeholder: true })),
+        ),
+      );
+
+      const expected = wholeForm(
+        "/posts/123",
+        "create-post",
+        "edit_post",
+        { method: "patch" },
+        () =>
+          '<input id="post_comments_attributes_0_body" name="post[comments_attributes][0][body]" placeholder="Write body here" type="text" />',
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("text field placeholder with locales fallback and nested attributes", () => {
+    I18n.withLocale("placeholder", () => {
+      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+        f.fieldsFor("tags", null, null, (cf) =>
+          concat(cf.textField("value", { placeholder: true })),
+        ),
+      );
+
+      const expected = wholeForm(
+        "/posts/123",
+        "create-post",
+        "edit_post",
+        { method: "patch" },
+        () =>
+          '<input id="post_tags_attributes_0_value" name="post[tags_attributes][0][value]" placeholder="Tag" type="text" value="new tag" />',
+      );
+
+      assertDomEqual(expected, rendered);
     });
   });
 
@@ -1130,6 +1250,93 @@ describe("FormHelperTest", () => {
     });
   });
 
+  it("textarea placeholder with locales", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<textarea id="post_title" name="post[title]" placeholder="What is this about?">\nHello World</textarea>',
+        view.textarea("post", "title", { placeholder: true }),
+      );
+    });
+  });
+
+  it("textarea placeholder with human attribute name", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<textarea id="post_cost" name="post[cost]" placeholder="Total cost">\n</textarea>',
+        view.textarea("post", "cost", { placeholder: true }),
+      );
+    });
+  });
+
+  it("textarea placeholder with string value", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<textarea id="post_cost" name="post[cost]" placeholder="HOW MUCH?">\n</textarea>',
+        view.textarea("post", "cost", { placeholder: "HOW MUCH?" }),
+      );
+    });
+  });
+
+  it("textarea placeholder with human attribute name and value", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<textarea id="post_cost" name="post[cost]" placeholder="Pounds">\n</textarea>',
+        view.textarea("post", "cost", { placeholder: ":uk" }),
+      );
+    });
+  });
+
+  it("textarea placeholder with locales and value", () => {
+    I18n.withLocale("placeholder", () => {
+      assertDomEqual(
+        '<textarea id="post_written_on" name="post[written_on]" placeholder="Escrito en">\n2004-06-15</textarea>',
+        view.textarea("post", "written_on", { placeholder: ":spanish" }),
+      );
+    });
+  });
+
+  it("textarea placeholder with locales and nested attributes", () => {
+    I18n.withLocale("placeholder", () => {
+      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+        f.fieldsFor("comments", null, null, (cf) =>
+          concat(cf.textarea("body", { placeholder: true })),
+        ),
+      );
+
+      const expected = wholeForm(
+        "/posts/123",
+        "create-post",
+        "edit_post",
+        { method: "patch" },
+        () =>
+          '<textarea id="post_comments_attributes_0_body" name="post[comments_attributes][0][body]" placeholder="Write body here">\n</textarea>',
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("textarea placeholder with locales fallback and nested attributes", () => {
+    I18n.withLocale("placeholder", () => {
+      formFor(post, { html: { id: "create-post" } }, (f: FormBuilder) =>
+        f.fieldsFor("tags", null, null, (cf) =>
+          concat(cf.textarea("value", { placeholder: true })),
+        ),
+      );
+
+      const expected = wholeForm(
+        "/posts/123",
+        "create-post",
+        "edit_post",
+        { method: "patch" },
+        () =>
+          '<textarea id="post_tags_attributes_0_value" name="post[tags_attributes][0][value]" placeholder="Tag">\nnew tag</textarea>',
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
   it("textarea", () => {
     assertDomEqual(
       '<textarea id="post_body" name="post[body]">\nBack to the hill and over it again!</textarea>',
@@ -1239,6 +1446,26 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, view.dateField("post", "written_on", { value: value }));
   });
 
+  it("date field with datetime value attr", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="date" value="2013-06-29" />';
+    const value = DateTime.civil(2013, 6, 29);
+    assertDomEqual(expected, view.dateField("post", "written_on", { value: value }));
+  });
+
+  it("date field with timewithzone value", () => {
+    const previousTimeZone = zone();
+    setZone("UTC");
+    try {
+      const expected =
+        '<input id="post_written_on" name="post[written_on]" type="date" value="2004-06-15" />';
+      post.written_on = zone()!.parse("2004-06-15 15:30:45");
+      assertDomEqual(expected, view.dateField("post", "written_on"));
+    } finally {
+      setZone(previousTimeZone);
+    }
+  });
+
   it("date field with nil value", () => {
     const expected = '<input id="post_written_on" name="post[written_on]" type="date" />';
     post.written_on = null;
@@ -1275,6 +1502,82 @@ describe("FormHelperTest", () => {
     assertDomEqual(expected, view.timeField("post", "written_on"));
   });
 
+  it("time field with datetime value", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="time" value="01:02:03.000" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    assertDomEqual(expected, view.timeField("post", "written_on"));
+  });
+
+  it("time field with extra attrs", () => {
+    const expected =
+      '<input id="post_written_on" step="60" max="10:25:00.000" min="20:45:30.000" name="post[written_on]" type="time" value="01:02:03.000" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = DateTime.civil(2000, 6, 15, 20, 45, 30);
+    const maxValue = DateTime.civil(2010, 8, 15, 10, 25, 0);
+    const step = 60;
+    assertDomEqual(
+      expected,
+      view.timeField("post", "written_on", { min: minValue, max: maxValue, step: step }),
+    );
+  });
+
+  it("time field with value attr", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="time" value="01:02:03.000" />';
+    const value = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    assertDomEqual(expected, view.timeField("post", "written_on", { value: value }));
+  });
+
+  it("time field with value attr that excludes seconds", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="time" value="01:45" />';
+    assertDomEqual(expected, view.timeField("post", "written_on", { value: "01:45" }));
+  });
+
+  it("time field with timewithzone value", () => {
+    const previousTimeZone = zone();
+    setZone("UTC");
+    try {
+      const expected =
+        '<input id="post_written_on" name="post[written_on]" type="time" value="01:02:03.000" />';
+      post.written_on = zone()!.parse("2004-06-15 01:02:03");
+      assertDomEqual(expected, view.timeField("post", "written_on"));
+    } finally {
+      setZone(previousTimeZone);
+    }
+  });
+
+  it("time field with nil value", () => {
+    const expected = '<input id="post_written_on" name="post[written_on]" type="time" />';
+    post.written_on = null;
+    assertDomEqual(expected, view.timeField("post", "written_on"));
+  });
+
+  it("time field with string values for min and max", () => {
+    const expected =
+      '<input id="post_written_on" max="10:25:00.000" min="20:45:30.000" name="post[written_on]" type="time" value="01:02:03.000" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = "20:45:30.000";
+    const maxValue = "10:25:00.000";
+    assertDomEqual(
+      expected,
+      view.timeField("post", "written_on", { min: minValue, max: maxValue }),
+    );
+  });
+
+  it("time field with invalid string values for min and max", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="time" value="01:02:03.000" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = "foo";
+    const maxValue = "bar";
+    assertDomEqual(
+      expected,
+      view.timeField("post", "written_on", { min: minValue, max: maxValue }),
+    );
+  });
+
   it("time field without seconds", () => {
     const expected =
       '<input id="post_written_on" name="post[written_on]" type="time" value="01:02" max="10:25" min="20:45" />';
@@ -1291,6 +1594,82 @@ describe("FormHelperTest", () => {
     const expected =
       '<input id="post_written_on" name="post[written_on]" type="datetime-local" value="2004-06-15T00:00:00" />';
     assertDomEqual(expected, view.datetimeField("post", "written_on"));
+  });
+
+  it("datetime field with datetime value", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="datetime-local" value="2004-06-15T01:02:03" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    assertDomEqual(expected, view.datetimeField("post", "written_on"));
+  });
+
+  it("datetime field with extra attrs", () => {
+    const expected =
+      '<input id="post_written_on" step="60" max="2010-08-15T10:25:00" min="2000-06-15T20:45:30" name="post[written_on]" type="datetime-local" value="2004-06-15T01:02:03" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = DateTime.civil(2000, 6, 15, 20, 45, 30);
+    const maxValue = DateTime.civil(2010, 8, 15, 10, 25, 0);
+    const step = 60;
+    assertDomEqual(
+      expected,
+      view.datetimeField("post", "written_on", { min: minValue, max: maxValue, step: step }),
+    );
+  });
+
+  it("datetime field with value attr", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="datetime-local" value="2013-06-29T13:37:00" />';
+    const value = DateTime.civil(2013, 6, 29, 13, 37);
+    assertDomEqual(expected, view.datetimeField("post", "written_on", { value: value }));
+  });
+
+  it("datetime field with timewithzone value", () => {
+    const previousTimeZone = zone();
+    setZone("UTC");
+    try {
+      const expected =
+        '<input id="post_written_on" name="post[written_on]" type="datetime-local" value="2004-06-15T15:30:45" />';
+      post.written_on = zone()!.parse("2004-06-15 15:30:45");
+      assertDomEqual(expected, view.datetimeField("post", "written_on"));
+    } finally {
+      setZone(previousTimeZone);
+    }
+  });
+
+  it("datetime field with nil value", () => {
+    const expected = '<input id="post_written_on" name="post[written_on]" type="datetime-local" />';
+    post.written_on = null;
+    assertDomEqual(expected, view.datetimeField("post", "written_on"));
+  });
+
+  it("datetime field with string values for min and max", () => {
+    const expected =
+      '<input id="post_written_on" max="2010-08-15T10:25:00" min="2000-06-15T20:45:30" name="post[written_on]" type="datetime-local" value="2004-06-15T01:02:03" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = "2000-06-15T20:45:30";
+    const maxValue = "2010-08-15T10:25:00";
+    assertDomEqual(
+      expected,
+      view.datetimeField("post", "written_on", { min: minValue, max: maxValue }),
+    );
+  });
+
+  it("datetime field with invalid string values for min and max", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="datetime-local" value="2004-06-15T01:02:03" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = "foo";
+    const maxValue = "bar";
+    assertDomEqual(
+      expected,
+      view.datetimeField("post", "written_on", { min: minValue, max: maxValue }),
+    );
+  });
+
+  it("datetime local field", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="datetime-local" value="2004-06-15T00:00:00" />';
+    assertDomEqual(expected, view.datetimeLocalField("post", "written_on"));
   });
 
   it("datetime local field without seconds", () => {
@@ -1324,6 +1703,246 @@ describe("FormHelperTest", () => {
     const expected = '<input id="post_written_on" name="post[written_on]" type="week" />';
     post.written_on = null;
     assertDomEqual(expected, view.weekField("post", "written_on"));
+  });
+
+  it("datetime local field with value attr that excludes seconds", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="datetime-local" value="2004-06-15T00:00" />';
+    assertDomEqual(
+      expected,
+      view.datetimeLocalField("post", "written_on", { value: "2004-06-15T00:00" }),
+    );
+  });
+
+  it("month field with datetime value", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="month" value="2004-06" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    assertDomEqual(expected, view.monthField("post", "written_on"));
+  });
+
+  it("month field with extra attrs", () => {
+    const expected =
+      '<input id="post_written_on" step="2" max="2010-12" min="2000-02" name="post[written_on]" type="month" value="2004-06" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = DateTime.civil(2000, 2, 13);
+    const maxValue = DateTime.civil(2010, 12, 23);
+    const step = 2;
+    assertDomEqual(
+      expected,
+      view.monthField("post", "written_on", { min: minValue, max: maxValue, step: step }),
+    );
+  });
+
+  it("month field with datetime value attr", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="month" value="2004-06" />';
+    const value = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    assertDomEqual(expected, view.monthField("post", "written_on", { value: value }));
+  });
+
+  it("month field with timewithzone value", () => {
+    const previousTimeZone = zone();
+    setZone("UTC");
+    try {
+      const expected =
+        '<input id="post_written_on" name="post[written_on]" type="month" value="2004-06" />';
+      post.written_on = zone()!.parse("2004-06-15 15:30:45");
+      assertDomEqual(expected, view.monthField("post", "written_on"));
+    } finally {
+      setZone(previousTimeZone);
+    }
+  });
+
+  it("week field with datetime value", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="week" value="2004-W25" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    assertDomEqual(expected, view.weekField("post", "written_on"));
+  });
+
+  it("week field with extra attrs", () => {
+    const expected =
+      '<input id="post_written_on" step="2" max="2010-W51" min="2000-W06" name="post[written_on]" type="week" value="2004-W25" />';
+    post.written_on = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    const minValue = DateTime.civil(2000, 2, 13);
+    const maxValue = DateTime.civil(2010, 12, 23);
+    const step = 2;
+    assertDomEqual(
+      expected,
+      view.weekField("post", "written_on", { min: minValue, max: maxValue, step: step }),
+    );
+  });
+
+  it("week field with datetime value attr", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="week" value="2004-W25" />';
+    const value = DateTime.civil(2004, 6, 15, 1, 2, 3);
+    assertDomEqual(expected, view.weekField("post", "written_on", { value: value }));
+  });
+
+  it("week field with timewithzone value", () => {
+    const previousTimeZone = zone();
+    setZone("UTC");
+    try {
+      const expected =
+        '<input id="post_written_on" name="post[written_on]" type="week" value="2004-W25" />';
+      post.written_on = zone()!.parse("2004-06-15 15:30:45");
+      assertDomEqual(expected, view.weekField("post", "written_on"));
+    } finally {
+      setZone(previousTimeZone);
+    }
+  });
+
+  it("week field week number base", () => {
+    const expected =
+      '<input id="post_written_on" name="post[written_on]" type="week" value="2015-W01" />';
+    post.written_on = DateTime.civil(2015, 1, 1, 1, 2, 3);
+    assertDomEqual(expected, view.weekField("post", "written_on"));
+  });
+
+  it("explicit name", () => {
+    assertDomEqual(
+      '<input id="post_title" name="dont guess" type="text" value="Hello World" />',
+      view.textField("post", "title", { name: "dont guess" }),
+    );
+    assertDomEqual(
+      '<textarea id="post_body" name="really!">\nBack to the hill and over it again!</textarea>',
+      view.textarea("post", "body", { name: "really!" }),
+    );
+    assertDomEqual(
+      '<input name="i mean it" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="post_secret" name="i mean it" type="checkbox" value="1" />',
+      view.checkbox("post", "secret", { name: "i mean it" }),
+    );
+  });
+
+  it("explicit id", () => {
+    assertDomEqual(
+      '<input id="dont guess" name="post[title]" type="text" value="Hello World" />',
+      view.textField("post", "title", { id: "dont guess" }),
+    );
+    assertDomEqual(
+      '<textarea id="really!" name="post[body]">\nBack to the hill and over it again!</textarea>',
+      view.textarea("post", "body", { id: "really!" }),
+    );
+    assertDomEqual(
+      '<input name="post[secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="i mean it" name="post[secret]" type="checkbox" value="1" />',
+      view.checkbox("post", "secret", { id: "i mean it" }),
+    );
+  });
+
+  it("nil id", () => {
+    assertDomEqual(
+      '<input name="post[title]" type="text" value="Hello World" />',
+      view.textField("post", "title", { id: null }),
+    );
+    assertDomEqual(
+      '<textarea name="post[body]">\nBack to the hill and over it again!</textarea>',
+      view.textarea("post", "body", { id: null }),
+    );
+    assertDomEqual(
+      '<input name="post[secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" name="post[secret]" type="checkbox" value="1" />',
+      view.checkbox("post", "secret", { id: null }),
+    );
+    assertDomEqual(
+      '<input type="radio" name="post[secret]" value="0" />',
+      view.radioButton("post", "secret", "0", { id: null }),
+    );
+    assertDomEqual(
+      '<select name="post[secret]"></select>',
+      view.select("post", "secret", [], {}, { id: null }),
+    );
+  });
+
+  it("index", () => {
+    assertDomEqual(
+      '<input name="post[5][title]" id="post_5_title" type="text" value="Hello World" />',
+      view.textField("post", "title", { index: 5 }),
+    );
+    assertDomEqual(
+      '<textarea name="post[5][body]" id="post_5_body">\nBack to the hill and over it again!</textarea>',
+      view.textarea("post", "body", { index: 5 }),
+    );
+    assertDomEqual(
+      '<input name="post[5][secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="post_5_secret" name="post[5][secret]" type="checkbox" value="1" />',
+      view.checkbox("post", "secret", { index: 5 }),
+    );
+    assertDomEqual(
+      view.textField("post", "title", { index: 5 }),
+      view.textField("post", "title", { index: 5 }),
+    );
+    assertDomEqual(
+      view.textarea("post", "body", { index: 5 }),
+      view.textarea("post", "body", { index: 5 }),
+    );
+    assertDomEqual(
+      view.checkbox("post", "secret", { index: 5 }),
+      view.checkbox("post", "secret", { index: 5 }),
+    );
+  });
+
+  it("index with nil id", () => {
+    assertDomEqual(
+      '<input name="post[5][title]" type="text" value="Hello World" />',
+      view.textField("post", "title", { index: 5, id: null }),
+    );
+    assertDomEqual(
+      '<textarea name="post[5][body]">\nBack to the hill and over it again!</textarea>',
+      view.textarea("post", "body", { index: 5, id: null }),
+    );
+    assertDomEqual(
+      '<input name="post[5][secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" name="post[5][secret]" type="checkbox" value="1" />',
+      view.checkbox("post", "secret", { index: 5, id: null }),
+    );
+  });
+
+  it("auto index", () => {
+    const pid = 123;
+    assertDomEqual(`<label for="post_${pid}_title">Title</label>`, view.label("post[]", "title"));
+    assertDomEqual(
+      `<input id="post_${pid}_title" name="post[${pid}][title]" type="text" value="Hello World" />`,
+      view.textField("post[]", "title"),
+    );
+    assertDomEqual(
+      `<textarea id="post_${pid}_body" name="post[${pid}][body]">\nBack to the hill and over it again!</textarea>`,
+      view.textarea("post[]", "body"),
+    );
+    assertDomEqual(
+      `<input name="post[${pid}][secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" id="post_${pid}_secret" name="post[${pid}][secret]" type="checkbox" value="1" />`,
+      view.checkbox("post[]", "secret"),
+    );
+    assertDomEqual(
+      `<input checked="checked" id="post_${pid}_title_hello_world" name="post[${pid}][title]" type="radio" value="Hello World" />`,
+      view.radioButton("post[]", "title", "Hello World"),
+    );
+    assertDomEqual(
+      `<input id="post_${pid}_title_goodbye_world" name="post[${pid}][title]" type="radio" value="Goodbye World" />`,
+      view.radioButton("post[]", "title", "Goodbye World"),
+    );
+  });
+
+  it("auto index with nil id", () => {
+    const pid = 123;
+    assertDomEqual(
+      `<input name="post[${pid}][title]" type="text" value="Hello World" />`,
+      view.textField("post[]", "title", { id: null }),
+    );
+    assertDomEqual(
+      `<textarea name="post[${pid}][body]">\nBack to the hill and over it again!</textarea>`,
+      view.textarea("post[]", "body", { id: null }),
+    );
+    assertDomEqual(
+      `<input name="post[${pid}][secret]" type="hidden" value="0" autocomplete="off" /><input checked="checked" name="post[${pid}][secret]" type="checkbox" value="1" />`,
+      view.checkbox("post[]", "secret", { id: null }),
+    );
+    assertDomEqual(
+      `<input checked="checked" name="post[${pid}][title]" type="radio" value="Hello World" />`,
+      view.radioButton("post[]", "title", "Hello World", { id: null }),
+    );
+    assertDomEqual(
+      `<input name="post[${pid}][title]" type="radio" value="Goodbye World" />`,
+      view.radioButton("post[]", "title", "Goodbye World", { id: null }),
+    );
   });
 
   it("url field", () => {

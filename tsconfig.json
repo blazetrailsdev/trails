@@ -23,6 +23,7 @@
     { "path": "packages/date" },
     { "path": "packages/activesupport" },
     { "path": "packages/bcrypt" },
+    { "path": "packages/vitest-matchers" },
     { "path": "packages/msgpack" },
     { "path": "packages/tse-compiler" },
     { "path": "packages/arel" },

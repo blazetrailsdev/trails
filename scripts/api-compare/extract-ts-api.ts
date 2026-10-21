@@ -1263,6 +1263,21 @@ export function extractFromProgram(
       if (creditAttribute(attr, false)) fileHasClassOrModule = true;
     }
 
+    for (const { owner, methods } of collectIncludedHelperBlockMembers(
+      sourceFile,
+      checker,
+      relPath,
+    )) {
+      const mod = info.modules[`${relPath}:${owner}`];
+      if (mod === undefined) continue;
+      for (const method of methods) {
+        const at = mod.instanceMethods.findIndex((m) => m.name === method.name);
+        if (at !== -1 && mod.instanceMethods[at].bodyless !== true) continue;
+        if (at === -1) mod.instanceMethods.push(method);
+        else mod.instanceMethods[at] = method;
+      }
+    }
+
     // Also capture functions exported via `export { foo, bar }` (named export lists).
     // Resolve aliases so ExportSpecifier nodes reach the underlying FunctionDeclaration.
     const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
@@ -3760,7 +3775,12 @@ function enclosingEntity(node: ts.Node): { name: string; seatsModule: boolean } 
       const hook = onLoadHookModule(cur.expression);
       if (hook !== undefined) return { name: hook, seatsModule: true };
       const name = includedHookOwner(cur.expression);
-      if (name !== undefined) return { name, seatsModule: isExportedModuleConst(cur.parent, name) };
+      if (name !== undefined) {
+        return {
+          name,
+          seatsModule: isExportedModuleConst(cur.parent, name) || isExportedConst(cur.parent, name),
+        };
+      }
     }
   }
   return undefined;
@@ -3810,6 +3830,65 @@ function includedHookOwner(expr: ts.Expression): string | undefined {
   if (!ts.isIdentifier(owner)) return undefined;
   const name = ts.isPropertyAccessExpression(hook) ? hook.name : hook.argumentExpression;
   return ts.isIdentifier(name) && name.text === "included" ? owner.text : undefined;
+}
+
+/**
+ * The methods of a `helper do ... end` block inside an `included do` port:
+ * `X.included(null, function () { this.helper((helper) => { Object.assign(helper, { ... }) }) })`.
+ * `extract-ruby-api.rb` files the block's `def`s under `X`
+ * (`action_view/test_case.rb:209-217`), so they are credited to `X` here.
+ */
+function collectIncludedHelperBlockMembers(
+  sourceFile: ts.SourceFile,
+  checker: ts.TypeChecker,
+  relPath: string,
+): { owner: string; methods: MethodInfo[] }[] {
+  const out: { owner: string; methods: MethodInfo[] }[] = [];
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isExpressionStatement(stmt)) continue;
+    const owner = includedHookOwner(stmt.expression);
+    if (owner === undefined) continue;
+    const visit = (node: ts.Node, inHelper: boolean): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.expression.kind === ts.SyntaxKind.ThisKeyword &&
+        node.expression.name.text === "helper"
+      ) {
+        node.arguments.forEach((arg) => visit(arg, true));
+        return;
+      }
+      if (
+        inHelper &&
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        ts.isIdentifier(node.expression.expression) &&
+        node.expression.expression.text === "Object" &&
+        node.expression.name.text === "assign"
+      ) {
+        for (const arg of node.arguments.slice(1)) {
+          if (ts.isObjectLiteralExpression(arg)) {
+            out.push({ owner, methods: harvestObjectLiteralMethods(arg, checker, relPath) });
+          }
+        }
+        return;
+      }
+      ts.forEachChild(node, (child) => visit(child, inHelper));
+    };
+    visit(stmt.expression, false);
+  }
+  return out;
+}
+
+function isExportedConst(sourceFile: ts.SourceFile, name: string): boolean {
+  return sourceFile.statements.some(
+    (stmt) =>
+      ts.isVariableStatement(stmt) &&
+      isExported(stmt) &&
+      stmt.declarationList.declarations.some(
+        (decl) => ts.isIdentifier(decl.name) && decl.name.text === name,
+      ),
+  );
 }
 
 function isExportedModuleConst(sourceFile: ts.SourceFile, name: string): boolean {
@@ -3876,6 +3955,12 @@ function isDefineModuleCall(expr: ts.Expression): expr is ts.CallExpression {
     ts.isIdentifier(expr.expression) &&
     expr.expression.text === "defineModule"
   );
+}
+
+/** An object-literal value that holds no value yet: `undefined` / `null`, through `as` casts. */
+function isUnsetSlot(expr: ts.Expression): boolean {
+  const e = unwrapAssertions(expr);
+  return (ts.isIdentifier(e) && e.text === "undefined") || e.kind === ts.SyntaxKind.NullKeyword;
 }
 
 function unwrapAssertions(expr: ts.Expression): ts.Expression {
@@ -4108,6 +4193,7 @@ export function harvestObjectLiteralMethods(
   file: string,
 ): MethodInfo[] {
   const out: MethodInfo[] = [];
+  const slots = new Set<string>();
   for (const prop of obj.properties) {
     let mname: string | null = null;
     // Params are recoverable for inline method/function forms; identifier
@@ -4183,6 +4269,16 @@ export function harvestObjectLiteralMethods(
         callSeq = extractCallSeq(init.body);
         callArgs = extractCallArgs(init.body);
         skeleton = extractSkeleton(init.body);
+      } else if (
+        isUnsetSlot(init) &&
+        checker.getNonNullableType(checker.getTypeAtLocation(prop.name)).getCallSignatures()
+          .length === 0
+      ) {
+        // `controller: undefined as T | undefined` — a module's `attr_accessor`
+        // slot, credited as a class field is (see the PropertyDeclaration arm).
+        // A holder with no methods (`{ klass: null }`) is state, not a module.
+        mname = prop.name.text;
+        slots.add(mname);
       } else {
         // `foo: bar` / `foo: NS.bar` — count if the RHS resolves to a
         // callable. Catches `readAttributeForValidation:
@@ -4244,7 +4340,7 @@ export function harvestObjectLiteralMethods(
       ...(aliasOf !== undefined ? { aliasOf } : {}),
     });
   }
-  return out;
+  return out.every((m) => slots.has(m.name)) ? [] : out;
 }
 
 /**

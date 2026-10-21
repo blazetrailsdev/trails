@@ -26,7 +26,7 @@ describe("normalizeRailsKind", () => {
   });
 
   it("maps the must_be_* spec family, which the prefix rewrite alone cannot reach", () => {
-    expect(normalizeRailsKind("must_be_kind_of")).toBe("instanceOf");
+    expect(normalizeRailsKind("must_be_kind_of")).toBe("kindOf");
     expect(normalizeRailsKind("must_be_instance_of")).toBe("instanceOf");
     expect(normalizeRailsKind("must_be_nil")).toBe("nil");
     expect(normalizeRailsKind("must_be_empty")).toBe("empty");
@@ -91,9 +91,9 @@ describe("normalizeRailsKind", () => {
       expect_to_equal: "equal",
       expect_not_to_equal: "notEqual",
       "expect_to_be_>": "operator",
-      expect_to_be_a: "instanceOf",
+      expect_to_be_a: "kindOf",
       expect_to_be_an_instance_of: "instanceOf",
-      expect_to_be_kind_of: "instanceOf",
+      expect_to_be_kind_of: "kindOf",
       expect_to_respond_to: "respondTo",
       expect_not_to_respond_to: "notRespondTo",
     });
@@ -113,8 +113,8 @@ describe("normalizeRailsKind", () => {
     expect(normalizeRailsKind("expect_to_be_empty")).toBe("empty");
     expect(normalizeRailsKind("expect_not_to_be_empty")).toBe("notEmpty");
     expect(normalizeRailsKind("expect_not_to_be_nil")).toBe("notNil");
-    expect(normalizeRailsKind("expect_to_be_a")).toBe("instanceOf");
-    expect(normalizeRailsKind("expect_to_be_kind_of")).toBe("instanceOf");
+    expect(normalizeRailsKind("expect_to_be_a")).toBe("kindOf");
+    expect(normalizeRailsKind("expect_to_be_kind_of")).toBe("kindOf");
     expect(normalizeRailsKind("expect_to_be_falsey")).toBe("falsy");
     expect(normalizeRailsKind("expect_to_be_>")).toBe("operator");
     expect(normalizeRailsKind("expect_not_to_be_falsey")).toBe("truthy");
@@ -259,5 +259,23 @@ describe("diffHistograms", () => {
     // toBe ~ equal, toBeNull ~ nil — same normalized histogram despite different names.
     const trails = buildHistogram(["toBe", "toBeNull"], "trails");
     expect(diffHistograms(rails.histogram, trails.histogram)).toEqual([]);
+  });
+});
+
+describe("Minitest matchers", () => {
+  it("credits each matcher with its Minitest counterpart's kind", () => {
+    expect(normalizeTrailsKind("toEqualRuby")).toBe("equal");
+    expect(normalizeTrailsKind("not:toEqualRuby")).toBe("notEqual");
+    expect(normalizeTrailsKind("toBeRubyTruthy")).toBe("truthy");
+    expect(normalizeTrailsKind("toBeRubyFalsy")).toBe("falsy");
+    expect(normalizeTrailsKind("not:toBeRubyTruthy")).toBe("falsy");
+    expect(normalizeTrailsKind("toBeWithinDelta")).toBe("inDelta");
+    expect(normalizeTrailsKind("toBeEmpty")).toBe("empty");
+    expect(normalizeTrailsKind("not:toBeEmpty")).toBe("notEmpty");
+    expect(normalizeTrailsKind("toBeExactInstanceOf")).toBe("instanceOf");
+    expect(normalizeTrailsKind("toBeInstanceOf")).toBe("kindOf");
+    expect(normalizeTrailsKind("toRespondTo")).toBe("respondTo");
+    expect(normalizeTrailsKind("not:toRespondTo")).toBe("notRespondTo");
+    expect(normalizeRailsKind("assert_kind_of")).toBe("kindOf");
   });
 });

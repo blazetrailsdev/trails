@@ -12,7 +12,7 @@ are run against it only. No trails handler compiles to Ruby, so there is no
 `RubyTracker`. By repo-owner ruling (2026-10-18), `TSETracker` answers those
 three tests, and only those, instead: a `<%#` comment is not searched for `render`, a keyword-hash
 `render` call with a key outside `ALL_KNOWN_KEYS` is skipped, and a String
-`spacer_template:` is a dependency ahead of the partial.
+`spacerTemplate:` is a dependency ahead of the partial.
 `TSETracker#renderDependencies` carries `@inventedArm if — PERMANENT` and
 `@inventedArm replace — PERMANENT` against this section.
 

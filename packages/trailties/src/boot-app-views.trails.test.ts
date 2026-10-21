@@ -16,6 +16,10 @@ describe("a generated app renders its own views", () => {
     app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
 
     await Trails.initialize();
+    const order = app.initializers.tsort().map((i) => i.name);
+    expect(order.indexOf("setup_main_autoloader")).toBeGreaterThan(
+      order.indexOf("action_controller.set_helpers_path"),
+    );
 
     const [status, headers, body] = await (rbFSend(app.app(), "call", {
       REQUEST_METHOD: "GET",
@@ -29,5 +33,6 @@ describe("a generated app renders its own views", () => {
     expect(html).toContain("<p>Hello from TSE</p>");
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("&lt;span class=&quot;badge&quot;&gt;ready&lt;/span&gt;");
+    expect(html).toContain("&lt;em&gt;rendered&lt;/em&gt;");
   }, 15_000);
 });

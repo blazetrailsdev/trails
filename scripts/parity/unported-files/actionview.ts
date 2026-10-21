@@ -47,4 +47,32 @@ export const ACTIONVIEW_UNPORTED_FILES: UnportedFile[] = [
       "`:builder` handler is unported above for want of XmlMarkup, and every test in " +
       "atom_feed_helper_test.rb renders a `.builder` template, so neither half has a caller.",
   },
+  {
+    pattern: "dependency_tracker/ruby_tracker.rb",
+    package: "actionview",
+    reason:
+      "`DependencyTracker::RubyTracker` (ruby_tracker.rb) reads a template's compiled Ruby. " +
+      'No trails handler compiles to Ruby, so there is no `RubyTracker` and nothing for a `RenderParser` to parse: by repo-owner ruling (2026-10-18), recorded in packages/actionview/CLAUDE.md § "`TSETracker` answers what `RubyTracker` answers", `TSETracker` answers the three `RubyTrackerTests` (dependency_tracker_test.rb:274-302) instead. PERMANENT.',
+  },
+  {
+    pattern: "/render_parser.rb",
+    package: "actionview",
+    reason:
+      "`RenderParser` (render_parser.rb) reads a template's compiled Ruby. " +
+      'No trails handler compiles to Ruby, so there is no `RubyTracker` and nothing for a `RenderParser` to parse: by repo-owner ruling (2026-10-18), recorded in packages/actionview/CLAUDE.md § "`TSETracker` answers what `RubyTracker` answers", `TSETracker` answers the three `RubyTrackerTests` (dependency_tracker_test.rb:274-302) instead. PERMANENT.',
+  },
+  {
+    pattern: "render_parser/prism_render_parser.rb",
+    package: "actionview",
+    reason:
+      "`RenderParser::PrismRenderParser` (prism_render_parser.rb) reads a template's compiled Ruby. " +
+      'No trails handler compiles to Ruby, so there is no `RubyTracker` and nothing for a `RenderParser` to parse: by repo-owner ruling (2026-10-18), recorded in packages/actionview/CLAUDE.md § "`TSETracker` answers what `RubyTracker` answers", `TSETracker` answers the three `RubyTrackerTests` (dependency_tracker_test.rb:274-302) instead. PERMANENT.',
+  },
+  {
+    pattern: "render_parser/ripper_render_parser.rb",
+    package: "actionview",
+    reason:
+      "`RenderParser::RipperRenderParser` (ripper_render_parser.rb) reads a template's compiled Ruby. " +
+      'No trails handler compiles to Ruby, so there is no `RubyTracker` and nothing for a `RenderParser` to parse: by repo-owner ruling (2026-10-18), recorded in packages/actionview/CLAUDE.md § "`TSETracker` answers what `RubyTracker` answers", `TSETracker` answers the three `RubyTrackerTests` (dependency_tracker_test.rb:274-302) instead. PERMANENT.',
+  },
 ];
