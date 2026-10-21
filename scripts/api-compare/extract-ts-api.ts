@@ -4221,7 +4221,11 @@ export function harvestObjectLiteralMethods(
     const propMissingRailsCalls = missingRailsCallTags(prop);
     const propMissingRailsArgs = missingRailsArgsTags(prop);
     const propMissingRailsNames = missingRailsNameTags(prop);
-    const propInventedArms = inventedArmTags(prop);
+    // An includer harvesting a module declared elsewhere must not carry that
+    // module's arm receipts: they are compared, and judged, at the declaring file.
+    const declaredHere =
+      file === "" || prop.getSourceFile().fileName.replace(/\\/g, "/").endsWith(`/${file}`);
+    const propInventedArms = declaredHere ? inventedArmTags(prop) : undefined;
     const propMissingRailsCallReasons = missingRailsCallTagReasons(prop);
     const propMissingRailsArgsReasons = missingRailsArgsTagReasons(prop);
     if (

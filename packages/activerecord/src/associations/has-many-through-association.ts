@@ -16,7 +16,7 @@ import {
   rbDeclareIvar,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
-import { exceptBang, underscore, isBlank, kernelArray, wrap } from "@blazetrails/activesupport";
+import { exceptBang, underscore, isBlank, wrap } from "@blazetrails/activesupport";
 import { zip } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
@@ -152,7 +152,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         const target = this.throughAssociation().target;
 
         if (inverse != null && target != null && !globalThis.Array.isArray(target)) {
-          zip(kernelArray(target.id), kernelArray(inverse.foreignKey())).map(
+          zip(Array(target.id), Array(inverse.foreignKey())).map(
             ([primaryKeyValue, foreignKeyColumn]) => {
               (attributes as Record<string, unknown>)[foreignKeyColumn as string] = primaryKeyValue;
             },
@@ -406,7 +406,7 @@ function targetReflectionHasAssociatedRecord(
 ): boolean {
   if (throughAssoc.macro !== "belongsTo") return true;
   const fk = throughAssoc.options.foreignKey ?? `${underscore(throughAssoc.name)}_id`;
-  const columns = Array.isArray(fk) ? fk : [fk];
+  const columns = globalThis.Array.isArray(fk) ? fk : [fk];
   return !columns.every((column) => isBlank(record._readAttribute(String(column))));
 }
 

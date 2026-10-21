@@ -77,6 +77,7 @@ export function appendInfoToPayload(
 }
 
 export class ControllerRuntime {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
   static ClassMethods = ClassMethods;
 }
