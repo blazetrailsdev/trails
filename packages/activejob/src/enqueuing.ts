@@ -37,21 +37,13 @@ interface EnqueuingJob {
   rawEnqueue(): Promise<unknown>;
 }
 
-type InstrumentEnqueueAll = (
-  queueAdapter: unknown,
-  jobs: unknown[],
-  block: (payload: Record<string, unknown>) => Promise<unknown>,
-) => Promise<unknown>;
-
 export async function performAllLater(...jobs: unknown[]): Promise<null> {
   jobs.splice(0, jobs.length, ...flatten(jobs));
   for (const [queueAdapter, adapterJobs] of groupBy(
     jobs as EnqueuingJob[],
     (job) => job.queueAdapter,
   )) {
-    await (
-      ActiveJob as unknown as { instrumentEnqueueAll: InstrumentEnqueueAll }
-    ).instrumentEnqueueAll(queueAdapter, adapterJobs, async () => {
+    await ActiveJob.instrumentEnqueueAll(queueAdapter, adapterJobs, async () => {
       if (rbObjRespondTo(queueAdapter, "enqueueAll")) {
         return await queueAdapter.enqueueAll!(adapterJobs);
       } else {
@@ -112,8 +104,7 @@ export class Enqueuing {
 
     await this.runCallbacks("enqueue", () => this.rawEnqueue());
 
-    const successfullyEnqueued = this.isSuccessfullyEnqueued();
-    if (successfullyEnqueued != null && successfullyEnqueued !== false) {
+    if (this.isSuccessfullyEnqueued() != null && this.isSuccessfullyEnqueued() !== false) {
       return this;
     } else {
       return false;
@@ -121,7 +112,7 @@ export class Enqueuing {
   }
 
   /** @internal */
-  async rawEnqueue(this: EnqueuingJob): Promise<unknown> {
+  private async rawEnqueue(this: EnqueuingJob): Promise<unknown> {
     try {
       if (this.scheduledAt != null && this.scheduledAt !== false) {
         await this.queueAdapter.enqueueAt(this, toF(this.scheduledAt));
