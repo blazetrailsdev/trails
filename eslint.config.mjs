@@ -1043,9 +1043,6 @@ export default defineConfig(
     },
   },
 
-  // ── marcel: extension_test.rb:16-22 defines each test under
-  // `unless extensions.include?`, and test_helper.rb:35 keeps a dead
-  // `extra = nil` assignment; both mirror the gem line for line.
   {
     files: ["packages/marcel/src/extension.test.ts"],
     rules: {
