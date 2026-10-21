@@ -168,7 +168,8 @@ export interface ConnectionPoolConfiguration {
   readonly queryCache: Store;
 }
 
-export const ConnectionPoolConfiguration = {
+export const ConnectionPoolConfiguration: ThisType<ConnectionPoolConfigurationHost> &
+  Record<string, any> = {
   checkoutAndVerify: async function checkoutAndVerify(
     this: ConnectionPoolConfigurationHost,
     connection: QueryCacheHost,
@@ -245,7 +246,7 @@ export const ConnectionPoolConfiguration = {
       return new Store(pool._queryCacheVersion, pool._queryCacheMaxSize);
     });
   },
-} satisfies ThisType<ConnectionPoolConfigurationHost>;
+};
 
 export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
   const proto = base.prototype as Record<string, unknown>;
@@ -454,12 +455,13 @@ function sqlCacheKey(sql: string, binds: unknown[]): string {
     : sql;
 }
 
-export const QueryCache: Record<string, unknown> & {
-  [included]?: (base: {
-    prototype: object;
-    setCallback(name: string, ...filterList: unknown[]): void;
-  }) => void;
-} = {
+export const QueryCache: ThisType<QueryCacheHost> &
+  Record<string, unknown> & {
+    [included]?: (base: {
+      prototype: object;
+      setCallback(name: string, ...filterList: unknown[]): void;
+    }) => void;
+  } = {
   get queryCache(): Store | null {
     return this._queryCache;
   },
@@ -480,7 +482,7 @@ export const QueryCache: Record<string, unknown> & {
   cacheNotificationInfoResult,
   cacheNotificationInfo,
   selectAll,
-} satisfies ThisType<QueryCacheHost>;
+};
 
 QueryCache[included] = function (base: {
   prototype: object;

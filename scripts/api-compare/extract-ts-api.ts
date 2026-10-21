@@ -730,7 +730,15 @@ export function extractFromProgram(
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
           for (const nested of staticModuleInstances(node, classInfo.name)) {
-            const instanceMethods = harvestModuleInstanceMethods(nested.init, checker, relPath);
+            // A nested Ruby module seated as a plain object
+            // (`static TableDefinition = { column() {...} }`, RFC 0197).
+            const literal = unwrapAssertions(nested.init);
+            const instanceMethods =
+              ts.isObjectLiteralExpression(literal) &&
+              /^[A-Z]/.test(nested.name) &&
+              /[a-z]/.test(nested.name)
+                ? harvestObjectLiteralMethods(literal, checker, relPath)
+                : harvestModuleInstanceMethods(nested.init, checker, relPath);
             if (instanceMethods.length === 0) continue;
             info.modules[`${relPath}:${nested.seat}`] = {
               name: nested.name,

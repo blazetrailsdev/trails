@@ -1718,7 +1718,12 @@ export function rbModAppendFeatures(
       if (typeof modDesc.value === "function" && (!existing || existingIsMixin)) {
         const shadowed = Reflect.get(klass.prototype, key) as unknown;
         if (typeof shadowed === "function" && shadowed !== modDesc.value) {
-          descriptors[superSlot(modDesc.value as AnyFunction, key)] = {
+          descriptors[
+            superSlots.get(modDesc.value as AnyFunction) ??
+              superSlots
+                .set(modDesc.value as AnyFunction, Symbol(`super:${key}`))
+                .get(modDesc.value as AnyFunction)!
+          ] = {
             value: shadowed,
             configurable: true,
           };
@@ -1764,7 +1769,11 @@ export function rbModAppendFeatures(
         descriptors[key] = { ...modDesc, configurable: true, enumerable: false };
         if (typeof key === "string" && "value" in modDesc) {
           const shadowed = Reflect.get(klass.prototype, key) as unknown;
-          const slot = superSlot(modDesc.value as AnyFunction, key);
+          const slot =
+            superSlots.get(modDesc.value as AnyFunction) ??
+            superSlots
+              .set(modDesc.value as AnyFunction, Symbol(`super:${key}`))
+              .get(modDesc.value as AnyFunction)!;
           if (
             typeof shadowed === "function" &&
             shadowed !== modDesc.value &&
@@ -1784,12 +1793,6 @@ export function rbModAppendFeatures(
 }
 
 const superSlots = new WeakMap<AnyFunction, symbol>();
-
-function superSlot(method: AnyFunction, key: string): symbol {
-  let slot = superSlots.get(method);
-  if (slot === undefined) superSlots.set(method, (slot = Symbol(`super:${key}`)));
-  return slot;
-}
 
 /**
  * Mirrors: Ruby's `super` — vendor/ruby/v3.3.11/vm_eval.c:366 `rb_call_super`.
@@ -2128,7 +2131,11 @@ export function rbModPrependFeatures(klass: AnyClass, mod: ModuleObject | AnyCla
         "value" in descriptor &&
         shadowed !== descriptor.value
       ) {
-        const slot = superSlot(descriptor.value as AnyFunction, key);
+        const slot =
+          superSlots.get(descriptor.value as AnyFunction) ??
+          superSlots
+            .set(descriptor.value as AnyFunction, Symbol(`super:${key}`))
+            .get(descriptor.value as AnyFunction)!;
         if (!seated.has(slot)) {
           seated.add(slot);
           Object.defineProperty(klass.prototype, slot, { value: shadowed, configurable: true });
@@ -2269,10 +2276,17 @@ function extendObject(klass: AnyClass | object, mod: ModuleObject | AnyClass | M
       shadowed !== modDesc.value &&
       (!existing || getterIsMixin)
     ) {
-      Object.defineProperty(klass, superSlot(modDesc.value as AnyFunction, key), {
-        value: shadowed,
-        configurable: true,
-      });
+      Object.defineProperty(
+        klass,
+        superSlots.get(modDesc.value as AnyFunction) ??
+          superSlots
+            .set(modDesc.value as AnyFunction, Symbol(`super:${key}`))
+            .get(modDesc.value as AnyFunction)!,
+        {
+          value: shadowed,
+          configurable: true,
+        },
+      );
     }
     if (!existing) {
       Object.defineProperty(klass, key, descriptor);
