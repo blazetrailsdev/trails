@@ -924,6 +924,7 @@ function rbAttr(klass: { prototype: object }, id: string, read: boolean, write: 
         }
       : {}),
   });
+  if (typeof klass !== "function") Object.defineProperty(klass.prototype, id, { enumerable: true });
 }
 
 /**
