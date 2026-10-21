@@ -1343,6 +1343,14 @@ export class Lowerer {
     if (n.k === "and") return `${this.condP(n.left, ctx)} && ${this.condP(n.right, ctx)}`;
     if (n.k === "or") return `${this.condP(n.left, ctx)} || ${this.condP(n.right, ctx)}`;
     if (n.k === "call" && n.name === "!" && n.recv) return `!(${this.cond(n.recv, ctx)})`;
+    // `s.index(sub)` as a condition: whether `sub` occurs (an index, 0 included,
+    // is truthy; nil is not).
+    if (n.k === "call" && n.name === "index" && n.recv && n.args.length === 1 && !n.block) {
+      const at = this.typeOf(n.args[0], ctx);
+      const s = this.strRecv(n.recv, this.expr(n.recv, ctx), ctx);
+      if (s && (n.args[0].k === "str" || (at?.k === "prim" && at.name === "string")))
+        return `${s}.includes(${this.expr(n.args[0], ctx)})`;
+    }
     if (n.k === "defined") {
       const e = this.expr(n, ctx);
       return `${needsParens(e) ? `(${e})` : e} != null`;
@@ -2864,6 +2872,27 @@ export class Lowerer {
       const r = this.expr(n.recv, ctx);
       return `${needsParens(r) ? `(${r})` : r}.length`;
     }
+    // `s.split(sep, …).first`: the text before the first separator, nil for an
+    // empty String (string.c rb_str_split_m answers [] for ""). A limit does not
+    // change the first field; `" "` (awk-style) keeps the method table.
+    if (
+      n.name === "first" &&
+      !n.args.length &&
+      !n.block &&
+      n.recv?.k === "call" &&
+      n.recv.name === "split" &&
+      n.recv.recv &&
+      n.recv.args.length >= 1 &&
+      n.recv.args.length <= 2 &&
+      (n.recv.args[0].k === "regex" || (n.recv.args[0].k === "str" && n.recv.args[0].value !== " "))
+    ) {
+      const s0 = this.strRecv(n.recv.recv, this.expr(n.recv.recv, ctx), ctx);
+      if (s0) {
+        const sep = this.expr(n.recv.args[0], ctx);
+        const f = (x: string) => `(${x} === "" ? null : ${x}.split(${sep})[0])`;
+        return /^[\w$]+$/.test(s0) ? f(s0) : `((x: string) => ${f("x")})(${s0})`;
+      }
+    }
     // A native vitest test file: a helper `def` (`files`, `self.class.fixture_path`)
     // is a function the test file declares or imports.
     {
@@ -3675,6 +3704,12 @@ export class Lowerer {
       const stringish =
         (rt?.k === "prim" && rt.name === "string") ||
         (!rt && STRING_ONLY.has(name) && !this.index.methodNames.has(name));
+      // `downcase` / `upcase` with no options: JS's case mapping is Ruby's
+      // default Unicode one (string.c rb_str_downcase).
+      if (stringish && (name === "downcase" || name === "upcase") && !n.args.length) {
+        const s = rt ? (needsParens(r) ? `(${r})` : r) : `(${r} as string)`;
+        return `${s}.${name === "downcase" ? "toLowerCase" : "toUpperCase"}()`;
+      }
       if (
         stringish &&
         /^[a-z_]/.test(name) &&
@@ -4393,6 +4428,16 @@ export class Lowerer {
   typeOf(n: N | null | undefined, ctx: Ctx): TypeRef {
     if (!n) return null;
     const T = this.resolver.types;
+    // `to_s`, `downcase`, `upcase` answer a String (any receiver's `to_s`,
+    // string.c rb_str_downcase / rb_str_upcase).
+    if (
+      n.k === "call" &&
+      n.recv &&
+      !n.args.length &&
+      ["to_s", "downcase", "upcase"].includes(n.name) &&
+      !this.index.methodNames.has(n.name)
+    )
+      return { k: "prim", name: "string" };
     if (n.k === "call" && n.recv && !n.args.length) {
       // A bound of a Range, where every Range the gem builds is Integer-bounded.
       if (this.intRanges && ["begin", "end", "first", "last", "min", "max"].includes(n.name)) {
@@ -4851,7 +4896,12 @@ export class Lowerer {
           // `str[1..-1]` / `ary[0, 2]`: `String#[]` (string.c rb_str_aref_m) through
           // the String method table's `get`, or `Array#[]` (array.c rb_ary_aref).
           const t = this.typeOf(n.recv, ctx);
-          const str = (x: string) => `${rc("rbStrSend")}(${x}, "get", ${a.join(", ")})[0]`;
+          // `s[0..0]` / `s[1..-1]`: a String slice by a literal Range from a
+          // non-negative start is `slice` (string.c rb_str_aref_m), nil only where
+          // the start is past the end.
+          const native = this.nativeStrSlice(n.args[0], a.length);
+          const str = (x: string) =>
+            native ? native(x) : `${rc("rbStrSend")}(${x}, "get", ${a.join(", ")})[0]`;
           const ary = (x: string) => `${rc("arySlice")}(${x}, ${a.join(", ")})`;
           if (t?.k === "prim" && t.name === "string") return str(r);
           if (t?.k === "array") return ary(r);
@@ -4958,6 +5008,37 @@ export class Lowerer {
         return `~${lhs}`;
     }
     return `${lhs}.${tsMethodName(name)}(${a.join(", ")})`;
+  }
+
+  /**
+   * `String#[]` with one literal Integer Range from a non-negative start, as JS
+   * `slice` on receiver `x`; null where the index is anything else.
+   */
+  nativeStrSlice(r: N, argc: number): ((x: string) => string) | null {
+    if (argc !== 1 || r?.k !== "range" || r.from?.k !== "int" || r.to?.k !== "int") return null;
+    const from = Number(r.from.value);
+    const to = Number(r.to.value);
+    if (from < 0) return null;
+    const end = r.exclusive ? to : to + 1;
+    const args = end === 0 && !r.exclusive ? `${from}` : `${from}, ${end}`;
+    return (x) => {
+      const sl = `${x}.slice(${args})`;
+      return from === 0 ? sl : `(${x}.length < ${from} ? null : ${sl})`;
+    };
+  }
+
+  /** A String receiver: `x` itself where typed, else cast (`(x as string)`). */
+  strRecv(recvNode: N, r: string, ctx: Ctx): string | null {
+    const t = this.typeOf(recvNode, ctx);
+    if (t?.k === "prim" && t.name === "string") return needsParens(r) ? `(${r})` : r;
+    if (
+      !t &&
+      recvNode?.k === "call" &&
+      (STRING_ONLY.has(recvNode.name) || recvNode.name === "to_s") &&
+      !this.index.methodNames.has(recvNode.name)
+    )
+      return `(${r} as string)`;
+    return null;
   }
 
   mayBeArray(n: N): boolean {
