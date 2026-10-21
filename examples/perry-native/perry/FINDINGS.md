@@ -566,3 +566,53 @@ at all, `Class extends value undefined`), and adapter-only (1133). The open
 question is where between 139 and 364 modules the ceiling actually sits, and
 that is a Perry-internal threshold to bisect against a synthetic graph, not
 something a different trails entry point can route around.
+
+## 04d's new failure: `registerProcessAdapter`, and four refuted hypotheses
+
+With wall 3b gone (above), `04d-ruby-compat-barrel` compiles, links and
+reaches startup on `main` @ `20fde48d`, then fails at runtime:
+
+    TypeError: Cannot convert undefined or null to object
+        at registerProcessAdapter (<anonymous>)
+        at tryAutoRegisterNode (<anonymous>)
+
+This is a different and far more ordinary class of bug than the shape mint: a
+JS-level error in our own code's auto-registration path, not a compiler
+internal abort. `registerProcessAdapter`
+(`ruby-compat/src/process-adapter.ts:428`) has exactly two calls that can
+raise it — `Object.keys(envInternal)` and `Object.entries(envSnapshot)` — so
+one of those receives undefined.
+
+**It is not yet diagnosed, and four plausible causes are ruled out.** Each was
+tested as a synthetic program compiled by the same from-source Perry, against
+Node as the control. Perry matched Node in all four:
+
+| Hypothesis                                                                                             | Probe                                                               | Result                                                                                  |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `Object.create(null)` breaks `Object.keys`/`entries`                                                   | null-prototype object, both calls                                   | **matches Node**                                                                        |
+| Perry's `process` is incomplete, so `envSnapshot` is undefined                                         | `process.env`/`argv`/`versions` shape                               | **matches Node** — 64 env keys, argv array, `versions.node=22.0.0`                      |
+| `() => ({ ...x })` — a concise arrow body whose object literal holds only a spread — returns undefined | 5 arrow/spread forms, incl. one built in a closure over a parameter | **matches Node**                                                                        |
+| Perry does not enforce TDZ, so an uninitialized `const` reads as undefined instead of throwing         | same-module, and a true cross-module import cycle                   | **matches Node** — both raise `ReferenceError: Cannot access 'x' before initialization` |
+
+The last one is worth keeping in mind: Perry enforces temporal dead zones
+correctly, across an import cycle, which removes the most attractive
+explanation for a foundation-layer initialization failure.
+
+Since no synthetic program reproduces it, the next step is bisection against
+the real package rather than more guessing: instrument or narrow
+`process-adapter.ts` / `crypto-adapter.ts` under a deep import until the
+undefined value is identified. Note `crypto-adapter.ts:508` calls
+`tryAutoRegisterNode()` at module top level, so this runs during
+initialization, and `ruby-compat`'s six circular import groups (item 7) are
+real, even though a synthetic cycle behaves correctly.
+
+### Upstream filings from this round
+
+| Issue                                                  | Subject                                                                       | State |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------- | ----- |
+| [12978](https://github.com/PerryTS/perry/issues/12978) | constraint check compares a type parameter's `TypeVar`, not its instantiation | filed |
+| [12979](https://github.com/PerryTS/perry/issues/12979) | contributor docs cannot produce a working from-source build                   | filed |
+
+Both re-verified against `main` @ `20fde48d` immediately before filing, and
+both duplicate-searched first. 12978's reproducer is the 23-line
+`inQueryConnection` case and the warning text is unchanged from 0.5.1520.
