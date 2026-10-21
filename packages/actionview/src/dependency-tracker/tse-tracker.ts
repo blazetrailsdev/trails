@@ -22,7 +22,7 @@ const ALL_KNOWN_KEYS = [
 
 const RENDER_TYPE_KEYS = ["partial", "template", "layout"];
 
-function argumentList(code: string): string[] {
+function argumentList(code: string): [string[], number] {
   const args: string[] = [];
   let depth = 0;
   let start = 0;
@@ -37,6 +37,8 @@ function argumentList(code: string): string[] {
     } else if (ch === ")" || ch === "]" || ch === "}") {
       if (depth === 0) break;
       depth -= 1;
+    } else if (ch === ";" && depth === 0) {
+      break;
     } else if (ch === "," && depth === 0) {
       args.push(code.slice(start, pos).trim());
       start = pos + 1;
@@ -45,7 +47,7 @@ function argumentList(code: string): string[] {
   }
   const last = code.slice(start, pos).trim();
   if (last.length > 0 || args.length > 0) args.push(last);
-  return args;
+  return [args, pos];
 }
 
 /** @internal */
@@ -136,8 +138,11 @@ export class TSETracker {
         if (spacer?.index === 0 && spacer[0].length === spacerTemplate!.length) {
           this.addStaticDependency(dependencies, spacer.groups?.static, spacer.groups?.quote);
         }
-        this.addDependencies(dependencies, args, TSETracker.LAYOUT_DEPENDENCY);
+        const renderType = Object.keys(options).find((key) => RENDER_TYPE_KEYS.includes(key));
         this.addDependencies(dependencies, args, TSETracker.RENDER_ARGUMENTS);
+        if (renderType !== "layout") {
+          this.addDependencies(dependencies, args, TSETracker.LAYOUT_DEPENDENCY);
+        }
       }
     }
 
@@ -148,10 +153,12 @@ export class TSETracker {
     let source = code.trimStart();
     if (source.startsWith("(")) source = source.slice(1);
 
-    let arguments_ = argumentList(source).map((argument) => {
+    let arguments_ = argumentList(source)[0].map((argument) => {
       let current = argument;
-      while (current.startsWith("(") && argumentList(current.slice(1)).length === 1) {
-        current = argumentList(current.slice(1))[0]!;
+      while (current.startsWith("(")) {
+        const [body, end] = argumentList(current.slice(1));
+        if (body.length !== 1 || end !== current.length - 2) break;
+        current = body[0];
       }
       return current;
     });
@@ -166,7 +173,7 @@ export class TSETracker {
     if ((length === 1 || length === 2) && !isKeywordHash(arguments_[0])) {
       options = { partial: arguments_[0], locals: arguments_[1] ?? null };
     } else if (length === 1 && arguments_[0].startsWith("{")) {
-      const elements = argumentList(arguments_[0].slice(1)).filter((e) => e.length > 0);
+      const elements = argumentList(arguments_[0].slice(1))[0].filter((e) => e.length > 0);
       const pairs = elements.map((element) =>
         /^([\p{ID_Start}$_][\p{ID_Continue}$]*)\s*:([\s\S]*)$/u.exec(element),
       );
