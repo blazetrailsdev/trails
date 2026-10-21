@@ -65,7 +65,7 @@ export function sequenceLength(b: number[], i: number): number {
  * @noRailsEquivalent PERMANENT
  */
 export function strNew(b: number[]): string {
-  const decoder = new TextDecoder();
+  const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
   let str = "";
   let i = 0;
   let run = 0;
