@@ -66,33 +66,55 @@ export function walkTsFilesSync(
  *  `<pkg>/src` layer (`parity:api:detached` walks `scripts/` with it). A missing
  *  directory yields no files rather than throwing.
  *
- *  `skipDirs` is pruned *during* the descent, not filtered out of a finished
- *  listing. A single `readdir(dir, { recursive: true })` cannot prune, so it
- *  enumerated every path under a skipped subtree before discarding it: 2.2M
- *  entries under `scripts/`, whose per-workspace `node_modules` the walk never
- *  wanted, which is several hundred MB of path strings at once and reached
- *  `parity:api:detached`'s 4GB heap limit on CI. The same descent also made a
- *  dangling symlink inside one of those trees throw, and the `catch` below
- *  reads a throw as "no files" — so the whole of `scripts/` silently left the
- *  lint's population in any worktree whose nested `node_modules` held one. */
+ *  `skipDirs` is pruned *during* the descent, so a skipped subtree is never
+ *  read. Enumerating the whole tree with one `readdir(dir, { recursive: true })`
+ *  and filtering after could not prune: it listed every path under each
+ *  per-workspace `node_modules` before discarding it — 2.2M entries under
+ *  `scripts/`, which is the allocation that reached `parity:api:detached`'s 4GB
+ *  heap limit on CI — and it read a chain inside one of those trees that
+ *  `scandir` answers `ELOOP` for, which the `catch` below turns into "no
+ *  files", silently dropping the whole of `scripts/` from the lint's
+ *  population.
+ *
+ *  A symlinked directory is descended into, as `recursive: true` did:
+ *  `fixtures/all/admin` mirrors Rails' symlinked fixture layout, and a `Dirent`
+ *  for a symlink answers `isDirectory()` false. The guard against a cycle is
+ *  the chain of ancestor realpaths, not a set of every directory seen: the same
+ *  real directory reached by two sibling paths is listed under both, as
+ *  `fixtures/all/admin` and `fixtures/to-be-linked` are, and only an ancestor
+ *  repeating itself is a loop. */
 export async function walkTsFiles(dir: string, population: TsFilePopulation): Promise<string[]> {
-  let entries: fs.Dirent[];
-  try {
-    entries = await fsPromises.readdir(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  const results: string[] = [];
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      if (population.skipDirs.has(entry.name)) continue;
-      results.push(...(await walkTsFiles(fullPath, population)));
-    } else if (population.includeFile(entry.name)) {
-      results.push(fullPath);
+  const isDirectory = async (target: string): Promise<boolean> => {
+    try {
+      return (await fsPromises.stat(target)).isDirectory();
+    } catch {
+      return false;
     }
-  }
-  return results;
+  };
+  const walk = async (current: string, ancestors: ReadonlySet<string>): Promise<string[]> => {
+    let entries: fs.Dirent[];
+    let real: string;
+    try {
+      real = await fsPromises.realpath(current);
+      if (ancestors.has(real)) return [];
+      entries = await fsPromises.readdir(current, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+    const chain = new Set(ancestors).add(real);
+    const results: string[] = [];
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory() || (entry.isSymbolicLink() && (await isDirectory(fullPath)))) {
+        if (population.skipDirs.has(entry.name)) continue;
+        results.push(...(await walk(fullPath, chain)));
+      } else if (population.includeFile(entry.name)) {
+        results.push(fullPath);
+      }
+    }
+    return results;
+  };
+  return walk(dir, new Set());
 }
 
 /** Every file of `population` under `<packagesDir>/<pkg>/src`, sorted for

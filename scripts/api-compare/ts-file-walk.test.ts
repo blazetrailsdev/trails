@@ -90,6 +90,28 @@ describe("walkTsFiles", () => {
     expect(await walkTsFiles(path.join(root, "missing"), COMMITTED_TS_FILES)).toEqual([]);
   });
 
+  it("descends into a symlinked directory", async () => {
+    const linked = path.join(root, "linked");
+    await fs.mkdir(path.join(linked, "target"), { recursive: true });
+    await fs.writeFile(path.join(linked, "target", "fixture.ts"), "");
+    await fs.symlink(path.join(linked, "target"), path.join(linked, "alias"), "dir");
+
+    expect(
+      (await walkTsFiles(linked, COMMITTED_TS_FILES)).map((f) => path.relative(linked, f)).sort(),
+    ).toEqual([path.join("alias", "fixture.ts"), path.join("target", "fixture.ts")]);
+  });
+
+  it("stops at a symlink that loops back onto an ancestor", async () => {
+    const loop = path.join(root, "loop");
+    await fs.mkdir(path.join(loop, "inner"), { recursive: true });
+    await fs.writeFile(path.join(loop, "inner", "deep.ts"), "");
+    await fs.symlink(loop, path.join(loop, "inner", "up"), "dir");
+
+    expect(
+      (await walkTsFiles(loop, COMMITTED_TS_FILES)).map((f) => path.relative(loop, f)),
+    ).toEqual([path.join("inner", "deep.ts")]);
+  });
+
   it("lists a root whose skipped subtree cannot be read", async () => {
     const pruned = path.join(root, "pruned");
     const deps = path.join(pruned, "node_modules");
