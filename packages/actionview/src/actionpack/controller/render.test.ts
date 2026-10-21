@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
-import { Conversion, Naming } from "@blazetrails/activemodel";
-import { assert, assertNothingRaised, isPresent, Logger } from "@blazetrails/activesupport";
+import { ActiveModel, Conversion, Naming } from "@blazetrails/activemodel";
+import {
+  assert,
+  assertNothingRaised,
+  assertRaises,
+  isPresent,
+  Logger,
+} from "@blazetrails/activesupport";
 import { Date } from "@blazetrails/date";
 import {
   ArgumentError,
@@ -11,6 +17,7 @@ import {
   rbModConstSet,
   rbObjIvarGet,
   rbObjIvarSet,
+  rbObjSingletonClass,
   registerConstant,
   stringSplit,
   Struct,
@@ -22,7 +29,7 @@ import { FormBuilder } from "../../helpers/form-helper.js";
 import { DetailsKey } from "../../lookup-context.js";
 import type { PathSet } from "../../path-set.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
-import { BadCustomer, Customer, GoodCustomer } from "../../test-helpers/fake-models.js";
+import { BadCustomer, Customer, GoodCustomer, Post } from "../../test-helpers/fake-models.js";
 
 const Quiz = {} as { Question: typeof Question; QuestionsController: typeof QuestionsController };
 registerConstant("Quiz", Quiz);
@@ -61,6 +68,17 @@ class GamesController extends ActionController.Base {
 }
 rbModConstSet(Fun, "GamesController", GamesController);
 
+class ValidatingPost extends Post {
+  declare static validates: (...args: unknown[]) => void;
+  declare validate: () => Promise<boolean>;
+
+  static {
+    include(this, ActiveModel.Validations);
+
+    this.validates("title", { presence: true });
+  }
+}
+
 class TestController extends ActionController.Base {
   declare person: string;
   declare secret: string;
@@ -86,8 +104,7 @@ class TestController extends ActionController.Base {
     this.layout(":determineLayout");
     this.beforeAction(
       (c) => {
-        // BLOCKED: render-test-controller-gaps
-        ((c as TestController).request as unknown as { format: string }).format = "xml";
+        (c as TestController).request.setFormat("xml");
       },
       { only: "renderWithFilters" },
     );
@@ -322,7 +339,7 @@ class TestController extends ActionController.Base {
   async greeting(): Promise<void> {}
 
   async builderLayoutTest(): Promise<void> {
-    // BLOCKED: render-test-controller-gaps
+    // BLOCKED: render-test-controller-gaps-remaining
     this.name = null as unknown as string;
     await this.render({ action: "hello", layout: "layouts/builder" });
   }
@@ -507,6 +524,14 @@ class TestController extends ActionController.Base {
 
   async partialWithFormBuilder(): Promise<void> {
     await this.render({ partial: new FormBuilder("post", null, this.viewContext(), {}) });
+  }
+
+  async partialWithFormBuilderAndInvalidModel(): Promise<void> {
+    const post = new ValidatingPost();
+
+    await post.validate();
+
+    await this.render({ partial: new FormBuilder("post", post, this.viewContext(), {}) });
   }
 
   async partialWithFormBuilderSubclass(): Promise<void> {
@@ -700,6 +725,7 @@ describe("RenderTest", () => {
     testCase.controller = new TestController();
     await testCase.beforeSetup();
     testCase.routes = SharedTestRoutes;
+    include(rbObjSingletonClass(testCase.controller), SharedTestRoutes.urlHelpers());
     (testCase.controller as unknown as { logger: Logger }).logger = new Logger(null);
     Base.logger = new Logger(null);
 
@@ -722,7 +748,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: render-test-controller-gaps — view instance_variables list
+  // BLOCKED: render-test-controller-gaps-remaining — view instance_variables list
   test.skip("controller does not leak instance variables", async () => {
     const expected = [
       "_assigns",
@@ -754,16 +780,9 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello world!");
   });
 
-  // BLOCKED: render-test-controller-gaps — Template.Error backtrace starts at template.ts, not the template line
-  test.skip("line offset", async () => {
-    let exc: unknown;
-    try {
-      await testCase.get("renderLineOffset");
-    } catch (e) {
-      exc = e;
-    }
-    expect(exc).toBeInstanceOf(Template.Error);
-    const line = (exc as Error).stack!.split("\n")[1];
+  test("line offset", async () => {
+    const exc = await assertRaises([Template.Error], {}, () => testCase.get("renderLineOffset"));
+    const line = (exc as InstanceType<typeof Template.Error>).backtrace()![0];
     const m = line.match(/:(\d+):/);
     assert(m);
     expect(m![1]).toBe("1");
@@ -794,7 +813,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello world!");
   });
 
-  // BLOCKED: render-test-controller-gaps — action-name lookup folds case
+  // BLOCKED: render-test-controller-gaps-remaining — action-name lookup folds case
   test.skip("render action upcased", async () => {
     await expect(testCase.get("renderActionUpcasedHelloWorld")).rejects.toThrow(MissingTemplate);
   });
@@ -1107,8 +1126,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: render-test-controller-gaps — Request has no format= setter
-  test.skip("render with filters", async () => {
+  test("render with filters", async () => {
     await testCase.get("renderWithFilters");
     expect(testCase.response.body).toBe("<test>passed formatted xml erb</test>");
   });
@@ -1119,8 +1137,7 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-controller-gaps — redirect_to reaches no url helpers in TestCase
-  test.skip("double redirect", async () => {
+  test("double redirect", async () => {
     await expect(testCase.get("doubleRedirect")).rejects.toThrow(
       AbstractController.DoubleRenderError,
     );
@@ -1137,7 +1154,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hi web users! here is some cached stuff");
   });
 
-  // BLOCKED: render-test-controller-gaps — private name helper collides with @name
+  // BLOCKED: render-test-controller-gaps-remaining — private name helper collides with @name
   test.skip("rendering with conflicting local vars", async () => {
     await testCase.get("renderingWithConflictingLocalVars");
     expect(testCase.response.body).toBe(
@@ -1260,7 +1277,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello: david");
   });
 
-  // BLOCKED: render-test-controller-gaps — Parameters not read as partial locals
+  // BLOCKED: render-test-controller-gaps-remaining — Parameters not read as partial locals
   test.skip("partial with hashlike locals", async () => {
     await testCase.get("partialWithHashlikeLocals");
     expect(testCase.response.body).toBe("Hello: david");
@@ -1271,19 +1288,17 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe('<label for="post_title">Title</label>\n');
   });
 
-  // BLOCKED: render-test-controller-gaps — ValidatingPost/Post fake model unported
-  test.skip("partial with form builder and invalid model", async () => {
+  test("partial with form builder and invalid model", async () => {
     await testCase.get("partialWithFormBuilderAndInvalidModel");
     expect(testCase.response.body.trim()).toBe(
       '<div class="field_with_errors"><label for="post_title">Title</label></div>',
     );
   });
 
-  // BLOCKED: render-test-controller-gaps — ValidatingPost/Post fake model unported
-  test.skip("partial with form builder and invalid model custom field error proc", async () => {
+  test("partial with form builder and invalid model custom field error proc", async () => {
     const oldProc = Base.fieldErrorProc;
     Base.fieldErrorProc = function (html) {
-      // BLOCKED: render-test-controller-gaps
+      // BLOCKED: render-test-controller-gaps-remaining
       return (this.tag() as unknown as { div(...args: unknown[]): unknown }).div(html, {
         class: "errors",
       });
@@ -1298,8 +1313,7 @@ describe("RenderTest", () => {
     }
   });
 
-  // BLOCKED: render-test-controller-gaps — ValidatingPost/Post fake model unported
-  test.skip("partial with form builder and invalid model custom rendering field error proc", async () => {
+  test("partial with form builder and invalid model custom rendering field error proc", async () => {
     const oldProc = Base.fieldErrorProc;
     Base.fieldErrorProc = function (htmlTag, instance) {
       return this.render({
@@ -1387,8 +1401,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Bonjour: davidBonjour: mary");
   });
 
-  // BLOCKED: render-test-controller-gaps — to_partial_path dir bad-customers vs bad_customers fixture
-  test.skip("partial collection shorthand with different types of records", async () => {
+  test("partial collection shorthand with different types of records", async () => {
     await testCase.get("partialCollectionShorthandWithDifferentTypesOfRecords");
     expect(testCase.response.body).toBe(
       "Bonjour bad customer: mark0Bonjour good customer: craig1Bonjour bad customer: john2Bonjour good customer: zach3Bonjour good customer: brandon4Bonjour bad customer: dan5",
@@ -1441,7 +1454,7 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-controller-gaps — annotations not emitted on controller render
+  // BLOCKED: render-test-controller-gaps-remaining — annotations not emitted on controller render
   test.skip("template annotations", async () => {
     await withAnnotationsEnabled(() => testCase.get("greeting"));
     expect(testCase.response.body).toContain("<!-- BEGIN");
@@ -1450,14 +1463,13 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toContain("This is grand!");
   });
 
-  // BLOCKED: render-test-controller-gaps — annotations not emitted on controller render
-  test.skip("template annotations do not render for non html format", async () => {
+  test("template annotations do not render for non html format", async () => {
     await withAnnotationsEnabled(() => testCase.get("renderWithExplicitTemplateWithLocals"));
     expect(testCase.response.body).not.toContain("BEGIN");
     expect(stringSplit(testCase.response.body, "\n").length).toBe(1);
   });
 
-  // BLOCKED: render-test-controller-gaps — Template.Error backtrace starts at template.ts, not the template line
+  // BLOCKED: render-test-controller-gaps-remaining — annotations not emitted on controller render
   test.skip("line offset with annotations enabled", async () => {
     let exc: unknown;
     try {
@@ -1466,7 +1478,7 @@ describe("RenderTest", () => {
       exc = e;
     }
     expect(exc).toBeInstanceOf(Template.Error);
-    const line = (exc as Error).stack!.split("\n")[1];
+    const line = (exc as InstanceType<typeof Template.Error>).backtrace()![0];
     const m = line.match(/:(\d+):/);
     assert(m);
     expect(m![1]).toBe("1");

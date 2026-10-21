@@ -1,4 +1,5 @@
 import { pluralize, singularize } from "@blazetrails/activesupport";
+import { parse } from "@blazetrails/tse-compiler";
 
 import type { PathSet } from "../path-set.js";
 import type { Template } from "../template.js";
@@ -18,6 +19,36 @@ const ALL_KNOWN_KEYS = [
   "location",
   "spacerTemplate",
 ];
+
+const RENDER_TYPE_KEYS = ["partial", "template", "layout"];
+
+function argumentList(code: string): [string[], number] {
+  const args: string[] = [];
+  let depth = 0;
+  let start = 0;
+  let pos = 0;
+  while (pos < code.length) {
+    const ch = code[pos];
+    if (ch === "'" || ch === '"' || ch === "`") {
+      pos += 1;
+      while (pos < code.length && code[pos] !== ch) pos += code[pos] === "\\" ? 2 : 1;
+    } else if (ch === "(" || ch === "[" || ch === "{") {
+      depth += 1;
+    } else if (ch === ")" || ch === "]" || ch === "}") {
+      if (depth === 0) break;
+      depth -= 1;
+    } else if (ch === ";" && depth === 0) {
+      break;
+    } else if (ch === "," && depth === 0) {
+      args.push(code.slice(start, pos).trim());
+      start = pos + 1;
+    }
+    pos += 1;
+  }
+  const last = code.slice(start, pos).trim();
+  if (last.length > 0 || args.length > 0) args.push(last);
+  return [args, pos];
+}
 
 /** @internal */
 export class TSETracker {
@@ -87,37 +118,81 @@ export class TSETracker {
     return this.name.split("/").slice(0, -1).join("/");
   }
 
-  /**
-   * @inventedArm if — PERMANENT
-   * @inventedArm replace — PERMANENT
-   */
   private renderDependencies(): string[] {
     const dependencies: string[] = [];
-    const renderCalls = this.source
-      .replace(/<%#.*?%>/gsu, "")
-      .split(/\brender\b/)
-      .slice(1);
 
-    for (const args of renderCalls) {
-      const call = args.split("%>")[0];
-      if (/^\s*\(?\s*\{?\s*\w+:/u.test(call)) {
-        const options = call.replace(/^\s*\(?\s*\{?/u, "");
-        const keys = [...options.replace(/\{[^{}]*\}/gu, "").matchAll(/\b(\w+):/gu)].map(
-          (m) => m[1],
-        );
-        if (keys.some((key) => !ALL_KNOWN_KEYS.includes(key))) continue;
+    for (const node of parse(this.source).nodes) {
+      if (node.kind === "text") continue;
+
+      for (const args of node.value.split(/\brender(?:ToString)?\b/).slice(1)) {
+        const options = this.renderCallOptions(args);
+        if (options == null) continue;
+
+        if ("object" in options || "collection" in options) {
+          if ("object" in options && "collection" in options) continue;
+          if (!("partial" in options)) continue;
+        }
+
+        const spacerTemplate = options.spacerTemplate;
+        const spacer = spacerTemplate != null ? TSETracker.STRING.exec(spacerTemplate) : null;
+        if (
+          spacer?.index === 0 &&
+          spacer[0].length === spacerTemplate!.length &&
+          !(spacer.groups?.quote === "`" && spacer.groups.static?.includes("${"))
+        ) {
+          this.addStaticDependency(dependencies, spacer.groups?.static, spacer.groups?.quote);
+        }
+        const renderType = Object.keys(options).find((key) => RENDER_TYPE_KEYS.includes(key));
+        this.addDependencies(dependencies, args, TSETracker.RENDER_ARGUMENTS);
+        if (renderType !== "layout") {
+          this.addDependencies(dependencies, args, TSETracker.LAYOUT_DEPENDENCY);
+        }
       }
-      const spacer = new RegExp(`\\bspacerTemplate:\\s*${TSETracker.STRING.source}`, "su").exec(
-        call,
-      );
-      if (spacer) {
-        this.addStaticDependency(dependencies, spacer.groups?.static, spacer.groups?.quote);
-      }
-      this.addDependencies(dependencies, args, TSETracker.LAYOUT_DEPENDENCY);
-      this.addDependencies(dependencies, args, TSETracker.RENDER_ARGUMENTS);
     }
 
     return dependencies;
+  }
+
+  private renderCallOptions(code: string): Record<string, string | null> | null {
+    let source = code.trimStart();
+    if (source.startsWith("(")) source = source.slice(1);
+
+    let arguments_ = argumentList(source)[0].map((argument) => {
+      let current = argument;
+      while (current.startsWith("(")) {
+        const [body, end] = argumentList(current.slice(1));
+        if (body.length !== 1 || end !== current.length - 2) break;
+        current = body[0];
+      }
+      return current;
+    });
+    const isKeywordHash = (argument: string): boolean =>
+      /^\{|^[\p{ID_Start}$_][\p{ID_Continue}$]*\s*:(?!:)/u.test(argument);
+    if (arguments_.length > 0 && !arguments_[0].startsWith("{") && isKeywordHash(arguments_[0])) {
+      arguments_ = [`{${arguments_.join(", ")}}`];
+    }
+    const length = arguments_.length;
+
+    let options: Record<string, string | null> | null = null;
+    if ((length === 1 || length === 2) && !isKeywordHash(arguments_[0])) {
+      options = { partial: arguments_[0], locals: arguments_[1] ?? null };
+    } else if (length === 1 && arguments_[0].startsWith("{")) {
+      const elements = argumentList(arguments_[0].slice(1))[0].filter((e) => e.length > 0);
+      const pairs = elements.map((element) =>
+        /^([\p{ID_Start}$_][\p{ID_Continue}$]*)\s*:([\s\S]*)$/u.exec(element),
+      );
+      if (pairs.every((pair) => pair != null)) {
+        options = Object.fromEntries(pairs.map((pair) => [pair[1], pair[2].trim()]));
+      }
+    }
+
+    if (options == null) return null;
+
+    const keys = Object.keys(options);
+    if (!keys.some((key) => RENDER_TYPE_KEYS.includes(key))) return null;
+    if (keys.some((key) => !ALL_KNOWN_KEYS.includes(key))) return null;
+
+    return options;
   }
 
   private addDependencies(renderDependencies: string[], args: string, pattern: RegExp): void {
