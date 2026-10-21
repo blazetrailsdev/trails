@@ -32,7 +32,6 @@ export class MockResponse extends Response {
     this.bufferedBodyBang();
   }
 
-  /** @inventedArm if — PERMANENT */
   get errors(): string | null {
     return rbObjRespondTo(this._errors, "string") ? this._errors.string() : this._errors;
   }
