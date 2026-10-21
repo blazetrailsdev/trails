@@ -236,6 +236,7 @@ export {
   rbObjDup,
   include,
   included,
+  prepended,
   initialize,
   includedModules,
   initializeIncludedModules,

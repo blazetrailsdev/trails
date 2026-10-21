@@ -34,7 +34,11 @@ describe("YAML.unsafe_load", () => {
     File.open(testFile, "w", (io) => {
       YAML.dump(["badger", "elephant", "tiger"], io);
     });
-    expect(File.open(testFile, "r", (yf) => send(yf))).toEqual(["badger", "elephant", "tiger"]);
+    expect(File.open(testFile, undefined, (yf) => send(yf))).toEqual([
+      "badger",
+      "elephant",
+      "tiger",
+    ]);
   });
 
   it("loads strings", () => {

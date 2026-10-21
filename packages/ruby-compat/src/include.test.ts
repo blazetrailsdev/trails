@@ -28,6 +28,7 @@ import {
   extend,
   included,
   extended,
+  prepended,
   rbObjClone,
   rbObjDup,
   Kernel,
@@ -362,6 +363,34 @@ describe("prepend", () => {
     (Klass.prototype as unknown as DynMethods).greet = () => "reopened";
     prepend(Klass, mod);
     expect(new Klass().greet()).toBe("reopened");
+  });
+
+  it("fires the module's prepended hook with the class after the splice", () => {
+    class Klass {}
+    const seen: unknown[] = [];
+    const mod = {
+      greet(): string {
+        return "module";
+      },
+      [prepended](klass: unknown) {
+        seen.push(klass, typeof (Klass.prototype as unknown as DynMethods).greet);
+      },
+    };
+    prepend(Klass, mod);
+    expect(seen).toEqual([Klass, "function"]);
+  });
+
+  it("fires the prepended hook on a re-prepend that skips the splice", () => {
+    class Klass {}
+    let calls = 0;
+    const mod = {
+      [prepended]() {
+        calls++;
+      },
+    };
+    prepend(Klass, mod);
+    prepend(Klass, mod);
+    expect(calls).toBe(2);
   });
 });
 
@@ -1567,6 +1596,19 @@ describe("Module.new", () => {
 });
 
 describe("rbObjClone", () => {
+  it("answers a working copy of a Date, Map, Set, RegExp, and typed array", () => {
+    const date = new Date(0);
+    expect(rbObjClone(date).getTime()).toBe(0);
+    expect(rbObjClone(new Map([[1, 2]])).get(1)).toBe(2);
+    expect(rbObjClone(new Set([3])).has(3)).toBe(true);
+    expect(rbObjClone(/a/g).test("a")).toBe(true);
+    const bytes = new Uint8Array([1, 2]);
+    const copy = rbObjClone(bytes);
+    copy[0] = 9;
+    expect([...copy]).toEqual([9, 2]);
+    expect([...bytes]).toEqual([1, 2]);
+  });
+
   it("copies a class into a constructible class (rb_mod_init_copy)", () => {
     class Parent {
       greet(): string {

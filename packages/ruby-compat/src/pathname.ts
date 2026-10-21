@@ -1,5 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { File } from "./file.js";
+import { rbBlockGivenP } from "./hash.js";
 import { rbInspect } from "./object.js";
 import { stringValue } from "./string/support.js";
 
@@ -33,6 +34,17 @@ export class Pathname {
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:215` `path_to_s` */
   toPath(): string {
     return this.path;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:647` `path_open` */
+  open(...args: unknown[]): unknown {
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (file: File) => unknown) : undefined;
+    const file = File as unknown as { open(fileName: string, ...rest: unknown[]): unknown };
+    if (block) {
+      return file.open(this.toPath(), args[0], ...args.slice(1), block);
+    } else {
+      return file.open(this.toPath(), ...args);
+    }
   }
 
   private chopBasename(path: string): [string, string] | null {
