@@ -33,7 +33,9 @@ import {
   rbObjSingletonClass,
   rbStrSend,
   StandardError,
+  isSymbol,
   stringSuperclass,
+  symbolToS,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { OutputBuffer } from "./buffers.js";
@@ -186,7 +188,9 @@ export const ClassMethods = {
   tests(this: BehaviorClass, helperClass: string | HelperModule): void {
     if (typeof helperClass === "string") {
       this.helperClass = safeConstantize(
-        camelize(`${underscore(helperClass)}_helper`),
+        camelize(
+          `${underscore(isSymbol(helperClass) ? symbolToS(helperClass) : helperClass)}_helper`,
+        ),
       ) as HelperModule | null;
     } else if (rbObjIsKindOf(helperClass, Module) || isPlainHash(helperClass)) {
       this.helperClass = helperClass;
