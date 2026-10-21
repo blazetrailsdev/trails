@@ -57,7 +57,10 @@ export class BacktraceCleaner {
     return this.clean(backtrace, kind);
   }
 
-  cleanFrame(frame: string | object, kind: CleanKind = "silent"): string | undefined {
+  cleanFrame(
+    frame: string | object | number | bigint | boolean | null | undefined,
+    kind: CleanKind = "silent",
+  ): string | undefined {
     frame = rbObjAsString(frame);
     for (const f of this._filters) frame = f(rbObjAsString(frame));
 
