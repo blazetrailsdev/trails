@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "description": "MIME type detection for Trails, mirroring the marcel gem",
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/marcel.js",
+  "types": "dist/marcel.d.ts",
   "exports": {
     ".": {
       "types": "./dist/marcel.d.ts",
