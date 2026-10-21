@@ -424,6 +424,38 @@ describe("TextHelperTest", () => {
     ).toBe(
       "<p>This is a <mark>beautiful</mark> morning, but also a <mark>beautiful</mark> day</p>",
     );
+    expect(
+      highlight(
+        "<p>This is a <em>beautiful</em> morning, but also a beautiful day</p>",
+        "beautiful",
+      ).toString(),
+    ).toBe(
+      "<p>This is a <em><mark>beautiful</mark></em> morning, but also a <mark>beautiful</mark> day</p>",
+    );
+    expect(
+      highlight(
+        '<p>This is a <em class="error">beautiful</em> morning, but also a beautiful <span class="last">day</span></p>',
+        "beautiful",
+      ).toString(),
+    ).toBe(
+      '<p>This is a <em class="error"><mark>beautiful</mark></em> morning, but also a <mark>beautiful</mark> <span class="last">day</span></p>',
+    );
+    expect(
+      highlight(
+        '<p class="beautiful">This is a beautiful morning, but also a beautiful day</p>',
+        "beautiful",
+      ).toString(),
+    ).toBe(
+      '<p class="beautiful">This is a <mark>beautiful</mark> morning, but also a <mark>beautiful</mark> day</p>',
+    );
+    expect(
+      highlight(
+        '<p>This is a beautiful <a href="http://example.com/beautiful#top?what=beautiful%20morning&when=now+then">morning</a>, but also a beautiful day</p>',
+        "beautiful",
+      ).toString(),
+    ).toBe(
+      '<p>This is a <mark>beautiful</mark> <a href="http://example.com/beautiful#top?what=beautiful%20morning&amp;when=now+then">morning</a>, but also a <mark>beautiful</mark> day</p>',
+    );
     expect(highlight("<div>abc div</div>", "div", { highlighter: "<b>\\1</b>" }).toString()).toBe(
       "<div>abc <b>div</b></div>",
     );
@@ -468,6 +500,9 @@ describe("TextHelperTest", () => {
     expect(excerpt("This is a beautiful? morning", /\bbeau\w*\b/i, { radius: 5 })).toBe(
       "...is a beautiful? mor...",
     );
+    expect(excerpt("This is a beautiful? morning", /\b(beau\w*)\b/i, { radius: 5 })).toBe(
+      "...is a beautiful? mor...",
+    );
     expect(
       excerpt("This day was challenging for judge Allen and his colleagues.", /\ballen\b/i, {
         radius: 5,
@@ -479,6 +514,15 @@ describe("TextHelperTest", () => {
         separator: " ",
       }),
     ).toBe("...judge Allen and...");
+    expect(
+      excerpt(
+        "This day was challenging for judge Allen and his colleagues.",
+        /\b(\w*allen\w*)\b/i,
+        {
+          radius: 5,
+        },
+      ),
+    ).toBe("...was challenging for...");
   });
 
   it("excerpt should not be html safe", () => {
@@ -508,6 +552,15 @@ describe("TextHelperTest", () => {
     expect(
       excerpt("This is a beautiful morning", "beautiful", { omission: "[...]", radius: 5 }),
     ).toBe("[...]is a beautiful morn[...]");
+    expect(
+      excerpt(
+        "This is the ultimate supercalifragilisticexpialidoceous very looooooooooooooooooong looooooooooooong beautiful morning with amazing sunshine and awesome temperatures. So what are you gonna do about it?",
+        "very",
+        { omission: "[...]" },
+      ),
+    ).toBe(
+      "This is the ultimate supercalifragilisticexpialidoceous very looooooooooooooooooong looooooooooooong beautiful morning with amazing sunshine and awesome tempera[...]",
+    );
   });
 
   it("excerpt with utf8", () => {
@@ -540,11 +593,15 @@ describe("TextHelperTest", () => {
     expect(excerpt("my very\nvery\nvery long\nstring", "long", opts3)).toBe(
       "...very\nvery long\nstring",
     );
+
+    expect(excerpt("This is a beautiful morning", "a", { separator: null })).toBe(
+      excerpt("This is a beautiful morning", "a"),
+    );
   });
 
   it("concat", () => {
     const host = newHost("foo");
-    concat.call(host, "bar");
+    expect(concat.call(host, "bar").toStr()).toBe("foobar");
     expect(host.outputBuffer.toStr()).toBe("foobar");
   });
 

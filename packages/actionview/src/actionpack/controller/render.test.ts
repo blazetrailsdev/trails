@@ -13,6 +13,7 @@ import {
   ArgumentError,
   extend,
   include,
+  type Included,
   File,
   rbModConstSet,
   rbObjIvarGet,
@@ -34,6 +35,9 @@ import { BadCustomer, Customer, GoodCustomer, Post } from "../../test-helpers/fa
 const Quiz = {} as { Question: typeof Question; QuestionsController: typeof QuestionsController };
 registerConstant("Quiz", Quiz);
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveModel::Conversion` (render_test.rb); the class/interface merge is how a mixin surfaces on the type side.
+interface Question extends Included<typeof Conversion> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 class Question extends Struct.new("name", "id") {
   declare name: string;
   declare id: number | null;
@@ -318,8 +322,7 @@ class TestController extends ActionController.Base {
   }
 
   async renderTextWithResource(): Promise<void> {
-    // BLOCKED: controller-render-args-type-admits-rails-shapes
-    await this.render({ plain: new Customer("David") as unknown as string });
+    await this.render({ plain: new Customer("David") });
   }
 
   async renderXmlHello(): Promise<void> {
@@ -441,11 +444,10 @@ class TestController extends ActionController.Base {
   async actionTalkToLayout(): Promise<void> {}
 
   async renderWithAssignsOption(): Promise<void> {
-    // BLOCKED: controller-render-args-type-admits-rails-shapes
     await this.render({
       inline: "<%= this.hello %>",
       assigns: { hello: "world" },
-    } as { inline: string });
+    });
   }
 
   async yieldContentFor(): Promise<void> {
@@ -513,12 +515,11 @@ class TestController extends ActionController.Base {
   }
 
   async partialWithHashlikeLocals(): Promise<void> {
-    // BLOCKED: controller-render-args-type-admits-rails-shapes
     await this.render({
       partial: "customer",
       locals: new ActionController.Parameters({
         customer: new Customer("david"),
-      }) as unknown as Record<string, unknown>,
+      }),
     });
   }
 
@@ -647,8 +648,7 @@ class TestController extends ActionController.Base {
   }
 
   async partialWithNestedObjectShorthand(): Promise<void> {
-    // BLOCKED: controller-render-args-type-admits-rails-shapes
-    await this.render(new Quiz.Question("first") as unknown as string);
+    await this.render(new Quiz.Question("first"));
   }
 
   async partialHashCollection(): Promise<void> {

@@ -6,7 +6,7 @@ describe("OutputSafetyHelperTest", () => {
   it("raw returns the safe string", () => {
     const result = raw("hello");
     expect(result.toString()).toBe("hello");
-    expect(result.htmlSafe).toBe(true);
+    expect(result.htmlSafe).toBeTruthy();
   });
 
   it("raw handles nil values correctly", () => {
@@ -36,11 +36,11 @@ describe("OutputSafetyHelperTest", () => {
 
   it("to_sentence should escape non-html_safe values", () => {
     let actual = toSentence(["<", ">", "&", "'", '"']);
-    expect(actual.htmlSafe).toBe(true);
+    expect(actual.htmlSafe).toBeTruthy();
     expect(actual.toString()).toBe("&lt;, &gt;, &amp;, &#39;, and &quot;");
 
     actual = toSentence(["<script>"]);
-    expect(actual.htmlSafe).toBe(true);
+    expect(actual.htmlSafe).toBeTruthy();
     expect(actual.toString()).toBe("&lt;script&gt;");
   });
 
@@ -74,19 +74,19 @@ describe("OutputSafetyHelperTest", () => {
     const pTag = htmlSafe("<p>&lt;marquee&gt;shady stuff&lt;/marquee&gt;<br /></p>");
     const expected = `<a href="${url}">${url}</a> and <p>&lt;marquee&gt;shady stuff&lt;/marquee&gt;<br /></p>`;
     const actual = toSentence([linkTag, pTag]);
-    expect(actual.htmlSafe).toBe(true);
+    expect(actual.htmlSafe).toBeTruthy();
     expect(actual.toString()).toBe(expected);
   });
 
   it("to_sentence handles blank strings", () => {
     const actual = toSentence(["", "two", "three"]);
-    expect(actual.htmlSafe).toBe(true);
+    expect(actual.htmlSafe).toBeTruthy();
     expect(actual.toString()).toBe(", two, and three");
   });
 
   it("to_sentence handles nil values", () => {
     const actual = toSentence([null, "two", "three"]);
-    expect(actual.htmlSafe).toBe(true);
+    expect(actual.htmlSafe).toBeTruthy();
     expect(actual.toString()).toBe(", two, and three");
   });
 

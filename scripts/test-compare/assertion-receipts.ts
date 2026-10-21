@@ -31,6 +31,16 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actionview:template/output_safety_helper_test.rb › OutputSafetyHelperTest › safe_join should return the safe string separated by $, when second argument is not passed":
+    [
+      {
+        kind: "assert_equal",
+        value: "s:a|b",
+        as: null,
+        reason:
+          "Ruby's `$,` output field separator is a process global that `safe_join` reads as its default `sep` (`output_safety_helper.rb:33`); JS has no output field separator to set, so there is no `|` default to join with (template/output_safety_helper_test.rb:50)",
+      },
+    ],
   "actionview:template/form_helper_test.rb › FormHelperTest › explicit name": [
     {
       kind: "assert_dom_equal",

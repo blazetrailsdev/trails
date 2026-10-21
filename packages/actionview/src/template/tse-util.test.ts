@@ -63,12 +63,16 @@ describe("TseUtilTest", () => {
   });
 
   it("json escape does not alter json string meaning", () => {
+    /* eslint-disable vitest/no-conditional-expect -- Rails branches on `expected.nil?` (erb_util_test.rb:64-68) */
     for (const [raw] of JSON_ESCAPE_TEST_CASES) {
       const expected = JSON.parse(raw);
-      const escaped = jsonEscape(raw) as string;
-      const actual = JSON.parse(escaped);
-      expect(actual).toEqual(expected);
+      if (expected == null) {
+        expect(JSON.parse(jsonEscape(raw) as string)).toBeNull();
+      } else {
+        expect(JSON.parse(jsonEscape(raw) as string)).toEqual(expected);
+      }
     }
+    /* eslint-enable vitest/no-conditional-expect */
   });
 
   it("json escape is idempotent", () => {
@@ -81,24 +85,24 @@ describe("TseUtilTest", () => {
 
   it("json escape returns unsafe strings when passed unsafe strings", () => {
     const value = jsonEscape("asdf");
-    expect(value instanceof SafeBuffer && value.htmlSafe).toBe(false);
+    expect(value instanceof SafeBuffer && value.htmlSafe).toBeFalsy();
   });
 
   it("json escape returns safe strings when passed safe strings", () => {
     const value = jsonEscape(htmlSafe("asdf"));
-    expect(value instanceof SafeBuffer && value.htmlSafe).toBe(true);
+    expect(value instanceof SafeBuffer && value.htmlSafe).toBeTruthy();
   });
 
   it("html escape is html safe", () => {
     const escaped = h("<p>");
     expect(escaped.toString()).toBe("&lt;p&gt;");
-    expect(escaped.htmlSafe).toBe(true);
+    expect(escaped.htmlSafe).toBeTruthy();
   });
 
   it("html escape passes html escape unmodified", () => {
     const escaped = h(htmlSafe("<p>"));
     expect(escaped.toString()).toBe("<p>");
-    expect(escaped.htmlSafe).toBe(true);
+    expect(escaped.htmlSafe).toBeTruthy();
   });
 
   it("rest in ascii", () => {
@@ -120,11 +124,11 @@ describe("TseUtilTest", () => {
 
   it("html escape once returns safe strings when passed unsafe strings", () => {
     const value = htmlEscapeOnce("1 < 2 &amp; 3");
-    expect(value.htmlSafe).toBe(true);
+    expect(value.htmlSafe).toBeTruthy();
   });
 
   it("html escape once returns safe strings when passed safe strings", () => {
     const value = htmlEscapeOnce("1 < 2 &amp; 3");
-    expect(value.htmlSafe).toBe(true);
+    expect(value.htmlSafe).toBeTruthy();
   });
 });

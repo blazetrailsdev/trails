@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { include } from "@blazetrails/ruby-compat";
-import { assertEqual, assertKindOf, assertRespondTo } from "@blazetrails/activesupport";
+import { assertEqual, assertKindOf, assertRespondTo, isHtmlSafe } from "@blazetrails/activesupport";
 
 declare const Loofah: unknown;
 declare const Rails: unknown;
@@ -132,7 +132,7 @@ describe("SanitizeHelperTest", () => {
     expect(self.sanitize("asdf", { tags: ["a", "b"] })!.toString()).toBe(
       'safe_list_sanitizer#sanitize / asdf / {"tags":["a","b"]}',
     );
-    expect(self.sanitize("asdf")!.htmlSafe).toBe(true);
+    expect(self.sanitize("asdf")!.htmlSafe).toBeTruthy();
   });
 
   it("sanitize_css calls sanitize_css on the safe_list_sanitizer", () => {
@@ -141,12 +141,13 @@ describe("SanitizeHelperTest", () => {
 
   it("strip_tags calls sanitize on the full_sanitizer", () => {
     expect(self.stripTags("asdf")!.toString()).toBe("full_sanitizer#sanitize / asdf / {}");
-    expect(self.stripTags("asdf")!.htmlSafe).toBe(true);
+    expect(self.stripTags("asdf")!.htmlSafe).toBeTruthy();
   });
 
   it("strip_links calls sanitize on the link_sanitizer", () => {
     const result = self.stripLinks("asdf");
     expect(result).toBe("link_sanitizer#sanitize / asdf / {}");
+    expect(isHtmlSafe(self.stripLinks("asdf"))).toBeFalsy();
   });
 });
 
