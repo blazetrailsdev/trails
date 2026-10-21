@@ -19,12 +19,14 @@ import { ClassMethods as EnqueuingClassMethods } from "./enqueuing.js";
 import { Exceptions } from "./exceptions.js";
 import { ClassMethods as ExecutionClassMethods, Execution } from "./execution.js";
 import { ActiveJob } from "./namespaces.js";
+import { ClassMethods as QueueAdapterClassMethods, QueueAdapter } from "./queue-adapter.js";
+import "./queue-adapters.js";
 import { ClassMethods as QueueNameClassMethods, QueueName } from "./queue-name.js";
 import { ClassMethods as QueuePriorityClassMethods, QueuePriority } from "./queue-priority.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base
-  extends Core, Execution, Exceptions, Rescuable, Included<typeof ASCallbacks> {}
+  extends Core, QueueAdapter, Execution, Exceptions, Rescuable, Included<typeof ASCallbacks> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
@@ -34,6 +36,13 @@ export class Base {
 
   declare static deserialize: typeof ClassMethods.deserialize;
   declare static set: typeof ClassMethods.set;
+  declare static queueAdapter: unknown;
+  declare static queueAdapterName: string;
+  declare static _queueAdapterName: string | null;
+  declare static _queueAdapter: unknown;
+  declare static setQueueAdapter: typeof QueueAdapterClassMethods.setQueueAdapter;
+  declare static assignAdapter: typeof QueueAdapterClassMethods.assignAdapter;
+  declare static isQueueAdapter: typeof QueueAdapterClassMethods.isQueueAdapter;
   declare static defaultQueueName: unknown;
   declare static queueAs: typeof QueueNameClassMethods.queueAs;
   declare static queueNameFromPart: typeof QueueNameClassMethods.queueNameFromPart;
@@ -79,6 +88,7 @@ export class Base {
   }
 }
 include(Base, Core);
+include(Base, QueueAdapter);
 include(Base, QueueName);
 include(Base, QueuePriority);
 extend(Base, ClassMethods);

@@ -14,3 +14,7 @@ export { RangeSerializer } from "./serializers/range-serializer.js";
 export { BigDecimalSerializer } from "./serializers/big-decimal-serializer.js";
 export { QueueName } from "./queue-name.js";
 export { QueuePriority } from "./queue-priority.js";
+export { QueueAdapter } from "./queue-adapter.js";
+export { QueueAdapters } from "./namespaces.js";
+export { AbstractAdapter } from "./queue-adapters/abstract-adapter.js";
+export { InlineAdapter } from "./queue-adapters/inline-adapter.js";
