@@ -827,6 +827,23 @@ ancestor order, with the citation shape above. A module that is a `super`
 target converts in the same PR as the module whose `super` reaches it, because
 a plain module's copied methods outrank every carrier link.
 
+**A module included by an open set of classes binds `super` at include time**
+(RFC 0197, ruled by the repo owner on 2026-10-20). Inlining needs the list of
+includers, and a concern application code includes (`ActiveModel::Dirty`,
+`Validations`, `Attributes`, `TestFixtures`, a prepended `Correctable`) has
+none. For such a module the method stays in the module's own file under its
+Rails name, and its `super` is `rbCallSuper(this, foo, ...args)` (MRI
+`rb_call_super`, `vendor/ruby/v3.3.11/vm_eval.c:366`). When `include()`,
+`prepend()` or `extend()` copies `foo` over a method the target already
+answers, it seats that method under a slot private to `foo`; `rbCallSuper`
+reads it with one property read and, with nothing seated, falls through to
+`Kernel`. The seat is a snapshot: a method defined above the target after the
+include is not seen, so a `super` that reaches a live-include module stays on a
+`Module`. A method a class defines itself is not overwritten by the copy, so
+its JS `super.foo()` skips the module, and that class inlines the module body
+at its `super` (`HasManyThroughAssociation#buildRecord`). Inlining stays the
+rule for a module whose includers are a closed set of framework classes.
+
 ## Generated attribute readers are properties (`define_method_attribute`)
 
 Ruby's `attr_reader`-shaped API is a zero-arg method, so `person.name` and

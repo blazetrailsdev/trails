@@ -55,7 +55,7 @@ export class Association {
     name: string,
     scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown> = {},
-    block?: (mod: Module) => void,
+    block?: (mod: Record<string, unknown>) => void,
   ): any {
     if (model.isDangerousAttributeMethod(name)) {
       throw new ArgumentError(
@@ -78,7 +78,7 @@ export class Association {
     name: string,
     scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown>,
-    block?: (mod: Module) => void,
+    block?: (mod: Record<string, unknown>) => void,
   ): any {
     if (typeof name !== "string") {
       throw new ArgumentError("association names must be a Symbol");
@@ -118,7 +118,11 @@ export class Association {
     assertValidKeys(options, this.validOptions(options));
   }
 
-  static defineExtensions(_model: any, _name: string, _block?: (mod: Module) => void): any {
+  static defineExtensions(
+    _model: any,
+    _name: string,
+    _block?: (mod: Record<string, unknown>) => void,
+  ): any {
     return undefined;
   }
 

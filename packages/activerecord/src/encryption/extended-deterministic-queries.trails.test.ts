@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { Module } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import {
   AdditionalValue,
@@ -256,7 +255,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
 });
 
 function prepended(
-  mod: Module,
+  mod: object,
   methods: Record<string, unknown>,
 ): { serialize(value: unknown): unknown; scopeForCreate(): Record<string, unknown> } {
   class Host {}

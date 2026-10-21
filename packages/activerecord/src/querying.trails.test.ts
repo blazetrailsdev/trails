@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { block, type Module } from "@blazetrails/ruby-compat";
+import { block } from "@blazetrails/ruby-compat";
 import { Base, Relation } from "./index.js";
 import { _queryBySql, _loadFromSql } from "./querying.js";
 import { Result } from "./result.js";
@@ -42,7 +42,7 @@ describe("QueryingTest — static forwarders on Base", () => {
     };
     const relation = all.extending(
       { first: () => "module", only: () => "module" },
-      block((mod: Module) => mod.defineMethod("first", () => "block")),
+      block((mod: Record<string, unknown>) => (mod.first = () => "block")),
     );
 
     expect(relation.extendingValues).toHaveLength(2);
@@ -50,7 +50,9 @@ describe("QueryingTest — static forwarders on Base", () => {
     expect(relation.only()).toBe("module");
     expect(
       (
-        Topic.extending(block((mod: Module) => mod.defineMethod("page", () => 1))) as unknown as {
+        Topic.extending(
+          block((mod: Record<string, unknown>) => (mod.page = () => 1)),
+        ) as unknown as {
           page(): number;
         }
       ).page(),

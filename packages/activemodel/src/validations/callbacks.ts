@@ -6,7 +6,7 @@ import {
   kernelArray as array,
   type Extended,
 } from "@blazetrails/activesupport";
-import { isIntersect, Module } from "@blazetrails/ruby-compat";
+import { isIntersect, rbCallSuper } from "@blazetrails/ruby-compat";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
 
 export const ClassMethods = {
@@ -92,13 +92,11 @@ export interface RunValidationsBangHost {
 /** @internal */
 export async function runValidationsBang(this: RunValidationsBangHost): Promise<boolean> {
   return (await this._runValidationCallbacks(() =>
-    SuperMethods.superMethod(this, "runValidationsBang")!(),
+    rbCallSuper(this, runValidationsBang),
   )) as boolean;
 }
 
-const SuperMethods = new Module((mod) =>
-  mod.defineMethod("runValidationsBang", runValidationsBang),
-);
+const SuperMethods = { runValidationsBang };
 
 /** @internal */
 export function setOptionsForCallback(options: CallbackOptions): void {

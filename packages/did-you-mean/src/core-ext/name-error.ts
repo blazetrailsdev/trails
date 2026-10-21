@@ -1,4 +1,4 @@
-import { Exception, excToS, Module, StandardError } from "@blazetrails/ruby-compat";
+import { Exception, excToS, rbCallSuper, StandardError } from "@blazetrails/ruby-compat";
 import { formatter } from "../did-you-mean.js";
 
 interface CorrectableHost extends Error {
@@ -18,7 +18,7 @@ function detailedMessage(
   }: { highlight?: boolean; didYouMean?: boolean } & Record<string, unknown> = {},
 ): string {
   const zsuper = (): string =>
-    Correctable.superMethod(this, "detailedMessage")!({ highlight, didYouMean, ...rest }) as string;
+    rbCallSuper(this, detailedMessage, { highlight, didYouMean, ...rest }) as string;
   try {
     let msg = zsuper();
 
@@ -38,10 +38,4 @@ function detailedMessage(
   }
 }
 
-export const Correctable: Module<{
-  originalMessage: OmitThisParameter<typeof originalMessage>;
-  detailedMessage: OmitThisParameter<typeof detailedMessage>;
-}> = new Module((mod) => {
-  mod.defineMethod("originalMessage", originalMessage);
-  mod.defineMethod("detailedMessage", detailedMessage);
-});
+export const Correctable = { originalMessage, detailedMessage };

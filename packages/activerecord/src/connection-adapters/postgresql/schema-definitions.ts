@@ -18,7 +18,7 @@ import {
   fetch,
   include,
   included,
-  Module,
+  rbCallSuper,
   rbEqual,
   rbRegMatchP,
   RuntimeError,
@@ -106,13 +106,13 @@ function primaryKey(
     };
   }
 
-  return ColumnMethods.superMethod(this, "primaryKey")!(name, type, options);
+  return rbCallSuper(this, primaryKey, name, type, options);
 }
 
-export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
-  new Module();
-
-ColumnMethods.defineMethod("primaryKey", primaryKey);
+export const ColumnMethods: {
+  primaryKey: typeof primaryKey;
+  [included]?: (base: ColumnMethodsBase) => void;
+} = { primaryKey };
 
 ColumnMethods[included] = function (base: ColumnMethodsBase): void {
   base.defineColumnMethods(

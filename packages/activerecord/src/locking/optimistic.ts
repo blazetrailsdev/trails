@@ -1,4 +1,4 @@
-import { DelegateClass, Module, rtest, union } from "@blazetrails/ruby-compat";
+import { DelegateClass, rtest, union, rbCallSuper } from "@blazetrails/ruby-compat";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
@@ -44,11 +44,11 @@ export interface Optimistic {
   readonly lockOptimistically: boolean;
 }
 
-export const Optimistic = Object.assign(new Module(), {
+export const Optimistic = {
   [included](base: object): void {
     classAttribute.call(base, "lockOptimistically", { instanceWriter: false, default: true });
   },
-});
+};
 
 interface LockingRecord {
   constructor: { lockingEnabled: boolean; lockingColumn: string };
@@ -74,7 +74,7 @@ export async function incrementBang(
   this: LockingRecord & { lockingEnabled(): boolean },
   ...args: Parameters<typeof persistenceIncrementBang>
 ): Promise<unknown> {
-  const result = await Optimistic.superMethod(this, "incrementBang")!(...args);
+  const result = await rbCallSuper(this, incrementBang, ...args);
   if (this.lockingEnabled()) {
     const lockingColumn = this.constructor.lockingColumn;
     this.writeAttribute(lockingColumn, Number(this.readAttribute(lockingColumn)) + 1);
@@ -217,15 +217,17 @@ export function _clearLockingColumn(this: InstanceLockingHost): void {
 }
 
 export function initializeDup(this: InstanceLockingHost, other: unknown): void {
-  Optimistic.superMethod(this, "initializeDup")!(other);
+  rbCallSuper(this, initializeDup, other);
   if (this.constructor.lockingEnabled) _clearLockingColumn.call(this);
 }
 
-Optimistic.defineMethod("lockingEnabled", lockingEnabled);
-Optimistic.defineMethod("incrementBang", incrementBang);
-Optimistic.defineMethod("_lockValueForDatabase", _lockValueForDatabase);
-Optimistic.defineMethod("_clearLockingColumn", _clearLockingColumn);
-Optimistic.defineMethod("initializeDup", initializeDup);
+Object.assign(Optimistic, {
+  lockingEnabled,
+  incrementBang,
+  _lockValueForDatabase,
+  _clearLockingColumn,
+  initializeDup,
+});
 
 /** @internal */
 export function _queryConstraintsHash(

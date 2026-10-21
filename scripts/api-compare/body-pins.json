@@ -30519,13 +30519,6 @@
   {
     "package": "activerecord",
     "rubyFile": "base.rb",
-    "rubyName": "_create_record",
-    "digest": "0776569574c1d2de",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
     "rubyName": "_enum",
     "digest": "02a43efbb8e15d2b",
     "ref": "v8.0.2"
@@ -30568,22 +30561,8 @@
   {
     "package": "activerecord",
     "rubyFile": "base.rb",
-    "rubyName": "_query_constraints_hash",
-    "digest": "0da5e9b277134f28",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
     "rubyName": "_read_attribute",
     "digest": "c75d12e721bac62b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
-    "rubyName": "_touch_row",
-    "digest": "483f32e18707ac68",
     "ref": "v8.0.2"
   },
   {
@@ -30862,13 +30841,6 @@
   {
     "package": "activerecord",
     "rubyFile": "base.rb",
-    "rubyName": "create_or_update",
-    "digest": "5c2b36000cd5f45c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
     "rubyName": "define_delegated_type_methods",
     "digest": "801baa619f79bdf1",
     "ref": "v8.0.2"
@@ -30892,13 +30864,6 @@
     "rubyFile": "base.rb",
     "rubyName": "destroy",
     "digest": "7cec67cc0ef41f9d",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
-    "rubyName": "destroy_row",
-    "digest": "e097b684c707469f",
     "ref": "v8.0.2"
   },
   {

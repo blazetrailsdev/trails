@@ -119,6 +119,7 @@ export namespace Delegation {
     const receiverName = receiver.startsWith("self.") ? receiver.slice("self.".length) : receiver;
 
     const methodNames: string[] = [];
+    const enumerable = typeof owner !== "function" && !Object.hasOwn(owner, "constructor");
 
     let explicitReceiver = false;
     let receiverClass: unknown;
@@ -163,7 +164,7 @@ export namespace Delegation {
         iseqLocationSetup(set, file, line);
         Object.defineProperty(owner, methodName.slice(0, -1), {
           configurable: true,
-          enumerable: false,
+          enumerable,
           set,
         });
         continue;
@@ -204,7 +205,7 @@ export namespace Delegation {
         iseqLocationSetup(get, file, line);
         Object.defineProperty(owner, methodName, {
           configurable: true,
-          enumerable: false,
+          enumerable,
           get,
         });
         continue;
@@ -223,7 +224,7 @@ export namespace Delegation {
       iseqLocationSetup(value, file, line);
       Object.defineProperty(owner, methodName, {
         configurable: true,
-        enumerable: false,
+        enumerable,
         writable: true,
         value,
       });

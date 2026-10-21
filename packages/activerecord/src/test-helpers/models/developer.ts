@@ -15,7 +15,7 @@ import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
-import { Module, Range, RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
+import { Range, RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
 import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -54,7 +54,7 @@ export class Developer extends Base {
 
   static instanceCount: number | undefined;
 
-  declare static ProjectsAssociationExtension: Module;
+  declare static ProjectsAssociationExtension: Record<string, unknown>;
 
   static ProjectsAssociationExtension2 = {
     async findLeastRecent(this: Relation<Base>) {
@@ -75,9 +75,9 @@ export class Developer extends Base {
       null,
       { joinTable: "developers_projects", associationForeignKey: "project_id" },
       (mod) => {
-        mod.defineMethod("findMostRecent", async function (this: Relation<Base>) {
+        mod.findMostRecent = async function (this: Relation<Base>) {
           return this.order("id DESC").first();
-        });
+        };
       },
     );
 
@@ -135,9 +135,9 @@ export class Developer extends Base {
         associationForeignKey: "project_id",
       },
       (mod) => {
-        mod.defineMethod("findLeastRecent", async function (this: Relation<Base>) {
+        mod.findLeastRecent = async function (this: Relation<Base>) {
           return this.order("id ASC").first();
-        });
+        };
       },
     );
 

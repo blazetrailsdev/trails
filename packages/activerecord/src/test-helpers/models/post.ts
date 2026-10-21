@@ -1,5 +1,5 @@
 import type { ScopeOn } from "../../scoping/named.js";
-import { kernelThrow, Module, registerConstant } from "@blazetrails/ruby-compat";
+import { kernelThrow, rbCallSuper, registerConstant } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
 import type { AuthorAddress } from "./author.js";
@@ -160,20 +160,23 @@ export class Post extends Base {
   declare taggingsWithDeleteAll: AssociationProxy<Tagging>;
   declare taggingsWithDestroy: AssociationProxy<Tagging>;
 
-  static namedExtension = new Module();
+  static namedExtension = {
+    author(): string {
+      return "lifo";
+    },
 
-  declare static CommentsWithExtendAssociationExtension: Module;
+    greeting(this: object): string {
+      return `${rbCallSuper(this, Post.namedExtension.greeting) as string} :)`;
+    },
+  };
 
-  static namedExtension2 = new Module();
+  declare static CommentsWithExtendAssociationExtension: Record<string, unknown>;
 
-  static {
-    this.namedExtension.defineMethod("author", () => "lifo");
-    this.namedExtension.defineMethod("greeting", function (this: object) {
-      return `${Post.namedExtension.superMethod(this, "greeting")!()} :)`;
-    });
-
-    this.namedExtension2.defineMethod("greeting", () => "hullo");
-  }
+  static namedExtension2 = {
+    greeting(): string {
+      return "hullo";
+    },
+  };
 
   static _log: Array<[any, any, any]> = [];
 
@@ -328,7 +331,7 @@ export class Post extends Base {
       null,
       { extend: Post.namedExtension, className: "Comment", foreignKey: "post_id" },
       (mod) => {
-        mod.defineMethod("greeting", () => "hello");
+        mod.greeting = () => "hello";
       },
     );
     this.hasMany(
