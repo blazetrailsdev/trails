@@ -46,11 +46,12 @@ export class CollectionAssociation extends Association {
   static override defineExtensions(
     model: any,
     name: string,
-    block?: (mod: Module) => void,
-  ): Module | undefined {
+    block?: (mod: Record<string, unknown>) => void,
+  ): Record<string, unknown> | undefined {
     if (block) {
       const extensionModuleName = `${camelize(name)}AssociationExtension`;
-      const extension = new Module(block);
+      const extension: Record<string, unknown> = {};
+      block(extension);
       rbModConstSet(model, extensionModuleName, extension);
       return extension;
     }

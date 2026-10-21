@@ -15,7 +15,6 @@ import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
 import {
-  Module,
   include,
   rbClassInheritedP,
   rbClassSuperclass,
@@ -62,10 +61,7 @@ export interface AssociationOptions {
   afterAdd?: CollectionCallback<"afterAdd"> | CollectionCallback<"afterAdd">[];
   beforeRemove?: CollectionCallback<"beforeRemove"> | CollectionCallback<"beforeRemove">[];
   afterRemove?: CollectionCallback<"afterRemove"> | CollectionCallback<"afterRemove">[];
-  extend?:
-    | Record<string, (...args: unknown[]) => unknown>
-    | Module
-    | Array<Record<string, (...args: unknown[]) => unknown> | Module>;
+  extend?: object | object[];
   disableJoins?: boolean;
   associationForeignKey?: string;
   foreignType?: string;
@@ -177,7 +173,7 @@ export class Associations {
     name: string,
     scope: ((this: Relation<any>, ...args: any[]) => any) | AssociationOptions | null = null,
     options: AssociationOptions = {},
-    extension?: (mod: Module) => void,
+    extension?: (mod: Record<string, unknown>) => void,
   ): void {
     if (typeof scope === "object" && scope !== null) {
       options = scope;
@@ -201,7 +197,7 @@ export class Associations {
       | (AssociationOptions & { joinTable?: string })
       | null = null,
     options: AssociationOptions & { joinTable?: string } = {},
-    extension?: (mod: Module) => void,
+    extension?: (mod: Record<string, unknown>) => void,
   ): void {
     if (typeof scope === "object" && scope !== null) {
       options = scope;

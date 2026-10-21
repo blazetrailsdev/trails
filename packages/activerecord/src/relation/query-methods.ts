@@ -9,7 +9,6 @@ import {
   isModuleIncluded,
   isSymbol,
   merge,
-  Module,
   rbBlockGivenP,
   partition,
   rbFPublicSend,
@@ -995,7 +994,7 @@ function distinctBang(this: QueryMethodsHost, value = true): any {
   return this;
 }
 
-function extending(this: QueryMethodsHost, block: (mod: Module) => void): any;
+function extending(this: QueryMethodsHost, block: (mod: Record<string, unknown>) => void): any;
 function extending(this: QueryMethodsHost, ...modules: object[]): any;
 function extending(this: QueryMethodsHost, ...modules: object[]): any {
   const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
@@ -1006,11 +1005,15 @@ function extending(this: QueryMethodsHost, ...modules: object[]): any {
   }
 }
 
-function extendingBang(this: QueryMethodsHost, block: (mod: Module) => void): any;
+function extendingBang(this: QueryMethodsHost, block: (mod: Record<string, unknown>) => void): any;
 function extendingBang(this: QueryMethodsHost, ...modules: object[]): any;
 function extendingBang(this: QueryMethodsHost, ...modules: object[]): any {
   const block = rbBlockGivenP(modules[modules.length - 1]) ? modules.pop() : undefined;
-  if (block) modules.push(new Module(block as (mod: Module) => void));
+  if (block) {
+    const mod: Record<string, unknown> = {};
+    (block as (mod: Record<string, unknown>) => void)(mod);
+    modules.push(mod);
+  }
   modules.splice(0, modules.length, ...(flatten(modules) as object[]));
 
   this.extendingValues = [...this.extendingValues, ...modules];
