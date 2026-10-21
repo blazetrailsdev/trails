@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { beforeEach, describe, it } from "vitest";
-import { ActionController, ActionDispatch } from "@blazetrails/actionpack";
+import { beforeEach, describe, it, onTestFinished } from "vitest";
+import { ActionController, ActionDispatch, RouteSet } from "@blazetrails/actionpack";
 import {
   assert,
   assertCalledWith,
@@ -15,9 +15,13 @@ import {
   assertRaise,
   assertSame,
   HashWithIndifferentAccess,
+  TopLevel,
 } from "@blazetrails/activesupport";
 import { HTML5 } from "@blazetrails/nokogiri";
+import { Engine } from "@blazetrails/trailties/engine";
+import { Trailtie } from "@blazetrails/trailties/trailtie";
 import {
+  include,
   NoMethodError,
   rbCString,
   rbFSend,
@@ -367,8 +371,42 @@ describe("ATestHelperTest", () => {
     });
   });
 
-  it.skip("is able to use mounted routes", () => {
-    // BLOCKED: actionview-test-case-mounted-routes-test
+  it("is able to use mounted routes", () => {
+    const trails = TopLevel.Trails;
+    TopLevel.Trails = { Engine, Trailtie } as unknown as typeof TopLevel.Trails;
+    onTestFinished(() => {
+      TopLevel.Trails = trails;
+    });
+    tc().withRouting((set: any) => {
+      const app = class extends Engine {
+        static _routes?: RouteSet;
+
+        static routes(): RouteSet {
+          return (this._routes ??= new RouteSet());
+        }
+
+        static {
+          this.routes().draw(function (this: any) {
+            this.get("bar", { to: () => {} });
+          });
+        }
+
+        static override call(..._args: unknown[]): void {}
+      };
+
+      set.draw(function (this: any) {
+        this.mount(
+          new Map<unknown, unknown>([
+            [app, "/foo"],
+            ["as", "foo_app"],
+          ]),
+        );
+      });
+
+      include(rbObjSingletonClass(tc()), set.mountedHelpers());
+
+      assertEqual("/foo/bar", tc().fooApp.barPath());
+    });
   });
 
   it("named routes can be used from helper included in view", async () => {
@@ -604,12 +642,12 @@ describe("AHelperWithInitializeTest", () => {
 
 describe("PatternMatchingTestCases", () => {
   it.skip("document_root_element integrates with pattern matching", () => {
-    // BLOCKED: actionview-test-case-pattern-matching-tests
+    // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
   });
   it.skip("rendered.html integrates with pattern matching", () => {
-    // BLOCKED: actionview-test-case-pattern-matching-tests
+    // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
   });
   it.skip("rendered.json integrates with pattern matching", () => {
-    // BLOCKED: actionview-test-case-pattern-matching-tests
+    // PERMANENT-SKIP: CLAUDE.md, "Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)".
   });
 });
