@@ -2887,10 +2887,10 @@ export class Lowerer {
 
   /**
    * A minitest assertion in a ported test as the `expect` form test-compare
-   * scores back to it (scripts/test-compare/assertion-kinds.ts): `assert_equal
-   * exp, act` is `expect(act).toEqual(exp)`, `assert_nil x` is
-   * `expect(x ?? null).toBeNull()` (a Ruby nil may read `undefined`), and so on.
-   * Null for a call that is not an assertion.
+   * scores back to it (CONTRIBUTING.md, "Porting a Minitest assertion"): the
+   * built-in matcher where it gives Ruby's answer for the value, else the
+   * `@blazetrails/vitest-matchers` one. Test code calls no ruby-compat function
+   * to assert. Null for a call that is not an assertion.
    */
   assertion(n: N, ctx: Ctx): string | null {
     const a = (i: number) => this.expr(n.args[i], ctx);
@@ -2898,32 +2898,39 @@ export class Lowerer {
       n.block?.k === "block"
         ? this.arrow([], n.block.body, this.child(ctx, { testMode: true }))
         : null;
+    // A value Ruby and JS agree on: `toEqual` / `toBeTruthy` give Ruby's answer.
+    const plainLit = (x: N): boolean =>
+      ["str", "int", "float", "sym", "true", "false", "nil"].includes(x.k) ||
+      (x.k === "array" && x.elems?.every((e: N) => plainLit(e)));
+    const boolTyped = (x: N) => {
+      const t = this.typeOf(x, ctx);
+      return t?.k === "prim" && t.name === "boolean" && !t.nullable;
+    };
     switch (n.name) {
       case "assert":
-        return n.args.length >= 1 ? `expect(${a(0)}).toBeTruthy()` : null;
+        if (n.args.length < 1) return null;
+        return boolTyped(n.args[0])
+          ? `expect(${a(0)}).toBeTruthy()`
+          : `expect(${a(0)}).toBeRubyTruthy()`;
       case "assert_not":
       case "refute":
-        return n.args.length >= 1 ? `expect(${a(0)}).toBeFalsy()` : null;
+        if (n.args.length < 1) return null;
+        return boolTyped(n.args[0])
+          ? `expect(${a(0)}).toBeFalsy()`
+          : `expect(${a(0)}).toBeRubyFalsy()`;
+      // Minitest's `assert_equal` is Ruby's `==`: `toEqual` for a literal, and
+      // `toEqualRuby` where the expected value may define its own `==` (a Hash
+      // literal is `==` to a Map-backed Hash, hash.c rb_hash_equal).
       case "assert_equal":
         if (n.args.length < 2) return null;
-        // A Hash literal is `==` to any Hash with the same pairs (hash.c
-        // rb_hash_equal), a Map-backed one included, which `toEqual` is not:
-        // the actual value passes as the literal when Ruby's `==` holds, and
-        // fails with its own diff when it does not.
-        if (n.args[0].k === "hash") {
-          const t = `__act`;
-          return `expect(((${t}: any) => (${this.rc(ctx, "rbEqual")}(${t}, ${a(0)}) ? ${a(0)} : ${t}))(${a(1)})).toEqual(${a(0)})`;
-        }
-        return `expect(${a(1)}).toEqual(${a(0)})`;
-      // Ruby's `!=` (an object's `==`, identity by default): vitest's `toEqual`
-      // ignores classes, so two empty instances of different classes compare equal.
+        return plainLit(n.args[0])
+          ? `expect(${a(1)}).toEqual(${a(0)})`
+          : `expect(${a(1)}).toEqualRuby(${a(0)})`;
       case "assert_not_equal":
       case "refute_equal":
-        return n.args.length >= 2
-          ? `expect(${this.rc(ctx, "rbEqual")}(${a(1)}, ${a(0)})).toBe(false)`
-          : null;
+        return n.args.length >= 2 ? `expect(${a(1)}).not.toEqualRuby(${a(0)})` : null;
       // `assert_predicate obj, :sym?` sends the predicate (minitest assertions.rb),
-      // so it is lowered as the call `obj.sym?` and dispatches to its TS member.
+      // so it is lowered as the call `obj.sym?`; a Ruby predicate may answer a value.
       case "assert_predicate":
       case "assert_not_predicate":
       case "refute_predicate": {
@@ -2932,47 +2939,81 @@ export class Lowerer {
           { k: "call", recv: n.args[0], name: n.args[1].value, args: [], l: n.l },
           ctx,
         );
-        return `expect(${this.truthy(v)}).toBe(${n.name === "assert_predicate"})`;
+        return `expect(${v}).${n.name === "assert_predicate" ? "toBeRubyTruthy" : "toBeRubyFalsy"}()`;
       }
       case "assert_nil":
-        return n.args.length >= 1 ? `expect(${a(0)} ?? null).toBeNull()` : null;
+        return n.args.length >= 1 ? `expect(${a(0)}).toBeNull()` : null;
       case "assert_not_nil":
       case "refute_nil":
-        return n.args.length >= 1 ? `expect(${a(0)} ?? null).not.toBeNull()` : null;
+        return n.args.length >= 1 ? `expect(${a(0)}).not.toBeNull()` : null;
       case "assert_same":
         return n.args.length >= 2 ? `expect(${a(1)}).toBe(${a(0)})` : null;
       case "assert_match":
         return n.args.length >= 2 ? `expect(${a(1)}).toMatch(${a(0)})` : null;
       case "assert_no_match":
         return n.args.length >= 2 ? `expect(${a(1)}).not.toMatch(${a(0)})` : null;
+      // An Array includes by `==` (`toContainEqual`), a String by substring.
       case "assert_includes":
-        return n.args.length >= 2 ? `expect(${a(0)}).toContain(${a(1)})` : null;
       case "assert_not_includes":
-      case "refute_includes":
-        return n.args.length >= 2 ? `expect(${a(0)}).not.toContain(${a(1)})` : null;
-      // `assert_kind_of String, x`: a JS string primitive is no `instanceof String`;
-      // ruby-compat's `rbObjIsKindOf` answers Ruby's `kind_of?` for it.
-      case "assert_kind_of":
+      case "refute_includes": {
         if (n.args.length < 2) return null;
-        {
-          // Ruby's core classes are ruby-compat's `rbC*` (`rbObjClass("x")` is `rbCString`).
-          const c0 = n.args[0];
-          const core =
-            c0.k === "const" && c0.path.filter((x: string) => x).length === 1
-              ? RB_CORE_CLASSES[c0.path.filter((x: string) => x)[0]]
-              : undefined;
-          const k = core ? this.imp(ctx, "@blazetrails/ruby-compat", core) : a(0);
-          return `expect(${this.rc(ctx, "rbObjIsKindOf")}(${a(1)}, ${k})).toBe(true)`;
+        const t = this.typeOf(n.args[0], ctx);
+        const m =
+          n.args[0].k === "str" || (t?.k === "prim" && t.name === "string")
+            ? "toContain"
+            : "toContainEqual";
+        return `expect(${a(0)})${n.name === "assert_includes" ? "" : ".not"}.${m}(${a(1)})`;
+      }
+      // `assert_kind_of String, x`: a JS primitive is no `instanceof` its Ruby
+      // class, so a core class is checked by the primitive's own type.
+      case "assert_kind_of": {
+        if (n.args.length < 2) return null;
+        const c0 = n.args[0];
+        const name =
+          c0.k === "const" && c0.path.filter((x: string) => x).length === 1
+            ? c0.path.filter((x: string) => x)[0]
+            : null;
+        switch (name) {
+          case "String":
+          case "Symbol":
+            return `expect(typeof ${a(1)}).toBe("string")`;
+          case "Integer":
+            return `expect(Number.isInteger(${a(1)})).toBe(true)`;
+          case "Float":
+          case "Numeric":
+            return `expect(typeof ${a(1)}).toBe("number")`;
+          case "NilClass":
+            return `expect(${a(1)}).toBeNull()`;
+          case "TrueClass":
+            return `expect(${a(1)}).toBe(true)`;
+          case "FalseClass":
+            return `expect(${a(1)}).toBe(false)`;
+          // A Ruby Hash is a plain object unless it needs a Hash feature.
+          case "Hash":
+            return `expect(${a(1)}).toBeTypeOf("object")`;
         }
+        return `expect(${a(1)}).toBeInstanceOf(${a(0)})`;
+      }
       case "assert_not_instance_of":
-        return n.args.length >= 2 ? `expect(${a(1)}).not.toBeInstanceOf(${a(0)})` : null;
+        return n.args.length >= 2 ? `expect(${a(1)}).not.toBeExactInstanceOf(${a(0)})` : null;
       case "assert_instance_of":
-        return n.args.length >= 2 ? `expect(${a(1)}).toBeInstanceOf(${a(0)})` : null;
+        return n.args.length >= 2 ? `expect(${a(1)}).toBeExactInstanceOf(${a(0)})` : null;
+      case "assert_respond_to":
+        return n.args.length >= 2 ? `expect(${a(0)}).toRespondTo(${a(1)})` : null;
+      case "assert_in_delta":
+        return n.args.length >= 2
+          ? `expect(${a(1)}).toBeWithinDelta(${a(0)}${n.args.length >= 3 ? `, ${a(2)}` : ""})`
+          : null;
+      case "flunk":
+        return `expect.unreachable(${n.args.length ? a(0) : ""})`;
       // Minitest::Assertions#pass: an assertion that passes.
       case "pass":
         return n.args.length <= 1 ? "expect(true).toBe(true)" : null;
       case "assert_empty":
-        return n.args.length >= 1 ? `expect(${this.rc(ctx, "isEmpty")}(${a(0)})).toBe(true)` : null;
+        return n.args.length >= 1 ? `expect(${a(0)}).toBeEmpty()` : null;
+      case "assert_not_empty":
+      case "refute_empty":
+        return n.args.length >= 1 ? `expect(${a(0)}).not.toBeEmpty()` : null;
       case "assert_raises":
       case "assert_raise": {
         const f = blockFn();

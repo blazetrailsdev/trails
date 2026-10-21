@@ -1019,28 +1019,9 @@ export class Emitter {
           "ActiveSupportTestCase",
         );
         chunks.push(`${reg}(/(?:)/, ${host});`);
-        // Minitest's `assert_equal` is Ruby's `==` (minitest/assertions.rb
-        // `assert_equal`): a test's `expect(…).toEqual(…)` compares two Ruby
-        // values (a Date, a Time, a class with its own `==`) by `rbEqual`, as
-        // activesupport's own tests register for theirs (multibyte-chars.test.ts).
-        {
-          const ex = this.lw.imp(tctx, "vitest", "expect");
-          const eq = this.lw.rc(tctx, "rbEqual");
-          chunks.push(
-            [
-              `${ex}.addEqualityTesters([`,
-              `  function rubyEquals(a: unknown, b: unknown): boolean | undefined {`,
-              `    const plain = (x: unknown) =>`,
-              `      x === null || typeof x !== "object" || Array.isArray(x) || Object.getPrototypeOf(x) === Object.prototype;`,
-              `    if (plain(a) && plain(b)) return undefined;`,
-              // Ruby's `==` holding is equality; where it does not (a JS
-              // `String` subclass, whose `==` trails cannot dispatch), vitest's own decides.
-              `    return ${eq}(a, b) ? true : undefined;`,
-              `  },`,
-              `]);`,
-            ].join("\n"),
-          );
-        }
+        // The Ruby matchers' `Assertion` types (their setup is every vitest
+        // project's setupFiles).
+        chunks.unshift(`import type {} from "@blazetrails/vitest-matchers";`);
       }
       for (const s of top) chunks.push(...this.lw.stmt(s, tctx, false));
       // A top-level `def` (helper.rb's `adapter_is?`) is a method on Ruby's main
