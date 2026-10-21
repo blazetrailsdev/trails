@@ -7,6 +7,7 @@ import { inTimeZone } from "@blazetrails/activesupport/core-ext/date-and-time/zo
 import {
   Duration,
   TimeZone,
+  type TimeWithZone,
   assertPredicate,
   isHtmlSafe,
   ordinalize,
@@ -79,7 +80,10 @@ function add(base: Date, ms: number): Date {
 
 const from = new Date(Date.UTC(2004, 5, 6, 21, 45, 0));
 
-function assertDistanceOfTimeInWords(from: any, to: any = null) {
+function assertDistanceOfTimeInWords(
+  from: Time | TimeWithZone,
+  to: Time | TimeWithZone | null = null,
+) {
   to ??= from;
 
   expect(distanceOfTimeInWords(from, to.plus(Duration.seconds(0)), { includeSeconds: true })).toBe(
