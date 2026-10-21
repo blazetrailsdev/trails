@@ -8,6 +8,7 @@ import { Errors } from "@blazetrails/activemodel";
 
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
+import type { TextHelperHost } from "../helpers/text-helper.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
 
 const Post = Struct.new(
@@ -21,6 +22,7 @@ const Post = Struct.new(
 );
 const Continent = Struct.new("continent_name", "countries");
 const Country = Struct.new("country_id", "country_name");
+const Album = Struct.new("id", "title", "genre");
 const Digest = Struct.new("send_day");
 
 class Firm {
@@ -28,6 +30,7 @@ class Firm {
 }
 
 class FakeZone {
+  caseEquals?: () => never;
   constructor(public name: string) {}
   toString(): string {
     return this.name;
@@ -37,7 +40,7 @@ class FakeZone {
   }
 }
 
-type View = Base & Record<string, any>;
+type View = Base & TextHelperHost & Record<string, any>;
 
 describe("FormOptionsHelperTest", () => {
   let view: View;
@@ -213,9 +216,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.author_name = "Babe";
 
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      (view as any).concat(
-        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
-      );
+      view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
     });
 
     assertDomEqual(
@@ -229,9 +230,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.author_name = "Babe";
 
     const outputBuffer = view.fieldsFor("post", view.post, { index: 815 }, (f: any) => {
-      (view as any).concat(
-        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
-      );
+      view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
     });
 
     assertDomEqual(
@@ -246,9 +245,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.toParam = () => 815;
 
     const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: any) => {
-      (view as any).concat(
-        f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"),
-      );
+      view.concat(f.collectionSelect("author_name", dummyPosts(), "author_name", "author_name"));
     });
 
     assertDomEqual(
@@ -441,7 +438,7 @@ describe("FormOptionsHelperTest", () => {
     view.post.origin = "dk";
 
     const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
-      (view as any).concat(
+      view.concat(
         f.groupedCollectionSelect(
           "origin",
           dummyContinents(),
@@ -528,7 +525,7 @@ describe("FormOptionsHelperTest", () => {
     view.digest = new Digest();
 
     const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
-      (view as any).concat(f.weekdaySelect("send_day"));
+      view.concat(f.weekdaySelect("send_day"));
     });
 
     assertDomEqual(
@@ -542,7 +539,7 @@ describe("FormOptionsHelperTest", () => {
     view.digest.send_day = "Monday";
 
     const outputBuffer = view.fieldsFor("digest", view.digest, {}, (f: any) => {
-      (view as any).concat(f.weekdaySelect("send_day"));
+      view.concat(f.weekdaySelect("send_day"));
     });
 
     assertDomEqual(
@@ -609,7 +606,7 @@ describe("FormOptionsHelperTest", () => {
   });
 
   it("time zone options returns html safe string", () => {
-    expect(isHtmlSafe(view.timeZoneOptionsForSelect())).toBe(true);
+    expect(isHtmlSafe(view.timeZoneOptionsForSelect())).toBeTruthy();
   });
 
   it("time zone select", () => {
@@ -625,7 +622,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm = new Firm("D");
 
     const outputBuffer = view.fieldsFor("firm", view.firm, {}, (f: any) => {
-      (view as any).concat(f.timeZoneSelect("time_zone"));
+      view.concat(f.timeZoneSelect("time_zone"));
     });
 
     assertDomEqual(
@@ -638,7 +635,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm = new Firm("D");
 
     const outputBuffer = view.fieldsFor("firm", view.firm, { index: 305 }, (f: any) => {
-      (view as any).concat(f.timeZoneSelect("time_zone"));
+      view.concat(f.timeZoneSelect("time_zone"));
     });
 
     assertDomEqual(
@@ -652,7 +649,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm.toParam = () => 305;
 
     const outputBuffer = view.fieldsFor("firm[]", view.firm, {}, (f: any) => {
-      (view as any).concat(f.timeZoneSelect("time_zone"));
+      view.concat(f.timeZoneSelect("time_zone"));
     });
 
     assertDomEqual(
@@ -770,7 +767,7 @@ describe("FormOptionsHelperTest", () => {
     view.firm = new Firm("D");
 
     for (const tz of fakeTimezones) {
-      (tz as any).caseEquals = () => {
+      tz.caseEquals = () => {
         throw new Error();
       };
     }
@@ -812,6 +809,791 @@ describe("FormOptionsHelperTest", () => {
     assertDomEqual(
       '<select id="firm_time_zone" name="firm[time_zone]"><option value="A">A</option>\n<option value="B">B</option>\n<option value="C">C</option>\n<option value="D" selected="selected">D</option>\n<option value="E">E</option></select>',
       html,
+    );
+  });
+
+  const optionsFromCollectionForSelect = (...args: unknown[]) =>
+    view.optionsFromCollectionForSelect(...args);
+  const optionGroupsFromCollectionForSelect = (...args: unknown[]) =>
+    view.optionGroupsFromCollectionForSelect(...args);
+  const groupedOptionsForSelect = (...args: unknown[]) => view.groupedOptionsForSelect(...args);
+  const abeBabeCabe = (abe: string, babe: string, cabe: string) =>
+    `<option value="&lt;Abe&gt;"${abe}>&lt;Abe&gt; went home</option>\n<option value="Babe"${babe}>Babe went home</option>\n<option value="Cabe"${cabe}>Cabe went home</option>`;
+  const SEL = ' selected="selected"';
+  const DIS = ' disabled="disabled"';
+  const continentsHtml =
+    '<optgroup label="&lt;Africa&gt;"><option value="&lt;sa&gt;">&lt;South Africa&gt;</option>\n<option value="so">Somalia</option></optgroup><optgroup label="Europe"><option value="dk" selected="selected">Denmark</option>\n<option value="ie">Ireland</option></optgroup>';
+
+  it("collection options", () => {
+    assertDomEqual(
+      abeBabeCabe("", "", ""),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title"),
+    );
+  });
+
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
+  it.skip("collection options with private value method", async () => {
+    const e = await assertRaises([Error], {}, () =>
+      optionsFromCollectionForSelect(dummyPosts(), "secret", "title"),
+    );
+    assertMatch(/private method/, e.message);
+  });
+
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
+  it.skip("collection options with private text method", async () => {
+    const e = await assertRaises([Error], {}, () =>
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "secret"),
+    );
+    assertMatch(/private method/, e.message);
+  });
+
+  it("collection options with preselected value", () => {
+    assertDomEqual(
+      abeBabeCabe("", SEL, ""),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", "Babe"),
+    );
+  });
+
+  it("collection options with preselected value array", () => {
+    assertDomEqual(
+      abeBabeCabe("", SEL, SEL),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", ["Babe", "Cabe"]),
+    );
+  });
+
+  it("collection options with proc for selected", () => {
+    assertDomEqual(
+      abeBabeCabe("", SEL, ""),
+      optionsFromCollectionForSelect(
+        dummyPosts(),
+        "author_name",
+        "title",
+        (p: any) => p.author_name === "Babe",
+      ),
+    );
+  });
+
+  it("collection options with disabled value", () => {
+    assertDomEqual(
+      abeBabeCabe("", DIS, ""),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", { disabled: "Babe" }),
+    );
+  });
+
+  it("collection options with disabled array", () => {
+    assertDomEqual(
+      abeBabeCabe("", DIS, DIS),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", {
+        disabled: ["Babe", "Cabe"],
+      }),
+    );
+  });
+
+  it("collection options with preselected and disabled value", () => {
+    assertDomEqual(
+      abeBabeCabe("", DIS, SEL),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", {
+        selected: "Cabe",
+        disabled: "Babe",
+      }),
+    );
+  });
+
+  it("collection options with proc for disabled", () => {
+    assertDomEqual(
+      abeBabeCabe("", DIS, DIS),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", "title", {
+        disabled: (p: any) => ["Babe", "Cabe"].includes(p.author_name),
+      }),
+    );
+  });
+
+  it("collection options with proc for value method", () => {
+    assertDomEqual(
+      abeBabeCabe("", "", ""),
+      optionsFromCollectionForSelect(dummyPosts(), (p: any) => p.author_name, "title"),
+    );
+  });
+
+  it("collection options with proc for text method", () => {
+    assertDomEqual(
+      abeBabeCabe("", "", ""),
+      optionsFromCollectionForSelect(dummyPosts(), "author_name", (p: any) => p.title),
+    );
+  });
+
+  it("collection options with element attributes", () => {
+    assertDomEqual(
+      '<option value="USA" class="bold">USA</option>',
+      optionsFromCollectionForSelect([["USA", "USA", { class: "bold" }]], "first", "second"),
+    );
+  });
+
+  it("string options for select", () => {
+    const options =
+      '<option value="Denmark">Denmark</option><option value="USA">USA</option><option value="Sweden">Sweden</option>';
+    assertDomEqual(options, optionsForSelect(options));
+  });
+
+  it("array options for select with custom defined selected", () => {
+    assertDomEqual(
+      '<option selected="selected" type="Coach" value="1">Richard Bandler</option>\n<option type="Coachee" value="1">Richard Bandler</option>',
+      optionsForSelect([
+        ["Richard Bandler", 1, { type: "Coach", selected: "selected" }],
+        ["Richard Bandler", 1, { type: "Coachee" }],
+      ]),
+    );
+  });
+
+  it("array options for select with custom defined disabled", () => {
+    assertDomEqual(
+      '<option disabled="disabled" type="Coach" value="1">Richard Bandler</option>\n<option type="Coachee" value="1">Richard Bandler</option>',
+      optionsForSelect([
+        ["Richard Bandler", 1, { type: "Coach", disabled: "disabled" }],
+        ["Richard Bandler", 1, { type: "Coachee" }],
+      ]),
+    );
+  });
+
+  it("array options for select with selection array", () => {
+    assertDomEqual(
+      '<option value="Denmark">Denmark</option>\n<option value="&lt;USA&gt;" selected="selected">&lt;USA&gt;</option>\n<option value="Sweden" selected="selected">Sweden</option>',
+      optionsForSelect(["Denmark", "<USA>", "Sweden"], ["<USA>", "Sweden"]),
+    );
+  });
+
+  it("array options for select with disabled value", () => {
+    assertDomEqual(
+      '<option value="Denmark">Denmark</option>\n<option value="&lt;USA&gt;" disabled="disabled">&lt;USA&gt;</option>\n<option value="Sweden">Sweden</option>',
+      optionsForSelect(["Denmark", "<USA>", "Sweden"], { disabled: "<USA>" }),
+    );
+  });
+
+  it("array options for select with disabled array", () => {
+    assertDomEqual(
+      '<option value="Denmark">Denmark</option>\n<option value="&lt;USA&gt;" disabled="disabled">&lt;USA&gt;</option>\n<option value="Sweden" disabled="disabled">Sweden</option>',
+      optionsForSelect(["Denmark", "<USA>", "Sweden"], { disabled: ["<USA>", "Sweden"] }),
+    );
+  });
+
+  it("array options for select with selection and disabled value", () => {
+    assertDomEqual(
+      '<option value="Denmark" selected="selected">Denmark</option>\n<option value="&lt;USA&gt;" disabled="disabled">&lt;USA&gt;</option>\n<option value="Sweden">Sweden</option>',
+      optionsForSelect(["Denmark", "<USA>", "Sweden"], { selected: "Denmark", disabled: "<USA>" }),
+    );
+  });
+
+  it("boolean array options for select with selection and disabled value", () => {
+    assertDomEqual(
+      '<option value="true">true</option>\n<option value="false" selected="selected">false</option>',
+      optionsForSelect([true, false], { selected: false, disabled: null }),
+    );
+  });
+
+  it("array options for string include in other string bug fix", () => {
+    assertDomEqual(
+      '<option value="ruby">ruby</option>\n<option value="rubyonrails" selected="selected">rubyonrails</option>',
+      optionsForSelect(["ruby", "rubyonrails"], "rubyonrails"),
+    );
+    assertDomEqual(
+      '<option value="ruby" selected="selected">ruby</option>\n<option value="rubyonrails">rubyonrails</option>',
+      optionsForSelect(["ruby", "rubyonrails"], "ruby"),
+    );
+    assertDomEqual(
+      '<option value="ruby" selected="selected">ruby</option>\n<option value="rubyonrails">rubyonrails</option>\n<option value=""></option>',
+      optionsForSelect(["ruby", "rubyonrails", null], "ruby"),
+    );
+  });
+
+  it("ducktyped options for select", () => {
+    const quack = Struct.new("first", "last");
+    assertDomEqual(
+      '<option value="&lt;Kroner&gt;">&lt;DKR&gt;</option>\n<option value="Dollar">$</option>',
+      optionsForSelect([new quack("<DKR>", "<Kroner>"), new quack("$", "Dollar")]),
+    );
+    assertDomEqual(
+      '<option value="&lt;Kroner&gt;">&lt;DKR&gt;</option>\n<option value="Dollar" selected="selected">$</option>',
+      optionsForSelect([new quack("<DKR>", "<Kroner>"), new quack("$", "Dollar")], "Dollar"),
+    );
+    assertDomEqual(
+      '<option value="&lt;Kroner&gt;" selected="selected">&lt;DKR&gt;</option>\n<option value="Dollar" selected="selected">$</option>',
+      optionsForSelect(
+        [new quack("<DKR>", "<Kroner>"), new quack("$", "Dollar")],
+        ["Dollar", "<Kroner>"],
+      ),
+    );
+  });
+
+  it("collection options with preselected value as string and option value is integer", () => {
+    const albums = [new Album(1, "first", "rap"), new Album(2, "second", "pop")];
+    assertDomEqual(
+      '<option selected="selected" value="1">rap</option>\n<option value="2">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { selected: "1" }),
+    );
+  });
+
+  it("collection options with preselected value as integer and option value is string", () => {
+    const albums = [new Album("1", "first", "rap"), new Album("2", "second", "pop")];
+    assertDomEqual(
+      '<option selected="selected" value="1">rap</option>\n<option value="2">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { selected: 1 }),
+    );
+  });
+
+  it("collection options with preselected value as string and option value is float", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+    ];
+    assertDomEqual(
+      '<option value="1.0">rap</option>\n<option value="2.0" selected="selected">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { selected: "2.0" }),
+    );
+  });
+
+  it("collection options with preselected value as nil", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+    ];
+    assertDomEqual(
+      '<option value="1.0">rap</option>\n<option value="2.0">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { selected: null }),
+    );
+  });
+
+  it("collection options with disabled value as nil", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+    ];
+    assertDomEqual(
+      '<option value="1.0">rap</option>\n<option value="2.0">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { disabled: null }),
+    );
+  });
+
+  it("collection options with disabled value as array", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+    ];
+    assertDomEqual(
+      '<option disabled="disabled" value="1.0">rap</option>\n<option disabled="disabled" value="2.0">pop</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", { disabled: ["1.0", new Number(2.0)] }),
+    );
+  });
+
+  it("collection options with preselected values as string array and option value is float", () => {
+    const albums = [
+      new Album(new Number(1.0), "first", "rap"),
+      new Album(new Number(2.0), "second", "pop"),
+      new Album(new Number(3.0), "third", "country"),
+    ];
+    assertDomEqual(
+      '<option value="1.0" selected="selected">rap</option>\n<option value="2.0">pop</option>\n<option value="3.0" selected="selected">country</option>',
+      optionsFromCollectionForSelect(albums, "id", "genre", ["1.0", "3.0"]),
+    );
+  });
+
+  it("option groups from collection for select", () => {
+    assertDomEqual(
+      continentsHtml,
+      optionGroupsFromCollectionForSelect(
+        dummyContinents(),
+        "countries",
+        "continent_name",
+        "country_id",
+        "country_name",
+        "dk",
+      ),
+    );
+  });
+
+  it("option groups from collection for select with callable group method", () => {
+    const groupProc = (c: any) => c.countries;
+    assertDomEqual(
+      continentsHtml,
+      optionGroupsFromCollectionForSelect(
+        dummyContinents(),
+        groupProc,
+        "continent_name",
+        "country_id",
+        "country_name",
+        "dk",
+      ),
+    );
+  });
+
+  it("option groups from collection for select with callable group label method", () => {
+    const labelProc = (c: any) => c.continent_name;
+    assertDomEqual(
+      continentsHtml,
+      optionGroupsFromCollectionForSelect(
+        dummyContinents(),
+        "countries",
+        labelProc,
+        "country_id",
+        "country_name",
+        "dk",
+      ),
+    );
+  });
+
+  it("option groups from collection for select returns html safe string", () => {
+    expect(
+      isHtmlSafe(
+        optionGroupsFromCollectionForSelect(
+          dummyContinents(),
+          "countries",
+          "continent_name",
+          "country_id",
+          "country_name",
+          "dk",
+        ),
+      ),
+    ).toBeTruthy();
+  });
+
+  it("grouped options for select with array and html attributes", () => {
+    assertDomEqual(
+      '<optgroup label="North America" data-foo="bar"><option value="US">United States</option>\n<option value="Canada">Canada</option></optgroup><optgroup label="Europe" disabled="disabled"><option value="GB">Great Britain</option>\n<option value="Germany">Germany</option></optgroup>',
+      groupedOptionsForSelect([
+        ["North America", [["United States", "US"], "Canada"], { data: { foo: "bar" } }],
+        ["Europe", [["Great Britain", "GB"], "Germany"], { disabled: "disabled" }],
+      ]),
+    );
+  });
+
+  it("grouped options for select with optional divider", () => {
+    assertDomEqual(
+      '<optgroup label="----------"><option value="US">US</option>\n<option value="Canada">Canada</option></optgroup><optgroup label="----------"><option value="GB">GB</option>\n<option value="Germany">Germany</option></optgroup>',
+      groupedOptionsForSelect(
+        [
+          ["US", "Canada"],
+          ["GB", "Germany"],
+        ],
+        null,
+        { divider: "----------" },
+      ),
+    );
+  });
+
+  it("grouped options for select with selected and prompt", () => {
+    assertDomEqual(
+      '<option value="">Choose a product...</option><optgroup label="Hats"><option value="Baseball Cap">Baseball Cap</option>\n<option selected="selected" value="Cowboy Hat">Cowboy Hat</option></optgroup>',
+      groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]], "Cowboy Hat", {
+        prompt: "Choose a product...",
+      }),
+    );
+  });
+
+  it("grouped options for select with selected and prompt true", () => {
+    assertDomEqual(
+      '<option value="">Please select</option><optgroup label="Hats"><option value="Baseball Cap">Baseball Cap</option>\n<option selected="selected" value="Cowboy Hat">Cowboy Hat</option></optgroup>',
+      groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]], "Cowboy Hat", {
+        prompt: true,
+      }),
+    );
+  });
+
+  it("grouped options for select returns html safe string", () => {
+    expect(
+      isHtmlSafe(groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]])),
+    ).toBeTruthy();
+  });
+
+  it("grouped options for select with prompt returns html escaped string", () => {
+    assertDomEqual(
+      '<option value="">&lt;Choose One&gt;</option><optgroup label="Hats"><option value="Baseball Cap">Baseball Cap</option>\n<option value="Cowboy Hat">Cowboy Hat</option></optgroup>',
+      groupedOptionsForSelect([["Hats", ["Baseball Cap", "Cowboy Hat"]]], null, {
+        prompt: "<Choose One>",
+      }),
+    );
+  });
+
+  it("optgroups with with options with hash", () => {
+    assertDomEqual(
+      '<optgroup label="North America"><option value="United States">United States</option>\n<option value="Canada">Canada</option></optgroup><optgroup label="Europe"><option value="Denmark">Denmark</option>\n<option value="Germany">Germany</option></optgroup>',
+      groupedOptionsForSelect({
+        "North America": ["United States", "Canada"],
+        Europe: ["Denmark", "Germany"],
+      }),
+    );
+  });
+
+  const abeMusHest = ["abe", "<mus>", "hest"];
+  const postCategory = (inner: string, attrs = 'id="post_category" name="post[category]"') =>
+    `<select ${attrs}>${inner}</select>`;
+  const abeMusHestOptions = (abe: string, mus: string, hest: string) =>
+    `<option value="abe"${abe}>abe</option>\n<option value="&lt;mus&gt;"${mus}>&lt;mus&gt;</option>\n<option value="hest"${hest}>hest</option>`;
+  const promptBlank =
+    '<option value="">Please select</option>\n<option value="" label=" "></option>\n';
+  const newPost = (category: unknown) => {
+    view.post = new Post();
+    view.post.category = category;
+  };
+  const requiredExpected = (inner: string, attrs = "") =>
+    `<select id="post_category" name="post[category]" required="required"${attrs}>${inner}<option value="abe">abe</option>\n<option value="mus">mus</option>\n<option value="hest">hest</option></select>`;
+
+  it("select under fields for with index", () => {
+    newPost("<mus>");
+    const outputBuffer = view.fieldsFor("post", view.post, { index: 108 }, (f: any) => {
+      view.concat(f.select("category", abeMusHest));
+    });
+    assertDomEqual(
+      postCategory(
+        abeMusHestOptions("", SEL, ""),
+        'id="post_108_category" name="post[108][category]"',
+      ),
+      outputBuffer,
+    );
+  });
+
+  it("select under fields for with auto index", () => {
+    newPost("<mus>");
+    view.post.toParam = () => 108;
+    const outputBuffer = view.fieldsFor("post[]", view.post, {}, (f: any) => {
+      view.concat(f.select("category", abeMusHest));
+    });
+    assertDomEqual(
+      postCategory(
+        abeMusHestOptions("", SEL, ""),
+        'id="post_108_category" name="post[108][category]"',
+      ),
+      outputBuffer,
+    );
+  });
+
+  it("select under fields for with string and given prompt", () => {
+    view.post = new Post();
+    const options = view.raw(
+      '<option value="abe">abe</option><option value="mus">mus</option><option value="hest">hest</option>',
+    );
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+      view.concat(f.select("category", options, { prompt: "The prompt" }));
+    });
+    assertDomEqual(postCategory(`<option value="">The prompt</option>\n${options}`), outputBuffer);
+  });
+
+  it("select under fields for with block", () => {
+    view.post = new Post();
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+      view.concat(
+        f.select("category", null, {}, {}, () => {
+          view.concat(view.contentTag("option", "hello world"));
+        }),
+      );
+    });
+    assertDomEqual(postCategory("<option>hello world</option>"), outputBuffer);
+  });
+
+  it("select under fields for with block without options", () => {
+    view.post = new Post();
+    const outputBuffer = view.fieldsFor("post", view.post, {}, (f: any) => {
+      view.concat(f.select("category", null, {}, {}, () => {}));
+    });
+    assertDomEqual(postCategory(""), outputBuffer);
+  });
+
+  it("select with multiple and without hidden input", () => {
+    const outputBuffer = select(
+      "post",
+      "category",
+      "",
+      { includeHidden: false },
+      { multiple: true },
+    );
+    assertDomEqual(
+      '<select multiple="multiple" id="post_category" name="post[category][]"></select>',
+      outputBuffer,
+    );
+  });
+
+  it("select with multiple and with explicit name ending with brackets", () => {
+    const outputBuffer = select(
+      "post",
+      "category",
+      [],
+      { includeHidden: false },
+      { multiple: true, name: "post[category][]" },
+    );
+    assertDomEqual(
+      '<select multiple="multiple" id="post_category" name="post[category][]"></select>',
+      outputBuffer,
+    );
+  });
+
+  it("select with multiple and disabled to add disabled hidden input", () => {
+    const outputBuffer = select("post", "category", "", {}, { multiple: true, disabled: true });
+    assertDomEqual(
+      '<input disabled="disabled"type="hidden" name="post[category][]" value="" autocomplete="off"/><select multiple="multiple" disabled="disabled" id="post_category" name="post[category][]"></select>',
+      outputBuffer,
+    );
+  });
+
+  it("select with blank", () => {
+    newPost("<mus>");
+    assertDomEqual(
+      postCategory(`<option value="" label=" "></option>\n${abeMusHestOptions("", SEL, "")}`),
+      select("post", "category", abeMusHest, { includeBlank: true }),
+    );
+  });
+
+  it("select with blank as string", () => {
+    newPost("<mus>");
+    assertDomEqual(
+      postCategory(`<option value="">None</option>\n${abeMusHestOptions("", SEL, "")}`),
+      select("post", "category", abeMusHest, { includeBlank: "None" }),
+    );
+  });
+
+  it("select with blank as string escaped", () => {
+    newPost("<mus>");
+    assertDomEqual(
+      postCategory(`<option value="">&lt;None&gt;</option>\n${abeMusHestOptions("", SEL, "")}`),
+      select("post", "category", abeMusHest, { includeBlank: "<None>" }),
+    );
+  });
+
+  it("select with default prompt", () => {
+    newPost("");
+    assertDomEqual(
+      postCategory(`<option value="">Please select</option>\n${abeMusHestOptions("", "", "")}`),
+      select("post", "category", abeMusHest, { prompt: true }),
+    );
+  });
+
+  it("select no prompt when select has value", () => {
+    newPost("<mus>");
+    assertDomEqual(
+      postCategory(abeMusHestOptions("", SEL, "")),
+      select("post", "category", abeMusHest, { prompt: true }),
+    );
+  });
+
+  it("select with given prompt", () => {
+    newPost("");
+    assertDomEqual(
+      postCategory(`<option value="">The prompt</option>\n${abeMusHestOptions("", "", "")}`),
+      select("post", "category", abeMusHest, { prompt: "The prompt" }),
+    );
+  });
+
+  it("select with given prompt escaped", () => {
+    view.post = new Post();
+    assertDomEqual(
+      postCategory(
+        `<option value="">&lt;The prompt&gt;</option>\n${abeMusHestOptions("", "", "")}`,
+      ),
+      select("post", "category", abeMusHest, { prompt: "<The prompt>" }),
+    );
+  });
+
+  it("select with prompt and blank", () => {
+    newPost("");
+    assertDomEqual(
+      postCategory(`${promptBlank}${abeMusHestOptions("", "", "")}`),
+      select("post", "category", abeMusHest, { prompt: true, includeBlank: true }),
+    );
+  });
+
+  it("select with empty", () => {
+    newPost("");
+    assertDomEqual(
+      postCategory(promptBlank),
+      select("post", "category", [], { prompt: true, includeBlank: true }),
+    );
+  });
+
+  it("select with html options", () => {
+    newPost("");
+    assertDomEqual(
+      postCategory(
+        promptBlank,
+        'class="disabled" disabled="disabled" name="post[category]" id="post_category"',
+      ),
+      select(
+        "post",
+        "category",
+        [],
+        { prompt: true, includeBlank: true },
+        { class: "disabled", disabled: true },
+      ),
+    );
+  });
+
+  it("select with nil", () => {
+    newPost("othervalue");
+    assertDomEqual(
+      postCategory(
+        '<option value=""></option>\n<option value="othervalue" selected="selected">othervalue</option>',
+      ),
+      select("post", "category", [null, "othervalue"]),
+    );
+  });
+
+  it("select with nil as selected value", () => {
+    newPost(null);
+    assertDomEqual(
+      postCategory(
+        '<option selected="selected" value="">none</option>\n<option value="1">programming</option>\n<option value="2">economics</option>',
+      ),
+      select("post", "category", { none: null, programming: 1, economics: 2 }),
+    );
+  });
+
+  it("select with nil and selected option as nil", () => {
+    newPost(null);
+    assertDomEqual(
+      postCategory(
+        '<option value="">none</option>\n<option value="1">programming</option>\n<option value="2">economics</option>',
+      ),
+      select("post", "category", { none: null, programming: 1, economics: 2 }, { selected: null }),
+    );
+  });
+
+  it("required select with include blank prompt", () => {
+    const expected = requiredExpected('<option value="">Select one</option>\n');
+    assertDomEqual(
+      expected,
+      select(
+        "post",
+        "category",
+        ["abe", "mus", "hest"],
+        { includeBlank: "Select one" },
+        { required: true },
+      ),
+    );
+    assertDomEqual(
+      expected,
+      select("post", "category", ["abe", "mus", "hest"], {
+        includeBlank: "Select one",
+        required: true,
+      }),
+    );
+  });
+
+  it("required select with prompt", () => {
+    assertDomEqual(
+      requiredExpected('<option value="">Select one</option>\n'),
+      select(
+        "post",
+        "category",
+        ["abe", "mus", "hest"],
+        { prompt: "Select one" },
+        { required: true },
+      ),
+    );
+    assertDomEqual(
+      requiredExpected('<option value="">Select one</option>\n'),
+      select("post", "category", ["abe", "mus", "hest"], { prompt: "Select one", required: true }),
+    );
+  });
+
+  it("required select display size equals to one", () => {
+    assertDomEqual(
+      requiredExpected('<option value="" label=" "></option>\n', ' size="1"'),
+      select("post", "category", ["abe", "mus", "hest"], {}, { required: true, size: 1 }),
+    );
+    assertDomEqual(
+      requiredExpected('<option value="" label=" "></option>\n', ' size="1"'),
+      select("post", "category", ["abe", "mus", "hest"], { required: true, size: 1 }),
+    );
+  });
+
+  it("required select with display size bigger than one", () => {
+    assertDomEqual(
+      requiredExpected("", ' size="2"'),
+      select("post", "category", ["abe", "mus", "hest"], {}, { required: true, size: 2 }),
+    );
+    assertDomEqual(
+      requiredExpected("", ' size="2"'),
+      select("post", "category", ["abe", "mus", "hest"], { required: true, size: 2 }),
+    );
+  });
+
+  it("required select with multiple option", () => {
+    const expected =
+      '<input name="post[category][]" type="hidden" value="" autocomplete="off"/><select id="post_category" multiple="multiple" name="post[category][]" required="required"><option value="abe">abe</option>\n<option value="mus">mus</option>\n<option value="hest">hest</option></select>';
+    assertDomEqual(
+      expected,
+      select("post", "category", ["abe", "mus", "hest"], {}, { required: true, multiple: true }),
+    );
+    assertDomEqual(
+      expected,
+      select("post", "category", ["abe", "mus", "hest"], { required: true, multiple: true }),
+    );
+  });
+
+  it("select with integer", () => {
+    newPost("");
+    assertDomEqual(
+      postCategory(`${promptBlank}<option value="1">1</option>`),
+      select("post", "category", [1], { prompt: true, includeBlank: true }),
+    );
+  });
+
+  it("list of lists", () => {
+    newPost("");
+    assertDomEqual(
+      postCategory(
+        `${promptBlank}<option value="number">Number</option>\n<option value="text">Text</option>\n<option value="boolean">Yes/No</option>`,
+      ),
+      select(
+        "post",
+        "category",
+        [
+          ["Number", "number"],
+          ["Text", "text"],
+          ["Yes/No", "boolean"],
+        ],
+        { prompt: true, includeBlank: true },
+      ),
+    );
+  });
+
+  it("select with selected value", () => {
+    newPost("<mus>");
+    assertDomEqual(
+      postCategory(abeMusHestOptions(SEL, "", "")),
+      select("post", "category", abeMusHest, { selected: "abe" }),
+    );
+  });
+
+  it("select with index option", () => {
+    view.album = new Album();
+    view.album.id = 1;
+    view.album.toParam = () => String(view.album);
+    const expected =
+      '<select id="album__genre" name="album[][genre]"><option value="rap">rap</option>\n<option value="rock">rock</option>\n<option value="country">country</option></select>';
+    assertDomEqual(
+      expected,
+      select("album[]", "genre", ["rap", "rock", "country"], {}, { index: null }),
+    );
+  });
+
+  it("select with selected nil", () => {
+    newPost("<mus>");
+    assertDomEqual(
+      postCategory(abeMusHestOptions("", "", "")),
+      select("post", "category", abeMusHest, { selected: null }),
+    );
+  });
+
+  it("select with disabled value", () => {
+    newPost("<mus>");
+    assertDomEqual(
+      postCategory(abeMusHestOptions("", SEL, DIS)),
+      select("post", "category", abeMusHest, { disabled: "hest" }),
+    );
+  });
+
+  it("select not existing method with selected value", () => {
+    view.post = new Post();
+    assertDomEqual(
+      '<select id="post_locale" name="post[locale]"><option value="en">en</option>\n<option value="ru" selected="selected">ru</option></select>',
+      select("post", "locale", ["en", "ru"], { selected: "ru" }),
     );
   });
 });
