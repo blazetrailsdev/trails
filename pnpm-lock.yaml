@@ -718,6 +718,9 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../../packages/tse-compiler
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../../packages/vitest-matchers
 
   scripts/parity:
     dependencies:
