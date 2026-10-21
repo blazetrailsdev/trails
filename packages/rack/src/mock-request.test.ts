@@ -4,7 +4,7 @@ import { MockRequest, type RackApp } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
 import { UploadedFile } from "./multipart/uploaded-file.js";
 import { Request } from "./request.js";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { Encoding, File, StringIO, Tempfile } from "@blazetrails/ruby-compat";
 import * as path from "path";
 
 const fixtureDir = path.join(__dirname, "..", "test", "multipart");
@@ -33,20 +33,25 @@ it("return a MockResponse", async () => {
 
 it("be able to only return the environment", () => {
   const env = MockRequest.envFor("");
-  expect(typeof env).toBe("object");
+  expect(env).toBeInstanceOf(Object);
 });
 
 it("should handle a non-GET request with :input String and :params", () => {
   const env = MockRequest.envFor("/", { ":method": "post", ":input": "", ":params": {} });
   expect(env["PATH_INFO"]).toBe("/");
-  expect(typeof env).toBe("object");
+  expect(env).toBeInstanceOf(Object);
   expect(env["rack.input"].read()).toBe("");
 });
 
 it("should convert :input IO object to binary encoding", () => {
-  const f = new StringIO("binary data \xff");
-  const env = MockRequest.envFor("/", { ":method": "post", ":input": f });
-  expect(env["rack.input"].read()).toBe("binary data \xff");
+  const f = File.open(__filename, "r", { externalEncoding: "UTF-8" });
+  try {
+    const env = MockRequest.envFor("/", { ":method": "post", ":input": f });
+    expect(f.externalEncoding()).toBe(Encoding.BINARY);
+    expect(env["rack.input"].read()).toBe(File.binread(__filename));
+  } finally {
+    f?.close();
+  }
 });
 
 it("should handle :input object that does not respond to set_encoding", () => {
@@ -68,7 +73,7 @@ it("return an environment with a path", () => {
   );
   expect(env["QUERY_STRING"]).toBe("location[]=1&location[]=2&age_group[]=2");
   expect(env["PATH_INFO"]).toBe("/parse");
-  expect(typeof env).toBe("object");
+  expect(env).toBeInstanceOf(Object);
 });
 
 it("provide sensible defaults", async () => {
@@ -112,6 +117,11 @@ it("set content length", () => {
   expect(env["CONTENT_LENGTH"]).toBe("3");
 
   env = MockRequest.envFor("/", { ":input": new StringIO("foo") });
+  expect(env["CONTENT_LENGTH"]).toBe("3");
+
+  const t = Tempfile.new("name");
+  t.write("foo");
+  env = MockRequest.envFor("/", { ":input": t });
   expect(env["CONTENT_LENGTH"]).toBe("3");
 
   env = MockRequest.envFor("/", { ":input": { read: () => "foo" } });

@@ -1,4 +1,6 @@
-import { it, expect } from "vitest";
+import { it, expect, vi } from "vitest";
+import { Range } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
 import { CommonLogger } from "./common-logger.js";
 import { MockRequest } from "./mock-request.js";
 
@@ -6,12 +8,14 @@ const length = 6;
 const app = async () =>
   [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any;
 const appWithoutLength = async () => [200, { "content-type": "text/html" }, []] as any;
+const appWithoutLint = async () =>
+  [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any;
 const appWithZeroLength = async () =>
   [200, { "content-type": "text/html", "content-length": "0" }, []] as any;
 
 it("log to rack.errors by default", async () => {
   const res = await new MockRequest((env) => new CommonLogger(app).call(env)).get("/");
-  expect(res.errors).not.toBe("");
+  expect(res.errors!.length === 0).toBeFalsy();
   expect(res.errors).toMatch(/"GET \/ HTTP\/1\.1" 200 6 /);
 });
 
@@ -44,7 +48,7 @@ it("work with standard library logger", async () => {
 
 it("log - content length if header is missing", async () => {
   const res = await new MockRequest((env) => new CommonLogger(appWithoutLength).call(env)).get("/");
-  expect(res.errors).not.toBe("");
+  expect(res.errors!.length === 0).toBeFalsy();
   expect(res.errors).toMatch(/"GET \/ HTTP\/1\.1" 200 - /);
 });
 
@@ -52,7 +56,7 @@ it("log - content length if header is zero", async () => {
   const res = await new MockRequest((env) => new CommonLogger(appWithZeroLength).call(env)).get(
     "/",
   );
-  expect(res.errors).not.toBe("");
+  expect(res.errors!.length === 0).toBeFalsy();
   expect(res.errors).toMatch(/"GET \/ HTTP\/1\.1" 200 - /);
 });
 
@@ -60,7 +64,7 @@ it("log - records host from X-Forwarded-For header", async () => {
   const res = await new MockRequest((env) => new CommonLogger(app).call(env)).get("/", {
     HTTP_X_FORWARDED_FOR: "203.0.113.0",
   });
-  expect(res.errors).not.toBe("");
+  expect(res.errors!.length === 0).toBeFalsy();
   expect(res.errors).toMatch(/203\.0\.113\.0 - /);
 });
 
@@ -68,7 +72,7 @@ it("log - records host from RFC 7239 forwarded for header", async () => {
   const res = await new MockRequest((env) => new CommonLogger(app).call(env)).get("/", {
     HTTP_FORWARDED: "for=203.0.113.0",
   });
-  expect(res.errors).not.toBe("");
+  expect(res.errors!.length === 0).toBeFalsy();
   expect(res.errors).toMatch(/203\.0\.113\.0 - /);
 });
 
@@ -79,15 +83,23 @@ it("log in common log format", async () => {
       this.str += s;
     },
   };
-  await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/", {
-    QUERY_STRING: "foo=bar",
-  });
+  const t = 0;
+  const now = vi.spyOn(Time, "now").mockImplementation(() => Time.at(t));
+  try {
+    await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/", {
+      QUERY_STRING: "foo=bar",
+    });
+  } finally {
+    now.mockRestore();
+  }
+
   const md = /- - - \[([^\]]+)\] "(\w+) \/\?foo=bar HTTP\/1\.1" (\d{3}) \d+ ([\d.]+)/.exec(log.str);
-  expect(md).not.toBeNull();
-  const [, , method, status, duration] = md!;
+  expect(md).not.toEqual(null);
+  const [, time, method, status, duration] = md!;
+  expect(time).toBe(Time.at(0).strftime("%d/%b/%Y:%H:%M:%S %z"));
   expect(method).toBe("GET");
   expect(status).toBe("200");
-  expect(parseFloat(duration)).toBeLessThanOrEqual(1);
+  expect(new Range(0, 1).isInclude(parseFloat(duration))).toBeTruthy();
 });
 
 it("escapes non printable characters including newline", async () => {
@@ -102,6 +114,13 @@ it("escapes non printable characters including newline", async () => {
       logdev.write(msg + "\n");
     },
   };
+  await new MockRequest((env) => new CommonLogger(appWithoutLint, log).call(env)).request(
+    "GET\x1f",
+    "/hello",
+  );
+
+  expect(logdev.str).toMatch(/GET\\x1f \/hello HTTP\/1\.1/);
+
   await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/", {
     REMOTE_USER: "foo\nbar",
     QUERY_STRING: "bar\nbaz",

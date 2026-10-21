@@ -6,7 +6,7 @@
  */
 
 import { Time } from "@blazetrails/date";
-import { CGI, fetch, rbFArray, rbStrToI } from "@blazetrails/ruby-compat";
+import { CGI, fetch, rbFArray, rbObjRespondTo, rbStrToI } from "@blazetrails/ruby-compat";
 import { Response } from "./response.js";
 import { SET_COOKIE } from "./constants.js";
 
@@ -18,23 +18,25 @@ export class MockResponse extends Response {
   private _errors: any;
   private _bufferedBody: string | undefined;
 
-  constructor(status: number, headers: Record<string, any>, body: any, errors?: any) {
+  constructor(status: number, headers: Record<string, any>, body: any, errors: any = null) {
     super(body, status, headers);
-    this.originalHeaders = { ...headers };
-    this._errors = errors;
+    this.originalHeaders = headers;
+
+    if (errors) {
+      this._errors = rbObjRespondTo(errors, "string") ? errors : null;
+    } else {
+      this._errors = "";
+    }
+
     this.cookies = this.parseCookiesFromHeader();
     this.bufferedBodyBang();
   }
 
-  get errors(): string {
-    if (this._errors) {
-      if (typeof this._errors.string === "function") return this._errors.string();
-      if (typeof this._errors === "string") return this._errors;
-    }
-    return "";
+  get errors(): string | null {
+    return rbObjRespondTo(this._errors, "string") ? this._errors.string() : this._errors;
   }
 
-  set errors(value: string) {
+  set errors(value: string | null) {
     this._errors = value;
   }
 

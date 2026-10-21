@@ -1,227 +1,317 @@
 import { Time } from "@blazetrails/date";
-import { describe, it, expect } from "vitest";
+import { ArgumentError, StringIO } from "@blazetrails/ruby-compat";
+import { Psych } from "@blazetrails/ruby-compat/psych";
+import { describe, it, expect, beforeEach } from "vitest";
 import { MockRequest, FatalWarning } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
+import { Lint } from "./lint.js";
+import { Request } from "./request.js";
+import { Response } from "./response.js";
 
-const app = async (
-  _env: Record<string, any>,
-): Promise<[number, Record<string, string | string[]>, any]> => {
-  return [200, { "content-type": "text/plain" }, ["OK"]];
-};
+const app = new Lint((env: Record<string, any>) => {
+  const req = new Request(env);
+
+  const input = env["rack.input"];
+  if (input) env["mock.postdata"] = input.read();
+
+  if (req.GET["error"]) {
+    env["rack.errors"].puts(req.GET["error"]);
+    env["rack.errors"].flush();
+  }
+
+  const body = req.isHead() ? "" : Psych.dump(env);
+  const response = new Response(body, req.GET["status"] || 200, { "content-type": "text/yaml" });
+  response.setCookie("session_test", { value: "session_test", domain: "test.com", path: "/" });
+  response.setCookie("secure_test", {
+    value: "secure_test",
+    domain: "test.com",
+    path: "/",
+    secure: true,
+  });
+  response.setCookie("persistent_test", {
+    value: "persistent_test",
+    maxAge: 15552000,
+    path: "/",
+  });
+  response.setCookie("persistent_with_expires_test", {
+    value: "persistent_with_expires_test",
+    expires: Time.httpdate("Thu, 31 Oct 2021 07:28:00 GMT"),
+    path: "/",
+  });
+  response.setCookie("expires_and_max-age_test", {
+    value: "expires_and_max-age_test",
+    expires: Time.now().plus(15552000 * 2),
+    maxAge: 15552000,
+    path: "/",
+  });
+  return response.finish();
+});
 
 it("has standard constructor", () => {
-  const res = new MockResponse(200, { "content-type": "text/plain" }, ["hello"]);
-  expect(res.status).toBe(200);
-  expect(res.headers["content-type"]).toBe("text/plain");
-  expect(res.body).toBe("hello");
+  const headers = { header: "value" };
+  const body = ["body"];
+
+  const response = new MockResponse(200, headers, body);
+
+  expect(response.status).toBe(200);
+  expect(response.headers).toEqual(headers);
+  expect(response.body).toBe(body.join(""));
 });
 
 it("provides access to the HTTP status", async () => {
-  const req = new MockRequest(app);
-  const res = await req.get("/");
-  expect(res.status).toBe(200);
+  let res = await new MockRequest(app).get("");
+  expect(res.isSuccessful).toBeTruthy();
+  expect(res.isOk).toBeTruthy();
+
+  res = await new MockRequest(app).get("/?status=404");
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isClientError).toBeTruthy();
+  expect(res.isNotFound).toBeTruthy();
+
+  res = await new MockRequest(app).get("/?status=501");
+  expect(res.isSuccessful).toBeFalsy();
+  expect(res.isServerError).toBeTruthy();
+
+  res = await new MockRequest(app).get("/?status=307");
+  expect(res.isRedirect).toBeTruthy();
+
+  res = await new MockRequest(app).get("/?status=201", { ":lint": true });
+  expect(res.isEmpty()).toBeTruthy();
 });
 
 it("provides access to the HTTP headers", async () => {
-  const req = new MockRequest(app);
-  const res = await req.get("/");
-  expect(res.headers["content-type"]).toBe("text/plain");
+  const res = await new MockRequest(app).get("");
+  expect(Object.keys(res.headers)).toContain("content-type");
+  expect(res.headers["content-type"]).toBe("text/yaml");
+  expect(res.originalHeaders["content-type"]).toBe("text/yaml");
+  expect(res.get("content-type")).toBe("text/yaml");
+  expect(res.contentType).toBe("text/yaml");
+  expect(res.contentLength).not.toEqual(0);
+  expect(res.location).toBeUndefined();
 });
 
 it("provides access to session cookies", async () => {
-  const cookieApp = async () =>
-    [200, { "set-cookie": "foo=bar" }, ["OK"]] as [number, Record<string, string | string[]>, any];
-  const res = await new MockRequest(cookieApp).get("/");
-  expect(res.cookie("foo")).toBeDefined();
-  expect(res.cookie("foo")!.value).toEqual(["bar"]);
+  const res = await new MockRequest(app).get("");
+  const sessionCookie = res.cookie("session_test")!;
+  expect(sessionCookie.value[0]).toBe("session_test");
+  expect(sessionCookie.domain).toBe("test.com");
+  expect(sessionCookie.path).toBe("/");
+  expect(sessionCookie.secure).toBe(false);
+  expect(sessionCookie.expires).toBeNull();
 });
 
 it("provides access to persistent cookies set with max-age", async () => {
-  const cookieApp = async () =>
-    [200, { "set-cookie": "foo=bar; max-age=3600" }, ["OK"]] as [
-      number,
-      Record<string, string>,
-      any,
-    ];
-  const res = await new MockRequest(cookieApp).get("/");
-  const c = res.cookie("foo");
-  expect(c).toBeDefined();
-  expect(c!.expires).toBeDefined();
-  expect((c!.expires as Time).compare(Time.now().plus(3600))).toBe(-1);
+  const res = await new MockRequest(app).get("");
+  const persistentCookie = res.cookie("persistent_test")!;
+  expect(persistentCookie.value[0]).toBe("persistent_test");
+  expect(persistentCookie.domain).toBeNull();
+  expect(persistentCookie.path).toBe("/");
+  expect(persistentCookie.secure).toBe(false);
+  expect(persistentCookie.expires).not.toBeNull();
+  expect((persistentCookie.expires as Time).compare(Time.now().plus(15552000))).toBeLessThan(0);
 });
 
 it("provides access to persistent cookies set with expires", async () => {
-  const future = new Date(Date.now() + 86400000).toUTCString();
-  const cookieApp = async () =>
-    [200, { "set-cookie": `foo=bar; expires=${future}` }, ["OK"]] as [
-      number,
-      Record<string, string>,
-      any,
-    ];
-  const res = await new MockRequest(cookieApp).get("/");
-  const c = res.cookie("foo");
-  expect(c).toBeDefined();
-  expect(c!.expires).toBeDefined();
-  expect((c!.expires as Time).compare(Time.httpdate(future))).toBe(0);
+  const res = await new MockRequest(app).get("");
+  const persistentCookie = res.cookie("persistent_with_expires_test")!;
+  expect(persistentCookie.value[0]).toBe("persistent_with_expires_test");
+  expect(persistentCookie.domain).toBeNull();
+  expect(persistentCookie.path).toBe("/");
+  expect(persistentCookie.secure).toBe(false);
+  expect(persistentCookie.expires).not.toBeNull();
+  expect(persistentCookie.expires).toEqual(Time.httpdate("Thu, 31 Oct 2021 07:28:00 GMT"));
 });
 
 it("parses cookies giving max-age precedence over expires", async () => {
-  const past = new Date(Date.now() - 86400000).toUTCString();
-  const cookieApp = async () =>
-    [200, { "set-cookie": `foo=bar; max-age=3600; expires=${past}` }, ["OK"]] as [
-      number,
-      Record<string, string>,
-      any,
-    ];
-  const res = await new MockRequest(cookieApp).get("/");
-  const c = res.cookie("foo");
-  expect((c!.expires as Time).compare(Time.now().plus(3600))).toBe(-1);
+  const res = await new MockRequest(app).get("");
+  const persistentCookie = res.cookie("expires_and_max-age_test")!;
+  expect(persistentCookie.value[0]).toBe("expires_and_max-age_test");
+  expect(persistentCookie.expires).not.toBeNull();
+  expect((persistentCookie.expires as Time).compare(Time.now().plus(15552000))).toBeLessThan(0);
 });
 
 it("provides access to secure cookies", async () => {
-  const cookieApp = async () =>
-    [200, { "set-cookie": "foo=bar; secure" }, ["OK"]] as [
-      number,
-      Record<string, string | string[]>,
-      any,
-    ];
-  const res = await new MockRequest(cookieApp).get("/");
-  expect(res.cookie("foo")!.secure).toBe(true);
+  const res = await new MockRequest(app).get("");
+  const secureCookie = res.cookie("secure_test")!;
+  expect(secureCookie.value[0]).toBe("secure_test");
+  expect(secureCookie.domain).toBe("test.com");
+  expect(secureCookie.path).toBe("/");
+  expect(secureCookie.secure).toBe(true);
+  expect(secureCookie.expires).toBeNull();
 });
 
 it("parses cookie headers with equals sign at the end", async () => {
-  const cookieApp = async () =>
-    [200, { "set-cookie": "foo=bar=" }, ["OK"]] as [number, Record<string, string | string[]>, any];
-  const res = await new MockRequest(cookieApp).get("/");
-  expect(res.cookie("foo")).toBeDefined();
+  const res = await new MockRequest(() => [
+    200,
+    { "Set-Cookie": "__cf_bm=_somebase64encodedstringwithequalsatthened=; array=awesome" },
+    [""],
+  ]).get("");
+  const cookie = res.cookie("__cf_bm")!;
+  expect(cookie.value[0]).toBe("_somebase64encodedstringwithequalsatthened=");
 });
 
 it("returns nil if a non existent cookie is requested", async () => {
-  const res = await new MockRequest(app).get("/");
-  expect(res.cookie("nonexistent")).toBeNull();
+  const res = await new MockRequest(app).get("");
+  expect(res.cookie("i_dont_exist")).toBeNull();
 });
 
 it("handles an empty cookie", async () => {
-  const cookieApp = async () =>
-    [200, { "set-cookie": "foo=" }, ["OK"]] as [number, Record<string, string | string[]>, any];
-  const res = await new MockRequest(cookieApp).get("/");
-  const c = res.cookie("foo");
-  expect(c).toBeDefined();
+  const res = await new MockRequest(() => [200, { "Set-Cookie": "" }, [""]]).get("");
+  expect(res.cookie("i_dont_exist")).toBeNull();
 });
 
 it("parses multiple set-cookie headers provided as hash with array value", async () => {
-  const cookieApp = async () =>
-    [200, { "set-cookie": ["foo=bar", "baz=qux"] }, ["OK"]] as [number, Record<string, any>, any];
-  const res = await new MockRequest(cookieApp).get("/");
-  expect(res.cookie("foo")).toBeDefined();
-  expect(res.cookie("baz")).toBeDefined();
+  const cookieHeaders = { "set-cookie": ["array=awesome", "multiple=times"] };
+  const res = await new MockRequest(() => [200, cookieHeaders, [""]]).get("");
+  const arrayCookie = res.cookie("array")!;
+  expect(arrayCookie.value[0]).toBe("awesome");
+  const secondCookie = res.cookie("multiple")!;
+  expect(secondCookie.value[0]).toBe("times");
 });
 
 it("provides access to the HTTP body", async () => {
-  const res = await new MockRequest(app).get("/");
-  expect(res.body).toBe("OK");
+  const res = await new MockRequest(app).get("");
+  expect(res.body).toMatch(/rack/);
+  expect(res.body).toMatch(/rack/);
+
+  expect(res.match(/rack/)![0]).toBe("rack");
+  expect(res.match(/banana/)).toBeNull();
 });
 
 it("provides access to the Rack errors", async () => {
-  const errApp = async (env: any) => {
-    env["rack.errors"].write("test error");
-    return [200, {}, ["OK"]] as [number, Record<string, string | string[]>, any];
-  };
-  const res = await new MockRequest(errApp).get("/");
-  expect(res.errors).toContain("test error");
+  const res = await new MockRequest(app).get("/?error=foo", { ":lint": true });
+  expect(res.isOk).toBeTruthy();
+  expect(res.errors!.length === 0).toBeFalsy();
+  expect(res.errors).toContain("foo");
 });
 
-it("allows calling body.close afterwards", async () => {
-  let closed = false;
-  const body = {
-    close() {
-      closed = true;
-    },
-  };
-  const closeApp = async () => [200, {}, body] as any;
-  await new MockRequest(closeApp).get("/");
-  expect(closed).toBe(true);
+it("allows calling body.close afterwards", () => {
+  const body = new StringIO("hi");
+  const res = new MockResponse(200, {}, body);
+  body.close();
+  expect(res.body).toBe("hi");
 });
 
 it("ignores plain strings passed as errors", () => {
-  const res = new MockResponse(200, {}, ["OK"], "some error string");
-  expect(res.errors).toBe("some error string");
+  expect(new MockResponse(200, {}, [], "e").errors).toBeNull();
 });
 
 it("optionally makes Rack errors fatal", async () => {
-  const errApp = async (env: any) => {
-    env["rack.errors"].write("fatal!");
-    return [200, {}, ["OK"]] as [number, Record<string, string | string[]>, any];
-  };
-  await expect(new MockRequest(errApp).get("/", { ":fatal": true })).rejects.toThrow(FatalWarning);
+  await expect(new MockRequest(app).get("/?error=foo", { ":fatal": true })).rejects.toThrow(
+    FatalWarning,
+  );
+
+  const error = await new MockRequest((env) =>
+    env["rack.errors"].write(env["rack.errors"].string()),
+  )
+    .get("/", { ":fatal": true })
+    .catch((e) => e);
+  expect(error).toBeInstanceOf(FatalWarning);
+  expect(error.message).toBe("");
 });
+
+class ChunkedBody {
+  static TERM = "\r\n";
+  static TAIL = `0${ChunkedBody.TERM}`;
+
+  private body: string[];
+
+  constructor(body: string[]) {
+    this.body = body;
+  }
+
+  each(block: (chunk: string) => void): void {
+    const term = ChunkedBody.TERM;
+    for (const chunk of this.body) {
+      const size = chunk.length;
+      if (size === 0) continue;
+
+      block([size.toString(16), term, chunk, term].join(""));
+    }
+    block(ChunkedBody.TAIL);
+    block(term);
+  }
+
+  close(): void {}
+}
 
 it("does not calculate content length for streaming body", () => {
-  const streamBody = {
-    each(cb: any) {
-      cb("hi");
-    },
-  };
-  const res = new MockResponse(200, {}, streamBody);
-  expect(res.status).toBe(200);
-});
-
-it("handles Proc bodies", () => {
-  const procBody = () => "hello";
-  const res = new MockResponse(200, {}, procBody);
-  expect(res.status).toBe(200);
-});
-
-it("closes streaming bodies that respond to close", async () => {
-  let closed = false;
-  const body = {
-    each(cb: any) {
-      cb("streaming");
-    },
-    close() {
-      closed = true;
-    },
-  };
-  const streamApp = async () => [200, {}, body] as any;
-  await new MockRequest(streamApp).get("/");
-  expect(closed).toBe(true);
+  const body = new ChunkedBody(["a".repeat(96)]);
+  const res = new MockResponse(200, { "transfer-encoding": "chunked" }, body).toA();
+  const headers = res[1];
+  expect(Object.hasOwn(headers, "content-length")).toBeFalsy();
 });
 
 describe("headers", () => {
+  let res: MockResponse;
+
+  beforeEach(async () => {
+    res = await new MockRequest(app).get("");
+    res.setHeader("FOO", "1");
+  });
+
   it("has_header?", () => {
-    const res = new MockResponse(200, { "content-type": "text/plain" }, ["OK"]);
-    expect(res.hasHeader("content-type")).toBe(true);
-    expect(res.hasHeader("x-missing")).toBe(false);
+    expect(() => res.hasHeader(null as any)).toThrow(ArgumentError);
+
+    expect(res.hasHeader("FOO")).toBe(true);
+    expect(res.hasHeader("Foo")).toBe(true);
   });
 
   it("get_header", () => {
-    const res = new MockResponse(200, { "content-type": "text/plain" }, ["OK"]);
-    expect(res.getHeader("content-type")).toBe("text/plain");
-    expect(res.getHeader("x-missing")).toBeUndefined();
+    expect(() => res.getHeader(null as any)).toThrow(ArgumentError);
+
+    expect(res.getHeader("FOO")).toBe("1");
+    expect(res.getHeader("Foo")).toBe("1");
   });
 
   it("set_header", () => {
-    const res = new MockResponse(200, {}, ["OK"]);
-    res.setHeader("x-custom", "val");
-    expect(res.getHeader("x-custom")).toBe("val");
+    expect(() => res.setHeader(null as any, "1")).toThrow(ArgumentError);
+
+    expect(res.setHeader("FOO", "2")).toBe("2");
+    expect(res.getHeader("FOO")).toBe("2");
+
+    expect(res.setHeader("Foo", "3")).toBe("3");
+    expect(res.getHeader("Foo")).toBe("3");
+    expect(res.getHeader("FOO")).toBe("3");
+
+    expect(res.setHeader("FOO", null)).toBeNull();
+    expect(res.getHeader("FOO")).toBeNull();
+    expect(res.hasHeader("FOO")).toBe(true);
   });
 
   it("add_header", () => {
-    const res = new MockResponse(200, { "x-custom": "a" }, ["OK"]);
-    res.addHeader("x-custom", "b");
-    expect(res.getHeader("x-custom")).toEqual(["a", "b"]);
+    expect(() => res.addHeader(null as any, "1")).toThrow(ArgumentError);
+
+    expect(res.addHeader("FOO", "1")).toEqual(["1", "1"]);
+    expect(res.getHeader("FOO")).toEqual(["1", "1"]);
+
+    expect(res.addHeader("FOO", null)).toEqual(["1", "1"]);
+    expect(res.getHeader("FOO")).toEqual(["1", "1"]);
+
+    expect(res.addHeader("FOO", 2 as any)).toEqual(["1", "1", "2"]);
+    expect(res.getHeader("FOO")).toEqual(["1", "1", "2"]);
+
+    expect(res.addHeader("Foo", "yep")).toEqual(["1", "1", "2", "yep"]);
+    expect(res.getHeader("Foo")).toEqual(["1", "1", "2", "yep"]);
+    expect(res.getHeader("FOO")).toEqual(["1", "1", "2", "yep"]);
   });
 
   it("delete_header", () => {
-    const res = new MockResponse(200, { "x-custom": "val" }, ["OK"]);
-    const deleted = res.deleteHeader("x-custom");
-    expect(deleted).toBe("val");
-    expect(res.hasHeader("x-custom")).toBe(false);
+    expect(() => res.deleteHeader(null as any)).toThrow(ArgumentError);
+
+    expect(res.deleteHeader("FOO")).toBe("1");
+    expect(res.hasHeader("FOO")).toBe(false);
+
+    expect(res.hasHeader("Foo")).toBe(false);
+    expect(res.deleteHeader("Foo")).toBeNull();
   });
 
-  it("does not add extra headers", () => {
-    const res = new MockResponse(200, { "content-type": "text/plain" }, ["OK"]);
-    const keys = Object.keys(res.headers);
-    expect(keys).toEqual(["content-type"]);
+  it("does not add extra headers", async () => {
+    const enumerableApp = () => [200, {}, [""][Symbol.iterator]()] as any;
+
+    const response = await new MockRequest(enumerableApp).get("/");
+    expect(response.status).toBe(200);
+    expect(response.headers).toEqual({});
+    expect(response.body).toBe("");
   });
 });
