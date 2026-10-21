@@ -41,7 +41,9 @@ export class Base {
   declare static _queueAdapterName: string | null;
   declare static _queueAdapter: unknown;
   declare static setQueueAdapter: typeof QueueAdapterClassMethods.setQueueAdapter;
+  /** @internal */
   declare static assignAdapter: typeof QueueAdapterClassMethods.assignAdapter;
+  /** @internal */
   declare static isQueueAdapter: typeof QueueAdapterClassMethods.isQueueAdapter;
   declare static defaultQueueName: unknown;
   declare static queueAs: typeof QueueNameClassMethods.queueAs;

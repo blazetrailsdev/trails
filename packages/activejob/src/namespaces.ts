@@ -16,7 +16,7 @@ import type { Exceptions } from "./exceptions.js";
 import type { Execution } from "./execution.js";
 import type { QueueName } from "./queue-name.js";
 import type { QueueAdapter } from "./queue-adapter.js";
-import type * as ActiveJobModule from "./active-job.js";
+import type * as QueueAdapterModule from "./queue-adapter.js";
 import type { QueuePriority } from "./queue-priority.js";
 import type { ObjectSerializer } from "./serializers/object-serializer.js";
 
@@ -54,7 +54,7 @@ export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
   SerializationError: typeof ArgumentsModule.SerializationError;
   QueueAdapters: typeof QueueAdapters;
   QueueAdapter: typeof QueueAdapter;
-  adapterName: typeof ActiveJobModule.adapterName;
+  adapterName: typeof QueueAdapterModule.adapterName;
   QueueName: typeof QueueName;
   Callbacks: typeof Callbacks;
   Exceptions: typeof Exceptions;

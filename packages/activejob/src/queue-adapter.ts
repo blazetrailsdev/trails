@@ -1,12 +1,19 @@
-import { Concern, classAttribute, extend, tryCall, underscore } from "@blazetrails/activesupport";
+import {
+  Concern,
+  classAttribute,
+  demodulize,
+  extend,
+  tryCall,
+  underscore,
+} from "@blazetrails/activesupport";
 import {
   ArgumentError,
   classModule,
   rbModConstSet,
+  rbModName,
   rbObjClass,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
-import "./active-job.js";
 import { ActiveJob, QueueAdapters } from "./namespaces.js";
 
 interface QueueAdapterClass {
@@ -17,6 +24,18 @@ interface QueueAdapterClass {
   assignAdapter(adapterName: string, queueAdapter: unknown): void;
   isQueueAdapter(object: unknown): boolean;
 }
+
+/** @internal */
+export function adapterName(adapter: unknown): string {
+  if (rbObjRespondTo(adapter, "queueAdapterName")) {
+    return (adapter as { queueAdapterName: string }).queueAdapterName;
+  }
+
+  const adapterClass = typeof adapter === "function" ? adapter : rbObjClass(adapter);
+  const name = demodulize(rbModName(adapterClass as object) as string);
+  return `${name.endsWith("Adapter") ? name.slice(0, -"Adapter".length) : name}`;
+}
+Object.assign(ActiveJob, { adapterName });
 
 const QUEUE_ADAPTER_METHODS = Object.freeze(["enqueue", "enqueueAt"]);
 
