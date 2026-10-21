@@ -64,7 +64,11 @@ export function walkTsFilesSync(
 /** Every file of `population` under `dir`, recursively, in `readdir` order.
  *  The flat async counterpart to `walkTsFilesSync`, for roots with no
  *  `<pkg>/src` layer (`parity:api:detached` walks `scripts/` with it). A missing
- *  directory yields no files rather than throwing.
+ *  ROOT yields no files rather than throwing; below the root only a path that
+ *  vanished mid-walk is tolerated, and every other error is raised. Reading a
+ *  subtree is not allowed to fail quietly — a walk that swallowed an
+ *  unreadable directory would under-report the lint's population and still
+ *  report success, which is the defect this walk was rewritten to remove.
  *
  *  `skipDirs` is pruned *during* the descent, so a skipped subtree is never
  *  read. Enumerating the whole tree with one `readdir(dir, { recursive: true })`
@@ -72,9 +76,14 @@ export function walkTsFilesSync(
  *  per-workspace `node_modules` before discarding it — 2.2M entries under
  *  `scripts/`, which is the allocation that reached `parity:api:detached`'s 4GB
  *  heap limit on CI — and it read a chain inside one of those trees that
- *  `scandir` answers `ELOOP` for, which the `catch` below turns into "no
+ *  `scandir` answers `ELOOP` for, which a blanket `catch` turned into "no
  *  files", silently dropping the whole of `scripts/` from the lint's
  *  population.
+ *
+ *  Walking entry by entry also distinguishes a directory from a file, where
+ *  the old listing matched both on name alone: a directory named `foo.ts` was
+ *  returned AS a source file, and every caller hands what it returns to
+ *  `readFile` (`EISDIR`). It is now descended into instead.
  *
  *  A symlinked directory is descended into, as `recursive: true` did:
  *  `fixtures/all/admin` mirrors Rails' symlinked fixture layout, and a `Dirent`
@@ -84,11 +93,17 @@ export function walkTsFilesSync(
  *  `fixtures/all/admin` and `fixtures/to-be-linked` are, and only an ancestor
  *  repeating itself is a loop. */
 export async function walkTsFiles(dir: string, population: TsFilePopulation): Promise<string[]> {
+  const isVanished = (error: unknown): boolean =>
+    (error as { code?: string } | null)?.code === "ENOENT";
+  /** A symlink the walk cannot resolve is read as the file its name makes it,
+   *  which is what the name-based listing did with it. */
   const isDirectory = async (target: string): Promise<boolean> => {
     try {
       return (await fsPromises.stat(target)).isDirectory();
-    } catch {
-      return false;
+    } catch (error) {
+      const code = (error as { code?: string } | null)?.code;
+      if (code === "ENOENT" || code === "ELOOP" || code === "EACCES") return false;
+      throw error;
     }
   };
   const walk = async (current: string, ancestors: ReadonlySet<string>): Promise<string[]> => {
@@ -98,8 +113,9 @@ export async function walkTsFiles(dir: string, population: TsFilePopulation): Pr
       real = await fsPromises.realpath(current);
       if (ancestors.has(real)) return [];
       entries = await fsPromises.readdir(current, { withFileTypes: true });
-    } catch {
-      return [];
+    } catch (error) {
+      if (ancestors.size === 0 || isVanished(error)) return [];
+      throw error;
     }
     const chain = new Set(ancestors).add(real);
     const results: string[] = [];
@@ -107,7 +123,7 @@ export async function walkTsFiles(dir: string, population: TsFilePopulation): Pr
       const fullPath = path.join(current, entry.name);
       if (entry.isDirectory() || (entry.isSymbolicLink() && (await isDirectory(fullPath)))) {
         if (population.skipDirs.has(entry.name)) continue;
-        results.push(...(await walk(fullPath, chain)));
+        for (const nested of await walk(fullPath, chain)) results.push(nested);
       } else if (population.includeFile(entry.name)) {
         results.push(fullPath);
       }

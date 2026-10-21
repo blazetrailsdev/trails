@@ -112,6 +112,29 @@ describe("walkTsFiles", () => {
     ).toEqual([path.join("inner", "deep.ts")]);
   });
 
+  it("descends into a directory whose name ends in .ts", async () => {
+    const odd = path.join(root, "odd");
+    await fs.mkdir(path.join(odd, "looks-like-a-file.ts"), { recursive: true });
+    await fs.writeFile(path.join(odd, "looks-like-a-file.ts", "inner.ts"), "");
+
+    expect((await walkTsFiles(odd, COMMITTED_TS_FILES)).map((f) => path.relative(odd, f))).toEqual([
+      path.join("looks-like-a-file.ts", "inner.ts"),
+    ]);
+  });
+
+  it("raises rather than under-report when a walked subtree cannot be read", async () => {
+    const denied = path.join(root, "denied");
+    const inner = path.join(denied, "inner");
+    await fs.mkdir(inner, { recursive: true });
+    await fs.writeFile(path.join(denied, "kept.ts"), "");
+    await fs.chmod(inner, 0o000);
+    try {
+      await expect(walkTsFiles(denied, COMMITTED_TS_FILES)).rejects.toThrow(/EACCES/);
+    } finally {
+      await fs.chmod(inner, 0o755);
+    }
+  });
+
   it("lists a root whose skipped subtree cannot be read", async () => {
     const pruned = path.join(root, "pruned");
     const deps = path.join(pruned, "node_modules");
