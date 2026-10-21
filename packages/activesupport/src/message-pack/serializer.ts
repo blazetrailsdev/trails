@@ -79,7 +79,7 @@ export const Serializer = {
   installUnregisteredTypeHandler(this: SerializerHost): void {
     Extensions.installUnregisteredTypeError(this.messagePackFactory);
   },
-} as unknown as Serializer;
+};
 delegate.call(Serializer, "registerType", { to: "messagePackFactory" });
 rbModConstSet(Serializer, "SIGNATURE", SIGNATURE);
 rbModConstSet(Serializer, "SIGNATURE_INT", SIGNATURE_INT);
