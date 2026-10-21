@@ -1228,10 +1228,13 @@ export function countTsInternalNames(
 ): number {
   const isInternal = (m: MethodInfo): boolean =>
     m.internal === true && m.declaredIn === undefined && !m.name.startsWith("_");
+  const functionNames = new Set((fileFunctions ?? []).map((fn) => fn.name));
+  const isOwnMember = (m: MethodInfo): boolean =>
+    isInternal(m) && !(m.bodyless === true && functionNames.has(m.name));
   let count = internalConstants.filter((n) => !n.startsWith("_")).length;
   for (const c of [...classes, ...modules]) {
     if (c.file !== file) continue;
-    count += [...c.instanceMethods, ...c.classMethods].filter(isInternal).length;
+    count += [...c.instanceMethods, ...c.classMethods].filter(isOwnMember).length;
   }
   return count + (fileFunctions ?? []).filter(isInternal).length;
 }
