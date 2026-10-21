@@ -308,7 +308,7 @@ export class Wrapper {
       }
       env[RACK_MULTIPART_TEMPFILE_FACTORY] = (filename: string, contentType: string) => {
         const io = tempfileFactory(filename, contentType);
-        if (!rbObjRespondTo(io, "<<")) {
+        if (!rbObjRespondTo(io, "append")) {
           throw new LintError("rack.multipart.tempfile_factory return value must respond to #<<");
         }
         return io;

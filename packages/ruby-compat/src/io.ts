@@ -1135,6 +1135,16 @@ export class IO {
   }
 
   /**
+   * `IO#<<` (`vendor/ruby/v3.3.11/io.c:15501` `rb_io_addstr`, `io.c:2323-2327`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  append(str: string | Uint8Array): this {
+    this.write(str);
+    return this;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/io.c:2263` `io_write_m` in its one-argument form, which
    * answers the number of bytes written. On a binary stream — {@link binmode},
    * or a mode carrying `b` (`rb_io_binmode`, `io.c:6311`) — `string` goes out
