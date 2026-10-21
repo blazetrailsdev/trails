@@ -256,6 +256,7 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toThrowError: "raises",
   toBeInstanceOf: "kindOf",
   toBeExactInstanceOf: "instanceOf",
+  toEqualRuby: "equal",
   toBeRubyTruthy: "truthy",
   toBeRubyFalsy: "falsy",
   toBeWithinDelta: "inDelta",

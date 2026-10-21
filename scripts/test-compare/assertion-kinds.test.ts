@@ -264,6 +264,8 @@ describe("diffHistograms", () => {
 
 describe("Minitest matchers", () => {
   it("credits each matcher with its Minitest counterpart's kind", () => {
+    expect(normalizeTrailsKind("toEqualRuby")).toBe("equal");
+    expect(normalizeTrailsKind("not:toEqualRuby")).toBe("notEqual");
     expect(normalizeTrailsKind("toBeRubyTruthy")).toBe("truthy");
     expect(normalizeTrailsKind("toBeRubyFalsy")).toBe("falsy");
     expect(normalizeTrailsKind("not:toBeRubyTruthy")).toBe("falsy");

@@ -28,6 +28,8 @@ describe("RubyMatchers", () => {
     expect(new Map()).toBeEmpty();
     expect({}).toBeEmpty();
     expect({ a: 1 }).not.toBeEmpty();
+    expect(null).not.toBeEmpty();
+    expect(0).not.toBeEmpty();
   });
 
   it("checks the exact class", () => {
@@ -41,10 +43,9 @@ describe("RubyMatchers", () => {
     expect(new Money(1)).not.toRespondTo("missing");
   });
 
-  it("defers toEqual to an operand's Ruby ==", () => {
-    expect(new Money(5)).toEqual(new Euro(5));
-    expect(new Money(5)).not.toEqual(new Money(6));
-    expect([new Money(1)]).toEqual([new Money(1)]);
-    expect({ a: 1 }).toEqual({ a: 1 });
+  it("compares with Ruby ==", () => {
+    expect(new Euro(5)).toEqualRuby(new Money(5));
+    expect(new Money(5)).not.toEqualRuby(new Money(6));
+    expect([new Money(1)]).toEqualRuby([new Money(1)]);
   });
 });

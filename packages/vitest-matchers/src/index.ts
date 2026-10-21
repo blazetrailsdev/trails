@@ -2,9 +2,9 @@ import { isEmpty, rbEqual, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { ExpectStatic } from "vitest";
 
 type MatcherState = ReturnType<ExpectStatic["getState"]>;
-type Tester = Parameters<ExpectStatic["addEqualityTesters"]>[0][number];
 
 export interface RubyMatchers<R = unknown> {
+  toEqualRuby(exp: unknown): R;
   toBeRubyTruthy(): R;
   toBeRubyFalsy(): R;
   toBeWithinDelta(exp: number, delta?: number): R;
@@ -34,6 +34,9 @@ function result(
 }
 
 export const matchers = {
+  toEqualRuby(this: MatcherState, act: unknown, exp: unknown) {
+    return result(this, rbEqual(exp, act), act, `to == ${this.utils.printExpected(exp)}`);
+  },
   toBeRubyTruthy(this: MatcherState, received: unknown) {
     return result(this, received != null && received !== false, received, "to be truthy");
   },
@@ -45,7 +48,8 @@ export const matchers = {
     return result(this, delta >= n, act, `to be within ${delta} of ${exp}`);
   },
   toBeEmpty(this: MatcherState, received: object) {
-    return result(this, isEmpty(received), received, "to be empty");
+    const pass = rbObjRespondTo(received, "isEmpty") || isEnumerable(received);
+    return result(this, pass && isEmpty(received), received, "to be empty");
   },
   toBeExactInstanceOf(this: MatcherState, received: unknown, cls: unknown) {
     const pass = received != null && (received as object).constructor === cls;
@@ -56,14 +60,6 @@ export const matchers = {
   },
 };
 
-export const rubyEquality: Tester = (a, b) => {
-  if (definesEquality(b)) return rbEqual(b, a);
-  if (definesEquality(a)) return rbEqual(a, b);
-  return undefined;
-};
-
-function definesEquality(value: unknown): boolean {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as { equals?: unknown; eql?: unknown };
-  return typeof v.equals === "function" || typeof v.eql === "function";
+function isEnumerable(value: unknown): boolean {
+  return typeof value === "string" || (typeof value === "object" && value !== null);
 }
