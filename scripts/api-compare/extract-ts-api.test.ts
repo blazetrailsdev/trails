@@ -7854,16 +7854,15 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     ]);
   });
 
-  it("credits top-level attrInternal and delegate on a class module's prototype", () => {
+  it("credits top-level attrInternal and delegate on a class's prototype", () => {
     const info = extractFromFiles("/p", {
       "controller-helper.ts": `
         import { attrInternal, delegate } from "@blazetrails/activesupport";
-        import { classModule } from "@blazetrails/ruby-compat";
-        export class ControllerHelper {
-          static readonly [classModule] = true;
-        }
+        const DELEGATES = ["params", "session"] as const;
+        export class ControllerHelper {}
         attrInternal.call(ControllerHelper.prototype, "controller");
-        delegate.call(ControllerHelper.prototype, "params", "session", { to: "controller" });
+        delegate.call(ControllerHelper.prototype, ...DELEGATES, { to: "controller" });
+        delegate.call(ControllerHelper.prototype, "flash", { to: "controller", prefix: true });
       `,
     });
     const klass = info.classes["controller-helper.ts:ControllerHelper"];
@@ -7874,6 +7873,7 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(seats("controller")).toEqual(["instance", "instance writer"]);
     expect(seats("params")).toEqual(["instance"]);
     expect(seats("session")).toEqual(["instance"]);
+    expect(seats("flash")).toEqual([]);
   });
 
   it("seats a cattrAccessor inside an onLoad block on the hook's module", () => {

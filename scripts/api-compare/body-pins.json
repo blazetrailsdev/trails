@@ -17496,13 +17496,6 @@
   {
     "package": "actionview",
     "rubyFile": "helpers/form_options_helper.rb",
-    "rubyName": "option_groups_from_collection_for_select",
-    "digest": "483f78844ae37a75",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/form_options_helper.rb",
     "rubyName": "option_html_attributes",
     "digest": "34a93b93e30d08fc",
     "ref": "v8.0.2"
@@ -17839,13 +17832,6 @@
   {
     "package": "actionview",
     "rubyFile": "helpers/form_tag_helper.rb",
-    "rubyName": "field_name",
-    "digest": "89c856e5cf4a0ab7",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/form_tag_helper.rb",
     "rubyName": "field_set_tag",
     "digest": "a92e537fd02c379f",
     "ref": "v8.0.2"
@@ -17855,13 +17841,6 @@
     "rubyFile": "helpers/form_tag_helper.rb",
     "rubyName": "file_field_tag",
     "digest": "a53c2b175c3d41dc",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/form_tag_helper.rb",
-    "rubyName": "form_tag",
-    "digest": "42f18563d0d95b56",
     "ref": "v8.0.2"
   },
   {
@@ -18807,13 +18786,6 @@
     "rubyFile": "helpers/tags/collection_helpers.rb",
     "rubyName": "label",
     "digest": "3e55606ed8c4597c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "helpers/tags/collection_helpers.rb",
-    "rubyName": "render_collection",
-    "digest": "3fca9e40d48b5518",
     "ref": "v8.0.2"
   },
   {
@@ -19981,13 +19953,6 @@
   {
     "package": "actionview",
     "rubyFile": "layouts.rb",
-    "rubyName": "initialize",
-    "digest": "79d7013f00564079",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "layouts.rb",
     "rubyName": "layout",
     "digest": "45b95175ce3a1500",
     "ref": "v8.0.2"
@@ -20956,13 +20921,6 @@
     "rubyFile": "rendering.rb",
     "rubyName": "_process_format",
     "digest": "d048660d09e8241f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "rendering.rb",
-    "rubyName": "_process_render_template_options",
-    "digest": "104693244c7cabb7",
     "ref": "v8.0.2"
   },
   {
@@ -22004,13 +21962,6 @@
   {
     "package": "actionview",
     "rubyFile": "test_case.rb",
-    "rubyName": "setup_with_controller",
-    "digest": "b11a38df5c26bb14",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "test_case.rb",
     "rubyName": "tests",
     "digest": "1be3ec12df978a5f",
     "ref": "v8.0.2"
@@ -22076,13 +22027,6 @@
     "rubyFile": "testing/resolvers.rb",
     "rubyName": "to_s",
     "digest": "8984f5cda7dcec2d",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "unbound_template.rb",
-    "rubyName": "bind_locals",
-    "digest": "ae51907270207b27",
     "ref": "v8.0.2"
   },
   {
