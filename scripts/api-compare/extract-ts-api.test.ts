@@ -3422,7 +3422,7 @@ describe("extractFromProgram — include() detection", () => {
     const classes = Object.values(info.classes);
     const modules = Object.values(info.modules);
     const internal = (file: string): number =>
-      countTsInternalNames(file, classes, modules, info.fileFunctions[file], []);
+      countTsInternalNames(file, classes, modules, info.fileFunctions?.[file], []);
     expect(classOf(info, "Base").instanceMethods.map((m) => [m.name, m.declaredIn])).toEqual([
       ["saveBelongsTo", "autosave.ts"],
       ["createOrUpdate", "persistence.ts"],
