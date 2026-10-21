@@ -1028,6 +1028,8 @@ export class Emitter {
 
     const body = (b: N, locals: string[]): string[] => {
       const ctx = ctxFor({ testMode: true, asyncBox: { awaits: false } });
+      // The function body a local's assignments are counted in (`const` for one).
+      ctx.scope.body = b;
       for (const l of locals) ctx.scope.locals.add(l);
       const lines = this.lw.block(this.lw.seqBody(b), ctx, false);
       const hz: Set<string> | undefined = ctx.scope.hoisted;
@@ -1039,9 +1041,12 @@ export class Emitter {
       lines.some((l) => /\bcontext\.skip\(/.test(l)) ? "async (context)" : "async ()";
     const out: string[] = [];
     const loopLocals: string[] = [];
+    // The class-level block being lowered, for counting a local's assignments.
+    let classBody: N | undefined;
     const nameCtx = () => {
       const c = ctxFor({ selfKind: "static", asyncBox: undefined });
       for (const l of loopLocals) c.scope.locals.add(l);
+      c.scope.body = classBody;
       return c;
     };
     const emitBody = (stmts: N[], out: string[], guard: string | null): void => {
@@ -1131,7 +1136,10 @@ export class Emitter {
           const mark = loopLocals.length;
           loopLocals.push(...params);
           const inner: string[] = [];
+          const outer = classBody;
+          classBody = s.block.body;
           emitBody(this.lw.seqBody(s.block.body), inner, guard);
+          classBody = outer;
           loopLocals.length = mark;
           const args = s.args.map((a: N) => this.lw.expr(a, nameCtx()));
           const callee =
