@@ -11,6 +11,8 @@ import {
   MemoryStore,
   I18n,
   Logger,
+  assert,
+  symbolizeKeys,
   SafeBuffer,
   assertEqual,
   assertIncludes,
@@ -56,7 +58,7 @@ class TestRenderable {
   }
 }
 
-const resolver = new FixtureResolver({
+const fixtures: Record<string, string> = {
   "test/_customer.html.tse":
     'Hello: <%= (() => { try { return customer.name; } catch { return "Anonymous"; } })() %>',
   "test/_template_not_named_customer.html.tse": "Hello: <%= customer.name %>\n",
@@ -129,7 +131,8 @@ const resolver = new FixtureResolver({
     '<p>First paragraph</p>\n<p>Second paragraph</p>\n<p>Third paragraph</p>\n<p>Fourth paragraph</p>\n<p>Fifth paragraph</p>\n<p>Sixth paragraph</p>\n<p>Seventh paragraph</p>\n<p>Eight paragraph</p>\n<p>Ninth paragraph</p>\n<p>Tenth paragraph</p>\n<%= (() => { throw new Error("error here!"); })() %>\n<p>Eleventh paragraph</p>\n<p>Twelfth paragraph</p>',
   "test/_raise.html.tse": "<%= doesnt_exist %>",
   "test/sub_template_raise.html.tse": '<%= render({ partial: "test/raise" }) %>',
-  "test/_klass.tse": "<%= klass.constructor.name %>",
+  "test/_klass.tse":
+    '<%= klass === null ? "NilClass" : klass === false ? "FalseClass" : klass.constructor.name %>',
   "test/_partial_iteration_1.tse":
     '<%= typeof partial_iteration_1_iteration === "undefined" ? "" : "local-variable" %>\n',
   "test/_partial_iteration_2.tse":
@@ -187,9 +190,14 @@ const resolver = new FixtureResolver({
     "<%= cache(cached_customer, {}, () => { %>\n  Hello: <%= cached_customer.name %>\n<% }) %>",
   "test/_cached_set.tse":
     "<%= cached_set[0] %> | <%= cached_set[1] %> | <%= cached_set[2] %> | <%= cached_set[3] %> | <%= cached_set[4] %>\n",
+  "test/malformed/malformed~": "",
+  "test/malformed/malformed.tse~": "",
+  "test/malformed/malformed.html.tse~": "",
+  "test/malformed/malformed.en.html.tse~": "",
   "test/uncacheable.html.tse":
     '<%= cache("uhoh", {}, () => { %>\n  <%= uncacheableBang() %>\n<% }) %>\n',
-});
+};
+const resolver = new FixtureResolver(fixtures);
 
 let view: Base & {
   controller: TestController | null;
@@ -689,7 +697,16 @@ describe("CachedViewRenderTest", () => {
     const e = await assertRaises([TemplateError], {}, () =>
       view.render({ template: "with_format", formats: [":json"] }),
     );
-    assertIncludes(e.message, "Missing partial /_missing with");
+    const details = {
+      locale: [":en"],
+      formats: [":json"],
+      variants: [],
+      handlers: [":raw", ":tse", ":html", ":ruby"],
+    };
+    assertIncludes(
+      e.message,
+      `Missing partial /_missing with ${rbInspect(symbolizeKeys(details))}.`,
+    );
   });
 
   // BLOCKED: render-test-surfaced-rendering-gaps
@@ -752,6 +769,7 @@ describe("CachedViewRenderTest", () => {
   });
 
   it("render outside path", async () => {
+    assert(await File.isExistAsync(File.expandPath("../test-helpers/abstract-unit.ts", __dir__)));
     await assertRaises([MissingTemplate], {}, () =>
       view.render({ template: "../\\../test/abstract_unit.rb" }),
     );
@@ -840,7 +858,8 @@ describe("CachedViewRenderTest", () => {
       "Hello: david",
       String(await view.render({ partial: "test/customer", object: new Customer("david") })),
     );
-    assertEqual("Boolean", String(await view.render({ partial: "test/klass", object: false })));
+    assertEqual("FalseClass", String(await view.render({ partial: "test/klass", object: false })));
+    assertEqual("NilClass", String(await view.render({ partial: "test/klass", object: null })));
   });
 
   it("render renderable render in", async () => {
@@ -1010,6 +1029,10 @@ describe("CachedViewRenderTest", () => {
       "malformed.html.tse",
       "malformed.en.html.tse",
     ]) {
+      assert(
+        Object.hasOwn(fixtures, `test/malformed/${name}~`),
+        `Malformed file (${name}~) which should be ignored does not exists`,
+      );
       await assertRaises([MissingTemplate], {}, () =>
         view.render({ template: `test/malformed/${name}` }),
       );
