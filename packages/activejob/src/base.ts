@@ -64,7 +64,7 @@ export class Base {
   declare static defaultPriority: unknown;
   declare static queueWithPriority: typeof QueuePriorityClassMethods.queueWithPriority;
   declare static priority: unknown;
-  declare static enqueueAfterTransactionCommit: boolean;
+  declare static enqueueAfterTransactionCommit: boolean | string;
   declare static performLater: typeof EnqueuingClassMethods.performLater;
   declare static jobOrInstantiate: typeof EnqueuingClassMethods.jobOrInstantiate;
   declare static performNow: typeof ExecutionClassMethods.performNow;

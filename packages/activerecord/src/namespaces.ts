@@ -213,6 +213,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Point: new (x: number, y: number) => { x: number; y: number };
   TestCase: typeof TestCase;
   Railties: typeof Railties;
+  afterAllTransactionsCommit: typeof import("./active-record.js").afterAllTransactionsCommit;
 };
 registerConstant("ActiveRecord", ActiveRecord);
 TopLevel.ActiveRecord = ActiveRecord;

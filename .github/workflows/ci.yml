@@ -879,6 +879,10 @@ jobs:
       # rails-comparison, the job that fetches vendor/.
       - if: needs.changes.outputs.thor_only != 'true'
         env:
+          AJ_ADAPTER: test
+        run: pnpm vitest run packages/activejob
+      - if: needs.changes.outputs.thor_only != 'true'
+        env:
           AJ_ADAPTER: inline
         run: >
           pnpm vitest run

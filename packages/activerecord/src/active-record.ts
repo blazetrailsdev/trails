@@ -498,6 +498,12 @@ export function afterAllTransactionsCommit(
   }
 }
 
+Object.defineProperty(ActiveRecord, "afterAllTransactionsCommit", {
+  value: afterAllTransactionsCommit,
+  writable: true,
+  configurable: true,
+});
+
 export function allOpenTransactions(): Transaction[] {
   const openTransactions: Transaction[] = [];
   ActiveRecord.Base.connectionHandler.eachConnectionPool((pool) => {
