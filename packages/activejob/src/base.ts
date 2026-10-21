@@ -1,7 +1,7 @@
 import {
   Callbacks as ASCallbacks,
   type Included,
-  type Rescuable,
+  Rescuable,
   runLoadHooks,
   zone,
 } from "@blazetrails/activesupport";
@@ -16,13 +16,15 @@ import {
 import { Callbacks } from "./callbacks.js";
 import { ClassMethods, Core } from "./core.js";
 import { ClassMethods as EnqueuingClassMethods } from "./enqueuing.js";
+import { Exceptions } from "./exceptions.js";
 import { ClassMethods as ExecutionClassMethods, Execution } from "./execution.js";
 import { ActiveJob } from "./namespaces.js";
 import { ClassMethods as QueueNameClassMethods, QueueName } from "./queue-name.js";
 import { ClassMethods as QueuePriorityClassMethods, QueuePriority } from "./queue-priority.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends Core, Execution, Rescuable, Included<typeof ASCallbacks> {}
+export interface Base
+  extends Core, Execution, Exceptions, Rescuable, Included<typeof ASCallbacks> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
@@ -45,7 +47,10 @@ export class Base {
   declare static jobOrInstantiate: typeof EnqueuingClassMethods.jobOrInstantiate;
   declare static performNow: typeof ExecutionClassMethods.performNow;
   declare static execute: typeof ExecutionClassMethods.execute;
-  declare static rescueFrom: (...args: unknown[]) => void;
+  declare static rescueFrom: typeof Rescuable.ClassMethods.rescueFrom;
+  declare static afterDiscardProcs: Exceptions["afterDiscardProcs"];
+  declare static retryJitter: unknown;
+  declare static rescueHandlers: unknown[][];
 
   /**
    * @inventedArm if — PERMANENT
@@ -79,6 +84,7 @@ extend(Base, ClassMethods);
 extend(Base, EnqueuingClassMethods);
 include(Base, Execution);
 include(Base, Callbacks);
+include(Base, Exceptions);
 rbModConstSet(ActiveJob, "Base", Base);
 
 runLoadHooks("active_job", Base);

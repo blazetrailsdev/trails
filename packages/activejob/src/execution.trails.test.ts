@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NotImplementedError, rbModConstSet } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbModConstSet, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { Callbacks } from "./callbacks.js";
 import { ActiveJob } from "./namespaces.js";
@@ -66,7 +66,31 @@ describe("ActiveJob::Execution", () => {
       }
     }
     rbModConstSet(ActiveJob, "ExecutedJob", ExecutedJob);
-    const jobData = new ExecutedJob(1).serialize();
-    expect(await Base.execute(jobData)).toBe(1);
+    try {
+      const jobData = new ExecutedJob(1).serialize();
+      expect(await Base.execute(jobData)).toBe(1);
+    } finally {
+      rbModRemoveConst(ActiveJob, "ExecutedJob");
+    }
+  });
+
+  it("runs the after_discard procs and re-raises an unhandled error", async () => {
+    const discarded: unknown[] = [];
+    class FailingJob extends Base {
+      async perform(): Promise<void> {
+        await Promise.resolve();
+        throw new OtherError("unhandled");
+      }
+    }
+    FailingJob.afterDiscardProcs = [
+      async (job: unknown, exception: unknown) => {
+        await Promise.resolve();
+        discarded.push([job, exception]);
+      },
+    ];
+    const job = new FailingJob();
+    const error = await job.performNow().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OtherError);
+    expect(discarded).toEqual([[job, error]]);
   });
 });

@@ -9,7 +9,7 @@ interface ExecutionJob {
   arguments: unknown[];
   deserializeArgumentsIfNeeded(): Promise<void>;
   rescueWithHandler(exception: unknown): unknown;
-  runAfterDiscardProcs?(exception: unknown): Promise<void>;
+  runAfterDiscardProcs(exception: unknown): Promise<void>;
   runCallbacks(kind: string, block?: () => unknown): unknown;
   perform(...arguments_: unknown[]): unknown;
   performNow(): Promise<unknown>;
@@ -50,7 +50,7 @@ export class Execution {
       const handled = await this.rescueWithHandler(exception);
       if (handled != null && handled !== false) return handled;
 
-      await this.runAfterDiscardProcs!(exception);
+      await this.runAfterDiscardProcs(exception);
       throw exception;
     }
   }

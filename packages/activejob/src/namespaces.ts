@@ -9,6 +9,7 @@ import type { ModuleSerializer } from "./serializers/module-serializer.js";
 import type { RangeSerializer } from "./serializers/range-serializer.js";
 import type { SymbolSerializer } from "./serializers/symbol-serializer.js";
 import type { Callbacks } from "./callbacks.js";
+import type { Exceptions } from "./exceptions.js";
 import type { Execution } from "./execution.js";
 import type { QueueName } from "./queue-name.js";
 import type { QueuePriority } from "./queue-priority.js";
@@ -44,6 +45,7 @@ export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
   QueueAdapters: typeof QueueAdapters;
   QueueName: typeof QueueName;
   Callbacks: typeof Callbacks;
+  Exceptions: typeof Exceptions;
   Execution: typeof Execution;
   QueuePriority: typeof QueuePriority;
   Serializers: typeof Serializers;
