@@ -1628,7 +1628,17 @@ export class Emitter {
     this.ivarTypes(u, f, body);
     const ctxStatic = this.baseCtx(u, f, { selfKind: "static", selfExpr: "this" });
     let ext = "";
-    if (u.superclass) {
+    // `class MyString < String`: a JS `String` object, which carries the
+    // content `MyString.new("foo")` passes (ruby-compat's `rbCString` is a
+    // class tag with no content).
+    const scPath = u.superclass?.k === "const" ? u.superclass.path.filter((x: string) => x) : [];
+    if (
+      scPath.length === 1 &&
+      scPath[0] === "String" &&
+      !this.index.resolveConst(u.superclass!.path, u.nesting.slice(0, -1))
+    ) {
+      ext = " extends String";
+    } else if (u.superclass) {
       const sc = this.lw.expr(
         u.superclass,
         this.baseCtx(u, f, { nesting: u.nesting.slice(0, -1) }),
