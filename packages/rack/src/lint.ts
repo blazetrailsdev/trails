@@ -9,6 +9,9 @@ import {
   rbObjClassname,
   rbObjRespondTo,
   stringInspect,
+  RuntimeError,
+  rbObjAsString,
+  rbStrDump,
   isPlainHash,
   kernelInteger,
   IO,
@@ -43,20 +46,131 @@ import {
   CONNECT,
 } from "./constants.js";
 
-export class LintError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LintError";
+export class LintError extends RuntimeError {}
+
+LintError.prototype.name = "LintError";
+
+export class InputWrapper {
+  private _input: any;
+
+  constructor(input: any) {
+    this._input = input;
+  }
+
+  gets(...args: unknown[]): unknown {
+    if (args.length !== 0) throw new LintError("rack.input#gets called with arguments");
+    const v = this._input.gets();
+    if (!(v == null || typeof v === "string")) {
+      throw new LintError("rack.input#gets didn't return a String");
+    }
+    return v;
+  }
+
+  read(...args: any[]): unknown {
+    if (!(args.length <= 2)) {
+      throw new LintError("rack.input#read called with too many arguments");
+    }
+    if (args.length >= 1) {
+      if (!(Number.isInteger(args[0]) || args[0] == null)) {
+        throw new LintError("rack.input#read called with non-integer and non-nil length");
+      }
+      if (!(args[0] == null || args[0] >= 0)) {
+        throw new LintError("rack.input#read called with a negative length");
+      }
+    }
+    if (args.length >= 2) {
+      if (typeof args[1] !== "string") {
+        throw new LintError("rack.input#read called with non-String buffer");
+      }
+    }
+    const v = this._input.read(...args);
+    if (!(v == null || typeof v === "string" || v instanceof Uint8Array)) {
+      throw new LintError("rack.input#read didn't return nil or a String");
+    }
+    if (args[0] == null) {
+      if (v == null) throw new LintError("rack.input#read(nil) returned nil on EOF");
+    }
+    return v;
+  }
+
+  each(...args: [...unknown[], (line: string) => unknown]): unknown {
+    const block = args.pop() as (line: string) => unknown;
+    if (args.length !== 0) throw new LintError("rack.input#each called with arguments");
+    return this._input.each((line: unknown) => {
+      if (typeof line !== "string") throw new LintError("rack.input#each didn't yield a String");
+      block(line);
+    });
+  }
+
+  close(...args: unknown[]): unknown {
+    return this._input.close(...args);
   }
 }
 
+export class ErrorWrapper {
+  private _error: any;
+
+  constructor(error: any) {
+    this._error = error;
+  }
+
+  puts(str: unknown): unknown {
+    return this._error.puts(str);
+  }
+
+  write(str: unknown): unknown {
+    if (typeof str !== "string") throw new LintError("rack.errors#write not called with a String");
+    return this._error.write(str);
+  }
+
+  flush(): unknown {
+    return this._error.flush();
+  }
+
+  close(..._args: unknown[]): never {
+    throw new LintError("rack.errors#close must not be called");
+  }
+}
+
+export class StreamWrapper {
+  static readonly REQUIRED_METHODS = [
+    "read",
+    "write",
+    "<<",
+    "flush",
+    "close",
+    "closeRead",
+    "closeWrite",
+    "isClosed",
+  ];
+
+  private _stream: any;
+
+  constructor(stream: any) {
+    this._stream = stream;
+
+    for (const methodName of StreamWrapper.REQUIRED_METHODS) {
+      if (!rbObjRespondTo(stream, methodName)) {
+        throw new LintError(`Stream must respond to ${methodName}`);
+      }
+    }
+  }
+}
+
+for (const methodName of StreamWrapper.REQUIRED_METHODS) {
+  Object.defineProperty(StreamWrapper.prototype, methodName, {
+    value(this: { _stream: any }, ...args: unknown[]) {
+      return this._stream[methodName](...args);
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+
 export class Wrapper {
-  static readonly BODY_METHODS: Record<string, true> = {
-    toAry: true,
-    each: true,
-    call: true,
-    toPath: true,
-  };
+  static InputWrapper = InputWrapper;
+  static ErrorWrapper = ErrorWrapper;
+  static StreamWrapper = StreamWrapper;
 
   private _app: RackApp | { call: RackApp };
   private env: Record<string, any> | null;
@@ -221,15 +335,15 @@ export class Wrapper {
     }
 
     try {
-      URI.parse(`http://${env[SERVER_NAME]}/`);
+      URI.parse(`http://${rbObjAsString(env[SERVER_NAME])}/`);
     } catch {
-      throw new LintError(`${env[SERVER_NAME]} must be a valid authority`);
+      throw new LintError(`${rbObjAsString(env[SERVER_NAME])} must be a valid authority`);
     }
 
     try {
-      URI.parse(`http://${env[HTTP_HOST]}/`);
+      URI.parse(`http://${rbObjAsString(env[HTTP_HOST])}/`);
     } catch {
-      throw new LintError(`${env[HTTP_HOST]} must be a valid authority`);
+      throw new LintError(`${rbObjAsString(env[HTTP_HOST])} must be a valid authority`);
     }
 
     const serverProtocol = env[SERVER_PROTOCOL];
@@ -275,7 +389,7 @@ export class Wrapper {
     this.checkEarlyHints(env);
 
     if (!/^[0-9A-Za-z!#$%&'*+.^_`|~-]+$/.test(env[REQUEST_METHOD])) {
-      throw new LintError(`REQUEST_METHOD unknown: ${rbInspect(env[REQUEST_METHOD])}`);
+      throw new LintError(`REQUEST_METHOD unknown: ${rbStrDump(env[REQUEST_METHOD])}`);
     }
 
     if (
@@ -348,16 +462,18 @@ export class Wrapper {
 
   checkInputStream(input: any): void {
     if (rbObjRespondTo(input, "externalEncoding") && input.externalEncoding() !== Encoding.BINARY) {
-      throw new LintError(`rack.input ${input} does not have ASCII-8BIT as its external encoding`);
+      throw new LintError(
+        `rack.input ${rbObjAsString(input)} does not have ASCII-8BIT as its external encoding`,
+      );
     }
 
     if (rbObjRespondTo(input, "isBinmode") && !input.isBinmode()) {
-      throw new LintError(`rack.input ${input} is not opened in binary mode`);
+      throw new LintError(`rack.input ${rbObjAsString(input)} is not opened in binary mode`);
     }
 
     for (const method of ["gets", "each", "read"]) {
       if (!rbObjRespondTo(input, method)) {
-        throw new LintError(`rack.input ${input} does not respond to #${method}`);
+        throw new LintError(`rack.input ${rbObjAsString(input)} does not respond to #${method}`);
       }
     }
   }
@@ -365,7 +481,7 @@ export class Wrapper {
   checkErrorStream(error: any): void {
     for (const method of ["puts", "write", "flush"]) {
       if (!rbObjRespondTo(error, method)) {
-        throw new LintError(`rack.error ${error} does not respond to #${method}`);
+        throw new LintError(`rack.error ${rbObjAsString(error)} does not respond to #${method}`);
       }
     }
   }
@@ -579,6 +695,13 @@ export class Wrapper {
     return iteration instanceof Promise ? iteration.then(finish) : finish();
   }
 
+  static readonly BODY_METHODS: Record<string, true> = {
+    toAry: true,
+    each: true,
+    call: true,
+    toPath: true,
+  };
+
   toPath(): string {
     return this._body.toPath();
   }
@@ -622,8 +745,32 @@ export class Wrapper {
   /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterator<string | Uint8Array> {
     const chunks: (string | Uint8Array)[] = [];
-    await this.each((chunk) => chunks.push(chunk));
-    yield* chunks;
+    let wake: (() => void) | null = null;
+    let done = false;
+    let failed = false;
+    let failure: unknown;
+    void Promise.resolve()
+      .then(() =>
+        this.each((chunk) => {
+          chunks.push(chunk);
+          wake?.();
+        }),
+      )
+      .catch((error: unknown) => {
+        failed = true;
+        failure = error;
+      })
+      .finally(() => {
+        done = true;
+        wake?.();
+      });
+    for (;;) {
+      while (chunks.length > 0) yield chunks.shift()!;
+      if (done) break;
+      await new Promise<void>((resolve) => (wake = resolve));
+      wake = null;
+    }
+    if (failed) throw failure;
   }
 }
 
@@ -644,122 +791,6 @@ export class Lint {
     return new Wrapper(this.app, env).response();
   }
 
+  static LintError = LintError;
   static Wrapper = Wrapper;
-}
-
-export class InputWrapper {
-  private _input: any;
-
-  constructor(input: any) {
-    this._input = input;
-  }
-
-  gets(...args: unknown[]): unknown {
-    if (args.length !== 0) throw new LintError("rack.input#gets called with arguments");
-    const v = this._input.gets();
-    if (!(v == null || typeof v === "string")) {
-      throw new LintError("rack.input#gets didn't return a String");
-    }
-    return v;
-  }
-
-  read(...args: any[]): unknown {
-    if (!(args.length <= 2)) {
-      throw new LintError("rack.input#read called with too many arguments");
-    }
-    if (args.length >= 1) {
-      if (!(Number.isInteger(args[0]) || args[0] == null)) {
-        throw new LintError("rack.input#read called with non-integer and non-nil length");
-      }
-      if (!(args[0] == null || args[0] >= 0)) {
-        throw new LintError("rack.input#read called with a negative length");
-      }
-    }
-    if (args.length >= 2) {
-      if (typeof args[1] !== "string") {
-        throw new LintError("rack.input#read called with non-String buffer");
-      }
-    }
-    const v = this._input.read(...args);
-    if (!(v == null || typeof v === "string" || v instanceof Uint8Array)) {
-      throw new LintError("rack.input#read didn't return nil or a String");
-    }
-    if (args[0] == null) {
-      if (v == null) throw new LintError("rack.input#read(nil) returned nil on EOF");
-    }
-    return v;
-  }
-
-  each(...args: [...unknown[], (line: string) => unknown]): unknown {
-    const block = args.pop() as (line: string) => unknown;
-    if (args.length !== 0) throw new LintError("rack.input#each called with arguments");
-    return this._input.each((line: unknown) => {
-      if (typeof line !== "string") throw new LintError("rack.input#each didn't yield a String");
-      block(line);
-    });
-  }
-
-  close(...args: unknown[]): unknown {
-    return this._input.close(...args);
-  }
-}
-
-export class ErrorWrapper {
-  private _error: any;
-
-  constructor(error: any) {
-    this._error = error;
-  }
-
-  puts(str: unknown): unknown {
-    return this._error.puts(str);
-  }
-
-  write(str: unknown): unknown {
-    if (typeof str !== "string") throw new LintError("rack.errors#write not called with a String");
-    return this._error.write(str);
-  }
-
-  flush(): unknown {
-    return this._error.flush();
-  }
-
-  close(..._args: unknown[]): never {
-    throw new LintError("rack.errors#close must not be called");
-  }
-}
-
-export class StreamWrapper {
-  static readonly REQUIRED_METHODS = [
-    "read",
-    "write",
-    "<<",
-    "flush",
-    "close",
-    "closeRead",
-    "closeWrite",
-    "isClosed",
-  ];
-
-  private _stream: any;
-
-  constructor(stream: any) {
-    this._stream = stream;
-
-    for (const methodName of StreamWrapper.REQUIRED_METHODS) {
-      if (!rbObjRespondTo(stream, methodName)) {
-        throw new LintError(`Stream must respond to ${methodName}`);
-      }
-    }
-  }
-}
-
-for (const methodName of StreamWrapper.REQUIRED_METHODS) {
-  Object.defineProperty(StreamWrapper.prototype, methodName, {
-    value(this: { _stream: any }, ...args: unknown[]) {
-      return this._stream[methodName](...args);
-    },
-    writable: true,
-    configurable: true,
-  });
 }
