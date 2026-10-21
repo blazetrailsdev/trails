@@ -9,6 +9,7 @@ import {
   eachPair,
   Exception,
   excBacktrace,
+  excSetupMessage,
   excSetBacktrace,
   hashAref,
   hashAset,
@@ -269,8 +270,11 @@ function convertToGlobalIdHash(argument: GlobalIDModel): Record<string, unknown>
     };
   } catch (error) {
     if (!(error instanceof MissingModelIdError)) throw error;
-    throw new SerializationError(
-      `Unable to serialize ${rbModName(rbObjClass(argument))} without an id. (Maybe you forgot to call save?)`,
+    throw excSetupMessage(
+      new SerializationError(
+        `Unable to serialize ${rbModName(rbObjClass(argument))} without an id. (Maybe you forgot to call save?)`,
+      ),
+      error,
     );
   }
 }

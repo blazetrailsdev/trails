@@ -11,7 +11,7 @@ import {
   registerConstant,
   StandardError,
 } from "@blazetrails/ruby-compat";
-import { GlobalID, Identification } from "@blazetrails/globalid";
+import { GlobalID, Identification, MissingModelIdError } from "@blazetrails/globalid";
 import { ActiveJob } from "./index.js";
 import {
   Arguments,
@@ -197,11 +197,17 @@ describe("ActiveJob::Arguments GlobalID arm", () => {
   });
 
   it("raises SerializationError for a record without an id", () => {
-    expect(() => serialize([new Person(null)])).toThrow(
-      new SerializationError(
-        "Unable to serialize Person without an id. (Maybe you forgot to call save?)",
-      ),
+    let raised: unknown;
+    try {
+      serialize([new Person(null)]);
+    } catch (error) {
+      raised = error;
+    }
+    expect(raised).toBeInstanceOf(SerializationError);
+    expect((raised as Error).message).toBe(
+      "Unable to serialize Person without an id. (Maybe you forgot to call save?)",
     );
+    expect((raised as Error).cause).toBeInstanceOf(MissingModelIdError);
   });
 
   it("treats a hash with _aj_globalid and another key as a plain hash", async () => {
