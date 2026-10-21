@@ -378,9 +378,9 @@ export class SchemaCache {
       } else {
         file = forceEncoding(file, Encoding.UTF_8);
         if (rbObjRespondTo(YAML, "unsafeLoad")) {
-          return YAML.unsafeLoad(file) as SchemaCache;
+          return YAML.unsafeLoad(file as string) as SchemaCache;
         } else {
-          return YAML.load(file) as SchemaCache;
+          return YAML.load(file as string) as SchemaCache;
         }
       }
     });
@@ -390,7 +390,10 @@ export class SchemaCache {
    * @missingRailsArgs read — PERMANENT
    * @inventedArm binread — PERMANENT
    */
-  private static async read<T>(filename: string, callback: (data: string) => T): Promise<T> {
+  private static async read<T>(
+    filename: string,
+    callback: (data: string | Uint8Array) => T,
+  ): Promise<T> {
     if (File.extname(filename) === ".gz") {
       return Zlib.GzipReader.open(filename, async (gz) => callback(await gz.read()));
     }
@@ -544,7 +547,7 @@ export class SchemaCache {
   async dumpTo(filename: string): Promise<void> {
     await this.open(filename, (f) => {
       if (filename.includes(".dump")) {
-        f.write(Uint8Array.from(Marshal.dump(this), (byte) => byte.charCodeAt(0)));
+        f.write(Marshal.dump(this));
       } else {
         f.write(YAML.dump(this));
       }

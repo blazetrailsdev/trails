@@ -27,6 +27,8 @@ import {
   rbFSend,
 } from "@blazetrails/ruby-compat";
 
+const dumpStr = (value: unknown): string => String.fromCharCode(...Marshal.dump(value));
+
 const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
 const gemDateTime = (str: string, comp?: boolean) => dtNewByFrags(RubyDate._parse(str, comp));
 
@@ -1898,19 +1900,19 @@ describe("Date#marshalLoad legacy dumps", () => {
 
 describe("Marshal over Date", () => {
   it("dumps a Date and a DateTime as ruby does", () => {
-    expect(Marshal.dump(new RubyDate(2016, 1, 1))).toBe(
+    expect(dumpStr(new RubyDate(2016, 1, 1))).toBe(
       "\x04\bU:\tDate[\x0bi\x00i\x03-\x7f%i\x00i\x00i\x00f\f2299161",
     );
-    expect(Marshal.dump(new RubyDate(2016, 1, 1, RubyDate.JULIAN))).toBe(
+    expect(dumpStr(new RubyDate(2016, 1, 1, RubyDate.JULIAN))).toBe(
       "\x04\bU:\tDate[\x0bi\x00i\x03:\x7f%i\x00i\x00i\x00f\binf",
     );
-    expect(Marshal.dump(new RubyDate(-4712, 1, 1))).toBe(
+    expect(dumpStr(new RubyDate(-4712, 1, 1))).toBe(
       "\x04\bU:\tDate[\x0bi\x00i\x00i\x00i\x00i\x00f\f2299161",
     );
-    expect(Marshal.dump(new RubyDateTime(2016, 1, 1, 12, 30, new Rational(1, 2), "+09:00"))).toBe(
+    expect(dumpStr(new RubyDateTime(2016, 1, 1, 12, 30, new Rational(1, 2), "+09:00"))).toBe(
       "\x04\bU:\rDateTime[\x0bi\x00i\x03-\x7f%i\x0281i\x04\x00e\xcd\x1di\x02\x90~f\f2299161",
     );
-    expect(Marshal.dump(new RubyDateTime(2016, 1, 1, 0, 0, new Rational(1, 3)))).toBe(
+    expect(dumpStr(new RubyDateTime(2016, 1, 1, 0, 0, new Rational(1, 3)))).toBe(
       "\x04\bU:\rDateTime[\x0bi\x00i\x03-\x7f%i\x00U:\rRational[\x07i\x04\x00\xca\x9a;i\x08i\x00f\f2299161",
     );
   });
@@ -1933,7 +1935,7 @@ describe("Marshal over Date", () => {
 
   it("dumps a Temporal.PlainDate as the Date it seats, and loads it back equal", () => {
     const date = Temporal.PlainDate.from("2016-01-01");
-    expect(Marshal.dump(date)).toBe(Marshal.dump(new RubyDate(2016, 1, 1)));
+    expect(Marshal.dump(date)).toEqual(Marshal.dump(new RubyDate(2016, 1, 1)));
 
     const loaded = Marshal.load(Marshal.dump([date, date])) as RubyDate[];
     expect(loaded[0]).toBeInstanceOf(RubyDate);

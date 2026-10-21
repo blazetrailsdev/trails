@@ -758,9 +758,9 @@ onLoad("action_dispatch_request", function (this: object) {
 const MAX_COOKIE_SIZE = 4096;
 
 export interface CookieSerializer {
-  dump(value: unknown): string;
-  load(dumped: string): unknown;
-  dumped(payload: string): boolean;
+  dump(value: unknown): string | Uint8Array;
+  load(dumped: string | Uint8Array): unknown;
+  dumped(payload: string | Uint8Array): boolean;
 }
 
 /** @internal */
@@ -792,7 +792,10 @@ export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
 }
 
 /** @internal */
-export function isReserialize(this: SerializedCookieJarsHost, dumped: string): boolean {
+export function isReserialize(
+  this: SerializedCookieJarsHost,
+  dumped: string | Uint8Array,
+): boolean {
   const configured = serializer.call(this);
   return (
     [...SERIALIZERS.values()].includes(configured as SerializerWithFallbackSerializer) &&
@@ -811,12 +814,12 @@ export function parse(
   if (dumped != null) {
     let value: unknown;
     try {
-      value = serializer.call(this).load(dumped as string);
+      value = serializer.call(this).load(dumped as string | Uint8Array);
     } catch {
       return undefined;
     }
 
-    if (forceReserialize || isReserialize.call(this, dumped as string)) {
+    if (forceReserialize || isReserialize.call(this, dumped as string | Uint8Array)) {
       this.set(name, { value });
     }
 

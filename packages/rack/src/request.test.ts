@@ -21,6 +21,7 @@ import {
   rbInspect,
   strNew,
   warn,
+  b,
 } from "@blazetrails/ruby-compat";
 import {
   escape,
@@ -825,7 +826,7 @@ function rackRequestTests(makeRequest: (env: Record<string, any>) => any): void 
     assertEmpty(post);
     expect(req.POST).toBe(post);
     expect(req.params).toEqual({ foo: "quux" });
-    expect(req.body.read()).toBe("foo=bar&quux=bla");
+    expect(req.body.read()).toEqual(b("foo=bar&quux=bla"));
   });
 
   it("parse POST data on PUT when media type is form-data", () => {
@@ -1442,7 +1443,7 @@ content-disposition: form-data; name="mean"; filename="mean"\r
 
     expect(req.POST["huge"].tempfile.size()).toBe(32768);
     expect(req.POST["mean"].tempfile.size()).toBe(10);
-    expect(req.POST["mean"].tempfile.read()).toBe("--AaB03xha");
+    expect(req.POST["mean"].tempfile.read()).toEqual(b("--AaB03xha"));
   });
 
   it("record tempfiles from multipart form data in env[rack.tempfiles]", () => {

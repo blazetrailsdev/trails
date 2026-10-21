@@ -508,7 +508,7 @@ export class Generic {
     this._query = v.replace(/(?!%[0-9a-fA-F]{2}|[!$-&(-;=?-_a-~])[\s\S]/g, (c) => {
       let out = "";
       for (const byte of b(c)) {
-        out += `%${byte.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`;
+        out += `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
       }
       return out;
     });
@@ -553,7 +553,7 @@ export class Generic {
     this._fragment = v.replace(/(?!%[0-9a-fA-F]{2}|[!-~])[\s\S]/g, (c) => {
       let out = "";
       for (const byte of b(c)) {
-        out += `%${byte.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`;
+        out += `%${byte.toString(16).toUpperCase().padStart(2, "0")}`;
       }
       return out;
     });

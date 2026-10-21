@@ -396,7 +396,7 @@ export type { PrettyPrintOutput } from "./pretty-print.js";
 export { PP } from "./pp.js";
 export { b } from "./string/b.js";
 export { bytes, strNew } from "./string/bytes.js";
-export { byteslice, rbStrGetbyte, rbStrSetbyte } from "./string/byte-methods.js";
+export { byteslice, rbStrByteslice, rbStrGetbyte, rbStrSetbyte } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
 export { capitalize, casecmp } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
@@ -414,6 +414,8 @@ export {
   rbObjNotMatch,
   rbStrMatch,
   rbStrRespondTo,
+  rbStrInclude,
+  rbStrPlus,
   rbStrSend,
   rstrip,
   strip,
@@ -426,7 +428,13 @@ export { Struct, isStruct, rbStructInitialize, rstructGet, type StructInstance }
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
-export { rbStrPartition, rbStrRpartition, rbStrScanSubexpCall, rbStrSub } from "./string/sub.js";
+export {
+  rbStrPartition,
+  rbStrRpartition,
+  rbStrScanSubexpCall,
+  rbStrStartWith,
+  rbStrSub,
+} from "./string/sub.js";
 export { rbCheckStringType, stringValue, strlen, strUminus } from "./string/support.js";
 export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-encoding.js";
 export { encode } from "./string/encode.js";

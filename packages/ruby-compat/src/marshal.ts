@@ -684,6 +684,9 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     } else if (typeof obj === "string") {
       wByte(TYPE_STRING, arg);
       wCstr(obj, arg);
+    } else if (obj instanceof Uint8Array) {
+      wByte(TYPE_STRING, arg);
+      wBytes(obj, obj.length, arg);
     } else if (Array.isArray(obj)) {
       wUclass(obj, Array, arg);
       wByte(TYPE_ARRAY, arg);
@@ -743,7 +746,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
 }
 
 /** `rb_marshal_dump_limited` (`vendor/ruby/v3.3.11/marshal.c:1228`). */
-function rbMarshalDumpLimited(obj: unknown, limit: number): string {
+function rbMarshalDumpLimited(obj: unknown, limit: number): Uint8Array {
   const arg: DumpArg = {
     str: [],
     symbols: new Map(),
@@ -758,11 +761,7 @@ function rbMarshalDumpLimited(obj: unknown, limit: number): string {
 
   wObject(obj, arg, limit);
 
-  let port = "";
-  for (let i = 0; i < arg.str.length; i += 0x8000) {
-    port += String.fromCharCode(...arg.str.slice(i, i + 0x8000));
-  }
-  return port;
+  return Uint8Array.from(arg.str);
 }
 
 /** `too_short` (`vendor/ruby/v3.3.11/marshal.c:1337`). */
@@ -989,10 +988,19 @@ function rEntry<T>(v: T, arg: LoadArg): T {
  * retags a Ruby String in place; a JS string is immutable, so the re-read
  * string is answered, and `undefined` is the C `FALSE`.
  */
-function rIvarEncoding(obj: unknown, arg: LoadArg, sym: string, val: unknown): string | undefined {
+function rIvarEncoding(
+  obj: unknown,
+  arg: LoadArg,
+  sym: string,
+  val: unknown,
+): string | Uint8Array | undefined {
   const idx = sym2encidx(sym, val);
   if (idx !== null) {
-    if (typeof obj === "string") {
+    if (obj instanceof Uint8Array) {
+      let str = "";
+      for (const byte of obj) str += String.fromCharCode(byte);
+      return forceEncoding(str, idx);
+    } else if (typeof obj === "string") {
       return forceEncoding(obj, idx);
     } else {
       throw new ArgumentError(`${rbObjAsString(obj)} is not enc_capable`);
@@ -1005,7 +1013,7 @@ function rIvarEncoding(obj: unknown, arg: LoadArg, sym: string, val: unknown): s
  * `r_encname` (`vendor/ruby/v3.3.11/marshal.c:1750`). `obj` holds the String
  * `rb_enc_associate_index` retags in place, and is left holding the re-read one.
  */
-function rEncname(obj: { value: string }, arg: LoadArg): number {
+function rEncname(obj: { value: string | Uint8Array }, arg: LoadArg): number {
   let len = rLong(arg);
   if (len > 0) {
     const sym = rSymbol(arg);
@@ -1321,7 +1329,10 @@ function rObjectFor(
       }
 
       case TYPE_STRING:
-        v = rEntry(rString(arg), arg);
+        v = rEntry(
+          Uint8Array.from(rString(arg), (c) => c.charCodeAt(0)),
+          arg,
+        );
         v = rLeave(v, arg);
         break;
 
@@ -1502,7 +1513,13 @@ function rObject(arg: LoadArg): unknown {
 
 /** `rb_marshal_load_with_proc` (`vendor/ruby/v3.3.11/marshal.c:2378`), for a String `port`. */
 function rbMarshalLoadWithProc(port: unknown): unknown {
-  const v = rbCheckStringType(port);
+  let v: string | null;
+  if (port instanceof Uint8Array) {
+    v = "";
+    for (const byte of port) v += String.fromCharCode(byte);
+  } else {
+    v = rbCheckStringType(port);
+  }
   if (v === null) {
     throw new TypeError("instance of IO needed");
   }
@@ -1569,7 +1586,7 @@ export const Marshal = {
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */
-  dump(obj: unknown, limit: number = -1): string {
+  dump(obj: unknown, limit: number = -1): Uint8Array {
     return rbMarshalDumpLimited(obj, limit);
   },
 

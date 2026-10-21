@@ -257,13 +257,13 @@ export class FileBody {
     return this._toPath;
   }
 
-  get body(): string {
+  get body(): Uint8Array {
     return IO.binread(this.toPath());
   }
 
-  each(block: (chunk: string) => unknown): void {
+  each(block: (chunk: Uint8Array) => unknown): void {
     File.open(this.toPath(), "rb", (file) => {
-      let chunk: string | null;
+      let chunk: Uint8Array | null;
       while ((chunk = file.read(16384)) !== null) block(chunk);
     });
   }

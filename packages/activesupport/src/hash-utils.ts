@@ -570,7 +570,7 @@ rbModDefineMethod(
 );
 
 export function fromXml(
-  xml: string | StringIO | null | undefined,
+  xml: string | Uint8Array | StringIO | null | undefined,
   disallowedTypes?: string[] | null,
 ): unknown {
   return new XMLConverter(xml, disallowedTypes).toH();

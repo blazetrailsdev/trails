@@ -69,11 +69,11 @@ Object.freeze(EMPTY);
 export class BoundedIO {
   private cursor = 0;
   constructor(
-    private io: { read(n: number, outbuf?: string): string | null },
+    private io: { read(n: number, outbuf?: string): string | Uint8Array | null },
     private contentLength: number,
   ) {}
 
-  read(size: number, outbuf?: string): string | null {
+  read(size: number, outbuf?: string): string | Uint8Array | null {
     if (this.cursor >= this.contentLength) return null;
 
     const left = this.contentLength - this.cursor;
@@ -301,7 +301,7 @@ export class Parser {
   }
 
   static parse(
-    io: { read(n: number): string | null },
+    io: { read(n: number): string | Uint8Array | null },
     contentLength: number | null,
     contentType: string | null | undefined,
     tmpfile: ((filename: string, contentType: string) => any) | null,
@@ -341,7 +341,7 @@ export class Parser {
     this.headRegex = new RegExp(`(.*?${EOL})${EOL}`, "s");
   }
 
-  parse(io: { read(n: number, outbuf?: string): string | null }) {
+  parse(io: { read(n: number, outbuf?: string): string | Uint8Array | null }) {
     const outbuf = "";
     this.readData(io, outbuf);
     while (true) {
@@ -376,12 +376,14 @@ export class Parser {
   }
 
   /** @internal */ private readData(
-    io: { read(n: number, outbuf?: string): string | null },
+    io: { read(n: number, outbuf?: string): string | Uint8Array | null },
     outbuf: string,
   ) {
     const content = io.read(this.bufsize, outbuf);
     this.handleEmptyContentBang(content);
-    this.sbuf.concat(content!);
+    this.sbuf.concat(
+      content instanceof Uint8Array ? Buffer.from(content).toString("latin1") : content!,
+    );
   }
 
   /** @internal */ private handleFastForward(): void | "want_read" {
@@ -579,7 +581,7 @@ export class Parser {
       return Encoding.BINARY;
     }
   }
-  /** @internal */ private handleEmptyContentBang(content: string | null | undefined) {
-    if (!content) throw new EmptyContentError();
+  /** @internal */ private handleEmptyContentBang(content: string | Uint8Array | null | undefined) {
+    if (content == null || content.length === 0) throw new EmptyContentError();
   }
 }

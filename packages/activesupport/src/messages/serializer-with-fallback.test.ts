@@ -25,7 +25,7 @@ const messagePackModule = {
 
 function assertRoundtrip(
   serializerUnderTest: Serializer,
-  deserializer: { load(dumped: string): unknown } = serializerUnderTest,
+  deserializer: { load(dumped: string | Uint8Array): unknown } = serializerUnderTest,
 ): void {
   const value = [{ a_boolean: false, a_number: 123 }];
   expect(deserializer.load(serializerUnderTest.dump(value))).toEqual(value);

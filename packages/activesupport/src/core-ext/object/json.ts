@@ -340,6 +340,7 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   if (value == null) return NilClass.asJson(value, options);
   if (typeof value === "boolean") return TrueClass.asJson(value, options);
   if (typeof value === "string") return String.asJson(value, options);
+  if (value instanceof Uint8Array) return String.asJson(new TextDecoder().decode(value), options);
   if (typeof value === "number" || value instanceof globalThis.Number) {
     return Float.asJson(value as number, options);
   }

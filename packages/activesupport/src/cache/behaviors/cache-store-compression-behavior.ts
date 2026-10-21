@@ -1,3 +1,4 @@
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { Entry } from "../entry.js";
 import { coder } from "../coder.js";
@@ -163,8 +164,8 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
       deflate(_dumped: string): string {
         return "yolo";
       },
-      inflate(compressed: string): string | undefined {
-        return compressed === "yolo" ? coder.dump("lossy!") : undefined;
+      inflate(compressed: string | Uint8Array): string | undefined {
+        return rbEqual(compressed, "yolo") ? coder.dump("lossy!") : undefined;
       },
     };
 

@@ -5,7 +5,7 @@ import { Encoding } from "../json/encoding.js";
 import { onLoad } from "../lazy-load-hooks.js";
 import { ActiveSupport } from "../namespaces.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { Rational, fetch, hasKey, hashAref } from "@blazetrails/ruby-compat";
+import { Rational, fetch, hasKey, hashAref, rbStrStartWith } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
@@ -39,10 +39,10 @@ export abstract class Metadata {
   ];
 
   protected abstract readonly serializer: MessageSerializer;
-  protected abstract encode(data: string | Buffer, options?: { urlSafe?: boolean }): string;
-  protected abstract decode(encoded: string, options?: { urlSafe?: boolean }): Buffer;
+  protected abstract encode(data: string | Uint8Array, options?: { urlSafe?: boolean }): string;
+  protected abstract decode(encoded: string | Uint8Array, options?: { urlSafe?: boolean }): Buffer;
   protected abstract serialize(data: unknown): unknown;
-  protected abstract deserialize(serialized: string): unknown;
+  protected abstract deserialize(serialized: string | Uint8Array): unknown;
 
   protected serializeWithMetadata(data: unknown, metadata: MetadataOptions = {}): unknown {
     const hasMetadata = Object.values(metadata).some(isPresent);
@@ -58,7 +58,7 @@ export abstract class Metadata {
   }
 
   protected deserializeWithMetadata(
-    message: string,
+    message: string | Uint8Array,
     expectedMetadata: ExpectedMetadataOptions = {},
   ): unknown {
     if (this.dualSerializedMetadataEnvelopeJson(message)) {
@@ -131,8 +131,8 @@ export abstract class Metadata {
     return typeof object === "object" && object !== null && hasKey(object, "_rails");
   }
 
-  protected dualSerializedMetadataEnvelopeJson(string: string): boolean {
-    return string.startsWith('{"_rails":{"message":');
+  protected dualSerializedMetadataEnvelopeJson(string: string | Uint8Array): boolean {
+    return rbStrStartWith(string, '{"_rails":{"message":');
   }
 
   protected pickExpiry(
@@ -169,7 +169,7 @@ export abstract class Metadata {
     return ActiveSupportJSON.encode(data);
   }
 
-  protected deserializeFromJson(serialized: string): unknown {
+  protected deserializeFromJson(serialized: string | Uint8Array): unknown {
     try {
       return ActiveSupportJSON.decode(serialized);
     } catch (error) {
@@ -178,12 +178,11 @@ export abstract class Metadata {
   }
 
   protected serializeToJsonSafeString(data: unknown): string {
-    return this.encode(this.serialize(data) as string, { urlSafe: false });
+    return this.encode(this.serialize(data) as string | Uint8Array, { urlSafe: false });
   }
 
-  /** @missingRailsName decode — PERMANENT */
   protected deserializeFromJsonSafeString(string: string): unknown {
-    return this.deserialize(this.decode(string, { urlSafe: false }).toString("latin1"));
+    return this.deserialize(this.decode(string, { urlSafe: false }));
   }
 }
 

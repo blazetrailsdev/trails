@@ -1,5 +1,5 @@
 import { Time } from "@blazetrails/date";
-import { rbCNumeric, rbObjDup, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import { rbCNumeric, rbEqual, rbObjDup, rbObjIsKindOf } from "@blazetrails/ruby-compat";
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { coder } from "./coder.js";
@@ -12,7 +12,7 @@ export class Entry {
   }
 
   protected _value: unknown;
-  readonly version: string | null;
+  readonly version: string | Uint8Array | null;
   private _createdAt: number;
   private _expiresIn: number | null;
   private _compressed: boolean;
@@ -21,7 +21,7 @@ export class Entry {
   static unpack(members: unknown[]): Entry {
     return new Entry(members.length > 0 ? members[0] : null, {
       expiresAt: (members[1] as number | null) ?? null,
-      version: (members[2] as string | null) ?? null,
+      version: (members[2] as string | Uint8Array | null) ?? null,
     });
   }
 
@@ -29,7 +29,7 @@ export class Entry {
     value: unknown,
     options: {
       compressed?: boolean;
-      version?: string | null;
+      version?: string | Uint8Array | null;
       expiresIn?: number | Duration | null;
       expiresAt?: number | null;
     } = {},
@@ -66,8 +66,8 @@ export class Entry {
     return this._expiresIn != null && this._createdAt + this._expiresIn <= Time.now().toF() * 1000;
   }
 
-  isMismatched(version: string | null | undefined): boolean {
-    return !!(this.version && version && this.version !== version);
+  isMismatched(version: string | Uint8Array | null | undefined): boolean {
+    return !!(this.version && version && !rbEqual(this.version, version));
   }
 
   isCompressed(): boolean {
@@ -145,11 +145,11 @@ export class Entry {
     return this;
   }
 
-  private uncompress(value: string): unknown {
+  private uncompress(value: string | Uint8Array): unknown {
     return this.marshalLoad(inflate(value));
   }
 
-  private marshalLoad(payload: string): unknown {
+  private marshalLoad(payload: string | Uint8Array): unknown {
     try {
       return coder.load(payload);
     } catch (error) {

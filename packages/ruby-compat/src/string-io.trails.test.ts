@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { Encoding } from "./encoding.js";
 import { StringIO } from "./string-io.js";
+import { b } from "./string/b.js";
 
 describe("StringIO", () => {
   it("reads the buffer forward and reports eof", () => {
     const io = new StringIO("abc");
-    expect(io.read(2)).toBe("ab");
+    expect(io.read(2)).toEqual(b("ab"));
     expect(io.read()).toBe("c");
     expect(io.isEof()).toBe(true);
     expect(io.read()).toBe("");
@@ -27,9 +28,9 @@ describe("StringIO", () => {
   });
 
   it("counts bytes, not code points, in a binary string", () => {
-    const io = new StringIO("\xff");
+    const io = new StringIO(Uint8Array.of(0xff));
     expect(io.size()).toBe(1);
-    expect(io.read()).toBe("\xff");
+    expect(io.read()).toEqual(Uint8Array.of(0xff));
   });
 
   it("writes from the current position", () => {
@@ -56,12 +57,10 @@ describe("StringIO", () => {
   });
   it("round-trips an arbitrary byte sequence through read, sizing it in bytes", () => {
     const bytes = Array.from({ length: 256 }, (_, i) => i);
-    const buffer = String.fromCharCode(...bytes);
-    const io = new StringIO(buffer);
+    const io = new StringIO(Uint8Array.from(bytes));
 
     expect(io.size()).toBe(256);
-    const read = io.read();
-    expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(bytes);
+    expect(Array.from(io.read())).toEqual(bytes);
   });
   it("puts writes each argument on its own line, appending a newline only when absent", () => {
     const io = new StringIO();
@@ -96,9 +95,9 @@ describe("StringIO", () => {
     const bytes = Array.from({ length: 256 }, (_, i) => i);
     const io = new StringIO();
     expect(io.setEncoding(Encoding.BINARY)).toBe(io);
-    io.write(String.fromCharCode(...bytes));
+    io.write(Uint8Array.from(bytes));
     io.rewind();
-    expect(Array.from(io.read(), (c) => c.charCodeAt(0))).toEqual(bytes);
+    expect(Array.from(io.read() as unknown as Uint8Array)).toEqual(bytes);
   });
 
   it("set_encoding accepts an encoding name and raises on an unknown one", () => {

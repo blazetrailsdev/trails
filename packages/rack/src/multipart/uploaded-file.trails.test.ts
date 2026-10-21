@@ -1,7 +1,7 @@
 import * as path from "path";
 import { describe, expect, it } from "vitest";
 
-import { File, Tempfile } from "@blazetrails/ruby-compat";
+import { b, File, Tempfile } from "@blazetrails/ruby-compat";
 
 import { MockRequest } from "../mock-request.js";
 import { Generator } from "./generator.js";
@@ -27,15 +27,12 @@ describe("Rack::Multipart::UploadedFile", () => {
     expect(File.stat(file.path!).size).toBe(File.stat(logo).size);
 
     (file.tempfile as Tempfile).write("clobber");
-    expect(File.open(file.path!, "rb", (f) => f.read(7))).toBe("clobber");
-    expect(File.open(logo, "rb", (f) => f.read(7))).not.toBe("clobber");
+    expect(File.open(file.path!, "rb", (f) => f.read(7))).toEqual(b("clobber"));
+    expect(File.open(logo, "rb", (f) => f.read(7))).not.toEqual(b("clobber"));
   });
 
   it("builds a body carrying the file's bytes, counted by CONTENT_LENGTH", () => {
-    const raw = Buffer.from(
-      File.open(logo, "rb", (f) => f.read(File.stat(logo).size) ?? ""),
-      "latin1",
-    );
+    const raw = Buffer.from(File.open(logo, "rb", (f) => f.read(File.stat(logo).size)!));
     const files = new UploadedFile(logo);
     const data = new Generator({ "submit-name": "Larry", files }).dump() as string;
 

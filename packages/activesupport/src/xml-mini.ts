@@ -151,8 +151,10 @@ export function setDepth(value: number): void {
 /** @internal */
 let _backend: XmlMiniBackend | null | undefined;
 
-export function parse(data: string | StringIO | null | undefined): Record<string, unknown> {
-  return backend()!.parse(data);
+export function parse(
+  data: string | Uint8Array | StringIO | null | undefined,
+): Record<string, unknown> {
+  return backend()!.parse(data instanceof Uint8Array ? new TextDecoder().decode(data) : data);
 }
 
 export function backend(): XmlMiniBackend | null | undefined {

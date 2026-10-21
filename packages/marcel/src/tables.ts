@@ -2503,7 +2503,7 @@ export const TYPE_PARENTS: Record<string, string[]> = {
   "video/x-ogm": ["video/ogg"],
 };
 
-const b = new Hash<string, string>((h, k) => hashAset(h, k, Object.freeze(RubyCompat.b(k))));
+const b = new Hash<string, Uint8Array>((h, k) => hashAset(h, k, RubyCompat.b(k)));
 
 export const MAGIC = [
   ["image/jpeg", [[0, hashAref(b, "\udcff\udcd8\udcff")]]],

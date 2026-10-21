@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { HttpRequest, HttpResponse, HttpSocket, StringIO } from "@blazetrails/ruby-compat";
+import { b } from "@blazetrails/ruby-compat";
 import type { RackApp, RackBody, RackEnv } from "../index.js";
 import { RACK_ERRORS, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "../constants.js";
 import { Files } from "../files.js";
@@ -84,7 +85,7 @@ describe("Rack::Handler::Node", () => {
     expect(env.REQUEST_METHOD).toBe("POST");
     const input = env["rack.input"] as StringIO;
     expect(typeof input.read).toBe("function");
-    expect(input.read()).toBe('{"name":"dean"}');
+    expect(input.read()).toEqual(b('{"name":"dean"}'));
   });
 
   it("reads a binary request body byte-identically", async () => {
@@ -99,10 +100,10 @@ describe("Rack::Handler::Node", () => {
       headers: { "content-type": "application/octet-stream" },
     });
 
-    const input = env["rack.input"] as StringIO;
+    const input = env["rack.input"] as StringIO<Uint8Array>;
     expect(input.size()).toBe(png.length);
     const read = input.read();
-    expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(Array.from(png));
+    expect(Array.from(read)).toEqual(Array.from(png));
   });
 
   it("maps content-type and content-length to CGI keys", async () => {

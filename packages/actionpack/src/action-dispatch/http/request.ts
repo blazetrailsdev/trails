@@ -8,6 +8,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   EOFError,
+  b,
   Encoding,
   StringIO,
   forceEncoding,
@@ -260,7 +261,7 @@ export class Request {
   }
 
   get contentLength(): number {
-    if (this.hasHeader(TRANSFER_ENCODING)) return new TextEncoder().encode(this.rawPost).length;
+    if (this.hasHeader(TRANSFER_ENCODING)) return b(this.rawPost).length;
     return Number(toI(this.rackRequest.contentLength));
   }
 
@@ -334,11 +335,11 @@ export class Request {
     }
   }
 
-  get rawPost(): string {
+  get rawPost(): string | Uint8Array {
     if (!this.hasHeader("RAW_POST_DATA")) {
       this.setHeader("RAW_POST_DATA", this.readBodyStream());
     }
-    return this.getHeader("RAW_POST_DATA") as string;
+    return this.getHeader("RAW_POST_DATA") as string | Uint8Array;
   }
 
   declare readonly params: Record<string, unknown>;
@@ -363,7 +364,7 @@ export class Request {
 
   /** @internal */
   private _fallbackRequestParameters(): Record<string, unknown> {
-    const input = this.rawPost;
+    const input = forceEncoding(this.rawPost, Encoding.UTF_8) as string;
     if (!input) return {};
     const ct = ((this.env["CONTENT_TYPE"] as string) || "").toLowerCase();
     if (ct.includes("application/x-www-form-urlencoded")) {
@@ -539,7 +540,7 @@ export class Request {
   }
 
   /** @internal */
-  protected readBodyStream(): string | null | undefined {
+  protected readBodyStream(): string | Uint8Array | null | undefined {
     if (this.bodyStream != null) {
       return this.resetStream(this.bodyStream, () => {
         if (this.hasHeader(TRANSFER_ENCODING)) {

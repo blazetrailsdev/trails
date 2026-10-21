@@ -14,13 +14,16 @@ import {
   Encoding,
   encode,
   rbModConstSet,
+  b,
+  rbEqual,
+  rbStrInclude,
 } from "@blazetrails/ruby-compat";
 import { Marcel as MarcelSeat } from "./namespaces.js";
 
-export type MagicMatch = [number | Range<number>, string | null, MagicMatch[]?];
+export type MagicMatch = [number | Range<number>, string | Uint8Array | null, MagicMatch[]?];
 
 interface MagicIO {
-  read(length: number, buffer?: string | Uint8Array): string | null;
+  read(length: number, buffer?: string | Uint8Array): string | Uint8Array | null;
   rewind(): unknown;
   binmode(): unknown;
   setEncoding(encoding: Encoding): unknown;
@@ -176,13 +179,14 @@ export class Magic {
     return matches.some(([offset, value, children]) => {
       let match: boolean | null = null;
       if (value != null) {
+        const bytesize = b(value).length;
         if (offset instanceof Range) {
           io.read(offset.begin!, buffer);
-          const x = io.read(offset.end! - offset.begin! + value.length, buffer);
-          match = x != null && x.includes(value);
+          const x = io.read(offset.end! - offset.begin! + bytesize, buffer);
+          match = x != null && rbStrInclude(x, value);
         } else {
           io.read(offset, buffer);
-          match = io.read(value.length, buffer) === value;
+          match = rbEqual(io.read(bytesize, buffer), value);
         }
       }
       io.rewind();

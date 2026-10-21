@@ -227,7 +227,7 @@ export const Zlib = {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Deflate`.
    */
   Deflate: {
-    deflate(src: string | Uint8Array): string {
+    deflate(src: string | Uint8Array): Uint8Array {
       return b(getZlib().deflate(src instanceof Uint8Array ? src : new TextEncoder().encode(src)));
     },
   },

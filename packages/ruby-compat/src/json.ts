@@ -126,8 +126,9 @@ export namespace JSON {
     return globalJSON.stringify(value) ?? "null";
   }
 
-  export function load(dumped: string): unknown {
-    return globalJSON.parse(dumped, (_key, value) => {
+  export function load(dumped: string | Uint8Array): unknown {
+    const source = typeof dumped === "string" ? dumped : new TextDecoder().decode(dumped);
+    return globalJSON.parse(source, (_key, value) => {
       if (value !== null && typeof value === "object" && typeof value.json_class === "string") {
         const klass = deepConstGet(value.json_class) as { jsonCreate?: (hash: object) => unknown };
         if (typeof klass?.jsonCreate === "function") return klass.jsonCreate(value);

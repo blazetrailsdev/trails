@@ -161,7 +161,10 @@ export class Node {
   }
 
   /** @internal */
-  private async requestEnv(req: HttpRequest, input: StringIO): Promise<RackEnv> {
+  private async requestEnv(
+    req: HttpRequest,
+    input: StringIO<string | Uint8Array>,
+  ): Promise<RackEnv> {
     const env = await this.metaVars(req);
     for (const key of Object.keys(env)) {
       if (env[key] == null) delete env[key];
@@ -269,9 +272,9 @@ function header(req: HttpRequest, name: string): string | undefined {
 /** @noRailsEquivalent PERMANENT */
 const MAX_BODY_SIZE = 10 * 1024 * 1024;
 
-function readBody(req: HttpRequest): Promise<string> {
+function readBody(req: HttpRequest): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
-    const chunks: string[] = [];
+    const chunks: Uint8Array[] = [];
     let totalLength = 0;
     req.on("data", (chunk) => {
       totalLength += chunk.length;
@@ -280,18 +283,17 @@ function readBody(req: HttpRequest): Promise<string> {
         reject(new Error("Request body too large"));
         return;
       }
-      chunks.push(binaryString(chunk));
+      chunks.push(chunk);
     });
-    req.on("end", () => resolve(chunks.join("")));
+    req.on("end", () => {
+      const body = new Uint8Array(totalLength);
+      let offset = 0;
+      for (const chunk of chunks) {
+        body.set(chunk, offset);
+        offset += chunk.length;
+      }
+      resolve(body);
+    });
     req.on("error", reject);
   });
-}
-
-/** @noRailsEquivalent PERMANENT */
-function binaryString(bytes: Uint8Array): string {
-  let out = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return out;
 }

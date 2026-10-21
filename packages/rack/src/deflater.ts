@@ -132,16 +132,15 @@ export class GzipStream {
     this.sync = sync;
   }
 
-  /** @missingRailsName part — PERMANENT */
   async each(block: (data: Uint8Array) => void): Promise<void> {
     this.writer = block;
     const gzip = new GzipWriter(this);
     if (this.mtime) gzip.mtime = this.mtime;
     try {
       if (this.body instanceof File) {
-        let part: string | null;
+        let part: Uint8Array | null;
         while ((part = this.body.read(GzipStream.BUFFER_LENGTH)) != null) {
-          gzip.write(Buffer.from(String(part), "binary"));
+          gzip.write(part);
           if (this.sync) await gzip.flush();
         }
       } else {
