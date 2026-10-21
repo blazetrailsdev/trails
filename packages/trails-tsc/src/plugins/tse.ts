@@ -273,7 +273,8 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
   for (const line of destructureLines(locals)) header.push(line);
   if (scope !== undefined) {
     const declared = new Set(locals.map((l) => l.name));
-    const free = freeIdentifiers(body).filter((name) => !declared.has(name));
+    const { names, guarded } = freeIdentifiers(body);
+    const free = names.filter((name) => !declared.has(name));
     for (const [name, line] of Object.entries(INJECTED)) {
       if (!free.includes(name)) continue;
       free.splice(free.indexOf(name), 1);
@@ -282,12 +283,14 @@ export function virtualizeTseWithDeltas(source: string, scope?: TseScope): Virtu
     if (free.length > 0) {
       const scopes = ast.localsSignature === null ? "[locals, this, TopLevel]" : "[this, TopLevel]";
       header.push(
-        `  const __lookup = (name: string): any => { for (const scope of ${scopes} as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } return Reflect.get(globalThis, name); };`,
+        `  const __lookup = (name: string, guarded = false): any => { for (const scope of ${scopes} as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded || name in globalThis) return Reflect.get(globalThis, name); const raise = (): never => { throw new ReferenceError(name + " is not defined"); }; return new Proxy(raise, { get: raise, has: raise, apply: raise, construct: raise, set: raise }); };`,
       );
     }
     for (const name of free) {
       const key = JSON.stringify(name);
-      header.push(`  let ${name} = __lookup(${key}) as Scope<${key}>;`);
+      header.push(
+        `  let ${name} = __lookup(${key}${guarded.has(name) ? ", true" : ""}) as Scope<${key}>;`,
+      );
     }
   }
   const footer = ["  return _ob;", "}", ""];
@@ -367,7 +370,7 @@ const UNDECLARABLE = new Set([
   "__lookup",
 ]);
 
-function freeIdentifiers(body: readonly string[]): string[] {
+function freeIdentifiers(body: readonly string[]): { names: string[]; guarded: Set<string> } {
   const sf = ts.createSourceFile(
     "body.ts",
     `async function __tse() {\n${body.join("\n")}\n}`,
@@ -376,27 +379,49 @@ function freeIdentifiers(body: readonly string[]): string[] {
   );
   const fn = sf.statements[0] as ts.FunctionDeclaration;
   const names = new Set<string>();
-  const visit = (node: ts.Node): void => {
+  const guarded = new Set<string>();
+  const visit = (node: ts.Node, bound: ReadonlySet<string>): void => {
     if (ts.isTypeNode(node)) return;
     if (ts.isIdentifier(node) && isReference(node) && !UNDECLARABLE.has(node.text)) {
-      names.add(node.text);
+      if (!bound.has(node.text)) {
+        names.add(node.text);
+        if (ts.isTypeOfExpression(node.parent)) guarded.add(node.text);
+      }
     }
-    ts.forEachChild(node, visit);
+    const inner = scopeBindings(node);
+    const next = inner.size === 0 ? bound : new Set([...bound, ...inner]);
+    ts.forEachChild(node, (child) => visit(child, next));
   };
-  ts.forEachChild(fn.body!, visit);
-  for (const stmt of fn.body!.statements) {
-    if (ts.isVariableStatement(stmt)) {
-      for (const decl of stmt.declarationList.declarations) deleteBound(decl.name, names);
-    } else if ((ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) && stmt.name) {
-      names.delete(stmt.name.text);
-    }
-  }
-  return [...names].sort();
+  visit(fn.body!, new Set());
+  return { names: [...names].sort(), guarded };
 }
 
-function deleteBound(name: ts.BindingName, names: Set<string>): void {
-  if (ts.isIdentifier(name)) names.delete(name.text);
-  else for (const el of name.elements) if (!ts.isOmittedExpression(el)) deleteBound(el.name, names);
+function scopeBindings(node: ts.Node): Set<string> {
+  const bound = new Set<string>();
+  const add = (name: ts.BindingName): void => {
+    if (ts.isIdentifier(name)) bound.add(name.text);
+    else for (const el of name.elements) if (!ts.isOmittedExpression(el)) add(el.name);
+  };
+  if (ts.isFunctionLike(node)) for (const param of node.parameters) add(param.name);
+  if (ts.isCatchClause(node) && node.variableDeclaration) add(node.variableDeclaration.name);
+  if (ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node)) {
+    const init = node.initializer;
+    if (init && ts.isVariableDeclarationList(init))
+      for (const decl of init.declarations) add(decl.name);
+  }
+  if (ts.isBlock(node) || ts.isSourceFile(node) || ts.isCaseBlock(node)) {
+    const statements = ts.isCaseBlock(node)
+      ? node.clauses.flatMap((clause) => [...clause.statements])
+      : node.statements;
+    for (const stmt of statements) {
+      if (ts.isVariableStatement(stmt)) {
+        for (const decl of stmt.declarationList.declarations) add(decl.name);
+      } else if ((ts.isFunctionDeclaration(stmt) || ts.isClassDeclaration(stmt)) && stmt.name) {
+        bound.add(stmt.name.text);
+      }
+    }
+  }
+  return bound;
 }
 
 function isReference(node: ts.Identifier): boolean {

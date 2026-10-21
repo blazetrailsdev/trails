@@ -805,8 +805,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: tse-undefined-local-raises-template-error
-  it.skip("render partial with errors", async () => {
+  it("render partial with errors", async () => {
     const e = await assertRaises([TemplateError], {}, () => view.render({ partial: "test/raise" }));
     assertMatch(/doesnt_exist/, e.message);
     assertEqual("", (e as TemplateError).subTemplateMessage());
@@ -824,8 +823,7 @@ describe("CachedViewRenderTest", () => {
     assertEqual("    10: <p>Tenth paragraph</p>", errorLines[2]);
   });
 
-  // BLOCKED: tse-undefined-local-raises-template-error
-  it.skip("render template with errors", async () => {
+  it("render template with errors", async () => {
     const e = await assertRaises([TemplateError], {}, () =>
       view.render({ template: "test/_raise" }),
     );
@@ -833,8 +831,7 @@ describe("CachedViewRenderTest", () => {
     assertEqual("", (e as TemplateError).subTemplateMessage());
   });
 
-  // BLOCKED: tse-undefined-local-raises-template-error
-  it.skip("render sub template with errors", async () => {
+  it("render sub template with errors", async () => {
     const e = await assertRaises([TemplateError], {}, () =>
       view.render({ template: "test/sub_template_raise" }),
     );
@@ -845,8 +842,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: tse-undefined-local-raises-template-error
-  it.skip("undefined method error references named class", async () => {
+  it("undefined method error references named class", async () => {
     const e = await assertRaises([TemplateError], {}, () =>
       view.render({ inline: "<%= undefined_name %>" }),
     );
@@ -955,8 +951,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: tse-undefined-local-raises-template-error
-  it.skip("render partial without object or collection does not generate partial name local variable", async () => {
+  it("render partial without object or collection does not generate partial name local variable", async () => {
     const exception = await assertRaises([TemplateError], {}, () =>
       controllerView.render("partial_name_local_variable"),
     );
@@ -1194,8 +1189,7 @@ describe("CachedViewRenderTest", () => {
     assertMatch("Missing partial /_true with", e.message);
   });
 
-  // BLOCKED: missing-template-detailed-message-spellcheck
-  it.skip("render partial provides spellcheck", async () => {
+  it("render partial provides spellcheck", async () => {
     const e = await assertRaises([MissingTemplate], {}, () =>
       view.render({ partial: "test/partail" }),
     );
@@ -1205,8 +1199,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: missing-template-detailed-message-spellcheck
-  it.skip("spellcheck doesnt list directories", async () => {
+  it("spellcheck doesnt list directories", async () => {
     const e = await assertRaises([MissingTemplate], {}, () =>
       view.render({ partial: "test/directory" }),
     );
@@ -1220,8 +1213,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: missing-template-detailed-message-spellcheck
-  it.skip("spellcheck only lists templates", async () => {
+  it("spellcheck only lists templates", async () => {
     const e = await assertRaises([MissingTemplate], {}, () =>
       view.render({ template: "test/partial" }),
     );
@@ -1235,8 +1227,7 @@ describe("CachedViewRenderTest", () => {
     );
   });
 
-  // BLOCKED: missing-template-detailed-message-spellcheck
-  it.skip("spellcheck only lists partials", async () => {
+  it("spellcheck only lists partials", async () => {
     const e = await assertRaises([MissingTemplate], {}, () =>
       view.render({ partial: "test/template" }),
     );

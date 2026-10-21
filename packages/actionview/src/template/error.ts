@@ -1,11 +1,12 @@
 import { isPresent, SyntaxErrorProxy, symbolizeKeys } from "@blazetrails/activesupport";
-import { Jaro } from "@blazetrails/did-you-mean";
+import { Correctable, Jaro } from "@blazetrails/did-you-mean";
 import {
   ArgumentError,
   type Encoding,
   excBacktrace,
   excBacktraceLocations,
   File,
+  include,
   type Location,
   rbInspect,
   regexpEscape,
@@ -199,6 +200,7 @@ export class MissingTemplate extends ActionViewError {
     }
   }
 }
+include(MissingTemplate, Correctable);
 
 export class TemplateError extends ActionViewError {
   static readonly SOURCE_CODE_RADIUS = 3;
