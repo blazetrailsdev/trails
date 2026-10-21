@@ -1050,7 +1050,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["packages/marcel/src/test-helpers/**/*.ts"],
+    files: ["packages/marcel/src/test-helpers/test-helper.ts"],
     rules: {
       "no-useless-assignment": "off",
       "prefer-const": ["error", { destructuring: "all" }],
