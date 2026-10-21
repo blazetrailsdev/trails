@@ -1,3 +1,4 @@
+import { rbModAppendFeatures } from "@blazetrails/ruby-compat/include";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Result } from "./result.js";
 import { FutureResult, Complete, type FutureResultConnection } from "./future-result.js";
@@ -25,7 +26,7 @@ function overSuper(
     }
   }
   class Host extends Parent {}
-  QueryCache.appendFeatures(Host);
+  rbModAppendFeatures(Host, QueryCache);
   return Object.assign(new Host(), props);
 }
 
@@ -328,10 +329,7 @@ describe("DatabaseStatements#select_all", () => {
       },
     };
 
-    const result = await DatabaseStatements.instanceMethod("selectAll")!.value.call(
-      host as never,
-      "SELECT 1",
-    );
+    const result = await DatabaseStatements.selectAll.call(host as never, "SELECT 1");
     expect(result).toBe(Result.empty());
   });
 
@@ -342,10 +340,7 @@ describe("DatabaseStatements#select_all", () => {
       },
     };
 
-    const result = await DatabaseStatements.instanceMethod("selectAll")!.value.call(
-      host as never,
-      "SELECT 1",
-    );
+    const result = await DatabaseStatements.selectAll.call(host as never, "SELECT 1");
     expect(result).toBe(Result.empty());
   });
 
@@ -356,9 +351,9 @@ describe("DatabaseStatements#select_all", () => {
       },
     };
 
-    await expect(
-      DatabaseStatements.instanceMethod("selectAll")!.value.call(host as never, "SELECT 1"),
-    ).rejects.toThrow("boom");
+    await expect(DatabaseStatements.selectAll.call(host as never, "SELECT 1")).rejects.toThrow(
+      "boom",
+    );
   });
 });
 
