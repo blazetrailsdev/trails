@@ -782,7 +782,7 @@ describe("RenderTest", () => {
 
   test("line offset", async () => {
     const exc = await assertRaises([Template.Error], {}, () => testCase.get("renderLineOffset"));
-    const line = (exc as InstanceType<typeof Template.Error>).backtrace()![0];
+    const line = exc.backtrace()![0];
     const m = line.match(/:(\d+):/);
     assert(m);
     expect(m![1]).toBe("1");
