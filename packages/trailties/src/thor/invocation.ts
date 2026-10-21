@@ -4,7 +4,6 @@ import {
   Hash,
   included,
   isModuleIncluded,
-  Module,
   rbFCaller,
   rbModToS,
   rbObjAsString,
@@ -168,24 +167,19 @@ function _parseInitializationOptions(
   return [args as unknown[], opts, config as BaseConfig];
 }
 
-export const Invocation = new Module((mod) => {
-  (mod as unknown as Record<symbol, unknown>)[included] = function (base: object): void {
+export const Invocation = {
+  ClassMethods,
+  [included](base: object): void {
     extend(base, ClassMethods);
-  };
-
-  mod.moduleEval((m) => {
-    Object.assign(m, {
-      currentCommandChain,
-      invoke,
-      invokeCommand,
-      invokeTask,
-      invokeAll,
-      invokeWithPadding,
-      _sharedConfiguration,
-      _retrieveClassAndCommand,
-      _retrieveClassAndTask,
-      _parseInitializationOptions,
-    });
-  });
-}) as Module & { ClassMethods: typeof ClassMethods };
-Invocation.ClassMethods = ClassMethods;
+  },
+  currentCommandChain,
+  invoke,
+  invokeCommand,
+  invokeTask,
+  invokeAll,
+  invokeWithPadding,
+  _sharedConfiguration,
+  _retrieveClassAndCommand,
+  _retrieveClassAndTask,
+  _parseInitializationOptions,
+};

@@ -1532,17 +1532,6 @@ export function extractFromProgram(
           reExportedFrom: declaringKey(sourceKey),
         };
         clonedThisRound = true;
-        continue;
-      }
-      const sourceModule = info.modules[sourceKey];
-      if (sourceModule) {
-        info.modules[key] = {
-          ...sourceModule,
-          name: re.localName,
-          file: re.fromFile,
-          reExportedFrom: declaringKey(sourceKey),
-        };
-        clonedThisRound = true;
       }
     }
   }

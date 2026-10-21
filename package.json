@@ -59,6 +59,8 @@
     "parity:api:predicates:tighten": "pnpm tsx scripts/api-compare/lint-predicate-kinds.ts --tighten",
     "parity:api:params:tighten": "pnpm tsx scripts/api-compare/lint-param-names.ts --tighten",
     "parity:types:casts": "tsx -e \"import('./scripts/parity/cast-count.ts').then((m) => m.main()).then(console.log)\"",
+    "parity:modules": "tsx -e \"import('./scripts/parity/module-count.ts').then((m) => m.main()).then(console.log)\"",
+    "parity:modules:tighten": "tsx -e \"import('./scripts/parity/module-count.ts').then((m) => m.main(['--tighten'])).then(console.log)\"",
     "parity:api:sends": "tsx -e \"import('./scripts/parity/send-count.ts').then((m) => m.main()).then(console.log)\"",
     "parity:api:blocks": "pnpm tsx scripts/api-compare/lint-block-params.ts",
     "parity:api:blocks:tighten": "pnpm tsx scripts/api-compare/lint-block-params.ts --tighten",

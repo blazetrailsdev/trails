@@ -1,0 +1,37 @@
+{
+  "actionpack": {
+    "newModule": 77,
+    "superMethod": 40,
+    "moduleImport": 25
+  },
+  "actionview": {
+    "newModule": 18,
+    "superMethod": 17,
+    "moduleImport": 14
+  },
+  "activejob": {
+    "newModule": 0,
+    "superMethod": 0,
+    "moduleImport": 1
+  },
+  "activemodel": {
+    "newModule": 5,
+    "superMethod": 0,
+    "moduleImport": 4
+  },
+  "activerecord": {
+    "newModule": 15,
+    "superMethod": 6,
+    "moduleImport": 20
+  },
+  "activesupport": {
+    "newModule": 25,
+    "superMethod": 2,
+    "moduleImport": 15
+  },
+  "trailties": {
+    "newModule": 0,
+    "superMethod": 0,
+    "moduleImport": 1
+  }
+}
