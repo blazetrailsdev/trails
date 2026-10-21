@@ -37,6 +37,7 @@
     "@blazetrails/tse-compiler": "workspace:*"
   },
   "devDependencies": {
+    "@blazetrails/actionpack": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "engines": {

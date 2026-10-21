@@ -215,6 +215,9 @@ importers:
         specifier: workspace:*
         version: link:../tse-compiler
     devDependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
       typescript:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1
