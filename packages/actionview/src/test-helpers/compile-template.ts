@@ -87,7 +87,10 @@ export async function compileTemplate(
   };
 }
 
-const FUNCTION_HEADER_LINES = 3;
+const FUNCTION_HEADER_LINES = new Function("exports", "require", "/*body*/")
+  .toString()
+  .split("/*body*/")[0]
+  .split("\n").length;
 let compiled = 0;
 
 const MODULES: Record<string, unknown> = {
