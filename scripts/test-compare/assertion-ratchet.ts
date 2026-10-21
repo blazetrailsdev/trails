@@ -65,7 +65,11 @@ export interface Violation {
   base: number;
 }
 
-/** Counters above their base count, plus packages the base never measured. */
+/**
+ * Counters above their base count, plus packages the base never measured that
+ * carry debt. A newly enrolled package with every counter at zero brings no
+ * debt in, so it is admitted and becomes its own base once main measures it.
+ */
 export function violations(
   current: Record<string, Counts>,
   base: Record<string, Counts>,
@@ -75,7 +79,7 @@ export function violations(
   for (const pkg of Object.keys(current).sort()) {
     const prior = base[pkg];
     if (!prior) {
-      unmarked.push(pkg);
+      if (COUNTERS.some((counter) => current[pkg][counter] > 0)) unmarked.push(pkg);
       continue;
     }
     for (const counter of COUNTERS) {
@@ -126,7 +130,7 @@ export function renderUnmarked(unmarked: string[], basePath: string): string {
     `assertion-mismatch ratchet: ${unmarked.length} package(s) are absent from ${basePath}:`,
     ...unmarked.map((p) => `  ${p}`),
     "A package the base never measured would let its whole assertion debt in unmeasured.",
-    "Land its comparison wiring with no matched-test assertion debt first.",
+    "Converge its matched-test assertion debt to zero before enrolling it.",
   ].join("\n");
 }
 
