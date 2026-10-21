@@ -36,16 +36,6 @@ export interface GemConfig {
 const GEMS: Record<string, GemConfig> = {
   activerecord: { gem: "activerecord", rubyRoot: "active_record", namespace: "ActiveRecord" },
   activejob: { gem: "activejob", rubyRoot: "active_job", namespace: "ActiveJob" },
-  marcel: {
-    gem: "marcel",
-    rubyRoot: "marcel",
-    namespace: "Marcel",
-    vendor: "marcel/v1.0.4",
-    skipTests: {
-      "gets content type from sources that conform to Rack::Lint::InputWrapper":
-        "Rack::Lint::InputWrapper is rack 2 (marcel.gemspec:25 `rack ~> 2.0`); trails ports rack 3.1.14, where it is Rack::Lint::Wrapper::InputWrapper (vendor/rack/v3.1.14/lib/rack/lint.rb:44, :445)",
-    },
-  },
 };
 
 // image_processing (janko/image_processing v1.14.0, vendor/rails/v8.0.2/Gemfile.lock:289),
