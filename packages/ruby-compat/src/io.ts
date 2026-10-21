@@ -514,6 +514,7 @@ function parseModeEnc(
  * @noRailsEquivalent PERMANENT
  */
 export const ioObjects = new Set<WeakRef<IO>>();
+const ioObjectsSweep = new FinalizationRegistry<WeakRef<IO>>((ref) => ioObjects.delete(ref));
 
 /**
  * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
@@ -579,7 +580,9 @@ export class IO {
     this.fd = fd;
     this.pathv = pathv;
     this.mode = rbIoModestrFmode(vmode);
-    ioObjects.add(new WeakRef(this));
+    const ref = new WeakRef(this);
+    ioObjects.add(ref);
+    ioObjectsSweep.register(this, ref);
   }
 
   /**
