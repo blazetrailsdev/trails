@@ -1772,7 +1772,10 @@ export type Extended<M extends object> = CallableMethods<M>;
  * Temporal value; an array is allocated as one (`rb_obj_alloc`), so its
  * elements, which Ruby copies in `Array#initialize_copy` (`array.c:8613`,
  * `rb_ary_replace`), land on a real array, and so are a JS `Date`, `Map`, `Set`,
- * `RegExp` and typed array. A class with an allocator ({@link rbDefineAllocFunc}) is
+ * `RegExp` and typed array. A typed array is copied through the constructor
+ * its `Symbol.toStringTag` names, since a Node `Buffer`'s `slice` answers a
+ * view onto the same memory and its own constructor is the deprecated
+ * `Buffer()`. A class with an allocator ({@link rbDefineAllocFunc}) is
  * allocated through it. The copy hook is found as a method entry.
  *
  * Ruby's `Object#initialize_clone` / `#initialize_dup` default to
@@ -2030,7 +2033,7 @@ export function prepend(
   if (!isModuleMethodTablePresent(klass, mod)) rbModPrependFeatures(klass, mod);
   if (typeof (mod as ModuleHooks)[prepended] === "function") {
     (mod as ModuleHooks)[prepended]!(klass);
-  } else {
+  } else if (!(mod instanceof Module)) {
     featureHook(mod, "prepended")?.(klass);
   }
 }
