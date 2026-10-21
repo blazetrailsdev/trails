@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbClassNewInstance } from "./include.js";
+import { rbCallSuper, rbClassNewInstance } from "./include.js";
 import { rbAbsintSize } from "./numeric.js";
 import {
   rbCArray,
@@ -32,8 +32,8 @@ import {
   OBJECT_METHOD_TABLE,
   rbFPublicSend,
   rbModAttrReader,
-  rbModDefineMethod,
   rbModAttrWriter,
+  rbModDefineMethod,
   rbModMethodDefined,
   rbFSend,
   toS as toSSend,
@@ -708,6 +708,22 @@ describe("rbModPublicMethodDefined", () => {
 });
 
 describe("rbModDefineMethod", () => {
+  it("replaces an own method, whose super reaches the ancestor, not the replaced definition", () => {
+    class Parent {
+      greet(): string {
+        return "parent";
+      }
+    }
+    class Child extends Parent {}
+    const define = () =>
+      rbModDefineMethod(Child, "greet", function greet(this: object): unknown {
+        return `child:${rbCallSuper(this, greet) as string}`;
+      });
+    define();
+    define();
+    expect((new Child() as Parent).greet()).toBe("child:parent");
+  });
+
   it("defines an instance method on the class, which method_defined? sees without its ancestors", () => {
     class Parent {}
     class Child extends Parent {}

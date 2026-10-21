@@ -852,7 +852,8 @@ export function rbSeatSuper(
  * statics (CLAUDE.md, "`singleton_class` is a per-object subclass"), so a
  * class's `singleton_class.define_method` passes `{ prototype: klass }`.
  *
- * Its `super` reaches the method `mid` shadows ({@link rbCallSuper}).
+ * It replaces `mod`'s own `mid`, and its `super` reaches the next `mid` in
+ * the ancestry ({@link rbCallSuper}).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -867,7 +868,12 @@ export function rbModDefineMethod(
         ? { value: body, writable: true, configurable: true }
         : { configurable: true, ...body },
   };
-  rbSeatSuper(mod.prototype, mid, typeof body === "function" ? body : body.value, descriptors);
+  rbSeatSuper(
+    Object.getPrototypeOf(mod.prototype) as object,
+    mid,
+    typeof body === "function" ? body : body.value,
+    descriptors,
+  );
   Object.defineProperties(mod.prototype, descriptors);
   return mid;
 }
