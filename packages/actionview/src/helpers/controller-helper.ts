@@ -64,19 +64,6 @@ export class ControllerHelper {}
 
 attrInternal.call(ControllerHelper.prototype, "controller", "request");
 
-delegate.call(
-  ControllerHelper.prototype,
-  "requestForgeryProtectionToken",
-  "params",
-  "session",
-  "cookies",
-  "response",
-  "headers",
-  "flash",
-  "actionName",
-  "controllerName",
-  "controllerPath",
-  { to: "controller" },
-);
+delegate.call(ControllerHelper.prototype, ...CONTROLLER_DELEGATES, { to: "controller" });
 
 Object.assign(ControllerHelper.prototype, { assignController, logger, isRespondTo });

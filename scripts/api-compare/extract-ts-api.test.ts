@@ -7854,6 +7854,28 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     ]);
   });
 
+  it("credits top-level attrInternal and delegate on a class's prototype", () => {
+    const info = extractFromFiles("/p", {
+      "controller-helper.ts": `
+        import { attrInternal, delegate } from "@blazetrails/activesupport";
+        const DELEGATES = ["params", "session"] as const;
+        export class ControllerHelper {}
+        attrInternal.call(ControllerHelper.prototype, "controller");
+        delegate.call(ControllerHelper.prototype, ...DELEGATES, { to: "controller" });
+        delegate.call(ControllerHelper.prototype, "flash", { to: "controller", prefix: true });
+      `,
+    });
+    const klass = info.classes["controller-helper.ts:ControllerHelper"];
+    const seats = (name: string) =>
+      [...klass.classMethods, ...klass.instanceMethods]
+        .filter((m) => m.name === name)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats("controller")).toEqual(["instance", "instance writer"]);
+    expect(seats("params")).toEqual(["instance"]);
+    expect(seats("session")).toEqual(["instance"]);
+    expect(seats("flash")).toEqual([]);
+  });
+
   it("seats a cattrAccessor inside an onLoad block on the hook's module", () => {
     const info = extractFromFiles("/p", {
       "form-helper.ts": `
