@@ -5038,7 +5038,9 @@ export class Lowerer {
     // Under `&.` a nil receiver must reach the `?.` as nil, not the conversion.
     const enumOf = (x: string) =>
       (nav === "?." ? `${x} == null ? ${x} : ` : "") +
-      `${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map ? [...${x}] : ` +
+      // A Set, a Map or an Enumerator (`ObjectSpace.each_object(File)`) by iterating
+      // it, a Hash's pairs, and anything else (an Array, a String) as is.
+      `${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map || ${x} instanceof ${this.rc(ctx, "Enumerator")} ? [...${x}] : ` +
       `Object.getPrototypeOf(${x}) === Object.prototype ? Object.entries(${x} as object) : (${x} as unknown[])`;
     const E =
       recvType?.k === "array"
