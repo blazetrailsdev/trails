@@ -43,6 +43,8 @@ packages/actionpack/src/test-helpers/fixtures/
 # FIXTURE_LOAD_PATH by actionpack/controller/render.test.ts; render_test.rb
 # asserts rendered bodies exactly.
 packages/actionview/src/test-helpers/fixtures/actionpack/
+# Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures, read by magic-byte detection.
+packages/marcel/src/test-helpers/fixtures/
 # Byte-for-byte copies of vendor/thor/v1.3.2/spec/fixtures; the `.ts` beside them are the ported `.thor` files.
 packages/trailties/src/thor/test-helpers/fixtures/*
 !packages/trailties/src/thor/test-helpers/fixtures/*.ts

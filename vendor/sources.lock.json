@@ -32,6 +32,10 @@
       "ref": "v2.24.0",
       "sha": "85990602c6fdb40489138e80080ca508200c7137"
     },
+    "marcel": {
+      "ref": "v1.0.4",
+      "sha": "cdf0e659c87f81e5d2b393cff3569f870bd71c47"
+    },
     "minitest": {
       "ref": "v5.27.0",
       "sha": "819e9b5f873d7ab6d4edfeaed48542279367ff93"

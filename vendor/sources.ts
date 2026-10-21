@@ -341,6 +341,26 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "marcel",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/marcel.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:344 resolves marcel (1.0.4), which
+      // Active Storage depends on.
+      ref: "v1.0.4",
+    },
+    packages: [
+      {
+        name: "marcel",
+        libPath: "lib/marcel",
+        libEntryFile: "lib/marcel.rb",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "thor",
     origin: {
       type: "git",
