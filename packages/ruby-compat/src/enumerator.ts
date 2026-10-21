@@ -129,6 +129,15 @@ export class Enumerator<T = unknown> {
   }
 
   /**
+   * `Enumerable#to_a` (`vendor/ruby/v3.3.11/enum.c:711` `enum_to_a`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  toA(): T[] {
+    return [...this];
+  }
+
+  /**
    * `enumerator_each` (`vendor/ruby/v3.3.11/enumerator.c:613`) run to completion
    * into a snapshot, which a `for…of` then walks. A multi-value yield is packed
    * into one Array (`vendor/ruby/v3.3.11/enum.c:53` `rb_enum_values_pack`).
