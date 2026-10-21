@@ -1,5 +1,7 @@
 import {
   File,
+  basicObjRespondTo,
+  rbCheckArrayType,
   each,
   rbEqual,
   rbFSend,
@@ -458,8 +460,7 @@ export class Wrapper {
   }
 
   checkHeaderValue(key: string, value: string): void {
-    // eslint-disable-next-line no-control-regex
-    if (/[\x00-\x1f]/.test(value)) {
+    if (/[^\x20-\u{10ffff}]/u.test(value)) {
       throw new LintError(`invalid header value ${key}: ${stringInspect(value)}`);
     }
   }
@@ -563,8 +564,7 @@ export class Wrapper {
         }
       }
 
-      this.size +=
-        typeof chunk === "string" ? new TextEncoder().encode(chunk).byteLength : chunk.byteLength;
+      this.size += Buffer.byteLength(chunk);
       block(chunk);
     };
     const iteration = Array.isArray(this._body)
@@ -587,13 +587,13 @@ export class Wrapper {
     if (Object.hasOwn(Wrapper.BODY_METHODS, name)) {
       return rbObjRespondTo(this._body, name);
     } else {
-      return name in this;
+      return basicObjRespondTo(this, name);
     }
   }
 
   toAry(): string[] {
     try {
-      const content: string[] = Array.isArray(this._body) ? this._body : this._body.toAry();
+      const content = rbCheckArrayType(this._body) as string[];
       if (!rbEqual(content, toEnum<string>(this._body).toA())) {
         throw new LintError("#to_ary not identical to contents produced by calling #each");
       }
@@ -690,7 +690,7 @@ export class InputWrapper {
     return v;
   }
 
-  each(...args: unknown[]): unknown {
+  each(...args: [...unknown[], (line: string) => unknown]): unknown {
     const block = args.pop() as (line: string) => unknown;
     if (args.length !== 0) throw new LintError("rack.input#each called with arguments");
     return this._input.each((line: unknown) => {
