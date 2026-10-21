@@ -207,6 +207,22 @@ describe("ForcedMutationTracker", () => {
     const change = tracker.changeToAttribute("name");
     expect(change).toEqual(["Alice", "Bob"]);
   });
+  it("forceChange clones a Date, array and plain object shallowly, as Object#clone does", () => {
+    const inner = { n: 1 };
+    const date = new Date(0);
+    const set = buildSet({ at: date, list: [inner], hash: { inner } });
+    const tracker = new ForcedMutationTracker(buildHost(set));
+
+    const at = tracker.forceChange("at") as Date;
+    const list = tracker.forceChange("list") as unknown[];
+    const hash = tracker.forceChange("hash") as { inner: unknown };
+    expect(at).not.toBe(date);
+    expect(at.getTime()).toBe(0);
+    expect(list).not.toBe(set.fetchValue("list"));
+    expect(list[0]).toBe(inner);
+    expect(hash).not.toBe(set.fetchValue("hash"));
+    expect(hash.inner).toBe(inner);
+  });
 });
 
 describe("forceChange and type.isChanged independence", () => {

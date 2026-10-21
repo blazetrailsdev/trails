@@ -1,31 +1,8 @@
-import { Temporal } from "@blazetrails/date";
 import { HashWithIndifferentAccess, isDuplicable } from "@blazetrails/activesupport";
-import { NoMethodError, rbEqual, TypeError } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbEqual, rbObjClone, TypeError } from "@blazetrails/ruby-compat";
 import { AttributeSet } from "./attribute-set.js";
 
 /** @internal */
-function dupValue(value: unknown): unknown {
-  if (value === null || typeof value !== "object") return value;
-  // boundary: Date is mutable — clone to protect dirty tracking when a legacy
-  if (value instanceof Date) return new Date(value.getTime());
-  if (
-    value instanceof Temporal.Instant ||
-    value instanceof Temporal.PlainDateTime ||
-    value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.PlainTime ||
-    value instanceof Temporal.ZonedDateTime
-  )
-    return value;
-  if (Array.isArray(value)) return value.map(dupValue);
-  const proto = Object.getPrototypeOf(value);
-  if (proto !== Object.prototype && proto !== null) return value;
-  const result: Record<string, unknown> = proto === null ? Object.create(null) : {};
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    result[k] = dupValue(v);
-  }
-  return result;
-}
-
 export class AttributeMutationTracker {
   static readonly OPTION_NOT_GIVEN: unknown = Object.freeze({});
 
@@ -183,7 +160,7 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
     let value: unknown;
     try {
       value = this.fetchValue(attrName);
-      return isDuplicable(value) ? dupValue(value) : value;
+      return isDuplicable(value) ? rbObjClone(value) : value;
     } catch (e) {
       if (e instanceof TypeError || e instanceof NoMethodError) return value;
       throw e;

@@ -68,6 +68,7 @@ type AnyFunction = (...args: never) => unknown;
 type ModuleHooks = {
   [included]?: (klass: unknown) => void;
   [extended]?: (klass: unknown) => void;
+  [prepended]?: (klass: unknown) => void;
   [initialize]?: (this: object, ...args: never[]) => void | Generator;
 };
 
@@ -909,6 +910,16 @@ export const included = Symbol.for("@blazetrails/ruby-compat:included");
  * hook, which the language has no equivalent of.
  */
 export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
+
+/**
+ * Symbol key for Ruby's Module#prepended callback, which `rb_mod_prepend`
+ * fires on the module once `prepend_features` has spliced it into the
+ * ancestry, on every call (vendor/ruby/v3.3.11/eval.c:1215).
+ *
+ * @noRailsEquivalent PERMANENT — the TypeScript spelling of a Ruby lifecycle
+ * hook, which the language has no equivalent of.
+ */
+export const prepended = Symbol.for("@blazetrails/ruby-compat:prepended");
 
 /**
  * Symbol key for a module's `initialize`, the per-instance half of Ruby's
@@ -1760,8 +1771,11 @@ export type Extended<M extends object> = CallableMethods<M>;
  * MRI's `special_object_p` (:380-393) and is returned as is (:539), as is a
  * Temporal value; an array is allocated as one (`rb_obj_alloc`), so its
  * elements, which Ruby copies in `Array#initialize_copy` (`array.c:8613`,
- * `rb_ary_replace`), land on a real array, and so are a JS `Date`, `Map`, `Set`
- * and `RegExp`. A class with an allocator ({@link rbDefineAllocFunc}) is
+ * `rb_ary_replace`), land on a real array, and so are a JS `Date`, `Map`, `Set`,
+ * `RegExp` and typed array. A typed array is copied through the constructor
+ * its `Symbol.toStringTag` names, since a Node `Buffer`'s `slice` answers a
+ * view onto the same memory and its own constructor is the deprecated
+ * `Buffer()`. A class with an allocator ({@link rbDefineAllocFunc}) is
  * allocated through it. The copy hook is found as a method entry.
  *
  * Ruby's `Object#initialize_clone` / `#initialize_dup` default to
@@ -1928,6 +1942,12 @@ function rbObjAlloc(obj: object, proto: object | null): object {
   if (obj instanceof Map) return Object.setPrototypeOf(new Map(obj), proto);
   if (obj instanceof Set) return Object.setPrototypeOf(new Set(obj), proto);
   if (obj instanceof RegExp) return Object.setPrototypeOf(new RegExp(obj), proto);
+  if (ArrayBuffer.isView(obj) && !(obj instanceof DataView)) {
+    const typedArray = (
+      globalThis as unknown as Record<string, new (src: ArrayLike<number>) => object>
+    )[(obj as Uint8Array)[Symbol.toStringTag]];
+    return Object.setPrototypeOf(new typedArray(obj as Uint8Array), proto);
+  }
   return Object.create(proto);
 }
 
@@ -2001,9 +2021,21 @@ export function prepend(
 ): void {
   const klass = target as AnyClass;
   const prependFeatures = featureHook(mod, "prependFeatures");
-  if (prependFeatures) return prependFeatures(klass);
-  if (isModuleMethodTablePresent(klass, mod)) return;
-  rbModPrependFeatures(klass, mod);
+  if (prependFeatures) {
+    prependFeatures(klass);
+    if (typeof (mod as ModuleHooks)[prepended] === "function") {
+      (mod as ModuleHooks)[prepended]!(klass);
+    } else {
+      featureHook(mod, "prepended")?.(klass);
+    }
+    return;
+  }
+  if (!isModuleMethodTablePresent(klass, mod)) rbModPrependFeatures(klass, mod);
+  if (typeof (mod as ModuleHooks)[prepended] === "function") {
+    (mod as ModuleHooks)[prepended]!(klass);
+  } else if (!(mod instanceof Module)) {
+    featureHook(mod, "prepended")?.(klass);
+  }
 }
 
 /**

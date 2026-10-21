@@ -27,4 +27,8 @@ describe("b", () => {
     expect(forceEncoding(b("café"), Encoding.UTF_8)).toBe("café");
     expect(forceEncoding(b("café"), Encoding.BINARY)).toBe(b("café"));
   });
+
+  it("answers a surrogate-carried invalid byte as that byte", () => {
+    expect(b("\udcff\udcd8\udcff")).toBe("\xff\xd8\xff");
+  });
 });

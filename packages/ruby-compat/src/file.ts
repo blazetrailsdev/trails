@@ -435,6 +435,8 @@ export class File extends IO {
    * `Tempfile#initialize` sets to `0600` (`vendor/ruby/v3.3.11/lib/tempfile.rb:158`)
    * and `external_encoding:` the stream's external encoding
    * (`rb_io_extract_encoding_option`, `io.c:6725,6750`).
+   * `mode` defaults to `"r"` (`rb_open_file`, `vendor/ruby/v3.3.11/io.c:8102`); a caller that
+   * skips it passes `undefined`.
    * Ruby's block is a block and its `opt` a trailing argument; TypeScript has
    * only the one trailing position for both, so the third parameter is either,
    * discriminated by `typeof`, and a block that follows an `opt` is the fourth.
@@ -453,19 +455,19 @@ export class File extends IO {
    */
   static open(
     fileName: string,
-    mode: string,
+    mode?: string,
     opt?: { perm?: number; externalEncoding?: Encoding | string },
   ): File;
-  static open<T>(fileName: string, mode: string, block: (file: File) => T): T;
+  static open<T>(fileName: string, mode: string | undefined, block: (file: File) => T): T;
   static open<T>(
     fileName: string,
-    mode: string,
+    mode: string | undefined,
     opt: { perm?: number; externalEncoding?: Encoding | string },
     block: (file: File) => T,
   ): T;
   static open<T>(
     fileName: string,
-    mode: string,
+    mode: string = "r",
     blockOrOpt?: ((file: File) => T) | { perm?: number; externalEncoding?: Encoding | string },
     optBlock?: (file: File) => T,
   ): T | File {
