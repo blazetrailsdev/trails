@@ -307,13 +307,78 @@ function expectChainMatcher(call: ts.CallExpression): string | null {
       cur = cur.expression;
     } else if (ts.isCallExpression(cur)) {
       if (ts.isIdentifier(cur.expression) && cur.expression.text === "expect") {
-        return negated ? `not:${matcher}` : matcher;
+        const kind = expectFormKind(matcher, call, cur) ?? matcher;
+        return negated ? `not:${kind}` : kind;
       }
       cur = cur.expression;
     } else {
       return null;
     }
   }
+}
+
+/**
+ * The Minitest helper name an `expect` form ports, for the forms whose matcher
+ * alone would score the wrong kind (the mapping table in CONTRIBUTING.md,
+ * "Porting a Minitest assertion"): Ruby truthiness and `rbEqual` /
+ * `rbObjRespondTo` asserted with `toBe(true)`, an `assert_in_delta` written
+ * `Math.abs(exp - act) <= delta`. An exact class compared through
+ * `.constructor` stays `toBe`, since `assert_equal Klass, o.class` ports to
+ * the same spelling. `null` leaves the matcher as the kind.
+ */
+function expectFormKind(
+  matcher: string,
+  call: ts.CallExpression,
+  expectCall: ts.CallExpression,
+): string | null {
+  const actual = expectCall.arguments[0];
+  if (actual === undefined) return null;
+  if (matcher === "toBeLessThanOrEqual") {
+    return isCallTo(actual, "Math.abs") ? "assertInDelta" : null;
+  }
+  if (matcher !== "toBe" && matcher !== "toEqual") return null;
+  const expected = call.arguments[0];
+  if (expected === undefined || expected.kind !== ts.SyntaxKind.TrueKeyword) return null;
+  if (isCallTo(actual, "rbEqual")) return "assertEqual";
+  // A third (`include_all`) argument is a Rails `assert_equal true,
+  // respond_to?(:m, true)`, which ports to the same spelling.
+  if (isCallTo(actual, "rbObjRespondTo") && (actual as ts.CallExpression).arguments.length === 2) {
+    return "assertRespondTo";
+  }
+  if (ts.isBinaryExpression(actual)) {
+    const op = actual.operatorToken.kind;
+    const pair = [actual.left, actual.right].map(binaryOperator);
+    if (
+      op === ts.SyntaxKind.AmpersandAmpersandToken &&
+      pair[0] === ts.SyntaxKind.ExclamationEqualsToken &&
+      pair[1] === ts.SyntaxKind.ExclamationEqualsEqualsToken
+    ) {
+      return "assert";
+    }
+    if (
+      op === ts.SyntaxKind.BarBarToken &&
+      pair[0] === ts.SyntaxKind.EqualsEqualsToken &&
+      pair[1] === ts.SyntaxKind.EqualsEqualsEqualsToken
+    ) {
+      return "refute";
+    }
+  }
+  return null;
+}
+
+function isCallTo(node: ts.Expression, callee: string): boolean {
+  if (!ts.isCallExpression(node)) return false;
+  const e = node.expression;
+  if (ts.isIdentifier(e)) return e.text === callee;
+  return (
+    ts.isPropertyAccessExpression(e) &&
+    ts.isIdentifier(e.expression) &&
+    `${e.expression.text}.${e.name.text}` === callee
+  );
+}
+
+function binaryOperator(node: ts.Expression): ts.SyntaxKind | null {
+  return ts.isBinaryExpression(node) ? node.operatorToken.kind : null;
 }
 
 /**

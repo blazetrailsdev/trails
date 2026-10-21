@@ -33,6 +33,7 @@ export type CanonicalKind =
   | "same"
   | "notSame"
   | "instanceOf"
+  | "kindOf"
   | "respondTo"
   | "notRespondTo"
   | "operator"
@@ -115,7 +116,7 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   assert_not_predicate: "falsy",
   refute_predicate: "falsy",
   assert_instance_of: "instanceOf",
-  assert_kind_of: "instanceOf",
+  assert_kind_of: "kindOf",
   assert_respond_to: "respondTo",
   assert_not_respond_to: "notRespondTo",
   refute_respond_to: "notRespondTo",
@@ -177,7 +178,7 @@ const MSPEC_MAP: Record<string, CanonicalKind> = {
   should_raise_error: "raises",
   should_not_raise_error: "nothingRaised",
   should_be_an_instance_of: "instanceOf",
-  should_be_kind_of: "instanceOf",
+  should_be_kind_of: "kindOf",
   should_match_yaml: "equal",
   should_be_true: "equal",
 };
@@ -210,10 +211,10 @@ const RSPEC_MAP: Record<string, CanonicalKind> = {
   "expect_to_be_>=": "operator",
   "expect_to_be_<": "operator",
   "expect_to_be_<=": "operator",
-  expect_to_be_a: "instanceOf",
+  expect_to_be_a: "kindOf",
   expect_to_be_an_instance_of: "instanceOf",
   expect_to_be_instance_of: "instanceOf",
-  expect_to_be_kind_of: "instanceOf",
+  expect_to_be_kind_of: "kindOf",
   expect_to_respond_to: "respondTo",
   expect_not_to_respond_to: "notRespondTo",
 };
@@ -253,7 +254,9 @@ const TRAILS_MAP: Record<string, CanonicalKind> = {
   toMatchObject: "match",
   toThrow: "raises",
   toThrowError: "raises",
-  toBeInstanceOf: "instanceOf",
+  // `instanceof` walks the prototype chain, so it is `kind_of?`; an exact
+  // class (`instance_of?`) is `expect(o.constructor).toBe(cls)`.
+  toBeInstanceOf: "kindOf",
   toHaveLength: "length",
   toBeGreaterThan: "operator",
   toBeGreaterThanOrEqual: "operator",
@@ -394,8 +397,14 @@ export interface KindHistogram {
  * permanent false mismatch. Folding both sides leaves an `assertSame` port
  * matching too. The value comparer normalizes separately and still tells the
  * two apart.
+ *
+ * `kind_of?` folds onto `instance_of?` for the same reason in reverse: ports
+ * written before the Minitest mapping table spelled `assert_instance_of` as
+ * `toBeInstanceOf`, which is `kind_of?`. Converging those ports to
+ * `expect(o.constructor).toBe(cls)` lifts this fold.
  */
 const HISTOGRAM_FOLD: Partial<Record<CanonicalKind, CanonicalKind>> = {
+  kindOf: "instanceOf",
   same: "equal",
   notSame: "notEqual",
 };
