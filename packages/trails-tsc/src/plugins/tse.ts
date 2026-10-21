@@ -1,11 +1,7 @@
 import ts from "typescript-5";
 import {
-  ARROW_BLOCK_RE,
   awaitFlowReads,
-  BLOCK_CLOSE_RE,
-  FUNCTION_BLOCK_RE,
-  netBraceDepth,
-  netUnclosedParens,
+  emitSteps,
   parse,
   parseLocalsSignature,
   LocalsSignatureError,
@@ -52,55 +48,14 @@ type EmittedLine = [code: string, node: TseAst["nodes"][number]];
 
 function emitNodes(nodes: TseAst["nodes"], escapeIgnore = false): EmittedLine[] {
   const lines: EmittedLine[] = [];
-  const innerDepths: number[] = [];
-  const innerCallExprParens: number[] = [];
-  let braceDepth = 0;
-  const functionDepths: number[] = [];
-  for (const node of nodes) {
-    const insideBlock = innerDepths.length > 0;
-    const bufRef = insideBlock ? "context.outputBuffer" : "_ob";
-    const awaits = !insideBlock && functionDepths.length === 0;
+  for (const { node, bufRef, awaits, suffix } of emitSteps(nodes, "context.outputBuffer", true)) {
     if (node.kind === "blockExpr") {
-      const trimmed = node.value.trim();
-      if (!ARROW_BLOCK_RE.test(trimmed)) {
-        throw new Error(
-          `TSE: block-expr tag must use arrow syntax (e.g. \`(x) => {\`); function/do forms are not supported. Got: \`${trimmed}\``,
-        );
-      }
-      innerDepths.push(0);
-      innerCallExprParens.push(netUnclosedParens(node.value) + (awaits ? 1 : 0));
       lines.push([`  ${bufRef}.append(${awaits ? "await (" : ""}${node.value.trim()}`, node]);
-    } else if (node.kind === "code" && insideBlock) {
-      const innerDepth = innerDepths[innerDepths.length - 1];
-      if (BLOCK_CLOSE_RE.test(node.value) && innerDepth === 0) {
-        innerDepths.pop();
-        const callExprParens = innerCallExprParens.pop()!;
-        const closer = node.value.trim().replace(/;\s*$/, "");
-        const closingParens = (closer.match(/\)/g) ?? []).length;
-        const suffix = ")".repeat(Math.max(0, 1 + callExprParens - closingParens)) + ";";
-        lines.push([`  ${closer}${suffix}`, node]);
-      } else {
-        innerDepths[innerDepths.length - 1] += netBraceDepth(node.value);
-        lines.push([emitNode(node, bufRef, false, escapeIgnore), node]);
-      }
+    } else if (suffix !== undefined) {
+      lines.push([`  ${node.value.trim().replace(/;\s*$/, "")}${suffix}`, node]);
     } else {
-      if (node.kind === "code") {
-        braceDepth += netBraceDepth(node.value);
-        while (
-          functionDepths.length > 0 &&
-          braceDepth < functionDepths[functionDepths.length - 1]
-        ) {
-          functionDepths.pop();
-        }
-        if (FUNCTION_BLOCK_RE.test(node.value.trimEnd())) functionDepths.push(braceDepth);
-      }
       lines.push([emitNode(node, bufRef, awaits, escapeIgnore), node]);
     }
-  }
-  if (innerDepths.length > 0) {
-    throw new Error(
-      `TSE: ${innerDepths.length} block-expr tag(s) were never closed — missing <% } %> or <% }) %>`,
-    );
   }
   return lines;
 }
