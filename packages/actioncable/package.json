@@ -1,0 +1,33 @@
+{
+  "name": "@blazetrails/actioncable",
+  "version": "0.1.0",
+  "description": "Integrated WebSockets for Trails, mirroring the actioncable gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

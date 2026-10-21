@@ -433,7 +433,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  each carved subtree still flips its own consuming job's gate
  *  via that gate's regex.
  *
- *  thor_only (scripts/ci/thor-only.sh)
+ *  thor_only (scripts/ci/scoped-only.sh)
  *  True only on a pull_request whose EVERY changed path is in the thor-only
  *  set: packages/trailties/src/thor/, vendor/thor/, and thor's parity-register
  *  rows (scripts/parity/unported-files/thor.ts and the thor/ shards of
@@ -466,6 +466,19 @@ function gateRegex(yml: string, name: string): RegExp {
  *    fetch is never saved under the key rails-comparison shares. The ci
  *    aggregate accepts each job's skip only on the other's side of thor_only.
  *
+ *  actioncable_only (scripts/ci/scoped-only.sh)
+ *  The same script answers it, over its own set: packages/actioncable/ and
+ *  scripts/parity/unported-files/actioncable.ts. vendor/ is not in it, being
+ *  shared with every Rails package. The two sets are disjoint, so a diff
+ *  touching both is neither and runs the full matrix. When it is true:
+ *  - actioncable_affected (ACTIONCABLE_PKGS_RE: actioncable and the packages
+ *    it depends on, never its dependents) runs leaf-tests' Action Cable step.
+ *  - trailties-tests runs `vitest related` over the actioncable sources, so a
+ *    trailties test that imports Action Cable is selected rather than skipped.
+ *  - virtualized-dx-type-tests and leaf-tests' DX type step skip, and
+ *    unit-tests keeps only the thor_only guard set, for the same reasons.
+ *    The ci aggregate accepts each skip only when actioncable_only is true.
+ *
  *  case "${{ github.event_name }}" in
  *  Website label opt-in. The Website job otherwise gates only on
  *  packages/website/ paths, so PRs that need a site preview (or
@@ -491,7 +504,7 @@ function gateRegex(yml: string, name: string): RegExp {
 type GateOpts = { cwd?: string; base?: string; head?: string };
 
 /** The filter step's last gate line; ci.yml names the script repo-relative. */
-const THOR_ONLY_CALL = "bash scripts/ci/thor-only.sh";
+const SCOPED_ONLY_CALL = "bash scripts/ci/scoped-only.sh";
 
 /**
  * The whole-surface comparison scripts scripts/ci/thor-comparison.sh does not
@@ -529,7 +542,7 @@ async function gateRunner(
   const fnStart = lines.findIndex((l) => l.startsWith("is_additive_registration()"));
   const fnEnd = lines.indexOf("}", fnStart);
   if (fnStart === -1 || fnEnd === -1) throw new Error("no is_additive_registration in ci.yml");
-  const end = lines.findIndex((l) => l.startsWith(THOR_ONLY_CALL));
+  const end = lines.findIndex((l) => l.startsWith(SCOPED_ONLY_CALL));
   if (start === -1 || end === -1) throw new Error("no gate block in ci.yml");
   const script = [
     "set -euo pipefail",
@@ -537,7 +550,10 @@ async function gateRunner(
     'GITHUB_OUTPUT=$(mktemp)\nfiles="$1"\nbase="${2:-}"\nhead="${3:-}"',
     ...lines.slice(fnStart, fnEnd + 1),
     ...lines.slice(start, end),
-    lines[end].replace(THOR_ONLY_CALL, `bash ${path.join(REPO_ROOT, "scripts/ci/thor-only.sh")}`),
+    lines[end].replace(
+      SCOPED_ONLY_CALL,
+      `bash ${path.join(REPO_ROOT, "scripts/ci/scoped-only.sh")}`,
+    ),
     'cat "$GITHUB_OUTPUT"; rm -f "$GITHUB_OUTPUT"',
   ].join("\n");
 
@@ -1324,16 +1340,58 @@ describe("CI runs every tooling test suite", () => {
     expect((await runGate("packages/trailties/src/thorough.ts")).thor_only).toBe("false");
   });
 
+  it("sets actioncable_only only when every changed path is in the actioncable-only set", async () => {
+    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+    const cable = "packages/actioncable/src/server/base.ts";
+
+    const cableOnly = await runGate(
+      [
+        cable,
+        "packages/actioncable/src/server/base.test.ts",
+        "scripts/parity/unported-files/actioncable.ts",
+      ].join("\n"),
+    );
+    expect(cableOnly.actioncable_only).toBe("true");
+    expect(cableOnly.thor_only).toBe("false");
+    expect(cableOnly.actioncable_affected).toBe("true");
+    expect(cableOnly.unit_tests_affected).toBe("true");
+    expect(cableOnly.activerecord_affected).toBe("false");
+    expect(cableOnly.actionpack_affected).toBe("false");
+
+    const withTrailties = await runGate(`${cable}\npackages/trailties/src/generators/base.ts`);
+    expect(withTrailties.actioncable_only).toBe("false");
+    expect(withTrailties.trailties_affected).toBe("true");
+
+    const withLockfile = await runGate(
+      `${cable}\npnpm-lock.yaml`,
+      await diffRepo({ "pnpm-lock.yaml": "packages: {}\n" }),
+    );
+    expect(withLockfile.actioncable_only).toBe("false");
+    expect(withLockfile.activerecord_affected).toBe("true");
+
+    const withThor = await runGate(`${cable}\npackages/trailties/src/thor/actions.ts`);
+    expect(withThor.actioncable_only).toBe("false");
+    expect(withThor.thor_only).toBe("false");
+
+    expect(
+      (await runGate("vendor/rails/v8.0.2/actioncable/lib/action_cable.rb")).actioncable_only,
+    ).toBe("false");
+    expect((await runGate("packages/activesupport/src/index.ts")).actioncable_affected).toBe(
+      "true",
+    );
+    expect((await runGate(cable)).actionpack_affected).toBe("false");
+  });
+
   it("never sets thor_only outside the pull_request gate arm", async () => {
     const yml = await readFile(CI_YML, "utf8");
-    expect(yml.split(THOR_ONLY_CALL).length - 1).toBe(1);
+    expect(yml.split(SCOPED_ONLY_CALL).length - 1).toBe(1);
 
     const lines = yml.split("\n").map((l) => l.trim());
     const forced = lines.indexOf("push|schedule|workflow_dispatch)");
     const forcedEnd = lines.indexOf(";;", forced);
-    const call = lines.findIndex((l) => l.startsWith(THOR_ONLY_CALL));
+    const call = lines.findIndex((l) => l.startsWith(SCOPED_ONLY_CALL));
     expect(forced).toBeGreaterThan(-1);
-    expect(lines.slice(forced, forcedEnd).some((l) => l.includes("thor-only"))).toBe(false);
+    expect(lines.slice(forced, forcedEnd).some((l) => l.includes("scoped-only"))).toBe(false);
     expect(call).toBeGreaterThan(forcedEnd);
   });
 
@@ -1343,17 +1401,26 @@ describe("CI runs every tooling test suite", () => {
     const aggregate = flat(wf.jobs.ci.steps[0].run);
 
     expect(flat(wf.jobs["virtualized-dx-type-tests"].if)).toContain(
-      "(needs.changes.outputs.trailties_affected == 'true' && needs.changes.outputs.thor_only != 'true')",
+      "(needs.changes.outputs.trailties_affected == 'true' && needs.changes.outputs.thor_only != 'true'",
     );
     expect(flat(wf.jobs["leaf-tests"].if)).toContain(
-      "(needs.changes.outputs.trailties_affected == 'true' && needs.changes.outputs.thor_only != 'true')",
+      "(needs.changes.outputs.trailties_affected == 'true' && needs.changes.outputs.thor_only != 'true'",
     );
     expect(wf.jobs.ci.steps[0].env.THOR_ONLY).toBe("${{ needs.changes.outputs.thor_only }}");
+    expect(wf.jobs.ci.steps[0].env.ACTIONCABLE_ONLY).toBe(
+      "${{ needs.changes.outputs.actioncable_only }}",
+    );
+    for (const job of ["virtualized-dx-type-tests", "leaf-tests"]) {
+      expect(flat(wf.jobs[job].if)).toContain(
+        "needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'))",
+      );
+    }
+    expect(aggregate.split('|| [ "$ACTIONCABLE_ONLY" = "true" ]; }').length - 1).toBe(2);
     expect(aggregate).toContain(
-      '[ "$TRAILS_TSC_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }',
+      '[ "$TRAILS_TSC_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }',
     );
     expect(aggregate).toContain(
-      '[ "$AR_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }',
+      '[ "$AR_AFFECTED" = "false" ] && { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }',
     );
   });
 
