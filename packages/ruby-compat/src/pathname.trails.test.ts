@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { File } from "./file.js";
+import { block } from "./hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { Pathname } from "./pathname.js";
 
@@ -81,6 +86,30 @@ describe("Pathname (trails)", () => {
       [".", ".."],
     ]) {
       expect(() => new Pathname(dest).relativePathFrom(base)).toThrow(ArgumentError);
+    }
+  });
+});
+
+describe("Pathname#open", () => {
+  it("forwards to File.open, answering the block's value", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-pathname-"));
+    try {
+      const path = join(dir, "magic");
+      writeFileSync(path, Buffer.from([0xff, 0xd8, 0xff]));
+      expect(
+        new Pathname(path).open(
+          "rb",
+          block((f: File) => f.read()),
+        ),
+      ).toBe("\xff\xd8\xff");
+      const text = join(dir, "text");
+      writeFileSync(text, "hello");
+      expect(new Pathname(text).open(block((f: File) => f.read()))).toBe("hello");
+      const file = new Pathname(path).open() as File;
+      expect(file).toBeInstanceOf(File);
+      file.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

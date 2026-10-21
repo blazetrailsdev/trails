@@ -27,6 +27,7 @@
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
-    "@blazetrails/ruby-compat": "workspace:*"
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*"
   }
 }
