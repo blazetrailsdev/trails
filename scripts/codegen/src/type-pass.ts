@@ -546,6 +546,30 @@ export class TypePass {
         } else if (ts.isBinaryExpression(parent) && NIL_TESTS.includes(parent.operatorToken.kind)) {
           // says nothing
         } else if (
+          // Tested, handed on or held: says nothing of what it is either.
+          (ts.isBinaryExpression(parent) &&
+            ((parent.left === ref &&
+              parent.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword) ||
+              (parent.right === ref && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken) ||
+              parent.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken ||
+              parent.operatorToken.kind === ts.SyntaxKind.BarBarToken)) ||
+          ts.isTypeOfExpression(parent) ||
+          (ts.isPrefixUnaryExpression(parent) &&
+            parent.operator === ts.SyntaxKind.ExclamationToken) ||
+          (ts.isConditionalExpression(parent) && parent.condition === ref) ||
+          ((ts.isIfStatement(parent) || ts.isWhileStatement(parent)) &&
+            parent.expression === ref) ||
+          ts.isReturnStatement(parent) ||
+          (ts.isVariableDeclaration(parent) && parent.initializer === ref) ||
+          ts.isArrayLiteralExpression(parent) ||
+          (ts.isPropertyAssignment(parent) && parent.initializer === ref) ||
+          ts.isShorthandPropertyAssignment(parent) ||
+          ts.isTemplateSpan(parent) ||
+          ts.isAsExpression(parent) ||
+          ts.isParenthesizedExpression(parent)
+        ) {
+          // says nothing
+        } else if (
           ts.isBinaryExpression(parent) &&
           parent.left === ref &&
           parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
