@@ -61,21 +61,81 @@ export function walkTsFilesSync(
   return results;
 }
 
-/** Every file of `population` under `dir`, recursively, in `readdir` order.
+/** Every file of `population` under `dir`, recursively, depth first: each
+ *  directory's own entries in `readdir` order, with a subdirectory's files at
+ *  the position of its entry. `readdir(dir, { recursive: true })` ordered a
+ *  whole directory ahead of its subtrees, so the two orders differ — every
+ *  caller sorts (`listLintedFiles`, `walkPackageTsFiles`, and
+ *  `parity:api:detached`'s scoped pass), which is what makes the change safe.
  *  The flat async counterpart to `walkTsFilesSync`, for roots with no
  *  `<pkg>/src` layer (`parity:api:detached` walks `scripts/` with it). A missing
- *  directory yields no files rather than throwing. */
+ *  ROOT yields no files rather than throwing; below the root only a path that
+ *  vanished mid-walk is tolerated, and every other error is raised. Reading a
+ *  subtree is not allowed to fail quietly — a walk that swallowed an
+ *  unreadable directory would under-report the lint's population and still
+ *  report success, which is the defect this walk was rewritten to remove.
+ *
+ *  `skipDirs` is pruned *during* the descent, so a skipped subtree is never
+ *  read. Enumerating the whole tree with one `readdir(dir, { recursive: true })`
+ *  and filtering after could not prune: it listed every path under each
+ *  per-workspace `node_modules` before discarding it — 2.2M entries under
+ *  `scripts/`, which is the allocation that reached `parity:api:detached`'s 4GB
+ *  heap limit on CI — and it read a chain inside one of those trees that
+ *  `scandir` answers `ELOOP` for, which a blanket `catch` turned into "no
+ *  files", silently dropping the whole of `scripts/` from the lint's
+ *  population.
+ *
+ *  Walking entry by entry also distinguishes a directory from a file, where
+ *  the old listing matched both on name alone: a directory named `foo.ts` was
+ *  returned AS a source file, and every caller hands what it returns to
+ *  `readFile` (`EISDIR`). It is now descended into instead.
+ *
+ *  A symlinked directory is descended into, as `recursive: true` did:
+ *  `fixtures/all/admin` mirrors Rails' symlinked fixture layout, and a `Dirent`
+ *  for a symlink answers `isDirectory()` false. The guard against a cycle is
+ *  the chain of ancestor realpaths, not a set of every directory seen: the same
+ *  real directory reached by two sibling paths is listed under both, as
+ *  `fixtures/all/admin` and `fixtures/to-be-linked` are, and only an ancestor
+ *  repeating itself is a loop. */
 export async function walkTsFiles(dir: string, population: TsFilePopulation): Promise<string[]> {
-  let names: string[];
-  try {
-    names = await fsPromises.readdir(dir, { recursive: true });
-  } catch {
-    return [];
-  }
-  return names
-    .filter((name) => population.includeFile(path.basename(name)))
-    .filter((name) => !name.split(path.sep).some((seg) => population.skipDirs.has(seg)))
-    .map((name) => path.join(dir, name));
+  const isVanished = (error: unknown): boolean =>
+    (error as { code?: string } | null)?.code === "ENOENT";
+  /** A symlink the walk cannot resolve is read as the file its name makes it,
+   *  which is what the name-based listing did with it. */
+  const isDirectory = async (target: string): Promise<boolean> => {
+    try {
+      return (await fsPromises.stat(target)).isDirectory();
+    } catch (error) {
+      const code = (error as { code?: string } | null)?.code;
+      if (code === "ENOENT" || code === "ELOOP" || code === "EACCES") return false;
+      throw error;
+    }
+  };
+  const walk = async (current: string, ancestors: ReadonlySet<string>): Promise<string[]> => {
+    let entries: fs.Dirent[];
+    let real: string;
+    try {
+      real = await fsPromises.realpath(current);
+      if (ancestors.has(real)) return [];
+      entries = await fsPromises.readdir(current, { withFileTypes: true });
+    } catch (error) {
+      if (ancestors.size === 0 || isVanished(error)) return [];
+      throw error;
+    }
+    const chain = new Set(ancestors).add(real);
+    const results: string[] = [];
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory() || (entry.isSymbolicLink() && (await isDirectory(fullPath)))) {
+        if (population.skipDirs.has(entry.name)) continue;
+        for (const nested of await walk(fullPath, chain)) results.push(nested);
+      } else if (population.includeFile(entry.name)) {
+        results.push(fullPath);
+      }
+    }
+    return results;
+  };
+  return walk(dir, new Set());
 }
 
 /** Every file of `population` under `<packagesDir>/<pkg>/src`, sorted for
