@@ -102,7 +102,11 @@ export class BodyProxy {
       throw new Error("NoMethodError: undefined method 'to_str'");
     }
     if (methodName === "toArray" || methodName === "to_ary") {
-      return this.toArray();
+      try {
+        return Array.isArray(this.body) ? this.body : this.body.toArray(...args);
+      } finally {
+        this.close();
+      }
     }
     if (typeof this.body?.[methodName] === "function") {
       return this.body[methodName](...args);

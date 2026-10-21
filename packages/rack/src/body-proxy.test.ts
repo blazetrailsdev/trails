@@ -1,4 +1,5 @@
 import { it, expect } from "vitest";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { BodyProxy } from "./body-proxy.js";
 
 it("call each on the wrapped body", () => {
@@ -12,15 +13,10 @@ it("call each on the wrapped body", () => {
 });
 
 it("call close on the wrapped body", () => {
-  let closed = false;
-  const body = {
-    close() {
-      closed = true;
-    },
-  };
+  const body = new StringIO();
   const proxy = new BodyProxy(body, () => {});
   proxy.close();
-  expect(closed).toBe(true);
+  expect(body.closed).toBeTruthy();
 });
 
 it("only call close on the wrapped body if it responds to close", () => {
@@ -49,14 +45,21 @@ it("call the passed block on close even if there is an exception", () => {
   const proxy = new BodyProxy(body, () => {
     called = true;
   });
-  expect(called).toBe(false);
-  let caught: Error | undefined;
-  try {
-    proxy.close();
-  } catch (e: any) {
-    caught = e;
-  }
-  expect(caught).toBeDefined();
+  const e = (() => {
+    try {
+      expect(called).toBe(false);
+      proxy.close();
+    } catch (error: any) {
+      return error;
+    }
+  })();
+
+  void (
+    e ??
+    (() => {
+      throw new Error("Expected exception to have been raised");
+    })()
+  );
   expect(called).toBe(true);
 });
 
@@ -104,7 +107,7 @@ it("not respond to :to_ary if body does not respond to it", () => {
   };
   const proxy = new BodyProxy(body, () => {});
   expect(proxy.respondToMissing("to_ary")).toBe(false);
-  expect(() => proxy.methodMissing("to_ary")).not.toThrow();
+  expect(() => proxy.methodMissing("to_ary")).toThrow(TypeError);
 });
 
 it("not respond to :to_str", () => {
