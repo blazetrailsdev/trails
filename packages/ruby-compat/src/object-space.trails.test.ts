@@ -3,6 +3,7 @@ import { ObjectSpace } from "./object-space.js";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Enumerator } from "./enumerator.js";
 import { File } from "./file.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 
@@ -66,6 +67,10 @@ describe("ObjectSpace.each_object", () => {
     file.close();
     expect(found()).toEqual([file]);
     expect(file.isClosed()).toBe(true);
+    expect(ObjectSpace.eachObject(File, () => null)).toBeGreaterThanOrEqual(1);
+    const enumerator = ObjectSpace.eachObject(File);
+    expect(enumerator).toBeInstanceOf(Enumerator);
+    expect((enumerator as Enumerator<File>).toA()).toContain(file);
     expect(() => ObjectSpace.eachObject(String, () => null)).toThrow(NotImplementedError);
   });
 });
