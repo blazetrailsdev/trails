@@ -1,7 +1,14 @@
-import { decodeLineMappings, transpileTse, virtualizeTseWithDeltas } from "@blazetrails/trails-tsc";
+import {
+  decodeLineMappings,
+  transpileTse,
+  tseHandlerScope,
+  virtualizeHandler,
+  virtualizeTseWithDeltas,
+} from "@blazetrails/trails-tsc";
 import { chomp, htmlSafe, TopLevel } from "@blazetrails/activesupport";
 import * as RubyCompat from "@blazetrails/ruby-compat";
-import { ArgumentError, Encoding, rbEqual } from "@blazetrails/ruby-compat";
+import { Encoding } from "@blazetrails/ruby-compat";
+import { Base } from "../base.js";
 import { OutputBuffer } from "../buffers.js";
 import { WrongEncodingError } from "../template/error.js";
 import { Tse } from "../template/handlers/tse.js";
@@ -17,26 +24,14 @@ export async function compileTemplate(
   template: Template,
   source: string,
 ): Promise<{ default: StandIn }> {
-  if (!(template.handler instanceof Tse)) {
-    const code = template.handler.call(template, source);
-    if (/\p{Surrogate}/u.test(code)) throw new WrongEncodingError(code, Encoding.defaultInternal);
-    const fn = new Function(
-      "ArgumentError",
-      "htmlSafe",
-      "OutputBuffer",
-      "TopLevel",
-      "RubyCompat",
-      `return async function (context, localAssigns, _) { const outputBuffer = context.outputBuffer; with (TopLevel) { with (this) { with (localAssigns) { ${code}\n} } } };`,
-    )(ArgumentError, htmlSafe, OutputBuffer, TopLevel, RubyCompat) as StandIn;
-    return { default: fn };
-  }
-  const prepared = template.handler.stripTrailingNewlines ? chomp(source) : source;
-  const escapeIgnore = Tse.escapeIgnoreList.some((type) => rbEqual(type, template.type));
-  const { ts, mappings } = virtualizeTseWithDeltas(prepared, {
-    view: "any",
-    escapeIgnore,
-    localsSignature: template.strictLocalsBang(),
-  });
+  const { ts, mappings } =
+    template.handler instanceof Tse
+      ? virtualizeTseWithDeltas(template.handler.stripTrailingNewlines ? chomp(source) : source, {
+          view: "any",
+          localsSignature: template.strictLocalsBang(),
+          ...tseHandlerScope(template, Base.annotateRenderedViewWithFilenames),
+        })
+      : virtualizeHandler(handlerCode(template, source), source);
   const { outputText, sourceMapText } = transpileTse(ts);
   const tseLine = new Map<number, number>();
   for (const m of mappings) if (!tseLine.has(m.genLine)) tseLine.set(m.genLine, m.srcLine);
@@ -77,6 +72,12 @@ export async function compileTemplate(
   };
 }
 
+function handlerCode(template: Template, source: string): string {
+  const code = template.handler.call(template, source);
+  if (/\p{Surrogate}/u.test(code)) throw new WrongEncodingError(code, Encoding.defaultInternal);
+  return code;
+}
+
 const FUNCTION_HEADER_LINES = new Function("exports", "require", "/*body*/")
   .toString()
   .split("/*body*/")[0]
@@ -84,7 +85,7 @@ const FUNCTION_HEADER_LINES = new Function("exports", "require", "/*body*/")
 let compiled = 0;
 
 const MODULES: Record<string, unknown> = {
-  "@blazetrails/actionview": { TopLevel },
+  "@blazetrails/actionview": { OutputBuffer, TopLevel },
   "@blazetrails/activesupport": { htmlSafe },
   "@blazetrails/ruby-compat": RubyCompat,
 };

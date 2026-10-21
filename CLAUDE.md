@@ -1913,10 +1913,15 @@ environment, and shipped code has no eval pipeline.** The split is:
   TypeScript module, and `build-views` (`trails-tsc-views build`) writes one
   for every `.tse` file, partials and unused templates included, into
   `.trails/views/` (`--in-place` beside the file, for a package's own
-  templates).
+  templates). It builds each stand-in with the options `Tse#call` would use
+  (annotation, trim mode, trailing newlines, escape-ignore), and a file under
+  any other registered handler gets a module wrapping that handler's `call`
+  output, built at build time.
 - **`tsc` is the compiler.** `build-views` emits `<template>.js` with a source
   map chained back to the `.tse` file, so a backtrace names the template's own
-  line (Rails' `identifier, offset`) when Node runs with source maps enabled.
+  line (Rails' `identifier, offset`). `Application#initialize` turns on
+  Node's source-map support (`setSourceMapsSupport`, through the process
+  adapter) before any template module loads.
 
 The loader reads a template's module from where `build-views` writes it by
 default: an identifier under `<root>/app/views/` loads

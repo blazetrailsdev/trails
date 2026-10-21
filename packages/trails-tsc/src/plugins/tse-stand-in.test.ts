@@ -4,12 +4,13 @@ import {
   Base,
   FixtureResolver,
   LookupContext,
+  OutputBuffer,
   Template,
   TemplateHandlers,
   TopLevel,
   TseHandler,
 } from "@blazetrails/actionview";
-import { virtualizeTse } from "./tse.js";
+import { tseLookupTransformer, virtualizeTse } from "./tse.js";
 
 // @ts-expect-error -- Property 'glob' does not exist on type 'ImportMeta'
 const globbed: Record<string, string> = import.meta.glob(
@@ -28,6 +29,7 @@ type StandIn = (this: object, context: object, locals: object, _?: unknown) => P
 function standIn(source: string): StandIn {
   const js = ts.transpileModule(virtualizeTse(source, { view: "any" }), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+    transformers: { before: [tseLookupTransformer] },
   }).outputText;
   const body = js
     .replace('import { TopLevel } from "@blazetrails/actionview";', "")
@@ -181,5 +183,31 @@ describe("TSE stand-in scope", () => {
     expect(compiled.size).toBe(Object.keys(fixtures).length);
     const methods = new Set(compile.mock.contexts.map((t) => (t as Template).methodName()));
     expect(methods.size).toBe(compile.mock.calls.length);
+  });
+
+  const view = (): Base => {
+    const v = new (Base.withEmptyTemplateCache())(null, {}, null);
+    v.outputBuffer = new OutputBuffer();
+    return v;
+  };
+
+  it("writes an assigned view property to the view", async () => {
+    const v = view();
+    await standIn('<% virtualPath = "written" %>').call(v, v, {});
+    expect(v.virtualPath).toBe("written");
+  });
+
+  it("reads a view property changed during the render live", async () => {
+    const v = view();
+    v.virtualPath = "before";
+    const out = await standIn('<% this.virtualPath = "after" %><%= virtualPath %>').call(v, v, {});
+    expect(String((out as OutputBuffer).toString())).toBe("after");
+  });
+
+  it("raises ReferenceError for an undefined name at its point of use", async () => {
+    const v = view();
+    await expect(standIn("<%= notDefinedAnywhere %>").call(v, v, {})).rejects.toThrow(
+      ReferenceError,
+    );
   });
 });
