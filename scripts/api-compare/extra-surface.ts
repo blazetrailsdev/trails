@@ -1228,8 +1228,6 @@ export function countTsInternalNames(
 ): number {
   const isInternal = (m: MethodInfo): boolean =>
     m.internal === true && m.declaredIn === undefined && !m.name.startsWith("_");
-  // `Object.assign(Mod, { foo })` seats the file function `foo` on a plain
-  // module: one declaration, already counted below as a file function.
   const functionNames = new Set((fileFunctions ?? []).map((fn) => fn.name));
   const isOwnMember = (m: MethodInfo): boolean =>
     isInternal(m) && !(m.bodyless === true && functionNames.has(m.name));
