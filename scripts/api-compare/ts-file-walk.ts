@@ -61,7 +61,12 @@ export function walkTsFilesSync(
   return results;
 }
 
-/** Every file of `population` under `dir`, recursively, in `readdir` order.
+/** Every file of `population` under `dir`, recursively, depth first: each
+ *  directory's own entries in `readdir` order, with a subdirectory's files at
+ *  the position of its entry. `readdir(dir, { recursive: true })` ordered a
+ *  whole directory ahead of its subtrees, so the two orders differ — every
+ *  caller sorts (`listLintedFiles`, `walkPackageTsFiles`, and
+ *  `parity:api:detached`'s scoped pass), which is what makes the change safe.
  *  The flat async counterpart to `walkTsFilesSync`, for roots with no
  *  `<pkg>/src` layer (`parity:api:detached` walks `scripts/` with it). A missing
  *  ROOT yields no files rather than throwing; below the root only a path that
