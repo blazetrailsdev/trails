@@ -48,7 +48,7 @@ export const matchers = {
     return result(this, delta >= n, act, `to be within ${delta} of ${exp}`);
   },
   toBeEmpty(this: MatcherState, received: object) {
-    const pass = rbObjRespondTo(received, "isEmpty") || isEnumerable(received);
+    const pass = rbObjRespondTo(received, "isEmpty") || respondsToEmpty(received);
     return result(this, pass && isEmpty(received), received, "to be empty");
   },
   toBeExactInstanceOf(this: MatcherState, received: unknown, cls: unknown) {
@@ -60,6 +60,10 @@ export const matchers = {
   },
 };
 
-function isEnumerable(value: unknown): boolean {
-  return typeof value === "string" || (typeof value === "object" && value !== null);
+function respondsToEmpty(value: unknown): boolean {
+  if (typeof value === "string" || Array.isArray(value)) return true;
+  if (value instanceof Set || value instanceof Map) return true;
+  if (typeof value !== "object" || value === null) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }

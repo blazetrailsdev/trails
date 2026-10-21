@@ -30,12 +30,16 @@ describe("RubyMatchers", () => {
     expect({ a: 1 }).not.toBeEmpty();
     expect(null).not.toBeEmpty();
     expect(0).not.toBeEmpty();
+    expect(new (class {})()).not.toBeEmpty();
+    expect(new Date()).not.toBeEmpty();
+    expect(Object.create(null)).toBeEmpty();
   });
 
   it("checks the exact class", () => {
     expect(new Euro(1)).toBeExactInstanceOf(Euro);
     expect(new Euro(1)).not.toBeExactInstanceOf(Money);
     expect(new Euro(1)).toBeInstanceOf(Money);
+    expect("a").toBeExactInstanceOf(String);
   });
 
   it("asks respond_to?", () => {
