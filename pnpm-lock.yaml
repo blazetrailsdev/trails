@@ -726,6 +726,9 @@ importers:
       '@blazetrails/bcrypt':
         specifier: workspace:*
         version: link:../../packages/bcrypt
+      '@blazetrails/builder':
+        specifier: workspace:*
+        version: link:../../packages/builder
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../../packages/date
