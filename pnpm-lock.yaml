@@ -550,6 +550,15 @@ importers:
         specifier: ^2.8.3
         version: 2.8.3
 
+  packages/solid-queue:
+    dependencies:
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+
   packages/trails-tsc:
     dependencies:
       '@blazetrails/actionview':
@@ -768,6 +777,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../../packages/ruby-compat
+      '@blazetrails/solid-queue':
+        specifier: workspace:*
+        version: link:../../packages/solid-queue
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../../packages/trails-tsc

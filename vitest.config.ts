@@ -312,6 +312,8 @@ const alias = {
   "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/src/index.ts"),
   "@blazetrails/actioncable/": path.resolve(__dirname, "packages/actioncable/src") + "/",
   "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/src/index.ts"),
+  "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/src") + "/",
+  "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/src/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
   "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/src/engine.ts"),
   "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
@@ -472,6 +474,7 @@ export default defineConfig({
           include: [
             "packages/activerecord/src/**/*.test.ts",
             "packages/activerecord/scripts/**/*.test.ts",
+            "packages/solid-queue/src/**/*.test.ts",
           ],
           exclude: [...SHARED_EXCLUDE, ...ADAPTER_SPECIFIC_EXCLUDE, ...SQLITE_DRIVER_TESTS],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
@@ -550,7 +553,12 @@ export default defineConfig({
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],
-          exclude: ["packages/activerecord/**", "packages/trailties/**", ...SHARED_EXCLUDE],
+          exclude: [
+            "packages/activerecord/**",
+            "packages/solid-queue/**",
+            "packages/trailties/**",
+            ...SHARED_EXCLUDE,
+          ],
           globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
           setupFiles: otherSetupFiles,
         },
