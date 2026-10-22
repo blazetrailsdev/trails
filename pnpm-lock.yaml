@@ -454,6 +454,9 @@ importers:
 
   packages/html-sanitizer:
     dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../nokogiri
