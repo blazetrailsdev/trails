@@ -27,11 +27,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { instantFrom } from "./temporal.js";
 
-/**
- * Ruby's unary `-@` over the numerics a Duration holds: `rb_float_uminus`
- * (`vendor/ruby/v3.3.11/numeric.c:1156`), `rb_int_uminus` (`numeric.c:3833`)
- * and `rb_rational_uminus` (`vendor/ruby/v3.3.11/rational.c:611`).
- */
 function numericUminus(x: unknown): unknown {
   if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
   if (x instanceof Rational) return new Rational(-x.numerator, x.denominator);
