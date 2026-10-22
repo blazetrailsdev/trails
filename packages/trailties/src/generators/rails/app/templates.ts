@@ -109,6 +109,16 @@ ${ciSetup(packageManager)}
 `
   }`,
 
+  "app/jobs/application_job.ts": () => `import { ActiveJob } from "@blazetrails/activejob";
+
+export class ApplicationJob extends ActiveJob.Base {
+  // Automatically retry jobs that encountered a deadlock
+  // static { this.retryOn(ActiveRecord.Deadlocked); }
+
+  // Most jobs are safe to ignore if the underlying records are no longer available
+  // static { this.discardOn(ActiveJob.DeserializationError); }
+}
+`,
   "github/dependabot.yml": () => `version: 2
 updates:
 - package-ecosystem: npm

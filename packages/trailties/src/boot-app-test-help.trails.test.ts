@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
+import { ActiveJob } from "@blazetrails/activejob";
+import { constantize } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
@@ -9,6 +11,7 @@ import {
   include,
   includedModules,
   rbCallSuper,
+  rbModName,
   setEnv,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -156,5 +159,25 @@ describe("test_help wires a booted app into the test case classes", () => {
       "A second post",
       "Welcome to Trails",
     ]);
+  });
+
+  it("performs an app/jobs job through the inline adapter by its constantized job_class", async () => {
+    const { WelcomeEmailJob } =
+      await import("./__fixtures__/boot-app/app/jobs/welcome-email-job.js");
+    const previous = ActiveJob.Base.queueAdapter;
+    ActiveJob.Base.setQueueAdapter("inline");
+    try {
+      await WelcomeEmailJob.performLater("david");
+    } finally {
+      ActiveJob.Base.setQueueAdapter(previous);
+    }
+    expect(WelcomeEmailJob.performed).toEqual([["david"]]);
+    expect(constantize("WelcomeEmailJob")).toBe(WelcomeEmailJob);
+  });
+
+  it("registers a namespaced app/jobs job under its namespace-prefixed name", async () => {
+    const { CleanupJob } = await import("./__fixtures__/boot-app/app/jobs/admin/cleanup-job.js");
+    expect(rbModName(CleanupJob)).toBe("Admin::CleanupJob");
+    expect(constantize("Admin::CleanupJob")).toBe(CleanupJob);
   });
 });

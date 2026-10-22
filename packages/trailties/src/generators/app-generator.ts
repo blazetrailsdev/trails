@@ -1069,17 +1069,7 @@ Trails.application!.config.filterParameters = Trails.application!.config.filterP
     );
 
     if (!this.skip("ActiveJob")) {
-      this.createFile(
-        "app/jobs/application-job.ts",
-        tsModule({
-          declarations: [
-            tsClass({
-              name: "ApplicationJob",
-              body: [tsField("queueAs", "string", { inferType: true, initializer: '"default"' })],
-            }),
-          ],
-        }),
-      );
+      this.template("app/jobs/application_job.ts", "app/jobs/application-job.ts");
     }
 
     if (!this.skip("ActionMailer")) {
