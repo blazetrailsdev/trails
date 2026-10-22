@@ -75,6 +75,9 @@ export class ThreadPoolExecutor {
     this.maxLength = maxThreads;
     this.maxQueue = maxQueue;
     this.fallbackPolicy = fallbackPolicy;
+    if (!["abort", "discard", "caller_runs"].includes(fallbackPolicy)) {
+      throw new ArgumentError(`${fallbackPolicy} is not a valid fallback policy`);
+    }
     this.idletime = Math.trunc(idletime);
     this.autoTerminate = autoTerminate;
 
@@ -139,7 +142,11 @@ export class ThreadPoolExecutor {
       case "discard":
         return false;
       case "caller_runs":
-        task();
+        try {
+          task();
+        } catch {
+          return true;
+        }
         return true;
     }
   }

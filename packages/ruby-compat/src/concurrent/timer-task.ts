@@ -24,6 +24,8 @@ export class TimerTask {
   private readonly _task: (task: TimerTask) => unknown;
   private _running = false;
   private _timer: ReturnType<typeof setTimeout> | undefined;
+  private _generation = 0;
+  private _inFlight: Promise<unknown> | null = null;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
@@ -42,7 +44,14 @@ export class TimerTask {
   execute(): this {
     if (!this._running) {
       this._running = true;
-      this._scheduleNextTask();
+      const generation = this._generation;
+      if (this._inFlight) {
+        void this._inFlight.then(() => {
+          if (generation === this._generation) this._scheduleNextTask();
+        });
+      } else {
+        this._scheduleNextTask();
+      }
     }
     return this;
   }
@@ -50,26 +59,30 @@ export class TimerTask {
   /** @noRailsEquivalent PERMANENT */
   shutdown(): true {
     this._running = false;
+    this._generation += 1;
     clearTimeout(this._timer);
     this._timer = undefined;
     return true;
   }
 
   private _scheduleNextTask(interval = this.executionInterval): void {
+    const generation = this._generation;
     const timer: unknown = setTimeout(
-      () => void this._executeTask(),
+      () => void this._executeTask(generation),
       Math.min(interval * 1000, MAX_TIMEOUT),
     );
     this._timer = timer as ReturnType<typeof setTimeout>;
     (timer as { unref?: () => unknown }).unref?.();
   }
 
-  private async _executeTask(): Promise<void> {
-    if (!this._running) return;
-    await Promise.resolve()
+  private async _executeTask(generation: number): Promise<void> {
+    if (!this._running || generation !== this._generation) return;
+    this._inFlight = Promise.resolve()
       .then(() => this._task(this))
       .catch(() => null);
-    if (this._running) this._scheduleNextTask();
+    await this._inFlight;
+    this._inFlight = null;
+    if (this._running && generation === this._generation) this._scheduleNextTask();
   }
 }
 

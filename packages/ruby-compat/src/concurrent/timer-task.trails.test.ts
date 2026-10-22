@@ -51,7 +51,30 @@ describe("TimerTask", () => {
   });
 });
 
+describe("TimerTask restart", () => {
+  it("keeps one chain when restarted while a run is pending", async () => {
+    let active = 0;
+    let peak = 0;
+    const task = new TimerTask({ executionInterval: 0.01 }, async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await sleep(30);
+      active -= 1;
+    }).execute();
+    await sleep(15);
+    task.shutdown();
+    task.execute();
+    await sleep(150);
+    task.shutdown();
+    expect(peak).toBe(1);
+  });
+});
+
 describe("AtomicFixnum", () => {
+  it("rejects a non-integer initial value", () => {
+    expect(() => new AtomicFixnum(1.5)).toThrow("initial value must be a Fixnum");
+  });
+
   it("answers the new value from increment and decrement", () => {
     const counter = new Concurrent.AtomicFixnum(1);
     expect(counter).toBeInstanceOf(AtomicFixnum);

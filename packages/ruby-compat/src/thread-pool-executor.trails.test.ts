@@ -195,6 +195,30 @@ describe("ThreadPoolExecutor", () => {
     executor.shutdown();
   });
 
+  it("rejects an unknown fallback policy and rescues a caller_runs task", () => {
+    expect(
+      () =>
+        new ThreadPoolExecutor({
+          minThreads: 0,
+          maxThreads: 1,
+          maxQueue: 0,
+          fallbackPolicy: "bogus" as "abort",
+        }),
+    ).toThrow("bogus is not a valid fallback policy");
+    const executor = new ThreadPoolExecutor({
+      minThreads: 0,
+      maxThreads: 1,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+    });
+    executor.shutdown();
+    expect(
+      executor.post(() => {
+        throw new Error("boom");
+      }),
+    ).toBe(true);
+  });
+
   it("answers one global io executor", () => {
     expect(globalIoExecutor()).toBe(globalIoExecutor());
     expect(Concurrent.globalIoExecutor()).toBe(globalIoExecutor());

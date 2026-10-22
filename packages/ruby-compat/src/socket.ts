@@ -1,5 +1,6 @@
 import type { HttpSocket } from "./http-adapter.js";
 import { IO } from "./io.js";
+import { IOError } from "./io-error.js";
 
 /**
  * Ruby's `BasicSocket` (`vendor/ruby/v3.3.11/ext/socket/basicsocket.c:746`), an
@@ -16,6 +17,8 @@ export class BasicSocket extends IO {
   private _rbuf: Uint8Array[] = [];
   private _eof = false;
   private _closed = false;
+  private _readClosed = false;
+  private _writeClosed = false;
   private _waiting: (() => void)[] = [];
 
   /** @noRailsEquivalent PERMANENT */
@@ -24,7 +27,7 @@ export class BasicSocket extends IO {
     this.binmode();
     this._socket = socket;
     socket.on("data", (chunk) => {
-      this._rbuf.push(chunk);
+      if (!this._readClosed) this._rbuf.push(chunk);
       this._wake();
     });
     socket.on("end", () => {
@@ -43,8 +46,10 @@ export class BasicSocket extends IO {
 
   /**
    * `IO#read` (`vendor/ruby/v3.3.11/io.c:3731` `io_read`) over the bytes
-   * delivered so far. With no length it answers all of them, `""` once the
-   * peer has finished; with one, at most that many, and `nil` at end of file.
+   * delivered so far. With no length it answers all of them, an empty
+   * ASCII-8BIT String once the peer has finished; with one, at most that
+   * many, and `nil` at end of file. A closed read side raises `IOError`
+   * (`io.c:1029` `rb_io_check_char_readable`).
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -53,6 +58,7 @@ export class BasicSocket extends IO {
   override read(length: number, str?: Uint8Array | null): Uint8Array | null;
   override read(length: number | null, str?: Uint8Array | null): string | Uint8Array | null;
   override read(length?: number | null, str?: Uint8Array | null): string | Uint8Array | null {
+    if (this._closed || this._readClosed) throw new IOError("closed stream");
     const buffered = this._rbuf.reduce((n, chunk) => n + chunk.length, 0);
     if (length == null) length = buffered;
     else if (buffered === 0 && length > 0 && this._eof) return null;
@@ -81,8 +87,14 @@ export class BasicSocket extends IO {
     return new Promise((resolve) => this._waiting.push(() => resolve(this)));
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * `IO#write` (`vendor/ruby/v3.3.11/io.c:2263` `io_write_m`); a closed write
+   * side raises `IOError` (`io.c:1009` `rb_io_check_writable`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   override write(string: string | Uint8Array): number {
+    if (this._closed || this._writeClosed) throw new IOError("closed stream");
     const buffer = typeof string === "string" ? new TextEncoder().encode(string) : string;
     this._socket.write(buffer);
     return buffer.length;
@@ -110,6 +122,9 @@ export class BasicSocket extends IO {
    * @noRailsEquivalent PERMANENT
    */
   closeRead(): null {
+    if (this._closed) throw new IOError("closed stream");
+    if (this._writeClosed) return this.close();
+    this._readClosed = true;
     this._rbuf = [];
     this._eof = true;
     this._wake();
@@ -123,6 +138,9 @@ export class BasicSocket extends IO {
    * @noRailsEquivalent PERMANENT
    */
   closeWrite(): null {
+    if (this._closed) throw new IOError("closed stream");
+    if (this._readClosed) return this.close();
+    this._writeClosed = true;
     this._socket.end();
     return null;
   }
