@@ -1049,18 +1049,22 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - id: playwright-version
+      - name: Resolve the playwright-core version
+        id: playwright-version
         run: echo "version=$(node -p "require('playwright-core/package.json').version")" >>"$GITHUB_OUTPUT"
-      - id: playwright-cache
+      - name: Cache the chromium download
+        id: playwright-cache
         uses: actions/cache@v4
         with:
+          # Only the browser lives here. Its apt dependencies are installed
+          # system-wide, so `install-deps` runs on a hit too.
           path: ~/.cache/ms-playwright
-          key: ms-playwright-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      # The browser download is cached; its apt dependencies are not, so
-      # `install-deps` still runs on a hit.
-      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+          key: ms-playwright-v1-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - name: Install chromium's system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: pnpm exec playwright-core install-deps chromium
-      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - name: Install chromium and its system dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright-core install --with-deps chromium
       - run: pnpm vitest run --project system
 
