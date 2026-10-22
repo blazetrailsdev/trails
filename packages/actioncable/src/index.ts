@@ -3,3 +3,8 @@ export { version } from "./version.js";
 export { deprecator } from "./deprecator.js";
 export { ActionCable } from "./namespaces.js";
 import "./action-cable.js";
+import "./channel/naming.js";
+import "./channel/callbacks.js";
+import "./channel/periodic-timers.js";
+import "./connection/identification.js";
+import "./connection/authorization.js";
