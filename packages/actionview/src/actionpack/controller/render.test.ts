@@ -342,7 +342,7 @@ class TestController extends ActionController.Base {
   async greeting(): Promise<void> {}
 
   async builderLayoutTest(): Promise<void> {
-    // BLOCKED: render-test-controller-gaps-remaining
+    // BLOCKED: render-test-controller-gaps-owner-rulings
     this.name = null as unknown as string;
     await this.render({ action: "hello", layout: "layouts/builder" });
   }
@@ -748,7 +748,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — view instance_variables list
+  // BLOCKED: render-test-controller-gaps-owner-rulings — view instance_variables list
   test.skip("controller does not leak instance variables", async () => {
     const expected = [
       "_assigns",
@@ -813,7 +813,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello world!");
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — action-name lookup folds case
+  // BLOCKED: render-test-controller-gaps-owner-rulings — action-name lookup folds case
   test.skip("render action upcased", async () => {
     await expect(testCase.get("renderActionUpcasedHelloWorld")).rejects.toThrow(MissingTemplate);
   });
@@ -1154,7 +1154,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hi web users! here is some cached stuff");
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — private name helper collides with @name
+  // BLOCKED: render-test-controller-gaps-owner-rulings — private name helper collides with @name
   test.skip("rendering with conflicting local vars", async () => {
     await testCase.get("renderingWithConflictingLocalVars");
     expect(testCase.response.body).toBe(
@@ -1277,7 +1277,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello: david");
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — Parameters not read as partial locals
+  // BLOCKED: render-test-controller-gaps-owner-rulings — Parameters not read as partial locals
   test.skip("partial with hashlike locals", async () => {
     await testCase.get("partialWithHashlikeLocals");
     expect(testCase.response.body).toBe("Hello: david");
