@@ -50,6 +50,7 @@ interface StreamsChannel {
 
 type StreamOptions = { coder?: Coder | null };
 
+/** @missingRailsArgs subscribe — PERMANENT */
 function streamFrom(
   this: StreamsChannel,
   broadcasting: unknown,
