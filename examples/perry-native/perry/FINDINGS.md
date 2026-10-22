@@ -26,15 +26,16 @@ See [the correction](#correction-the-32gb-wall-is-resolution-not-module-count).
 
 Status of each wall after re-verification:
 
-| Wall                                       | Status                                                                                                                                                                          |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — codegen memory                         | 362 modules fit in 20GB. **Still the live blocker**, and the only one: the app's 32GB exhaustion was misattributed to it — see the correction.                                  |
-| 1b — resolver symlink cycle                | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased. |
-| 2 — WebAssembly cannot link                | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                          |
-| 3a — `importedClass.prototype`             | **Fixed upstream**, unreleased.                                                                                                                                                 |
-| 3b — shape-mint abort                      | **Gone** on `main` @ `20fde48d`. Re-verified 2026-10-20: 04d compiles, links and starts. Never filed; nothing to file.                                                          |
-| 3c — init-time hang at 362 modules         | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                |
-| 4 — TDZ check ate a spread call's receiver | **Fixed upstream** — our patch merged as [PR 12990](https://github.com/PerryTS/perry/pull/12990) (`ccad647e7a`). Unreleased.                                                    |
+| Wall                                       | Status                                                                                                                                                                                             |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — codegen memory                         | 362 modules fit in 20GB. **Still the live blocker**, and the only one: the app's 32GB exhaustion was misattributed to it — see the correction.                                                     |
+| 1b — resolver symlink cycle                | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased.                    |
+| 2 — WebAssembly cannot link                | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                                             |
+| 3a — `importedClass.prototype`             | **Fixed upstream**, unreleased.                                                                                                                                                                    |
+| 3b — shape-mint abort                      | **Gone** on `main` @ `20fde48d`. Re-verified 2026-10-20: 04d compiles, links and starts. Never filed; nothing to file.                                                                             |
+| 3c — init-time hang at 362 modules         | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                                   |
+| 4 — TDZ check ate a spread call's receiver | **Fixed upstream** — our patch merged as [PR 12990](https://github.com/PerryTS/perry/pull/12990) (`ccad647e7a`). Unreleased.                                                                       |
+| 5 — parentless class got a live `super`    | **Fixed upstream** — our patch merged as [PR 13001](https://github.com/PerryTS/perry/pull/13001) (`71a8beb530`), closing [issue 12889](https://github.com/PerryTS/perry/issues/12889). Unreleased. |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
@@ -568,7 +569,7 @@ question is where between 139 and 364 modules the ceiling actually sits, and
 that is a Perry-internal threshold to bisect against a synthetic graph, not
 something a different trails entry point can route around.
 
-## 04d: the barrel rung boots, after two Perry bugs (one fixed upstream)
+## 04d: the barrel rung boots on unmodified source, after two Perry bugs (both fixed upstream)
 
 With wall 3b gone (above), `04d-ruby-compat-barrel` compiles, links and
 reaches startup on `main` @ `20fde48d`, then fails at runtime:
@@ -626,37 +627,58 @@ Every value was a valid non-null object or array (`Object.keys` returned 0,
 the `Sequence`-wrapped callee, and the adjacent `PutValueSet` in the same
 function threading an explicit `receiver` field made the asymmetry obvious.
 
-### The second bug: `RFC3986Parser`, still open
+### The second bug: a parentless class got a live `super`
 
-With 12990 applied, 04d gets past `registerProcessAdapter` and fails at
+**Diagnosed and fixed upstream: [PR 13001](https://github.com/PerryTS/perry/pull/13001),
+merged as `71a8beb530`, closing [issue 12889](https://github.com/PerryTS/perry/issues/12889).**
+
+With 12990 applied, 04d got past `registerProcessAdapter` and failed at
 
     TypeError: Super constructor is not a constructor
         at new RFC3986Parser
 
 on a class with **zero** occurrences of `extends` or `super` in its file
 (`ruby-compat/src/uri/rfc3986-parser.ts:116`), constructed as an eager
-module-level singleton at `uri/common.ts:13`. Four reductions fail to
-reproduce it: a 3-key and a 9-key object literal in a class field initializer,
-a plain base class with initializers, and a class constructed across a true
-import cycle. Like the shape mint, it needs the populated 137-module context.
+module-level singleton at `uri/common.ts:13`.
 
-Two `perry-hir` tests are **red on upstream `main`** in exactly this area, and
-may be the same defect:
+The cause is `requires_live` in `perry-codegen/src/expr/super_constructor.rs`:
+it consulted `ctx.imported_class_ctors` **by bare class name** before
+establishing that the class is derived at all. `imported_class_ctors` is keyed
+by name, not by module, so a type-only import cycle registers an entry under a
+name the module itself declares — and a parentless class was then lowered with
+live heritage. Here `uri/generic.ts:4` has `import type { RFC3986Parser }` and
+`rfc3986-parser.ts:5` has a value import of `./generic.js`, completing the
+cycle. The fix returns `false` early when all four heritage slots
+(`extends_name`, `extends_expr`, `extends`, `native_extends`) are empty, plus a
+regression test verified to fail without it.
 
-- `class_member_var_captures::sibling_same_named_class_bindings_construct_their_own_class`
-  (panics "the fixture constructs its class statically")
-- `issue_11298_class_expr_evaluation_identity::native_module_parent_keeps_the_shared_template`
+It needs both a cycle and a class as the type-only target; inline
+`import { type X }` fails identically. Four reductions had failed to reproduce
+it before that was understood — a 3-key and a 9-key object literal in a class
+field initializer, a plain base class with initializers, and a class
+constructed across a value-only import cycle.
 
-Confirmed pre-existing, not ours, by reverting our one-line fix on the same
-base. Open upstream PR 12970 ("forward references read a per-evaluation class
-through its binding") touches class bindings and is worth watching.
+Two `perry-hir` tests red in this area on `main` at the time
+(`class_member_var_captures::sibling_same_named_class_bindings_construct_their_own_class`,
+`issue_11298_class_expr_evaluation_identity::native_module_parent_keeps_the_shared_template`)
+turned out to be unrelated; confirmed pre-existing by reverting our fix on the
+same base.
 
-**Workaround, if a boot is needed before this is fixed:** moving the field
-initializer into an explicit constructor avoids it. With that plus 12990, 04d
-runs natively and correctly — `[04d] a\.b\*c`, matching Node, at 137
-modules, the first time any barrel rung has booted. That workaround is **not
-committed**: it is worse TypeScript than the field initializer and exists only
-to route around a compiler defect.
+### The rung boots on unmodified trails source
+
+With 12990 and 13001 both on `main`, `04d-ruby-compat-barrel` compiles, links
+and runs natively against **completely unmodified trails source** — `[04d]
+a\.b\*c`, matching Node, at 137 modules. It is the first barrel rung ever to
+boot. Both earlier workarounds (the `for`-loop in place of `push(...spread)`,
+and moving the `regexp` field initializer into an explicit constructor) are
+reverted and **not committed**: each existed only to route around a compiler
+defect that is now fixed.
+
+**The lesson, again:** two of the three walls that stopped this rung were
+compiler bugs, and the diagnostic that found both was
+`perry compile --print-hir` — not reasoning about guards, and not synthetic
+reductions, which matched Node in eight of eight attempts across the two bugs.
+Instrument, do not infer.
 
 ### Upstream filings from this round
 
@@ -665,6 +687,9 @@ to route around a compiler defect.
 | [12978](https://github.com/PerryTS/perry/issues/12978) | constraint check compares a type parameter's `TypeVar`, not its instantiation | filed                   |
 | [12979](https://github.com/PerryTS/perry/issues/12979) | contributor docs cannot produce a working from-source build                   | filed                   |
 | [12990](https://github.com/PerryTS/perry/pull/12990)   | **PR** — lift a TDZ check out of a spread call's member callee                | **merged** `ccad647e7a` |
+| [12889](https://github.com/PerryTS/perry/issues/12889) | parentless class emits a `super` construct (pre-existing report we closed)    | **closed** by 13001     |
+| [13001](https://github.com/PerryTS/perry/pull/13001)   | **PR** — no live heritage for a class that extends nothing                    | **merged** `71a8beb530` |
+| [13009](https://github.com/PerryTS/perry/pull/13009)   | **PR** — three `cargo test` failures on `main` (CI, not our rung)             | **merged** `ce79cdac2f` |
 
 Both re-verified against `main` @ `20fde48d` immediately before filing, and
 both duplicate-searched first. 12978's reproducer is the 23-line
