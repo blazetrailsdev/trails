@@ -1,57 +1,70 @@
 import { it, expect } from "vitest";
+import { Dir, File, FileUtils, StringIO } from "@blazetrails/ruby-compat";
 import { Sendfile } from "./sendfile.js";
+import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
-
-const tmpdir = os.tmpdir();
+import type { MockResponse } from "./mock-response.js";
 
 function sendfileBody(filename = "rack_sendfile") {
-  const filepath = path.join(tmpdir, filename);
-  fs.writeFileSync(filepath, "");
-  const body: any = ["Hello World"];
-  body.toPath = () => filepath;
-  return body;
+  FileUtils.touch(File.join(Dir.tmpdir(), filename));
+  const res: any = ["Hello World"];
+  res.toPath = () => File.join(Dir.tmpdir(), filename);
+  return res;
 }
 
-function simpleApp(body: any = sendfileBody()) {
-  return async () => [200, { "content-type": "text/plain" }, body] as any;
+function simpleApp(body: any = sendfileBody()): any {
+  return (_env: Record<string, any>) => [200, { "content-type": "text/plain" }, body];
 }
 
 function sendfileApp(body: any, mappings: [string, string][] = []) {
-  return new Sendfile(simpleApp(body), null, mappings);
+  return new Lint(new Sendfile(simpleApp(body), null, mappings));
+}
+
+async function request(
+  headers: Record<string, any> = {},
+  body: any = sendfileBody(),
+  mappings: [string, string][] = [],
+  block: (response: MockResponse) => void,
+) {
+  block(await new MockRequest(sendfileApp(body, mappings)).get("/", headers));
+}
+
+function openFile(path: string) {
+  return File.open(path, "wb+");
 }
 
 it("does nothing when no x-sendfile-type header present", async () => {
-  const res = await new MockRequest((env) => sendfileApp(sendfileBody()).call(env)).get("/");
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("Hello World");
-  expect(res.headers["x-sendfile"]).toBeUndefined();
+  await request(undefined, undefined, undefined, (response) => {
+    expect(response.isOk).toBeTruthy();
+    expect(response.body).toBe("Hello World");
+    expect(Object.keys(response.headers)).not.toContain("x-sendfile");
+  });
 });
 
 it("does nothing and logs to rack.errors when incorrect x-sendfile-type header present", async () => {
-  const body = sendfileBody();
-  const app = sendfileApp(body);
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
-    HTTP_X_SENDFILE_TYPE: "X-Banana",
-  });
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("Hello World");
-  expect(res.headers["x-sendfile"]).toBeUndefined();
-  expect(res.errors).toContain('Unknown x-sendfile variation: "X-Banana"');
+  const io = new StringIO();
+  await request(
+    { HTTP_X_SENDFILE_TYPE: "X-Banana", "rack.errors": io },
+    undefined,
+    undefined,
+    (response) => {
+      expect(response.isOk).toBeTruthy();
+      expect(response.body).toBe("Hello World");
+      expect(Object.keys(response.headers)).not.toContain("x-sendfile");
+
+      io.rewind();
+      expect(io.read()).toBe('Unknown x-sendfile variation: "X-Banana"\n');
+    },
+  );
 });
 
 it("sets x-sendfile response header and discards body", async () => {
-  const body = sendfileBody();
-  const app = sendfileApp(body);
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
-    HTTP_X_SENDFILE_TYPE: "x-sendfile",
+  await request({ HTTP_X_SENDFILE_TYPE: "x-sendfile" }, undefined, undefined, (response) => {
+    expect(response.isOk).toBeTruthy();
+    expect(response.body.length === 0).toBeTruthy();
+    expect(response.headers["content-length"]).toBe("0");
+    expect(response.headers["x-sendfile"]).toBe(File.join(Dir.tmpdir(), "rack_sendfile"));
   });
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("");
-  expect(res.headers["content-length"]).toBe("0");
-  expect(res.headers["x-sendfile"]).toBe(path.join(tmpdir, "rack_sendfile"));
 });
 
 it("closes body when x-sendfile used", async () => {
@@ -60,151 +73,158 @@ it("closes body when x-sendfile used", async () => {
   body.close = () => {
     closed = true;
   };
-  const app = sendfileApp(body);
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
-    HTTP_X_SENDFILE_TYPE: "x-sendfile",
+  await request({ HTTP_X_SENDFILE_TYPE: "x-sendfile" }, body, undefined, (response) => {
+    expect(response.isOk).toBeTruthy();
+    expect(response.body.length === 0).toBeTruthy();
+    expect(response.headers["content-length"]).toBe("0");
+    expect(response.headers["x-sendfile"]).toBe(File.join(Dir.tmpdir(), "rack_sendfile"));
   });
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("");
-  expect(res.headers["x-sendfile"]).toBe(path.join(tmpdir, "rack_sendfile"));
   expect(closed).toBe(true);
 });
 
 it("sets x-lighttpd-send-file response header and discards body", async () => {
-  const body = sendfileBody();
-  const app = sendfileApp(body);
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
-    HTTP_X_SENDFILE_TYPE: "x-lighttpd-send-file",
-  });
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("");
-  expect(res.headers["content-length"]).toBe("0");
-  expect(res.headers["x-lighttpd-send-file"]).toBe(path.join(tmpdir, "rack_sendfile"));
+  await request(
+    { HTTP_X_SENDFILE_TYPE: "x-lighttpd-send-file" },
+    undefined,
+    undefined,
+    (response) => {
+      expect(response.isOk).toBeTruthy();
+      expect(response.body.length === 0).toBeTruthy();
+      expect(response.headers["content-length"]).toBe("0");
+      expect(response.headers["x-lighttpd-send-file"]).toBe(
+        File.join(Dir.tmpdir(), "rack_sendfile"),
+      );
+    },
+  );
 });
 
 it("sets x-accel-redirect response header and discards body", async () => {
-  const body = sendfileBody();
-  const app = sendfileApp(body);
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
+  const headers = {
     HTTP_X_SENDFILE_TYPE: "x-accel-redirect",
-    HTTP_X_ACCEL_MAPPING: `${tmpdir}/=/foo/bar/`,
+    HTTP_X_ACCEL_MAPPING: `${Dir.tmpdir()}/=/foo/bar/`,
+  };
+  await request(headers, undefined, undefined, (response) => {
+    expect(response.isOk).toBeTruthy();
+    expect(response.body.length === 0).toBeTruthy();
+    expect(response.headers["content-length"]).toBe("0");
+    expect(response.headers["x-accel-redirect"]).toBe("/foo/bar/rack_sendfile");
   });
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("");
-  expect(res.headers["content-length"]).toBe("0");
-  expect(res.headers["x-accel-redirect"]).toBe("/foo/bar/rack_sendfile");
 });
 
 it("sets x-accel-redirect response header to percent-encoded path", async () => {
-  const body = sendfileBody("file_with_%_?_symbol");
-  const app = sendfileApp(body);
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
+  const headers = {
     HTTP_X_SENDFILE_TYPE: "x-accel-redirect",
-    HTTP_X_ACCEL_MAPPING: `${tmpdir}/=/foo/bar%/`,
+    HTTP_X_ACCEL_MAPPING: `${Dir.tmpdir()}/=/foo/bar%/`,
+  };
+  await request(headers, sendfileBody("file_with_%_?_symbol"), undefined, (response) => {
+    expect(response.isOk).toBeTruthy();
+    expect(response.body.length === 0).toBeTruthy();
+    expect(response.headers["content-length"]).toBe("0");
+    expect(response.headers["x-accel-redirect"]).toBe("/foo/bar%25/file_with_%25_%3F_symbol");
   });
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("");
-  expect(res.headers["content-length"]).toBe("0");
-  expect(res.headers["x-accel-redirect"]).toBe("/foo/bar%25/file_with_%25_%3F_symbol");
 });
 
 it("writes to rack.error when no x-accel-mapping is specified", async () => {
-  const body = sendfileBody();
-  const app = sendfileApp(body);
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
-    HTTP_X_SENDFILE_TYPE: "x-accel-redirect",
+  await request({ HTTP_X_SENDFILE_TYPE: "x-accel-redirect" }, undefined, undefined, (response) => {
+    expect(response.isOk).toBeTruthy();
+    expect(response.body).toBe("Hello World");
+    expect(Object.keys(response.headers)).not.toContain("x-accel-redirect");
+    expect(response.errors).toContain("x-accel-mapping");
   });
-  expect(res.status).toBe(200);
-  expect(res.body).toBe("Hello World");
-  expect(res.headers["x-accel-redirect"]).toBeUndefined();
-  expect(res.errors).toContain("x-accel-mapping");
 });
 
 it("does nothing when body does not respond to #to_path", async () => {
-  const app = sendfileApp(["Not a file..."]);
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
-    HTTP_X_SENDFILE_TYPE: "x-sendfile",
-  });
-  expect(res.body).toBe("Not a file...");
-  expect(res.headers["x-sendfile"]).toBeUndefined();
+  await request(
+    { HTTP_X_SENDFILE_TYPE: "x-sendfile" },
+    ["Not a file..."],
+    undefined,
+    (response) => {
+      expect(response.body).toBe("Not a file...");
+      expect(Object.keys(response.headers)).not.toContain("x-sendfile");
+    },
+  );
 });
 
 it("sets x-accel-redirect response header and discards body when initialized with multiple mappings", async () => {
-  const dir1 = fs.mkdtempSync(path.join(tmpdir, "rack-test-"));
-  const dir2 = fs.mkdtempSync(path.join(tmpdir, "rack-test-"));
+  const dir1 = Dir.mktmpdir();
+  const dir2 = Dir.mktmpdir();
   try {
-    fs.writeFileSync(path.join(dir1, "rack_sendfile"), "hello world");
-    fs.writeFileSync(path.join(dir2, "rack_sendfile"), "goodbye world");
+    const firstBody = openFile(File.join(dir1, "rack_sendfile"));
+    firstBody.puts("hello world");
 
-    const body1: any = ["hello world"];
-    body1.toPath = () => path.join(dir1, "rack_sendfile");
-    const body2: any = ["goodbye world"];
-    body2.toPath = () => path.join(dir2, "rack_sendfile");
+    const secondBody = openFile(File.join(dir2, "rack_sendfile"));
+    secondBody.puts("goodbye world");
 
     const mappings: [string, string][] = [
       [`${dir1}/`, "/foo/bar/"],
       [`${dir2}/`, "/wibble/"],
     ];
 
-    let res = await new MockRequest((env) => sendfileApp(body1, mappings).call(env)).get("/", {
-      HTTP_X_SENDFILE_TYPE: "x-accel-redirect",
+    await request({ HTTP_X_SENDFILE_TYPE: "x-accel-redirect" }, firstBody, mappings, (response) => {
+      expect(response.isOk).toBeTruthy();
+      expect(response.body.length === 0).toBeTruthy();
+      expect(response.headers["content-length"]).toBe("0");
+      expect(response.headers["x-accel-redirect"]).toBe("/foo/bar/rack_sendfile");
     });
-    expect(res.status).toBe(200);
-    expect(res.body).toBe("");
-    expect(res.headers["x-accel-redirect"]).toBe("/foo/bar/rack_sendfile");
 
-    res = await new MockRequest((env) => sendfileApp(body2, mappings).call(env)).get("/", {
-      HTTP_X_SENDFILE_TYPE: "x-accel-redirect",
-    });
-    expect(res.status).toBe(200);
-    expect(res.body).toBe("");
-    expect(res.headers["x-accel-redirect"]).toBe("/wibble/rack_sendfile");
+    await request(
+      { HTTP_X_SENDFILE_TYPE: "x-accel-redirect" },
+      secondBody,
+      mappings,
+      (response) => {
+        expect(response.isOk).toBeTruthy();
+        expect(response.body.length === 0).toBeTruthy();
+        expect(response.headers["content-length"]).toBe("0");
+        expect(response.headers["x-accel-redirect"]).toBe("/wibble/rack_sendfile");
+      },
+    );
   } finally {
-    fs.rmSync(dir1, { recursive: true });
-    fs.rmSync(dir2, { recursive: true });
+    FileUtils.rmRf(dir1);
+    FileUtils.rmRf(dir2);
   }
 });
 
 it("sets x-accel-redirect response header and discards body when initialized with multiple mappings via header", async () => {
-  const dir1 = fs.mkdtempSync(path.join(tmpdir, "rack-test-"));
-  const dir2 = fs.mkdtempSync(path.join(tmpdir, "rack-test-"));
-  const dir3 = fs.mkdtempSync(path.join(tmpdir, "rack-test-"));
+  const dir1 = Dir.mktmpdir();
+  const dir2 = Dir.mktmpdir();
+  const dir3 = Dir.mktmpdir();
   try {
-    fs.writeFileSync(path.join(dir1, "rack_sendfile"), "hello world");
-    fs.writeFileSync(path.join(dir2, "rack_sendfile"), "goodbye world");
-    fs.writeFileSync(path.join(dir3, "rack_sendfile"), "hello again");
+    const firstBody = openFile(File.join(dir1, "rack_sendfile"));
+    firstBody.puts("hello world");
 
-    const body1: any = ["hello world"];
-    body1.toPath = () => path.join(dir1, "rack_sendfile");
+    const secondBody = openFile(File.join(dir2, "rack_sendfile"));
+    secondBody.puts("goodbye world");
 
-    const body2: any = ["goodbye world"];
-    body2.toPath = () => path.join(dir2, "rack_sendfile");
-
-    const body3: any = ["hello again"];
-    body3.toPath = () => path.join(dir3, "rack_sendfile");
+    const thirdBody = openFile(File.join(dir3, "rack_sendfile"));
+    thirdBody.puts("hello again world");
 
     const headers = {
       HTTP_X_SENDFILE_TYPE: "x-accel-redirect",
       HTTP_X_ACCEL_MAPPING: `${dir1}/=/foo/bar/, ${dir2}/=/wibble/`,
     };
 
-    let res = await new MockRequest((env) => sendfileApp(body1).call(env)).get("/", headers);
-    expect(res.status).toBe(200);
-    expect(res.body).toBe("");
-    expect(res.headers["x-accel-redirect"]).toBe("/foo/bar/rack_sendfile");
+    await request(headers, firstBody, undefined, (response) => {
+      expect(response.isOk).toBeTruthy();
+      expect(response.body.length === 0).toBeTruthy();
+      expect(response.headers["content-length"]).toBe("0");
+      expect(response.headers["x-accel-redirect"]).toBe("/foo/bar/rack_sendfile");
+    });
 
-    res = await new MockRequest((env) => sendfileApp(body2).call(env)).get("/", headers);
-    expect(res.status).toBe(200);
-    expect(res.body).toBe("");
-    expect(res.headers["x-accel-redirect"]).toBe("/wibble/rack_sendfile");
+    await request(headers, secondBody, undefined, (response) => {
+      expect(response.isOk).toBeTruthy();
+      expect(response.body.length === 0).toBeTruthy();
+      expect(response.headers["content-length"]).toBe("0");
+      expect(response.headers["x-accel-redirect"]).toBe("/wibble/rack_sendfile");
+    });
 
-    res = await new MockRequest((env) => sendfileApp(body3).call(env)).get("/", headers);
-    expect(res.status).toBe(200);
-    expect(res.body).toBe("");
-    expect(res.headers["x-accel-redirect"]).toBe(`${dir3}/rack_sendfile`);
+    await request(headers, thirdBody, undefined, (response) => {
+      expect(response.isOk).toBeTruthy();
+      expect(response.body.length === 0).toBeTruthy();
+      expect(response.headers["content-length"]).toBe("0");
+      expect(response.headers["x-accel-redirect"]).toBe(`${dir3}/rack_sendfile`);
+    });
   } finally {
-    fs.rmSync(dir1, { recursive: true });
-    fs.rmSync(dir2, { recursive: true });
-    fs.rmSync(dir3, { recursive: true });
+    FileUtils.rmRf(dir1);
+    FileUtils.rmRf(dir2);
   }
 });

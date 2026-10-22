@@ -1,9 +1,11 @@
 import { it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
+import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
 
-const echoApp = async (env: Record<string, any>) =>
-  [
+it("dispatches paths correctly", async () => {
+  const app = (env: Record<string, any>) => [
     200,
     {
       "x-scriptname": env["SCRIPT_NAME"],
@@ -11,176 +13,190 @@ const echoApp = async (env: Record<string, any>) =>
       "content-type": "text/plain",
     },
     [""],
-  ] as any;
+  ];
+  const map = new Lint(
+    new URLMap({
+      "http://foo.org/bar": app,
+      "/foo": app,
+      "/foo/bar": app,
+    }),
+  );
 
-it("dispatches paths correctly", async () => {
-  const map = new URLMap({
-    "http://foo.org/bar": echoApp,
-    "/foo": echoApp,
-    "/foo/bar": echoApp,
-  });
+  let res = await new MockRequest(map).get("/");
+  expect(res.isNotFound).toBeTruthy();
 
-  let res = await new MockRequest((env) => map.call(env)).get("/");
-  expect(res.status).toBe(404);
+  res = await new MockRequest(map).get("/qux");
+  expect(res.isNotFound).toBeTruthy();
 
-  res = await new MockRequest((env) => map.call(env)).get("/qux");
-  expect(res.status).toBe(404);
+  res = await new MockRequest(map).get("/foo");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-scriptname")).toBe("/foo");
+  expect(res.get("x-pathinfo")).toBe("");
 
-  res = await new MockRequest((env) => map.call(env)).get("/foo");
+  res = await new MockRequest(map).get("/foo/");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-scriptname")).toBe("/foo");
+  expect(res.get("x-pathinfo")).toBe("/");
+
+  res = await new MockRequest(map).get("/foo/bar");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-scriptname")).toBe("/foo/bar");
+  expect(res.get("x-pathinfo")).toBe("");
+
+  res = await new MockRequest(map).get("/foo/bard");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-scriptname")).toBe("/foo");
+  expect(res.get("x-pathinfo")).toBe("/bard");
+
+  res = await new MockRequest(map).get("/foo/bar/");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-scriptname")).toBe("/foo/bar");
+  expect(res.get("x-pathinfo")).toBe("/");
+
+  res = await new MockRequest(map).get("/foo///bar//quux");
   expect(res.status).toBe(200);
-  expect(res.headers["x-scriptname"]).toBe("/foo");
-  expect(res.headers["x-pathinfo"]).toBe("");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-scriptname")).toBe("/foo/bar");
+  expect(res.get("x-pathinfo")).toBe("//quux");
 
-  res = await new MockRequest((env) => map.call(env)).get("/foo/");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-scriptname"]).toBe("/foo");
-  expect(res.headers["x-pathinfo"]).toBe("/");
+  res = await new MockRequest(map).get("/foo/quux", { SCRIPT_NAME: "/bleh" });
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-scriptname")).toBe("/bleh/foo");
+  expect(res.get("x-pathinfo")).toBe("/quux");
 
-  res = await new MockRequest((env) => map.call(env)).get("/foo/bar");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-scriptname"]).toBe("/foo/bar");
-  expect(res.headers["x-pathinfo"]).toBe("");
+  res = await new MockRequest(map).get("/bar", { HTTP_HOST: "foo.org" });
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-scriptname")).toBe("/bar");
+  expect(res.get("x-pathinfo").length === 0).toBeTruthy();
 
-  res = await new MockRequest((env) => map.call(env)).get("/foo/bard");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-scriptname"]).toBe("/foo");
-  expect(res.headers["x-pathinfo"]).toBe("/bard");
-
-  res = await new MockRequest((env) => map.call(env)).get("/foo/bar/");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-scriptname"]).toBe("/foo/bar");
-  expect(res.headers["x-pathinfo"]).toBe("/");
-
-  res = await new MockRequest((env) => map.call(env)).get("/foo/quux", { SCRIPT_NAME: "/bleh" });
-  expect(res.status).toBe(200);
-  expect(res.headers["x-scriptname"]).toBe("/bleh/foo");
-  expect(res.headers["x-pathinfo"]).toBe("/quux");
-
-  res = await new MockRequest((env) => map.call(env)).get("/bar", { HTTP_HOST: "foo.org" });
-  expect(res.status).toBe(200);
-  expect(res.headers["x-scriptname"]).toBe("/bar");
-  expect(res.headers["x-pathinfo"]).toBe("");
-
-  res = await new MockRequest((env) => map.call(env)).get("/bar/", { HTTP_HOST: "foo.org" });
-  expect(res.status).toBe(200);
-  expect(res.headers["x-scriptname"]).toBe("/bar");
-  expect(res.headers["x-pathinfo"]).toBe("/");
+  res = await new MockRequest(map).get("/bar/", { HTTP_HOST: "foo.org" });
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-scriptname")).toBe("/bar");
+  expect(res.get("x-pathinfo")).toBe("/");
 });
 
 it("dispatches hosts correctly", async () => {
-  const map = new URLMap({
-    "http://foo.org/": async (env) =>
-      [
+  const map = new Lint(
+    new URLMap({
+      "http://foo.org/": (env: Record<string, any>) => [
         200,
         {
           "content-type": "text/plain",
           "x-position": "foo.org",
-          "x-host": env["HTTP_HOST"] || env["SERVER_NAME"],
+          "x-host": env["HTTP_HOST"] ?? env["SERVER_NAME"],
         },
         [""],
-      ] as any,
-    "http://subdomain.foo.org/": async (env) =>
-      [
+      ],
+      "http://subdomain.foo.org/": (env: Record<string, any>) => [
         200,
         {
           "content-type": "text/plain",
           "x-position": "subdomain.foo.org",
-          "x-host": env["HTTP_HOST"] || env["SERVER_NAME"],
+          "x-host": env["HTTP_HOST"] ?? env["SERVER_NAME"],
         },
         [""],
-      ] as any,
-    "http://bar.org/": async (env) =>
-      [
+      ],
+      "http://bar.org/": (env: Record<string, any>) => [
         200,
         {
           "content-type": "text/plain",
           "x-position": "bar.org",
-          "x-host": env["HTTP_HOST"] || env["SERVER_NAME"],
+          "x-host": env["HTTP_HOST"] ?? env["SERVER_NAME"],
         },
         [""],
-      ] as any,
-    "/": async (env) =>
-      [
+      ],
+      "/": (env: Record<string, any>) => [
         200,
         {
           "content-type": "text/plain",
           "x-position": "default.org",
-          "x-host": env["HTTP_HOST"] || env["SERVER_NAME"],
+          "x-host": env["HTTP_HOST"] ?? env["SERVER_NAME"],
         },
         [""],
-      ] as any,
-  });
+      ],
+    }),
+  );
 
-  let res = await new MockRequest((env) => map.call(env)).get("/");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("default.org");
+  let res = await new MockRequest(map).get("/");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("default.org");
 
-  res = await new MockRequest((env) => map.call(env)).get("/", { HTTP_HOST: "bar.org" });
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("bar.org");
+  res = await new MockRequest(map).get("/", { HTTP_HOST: "bar.org" });
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("bar.org");
 
-  res = await new MockRequest((env) => map.call(env)).get("/", { HTTP_HOST: "foo.org" });
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("foo.org");
+  res = await new MockRequest(map).get("/", { HTTP_HOST: "foo.org" });
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("foo.org");
 
-  res = await new MockRequest((env) => map.call(env)).get("/", {
+  res = await new MockRequest(map).get("/", {
     HTTP_HOST: "subdomain.foo.org",
     SERVER_NAME: "foo.org",
   });
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("subdomain.foo.org");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("subdomain.foo.org");
 
-  res = await new MockRequest((env) => map.call(env)).get("/", { HTTP_HOST: "example.org" });
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("default.org");
+  res = await new MockRequest(map).get("http://foo.org/");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("foo.org");
 
-  res = await new MockRequest((env) => map.call(env)).get("/", { HTTP_HOST: "any-host.org" });
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("default.org");
+  res = await new MockRequest(map).get("/", { HTTP_HOST: "example.org" });
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("default.org");
 
-  res = await new MockRequest((env) => map.call(env)).get("/", {
+  res = await new MockRequest(map).get("/", { HTTP_HOST: "any-host.org" });
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("default.org");
+
+  res = await new MockRequest(map).get("/", {
+    HTTP_HOST: "any-host.org",
+    HTTP_X_FORWARDED_HOST: "any-host.org",
+  });
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("default.org");
+
+  res = await new MockRequest(map).get("/", {
     HTTP_HOST: "example.org:9292",
     SERVER_PORT: "9292",
   });
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("default.org");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("default.org");
 });
 
 it("be nestable", async () => {
-  const map = new URLMap({
-    "/foo": (env) =>
-      new URLMap({
-        "/bar": (env2) =>
-          new URLMap({
-            "/quux": async (env3) =>
-              [
-                200,
-                {
-                  "content-type": "text/plain",
-                  "x-position": "/foo/bar/quux",
-                  "x-pathinfo": env3["PATH_INFO"],
-                  "x-scriptname": env3["SCRIPT_NAME"],
-                },
-                [""],
-              ] as any,
-          }).call(env2),
-      }).call(env),
-  });
+  const map = new Lint(
+    new URLMap({
+      "/foo": new URLMap({
+        "/bar": new URLMap({
+          "/quux": (env: Record<string, any>) => [
+            200,
+            {
+              "content-type": "text/plain",
+              "x-position": "/foo/bar/quux",
+              "x-pathinfo": env["PATH_INFO"],
+              "x-scriptname": env["SCRIPT_NAME"],
+            },
+            [""],
+          ],
+        }),
+      }),
+    }),
+  );
 
-  let res = await new MockRequest((env) => map.call(env)).get("/foo/bar");
-  expect(res.status).toBe(404);
+  let res = await new MockRequest(map).get("/foo/bar");
+  expect(res.isNotFound).toBeTruthy();
 
-  res = await new MockRequest((env) => map.call(env)).get("/foo/bar/quux");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("/foo/bar/quux");
-  expect(res.headers["x-pathinfo"]).toBe("");
-  expect(res.headers["x-scriptname"]).toBe("/foo/bar/quux");
+  res = await new MockRequest(map).get("/foo/bar/quux");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("/foo/bar/quux");
+  expect(res.get("x-pathinfo")).toBe("");
+  expect(res.get("x-scriptname")).toBe("/foo/bar/quux");
 });
 
 it("route root apps correctly", async () => {
-  const map = new URLMap({
-    "/": async (env) =>
-      [
+  const map = new Lint(
+    new URLMap({
+      "/": (env: Record<string, any>) => [
         200,
         {
           "content-type": "text/plain",
@@ -189,9 +205,8 @@ it("route root apps correctly", async () => {
           "x-scriptname": env["SCRIPT_NAME"],
         },
         [""],
-      ] as any,
-    "/foo": async (env) =>
-      [
+      ],
+      "/foo": (env: Record<string, any>) => [
         200,
         {
           "content-type": "text/plain",
@@ -200,32 +215,39 @@ it("route root apps correctly", async () => {
           "x-scriptname": env["SCRIPT_NAME"],
         },
         [""],
-      ] as any,
-  });
+      ],
+    }),
+  );
 
-  let res = await new MockRequest((env) => map.call(env)).get("/foo/bar");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("foo");
-  expect(res.headers["x-pathinfo"]).toBe("/bar");
-  expect(res.headers["x-scriptname"]).toBe("/foo");
+  let res = await new MockRequest(map).get("/foo/bar");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("foo");
+  expect(res.get("x-pathinfo")).toBe("/bar");
+  expect(res.get("x-scriptname")).toBe("/foo");
 
-  res = await new MockRequest((env) => map.call(env)).get("/foo");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("foo");
-  expect(res.headers["x-pathinfo"]).toBe("");
-  expect(res.headers["x-scriptname"]).toBe("/foo");
+  res = await new MockRequest(map).get("/foo");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("foo");
+  expect(res.get("x-pathinfo")).toBe("");
+  expect(res.get("x-scriptname")).toBe("/foo");
 
-  res = await new MockRequest((env) => map.call(env)).get("/bar");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("root");
-  expect(res.headers["x-pathinfo"]).toBe("/bar");
-  expect(res.headers["x-scriptname"]).toBe("");
+  res = await new MockRequest(map).get("/bar");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("root");
+  expect(res.get("x-pathinfo")).toBe("/bar");
+  expect(res.get("x-scriptname")).toBe("");
+
+  res = await new MockRequest(map).get("");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("root");
+  expect(res.get("x-pathinfo")).toBe("/");
+  expect(res.get("x-scriptname")).toBe("");
 });
 
 it("not squeeze slashes", async () => {
-  const map = new URLMap({
-    "/": async (env) =>
-      [
+  const map = new Lint(
+    new URLMap({
+      "/": (env: Record<string, any>) => [
         200,
         {
           "content-type": "text/plain",
@@ -234,9 +256,8 @@ it("not squeeze slashes", async () => {
           "x-scriptname": env["SCRIPT_NAME"],
         },
         [""],
-      ] as any,
-    "/foo": async (env) =>
-      [
+      ],
+      "/foo": (env: Record<string, any>) => [
         200,
         {
           "content-type": "text/plain",
@@ -245,20 +266,21 @@ it("not squeeze slashes", async () => {
           "x-scriptname": env["SCRIPT_NAME"],
         },
         [""],
-      ] as any,
-  });
+      ],
+    }),
+  );
 
-  const res = await new MockRequest((env) => map.call(env)).get("/http://example.org/bar");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("root");
-  expect(res.headers["x-pathinfo"]).toBe("/http://example.org/bar");
-  expect(res.headers["x-scriptname"]).toBe("");
+  const res = await new MockRequest(map).get("/http://example.org/bar");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("root");
+  expect(res.get("x-pathinfo")).toBe("/http://example.org/bar");
+  expect(res.get("x-scriptname")).toBe("");
 });
 
 it("not be case sensitive with hosts", async () => {
-  const map = new URLMap({
-    "http://example.org/": async (env) =>
-      [
+  const map = new Lint(
+    new URLMap({
+      "http://example.org/": (env: Record<string, any>) => [
         200,
         {
           "content-type": "text/plain",
@@ -267,18 +289,25 @@ it("not be case sensitive with hosts", async () => {
           "x-scriptname": env["SCRIPT_NAME"],
         },
         [""],
-      ] as any,
-  });
+      ],
+    }),
+  );
 
-  let res = await new MockRequest((env) => map.call(env)).get("http://example.org/");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("root");
+  let res = await new MockRequest(map).get("http://example.org/");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("root");
+  expect(res.get("x-pathinfo")).toBe("/");
+  expect(res.get("x-scriptname")).toBe("");
 
-  res = await new MockRequest((env) => map.call(env)).get("http://EXAMPLE.ORG/");
-  expect(res.status).toBe(200);
-  expect(res.headers["x-position"]).toBe("root");
+  res = await new MockRequest(map).get("http://EXAMPLE.ORG/");
+  expect(res.isOk).toBeTruthy();
+  expect(res.get("x-position")).toBe("root");
+  expect(res.get("x-pathinfo")).toBe("/");
+  expect(res.get("x-scriptname")).toBe("");
 });
 
 it("not allow locations unless they start with /", () => {
-  expect(() => new URLMap({ "a/": async () => [200, {}, []] as any })).toThrow();
+  expect(() => {
+    new URLMap({ "a/": (_env: Record<string, any>) => undefined as any });
+  }).toThrow(ArgumentError);
 });
