@@ -571,6 +571,18 @@ importers:
       '@blazetrails/activerecord':
         specifier: workspace:*
         version: link:../activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/arel':
+        specifier: workspace:*
+        version: link:../arel
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
 
   packages/trails-tsc:
     dependencies:
