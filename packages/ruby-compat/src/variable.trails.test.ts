@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./argument-error.js";
 import { include, Module, rbModConstSet } from "./include.js";
 import { NameError } from "./name-error.js";
@@ -9,7 +9,6 @@ import {
   rbConstGet,
   rbModConstGet,
   rbModConstants,
-  rbModDeprecateConstant,
   rbPathToClass,
   registerConstant,
   registeredConstant,
@@ -282,13 +281,69 @@ describe("rb_mod_constants", () => {
 });
 
 describe("rbModDeprecateConstant", () => {
+  const warn = vi.fn();
+  let v: typeof import("./variable.js");
+  let inc: typeof import("./include.js");
+  let rbConstGet: typeof v.rbConstGet;
+  let rbModConstGet: typeof v.rbModConstGet;
+  let rbModDeprecateConstant: typeof v.rbModDeprecateConstant;
+  let include: typeof inc.include;
+  let Module: typeof inc.Module;
+  let rbModConstSet: typeof inc.rbModConstSet;
+  let NameError: typeof import("./name-error.js").NameError;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    vi.doMock("./kernel-warn.js", () => ({ warn }));
+    v = await import("./variable.js");
+    inc = await import("./include.js");
+    ({ rbConstGet, rbModConstGet, rbModDeprecateConstant } = v);
+    ({ include, Module, rbModConstSet } = inc);
+    ({ NameError } = await import("./name-error.js"));
+    vi.doUnmock("./kernel-warn.js");
+  });
+
   it("records the names, answers the receiver and still reads the constant", () => {
     class Http {
       static NOT_FOUND = 404;
     }
+    warn.mockClear();
     expect(rbModDeprecateConstant(Http, "NOT_FOUND")).toBe(Http);
     expect(rbConstGet(Http, "NOT_FOUND")).toBe(404);
     expect(rbModConstGet(Http, "NOT_FOUND")).toBe(404);
+    expect(warn.mock.calls).toEqual([
+      ["constant Http::NOT_FOUND is deprecated", { category: ":deprecated" }],
+      ["constant Http::NOT_FOUND is deprecated", { category: ":deprecated" }],
+    ]);
+  });
+
+  it("warns naming the module for a constant read through an includer", () => {
+    const Mixin = new Module();
+    rbModConstSet(Mixin, "Old", 1);
+    rbModDeprecateConstant(Mixin, "Old");
+    class Host {}
+    include(Host, Mixin);
+    warn.mockClear();
+    expect(rbConstGet(Host, "Old")).toBe(1);
+    expect(warn.mock.calls).toEqual([
+      [
+        expect.stringMatching(/^constant #<Module:0x[0-9a-f]+>::Old is deprecated$/),
+        { category: ":deprecated" },
+      ],
+    ]);
+  });
+
+  it("warns naming the superclass that holds the constant", () => {
+    class Base {
+      static OLD = 1;
+    }
+    class Sub extends Base {}
+    rbModDeprecateConstant(Base, "OLD");
+    warn.mockClear();
+    expect(rbConstGet(Sub, "OLD")).toBe(1);
+    expect(warn.mock.calls).toEqual([
+      ["constant Base::OLD is deprecated", { category: ":deprecated" }],
+    ]);
   });
 
   it("raises NameError for a constant the module does not hold", () => {

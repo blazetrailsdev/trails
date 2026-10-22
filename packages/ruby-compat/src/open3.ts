@@ -47,7 +47,10 @@ export class Open3 {
    * `Open3.capture3` (`vendor/ruby/v3.3.11/lib/open3.rb:648-681`): the
    * command's stdout and stderr as two Strings, and its `Process::Status`.
    * `stdin_data` (default `""`, `open3.rb:655`) is written to the child's
-   * stdin, which is then closed (`open3.rb:670-675`). The remaining options go
+   * stdin, which is then closed (`open3.rb:670-675`); it is a String only,
+   * as the `readpartial` / `IO.copy_stream` arm (`open3.rb:667-668`) is not
+   * ported. `binmode` is taken out of the options (`open3.rb:656`) and has no
+   * effect, since every stream is read as a String. The remaining options go
    * to `spawn`, so `unsetenv_others: true` gives the child `env` alone. Several
    * command Strings are a program and its argv, spawned with no shell.
    *
@@ -61,7 +64,7 @@ export class Open3 {
   static async capture3(
     ...cmd: unknown[]
   ): Promise<[string, string, InstanceType<typeof Process.Status>]> {
-    let opts: { stdinData?: string | null; unsetenvOthers?: unknown };
+    let opts: { stdinData?: string | null; binmode?: unknown; unsetenvOthers?: unknown };
     if (cmd.length > 0 && isPlainHash(cmd[cmd.length - 1])) {
       opts = { ...(cmd.pop() as typeof opts) };
     } else {
@@ -70,6 +73,7 @@ export class Open3 {
 
     const stdinData = opts.stdinData || "";
     delete opts.stdinData;
+    delete opts.binmode;
 
     const [command, env, args] = rbExecargNew([...cmd, opts]);
     const adapter = getChildProcess();

@@ -24,7 +24,14 @@ import { warn } from "./kernel-warn.js";
 import { verbose } from "./verbose.js";
 import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
-import { RCLASS_CONST_TBL, classpaths, rbCBasicObject, rbCSymbol, rbModName } from "./object.js";
+import {
+  RCLASS_CONST_TBL,
+  classpaths,
+  rbCBasicObject,
+  rbCSymbol,
+  rbModName,
+  rbModToS,
+} from "./object.js";
 import { Range } from "./range.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { Struct } from "./struct.js";
@@ -321,7 +328,9 @@ export function rbConstWarnIfDeprecated(klass: object, id: string): void {
     if (klass === Object) {
       warn(`constant ::${id} is deprecated`, { category: ":deprecated" });
     } else {
-      warn(`constant ${rbModName(klass)}::${id} is deprecated`, { category: ":deprecated" });
+      warn(`constant ${rbModToS(klass as never)}::${id} is deprecated`, {
+        category: ":deprecated",
+      });
     }
   }
 }
