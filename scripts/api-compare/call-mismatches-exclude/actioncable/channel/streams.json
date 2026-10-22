@@ -1,0 +1,15 @@
+[
+  {
+    "package": "actioncable",
+    "tsFile": "channel/streams.ts",
+    "rubyName": "stream_from",
+    "call": "subscribe",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:broadcasting",
+      "ref:handler",
+      "ref:lambda"
+    ],
+    "reason": "Rails' third argument is a `lambda do … end` literal; the port passes the same success callback as an inline arrow, which the TS extractor reads as a trailing block rather than an argument."
+  }
+]
