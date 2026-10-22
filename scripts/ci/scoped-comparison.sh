@@ -57,11 +57,10 @@ SPEC
 )
 
 if [ "$LIB_PATHS_JSON" = "{}" ]; then
-  echo "::warning::$pkg has no vendored lib path, so it is not enrolled in the compare tooling; ran only its unscoped gates"
-  spec="$unscoped"
-else
-  spec="$scoped"$'\n'"$unscoped"
+  echo "::error::$pkg has no vendored lib path, so it is not enrolled in the compare tooling and cannot be compared alone"
+  exit 1
 fi
+spec="$scoped"$'\n'"$unscoped"
 
 printf "unscoped %s\n" "${unscoped_reasons[@]}"
 node scripts/ci/bg-gates.mjs start <<<"$spec"
