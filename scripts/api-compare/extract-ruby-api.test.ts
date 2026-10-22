@@ -3743,7 +3743,6 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
         class Core
           def ported
             [1].uniq
-            [2].sort
             [3].count { |x| x }
             1.5.round
             "a\\n".chomp("\\n")
@@ -3751,7 +3750,6 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
 
           def formless
             [1].uniq { |x| x }
-            [2].sort { |a, b| b <=> a }
             [3].count
             1.5.round(1)
             2.5.round(0)
@@ -3762,14 +3760,12 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
     expect(c["Core#ported"]).toEqual({
       uniq: ["array"],
-      sort: ["array"],
       count: ["array"],
       round: ["numeric"],
       chomp: ["string"],
     });
     expect(c["Core#formless"]).toEqual({
       uniq: ["formless"],
-      sort: ["formless"],
       count: ["formless"],
       round: ["formless"],
       chomp: ["formless"],

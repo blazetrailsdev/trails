@@ -3050,7 +3050,6 @@ class ApiExtractor
 
   FORM_ARMS = {
     "uniq" => ->(has_block, _args) { !has_block },
-    "sort" => ->(has_block, _args) { !has_block },
     "count" => ->(has_block, _args) { has_block },
     "round" => ->(_has_block, args) { args.all? { |arg| arg.nil? || arg == [:arg_paren, nil] } }
   }.freeze

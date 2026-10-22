@@ -312,7 +312,8 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   `[[1], [1]].uniq` ported as a `Set` is credited too;
  *   `take` / `drop` are `.slice(0, n)` / `.slice(n)`; `count` is
  *   `.filter(fn).length`; `to_h` is `Object.fromEntries(pairs)`; `zip` is
- *   `.map((x, i) => [x, b[i]])`. `sort` has no row: a comparator-less JS
+ *   `.map((x, i) => [x, b[i]])`, `b` the map receiver included, since
+ *   `xs.zip(xs)` is a Ruby call `rb_ary_zip` answers like any other. `sort` has no row: a comparator-less JS
  *   sort compares strings, where `rb_ary_sort` compares with `<=>`.
  *   No value form names its receiver, so the credit is body-scoped: one
  *   `.slice(1)` anywhere in the body credits every proven-array `drop` site,
@@ -329,7 +330,7 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   half-away `Math.sign(x) * Math.round(Math.abs(x))` (`Math.round` rounds
  *   -2.5 to -2, `float.c` rounds it to -3), `strip` as `.trim()`, `rstrip` as
  *   `.trimEnd()` and `chomp` as `s.endsWith(t) ? s.slice(0, -n) : s`.
- *   A site on an arm the form does not port — `uniq` / `sort` with a block,
+ *   A site on an arm the form does not port — `uniq` with a block,
  *   `count` without one, `round(digits)`, a `chomp` with no literal argument —
  *   records the kind `formless` (extract-ruby-api.rb#FORM_ARMS) and never
  *   credits.
