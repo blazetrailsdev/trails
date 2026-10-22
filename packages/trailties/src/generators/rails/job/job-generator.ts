@@ -53,7 +53,6 @@ export class JobGenerator extends NamedBase {
     }
   }
 
-  /** @internal */
   parentClassName(): string {
     return this.options.parent!;
   }
