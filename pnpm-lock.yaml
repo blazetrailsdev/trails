@@ -139,6 +139,21 @@ importers:
         specifier: ^4.21.0
         version: 4.21.0
 
+  packages/actioncable:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/actionpack:
     dependencies:
       '@blazetrails/actionview':
@@ -661,6 +676,9 @@ importers:
 
   scripts/guides-typecheck:
     dependencies:
+      '@blazetrails/actioncable':
+        specifier: workspace:*
+        version: link:../../packages/actioncable
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../../packages/actionpack
