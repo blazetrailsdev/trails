@@ -30,6 +30,7 @@ import type { QueueAdapter } from "./queue-adapter.js";
 import type * as QueueAdapterModule from "./queue-adapter.js";
 import type { QueuePriority } from "./queue-priority.js";
 import type * as TestCaseModule from "./test-case.js";
+import type * as ActiveJobModule from "./active-job.js";
 import type * as TestHelperModule from "./test-helper.js";
 import type { ObjectSerializer } from "./serializers/object-serializer.js";
 
@@ -96,6 +97,8 @@ export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
   Serializers: typeof Serializers;
   TestCase: typeof TestCaseModule.TestCase;
   TestHelper: typeof TestHelperModule.TestHelper;
+  verboseEnqueueLogs: typeof ActiveJobModule.verboseEnqueueLogs;
+  setVerboseEnqueueLogs: typeof ActiveJobModule.setVerboseEnqueueLogs;
 };
 registerConstant("ActiveJob", ActiveJob);
 extend(ActiveJob, Autoload);

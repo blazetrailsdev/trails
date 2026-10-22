@@ -1,3 +1,5 @@
+import { ActiveJob } from "./namespaces.js";
+
 let _verboseEnqueueLogs = false;
 
 export function verboseEnqueueLogs(): boolean {
@@ -7,3 +9,5 @@ export function verboseEnqueueLogs(): boolean {
 export function setVerboseEnqueueLogs(verboseEnqueueLogs: boolean): void {
   _verboseEnqueueLogs = verboseEnqueueLogs;
 }
+
+Object.assign(ActiveJob, { verboseEnqueueLogs, setVerboseEnqueueLogs });

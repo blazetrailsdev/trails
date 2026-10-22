@@ -76,13 +76,24 @@ describe("AppGenerator (trails-only)", () => {
       File.read(File.join(tmpDir, "my-app", "config", "environments", `${env}.ts`));
     for (const env of ["development", "test", "production"]) {
       expect(read(env)).not.toMatch(/actionController\.performCaching = true/);
-      expect(read(env)).not.toMatch(/activeRecord|actionMailer|activeStorage|activeJob/);
+      expect(read(env)).not.toMatch(/activeRecord|actionMailer|activeStorage/);
     }
     expect(read("development")).toMatch(/actionController\.performCaching = false/);
     expect(read("production")).toMatch(/this\.config\.i18n\.fallbacks = true;/);
     expect(read("production")).toMatch(
       /this\.config\.logger = TaggedLogging\.logger\(process\.stdout\);/,
     );
+  });
+
+  it("generates an app with Active Job on unless --skip-active-job is passed", async () => {
+    await new AppGenerator({ cwd: tmpDir, output: () => {}, appPath: "my-app" }).run();
+
+    expect(File.isExist(File.join(tmpDir, "my-app", "app", "jobs", "application-job.ts"))).toBe(
+      true,
+    );
+    expect(
+      File.read(File.join(tmpDir, "my-app", "config", "environments", "development.ts")),
+    ).toMatch(/this\.config\.activeJob\.verboseEnqueueLogs = true;/);
   });
 
   it("keeps skipEslint nil when not passed, distinct from an explicit false", () => {
