@@ -53,57 +53,6 @@ function argumentList(code: string): [string[], number] {
   return [args, pos];
 }
 
-function renderCallTemplate(node: string | null, directory: string): [string, boolean] | null {
-  if (node == null) return null;
-  const objectTemplate = false;
-  let template: string;
-  const string = TSETracker.STRING.exec(node);
-  if (string?.index === 0 && string[0].length === node.length) {
-    const path = string.groups!.static;
-    if (string.groups!.quote === "`" && path.includes("${")) {
-      template = "";
-      let pos = 0;
-      while (pos < path.length) {
-        const interpolation = path.indexOf("${", pos);
-        if (interpolation < 0) {
-          template += path.slice(pos);
-          break;
-        }
-        template += path.slice(pos, interpolation);
-        let unmatchedBrackets = 1;
-        pos = interpolation + 2;
-        while (unmatchedBrackets > 0) {
-          if (pos >= path.length) return null;
-          if (path[pos] === "{") unmatchedBrackets += 1;
-          else if (path[pos] === "}") unmatchedBrackets -= 1;
-          pos += 1;
-        }
-        template += "*";
-      }
-    } else {
-      template = path.includes("/") ? path : `${directory}/${path}`;
-    }
-  } else {
-    const chain = TSETracker.VARIABLE_OR_METHOD_CHAIN.exec(node);
-    if (chain?.index !== 0) return null;
-    const callArguments = node.slice(chain[0].length).trimStart();
-    if (
-      callArguments.length > 0 &&
-      !(
-        callArguments.startsWith("(") &&
-        argumentList(callArguments.slice(1))[1] === callArguments.length - 2
-      )
-    ) {
-      return null;
-    }
-    const dependency = chain.groups!.dynamic;
-
-    template = `${pluralize(dependency)}/${singularize(dependency)}`;
-  }
-
-  return [template, objectTemplate];
-}
-
 /** @internal */
 export class TSETracker {
   static EXPLICIT_DEPENDENCY = /# Template Dependency: (\S+)/g;
@@ -116,20 +65,6 @@ export class TSETracker {
   );
 
   static STRING = /(?<quote>['"`])(?<static>.*?)\k<quote>/su;
-
-  static PARTIAL_HASH_KEY = /(?:\bpartial:)\s*/u;
-
-  static LAYOUT_HASH_KEY = /(?:\blayout:)\s*/u;
-
-  static RENDER_ARGUMENTS = new RegExp(
-    `^(?:\\s*\\(?\\s*)(?:.*?${this.PARTIAL_HASH_KEY.source}|${this.LAYOUT_HASH_KEY.source})?(?:${this.STRING.source}|${this.VARIABLE_OR_METHOD_CHAIN.source})`,
-    "su",
-  );
-
-  static LAYOUT_DEPENDENCY = new RegExp(
-    `^(?:\\s*\\(?\\s*)(?:.*?${this.LAYOUT_HASH_KEY.source})(?:${this.STRING.source}|${this.VARIABLE_OR_METHOD_CHAIN.source})`,
-    "su",
-  );
 
   static supportsViewPaths(): boolean {
     return true;
@@ -180,16 +115,27 @@ export class TSETracker {
 
       const code = node.value;
       let masked = "";
+      const quotes: string[] = [];
       for (let pos = 0; pos < code.length; pos += 1) {
         const ch = code[pos];
-        if (ch === "'" || ch === '"' || ch === "`") {
-          const start = pos;
-          pos += 1;
-          while (pos < code.length && code[pos] !== ch) pos += code[pos] === "\\" ? 2 : 1;
-          masked += ch + " ".repeat(Math.max(0, Math.min(pos, code.length) - start - 1));
-          if (pos < code.length) masked += ch;
-        } else {
+        const quote = quotes.at(-1);
+        if (quote === undefined || quote === "{") {
+          if (ch === "'" || ch === '"' || ch === "`") quotes.push(ch);
+          else if (quote === "{" && ch === "{") quotes.push("{");
+          else if (quote === "{" && ch === "}") quotes.pop();
           masked += ch;
+        } else if (ch === "\\") {
+          masked += " ".repeat(Math.min(2, code.length - pos));
+          pos += 1;
+        } else if (ch === quote) {
+          quotes.pop();
+          masked += ch;
+        } else if (quote === "`" && code.startsWith("${", pos)) {
+          quotes.push("{");
+          masked += "${";
+          pos += 1;
+        } else {
+          masked += " ";
         }
       }
       const calls = [...masked.matchAll(/\brender(?:ToString)?\b/g)];
@@ -200,7 +146,7 @@ export class TSETracker {
         if (options == null) continue;
 
         const renderType = Object.keys(options).find((key) => RENDER_TYPE_KEYS.includes(key))!;
-        const templates = renderCallTemplate(options[renderType], this.directory);
+        const templates = this.renderCallTemplate(options[renderType]);
         if (templates == null) continue;
         const [template, objectTemplate] = templates;
 
@@ -209,18 +155,25 @@ export class TSETracker {
           if (!("partial" in options)) continue;
         }
 
-        const spacerTemplate = options.spacerTemplate;
-        const spacer = spacerTemplate != null ? TSETracker.STRING.exec(spacerTemplate) : null;
+        const spacer = TSETracker.STRING.exec(options.spacerTemplate ?? "");
         if (
           spacer?.index === 0 &&
-          spacer[0].length === spacerTemplate!.length &&
-          !(spacer.groups?.quote === "`" && spacer.groups.static?.includes("${"))
+          spacer[0].length === options.spacerTemplate!.length &&
+          !(spacer.groups!.quote === "`" && spacer.groups!.static.includes("${"))
         ) {
-          this.addStaticDependency(dependencies, spacer.groups?.static, spacer.groups?.quote);
+          dependencies.push(spacer.groups!.static);
         }
+
         dependencies.push(template);
-        if (renderType !== "layout") {
-          this.addDependencies(dependencies, args, TSETracker.LAYOUT_DEPENDENCY);
+
+        const layout = TSETracker.STRING.exec(options.layout ?? "");
+        if (
+          renderType !== "layout" &&
+          layout?.index === 0 &&
+          layout[0].length === options.layout!.length &&
+          !(layout.groups!.quote === "`" && layout.groups!.static.includes("${"))
+        ) {
+          dependencies.push(layout.groups!.static);
         }
       }
     }
@@ -269,64 +222,55 @@ export class TSETracker {
     return options;
   }
 
-  private addDependencies(renderDependencies: string[], args: string, pattern: RegExp): void {
-    const match = pattern.exec(args);
-    if (match) {
-      this.addDynamicDependency(renderDependencies, match.groups?.dynamic);
-      this.addStaticDependency(renderDependencies, match.groups?.static, match.groups?.quote);
-    }
-  }
-
-  private addDynamicDependency(dependencies: string[], dependency: string | undefined): void {
-    if (dependency != null) {
-      dependencies.push(`${pluralize(dependency)}/${singularize(dependency)}`);
-    }
-  }
-
-  private addStaticDependency(
-    dependencies: string[],
-    dependency: string | undefined,
-    quoteType: string | undefined,
-  ): void {
-    if (quoteType === "`" && dependency != null && dependency.includes("${")) {
-      let pos = 0;
-      let wildcardDependency = "";
-
-      while (pos < dependency.length) {
-        const interpolation = dependency.indexOf("${", pos);
-        if (interpolation >= 0) {
-          let unmatchedBrackets = 1;
-          wildcardDependency += dependency.slice(0, interpolation);
-          pos = interpolation + 2;
-
-          while (unmatchedBrackets > 0 && pos < dependency.length) {
-            const found = dependency.slice(pos).search(/[{}]/);
-            if (found < 0) return;
-
-            const matched = dependency[pos + found];
-            pos += found + 1;
-            if (matched === "{") {
-              unmatchedBrackets += 1;
-            } else if (matched === "}") {
-              unmatchedBrackets -= 1;
-            }
+  private renderCallTemplate(node: string | null): [string, boolean] | null {
+    if (node == null) return null;
+    const objectTemplate = false;
+    let template: string;
+    const string = TSETracker.STRING.exec(node);
+    if (string?.index === 0 && string[0].length === node.length) {
+      const path = string.groups!.static;
+      if (string.groups!.quote === "`" && path.includes("${")) {
+        template = "";
+        let pos = 0;
+        while (pos < path.length) {
+          const interpolation = path.indexOf("${", pos);
+          if (interpolation < 0) {
+            template += path.slice(pos);
+            break;
           }
-
-          wildcardDependency += "*";
-        } else {
-          wildcardDependency += dependency.slice(pos);
-          pos = dependency.length;
+          template += path.slice(pos, interpolation);
+          let unmatchedBrackets = 1;
+          pos = interpolation + 2;
+          while (unmatchedBrackets > 0) {
+            if (pos >= path.length) return null;
+            if (path[pos] === "{") unmatchedBrackets += 1;
+            else if (path[pos] === "}") unmatchedBrackets -= 1;
+            pos += 1;
+          }
+          template += "*";
         }
-      }
-
-      dependencies.push(wildcardDependency);
-    } else if (dependency != null) {
-      if (dependency.includes("/")) {
-        dependencies.push(dependency);
       } else {
-        dependencies.push(`${this.directory}/${dependency}`);
+        template = path.includes("/") ? path : `${this.directory}/${path}`;
       }
+    } else {
+      const chain = TSETracker.VARIABLE_OR_METHOD_CHAIN.exec(node);
+      if (chain?.index !== 0) return null;
+      const callArguments = node.slice(chain[0].length).trimStart();
+      if (
+        callArguments.length > 0 &&
+        !(
+          callArguments.startsWith("(") &&
+          argumentList(callArguments.slice(1))[1] === callArguments.length - 2
+        )
+      ) {
+        return null;
+      }
+      const dependency = chain.groups!.dynamic;
+
+      template = `${pluralize(dependency)}/${singularize(dependency)}`;
     }
+
+    return [template, objectTemplate];
   }
 
   private explicitDependencies(): string[] {

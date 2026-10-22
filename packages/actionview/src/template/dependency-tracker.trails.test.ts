@@ -98,4 +98,15 @@ describe("TSETracker interpolation holding an expression", () => {
 
     expect(new TSETracker("messages/show", template, null).dependencies()).toEqual([]);
   });
+
+  it("scans a render inside a backtick interpolation", () => {
+    const template = {
+      source: '<%= `${render("messages/message")}` %>',
+      handler: null,
+    } as unknown as Template;
+
+    expect(new TSETracker("messages/show", template, null).dependencies()).toEqual([
+      "messages/message",
+    ]);
+  });
 });
