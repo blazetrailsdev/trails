@@ -3,7 +3,6 @@ import {
   type Extended,
   include,
   type CodeGenerator,
-  type Included,
   included,
 } from "@blazetrails/activesupport";
 import { type Hash, keys, rbCallSuper, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
@@ -123,8 +122,33 @@ export function setDefineMethodAttribute(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
-export interface Attributes extends Included<typeof AttributeMethods> {
+export interface Attributes {
+  methodMissing(
+    ...args: Parameters<(typeof AttributeMethods)["methodMissing"]>
+  ): ReturnType<(typeof AttributeMethods)["methodMissing"]>;
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
+  isRespondToWithoutAttributes(
+    ...args: Parameters<(typeof AttributeMethods)["isRespondToWithoutAttributes"]>
+  ): ReturnType<(typeof AttributeMethods)["isRespondToWithoutAttributes"]>;
+  isRespondTo(
+    ...args: Parameters<(typeof AttributeMethods)["isRespondTo"]>
+  ): ReturnType<(typeof AttributeMethods)["isRespondTo"]>;
+  /** @internal */
+  isAttributeMethod(
+    ...args: Parameters<(typeof AttributeMethods)["isAttributeMethod"]>
+  ): ReturnType<(typeof AttributeMethods)["isAttributeMethod"]>;
+  /** @internal */
+  matchedAttributeMethod(
+    ...args: Parameters<(typeof AttributeMethods)["matchedAttributeMethod"]>
+  ): ReturnType<(typeof AttributeMethods)["matchedAttributeMethod"]>;
+  /** @internal */
+  missingAttribute(
+    ...args: Parameters<(typeof AttributeMethods)["missingAttribute"]>
+  ): ReturnType<(typeof AttributeMethods)["missingAttribute"]>;
+  /** @internal */
+  _readAttribute(
+    ...args: Parameters<(typeof AttributeMethods)["_readAttribute"]>
+  ): ReturnType<(typeof AttributeMethods)["_readAttribute"]>;
 
   /** @internal */
   _writeAttribute(name: string, value: unknown): void;

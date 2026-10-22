@@ -80,7 +80,9 @@ export interface API extends Conversion {
   _runValidateCallbacks(block?: () => unknown): unknown;
   freeze(): this;
 
-  validatesWith: typeof withValidatesWith;
+  validatesWith(
+    ...args: Parameters<typeof withValidatesWith>
+  ): ReturnType<typeof withValidatesWith>;
   validatesPresenceOf(...attrNames: AttrNameArg[]): Promise<void>;
   validatesAbsenceOf(...attrNames: AttrNameArg[]): Promise<void>;
   validatesLengthOf(...attrNames: AttrNameArg[]): Promise<void>;

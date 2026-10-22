@@ -10,7 +10,6 @@ import {
   ToJsonWithActiveSupportEncoder,
   extended,
   moduleParents,
-  type Included,
 } from "@blazetrails/activesupport";
 import {
   rbModName,
@@ -108,10 +107,8 @@ export interface ModelLike {
   modelName?: ModelName;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
-export interface ModelName {
-  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
-}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
+export interface ModelName extends ToJsonWithActiveSupportEncoder {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ModelName {
   name: string;

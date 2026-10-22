@@ -15,7 +15,6 @@ import {
   included,
   classAttribute,
   ToJsonWithActiveSupportEncoder,
-  type Included,
 } from "@blazetrails/activesupport";
 import { first } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
@@ -69,15 +68,11 @@ export class JSON {
     return this;
   }
 
-  declare serializableHash: typeof serializableHash;
-
   /** @internal */
   declare attributeNamesForSerialization: typeof attributeNamesForSerialization;
 
   /** @internal */
   declare serializableAttributes: typeof serializableAttributes;
-
-  declare readAttributeForSerialization: typeof readAttributeForSerialization;
 
   /** @internal */
   declare serializableAddIncludes: typeof serializableAddIncludes;
@@ -90,8 +85,13 @@ JSON.prototype.readAttributeForSerialization = readAttributeForSerialization;
 JSON.prototype.serializableAddIncludes = serializableAddIncludes;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (core_ext/object/json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
-export interface JSON {
-  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+export interface JSON extends ToJsonWithActiveSupportEncoder {
+  serializableHash(
+    ...args: Parameters<typeof serializableHash>
+  ): ReturnType<typeof serializableHash>;
+  readAttributeForSerialization(
+    ...args: Parameters<typeof readAttributeForSerialization>
+  ): ReturnType<typeof readAttributeForSerialization>;
 }
 
 include(JSON, ToJsonWithActiveSupportEncoder);

@@ -57,7 +57,7 @@ export const ClassMethods = {
           Object.getOwnPropertyDescriptor(klass, "prototype")?.writable === false) ||
         rbObjIsKindOf(klass, Module)
       ) {
-        const name = rbModName(klass);
+        const name = rbModName(klass as object);
         key = name != null && safeConstantize(name) === klass ? name : (klass as ExceptionClass);
       } else if (typeof klass === "string") {
         key = klass;

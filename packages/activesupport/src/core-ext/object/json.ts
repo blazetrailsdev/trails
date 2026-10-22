@@ -34,6 +34,11 @@ function toJSON(
 
 export const ToJsonWithActiveSupportEncoder = { toJSON };
 
+export interface ToJsonWithActiveSupportEncoder {
+  toJSON(options: string): unknown;
+  toJSON(options?: EncodeOptions | null): string;
+}
+
 rbModDefineMethod(RubyHash, "toJson", toJSON);
 
 export class Module {
