@@ -1,5 +1,6 @@
 # Multipart fixture files contain CRLF line endings that must be preserved exactly.
 packages/rack/test/multipart/* binary
+packages/rack/test/cgi/test.gz binary
 packages/actionpack/src/test-helpers/fixtures/multipart/* binary
 # Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures: magic-byte detection reads them exactly.
 packages/marcel/src/test-helpers/fixtures/** binary
