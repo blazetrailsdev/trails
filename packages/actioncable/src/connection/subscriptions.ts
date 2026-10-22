@@ -114,8 +114,7 @@ export class Subscriptions {
   }
 
   async unsubscribeFromAll(): Promise<void> {
-    for (const [id, channel] of Object.entries(this.subscriptions)) {
-      void id;
+    for (const [, channel] of Object.entries(this.subscriptions)) {
       await this.removeSubscription(channel);
     }
   }

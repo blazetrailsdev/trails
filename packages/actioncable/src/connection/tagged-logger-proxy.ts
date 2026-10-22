@@ -61,8 +61,7 @@ export class TaggedLoggerProxy {
     }
   }
 
-  /** @internal */
-  private log(type: Severity, message: unknown, block?: () => unknown): unknown {
+  log(type: Severity, message: unknown, block?: () => unknown): unknown {
     return this.tag(this.logger, () => this.logger[type](message, block));
   }
 }
@@ -72,7 +71,7 @@ for (const severity of ["debug", "info", "warn", "error", "fatal", "unknown"] as
     TaggedLoggerProxy,
     severity,
     function (this: TaggedLoggerProxy, message: unknown = null, block?: () => unknown) {
-      return (this as unknown as { log: TaggedLoggerProxy["log"] }).log(severity, message, block);
+      return this.log(severity, message, block);
     },
   );
 }
