@@ -336,6 +336,12 @@ export class Resolver {
     if (hit) return this.fqnRef(hit.fqn, ctx, lw);
     const segs = p[0] === "" ? p.slice(1) : p;
     const [root, ...rest] = segs;
+    const ext = GEM.externals?.[root];
+    if (ext) {
+      const v = lw.external(ctx, root);
+      if (rest.length === 1 && ext.consts?.[rest[0]] !== undefined) return ext.consts[rest[0]];
+      return [v, ...rest].join(".");
+    }
     if (root === "Arel") {
       const a = lw.imp(ctx, "@blazetrails/arel", "*", "Arel");
       return [a, ...rest].join(".");

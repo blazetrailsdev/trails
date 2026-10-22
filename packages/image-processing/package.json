@@ -26,5 +26,16 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "peerDependencies": {
+    "wasm-vips": "^0.0.19"
+  },
+  "peerDependenciesMeta": {
+    "wasm-vips": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "wasm-vips": "0.0.19"
   }
 }

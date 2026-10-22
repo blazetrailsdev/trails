@@ -1562,7 +1562,8 @@ export class Emitter {
       for (const s of u.late) chunks.push(...this.lw.stmt(s, ctx, false));
     }
     const header = this.imports(f);
-    const text = [...header, "", ...chunks].join("\n") + "\n";
+    const text =
+      [...header, ...(f.prelude?.size ? ["", ...f.prelude] : []), "", ...chunks].join("\n") + "\n";
     return { rubyFile: file.file, tsFile, text, ctx: f, defs, units: units.length };
   }
 

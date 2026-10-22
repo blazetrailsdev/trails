@@ -31,6 +31,24 @@ export interface GemConfig {
   skipTests?: Record<string, string>;
   /** The package directory under `packages/`, where it differs from `gem` (`image-processing`). */
   pkg?: string;
+  /**
+   * A Ruby library the gem binds, by its top-level constant, as the npm package
+   * standing in for it: the default export, initialised once per file
+   * (`const vips = await Vips();`), with the constants and singleton methods
+   * the Ruby library defines in Ruby rather than in the bound C library.
+   */
+  externals?: Record<string, External>;
+}
+
+export interface External {
+  module: string;
+  importName: string;
+  local: string;
+  init: string;
+  /** `Lib::NAME` → its JS expression. */
+  consts?: Record<string, string>;
+  /** `Lib.method(args)` → its JS expression. */
+  calls?: Record<string, (args: string[], local: string) => string>;
 }
 
 const GEMS: Record<string, GemConfig> = {
@@ -47,6 +65,30 @@ GEMS.image_processing = {
   vendor: "image_processing/v1.14.0",
   hand: false,
   pkg: "image-processing",
+  // ruby-vips over npm wasm-vips (RFC 0202, owner ruling 2026-10-21). wasm-vips
+  // binds libvips' object model as ruby-vips does; what ruby-vips writes in
+  // Ruby is ported from its lib/vips.rb (v2.2.3).
+  externals: {
+    Vips: {
+      module: "wasm-vips",
+      // Not `Vips`: that is `ImageProcessing::Vips` in vips.rb.
+      importName: "WasmVips",
+      local: "vips",
+      init: "await WasmVips()",
+      consts: {
+        // vips.rb:621 `class Error < RuntimeError`: wasm-vips throws a JS Error
+        // (`globalThis.`: the file imports `ImageProcessing::Error` as `Error`).
+        Error: "globalThis.Error",
+        // vips.rb:863
+        MAX_COORD: "10_000_000",
+      },
+      calls: {
+        // vips.rb:805-810 `major = version(0); minor = version(1)`.
+        "at_least_libvips?": ([x, y], v) =>
+          `(Number(${v}.version(0)) > ${x} || (Number(${v}.version(0)) === ${x} && Number(${v}.version(1)) >= ${y}))`,
+      },
+    },
+  },
 };
 
 const name = process.env.CODEGEN_GEM ?? "activerecord";

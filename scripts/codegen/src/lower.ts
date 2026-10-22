@@ -155,6 +155,8 @@ export interface FileCtx {
   fileFns?: Set<string>;
   /** The file's singleton (`def self.x`) function names. */
   sfnNames?: Set<string>;
+  /** Statements after the imports (an external library's initialisation). */
+  prelude?: Set<string>;
 }
 
 interface Ctx {
@@ -2890,6 +2892,17 @@ export class Lowerer {
         return /^[\w$]+$/.test(s0) ? f(s0) : `((x: string) => ${f("x")})(${s0})`;
       }
     }
+    // A Ruby-written singleton method of an external library (`Vips.at_least_libvips?`).
+    if (n.recv?.k === "const") {
+      const segs = n.recv.path.filter((x: string) => x);
+      const ext = segs.length === 1 ? GEM.externals?.[segs[0]] : undefined;
+      const tpl = ext?.calls?.[n.name];
+      if (tpl)
+        return tpl(
+          n.args.map((a: N) => this.expr(a, ctx)),
+          this.external(ctx, segs[0]),
+        );
+    }
     // A native vitest test file: a helper `def` (`files`, `self.class.fixture_path`)
     // is a function the test file declares or imports.
     {
@@ -5172,6 +5185,17 @@ export class Lowerer {
     if (!s) return null;
     const sep = JSON.stringify(n.args[0].value);
     return `((s: string, i = s.indexOf(${sep})) => (s === "" ? [] : i < 0 ? [s] : [s.slice(0, i), s.slice(i + ${n.args[0].value.length})]))(${s})`;
+  }
+
+  /**
+   * The local holding external library `root` (gem.ts `externals`): imported,
+   * and initialised at the top of the file once.
+   */
+  external(ctx: Ctx, root: string): string {
+    const ext = GEM.externals![root];
+    this.imp(ctx, ext.module, "default", ext.importName);
+    (ctx.f.prelude ??= new Set()).add(`const ${ext.local} = ${ext.init};`);
+    return ext.local;
   }
 
   /** Whether call `n` reaches a method known not to be async. */
