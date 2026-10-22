@@ -1735,7 +1735,7 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
   if (typeof value === "string") return value;
   if (value instanceof Uint8Array) return value;
   if (Array.isArray(value)) return rbInspect(value);
-  if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
+  if (isPlainHash(value) || value instanceof Map || value instanceof Set) return rbInspect(value);
   if (typeof value === "number" || value instanceof Number) return floToS(value);
   if (value instanceof RegExp) return rbRegToS(value);
   if (rbObjRespondTo(value, "toS")) {

@@ -15,7 +15,13 @@ import {
   teardown as logSubscriberTestHelperTeardown,
   TestHelper as LogSubscriberTestHelper,
 } from "@blazetrails/activesupport/log-subscriber/test-helper";
-import { include, kernelThrow, registerConstant, StringIO } from "@blazetrails/ruby-compat";
+import {
+  basicObjRespondTo,
+  include,
+  kernelThrow,
+  registerConstant,
+  StringIO,
+} from "@blazetrails/ruby-compat";
 import { setVerboseEnqueueLogs } from "./active-job.js";
 import { Base } from "./base.js";
 import { LogSubscriber } from "./log-subscriber.js";
@@ -506,6 +512,11 @@ describe("LoggingTest", () => {
     try {
       const stubbedInlineAdapter = new QueueAdapters.InlineAdapter();
       Object.assign(stubbedInlineAdapter, {
+        isRespondTo(methodName: string, includePrivate: boolean = false): boolean {
+          return (
+            methodName === "enqueueAll" || basicObjRespondTo(this, methodName, !includePrivate)
+          );
+        },
         enqueueAll(..._args: unknown[]): null {
           return null;
         },
