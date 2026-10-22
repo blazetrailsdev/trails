@@ -26,16 +26,19 @@ See [the correction](#correction-the-32gb-wall-is-resolution-not-module-count).
 
 Status of each wall after re-verification:
 
-| Wall                                       | Status                                                                                                                                                                                             |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — codegen memory                         | 362 modules fit in 20GB. **Still the live blocker**, and the only one: the app's 32GB exhaustion was misattributed to it — see the correction.                                                     |
-| 1b — resolver symlink cycle                | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased.                    |
-| 2 — WebAssembly cannot link                | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                                             |
-| 3a — `importedClass.prototype`             | **Fixed upstream**, unreleased.                                                                                                                                                                    |
-| 3b — shape-mint abort                      | **Gone** on `main` @ `20fde48d`. Re-verified 2026-10-20: 04d compiles, links and starts. Never filed; nothing to file.                                                                             |
-| 3c — init-time hang at 362 modules         | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                                   |
-| 4 — TDZ check ate a spread call's receiver | **Fixed upstream** — our patch merged as [PR 12990](https://github.com/PerryTS/perry/pull/12990) (`ccad647e7a`). Unreleased.                                                                       |
-| 5 — parentless class got a live `super`    | **Fixed upstream** — our patch merged as [PR 13001](https://github.com/PerryTS/perry/pull/13001) (`71a8beb530`), closing [issue 12889](https://github.com/PerryTS/perry/issues/12889). Unreleased. |
+| Wall                                       | Status                                                                                                                                                                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — codegen memory                         | **Gone** on `main` @ `e284a293`. Every rung to 1133 modules completes codegen inside 20GB; peak grows ~8 MiB/module, nothing superlinear. See [below](#wall-1-is-gone-the-compiler-now-sees-the-cap). |
+| 1b — resolver symlink cycle                | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased.                       |
+| 2 — WebAssembly cannot link                | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                                                |
+| 3a — `importedClass.prototype`             | **Fixed upstream**, unreleased.                                                                                                                                                                       |
+| 3b — shape-mint abort                      | **Gone** on `main` @ `20fde48d`. Re-verified 2026-10-20: 04d compiles, links and starts. Never filed; nothing to file.                                                                                |
+| 3c — init-time hang at 362 modules         | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                                      |
+| 4 — TDZ check ate a spread call's receiver | **Fixed upstream** — our patch merged as [PR 12990](https://github.com/PerryTS/perry/pull/12990) (`ccad647e7a`). Unreleased.                                                                          |
+| 5 — parentless class got a live `super`    | **Fixed upstream** — our patch merged as [PR 13001](https://github.com/PerryTS/perry/pull/13001) (`71a8beb530`), closing [issue 12889](https://github.com/PerryTS/perry/issues/12889). Unreleased.    |
+| 6 — namespace kind lost over a named hop   | **Fixed by us** — [PR 13091](https://github.com/PerryTS/perry/pull/13091), open. Blocked the link of every rung above 429 modules.                                                                    |
+| 7 — static ShapeId refused                 | **Open, pre-existing** — 04-activesupport (429). A/B-confirmed against an unpatched build of the same commit. Not filed yet.                                                                          |
+| 8 — `defineMethod is not a function`       | **Open** — the three largest rungs. Needs the populated graph: a 2-module probe of the same constructor matches Node.                                                                                 |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
@@ -680,6 +683,116 @@ compiler bugs, and the diagnostic that found both was
 reductions, which matched Node in eight of eight attempts across the two bugs.
 Instrument, do not infer.
 
+## Wall 1 is gone: the compiler now sees the cap
+
+Re-measured 2026-10-22 on `main` @ `e284a293`, built from source, every rung
+under `systemd-run MemoryMax=20G`, peak read from the scope's cgroup
+`memory.peak` so it counts `perry` **and** the `clang` children:
+
+| Rung                 | Modules | Before           | Peak now | Now                |
+| -------------------- | ------- | ---------------- | -------- | ------------------ |
+| 04c-ruby-compat      | 54      | ok               | 0.54 GiB | ok, correct output |
+| 04d-ruby-compat-barr | 139     | ok (after 2 fix) | 1.58 GiB | ok, correct output |
+| 04b-deep-import      | 364     | **MEM**          | 3.37 GiB | **ok, correct**    |
+| 04-activesupport     | 429     | **MEM**          | 3.76 GiB | links; wall 7      |
+| 05-model             | ~700    | **MEM** (12GB)   | 8.14 GiB | links; wall 8      |
+| 06b-crud             | 891     | **MEM** @ 61/891 | 8.63 GiB | links; wall 8      |
+| 06d-adapter-read     | 1133    | never run        | 8.91 GiB | links; wall 8      |
+
+**Nothing fails to compile any more.** Peak is linear at roughly 8 MiB per
+module, and parallelism is nearly free: 04b costs 2.87 GiB serial and 3.37 GiB
+across 12 module jobs, while taking 703s versus 116s. `PERRY_MODULE_JOBS=1` is
+no longer a lever worth pulling.
+
+What changed upstream is `CodegenBudget` (`perry-codegen/src/workers.rs`):
+every module job and LLVM unit worker is charged an estimated peak
+(320 MiB + 500 B/source-byte + 512 KiB/callable) against a budget sized from
+`MemAvailable` **and cgroup v2 headroom**, capped at 3/4 of it, largest module
+first. Our harness caps with `systemd-run MemoryMax`, which _is_ that cgroup, so
+the compiler now throttles against the limit it used to overrun:
+
+    [perry] codegen: budget: 12 CPU slots (physical cores; 24 hardware threads
+    available), 15.0 GiB memory (MemAvailable 42.4 GiB, cgroup headroom
+    20.0 GiB); up to 12 module jobs, largest first
+
+The original wall-1 measurement was taken against a compiler that could not see
+the cap. **That is the same lesson as wall 3b, now twice: re-measure on current
+`main` before reporting a Perry limit.** Knobs worth knowing:
+`PERRY_MODULE_JOBS`, `PERRY_CODEGEN_UNIT_JOBS`, `PERRY_CODEGEN_CPU_SLOTS`,
+`PERRY_CODEGEN_MEMORY_MB`, and `PERRY_CODEGEN_MEMORY_TRACE=1` for measured
+per-module peaks.
+
+`07-boot` is **not** a memory result: it was terminated at 1058s with
+`vite/dist/node/chunks/config.js` and `playwright-core/lib/coreBundle.js` still
+in LLVM codegen at 9.5 min each. That is the per-function `-O0` superlinearity
+of [5391](https://github.com/PerryTS/perry/issues/5391) inside a minified
+bundle, plus dev dependencies in the graph — a separate story from framework
+code.
+
+Measurement scripts live in the scratchpad (`peak.sh`, `mem-curve.sh`). Two
+false starts worth not repeating: `clang` must be on `PATH` or every module
+"fails" at 0.17 GiB with _no clang was found_, and `ru_maxrss` would miss the
+`clang` children entirely.
+
+## Wall 6: a namespace lost its kind over a named re-export hop
+
+With memory gone, the blocker became a link error, the same symbol on every
+rung from 429 modules up:
+
+    undefined reference to `__perry_wrap_perry_fn_packages_activesupport_src_i18n_ts__I18n$info'
+
+**Diagnosed and fixed: [PR 13091](https://github.com/PerryTS/perry/pull/13091).**
+The namespace scan in `run_pipeline.rs` follows `export { X } from "m"` and
+`export *` barrels, but not `import { X } from "m"; export { X }`, which lowers
+to an Import plus `Export::Named`. With that hop between a consumer and an
+`Export::NamespaceReExport` origin the scan stops one module short, the local
+never enters `namespace_imports`, and `I18n.translate(...)` lowers to
+`js_closure_alloc_singleton` over the binding plus `js_method_lookup` — but a
+namespace has no value wrapper, only one
+`__perry_namespace_value_<prefix>__<ns>:<member>` per member.
+
+Here `activesupport/src/i18n.ts` is `import * as I18n from "@blazetrails/i18n";
+export { I18n }` and `activemodel/src/i18n.ts` forwards it by name, which is why
+activemodel's module defines all three wrapper symbols and links while
+activesupport's defines none. [11275](https://github.com/PerryTS/perry/issues/11275)
+fixed kind-preservation for the other two hops; this was the third.
+
+Reduced to four dependency-free files, where the trigger is specifically a
+`const` export aliasing a local function (`export const t = translate`);
+`export function t(…)` and `export const t = 42` both link.
+
+**How it was found, and what wasted time.** Six synthetic reductions matched
+Node before one failed — the same ratio as walls 4 and 5. What worked was
+`nm` over the object cache (six objects referencing the symbol, none defining
+it), then `PERRY_LLVM_KEEP_IR=1` for both sides of the ABI mismatch, then an
+instrumented compiler printing `hir.exports` per module, which showed the two
+spellings of one source shape:
+
+    packages_activesupport_src_i18n_ts  exports=[NamespaceReExport { source: "@blazetrails/i18n", name: "I18n" }]
+    packages_activemodel_src_i18n_ts    exports=[Named { local: "I18n", exported: "I18n" }]
+
+Two corrections to things stated along the way: the module _is_ compiled (an
+earlier grep for `perry_fn_…__<name>` symbols found none and I read that as
+absent), and the "bare namespace value" symbol does not exist — every one
+carries a `:member` suffix that my regex had truncated at the `.`.
+
+## Walls 7 and 8: what stands past the link
+
+- **Wall 7 — `Perry internal error: the static ShapeId 0x800017d1 (proto
+0x4000000000000483) was refused`**, on 04-activesupport (429 modules).
+  **Pre-existing**, not ours: an unpatched build of the same commit produces the
+  identical ShapeId. It is a deliberate codegen self-check
+  (`static_shape_ids_tests.rs:778`), not a crash. Unfiled.
+- **Wall 8 — `TypeError: defineMethod is not a function at new Module`**, on
+  05-model, 06b-crud and 06d-adapter-read, identical on all three. `defineMethod`
+  is an ordinary instance method of ruby-compat's `Module`
+  (`include.ts:332`), and the throw is inside the constructor callback.
+  **Attribution is open and cannot be settled by A/B**: those rungs do not link
+  without 13091, so there is no before. What is known is that a two-module probe
+  doing `new Module((mod) => mod.defineMethod(...))` matches Node exactly, and
+  that 04d — which exercises ruby-compat and booted before — still prints
+  `[04d] a\.b\*c`. So it needs the populated graph, like the shape mint did.
+
 ### Upstream filings from this round
 
 | Issue                                                  | Subject                                                                       | State                   |
@@ -690,6 +803,7 @@ Instrument, do not infer.
 | [12889](https://github.com/PerryTS/perry/issues/12889) | parentless class emits a `super` construct (pre-existing report we closed)    | **closed** by 13001     |
 | [13001](https://github.com/PerryTS/perry/pull/13001)   | **PR** — no live heritage for a class that extends nothing                    | **merged** `71a8beb530` |
 | [13009](https://github.com/PerryTS/perry/pull/13009)   | **PR** — three `cargo test` failures on `main` (CI, not our rung)             | **merged** `ce79cdac2f` |
+| [13091](https://github.com/PerryTS/perry/pull/13091)   | **PR** — follow an import+export hop when classifying a namespace             | **open**, draft         |
 
 Both re-verified against `main` @ `20fde48d` immediately before filing, and
 both duplicate-searched first. 12978's reproducer is the 23-line
