@@ -1033,7 +1033,9 @@ jobs:
       - run: pnpm vitest run packages/actionpack --project "!system"
 
   # RFC 0166 system tests: the `system` Vitest project, against real browsers.
-  # webkit and webdriverio are not installed by default.
+  # Only chromium is installed: `Driver#browser` launches nothing else, and
+  # browser.trails.test.ts mocks playwright, so it needs no binary.
+  # webkit, firefox and webdriverio are not installed.
   system-tests:
     name: System Tests
     needs: changes
@@ -1047,7 +1049,19 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm exec playwright-core install --with-deps chromium firefox
+      - id: playwright-version
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >>"$GITHUB_OUTPUT"
+      - id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      # The browser download is cached; its apt dependencies are not, so
+      # `install-deps` still runs on a hit.
+      - if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: pnpm exec playwright-core install-deps chromium
+      - if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright-core install --with-deps chromium
       - run: pnpm vitest run --project system
 
   trailties-tests:
