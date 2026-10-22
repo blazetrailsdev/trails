@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { HttpSocket } from "./http-adapter.js";
+import { EOFError } from "./eof-error.js";
+import { SystemCallError } from "./errno.js";
 import { IOError } from "./io-error.js";
 import { TCPSocket } from "./socket.js";
 
@@ -11,6 +13,8 @@ function fakeSocket() {
     end: () => calls.push("end"),
     destroy: () => calls.push("destroy"),
     unshift: () => null,
+    pause: () => calls.push("pause"),
+    resume: () => calls.push("resume"),
     on: (event: string, fn: (arg?: unknown) => void) => (listeners[event] ??= []).push(fn),
     removeListener: () => null,
   };
@@ -38,5 +42,41 @@ describe("TCPSocket", () => {
     expect(io.isClosed()).toBe(true);
     expect(calls).toEqual(["end", "destroy"]);
     expect(() => io.read()).toThrow(IOError);
+  });
+
+  it("read_nonblock answers wait_readable, then bytes, then nil at end of file", () => {
+    const { socket, emit } = fakeSocket();
+    const io = new TCPSocket(socket);
+    expect(io.readNonblock(4096, null, { exception: false })).toBe("wait_readable");
+    expect(() => io.readNonblock(4096)).toThrow(SystemCallError);
+    emit("data", new Uint8Array([1, 2, 3]));
+    expect(io.readNonblock(2, null, { exception: false })).toEqual(new Uint8Array([1, 2]));
+    expect(io.readNonblock(4096, null, { exception: false })).toEqual(new Uint8Array([3]));
+    emit("end");
+    expect(io.readNonblock(4096, null, { exception: false })).toBeNull();
+    expect(() => io.readNonblock(4096)).toThrow(EOFError);
+  });
+
+  it("fills the outbuf with what was read and clears it at end of file", () => {
+    const { socket, emit } = fakeSocket();
+    const io = new TCPSocket(socket);
+    const buf = new Uint8Array([9, 9, 9]);
+    emit("data", new Uint8Array([1, 2]));
+    expect(io.read(2, buf)).toEqual(new Uint8Array([1, 2]));
+    expect(buf).toEqual(new Uint8Array([1, 2, 9]));
+    emit("end");
+    expect(io.read(2, buf)).toBeNull();
+    expect(buf).toEqual(new Uint8Array([0, 0, 0]));
+  });
+
+  it("pauses the socket above the high-water mark and resumes once drained", () => {
+    const { socket, calls, emit } = fakeSocket();
+    const io = new TCPSocket(socket);
+    emit("data", new Uint8Array(64 * 1024));
+    expect(calls).toEqual([]);
+    emit("data", new Uint8Array(1));
+    expect(calls).toEqual(["pause"]);
+    io.readNonblock(1);
+    expect(calls).toEqual(["pause", "resume"]);
   });
 });

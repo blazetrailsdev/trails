@@ -147,10 +147,12 @@ export class Node {
       socket.on("close", () => {
         unhijacked.delete(socket);
       });
-      if (head.length > 0) socket.unshift(head);
 
       try {
-        const env = await this.requestEnv(req, new StringIO(""));
+        const env = await this.requestEnv(
+          req,
+          new StringIO(await readUpgradeBody(req, socket, head)),
+        );
         env[RACK_IS_HIJACK] = true;
         env[RACK_HIJACK] = (): TCPSocket => {
           release();
@@ -305,6 +307,40 @@ function header(req: HttpRequest, name: string): string | undefined {
 
 /** @noRailsEquivalent PERMANENT */
 const MAX_BODY_SIZE = 10 * 1024 * 1024;
+
+function readUpgradeBody(
+  req: HttpRequest,
+  socket: HttpSocket,
+  head: Uint8Array,
+): Promise<string | Uint8Array> {
+  const length = Number(header(req, "content-length") ?? 0);
+  if (!(length > 0)) {
+    if (head.length > 0) socket.unshift(head);
+    return Promise.resolve("");
+  }
+  if (length > MAX_BODY_SIZE) return Promise.reject(new Error("Request body too large"));
+  const body = new Uint8Array(length);
+  let n = Math.min(length, head.length);
+  body.set(head.subarray(0, n));
+  if (head.length > n) socket.unshift(head.subarray(n));
+  if (n === length) return Promise.resolve(body);
+  return new Promise((resolve, reject) => {
+    const onData = (chunk: Uint8Array): void => {
+      const take = Math.min(length - n, chunk.length);
+      body.set(chunk.subarray(0, take), n);
+      n += take;
+      if (n < length) return;
+      socket.pause();
+      socket.removeListener("data", onData);
+      if (take < chunk.length) socket.unshift(chunk.subarray(take));
+      resolve(body);
+    };
+    socket.on("data", onData);
+    socket.on("end", () => {
+      if (n < length) reject(new Error("Request body truncated"));
+    });
+  });
+}
 
 function readBody(req: HttpRequest): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {

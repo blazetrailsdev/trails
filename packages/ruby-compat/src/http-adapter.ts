@@ -22,9 +22,12 @@ export interface HttpSocket {
   end(chunk?: string | Uint8Array): unknown;
   destroy(): unknown;
   unshift(chunk: Uint8Array): unknown;
+  pause(): unknown;
+  resume(): unknown;
   on(event: "data", listener: (chunk: Uint8Array) => void): unknown;
   on(event: "close" | "end", listener: () => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
+  removeListener(event: "data", listener: (chunk: Uint8Array) => void): unknown;
   removeListener(event: "error", listener: (error: Error) => void): unknown;
 }
 

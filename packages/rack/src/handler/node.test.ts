@@ -578,6 +578,39 @@ describe("Rack::Handler::Node", () => {
       expect(reply).toBe("head:first-frame");
     });
 
+    it("reads an upgrade request's body into rack.input and leaves the frame on the socket", async () => {
+      let input = "";
+      const reply = await new Promise<string>((resolve, reject) => {
+        serving(
+          async (env) => {
+            input = Buffer.from((env[RACK_INPUT] as StringIO<Uint8Array>).read()).toString();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
+            void io.waitReadable().then(() => {
+              io.write(`frame:${Buffer.from(io.read()).toString()}`);
+              io.closeWrite();
+            });
+            return [-1, {}, [""]];
+          },
+          async (url) => {
+            const socket = await openUpgrade(
+              Number(new URL(url).port),
+              "/cable",
+              "hello",
+              "content-length: 5\r\n",
+            );
+            await new Promise((r) => setTimeout(r, 50));
+            socket.write("first-frame");
+            let text = "";
+            socket.on("data", (chunk) => (text += chunk.toString()));
+            socket.on("close", () => resolve(text));
+          },
+        ).catch(reject);
+      });
+
+      expect(input).toBe("hello");
+      expect(reply).toBe("frame:first-frame");
+    });
+
     it("answers an upgrade the app does not hijack and closes the socket", async () => {
       let text = "";
       let closed = false;
@@ -774,12 +807,17 @@ describe("Rack::Handler::Node", () => {
 
 const lintableErrors = { puts() {}, write() {}, flush() {} };
 
-function openUpgrade(port: number, path: string, pipelined = ""): Promise<Socket> {
+function openUpgrade(
+  port: number,
+  path: string,
+  pipelined = "",
+  extraHeaders = "",
+): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const socket = connect(port, "127.0.0.1", () => {
       socket.write(
         `GET ${path} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n` +
-          `Connection: Upgrade\r\nUpgrade: websocket\r\n\r\n${pipelined}`,
+          `Connection: Upgrade\r\nUpgrade: websocket\r\n${extraHeaders}\r\n${pipelined}`,
       );
       resolve(socket);
     });
