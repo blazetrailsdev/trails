@@ -6,11 +6,15 @@ import { BodyProxy } from "./body-proxy.js";
 import { escapePath } from "./utils.js";
 
 export class Sendfile {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private _variation: string | null;
   private mappings: [RegExp, string][];
 
-  constructor(app: RackApp, variation?: string | null, mappings?: [string, string][]) {
+  constructor(
+    app: RackApp | { call: RackApp },
+    variation?: string | null,
+    mappings?: [string, string][],
+  ) {
     this.app = app;
     this._variation = variation ?? null;
     this.mappings = (mappings || []).map(([internal, external]) => [
@@ -20,7 +24,7 @@ export class Sendfile {
   }
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     const [, headers, body] = response;
 
     if (body && typeof body.toPath === "function") {
