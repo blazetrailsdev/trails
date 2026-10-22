@@ -165,7 +165,7 @@ export abstract class XmlBase {
   protected _nestedStructures(block: (xml: XmlBase) => unknown): void {
     this._level += 1;
     try {
-      block.call(this, this);
+      block(this);
     } finally {
       this._level -= 1;
     }

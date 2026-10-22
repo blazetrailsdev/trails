@@ -31,7 +31,7 @@ export class XmlMarkup extends XmlBase {
     return this._target;
   }
 
-  commentBang(commentText: unknown, block?: unknown): void {
+  commentBang(commentText: unknown, block?: (xml: XmlBase) => unknown): void {
     this._ensureNoBlock(typeof block === "function");
     this._special("<!-- ", " -->", commentText, null);
   }
@@ -61,7 +61,7 @@ export class XmlMarkup extends XmlBase {
   instructBang(
     directiveTag: string = ":xml",
     attrs: Record<string, unknown> = {},
-    block?: unknown,
+    block?: (xml: XmlBase) => unknown,
   ): void {
     this._ensureNoBlock(typeof block === "function");
     if (directiveTag === ":xml") {
@@ -78,12 +78,12 @@ export class XmlMarkup extends XmlBase {
     );
   }
 
-  cdataBang(text: string, block?: unknown): void {
+  cdataBang(text: string, block?: (xml: XmlBase) => unknown): void {
     this._ensureNoBlock(typeof block === "function");
     this._special("<![CDATA[", "]]>", text.replaceAll("]]>", "]]]]><![CDATA[>"), null);
   }
 
-  cdataValueBang(open: string, text: string, block?: unknown): void {
+  cdataValueBang(open: string, text: string, block?: (xml: XmlBase) => unknown): void {
     this._ensureNoBlock(typeof block === "function");
     this._special(
       `<${open}>`,
