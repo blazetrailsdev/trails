@@ -41,11 +41,11 @@ export function extractParams(
     hashes.push(params.pop());
     if (params.length === 0) break;
   }
-  const [nsArg, binds] = hashes.reverse() as [
+  // eslint-disable-next-line prefer-const -- Ruby reassigns `ns` alone (`searchable.rb:221-223`).
+  let [ns, binds] = hashes.reverse() as [
     Record<string, string> | undefined,
     Record<string, unknown> | undefined,
   ];
-  let ns = nsArg;
 
   ns ??=
     (this.document as { root?: { namespaces?: Record<string, string> } | null }).root?.namespaces ??
