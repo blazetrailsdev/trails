@@ -12,7 +12,7 @@ export class ExplainPrettyPrinter {
 
     pp.push(
       header
-        .padStart(header.length + Math.floor(Math.max(width - header.length, 0) / 2))
+        .padStart(header.length + Math.floor((width - header.length) / 2))
         .padEnd(width)
         .trimEnd(),
     );
