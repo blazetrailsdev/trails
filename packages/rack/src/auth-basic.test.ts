@@ -10,7 +10,7 @@ function realm() {
   return "WallysWorld";
 }
 
-function unprotectedApp(): any {
+function unprotectedApp() {
   return new Lint((env: Record<string, any>) => [
     200,
     { "content-type": "text/plain" },

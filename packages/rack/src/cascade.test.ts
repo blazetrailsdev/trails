@@ -12,15 +12,15 @@ function cascade(...args: ConstructorParameters<typeof Cascade>) {
 }
 
 const docroot = File.expandPath(File.join(__dirname, "..", "test"));
-const app1: any = new Files(docroot);
+const app1 = new Files(docroot);
 
-const app2: any = new URLMap({
+const app2 = new URLMap({
   "/crash": (_env: Record<string, any>) => {
     throw new RuntimeError("boom");
   },
 });
 
-const app3: any = new URLMap({
+const app3 = new URLMap({
   "/foo": (_env: Record<string, any>) => [200, { "content-type": "text/plain" }, [""]],
 });
 
@@ -91,7 +91,7 @@ it("append new app", async () => {
 
 it("close the body on cascade", async () => {
   const body = new StringIO();
-  const closer: any = (_env: Record<string, any>) => [404, {}, body];
+  const closer = (_env: Record<string, any>) => [404, {}, body];
   const c = new Cascade([closer, app3], [404]);
   expect((await new MockRequest(c).get("/foo")).isOk).toBeTruthy();
   expect(body.closed).toBeTruthy();

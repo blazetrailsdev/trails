@@ -12,7 +12,7 @@ function sendfileBody(filename = "rack_sendfile") {
   return res;
 }
 
-function simpleApp(body: any = sendfileBody()): any {
+function simpleApp(body: any = sendfileBody()) {
   return (_env: Record<string, any>) => [200, { "content-type": "text/plain" }, body];
 }
 
