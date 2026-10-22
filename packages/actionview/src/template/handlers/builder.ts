@@ -14,7 +14,7 @@ export class Builder implements TemplateHandler {
   call(_template: unknown, source: string): string {
     this.requireEngine();
     return (
-      "const xml = new Builder.XmlMarkup({ indent: 2, target: outputBuffer.raw() });" +
+      "const xml = new TopLevel.Builder.XmlMarkup({ indent: 2, target: outputBuffer.raw() });" +
       `${source};` +
       "return outputBuffer.toString();"
     );
@@ -22,6 +22,6 @@ export class Builder implements TemplateHandler {
 
   /** @internal */
   private requireEngine(): boolean {
-    return (this._required ??= true);
+    return (this._required ||= true);
   }
 }

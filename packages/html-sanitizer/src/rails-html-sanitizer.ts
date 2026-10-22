@@ -1,4 +1,4 @@
-import { Deprecation } from "@blazetrails/activesupport";
+import { Deprecation, camelize } from "@blazetrails/activesupport";
 
 export const ActionView = {
   Helpers: {
@@ -31,16 +31,6 @@ export const ActionView = {
         ): void {
           this.sanitizerVendor.safeListSanitizer.allowedAttributes = attributes;
         },
-
-        /** @internal */
-        deprecateOption(name: string): void {
-          Deprecation._instance().warn(
-            `The ${name} option is deprecated ` +
-              "and has no effect. Until Rails 5 the old behavior can still be " +
-              "installed. To do this add the `rails-deprecated-sanitizer` to " +
-              "your Gemfile. Consult the Rails 4.2 upgrade guide for more information.",
-          );
-        },
       } as SanitizeHelperClassMethods,
     },
   },
@@ -63,25 +53,36 @@ type SanitizeHelperClassMethods = {
   [K in `setSanitized${DeprecatedOption}`]: (this: unknown, _: unknown) => void;
 };
 
-for (const meth of [
-  "protocolSeparator",
-  "uriAttributes",
-  "badTags",
-  "allowedCssProperties",
-  "allowedCssKeywords",
-  "shorthandCssProperties",
-  "allowedProtocols",
-]) {
-  const methName = `sanitized${meth[0].toUpperCase()}${meth.slice(1)}`;
-  const ClassMethods = ActionView.Helpers.SanitizeHelper.ClassMethods as unknown as Record<
-    string,
-    (this: SanitizeHelperClassMethods, ...args: unknown[]) => void
-  >;
+const ClassMethods = ActionView.Helpers.SanitizeHelper.ClassMethods as unknown as Record<
+  string,
+  (this: SanitizeHelperClassMethods, ...args: unknown[]) => void
+>;
 
-  ClassMethods[methName] = function () {
+for (const meth of [
+  "protocol_separator",
+  "uri_attributes",
+  "bad_tags",
+  "allowed_css_properties",
+  "allowed_css_keywords",
+  "shorthand_css_properties",
+  "allowed_protocols",
+]) {
+  const methName = `sanitized_${meth}`;
+
+  ClassMethods[camelize(methName, false)] = function () {
     this.deprecateOption(methName);
   };
-  ClassMethods[`set${methName[0].toUpperCase()}${methName.slice(1)}`] = function (_: unknown) {
+  ClassMethods[camelize(`set_${methName}`, false)] = function (_: unknown) {
     this.deprecateOption(`${methName}=`);
   };
 }
+
+/** @internal */
+ClassMethods.deprecateOption = function (name: unknown): void {
+  Deprecation._instance().warn(
+    `The ${name} option is deprecated ` +
+      "and has no effect. Until Rails 5 the old behavior can still be " +
+      "installed. To do this add the `rails-deprecated-sanitizer` to " +
+      "your Gemfile. Consult the Rails 4.2 upgrade guide for more information.",
+  );
+};

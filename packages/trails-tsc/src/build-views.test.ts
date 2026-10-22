@@ -103,7 +103,7 @@ describe("buildViews", () => {
     const base = path.join(cwd, ".trails/views/feeds/index.xml.builder");
     const js = fs.readFileSync(base + ".js", "utf8");
     expect(js).toContain(
-      'new (__lookup("Builder").XmlMarkup)({ indent: 2, target: outputBuffer.raw() })',
+      "new TopLevel.Builder.XmlMarkup({ indent: 2, target: outputBuffer.raw() })",
     );
     expect(js).toContain("return outputBuffer.toString();");
     const map = JSON.parse(fs.readFileSync(base + ".js.map", "utf8"));

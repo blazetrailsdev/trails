@@ -16,10 +16,10 @@ describe("SanitizeHelper::ClassMethods deprecated options", () => {
       deprecator.behavior = behavior;
     }
     expect(messages[0]).toMatch(
-      /^DEPRECATION WARNING: The sanitizedBadTags option is deprecated and has no effect\./,
+      /^DEPRECATION WARNING: The sanitized_bad_tags option is deprecated and has no effect\./,
     );
     expect(messages[1]).toMatch(
-      /^DEPRECATION WARNING: The sanitizedAllowedProtocols= option is deprecated/,
+      /^DEPRECATION WARNING: The sanitized_allowed_protocols= option is deprecated/,
     );
   });
 });
