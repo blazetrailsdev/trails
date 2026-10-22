@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { Scalar, days, hours, seconds } from "./duration.js";
 
 describe("Scalar", () => {
@@ -108,5 +109,14 @@ describe("Duration over a Float value", () => {
     const zero = seconds(new Number(0) as number).negate().value;
     expect(Object.is(zero.valueOf(), -0)).toBe(true);
     expect(seconds(5).modulo(-3).value).toBe(-1);
+  });
+});
+
+describe("Duration#-@", () => {
+  it("negates a Rational, a bigint and a Float value", () => {
+    expect(new Scalar(new Rational(1, 2) as never).negate().value).toEqual(new Rational(-1, 2));
+    expect(new Scalar((2n ** 60n) as never).negate().value).toBe(-(2n ** 60n));
+    expect(new Scalar(1.5).negate().value).toBe(-1.5);
+    expect(seconds(3).negate().value).toBe(-3);
   });
 });

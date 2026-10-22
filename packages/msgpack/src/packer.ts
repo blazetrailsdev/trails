@@ -9,12 +9,10 @@ import {
   TypeError,
   isSymbol,
   kernelFloat,
-  rbAbsintSize,
   rbBuiltinClassName,
   rbCString,
   rbCSymbol,
   rbClassInheritedP,
-  rbClassOf,
   rbFSend,
   rbInspect,
   isStruct,
@@ -40,6 +38,31 @@ export type PackerExtRegistry = Map<unknown, PackerExtType>;
 
 const encoder = new Encoder();
 const floatEncoder = new Encoder({ forceIntegerToFloat: true });
+
+const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
+
+/**
+ * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`):
+ * the singleton class when the object has one, else `rb_obj_class`.
+ */
+function rbClassOf(obj: unknown): unknown {
+  if (typeof obj === "object" && obj !== null) {
+    const proto = Object.getPrototypeOf(obj);
+    if (proto !== null && Object.hasOwn(proto, FL_SINGLETON)) return proto[FL_SINGLETON];
+  }
+  return rbObjClass(obj);
+}
+
+/**
+ * `rb_absint_size` (`vendor/ruby/v3.3.11/bignum.c:3283`): the bytes the
+ * absolute value takes, with the leading zero bits of its top byte.
+ */
+function rbAbsintSize(val: bigint): [number, number] {
+  const v = val < 0n ? -val : val;
+  const bits = v === 0n ? 0 : v.toString(2).length;
+  const size = Math.ceil(bits / 8);
+  return [size, size * 8 - bits];
+}
 
 export class Packer<Io = unknown> {
   /** @internal */

@@ -105,15 +105,6 @@ export function rbObjClassname(x: unknown): string {
 }
 
 /**
- * `rb_obj_frozen_p` (`vendor/ruby/v3.3.11/object.c:1296`), `Object#frozen?`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbObjFrozenP(obj: unknown): boolean {
-  return Object.isFrozen(obj);
-}
-
-/**
  * `rb_set_class_path_string` (`vendor/ruby/v3.3.11/variable.c:407`), by which
  * `declare_under` (`vendor/ruby/v3.3.11/vm_insnhelper.c:5375`) paths a class
  * after the cbase it is declared in: `under`'s path, `::`, and `name`.
@@ -210,23 +201,6 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
   Object.setPrototypeOf(klass.prototype, proto);
   Object.setPrototypeOf(obj, klass.prototype);
   return klass;
-}
-
-/**
- * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`):
- * the singleton class when the object has one, where {@link rbObjClass}
- * skips it, and the class {@link rbObjClass} answers otherwise.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbClassOf(obj: unknown): Klass {
-  if (typeof obj === "object" && obj !== null) {
-    const proto = Object.getPrototypeOf(obj);
-    if (proto !== null && Object.hasOwn(proto, FL_SINGLETON)) {
-      return proto[FL_SINGLETON] as Klass;
-    }
-  }
-  return rbObjClass(obj);
 }
 
 /**

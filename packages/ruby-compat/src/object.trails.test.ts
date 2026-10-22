@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { rbCallSuper, rbClassNewInstance } from "./include.js";
-import { rbAbsintSize } from "./numeric.js";
 import {
   rbCArray,
   rbCBasicObject,
@@ -13,7 +12,6 @@ import {
   rbCTrueClass,
   rbCClass,
   rbObjClass,
-  rbClassOf,
   rbObjSingletonClass,
   rbClassAttachedObject,
   rbCDate,
@@ -1180,28 +1178,11 @@ describe("rb_class_inherited_p, rb_class_of and rb_absint_size", () => {
     expect(() => rbClassInheritedP(Sub, 1)).toThrow("compared with non class/module");
   });
 
-  it("answers the singleton class once an object has one", () => {
-    const obj = new Sub();
-    expect(rbClassOf(obj)).toBe(Sub);
-    const singleton = rbObjSingletonClass(obj);
-    expect(rbClassOf(obj)).toBe(singleton);
-    expect(rbClassInheritedP(singleton, Base)).toBe(true);
-    expect(rbClassOf(1)).toBe(rbCInteger);
-
+  it("ranks a Uint8Array subclass under String", () => {
     class Blob extends Uint8Array {}
-    expect(rbClassOf(Uint8Array.of(1))).toBe(rbCString);
-    expect(rbClassOf(Blob.of(1))).toBe(Blob);
-    expect(rbClassOf(Buffer.from([1]))).toBe(rbCString);
     expect(rbObjIsKindOf(Blob.of(1), rbCString)).toBe(true);
     expect(rbClassInheritedP(Blob, rbCString)).toBe(true);
     expect(rbModAncestors(Blob)).toContain(rbCString);
-  });
-
-  it("counts the bytes of the absolute value and its leading zero bits", () => {
-    expect(rbAbsintSize(0)).toEqual([0, 0]);
-    expect(rbAbsintSize(-1)).toEqual([1, 7]);
-    expect(rbAbsintSize(2n ** 64n - 1n)).toEqual([8, 0]);
-    expect(rbAbsintSize(-(2n ** 64n))).toEqual([9, 7]);
   });
 });
 

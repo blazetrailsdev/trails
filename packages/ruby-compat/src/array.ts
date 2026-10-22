@@ -2,9 +2,8 @@ import { rbEql, rbEqq, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
-import { Hash, rbBlockGivenP } from "./hash.js";
+import { Hash } from "./hash.js";
 import { IndexError } from "./index-error.js";
-import { warn } from "./kernel-warn.js";
 import { Enumerable } from "./enumerable.js";
 import { rbBigNorm, rbPlus } from "./numeric.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -17,7 +16,7 @@ import {
   toS,
 } from "./object.js";
 import { Range } from "./range.js";
-import { checkArity, num2long } from "./string/support.js";
+import { num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
 
 /** `toofew` (`vendor/ruby/v3.3.11/pack.c:120`). */
@@ -551,38 +550,6 @@ export function aryDeleteIf<T>(ary: T[], block: (item: T) => unknown): T[] {
 }
 
 /**
- * Ruby `Array#fetch` (`vendor/ruby/v3.3.11/array.c:1962` `rb_ary_fetch`): the element at
- * `pos`, or out of range the block's value, else the default, else an `IndexError`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function aryFetch(ary: readonly unknown[], ...argv: unknown[]): unknown {
-  const blockGiven = rbBlockGivenP(argv[argv.length - 1]);
-  const block = blockGiven ? (argv.pop() as (pos: unknown) => unknown) : undefined;
-  const argc = argv.length;
-  checkArity(argc, 1, 2);
-  const [pos, ifnone] = argv;
-  if (blockGiven && argc === 2) {
-    warn("warning: block supersedes default value argument");
-  }
-  let idx = num2long(pos);
-
-  if (idx < 0) {
-    idx += ary.length;
-  }
-  if (idx < 0 || ary.length <= idx) {
-    if (blockGiven) return block!(pos);
-    if (argc === 1) {
-      throw new IndexError(
-        `index ${idx - (idx < 0 ? ary.length : 0)} outside of array bounds: ${-ary.length}...${ary.length}`,
-      );
-    }
-    return ifnone;
-  }
-  return ary[idx];
-}
-
-/**
  * Ruby `Array#delete` (`vendor/ruby/v3.3.11/array.c:3973` `rb_ary_delete`): removes, in
  * place, every element `==` to `item` (`rb_equal`, so a record matches by
  * `ActiveRecord::Core#==`, not identity) and answers the last one removed.
@@ -663,24 +630,6 @@ export function insert<T>(ary: (T | null)[], pos: number, ...objects: T[]): (T |
   while (ary.length < pos) ary.push(null);
   ary.splice(pos, 0, ...objects);
   return ary;
-}
-
-/**
- * Ruby `Array#pop(n)` (`vendor/ruby/v3.3.11/array.c:1437` `rb_ary_pop_m`): removes, in
- * place, the last `n` elements and answers them in order. `n` past the length
- * takes them all, and a negative `n` raises (`ary_take_first_or_last_n`,
- * `array.c:1292-1307`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export function aryPop<T>(ary: T[], n: number): T[] {
-  const len = ary.length;
-  if (n > len) {
-    n = len;
-  } else if (n < 0) {
-    throw new ArgumentError("negative array size");
-  }
-  return ary.splice(len - n, n);
 }
 
 /**

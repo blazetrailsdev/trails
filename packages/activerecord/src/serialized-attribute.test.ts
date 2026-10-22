@@ -13,7 +13,6 @@ import {
   rbModConstSet,
   rbObjClass,
   rbObjDup,
-  rbObjFrozenP,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
@@ -302,10 +301,10 @@ describe("SerializedAttributeTest", () => {
   it("serialized class does not become frozen", async () => {
     setYamlColumnPermittedClasses([...yamlColumnPermittedClasses(), rbCClass]);
 
-    expect(rbObjFrozenP(rbCSymbol)).toBeFalsy();
+    expect(Object.isFrozen(rbCSymbol)).toBeFalsy();
     await ClassifiedTopic.create({ important: rbCSymbol });
     expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toHaveLength(0);
-    expect(rbObjFrozenP(rbCSymbol)).toBeFalsy();
+    expect(Object.isFrozen(rbCSymbol)).toBeFalsy();
   });
 
   it("nil serialized attribute without class constraint", () => {

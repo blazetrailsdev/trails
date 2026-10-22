@@ -9,7 +9,7 @@
  *   Rails' `when Date, Time then "'#{quoted_date(value)}'"` (quoting.rb:85)
  *   accepts Ruby's native time objects; trails' analogues are the Temporal
  *   types, `Time`, `TimeWithZone`, and a JS `Date`, which ruby-compat classes
- *   as `Time` (`rbClassOf`).
+ *   as `Time` (`rbObjClass`).
  *
  *   Rails' `when nil, Numeric, String then value` (quoting.rb:102) hands a
  *   Float to the driver unchanged. trails' whole-valued Float is a boxed
