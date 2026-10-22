@@ -269,8 +269,4 @@ export class StringIO<S extends string | Uint8Array = string> {
   isClosed(): boolean {
     return !this._readable && !this._writable;
   }
-
-  get closed(): boolean {
-    return this.isClosed();
-  }
 }
