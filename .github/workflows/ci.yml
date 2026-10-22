@@ -91,6 +91,7 @@ jobs:
       sqlite_runs_on: ${{ steps.self_hosted.outputs.sqlite_runs_on }}
       sqlite_shards: ${{ steps.self_hosted.outputs.sqlite_shards }}
       unit_runs_on: ${{ steps.self_hosted.outputs.unit_runs_on }}
+      unit_shards: ${{ steps.self_hosted.outputs.unit_shards }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -355,6 +356,7 @@ jobs:
           sqlite_runs_on=$hosted
           sqlite_shards='[1, 2]'
           unit_runs_on=$hosted
+          unit_shards='[1, 2]'
           if [ "$SAME_REPO" = true ] && [ -n "$GH_TOKEN" ]; then
             idle=$(gh api "repos/$GITHUB_REPOSITORY/actions/runners" \
               --jq '[.runners[] | select(.status == "online" and (.busy | not) and ([.labels[].name] as $l | all("self-hosted", "debian", "ARM64"; IN($l[]))))] | length' \
@@ -365,6 +367,7 @@ jobs:
                 sqlite_shards='[1]'
               else
                 unit_runs_on=$self_hosted
+                unit_shards='[1]'
               fi
             fi
           fi
@@ -372,6 +375,7 @@ jobs:
             echo "sqlite_runs_on=$sqlite_runs_on"
             echo "sqlite_shards=$sqlite_shards"
             echo "unit_runs_on=$unit_runs_on"
+            echo "unit_shards=$unit_shards"
           } >> "$GITHUB_OUTPUT"
 
   # `vars.RUNNER` is a single runner label (e.g. `self-hosted` or
@@ -859,6 +863,14 @@ jobs:
       needs.changes.outputs.unit_tests_affected == 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.unit_runs_on) }}
     timeout-minutes: 20
+    # 2-way file-level shard on hosted, one leg on an idle self-hosted runner
+    # (same shape as sqlite-tests). It runs on nearly every PR and its single
+    # ~9-min vitest step was the critical path of most non-AR PRs. The two
+    # activejob adapter passes split one per leg; with one leg it runs both.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.changes.outputs.unit_shards) }}
     steps:
       - uses: actions/checkout@v5
       # scripts/stale-story-references.test.ts compares story citations in
@@ -884,12 +896,12 @@ jobs:
       # scripts/schema-compare is the one suite that belongs elsewhere: it
       # parses the REAL vendored test/schema/schema.rb, so it runs as a step of
       # rails-comparison, the job that fetches vendor/.
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == 1
         env:
           AJ_ADAPTER: test
         run: pnpm vitest run packages/activejob
       # activejob/Rakefile:38-41 runs async_adapter_test.rb only in this lane.
-      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true' && matrix.shard == strategy.job-total
         env:
           AJ_ADAPTER: async
         run: pnpm vitest run packages/activejob
@@ -897,7 +909,7 @@ jobs:
         env:
           AJ_ADAPTER: inline
         run: >
-          pnpm vitest run
+          pnpm vitest run --shard=${{matrix.shard}}/${{strategy.job-total}}
           packages/arel
           packages/activejob
           packages/activemodel
@@ -948,7 +960,7 @@ jobs:
           scripts/vendor-recite.test.ts
           vendor/sources.test.ts
           vendor/fetch.test.ts
-      - if: needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true'
+      - if: (needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true') && matrix.shard == 1
         run: >
           pnpm vitest run
           scripts/stale-story-references.test.ts
