@@ -19,7 +19,7 @@ import { Enqueuing, ClassMethods as EnqueuingClassMethods } from "./enqueuing.js
 import { Exceptions } from "./exceptions.js";
 import { ClassMethods as ExecutionClassMethods, Execution } from "./execution.js";
 import "./configured-job.js";
-import "./instrumentation.js";
+import { Instrumentation } from "./instrumentation.js";
 import { ActiveJob } from "./namespaces.js";
 import { ClassMethods as QueueAdapterClassMethods, QueueAdapter } from "./queue-adapter.js";
 import "./queue-adapters.js";
@@ -116,6 +116,7 @@ include(Base, Enqueuing);
 include(Base, Execution);
 include(Base, Callbacks);
 include(Base, Exceptions);
+include(Base, Instrumentation);
 rbModConstSet(ActiveJob, "Base", Base);
 
 runLoadHooks("active_job", Base);
