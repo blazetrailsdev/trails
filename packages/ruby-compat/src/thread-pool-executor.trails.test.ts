@@ -63,4 +63,25 @@ describe("ThreadPoolExecutor", () => {
     executor.shutdown();
     expect(await executor.waitForTermination(1)).toBe(true);
   });
+
+  it("keeps minThreads idle workers past idletime", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 1,
+      maxThreads: 2,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+      idletime: 0.02,
+    });
+    const threads: Thread[] = [];
+    const task = () => void threads.push(Thread.current());
+
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(threads[1]).toBe(threads[0]);
+
+    executor.shutdown();
+    expect(await executor.waitForTermination(1)).toBe(true);
+  });
 });

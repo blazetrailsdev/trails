@@ -142,8 +142,10 @@ export class ThreadPoolExecutor {
         resolve(task);
       };
       const timer: unknown = setTimeout(() => {
-        this._ready.splice(this._ready.indexOf(ready), 1);
-        resolve(undefined);
+        if (this._running - this.minLength > 0) {
+          this._ready.splice(this._ready.indexOf(ready), 1);
+          resolve(undefined);
+        }
       }, this.idletime * 1000);
       (timer as { unref?: () => unknown }).unref?.();
       this._ready.push(ready);
