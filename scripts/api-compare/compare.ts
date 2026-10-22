@@ -768,7 +768,17 @@ export const SIGNIFICANT_CALLS: { has(value: string): boolean } = {
  * the 2026-09-18 addendum below `NO_JS_CALL_FORM` for the population this
  * closes.
  */
-const POSITIONAL_ARRAY_ANALOGUES = new Set(["first", "last", "any?", "size", "empty?"]);
+const POSITIONAL_ARRAY_ANALOGUES = new Set(["first", "last", "any?", "size", "empty?", "length"]);
+
+/**
+ * The {@link POSITIONAL_ARRAY_ANALOGUES} a proven `string` or `hash` receiver
+ * answers through `.length` too (`isEmpty(s)` is otherwise written only to
+ * earn the credit). The Relation homonym the comment above guards against
+ * only reaches the `local` / `ivar` / `expr` kinds, never a proven literal.
+ */
+const SIZE_ANALOGUES = new Set(["size", "empty?", "length"]);
+const SIZED_RECEIVER_KINDS = new Set(["array", "string", "hash"]);
+const ARRAY_RECEIVER_KIND = new Set(["array"]);
 
 /**
  * {@link SIGNIFICANT_CALLS}, narrowed for ONE Ruby body's own receiver-kind
@@ -796,7 +806,8 @@ export function significantCallsForReceivers(
       if (value === "with_indifferent_access" && tsNativeForms.has("object")) return false;
       if (!POSITIONAL_ARRAY_ANALOGUES.has(value)) return true;
       const kinds = receivers?.[value];
-      return !(kinds && kinds.length > 0 && kinds.every((k) => k === "array"));
+      const proven = SIZE_ANALOGUES.has(value) ? SIZED_RECEIVER_KINDS : ARRAY_RECEIVER_KIND;
+      return !(kinds && kinds.length > 0 && kinds.every((k) => proven.has(k)));
     },
   };
 }

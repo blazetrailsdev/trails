@@ -14,7 +14,9 @@ import {
   numericModulo,
   numericMul,
   numericPlus,
-  numericUminus,
+  NoMethodError,
+  Rational,
+  rbBigNorm,
   rbDbl2num,
   rbFloatTypeP,
   rbCNumeric,
@@ -40,6 +42,14 @@ import type { TimeWithZone } from "./time-with-zone.js";
 import { actsLike } from "./core-ext/object/acts-like.js";
 import { ISO8601Parser } from "./duration/iso8601-parser.js";
 import { ISO8601Serializer } from "./duration/iso8601-serializer.js";
+
+function numericUminus(x: unknown): unknown {
+  if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
+  if (x instanceof Rational) return new Rational(-x.numerator, x.denominator);
+  if (typeof x === "bigint") return rbBigNorm(-x);
+  if (typeof x === "number") return 0 - x;
+  throw new NoMethodError(`undefined method '-@' for ${inspect(x)}`);
+}
 
 export type DurationParts = {
   years: number;

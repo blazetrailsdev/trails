@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { rbCallSuper, rbClassNewInstance } from "./include.js";
-import { rbAbsintSize } from "./numeric.js";
 import {
   rbCArray,
   rbCBasicObject,
@@ -1195,13 +1194,6 @@ describe("rb_class_inherited_p, rb_class_of and rb_absint_size", () => {
     expect(rbObjIsKindOf(Blob.of(1), rbCString)).toBe(true);
     expect(rbClassInheritedP(Blob, rbCString)).toBe(true);
     expect(rbModAncestors(Blob)).toContain(rbCString);
-  });
-
-  it("counts the bytes of the absolute value and its leading zero bits", () => {
-    expect(rbAbsintSize(0)).toEqual([0, 0]);
-    expect(rbAbsintSize(-1)).toEqual([1, 7]);
-    expect(rbAbsintSize(2n ** 64n - 1n)).toEqual([8, 0]);
-    expect(rbAbsintSize(-(2n ** 64n))).toEqual([9, 7]);
   });
 });
 

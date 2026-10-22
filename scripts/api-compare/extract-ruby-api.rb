@@ -2315,6 +2315,70 @@ class ApiExtractor
     target[on_class ? :classMethods : :instanceMethods] << entry
   end
 
+  # VISIBILITY_ARMS_RATIONALE: an `elsif` arm whose condition reads only a
+  # visibility parameter, such as `elsif !include_private_methods && super(method, true)`
+  # (`activemodel/lib/active_model/attribute_methods.rb:528-533`), cannot answer
+  # differently from its sibling arm in trails, which has no runtime visibility
+  # (CLAUDE.md § "Method visibility is compile-time only"). The arm, and the
+  # calls inside it, are dropped from the calls, call-argument and skeleton
+  # facts every gate compares, and the entry is marked `visibilityArms`.
+  VISIBILITY_PARAM_NAMES = %w[include_private include_private_methods include_all include_priv priv].freeze
+
+  def visibility_params(_entry)
+    VISIBILITY_PARAM_NAMES
+  end
+
+  # The body with every visibility-only `elsif` arm spliced out of its chain,
+  # or `body` itself (the same object) when there is none.
+  def drop_visibility_arms(node, params)
+    return node unless node.is_a?(Array)
+
+    if %i[if elsif].include?(node[0]) && visibility_arm?(node[3], params)
+      rest = drop_visibility_arms(node[3][3], params)
+      return drop_visibility_arms([node[0], node[1], node[2], rest], params)
+    end
+    mapped = node.map { |child| drop_visibility_arms(child, params) }
+    mapped.each_with_index.all? { |child, i| child.equal?(node[i]) } ? node : mapped
+  end
+
+  def visibility_arm?(node, params)
+    node.is_a?(Array) && node[0] == :elsif && visibility_condition?(node[1], params)
+  end
+
+  # A condition built only of `!`, `&&` / `and`, references to a visibility
+  # parameter, and calls whose last argument is the literal `true`, reading at
+  # least one visibility parameter.
+  def visibility_condition?(cond, params)
+    seen = [false]
+    visibility_operand?(cond, params, seen) && seen[0]
+  end
+
+  def visibility_operand?(cond, params, seen)
+    return false unless cond.is_a?(Array)
+
+    case cond[0]
+    when :unary then %i[! not].include?(cond[1]) && visibility_operand?(cond[2], params, seen)
+    when :binary
+      %i[&& and].include?(cond[2]) && visibility_operand?(cond[1], params, seen) &&
+        visibility_operand?(cond[3], params, seen)
+    when :var_ref
+      return false unless cond[1][0] == :@ident && params.include?(cond[1][1])
+
+      seen[0] = true
+    when :paren then cond[1].is_a?(Array) && cond[1].length == 1 && visibility_operand?(cond[1][0], params, seen)
+    else trailing_true_call?(cond)
+    end
+  end
+
+  def trailing_true_call?(node)
+    args = { super: 1, method_add_arg: 2, command: 2, command_call: 4 }[node[0]]&.then { |i| node[i] }
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    return false unless args.is_a?(Array) && args[0] == :args_add_block && args[1].is_a?(Array)
+
+    last = args[1].last
+    last.is_a?(Array) && last[0] == :var_ref && last[1] == [:@kw, "true", last[1][2]]
+  end
+
   # The body-derived half of a method entry: every fact the manifest carries
   # about a method body, so a `define_method`-generated entry is
   # indistinguishable from a `def`-written one rather than reading as a
@@ -2325,8 +2389,10 @@ class ApiExtractor
     mark_symbol_discriminated(entry[:params], body)
     entry[:takesBlock] = true if entry[:params].any? { |p| p[:kind] == "block" } || body_takes_block?(body)
     dep_info = detect_deps(body)
+    compared = drop_visibility_arms(body, visibility_params(entry))
+    entry[:visibilityArms] = true unless compared.equal?(body)
     calls, weak_calls, call_receivers, call_receiver_names, string_eval_calls =
-      collect_method_calls(body, params_node)
+      collect_method_calls(compared, params_node)
     entry[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     entry[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     entry[:calls] = calls unless calls.empty?
@@ -2334,9 +2400,9 @@ class ApiExtractor
     entry[:callReceivers] = call_receivers unless call_receivers.empty?
     entry[:callReceiverNames] = call_receiver_names unless call_receiver_names.empty?
     entry[:stringEvalCalls] = string_eval_calls unless string_eval_calls.empty?
-    call_args = collect_call_args(body)
+    call_args = collect_call_args(compared)
     entry[:callArgs] = call_args unless call_args.empty?
-    skeleton = collect_method_skeleton(body)
+    skeleton = collect_method_skeleton(compared)
     entry[:skeleton] = skeleton unless skeleton.empty?
     opt_keys = collect_option_keys(body, entry[:params], fqn)
     entry[:option_keys] = opt_keys unless opt_keys.empty?

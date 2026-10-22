@@ -204,6 +204,10 @@ export interface MethodInfo {
    * sees. See extract-ruby-api.rb#STRING_EVAL_CALLS.
    */
   stringEvalCalls?: string[];
+  /** Set when extract-ruby-api.rb dropped an `elsif` arm only a visibility
+   *  parameter distinguishes from the calls, call-argument and skeleton facts
+   *  (CLAUDE.md § "Method visibility is compile-time only"). */
+  visibilityArms?: boolean;
   /**
    * Both extractors (RFC 0025 `## Call-argument fidelity`): every syntactic
    * call site in the body, in source order, with its argument descriptors.

@@ -570,15 +570,13 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity " +
       "(`object_id`, `equal?`, `class`), reflection (`instance_of?`, " +
       "`instance_variable_get` / `instance_variable_set` / `instance_variables`), " +
-      "dispatch (`send`, `public_send`, `tap`, " +
+      "dispatch (`tap`, " +
       "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), and " +
       "`clone`.",
     names: [
       "clone",
       "object_id",
       "class",
-      "send",
-      "public_send",
       "tap",
       "yield_self",
       "instance_of?",
@@ -590,6 +588,26 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "to_f",
       "to_r",
       "to_c",
+    ],
+  },
+  {
+    reason:
+      "PERMANENT — dispatch by name and visibility reflection. trails has no runtime " +
+      "visibility, so `send` / `public_send` dispatch alike and the `*_methods` / " +
+      '`*_method_defined?` readers have no fact to report (CLAUDE.md § "Method ' +
+      'visibility is compile-time only"). A dispatch with a literal name is spelled ' +
+      'as the direct member call (CLAUDE.md § "A dispatch by name is spelled directly").',
+    names: [
+      "send",
+      "public_send",
+      "public_method_defined?",
+      "private_method_defined?",
+      "protected_method_defined?",
+      "public_methods",
+      "private_methods",
+      "protected_methods",
+      "public_instance_methods",
+      "public_instance_method",
     ],
   },
   {

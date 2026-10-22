@@ -9,9 +9,7 @@ import {
   Rational,
   StringIO,
   KeyError,
-  aryFetch,
   aryIncludes,
-  block as blockOf,
   type ConflictBlock,
   eachKey,
   eachPair,
@@ -494,13 +492,8 @@ export class Parameters {
         if (blockGiven) {
           return blockGiven();
         } else {
-          return aryFetch(
-            args,
-            0,
-            blockOf(() => {
-              throw new ParameterMissing(key, [...this.parameters.keys()]);
-            }),
-          );
+          if (args.length > 0) return args[0];
+          throw new ParameterMissing(key, [...this.parameters.keys()]);
         }
       }),
     );

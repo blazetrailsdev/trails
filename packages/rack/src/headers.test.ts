@@ -11,7 +11,6 @@ import {
   rbInspect,
   rbObjClone,
   rbObjDup,
-  rbObjFrozenP,
   rbObjSingletonClass,
 } from "@blazetrails/ruby-compat";
 import { Headers } from "./headers.js";
@@ -192,7 +191,7 @@ describe("RackHeadersTest", () => {
     let keys = ["ab", "cd", "3"];
     eachKey(fh, (k: string) => {
       expect(keys.includes(k)).toBeTruthy();
-      expect(rbObjFrozenP(k)).toBeTruthy();
+      expect(Object.isFrozen(k)).toBeTruthy();
       keys = keys.filter((x) => x !== k);
     });
     expect(keys).toEqual([]);

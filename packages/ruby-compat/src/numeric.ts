@@ -255,20 +255,6 @@ export function rbBigNorm(x: bigint): number | bigint {
 }
 
 /**
- * `rb_absint_size` (`vendor/ruby/v3.3.11/bignum.c:3283`): the bytes the
- * absolute value takes, with `nlz_bits_ret`, the leading zero bits of its
- * most significant byte.
- * @noRailsEquivalent PERMANENT
- */
-export function rbAbsintSize(val: number | bigint): [number, number] {
-  let v = BigInt(val);
-  if (v < 0n) v = -v;
-  const bits = v === 0n ? 0 : v.toString(2).length;
-  const size = Math.ceil(bits / 8);
-  return [size, size * 8 - bits];
-}
-
-/**
  * `fix_mul` (`vendor/ruby/v3.3.11/numeric.c:4045`), `rb_float_mul` (`numeric.c:1237`),
  * `rb_rational_mul` (`vendor/ruby/v3.3.11/rational.c:861`).
  * @noRailsEquivalent PERMANENT
@@ -291,19 +277,6 @@ export function numericMul(x: unknown, y: unknown): unknown {
     if (y instanceof Rational) return y.mul(x);
   }
   throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
-}
-
-/**
- * `rb_float_uminus` (`vendor/ruby/v3.3.11/numeric.c:1156`), `rb_int_uminus` (`numeric.c:3833`),
- * `rb_rational_uminus` (`vendor/ruby/v3.3.11/rational.c:611`).
- * @noRailsEquivalent PERMANENT
- */
-export function numericUminus(x: unknown): unknown {
-  if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
-  if (x instanceof Rational) return new Rational(-x.numerator, x.denominator);
-  if (typeof x === "bigint") return rbBigNorm(-x);
-  if (typeof x === "number") return 0 - x;
-  throw new NoMethodError(`undefined method '-@' for ${rbInspect(x)}`);
 }
 
 /**

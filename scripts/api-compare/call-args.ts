@@ -28,6 +28,7 @@ import {
 import { NO_JS_CALL_FORM } from "./compare.js";
 import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
 import {
+  ENUMERABLE_FREE_FUNCTIONS,
   RECEIVER_KEYED_RUBY_COMPAT_EXPORTS,
   rubyCallName,
   rubyCompatAliases,
@@ -524,6 +525,68 @@ for (const [mri, { tsExport }] of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS) {
   exports.add(tsExport);
 }
 
+/**
+ * The reflection calls whose trailing argument only asks for private methods
+ * too: `respond_to?(name, true)` (`vendor/ruby/v3.3.11/vm_method.c:2864`),
+ * `methods(true)`, `method_defined?(name, true)`. trails has no runtime
+ * visibility, so the port takes no such argument (CLAUDE.md § "Method
+ * visibility is compile-time only") and the Ruby list is compared without it.
+ */
+const VISIBILITY_FLAG_CALLS = new Set([
+  "respond_to?",
+  "respond_to_missing?",
+  "methods",
+  "public_methods",
+  "method_defined?",
+]);
+
+/** `methods(false)` asks for singleton methods only (`rb_obj_methods`,
+ *  `vendor/ruby/v3.3.11/class.c:1960`), so only `true` is a visibility flag. */
+const METHODS_LISTS = new Set(["methods", "public_methods"]);
+
+/** The parameters a Rails body forwards as that visibility flag; kept equal to
+ *  extract-ruby-api.rb's `VISIBILITY_PARAM_NAMES` by call-args.test.ts. */
+export const VISIBILITY_PARAMS = new Set([
+  "id:include_private",
+  "id:include_private_methods",
+  "id:include_all",
+  "id:include_priv",
+  "id:priv",
+]);
+
+/** The Ruby site with a trailing visibility boolean dropped, unless the TS site
+ *  still passes it: a `true` / `false` literal, or a forwarded visibility
+ *  parameter. Any other trailing argument still compares. */
+function withoutVisibilityFlag(ruby: CallSite, ts: CallSite): CallSite {
+  if (!VISIBILITY_FLAG_CALLS.has(ruby.name)) return ruby;
+  const last = ruby.args[ruby.args.length - 1];
+  if (last === undefined || ts.args[ts.args.length - 1] === last) return ruby;
+  const flag = METHODS_LISTS.has(ruby.name) ? last === "bool:true" : last.startsWith("bool:");
+  if (!flag && !VISIBILITY_PARAMS.has(last)) return ruby;
+  return { ...ruby, args: ruby.args.slice(0, -1) };
+}
+
+/** Bare Ruby call name → its {@link ENUMERABLE_FREE_FUNCTIONS} export. */
+const ENUMERABLE_EXPORTS_BY_NAME = new Map<string, string>(
+  [...ENUMERABLE_FREE_FUNCTIONS].map(([mri, tsExport]) => [rubyCallName(mri), tsExport]),
+);
+
+/** Whether the TS site is the ruby-compat Enumerable free function for the Ruby
+ *  call (`partition(xs, fn)` for `xs.partition { }`). */
+function isEnumerableFreeFunction(ruby: CallSite, ts: CallSite): boolean {
+  return ts.rubyCompat !== undefined && ENUMERABLE_EXPORTS_BY_NAME.get(ruby.name) === ts.rubyCompat;
+}
+
+/** An Enumerable free function's trailing callback, passed by name rather than
+ *  as a literal (which the extractor already drops as `block`), is the Ruby
+ *  block: dropped when the Ruby site carries one and it alone explains the
+ *  extra length beyond the receiver. */
+function stripEnumerableBlockArg(ruby: CallSite, ts: CallSite, tsArgs: string[]): string[] {
+  if (!isEnumerableFreeFunction(ruby, ts)) return tsArgs;
+  if (!ruby.flags.includes("block") && rubyBlockArg(ruby) === undefined) return tsArgs;
+  return tsArgs.length === ruby.args.length + 2 ? tsArgs.slice(0, -1) : tsArgs;
+}
+
 /** Ruby core `Module#prepend` / `Module#include` / `Object#extend`
  *  (`vendor/ruby/v3.3.11/eval.c:1196,1139,1778`), ported by ruby-compat's
  *  `prepend(klass, mod)` / `include(klass, mod)` / `extend(obj, mod)` with the
@@ -548,6 +611,7 @@ const ACTIVESUPPORT_RECEIVER_EXPORTS = new Map([["stringify_keys", "stringifyKey
 function receiverIsFirstArg(ruby: CallSite, ts: CallSite): boolean {
   if (RECEIVER_AS_FIRST_ARG.has(ruby.name)) return true;
   if (MODULE_MIXIN_EXPORTS.has(ruby.name)) return ts.rubyCompat === ruby.name;
+  if (isEnumerableFreeFunction(ruby, ts)) return true;
   const activeSupport = ACTIVESUPPORT_RECEIVER_EXPORTS.get(ruby.name);
   if (activeSupport !== undefined && ts.activeSupport === activeSupport) return true;
   return (
@@ -608,7 +672,7 @@ function alignReceiverArgs(
   const stripped = stripCalleeReceiverArg(
     ruby,
     ruby.args,
-    stripMixinReceiver(ruby.args, tsArgs),
+    stripMixinReceiver(ruby.args, stripEnumerableBlockArg(ruby, ts, tsArgs)),
     calleeSigs,
   );
   const aligned = alignPortedReceiver(ruby, alignBuiltinReceiver(ruby, ts, ruby.args, stripped));
@@ -1473,6 +1537,7 @@ export function compareCallArgs(
       ? { verdict: "match", rubyArgs: [rubyKey], tsArgs: [tsKey] }
       : { verdict: "mismatch", class: "shape", rubyArgs: [rubyKey], tsArgs: [tsKey] };
   }
+  ruby = withoutVisibilityFlag(ruby, ts);
   if (isSkippedCallName(ruby.name)) return skipped("excludedCallName");
   if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return skipped("uncomparableFlag");
 

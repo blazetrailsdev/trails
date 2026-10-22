@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IndexError } from "./index-error.js";
-import { Hash, block } from "./hash.js";
+import { Hash } from "./hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
@@ -11,10 +10,8 @@ import {
   zip,
   aryDelete,
   aryDeleteIf,
-  aryFetch,
   aryIncludes,
   aryJoin,
-  aryPop,
   deleteAt,
   arySlice,
   compact,
@@ -532,30 +529,6 @@ describe("aryIncludes", () => {
   });
 });
 
-describe("aryFetch", () => {
-  it("answers the element, the block's value, the default, or raises IndexError", () => {
-    const ary = ["foo", "bar", 2];
-    expect([aryFetch(ary, 1), aryFetch(ary, -1), aryFetch(ary, 1, null)]).toEqual([
-      "bar",
-      2,
-      "bar",
-    ]);
-    expect(
-      aryFetch(
-        ary,
-        50,
-        block((index: number) => `Value for ${index}`),
-      ),
-    ).toBe("Value for 50");
-    expect(aryFetch(ary, 50, null)).toBeNull();
-    expect(() => aryFetch(ary, 50)).toThrow(
-      new IndexError("index 50 outside of array bounds: -3...3"),
-    );
-    expect(() => aryFetch(ary, -4)).toThrow("index -4 outside of array bounds: -3...3");
-    expect(() => aryFetch(ary, 1, 2, 3)).toThrow(/\(given 3, expected 1\.\.2\)/);
-  });
-});
-
 describe("aryDelete", () => {
   it("removes every == element in place and returns the last one removed", () => {
     const a = { equals: (o: unknown) => o === a || o === b };
@@ -615,21 +588,6 @@ describe("last", () => {
   it("raises on a negative n", () => {
     expect(() => last([1], -1)).toThrow(ArgumentError);
     expect(() => last([1], -1)).toThrow("negative array size");
-  });
-});
-
-describe("aryPop", () => {
-  it("pops the last n elements in place, all of them past the length", () => {
-    const ary = [1, 2, 3];
-    expect(aryPop(ary, 2)).toEqual([2, 3]);
-    expect(ary).toEqual([1]);
-    expect(aryPop(ary, 0)).toEqual([]);
-    expect(aryPop(ary, 5)).toEqual([1]);
-    expect(ary).toEqual([]);
-  });
-
-  it("raises for a negative count", () => {
-    expect(() => aryPop([1], -1)).toThrow("negative array size");
   });
 });
 

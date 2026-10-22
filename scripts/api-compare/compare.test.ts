@@ -403,6 +403,19 @@ describe("significantMissingCalls", () => {
     expect(sig.has("last")).toBe(true);
   });
 
+  it("significantCallsForReceivers credits empty?/size on a proven string or hash, never first/last", () => {
+    const sig = significantCallsForReceivers({
+      "empty?": ["string"],
+      size: ["hash", "array"],
+      first: ["string"],
+    });
+    expect(sig.has("empty?")).toBe(false);
+    expect(sig.has("size")).toBe(false);
+    expect(sig.has("first")).toBe(true);
+    const local = significantCallsForReceivers({ "empty?": ["string", "local"] });
+    expect(local.has("empty?")).toBe(true);
+  });
+
   it("significantCallsForReceivers still flags a positional-array name with no receiver proof at all", () => {
     const sig = significantCallsForReceivers({});
     expect(sig.has("first")).toBe(true);

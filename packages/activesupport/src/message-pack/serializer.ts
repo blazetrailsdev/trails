@@ -1,11 +1,4 @@
-import {
-  RuntimeError,
-  env as ENV,
-  fetch,
-  rbObjFrozenP,
-  rbStrGetbyte,
-  toI,
-} from "@blazetrails/ruby-compat";
+import { RuntimeError, env as ENV, fetch, rbStrGetbyte, toI } from "@blazetrails/ruby-compat";
 import { rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { Factory, type Pool } from "@blazetrails/msgpack";
 import { delegate } from "../module-ext.js";
@@ -70,7 +63,7 @@ export const Serializer = {
   /** @internal */
   messagePackPool(this: SerializerHost): Pool {
     if (this._messagePackPool == null) {
-      if (!rbObjFrozenP(this.messagePackFactory)) {
+      if (!Object.isFrozen(this.messagePackFactory)) {
         Extensions.install(this.messagePackFactory);
         this.installUnregisteredTypeHandler();
         this.messagePackFactory.freeze();

@@ -9,7 +9,6 @@ import {
   TypeError,
   isSymbol,
   kernelFloat,
-  rbAbsintSize,
   rbBuiltinClassName,
   rbCString,
   rbCSymbol,
@@ -40,6 +39,13 @@ export type PackerExtRegistry = Map<unknown, PackerExtType>;
 
 const encoder = new Encoder();
 const floatEncoder = new Encoder({ forceIntegerToFloat: true });
+
+function rbAbsintSize(val: bigint): [number, number] {
+  const v = val < 0n ? -val : val;
+  const bits = v === 0n ? 0 : v.toString(2).length;
+  const size = Math.ceil(bits / 8);
+  return [size, size * 8 - bits];
+}
 
 export class Packer<Io = unknown> {
   /** @internal */
