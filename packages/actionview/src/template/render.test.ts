@@ -709,7 +709,7 @@ describe("CachedViewRenderTest", () => {
       locale: [":en"],
       formats: [":json"],
       variants: [],
-      handlers: [":raw", ":tse", ":html", ":ruby"],
+      handlers: [":raw", ":tse", ":html", ":builder", ":ruby"],
     };
     assertIncludes(
       e.message,
