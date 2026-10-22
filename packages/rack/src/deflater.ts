@@ -148,7 +148,11 @@ export class GzipStream {
         const block = (part: string | Uint8Array): Promise<void> | undefined => {
           if (part.length === 0) return;
           gzip.write(typeof part === "string" ? new TextEncoder().encode(part) : part);
-          if (this.sync) return (flushed = gzip.flush());
+          if (this.sync) {
+            flushed = flushed ? flushed.then(() => gzip.flush()) : gzip.flush();
+            flushed.catch(() => {});
+            return flushed;
+          }
         };
         if (Symbol.asyncIterator in this.body || Symbol.iterator in this.body) {
           for await (const part of this.body) await block(part);

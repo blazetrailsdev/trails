@@ -15,6 +15,14 @@ export interface ZlibAdapter {
   gunzip(data: Uint8Array): Uint8Array;
   deflate(data: Uint8Array): Uint8Array;
   inflate(data: Uint8Array): Uint8Array;
+  /**
+   * Everything `data`, a possibly truncated stream, inflates to so far:
+   * zlib's `Z_SYNC_FLUSH` finish, which `Zlib::Inflate#inflate` reaches one
+   * chunk at a time (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2145`). `windowBits`
+   * picks the format as `inflateInit2` does: negative is raw deflate, `+ 32`
+   * detects zlib or gzip.
+   */
+  inflateStream(data: Uint8Array, windowBits: number): Uint8Array;
   gzipWriter(io: GzipWriterIO): GzipWriterHandle;
   gzipReader(io: GzipReaderIO): GzipReaderHandle;
 }
@@ -57,6 +65,8 @@ export interface GzipReaderIO {
  * @noRailsEquivalent PERMANENT
  */
 export interface GzipReaderHandle {
+  /** The header's MTIME field, read by `gzfile_read_header` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2743`). */
+  readonly mtime: number;
   read(): Promise<Uint8Array>;
 }
 
@@ -150,7 +160,8 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
  * offset 4 of the 10-byte gzip header (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2648,2672`).
  * Node's `createGzip` has no option for it, so the backend patches the field
  * into the first emitted chunk — which carries that header — to reproduce
- * `Zlib::GzipWriter#mtime=` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3356`).
+ * `Zlib::GzipWriter#mtime=` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3356`), and the `time(0)` it
+ * defaults to when unset (`zlib.c:2658-2660`).
  */
 const GZIP_HEADER_LENGTH = 10;
 
@@ -173,12 +184,16 @@ type NodeZlib = {
   gzipSync: (data: Uint8Array, options: { level: number; strategy: number }) => Uint8Array;
   gunzipSync: (data: Uint8Array) => Uint8Array;
   deflateSync: (data: Uint8Array) => Uint8Array;
-  inflateSync: (data: Uint8Array) => Uint8Array;
+  inflateSync: (data: Uint8Array, options?: { finishFlush: number }) => Uint8Array;
+  inflateRawSync: (data: Uint8Array, options: { finishFlush: number }) => Uint8Array;
+  unzipSync: (data: Uint8Array, options: { finishFlush: number }) => Uint8Array;
   createGzip: () => NodeGzipStream;
   createGunzip: () => NodeGzipStream;
 };
 
 const GZFILE_READ_SIZE = 2048;
+
+const Z_SYNC_FLUSH = 2;
 
 function wrap(zlib: NodeZlib): ZlibAdapter {
   return {
@@ -186,17 +201,47 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
     gunzip: (data) => zlib.gunzipSync(data),
     deflate: (data) => zlib.deflateSync(data),
     inflate: (data) => zlib.inflateSync(data),
+    inflateStream: (data, windowBits) => {
+      const options = { finishFlush: Z_SYNC_FLUSH };
+      if (windowBits < 0) return zlib.inflateRawSync(data, options);
+      if (windowBits > 15) return zlib.unzipSync(data, options);
+      return zlib.inflateSync(data, options);
+    },
     gzipWriter: (io) => {
       const stream = zlib.createGzip();
       let headerSeen = false;
       let failure: Error | null = null;
+      let pending: Uint8Array[] = [];
+      const writeRaw = (): void => {
+        if (failure !== null || pending.length === 0) return;
+        const dst = new Uint8Array(pending.reduce((n, chunk) => n + chunk.length, 0));
+        let offset = 0;
+        for (const chunk of pending) {
+          dst.set(chunk, offset);
+          offset += chunk.length;
+        }
+        pending = [];
+        try {
+          io.write(dst);
+        } catch (err) {
+          failure = err as Error;
+        }
+      };
       const handle: GzipWriterHandle = {
         mtime: null,
         write: (data) => stream.write(data),
-        flush: () => new Promise<void>((res) => stream.flush(res)),
+        flush: () =>
+          new Promise<void>((res, rej) =>
+            stream.flush(() => {
+              writeRaw();
+              if (failure !== null) rej(failure);
+              else res();
+            }),
+          ),
         finish: async () => {
           stream.end();
           await ended;
+          writeRaw();
           if (failure !== null) throw failure;
         },
       };
@@ -204,16 +249,16 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
         const bytes = chunk as Uint8Array;
         if (!headerSeen) {
           headerSeen = true;
-          if (handle.mtime !== null && bytes.length >= GZIP_HEADER_LENGTH) {
-            setGzipHeaderMtime(bytes, handle.mtime);
+          if (bytes.length >= GZIP_HEADER_LENGTH) {
+            setGzipHeaderMtime(bytes, handle.mtime ?? Math.floor(Date.now() / 1000));
           }
         }
-        io.write(bytes);
+        pending.push(bytes);
       });
       const ended = new Promise<void>((res) => {
         stream.on("end", () => res());
         stream.on("error", (err) => {
-          failure = err as Error;
+          failure ??= err as Error;
           res();
         });
       });
@@ -231,12 +276,19 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
           res();
         });
       });
+      const toBytes = (str: string | Uint8Array): Uint8Array =>
+        typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
+      const header = toBytes(io.read(GZIP_HEADER_LENGTH) ?? new Uint8Array());
+      const mtime =
+        header.length >= GZIP_HEADER_LENGTH
+          ? (header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24)) >>> 0
+          : 0;
+      stream.write(header);
       const readMore = async (): Promise<void> => {
         let str: string | Uint8Array | null;
         while (failure === null && (str = io.read(GZFILE_READ_SIZE)) !== null) {
           if (str.length === 0) continue;
-          const bytes =
-            typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
+          const bytes = toBytes(str);
           if (!stream.write(bytes)) {
             await new Promise<void>((res) => {
               stream.once("drain", res);
@@ -249,6 +301,7 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
       };
       let finished: Promise<void> | null = null;
       return {
+        mtime,
         read: async () => {
           finished ??= readMore();
           await finished;
