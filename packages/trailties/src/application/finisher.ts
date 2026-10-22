@@ -1,5 +1,6 @@
-import { DescendantsTracker, runLoadHooks, underscore } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { camelize, DescendantsTracker, runLoadHooks, underscore } from "@blazetrails/activesupport";
+import { Base as JobBase } from "@blazetrails/activejob";
+import { getFs, getPath, registerConstant } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
@@ -76,6 +77,7 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   }
   for (const klass of controllerConstants.values()) await defineController(klass);
   registerModel(await loadModels(this.paths()));
+  await loadJobs(this.paths());
 });
 
 Finisher.initializer(
@@ -266,6 +268,43 @@ async function defineController(klass: object): Promise<void> {
   await ActionController.Railties.Helpers.inherited(
     klass as ActionController.HelpersPathControllerClass,
   );
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function loadJobs(paths: Root): Promise<void> {
+  const node = paths.get("app");
+  if (!node) return;
+
+  const p = getPath();
+  for (const dir of await node.existentDirectories()) {
+    if (p.basename(dir) === "jobs") await collectJobs(dir, "");
+  }
+}
+
+/** @internal */
+async function collectJobs(dir: string, prefix: string): Promise<void> {
+  const fs = getFs();
+  const p = getPath();
+  if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
+
+  for (const entry of await fs.readdir(dir)) {
+    const full = p.join(dir, entry);
+    if ((await fs.stat(full)).isDirectory()) {
+      await collectJobs(full, `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}::`);
+      continue;
+    }
+    if (!/^.+[-_]job\.(?:ts|js)$/.test(entry)) continue;
+    const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
+    for (const value of Object.values(mod)) {
+      if (
+        typeof value === "function" &&
+        value.name.endsWith("Job") &&
+        value.prototype instanceof JobBase
+      ) {
+        registerConstant(`${prefix}${value.name}`, value);
+      }
+    }
+  }
 }
 
 /** @noRailsEquivalent PERMANENT */
