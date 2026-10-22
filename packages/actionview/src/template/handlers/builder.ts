@@ -6,7 +6,7 @@ export class Builder implements TemplateHandler {
   declare static defaultFormat: string;
 
   static {
-    classAttribute.call(this, "defaultFormat", { default: "xml" });
+    classAttribute.call(this, "defaultFormat", { default: ":xml" });
   }
 
   private _required?: boolean;
