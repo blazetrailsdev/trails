@@ -49,6 +49,8 @@ call-args after compare: $api/lint-call-args.ts --no-regen --package $pkg
 ruby-compat after compare: $api/lint-ruby-compat-calls.ts --no-regen --package $pkg
 arms-report after compare: $api/report-arms.ts --report --package=$pkg
 arm-throws after compare: $api/lint-arm-throws.ts --package $pkg
+params after compare: $api/lint-param-names.ts --package $pkg
+blocks after compare: $api/lint-block-params.ts --package $pkg
 predicates after compare: $api/lint-predicate-kinds.ts --package $pkg
 parents after compare: $api/lint-ambiguous-parents.ts --package $pkg
 inlined after compare: $api/lint-inlined-from.ts

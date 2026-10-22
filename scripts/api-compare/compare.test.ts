@@ -4880,7 +4880,9 @@ describe("rubyDefinitionBreakdown", () => {
     };
   }
   const skipName = [...SKIP][0];
-  const scoped = SCOPED_SKIP_GROUPS.filter((g) => g.tsMirrorName === undefined)
+  const scoped = SCOPED_SKIP_GROUPS.filter(
+    (g) => g.tsMirrorName === undefined && g.packages === undefined,
+  )
     .flatMap((g) => g.names.map((name) => ({ name, rubyFile: g.rubyFiles[0] })))
     .find(({ name }) => rubyMethodToTs(name) !== null)!;
 

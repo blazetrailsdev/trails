@@ -23,6 +23,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
 import { BLOCK_IDIOM } from "./block-params.js";
+import { scopeOf } from "./scope.js";
 import {
   GATED_PACKAGES,
   exceedances,
@@ -44,11 +45,12 @@ interface BlockParamArtifact {
   mismatches: (MeasuredRow & { rubyName: string; tsName: string })[];
 }
 
-async function main(tighten: boolean): Promise<number> {
+async function main(tighten: boolean, scope: string | null): Promise<number> {
+  const gated = scope === null ? GATED_PACKAGES : GATED_PACKAGES.filter((name) => name === scope);
   const file = path.join(OUTPUT_DIR, "block-param-mismatches.json");
   const artifact = JSON.parse(await fs.readFile(file, "utf-8")) as BlockParamArtifact;
 
-  const absent = unmeasuredPackages(artifact.packages, GATED_PACKAGES);
+  const absent = unmeasuredPackages(artifact.packages, gated);
   if (absent.length > 0) {
     console.error(
       `\nblock-param gate: gated package(s) not measured: ${absent.join(", ")}.\n` +
@@ -57,16 +59,20 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
   const marks = await loadMarks(BLOCK_MARK_PATH);
-  const unmarked = unmarkedPackages(marks, GATED_PACKAGES);
+  const unmarked = unmarkedPackages(marks, gated);
   if (unmarked.length > 0) {
     console.error(`\nblock-param gate: gated package(s) carry no mark: ${unmarked.join(", ")}.\n`);
     return 1;
   }
 
-  const current = measure(artifact.mismatches, GATED_PACKAGES);
-  const grew = exceedances(marks, current, GATED_PACKAGES);
-  const stale = staleMarks(marks, current, GATED_PACKAGES);
+  const current = measure(artifact.mismatches, gated);
+  const grew = exceedances(marks, current, gated);
+  const stale = staleMarks(marks, current, gated);
 
+  if (tighten && scope !== null) {
+    console.error("\n--tighten writes every package's mark; run it without --package.\n");
+    return 1;
+  }
   if (tighten) {
     if (grew.length > 0) {
       console.error("\nblock-param gate: refusing to tighten while the mark is EXCEEDED.\n");
@@ -107,7 +113,8 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  process.exit(await main(process.argv.slice(2).includes("--tighten")));
+  const argv = process.argv.slice(2);
+  process.exit(await main(argv.includes("--tighten"), scopeOf(argv)));
 }
 
 void runAsScript();

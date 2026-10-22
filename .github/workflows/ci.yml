@@ -1768,7 +1768,8 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
-      needs.changes.outputs.thor_only != 'true'
+      needs.changes.outputs.thor_only != 'true' &&
+      needs.changes.outputs.actioncable_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -2199,12 +2200,12 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
-      needs.changes.outputs.thor_only == 'true'
+      (needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      SCOPED_PACKAGE: thor
-      SCOPED_SOURCE: thor
+      SCOPED_PACKAGE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'actioncable' }}
+      SCOPED_SOURCE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'rails' }}
     permissions:
       contents: read
       actions: read
@@ -2604,12 +2605,12 @@ jobs:
                   # (no packages/**, scripts/{api,test,fixtures,schema}-compare/**,
                   # comparison-consumed manifest builders, vendor/**, or
                   # cross-cutting infra — see COMPARISON_RE).
-                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; then
                     continue
                   fi
                   ;;
                 rails-comparison-scoped)
-                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" != "true" ]; then
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || { [ "$THOR_ONLY" != "true" ] && [ "$ACTIONCABLE_ONLY" != "true" ]; }; then
                     continue
                   fi
                   ;;
