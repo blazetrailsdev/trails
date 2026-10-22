@@ -1763,7 +1763,8 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
-      needs.changes.outputs.thor_only != 'true'
+      needs.changes.outputs.thor_only != 'true' &&
+      needs.changes.outputs.actioncable_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -2188,15 +2189,21 @@ jobs:
         if: always()
         run: node scripts/ci/bg-gates.mjs summary
 
-  rails-comparison-thor:
-    name: Rails API/Test Comparison (thor)
+  # One job for every package a *_only flag scopes. SCOPED_PACKAGE names it;
+  # SCOPED_SOURCE is the vendored source holding its Ruby (actioncable is a
+  # package of the rails source, not a source of its own).
+  rails-comparison-scoped:
+    name: Rails API/Test Comparison (${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'actioncable' }})
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
-      needs.changes.outputs.thor_only == 'true'
+      (needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SCOPED_PACKAGE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'actioncable' }}
+      SCOPED_SOURCE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'rails' }}
     permissions:
       contents: read
       actions: read
@@ -2216,12 +2223,12 @@ jobs:
         with:
           path: vendor/*/*/
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
-      - name: Fetch the thor source
-        run: pnpm vendor:fetch --source thor
-      - name: Thor comparison
+      - name: Fetch the scoped package's source
+        run: pnpm vendor:fetch --source "$SCOPED_SOURCE"
+      - name: Scoped comparison
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash scripts/ci/thor-comparison.sh
+        run: bash scripts/ci/scoped-comparison.sh "$SCOPED_PACKAGE"
 
   schema-parity-rails:
     name: Schema Parity (Rails side)
@@ -2446,7 +2453,7 @@ jobs:
       - maria-tests
       - website
       - rails-comparison
-      - rails-comparison-thor
+      - rails-comparison-scoped
       - schema-parity-rails
       - schema-parity-trails
       - schema-parity-diff
@@ -2596,12 +2603,12 @@ jobs:
                   # (no packages/**, scripts/{api,test,fixtures,schema}-compare/**,
                   # comparison-consumed manifest builders, vendor/**, or
                   # cross-cutting infra — see COMPARISON_RE).
-                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; then
                     continue
                   fi
                   ;;
-                rails-comparison-thor)
-                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" != "true" ]; then
+                rails-comparison-scoped)
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || { [ "$THOR_ONLY" != "true" ] && [ "$ACTIONCABLE_ONLY" != "true" ]; }; then
                     continue
                   fi
                   ;;

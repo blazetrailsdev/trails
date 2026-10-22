@@ -13,6 +13,8 @@ export interface HttpResponse {
   writeHead(status: number, headers?: Record<string, string | string[]>): unknown;
   write(chunk: string | Uint8Array): unknown;
   end(chunk?: string | Uint8Array): unknown;
+  socket?: HttpSocket | null;
+  detachSocket?(socket: HttpSocket): unknown;
 }
 
 /** @noRailsEquivalent PERMANENT */

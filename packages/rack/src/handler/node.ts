@@ -77,7 +77,15 @@ export class Node {
   service(req: HttpRequest, res: HttpResponse): Promise<void> {
     return new Thread(async (): Promise<void> => {
       const env = await this.requestEnv(req, new StringIO(await readBody(req)));
-      env[RACK_IS_HIJACK] = false;
+      const socket = res.socket;
+      let hijacked = false;
+      const release = (): HttpSocket => {
+        hijacked = true;
+        res.detachSocket!(socket!);
+        return socket!;
+      };
+      env[RACK_IS_HIJACK] = socket != null && res.detachSocket !== undefined;
+      if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
 
       const [status, headers, body] = await (rbFSend(
         this.app,
@@ -85,8 +93,16 @@ export class Node {
         env,
       ) as Promise<RackResponse>);
       try {
+        if (hijacked) return;
+        const partial = headers[RACK_HIJACK] as unknown;
+        if (env[RACK_IS_HIJACK] && typeof partial === "function") {
+          release().write(responseHead(status, sentHeaders(headers)));
+          await (partial as (stream: HttpSocket) => unknown)(socket!);
+          return;
+        }
         res.writeHead(status, sentHeaders(headers));
         for await (const chunk of body) {
+          if (hijacked) return;
           res.write(chunk);
         }
         res.end();

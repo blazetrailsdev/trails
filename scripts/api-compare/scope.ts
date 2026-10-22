@@ -3,7 +3,7 @@ import { PACKAGES } from "./config.js";
 /**
  * The package `--package <name>` scopes a gate to, or null for the whole
  * surface. CI takes the scoped arm for a diff confined to one package
- * (scripts/ci/thor-comparison.sh); a scoped run only gates, so a flag that
+ * (scripts/ci/scoped-comparison.sh); a scoped run only gates, so a flag that
  * rewrites the committed marks is refused alongside it.
  */
 export function scopeOf(argv: readonly string[]): string | null {
