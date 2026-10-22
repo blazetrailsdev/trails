@@ -9,6 +9,7 @@
   "references": [
     { "path": "../actionpack" },
     { "path": "../activesupport" },
+    { "path": "../date" },
     { "path": "../rack" },
     { "path": "../ruby-compat" }
   ]

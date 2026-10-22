@@ -767,6 +767,11 @@ export function extractFromProgram(
             };
           }
         }
+      } else if (ts.isForOfStatement(node) && defineMethodLoop(node)) {
+        const { names, statement } = defineMethodLoop(node)!;
+        for (const name of names) {
+          fileFunctions.push(harvestDefineMethodSeat(statement, checker, relPath, name));
+        }
       } else if (ts.isExpressionStatement(node)) {
         if (defineMethodSeat(node.expression)) {
           fileFunctions.push(harvestDefineMethodSeat(node, checker, relPath));
@@ -4125,12 +4130,45 @@ function defineMethodSeat(
   return { name, body };
 }
 
+/**
+ * A top-level `for (const m of ["a", "b"] as const) rbModDefineMethod(Klass, m, fn)`:
+ * Ruby's `%i( a b ).each { |m| define_method(m) { … } }`
+ * (`connection/tagged_logger_proxy.rb:35-39`), one seat per listed name.
+ */
+function defineMethodLoop(
+  node: ts.ForOfStatement,
+): { names: string[]; statement: ts.ExpressionStatement } | undefined {
+  const decls = node.initializer;
+  if (!ts.isVariableDeclarationList(decls) || decls.declarations.length !== 1) return undefined;
+  const loopVar = decls.declarations[0].name;
+  if (!ts.isIdentifier(loopVar)) return undefined;
+  const list = unwrapAssertions(node.expression);
+  if (!ts.isArrayLiteralExpression(list)) return undefined;
+  if (!list.elements.every((e) => ts.isStringLiteralLike(e))) return undefined;
+  let statement: ts.Statement = node.statement;
+  if (ts.isBlock(statement)) {
+    if (statement.statements.length !== 1) return undefined;
+    statement = statement.statements[0];
+  }
+  if (!ts.isExpressionStatement(statement)) return undefined;
+  const call = statement.expression;
+  if (!ts.isCallExpression(call) || !ts.isIdentifier(call.expression)) return undefined;
+  if (call.expression.text !== "rbModDefineMethod") return undefined;
+  const [, name, body] = call.arguments;
+  if (!name || !ts.isIdentifier(name) || name.text !== loopVar.text || !body) return undefined;
+  if (!ts.isFunctionExpression(body) && !ts.isArrowFunction(body)) return undefined;
+  return { names: list.elements.map((e) => (e as ts.StringLiteralLike).text), statement };
+}
+
 function harvestDefineMethodSeat(
   node: ts.ExpressionStatement,
   checker: ts.TypeChecker,
   file: string,
+  name: string = defineMethodSeat(node.expression)!.name.text,
 ): MethodInfo {
-  const { name, body } = defineMethodSeat(node.expression)!;
+  const body = (node.expression as ts.CallExpression).arguments[2] as
+    | ts.FunctionExpression
+    | ts.ArrowFunction;
   const optionKeys = extractOptionKeys(body.parameters, checker);
   const calls = extractCalls(body.body);
   const callSeq = extractCallSeq(body.body);
@@ -4138,7 +4176,7 @@ function harvestDefineMethodSeat(
   const skeleton = extractSkeleton(body.body);
   const noRailsEquivalent = noRailsEquivalentReason(node);
   return {
-    name: name.text,
+    name,
     visibility: "public",
     params: extractParameters(body.parameters),
     isStatic: false,

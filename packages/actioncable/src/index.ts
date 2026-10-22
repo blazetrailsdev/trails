@@ -11,3 +11,7 @@ import "./connection/authorization.js";
 import "./connection/callbacks.js";
 import "./connection/internal-channel.js";
 import "./connection/stream-event-loop.js";
+import "./connection/subscriptions.js";
+import "./connection/message-buffer.js";
+import "./connection/tagged-logger-proxy.js";
+import "./server/configuration.js";
