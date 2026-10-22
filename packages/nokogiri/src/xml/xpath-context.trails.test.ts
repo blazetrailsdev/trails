@@ -119,6 +119,7 @@ describe("XPathContext", () => {
     expect(pairs).toHaveLength(3);
     expect(context.evaluate("string(namespace::a)")).toBe("urn:a");
     expect(context.evaluate("count(namespace::* | @*)")).toBe(4);
+    expect(set.plus(context.evaluate("namespace::*") as NodeSet).length).toBe(3);
     doc.dispose();
   });
 

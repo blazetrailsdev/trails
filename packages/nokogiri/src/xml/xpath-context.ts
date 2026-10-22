@@ -177,6 +177,7 @@ class LibXmlRoot {
 
 type LibXmlXPathNode = XmlNode | LibXmlRoot | NamespaceNode<LibXmlElement>;
 
+const libXmlNamespaces = new WeakMap<LibXmlDocument, Map<number, NamespaceNode<LibXmlElement>[]>>();
 const libXmlRoots = new WeakMap<LibXmlDocument, LibXmlRoot>();
 
 function libXmlRoot(doc: LibXmlDocument): LibXmlRoot {
@@ -215,7 +216,15 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
     return node instanceof LibXmlElement ? node.attrs : [];
   },
   namespaces(node) {
-    return node instanceof LibXmlElement ? namespaceNodes(node, node.namespaces) : [];
+    if (!(node instanceof LibXmlElement)) return [];
+    let byPtr = libXmlNamespaces.get(node.doc);
+    if (byPtr === undefined) libXmlNamespaces.set(node.doc, (byPtr = new Map()));
+    let namespaces = byPtr.get(libXmlPtr(node));
+    if (namespaces === undefined) {
+      namespaces = namespaceNodes(node, node.namespaces);
+      byPtr.set(libXmlPtr(node), namespaces);
+    }
+    return namespaces;
   },
   localName(node) {
     if (node instanceof NamespaceNode) return node.prefix ?? "";
@@ -239,7 +248,7 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
     return node.content;
   },
   key(node) {
-    if (node instanceof NamespaceNode) return `${libXmlPtr(node.owner)} xmlns:${node.prefix}`;
+    if (node instanceof NamespaceNode) return node;
     return node instanceof LibXmlRoot ? node : libXmlPtr(node);
   },
 };

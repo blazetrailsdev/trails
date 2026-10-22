@@ -41,7 +41,7 @@ export function extractParams(
     hashes.push(params.pop());
     if (params.length === 0) break;
   }
-  // eslint-disable-next-line prefer-const -- Ruby reassigns `ns` alone (`searchable.rb:221-223`).
+  // eslint-disable-next-line prefer-const
   let [ns, binds] = hashes.reverse() as [
     Record<string, string> | undefined,
     Record<string, unknown> | undefined,
