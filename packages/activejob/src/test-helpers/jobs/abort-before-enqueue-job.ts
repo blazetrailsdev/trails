@@ -17,7 +17,8 @@ export class AbortBeforeEnqueueJob extends Base {
   }
 
   throwOrRaise(): void {
-    if ((this.arguments[0] ?? ":abort") === ":abort") {
+    const first = this.arguments[0];
+    if ((first != null && first !== false ? first : ":abort") === ":abort") {
       kernelThrow(":abort");
     } else {
       throw new MyError();
