@@ -7,7 +7,6 @@ import {
   extend,
   classAttribute,
   Concern,
-  type Included,
 } from "@blazetrails/activesupport";
 
 interface ConversionRecord {
@@ -15,7 +14,12 @@ interface ConversionRecord {
   toKey(): unknown[] | null;
 }
 
-export type Conversion = Included<typeof Conversion>;
+export interface Conversion {
+  toModel<T>(this: T): T;
+  toKey(): unknown[] | null;
+  toParam(): string | null;
+  toPartialPath(): string;
+}
 
 export function toModel<T>(this: T): T {
   return this;
