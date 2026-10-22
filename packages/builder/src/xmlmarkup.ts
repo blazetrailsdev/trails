@@ -1,4 +1,4 @@
-import { isSymbol, rbBlockGivenP, symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, rbBlockGivenP, rbObjAsString, symbolToS } from "@blazetrails/ruby-compat";
 import { IllegalBlockError, type Target, XmlBase } from "./xmlbase.js";
 
 function lshift(target: Target, text: string): Target {
@@ -8,23 +8,23 @@ function lshift(target: Target, text: string): Target {
 }
 
 export interface XmlMarkupOptions {
-  indent?: number | null;
-  margin?: number | null;
+  indent?: number | false | null;
+  margin?: number | false | null;
   quote?: ":single" | ":double" | null;
   explicitNilHandling?: unknown;
-  target?: Target | null;
+  target?: Target | false | null;
 }
 
 export class XmlMarkup extends XmlBase {
   declare protected _quote: string;
 
   constructor(options: XmlMarkupOptions = {}) {
-    const indent = options.indent ?? 0;
-    const margin = options.margin ?? 0;
+    const indent = options.indent != null && options.indent !== false ? options.indent : 0;
+    const margin = options.margin != null && options.margin !== false ? options.margin : 0;
     super(indent, margin);
     this._quote = options.quote === ":single" ? "'" : '"';
     this._explicitNilHandling = options.explicitNilHandling;
-    this._target = options.target ?? "";
+    this._target = options.target != null && options.target !== false ? options.target : "";
   }
 
   targetBang(): Target {
@@ -108,7 +108,7 @@ export class XmlMarkup extends XmlBase {
     this._indent();
     this._target = lshift(this._target, open);
     if (data != null && data !== false)
-      this._target = lshift(this._target, isSymbol(data) ? symbolToS(data) : String(data));
+      this._target = lshift(this._target, isSymbol(data) ? symbolToS(data) : rbObjAsString(data));
     if (attrs) this._insertAttributes(attrs, order);
     this._target = lshift(this._target, close);
     this._newline();
@@ -149,7 +149,7 @@ export class XmlMarkup extends XmlBase {
 
   /** @internal */
   private _attrValue(value: unknown): string {
-    return isSymbol(value) ? symbolToS(value) : this._escapeAttribute(String(value));
+    return isSymbol(value) ? symbolToS(value) : this._escapeAttribute(rbObjAsString(value));
   }
 
   /** @internal */

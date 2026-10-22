@@ -1,4 +1,4 @@
-import { Encoding, encode as strEncode, rbObjEncoding } from "@blazetrails/ruby-compat";
+import { Encoding, encode as strEncode, rbObjEncoding, trTrans } from "@blazetrails/ruby-compat";
 
 const CP1252: Record<number, number> = {
   128: 8364,
@@ -90,11 +90,7 @@ function unicode(string: string | Uint8Array): string {
 }
 
 function encode(string: string | Uint8Array): string {
-  return unicode(string)
-    .replace(
-      new RegExp(`[${CP1252_DIFFERENCES}]`, "gu"),
-      (c) => [...UNICODE_EQUIVALENT][[...CP1252_DIFFERENCES].indexOf(c)],
-    )
+  return trTrans(unicode(string), CP1252_DIFFERENCES, UNICODE_EQUIVALENT, false)
     .replace(INVALID_XML_CHAR, REPLACEMENT_CHAR)
     .replace(XML_PREDEFINED, (c) => PREDEFINED[c.codePointAt(0)!]);
 }

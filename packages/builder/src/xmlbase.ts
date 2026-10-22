@@ -8,6 +8,7 @@ import {
   isPlainHash,
   isSymbol,
   rbBlockGivenP,
+  rbObjAsString,
   rbObjSingletonClass,
   stringToSym,
   symbolToS,
@@ -62,7 +63,7 @@ export abstract class XmlBase {
         if (this.isExplicitNilHandling()) Object.assign(attrs, { nil: true });
       } else {
         text ??= "";
-        text += isSymbol(arg) ? symbolToS(arg) : String(arg);
+        text += isSymbol(arg) ? symbolToS(arg) : rbObjAsString(arg);
       }
     }
     if (block) {
@@ -121,14 +122,16 @@ export abstract class XmlBase {
   /** @internal */
   protected abstract _endTag(sym: string): void;
 
-  /** @internal */
-  /** @missingRailsCall dummy? — CONVERGEABLE port-builder-xml-events-and-remaining-tests */
+  /**
+   * @internal
+   * @missingRailsCall dummy? — CONVERGEABLE port-builder-xml-events-and-remaining-tests
+   */
   protected _escape(text: string): string {
     const result = XChar.encode(text);
     try {
       const encoding = Encoding.find(this._encoding)!;
       const encoded = encode(result, encoding);
-      return typeof encoded === "string" ? encoded : String.fromCharCode(...encoded);
+      return typeof encoded === "string" ? encoded : new TextDecoder("latin1").decode(encoded);
     } catch (e) {
       if (!(e instanceof StandardError)) throw e;
       // eslint-disable-next-line no-control-regex
