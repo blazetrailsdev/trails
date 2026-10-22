@@ -27,7 +27,7 @@ import { TestRequest } from "../testing/test-request.js";
 import { Base } from "../../action-controller/base.js";
 import { TestCase } from "../../action-controller/test-case.js";
 import { Duration, include, isPresent } from "@blazetrails/activesupport";
-import { afterTeardown, travel, travelTo } from "@blazetrails/activesupport";
+import { travel, travelBack, travelTo } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 
 function cookieJarCookies(jar: CookieJar): Map<string, string> {
@@ -1235,7 +1235,7 @@ describe("CookiesTest", () => {
     tc.request.host = "www.nextangle.com";
   });
 
-  afterEach(() => afterTeardown());
+  afterEach(() => travelBack());
 
   function controllerCookies(): CookieJar {
     return (tc.controller as TestController).cookies();

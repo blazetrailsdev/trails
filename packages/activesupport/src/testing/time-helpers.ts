@@ -1,5 +1,5 @@
 import { Date, DateTime, Temporal, Time } from "@blazetrails/date";
-import { Rational, rational, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbCallSuper, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
@@ -78,9 +78,12 @@ export class SimpleStubs {
 let _simpleStubs: SimpleStubs | undefined;
 let _inBlock = false;
 
-export function afterTeardown(): void {
+export function afterTeardown(this: object): unknown {
   travelBack();
+  return rbCallSuper(this, afterTeardown);
 }
+
+export const TimeHelpers = { afterTeardown };
 
 export function travel(
   duration: Duration | number,

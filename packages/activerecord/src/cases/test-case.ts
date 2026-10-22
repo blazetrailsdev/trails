@@ -89,8 +89,13 @@ export class TestCase extends ActiveSupportTestCase {
     this.useTransactionalTests = true;
   }
 
+  /** @inlinedFrom ActiveRecord::TestFixtures#after_teardown rails/v8.0.2/activerecord/lib/active_record/test_fixtures.rb:14-18 */
   override async afterTeardown(): Promise<void> {
-    await super.afterTeardown();
+    try {
+      await super.afterTeardown();
+    } finally {
+      await this.teardownFixtures();
+    }
     await this.checkConnectionLeaks();
   }
 
