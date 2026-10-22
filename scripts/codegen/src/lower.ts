@@ -5290,7 +5290,11 @@ export class Lowerer {
     const ma = (i: number) => this.expr(matcher.args[i], ctx);
     // `expect { … }`: the block, run once.
     if (target.block?.k === "block" && !target.args.length) {
-      const f = this.arrow([], target.block.body, this.child(ctx, { testMode: true }));
+      const f = this.arrow(
+        target.block.params ?? [],
+        target.block.body,
+        this.child(ctx, { testMode: true }),
+      );
       const run = `(${f.startsWith("async") ? f : `async ${f}`})()`;
       if (ctx.asyncBox) ctx.asyncBox.awaits = true;
       if (matcher.name === "raise_error" || matcher.name === "raise_exception") {
@@ -5304,12 +5308,15 @@ export class Lowerer {
         const check = msg.k === "regex" ? `${m}.test(e.message)` : `e.message === ${m}`;
         return `await ${ex}(${run}).rejects.toSatisfy((e: Error) => e instanceof ${ma(0)} && ${check})`;
       }
+      const blockMatcher = this.rspecBlockMatcher(matcher, target, ctx, ex, not);
+      if (blockMatcher) return blockMatcher;
       return this.decline(ctx, "unhandled-node", n, `rspec block matcher ${matcher.name}`);
     }
     if (target.args.length !== 1) return null;
     const actual = this.expr(target.args[0], ctx);
     const one = (m: N, act: string): string | null => {
-      const arg = (i: number) => this.expr(m.args[i], ctx);
+      const arg = (i: number) => this.rspecArg(m.args[i], ctx);
+      const args = () => m.args.map((_: N, i: number) => arg(i)).join(", ");
       const lit = (x: N) =>
         ["str", "int", "float", "sym", "true", "false", "nil"].includes(x?.k) ||
         (x?.k === "array" && x.elems.every((e: N) => lit(e)));
@@ -5335,13 +5342,40 @@ export class Lowerer {
         case "match":
           return `${ex}(${act})${not}.toMatch(${arg(0)})`;
         case "include":
-          return m.args
-            .map((_: N, i: number) => `${ex}(${act})${not}.toContainEqual(${arg(i)})`)
-            .join("; ");
+          return `${ex}(${act})${not}.toInclude(${args()})`;
+        case "be_between": {
+          // `be_between(a, b).exclusive`
+          return `${ex}(${act})${not}.toBeBetween(${args()})`;
+        }
         case "start_with":
-        case "end_with": {
-          const js = m.name === "start_with" ? "startsWith" : "endsWith";
-          return `${ex}(${act})${not}.toSatisfy((x: string) => x.${js}(${arg(0)}))`;
+          return `${ex}(${act})${not}.toStartWith(${args()})`;
+        case "end_with":
+          return `${ex}(${act})${not}.toEndWith(${args()})`;
+        case "contain_exactly":
+          return `${ex}(${act})${not}.toContainExactly(${args()})`;
+        case "match_array":
+          return `${ex}(${act})${not}.toContainExactly(...${arg(0)})`;
+        case "have_key":
+          return `${ex}(${act})${not}.toHaveKey(${arg(0)})`;
+        case "and": {
+          // Compound `a.and(b)`: both hold (rspec compound.rb).
+          const l = m.recv?.k === "call" ? one(m.recv, act) : null;
+          const r = m.args[0]?.k === "call" ? one(m.args[0], act) : null;
+          return l && r ? `${l}; ${r}` : null;
+        }
+        case ">":
+        case ">=":
+        case "<":
+        case "<=": {
+          // `be > 0`: rspec BeComparedTo.
+          if (m.recv?.k !== "call" || m.recv.name !== "be" || m.recv.args.length) return null;
+          const fn = {
+            ">": "toBeGreaterThan",
+            ">=": "toBeGreaterThanOrEqual",
+            "<": "toBeLessThan",
+            "<=": "toBeLessThanOrEqual",
+          }[m.name as ">"];
+          return `${ex}(${act})${not}.${fn}(${arg(0)})`;
         }
         case "be_a":
         case "be_an":
@@ -5374,6 +5408,80 @@ export class Lowerer {
       one(matcher, actual) ??
       this.decline(ctx, "unhandled-node", n, `rspec matcher ${matcher.name}`)
     );
+  }
+
+  /** A matcher argument: rspec's `an_instance_of(K)` / `a_kind_of(K)` is `K`, matched by `===`. */
+  rspecArg(a: N, ctx: Ctx): string {
+    if (
+      a?.k === "call" &&
+      !a.recv &&
+      ["an_instance_of", "a_kind_of", "kind_of", "instance_of"].includes(a.name) &&
+      a.args.length === 1
+    )
+      return this.expr(a.args[0], ctx);
+    return this.expr(a, ctx);
+  }
+
+  /**
+   * `expect { … }.to change { x }.from(a).to(b).by(n)` / `yield_*` / `output(…).to_stderr`,
+   * as the async matchers of `@blazetrails/vitest-matchers`. Null for any other matcher.
+   */
+  rspecBlockMatcher(matcher: N, target: N, ctx: Ctx, ex: string, not: string): string | null {
+    const chain: N[] = [];
+    for (let m: N = matcher; m?.k === "call"; m = m.recv) chain.unshift(m);
+    const head = chain[0];
+    if (head.recv) return null;
+    const async = (f: string) => (f.startsWith("async") ? f : `async ${f}`);
+    const blk = this.arrow(
+      target.block.params ?? [],
+      target.block.body,
+      this.child(ctx, { testMode: true }),
+    );
+    const args = (c: N) => c.args.map((a: N) => this.rspecArg(a, ctx)).join(", ");
+    switch (head.name) {
+      case "change": {
+        let read: string;
+        if (head.block?.k === "block")
+          read = async(this.arrow([], head.block.body, this.child(ctx, { testMode: true })));
+        else if (head.args.length === 2 && head.args[1].k === "sym")
+          read = `async () => ${this.expr({ k: "call", recv: head.args[0], name: head.args[1].value, args: [], l: head.l }, ctx)}`;
+        else return null;
+        const opts: string[] = [];
+        for (const c of chain.slice(1)) {
+          if (!["from", "to", "by"].includes(c.name) || c.args.length !== 1) return null;
+          opts.push(`${c.name}: ${this.expr(c.args[0], ctx)}`);
+        }
+        return `await ${ex}(${async(blk)})${not}.toChange(${read}${opts.length ? `, { ${opts.join(", ")} }` : ""})`;
+      }
+      case "yield_control": {
+        let times = "";
+        for (const c of chain.slice(1)) {
+          if (c.name === "once") times = "1";
+          else if (c.name === "twice") times = "2";
+          else if (c.name === "exactly" && c.args.length === 1) times = this.expr(c.args[0], ctx);
+          else if (c.name !== "times") return null;
+        }
+        return `await ${ex}(${async(blk)})${not}.toYieldControl(${times})`;
+      }
+      case "yield_with_no_args":
+        return chain.length === 1 ? `await ${ex}(${async(blk)})${not}.toYieldWithNoArgs()` : null;
+      case "yield_with_args":
+        return chain.length === 1
+          ? `await ${ex}(${async(blk)})${not}.toYieldWithArgs(${args(head)})`
+          : null;
+      case "yield_successive_args":
+        return chain.length === 1
+          ? `await ${ex}(${async(blk)})${not}.toYieldSuccessiveArgs(${args(head)})`
+          : null;
+      case "output": {
+        if (chain.length > 2) return null;
+        const to = chain[1]?.name ?? "to_stdout";
+        if (to !== "to_stdout" && to !== "to_stderr") return null;
+        const exp = head.args.length ? this.expr(head.args[0], ctx) : "undefined";
+        return `await ${ex}(${async(blk)})${not}.toOutput(${exp}, ${JSON.stringify(to.slice(3))})`;
+      }
+    }
+    return null;
   }
 
   /**
