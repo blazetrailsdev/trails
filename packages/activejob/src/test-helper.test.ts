@@ -168,8 +168,6 @@ describe("AdapterIsNotTestAdapterTest", () => {
   });
 });
 
-type Configured = { performLater(...args: unknown[]): Promise<unknown> };
-
 class DoNotPerformEnqueuedJobs {
   static [included](base: typeof TestCase): void {
     base.setup(function (this: PerformedJobsTest) {
@@ -1129,8 +1127,8 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
   it("perform enqueued jobs with block with queue option", async ({ testCase }: TestContext) => {
     const t = testCase as unknown as TestHelper;
     await t.performEnqueuedJobs({ queue: "some_queue" }, async () => {
-      await (HelloJob.set({ queue: "some_queue" }) as Configured).performLater("kevin");
-      await (HelloJob.set({ queue: "other_queue" }) as Configured).performLater("bogdan");
+      await HelloJob.set({ queue: "some_queue" }).performLater("kevin");
+      await HelloJob.set({ queue: "other_queue" }).performLater("bogdan");
       await LoggingJob.performLater("bogdan");
     });
 
@@ -1140,8 +1138,8 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
 
   it("perform enqueued jobs without block with queue option", async ({ testCase }: TestContext) => {
     const t = testCase as unknown as TestHelper;
-    await (HelloJob.set({ queue: "some_queue" }) as Configured).performLater("kevin");
-    await (HelloJob.set({ queue: "other_queue" }) as Configured).performLater("bogdan");
+    await HelloJob.set({ queue: "some_queue" }).performLater("kevin");
+    await HelloJob.set({ queue: "other_queue" }).performLater("bogdan");
     await LoggingJob.performLater("bogdan");
 
     await t.performEnqueuedJobs({ queue: "some_queue" });
@@ -1155,9 +1153,9 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
   }: TestContext) => {
     const t = testCase as unknown as TestHelper;
     await t.performEnqueuedJobs({ only: HelloJob, queue: "other_queue" }, async () => {
-      await (HelloJob.set({ queue: "some_queue" }) as Configured).performLater("kevin");
-      await (HelloJob.set({ queue: "other_queue" }) as Configured).performLater("bogdan");
-      await (LoggingJob.set({ queue: "other_queue" }) as Configured).performLater("bogdan");
+      await HelloJob.set({ queue: "some_queue" }).performLater("kevin");
+      await HelloJob.set({ queue: "other_queue" }).performLater("bogdan");
+      await LoggingJob.set({ queue: "other_queue" }).performLater("bogdan");
     });
 
     await t.assertPerformedJobs(1);
@@ -1168,9 +1166,9 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
     testCase,
   }: TestContext) => {
     const t = testCase as unknown as TestHelper;
-    await (HelloJob.set({ queue: "some_queue" }) as Configured).performLater("kevin");
-    await (HelloJob.set({ queue: "other_queue" }) as Configured).performLater("bogdan");
-    await (LoggingJob.set({ queue: "other_queue" }) as Configured).performLater("bogdan");
+    await HelloJob.set({ queue: "some_queue" }).performLater("kevin");
+    await HelloJob.set({ queue: "other_queue" }).performLater("bogdan");
+    await LoggingJob.set({ queue: "other_queue" }).performLater("bogdan");
 
     await t.performEnqueuedJobs({ only: HelloJob, queue: "other_queue" });
 
@@ -1183,9 +1181,9 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
   }: TestContext) => {
     const t = testCase as unknown as TestHelper;
     await t.performEnqueuedJobs({ except: HelloJob, queue: "other_queue" }, async () => {
-      await (HelloJob.set({ queue: "other_queue" }) as Configured).performLater("kevin");
-      await (LoggingJob.set({ queue: "some_queue" }) as Configured).performLater("bogdan");
-      await (LoggingJob.set({ queue: "other_queue" }) as Configured).performLater("bogdan");
+      await HelloJob.set({ queue: "other_queue" }).performLater("kevin");
+      await LoggingJob.set({ queue: "some_queue" }).performLater("bogdan");
+      await LoggingJob.set({ queue: "other_queue" }).performLater("bogdan");
     });
 
     await t.assertPerformedJobs(1);
@@ -1196,9 +1194,9 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
     testCase,
   }: TestContext) => {
     const t = testCase as unknown as TestHelper;
-    await (HelloJob.set({ queue: "other_queue" }) as Configured).performLater("kevin");
-    await (LoggingJob.set({ queue: "some_queue" }) as Configured).performLater("bogdan");
-    await (LoggingJob.set({ queue: "other_queue" }) as Configured).performLater("bogdan");
+    await HelloJob.set({ queue: "other_queue" }).performLater("kevin");
+    await LoggingJob.set({ queue: "some_queue" }).performLater("bogdan");
+    await LoggingJob.set({ queue: "other_queue" }).performLater("bogdan");
 
     await t.performEnqueuedJobs({ except: HelloJob, queue: "other_queue" });
 
@@ -1217,7 +1215,7 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
 
   it("perform enqueued jobs with at with job wait in past", async ({ testCase }: TestContext) => {
     const t = testCase as unknown as TestHelper;
-    await (HelloJob.set({ waitUntil: Time.now().minus(100) }) as Configured).performLater("kevin");
+    await HelloJob.set({ waitUntil: Time.now().minus(100) }).performLater("kevin");
 
     await t.performEnqueuedJobs({ at: Time.now() });
 
@@ -1226,7 +1224,7 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
 
   it("perform enqueued jobs with at with job wait in future", async ({ testCase }: TestContext) => {
     const t = testCase as unknown as TestHelper;
-    await (HelloJob.set({ waitUntil: Time.now().plus(100) }) as Configured).performLater("kevin");
+    await HelloJob.set({ waitUntil: Time.now().plus(100) }).performLater("kevin");
 
     await t.performEnqueuedJobs({ at: Time.now() });
 
@@ -1249,9 +1247,7 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
   }: TestContext) => {
     const t = testCase as unknown as TestHelper;
     await t.performEnqueuedJobs({ at: Time.now() }, async () => {
-      await (HelloJob.set({ waitUntil: Time.now().minus(100) }) as Configured).performLater(
-        "kevin",
-      );
+      await HelloJob.set({ waitUntil: Time.now().minus(100) }).performLater("kevin");
     });
 
     await t.assertPerformedJobs(1);
@@ -1262,7 +1258,7 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
   }: TestContext) => {
     const t = testCase as unknown as TestHelper;
     await t.performEnqueuedJobs({ at: Time.now() }, async () => {
-      await (HelloJob.set({ waitUntil: Time.now().plus(100) }) as Configured).performLater("kevin");
+      await HelloJob.set({ waitUntil: Time.now().plus(100) }).performLater("kevin");
     });
 
     await t.assertPerformedJobs(0);
