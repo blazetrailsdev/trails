@@ -117,7 +117,9 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     if (methods.get || methods.set) Object.defineProperty(this.prototype, name, methods);
 
     if (instancePredicate) {
-      const predicateName = `is${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+      const lead = /^_*/.exec(name)![0];
+      const bare = name.slice(lead.length);
+      const predicateName = `${lead}is${bare.charAt(0).toUpperCase()}${bare.slice(1)}`;
       ClassAttribute.redefineMethod(this, predicateName, false, function (this: any) {
         return this[name] != null && this[name] !== false;
       });

@@ -77,7 +77,7 @@ export interface AutosaveAssociation {
   aroundSaveCollectionAssociation: OmitThisParameter<typeof aroundSaveCollectionAssociation>;
   saveCollectionAssociation: OmitThisParameter<typeof saveCollectionAssociation>;
   saveHasOneAssociation: OmitThisParameter<typeof saveHasOneAssociation>;
-  is_recordChanged: OmitThisParameter<typeof is_recordChanged>;
+  _isRecordChanged: OmitThisParameter<typeof _isRecordChanged>;
   isAssociationForeignKeyChanged: OmitThisParameter<typeof isAssociationForeignKeyChanged>;
   isInversePolymorphicAssociationChanged: OmitThisParameter<
     typeof isInversePolymorphicAssociationChanged
@@ -131,7 +131,7 @@ export const AutosaveAssociation = {
   aroundSaveCollectionAssociation,
   saveCollectionAssociation,
   saveHasOneAssociation,
-  is_recordChanged,
+  _isRecordChanged,
   isAssociationForeignKeyChanged,
   isInversePolymorphicAssociationChanged,
   saveBelongsToAssociation,
@@ -239,7 +239,7 @@ export async function saveHasOneAssociation(
     if (
       !(
         (autosave && record.changedForAutosave()) ||
-        is_recordChanged(reflection, record, primaryKeyValue)
+        _isRecordChanged(reflection, record, primaryKeyValue)
       )
     )
       return;
@@ -476,7 +476,7 @@ export async function aroundSaveCollectionAssociation(
 }
 
 /** @internal */
-export function is_recordChanged(reflection: any, record: any, key: unknown[]): boolean {
+export function _isRecordChanged(reflection: any, record: any, key: unknown[]): boolean {
   return (
     record.isNewRecord() ||
     isAssociationForeignKeyChanged(reflection, record, key) ||

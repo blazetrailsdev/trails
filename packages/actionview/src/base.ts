@@ -83,7 +83,7 @@ export class Base {
   declare static annotateRenderedViewWithFilenames: boolean;
   declare annotateRenderedViewWithFilenames: boolean;
   declare static _routes: unknown;
-  declare static is_routes: boolean;
+  declare static _isRoutes: boolean;
   declare _routes: unknown;
   declare static logger: unknown;
   declare static isLogger: boolean;

@@ -5,9 +5,9 @@
     "moduleImport": 25
   },
   "actionview": {
-    "newModule": 18,
-    "superMethod": 17,
-    "moduleImport": 14
+    "newModule": 15,
+    "superMethod": 16,
+    "moduleImport": 11
   },
   "activejob": {
     "newModule": 0,

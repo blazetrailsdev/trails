@@ -233,6 +233,9 @@ importers:
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../actionpack
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
       typescript:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1

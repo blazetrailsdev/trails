@@ -25,6 +25,7 @@ export interface BuildViewsOptions {
   viewsDir?: string;
   outDir?: string;
   inPlace?: boolean;
+  handlers?: readonly string[];
 }
 
 export interface BuildViewsResult {
@@ -40,6 +41,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
   const { Base, PathParser, TemplateHandlers, TseHandler, UnboundTemplate, WrongEncodingError } =
     await import("@blazetrails/actionview");
+  for (const handlers of opts.handlers ?? []) await import(path.resolve(cwd, handlers));
   const pathParser = new PathParser();
   const { files, skipped } = await walkTemplates(
     viewsDir,

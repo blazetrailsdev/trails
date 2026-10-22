@@ -304,6 +304,12 @@ export function _processRenderTemplateOptions(
 }
 
 export const ClassMethods = {
+  get _routes(): ViewContextRoutes | null {
+    return null;
+  },
+  get _helpers(): object | null {
+    return null;
+  },
   isInheritViewContextClass,
   buildViewContextClass,
   eagerLoadBang,
