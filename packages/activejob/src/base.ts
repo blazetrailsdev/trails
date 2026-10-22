@@ -16,10 +16,11 @@ import {
 import { Callbacks, ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 import { ClassMethods, Core } from "./core.js";
 import { Enqueuing, ClassMethods as EnqueuingClassMethods } from "./enqueuing.js";
-import { Exceptions } from "./exceptions.js";
+import { ClassMethods as ExceptionsClassMethods, Exceptions } from "./exceptions.js";
 import { ClassMethods as ExecutionClassMethods, Execution } from "./execution.js";
 import "./configured-job.js";
 import { Instrumentation } from "./instrumentation.js";
+import { Logging } from "./logging.js";
 import { ActiveJob } from "./namespaces.js";
 import { ClassMethods as QueueAdapterClassMethods, QueueAdapter } from "./queue-adapter.js";
 import "./queue-adapters.js";
@@ -35,7 +36,8 @@ export interface Base
     Execution,
     Exceptions,
     Rescuable,
-    Included<typeof ASCallbacks> {}
+    Included<typeof ASCallbacks>,
+    Pick<Included<typeof Instrumentation>, "instrument"> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
@@ -66,7 +68,7 @@ export class Base {
   declare static queueNameFromPart: typeof QueueNameClassMethods.queueNameFromPart;
   declare static queueName: unknown;
   declare static queueNameDelimiter: string;
-  declare static isQueueNameDelimiter: () => boolean;
+  declare static isQueueNameDelimiter: boolean;
   declare static queueNamePrefix: unknown;
   declare static defaultPriority: unknown;
   declare static queueWithPriority: typeof QueuePriorityClassMethods.queueWithPriority;
@@ -78,8 +80,15 @@ export class Base {
   declare static execute: typeof ExecutionClassMethods.execute;
   declare static rescueFrom: typeof Rescuable.ClassMethods.rescueFrom;
   declare static afterDiscardProcs: Exceptions["afterDiscardProcs"];
-  declare static isAfterDiscardProcs: () => boolean;
+  declare static isAfterDiscardProcs: boolean;
   declare static retryJitter: number;
+  declare static retryOn: typeof ExceptionsClassMethods.retryOn;
+  declare static discardOn: typeof ExceptionsClassMethods.discardOn;
+  declare static afterDiscard: typeof ExceptionsClassMethods.afterDiscard;
+  declare static logger: unknown;
+  declare static logArguments: boolean;
+  declare static isLogArguments: boolean;
+  declare logger: unknown;
   declare static rescueHandlers: unknown[][];
 
   /**
@@ -117,6 +126,7 @@ include(Base, Execution);
 include(Base, Callbacks);
 include(Base, Exceptions);
 include(Base, Instrumentation);
+include(Base, Logging);
 rbModConstSet(ActiveJob, "Base", Base);
 
 runLoadHooks("active_job", Base);
