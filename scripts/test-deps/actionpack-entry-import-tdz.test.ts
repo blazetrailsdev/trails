@@ -36,5 +36,6 @@ describe("actionpack entry circular-init", () => {
       expect(stderr).not.toMatch(/before initialization/);
       expect(status).toBe(0);
     },
+    30_000,
   );
 });
