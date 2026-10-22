@@ -13,6 +13,7 @@ import {
 import { Time } from "@blazetrails/date";
 import {
   ArgumentError,
+  aryDelete,
   Range,
   classModule,
   fetch,
@@ -158,6 +159,44 @@ export async function assertNoEnqueuedJobs(
   await this.assertEnqueuedJobs(0, { only, except, queue }, block);
 }
 
+export async function assertPerformedJobs(
+  this: TestHelper,
+  number: number,
+  { only = null, except = null, queue = null }: JobsWithOptions = {},
+  block: (() => unknown) | null = null,
+): Promise<void> {
+  this.requireActiveJobTestAdapterBang("assert_performed_jobs");
+
+  let performedJobsSize: number;
+  if (block != null) {
+    const originalCount = this.performedJobs.length;
+
+    await this.performEnqueuedJobs({ only, except, queue }, block);
+
+    const newCount = this.performedJobs.length;
+
+    performedJobsSize = newCount - originalCount;
+  } else {
+    performedJobsSize = this.performedJobsWith({ only, except, queue }).length;
+  }
+
+  assertEqual(
+    number,
+    performedJobsSize,
+    `${number} jobs expected, but ${performedJobsSize} were performed`,
+  );
+}
+
+export async function assertNoPerformedJobs(
+  this: TestHelper,
+  { only = null, except = null, queue = null }: JobsWithOptions = {},
+  block: (() => unknown) | null = null,
+): Promise<void> {
+  this.requireActiveJobTestAdapterBang("assert_no_performed_jobs");
+
+  await this.assertPerformedJobs(0, { only, except, queue }, block);
+}
+
 export async function assertEnqueuedWith(
   this: TestHelper,
   {
@@ -228,6 +267,121 @@ export async function assertEnqueuedWith(
 
   assert(matchingJob, message);
   return await this.instantiateJob(matchingJob!);
+}
+
+export async function assertPerformedWith(
+  this: TestHelper,
+  {
+    job = null,
+    args = null,
+    at = null,
+    queue = null,
+    priority = null,
+  }: AssertEnqueuedWithOptions = {},
+  block: (() => unknown) | null = null,
+): Promise<unknown> {
+  this.requireActiveJobTestAdapterBang("assert_performed_with");
+
+  const expected: Payload = Object.fromEntries(
+    Object.entries({
+      ":job": job,
+      ":args": args,
+      ":at": at,
+      ":queue": queue,
+      ":priority": priority,
+    }).filter(([, value]) => value != null),
+  );
+  const expectedArgs = this.prepareArgsForAssertion(expected);
+  const potentialMatches: Payload[] = [];
+
+  let jobs: Payload[];
+  if (block != null) {
+    const originalPerformedJobsCount = this.performedJobs.length;
+
+    await this.performEnqueuedJobs({}, block);
+
+    jobs = this.performedJobs.slice(originalPerformedJobsCount);
+  } else {
+    jobs = this.performedJobs;
+  }
+
+  let matchingJob: Payload | undefined;
+  for (const enqueuedJob of jobs) {
+    const deserializedJob = await this.deserializeArgsForAssertion(enqueuedJob);
+    potentialMatches.push(deserializedJob);
+
+    const matched = Object.entries(expectedArgs).every(([key, value]) => {
+      if (rbObjRespondTo(value, "call")) {
+        return (value as (arg: unknown) => unknown)(deserializedJob[key]);
+      } else {
+        return rbEqual(value, deserializedJob[key]);
+      }
+    });
+    if (matched) {
+      matchingJob = enqueuedJob;
+      break;
+    }
+  }
+
+  const matchingClass = potentialMatches.filter(
+    (enqueuedJob) => enqueuedJob["job_class"] === toS(job),
+  );
+
+  let message = `No performed job found with ${rbInspect(expected)}`;
+  if (potentialMatches.length === 0) {
+    message += "\n\nNo jobs were performed";
+  } else if (matchingClass.length === 0) {
+    message += `\n\nNo jobs of class ${toS(expected[":job"])} were performed, job classes performed: `;
+    message += potentialMatches.map((job) => job["job_class"]).join(", ");
+  } else {
+    message += `\n\nPotential matches: ${matchingClass.map((job) => toS(job)).join("\n")}`;
+  }
+
+  assert(matchingJob, message);
+  return await this.instantiateJob(matchingJob!);
+}
+
+export async function performEnqueuedJobs(
+  this: TestHelper,
+  { only = null, except = null, queue = null, at = null }: JobsWithOptions = {},
+  block: (() => unknown) | null = null,
+): Promise<unknown> {
+  if (block == null) {
+    this.requireActiveJobTestAdapterBang("perform_enqueued_jobs (without a block)");
+    return await this.flushEnqueuedJobs({ only, except, queue, at });
+  }
+
+  if (!this.isUsingTestAdapter()) {
+    return await _assertNothingRaisedOrWarn("perform_enqueued_jobs", block);
+  }
+
+  this.validateOption({ only, except });
+
+  const queueAdapter = this.queueAdapter() as TestAdapter;
+  const oldPerformEnqueuedJobs = queueAdapter.performEnqueuedJobs;
+  const oldPerformEnqueuedAtJobs = queueAdapter.performEnqueuedAtJobs;
+  const oldFilter = queueAdapter.filter;
+  const oldReject = queueAdapter.reject;
+  const oldQueue = queueAdapter.queue;
+  const oldAt = queueAdapter.at;
+
+  try {
+    queueAdapter.performEnqueuedJobs = true;
+    queueAdapter.performEnqueuedAtJobs = true;
+    queueAdapter.filter = only;
+    queueAdapter.reject = except;
+    queueAdapter.queue = queue;
+    queueAdapter.at = at;
+
+    return await _assertNothingRaisedOrWarn("perform_enqueued_jobs", block);
+  } finally {
+    queueAdapter.performEnqueuedJobs = oldPerformEnqueuedJobs;
+    queueAdapter.performEnqueuedAtJobs = oldPerformEnqueuedAtJobs;
+    queueAdapter.filter = oldFilter;
+    queueAdapter.reject = oldReject;
+    queueAdapter.queue = oldQueue;
+    queueAdapter.at = oldAt;
+  }
 }
 
 export function queueAdapter(): unknown {
@@ -304,6 +458,39 @@ export function enqueuedJobsWith(
   block: ((job: Payload) => void) | null = null,
 ): Payload[] {
   return this.jobsWith(this.enqueuedJobs, { only, except, queue, at }, block);
+}
+
+/** @internal */
+export function performedJobsWith(
+  this: TestHelper,
+  { only = null, except = null, queue = null }: JobsWithOptions = {},
+  block: ((job: Payload) => void) | null = null,
+): Payload[] {
+  return this.jobsWith(this.performedJobs, { only, except, queue }, block);
+}
+
+/**
+ * @internal
+ * @inventedArm then — PERMANENT
+ */
+export async function flushEnqueuedJobs(
+  this: TestHelper,
+  { only = null, except = null, queue = null, at = null }: JobsWithOptions = {},
+): Promise<number> {
+  let performed: Promise<void> = Promise.resolve();
+  const count = this.enqueuedJobsWith({ only, except, queue, at }, (payload) => {
+    performed = performed.then(async () => {
+      const queueAdapter = this.queueAdapter() as TestAdapter;
+      aryDelete(queueAdapter.enqueuedJobs, payload);
+      queueAdapter.performedJobs.push(payload);
+      const job = (await this.instantiateJob(payload, { skipDeserializeArguments: true })) as {
+        performNow(): Promise<unknown>;
+      };
+      await job.performNow();
+    });
+  }).length;
+  await performed;
+  return count;
 }
 
 /** @internal */
@@ -393,7 +580,11 @@ export interface TestHelper {
   queueAdapterForTest: typeof queueAdapterForTest;
   assertEnqueuedJobs: typeof assertEnqueuedJobs;
   assertNoEnqueuedJobs: typeof assertNoEnqueuedJobs;
+  assertPerformedJobs: typeof assertPerformedJobs;
+  assertNoPerformedJobs: typeof assertNoPerformedJobs;
   assertEnqueuedWith: typeof assertEnqueuedWith;
+  assertPerformedWith: typeof assertPerformedWith;
+  performEnqueuedJobs: typeof performEnqueuedJobs;
   queueAdapter: typeof queueAdapter;
   requireActiveJobTestAdapterBang: typeof requireActiveJobTestAdapterBang;
   isUsingTestAdapter: typeof isUsingTestAdapter;
@@ -402,6 +593,8 @@ export interface TestHelper {
   jobsWith: typeof jobsWith;
   filterAsProc: typeof filterAsProc;
   enqueuedJobsWith: typeof enqueuedJobsWith;
+  performedJobsWith: typeof performedJobsWith;
+  flushEnqueuedJobs: typeof flushEnqueuedJobs;
   prepareArgsForAssertion: typeof prepareArgsForAssertion;
   deserializeArgsForAssertion: typeof deserializeArgsForAssertion;
   instantiateJob: typeof instantiateJob;
@@ -414,7 +607,11 @@ Object.assign(TestHelper.prototype, {
   queueAdapterForTest,
   assertEnqueuedJobs,
   assertNoEnqueuedJobs,
+  assertPerformedJobs,
+  assertNoPerformedJobs,
   assertEnqueuedWith,
+  assertPerformedWith,
+  performEnqueuedJobs,
   queueAdapter,
   requireActiveJobTestAdapterBang,
   isUsingTestAdapter,
@@ -423,6 +620,8 @@ Object.assign(TestHelper.prototype, {
   jobsWith,
   filterAsProc,
   enqueuedJobsWith,
+  performedJobsWith,
+  flushEnqueuedJobs,
   prepareArgsForAssertion,
   deserializeArgsForAssertion,
   instantiateJob,
