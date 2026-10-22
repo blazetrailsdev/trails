@@ -1,4 +1,4 @@
-import { rbObjAsString, registerConstant, rtest } from "@blazetrails/ruby-compat";
+import { rbObjAsString, rbStrHex, registerConstant, rtest } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Bit extends ValueType<string> {
@@ -9,7 +9,7 @@ export class Bit extends ValueType<string> {
   castValue(value: unknown): string {
     if (typeof value === "string") {
       if (/^0x/i.test(value)) {
-        return BigInt(`0x${/^[0-9a-f]*/i.exec(value.slice(2))![0] || "0"}`).toString(2);
+        return rbStrHex(value.slice(2)).toString(2);
       } else {
         return value;
       }
