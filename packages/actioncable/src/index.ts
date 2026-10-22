@@ -8,3 +8,6 @@ import "./channel/callbacks.js";
 import "./channel/periodic-timers.js";
 import "./connection/identification.js";
 import "./connection/authorization.js";
+import "./connection/callbacks.js";
+import "./connection/internal-channel.js";
+import "./connection/stream-event-loop.js";
