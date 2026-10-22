@@ -168,7 +168,7 @@ export async function loadQueueSchema(): Promise<void> {
   });
 }
 
-export async function loadSchema(): Promise<void> {
+export async function loadAppSchema(): Promise<void> {
   await Schema.get(7.1).define({ version: 2024_08_19_165045 }, async (schema) => {
     await schema.createTable("job_results", { force: "cascade" }, (t) => {
       t.string("queue_name");

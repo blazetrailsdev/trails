@@ -24,7 +24,7 @@ import {
 import { ApplicationJob } from "./test-helpers/application-job.js";
 import { AddToBufferJob } from "./test-helpers/add-to-buffer-job.js";
 import { JobResult, StoreResultJob } from "./test-helpers/job-result.js";
-import { loadQueueSchema, loadSchema } from "./test-helpers/queue-schema.js";
+import { loadAppSchema, loadQueueSchema } from "./test-helpers/queue-schema.js";
 
 const JobTest = {};
 rbModConstSet(SolidQueue, "JobTest", JobTest);
@@ -69,7 +69,7 @@ describe("SolidQueue::JobTest", () => {
 
   beforeAll(async () => {
     await loadQueueSchema();
-    await loadSchema();
+    await loadAppSchema();
     ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
   });
 
