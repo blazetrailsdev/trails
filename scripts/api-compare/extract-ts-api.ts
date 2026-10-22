@@ -1233,7 +1233,7 @@ export function extractFromProgram(
         const seats: boolean[] = [true];
         if (attr.instanceReader || attr.instanceWriter) seats.push(false);
         const predicate = attr.instancePredicate
-          ? `is${name.charAt(0).toUpperCase()}${name.slice(1)}`
+          ? name.replace(/^(_*)(.)/, (_m, lead: string, c: string) => `${lead}is${c.toUpperCase()}`)
           : undefined;
         for (const isStatic of seats) {
           const members = isStatic ? entity.classMethods : entity.instanceMethods;

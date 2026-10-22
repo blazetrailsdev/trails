@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import {
   tag as _tag,
   contentTag as _contentTag,
@@ -116,7 +117,7 @@ describe("TagHelperTest", () => {
   });
 
   it("tag builder renders unknown html elements", () => {
-    expect(tag()).toRespondTo("turbo_frame");
+    expect(tag() as object).toRespondTo("turbo_frame");
 
     expect((tag() as any).turbo_frame("Rendered", { id: "rendered" }).toString()).toEqual(
       '<turbo-frame id="rendered">Rendered</turbo-frame>',
@@ -951,6 +952,6 @@ describe("TagHelperTest", () => {
   });
 
   it("respond to", () => {
-    expect(tag()).toRespondTo("any_tag");
+    expect(tag() as object).toRespondTo("any_tag");
   });
 });
