@@ -1,4 +1,4 @@
-import type { HttpSocket } from "@blazetrails/ruby-compat";
+import type { TCPSocket } from "@blazetrails/ruby-compat";
 import type { RackHeaders, RackResponse } from "@blazetrails/rack";
 import { describe, expectTypeOf, it } from "vitest";
 
@@ -6,7 +6,7 @@ describe("RackHeaders", () => {
   it("admits a rack.hijack callback beside ordinary headers", () => {
     const headers: RackHeaders = {
       "content-type": "text/plain",
-      "rack.hijack": (stream: HttpSocket) => stream,
+      "rack.hijack": (stream: TCPSocket) => stream,
     };
     const response: RackResponse = [200, headers, []];
     expectTypeOf(response).toMatchTypeOf<RackResponse>();
@@ -14,7 +14,7 @@ describe("RackHeaders", () => {
 
   it("rejects a callable under any other header name", () => {
     // @ts-expect-error a callback is a header value only under rack.hijack
-    const headers: RackHeaders = { "x-hijack": (stream: HttpSocket) => stream };
+    const headers: RackHeaders = { "x-hijack": (stream: TCPSocket) => stream };
     expectTypeOf(headers).toMatchTypeOf<RackHeaders>();
   });
 
