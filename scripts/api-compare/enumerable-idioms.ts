@@ -203,6 +203,12 @@ const NOT_A_HASH: ReadonlySet<string> = new Set([
   "numeric",
 ]);
 
+const ARRAY: ReadonlySet<string> = new Set(["array"]);
+const HASH: ReadonlySet<string> = new Set(["hash"]);
+const NUMERIC: ReadonlySet<string> = new Set(["numeric"]);
+const STRING: ReadonlySet<string> = new Set(["string"]);
+const NUMERIC_OR_STRING: ReadonlySet<string> = new Set(["numeric", "string"]);
+
 /** How a port writes each native Hash form, for a gate message to name. */
 export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
   ["in", "k in h"],
@@ -296,6 +302,31 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   drops it for every receiver. `fetch` has none either, because JS has no
  *   form for it: `h.k ?? d` substitutes the default for a stored `nil`, which
  *   `h.fetch(:k, d)` does not, and marks nothing.
+ * - The value rows (RFC 0194). Each credits only where every site of the name
+ *   has the one proven kind its form ports, and records no receiver name:
+ *   `extract-ts-api.ts#nativeValueForms` marks the form wherever it appears.
+ *   On an `array`: `compact` is `.filter((x) => x != null)` (`array.c:6234`
+ *   drops `nil` only); `uniq` is `[...new Set(xs)]` / `Array.from(new Set(xs))`
+ *   and `union` the same over a literal of spreads (both `eql?`-keyed,
+ *   `array.c:6097`, `:5669`, which a `Set` matches for every primitive);
+ *   `take` / `drop` are `.slice(0, n)` / `.slice(n)`; `count` is
+ *   `.filter(fn).length`; `to_h` is `Object.fromEntries(pairs)` /
+ *   `new Map(pairs)`; `zip` is `.map((x, i) => [x, b[i]])`; `sort` is a
+ *   `.sort()` / `.toSorted()` with no comparator. On a `hash`: `keys`,
+ *   `values`, `transform_values` (an `Object.fromEntries` over a mapped
+ *   `Object.entries`), `each_value` (`for … of Object.values(h)`), `values_at`
+ *   (`keys.map((k) => h[k])`), `dup` (a lone `{ ...h }`) and `except`, a
+ *   rest-destructure `const { a, b, ...rest } = h` whose every key is literal.
+ *   `slice` has no row: it skips an absent key and an object literal does not.
+ *   On a `numeric` / `string`: `to_i` (`Math.trunc` / `Number.parseInt(s, 10)`),
+ *   `to_f` (`Number.parseFloat`), `nan?` (`Number.isNaN`), `round` only as the
+ *   half-away `Math.sign(x) * Math.round(Math.abs(x))` (`Math.round` rounds
+ *   -2.5 to -2, `float.c` rounds it to -3), `strip` as `.trim()`, `rstrip` as
+ *   `.trimEnd()` and `chomp` as `s.endsWith(t) ? s.slice(0, -n) : s`.
+ *   A site on an arm the form does not port — `uniq` / `sort` with a block,
+ *   `count` without one, `round(digits)`, a `chomp` with no literal argument —
+ *   records the kind `formless` (extract-ruby-api.rb#FORM_ARMS) and never
+ *   credits.
  *
  * A row drops the Ruby call from significance, so nothing pairs its argument
  * list by name. A row whose form names a KEY declares `key`: the extractor
@@ -390,6 +421,29 @@ export const NATIVE_FORM_ANALOGUES = new Map<
       named: true,
     },
   ],
+  ["compact", { form: "compact", receivers: "explicit", creditedKinds: ARRAY }],
+  ["uniq", { form: "uniq", receivers: "explicit", creditedKinds: ARRAY }],
+  ["union", { form: "union", receivers: "explicit", creditedKinds: ARRAY }],
+  ["take", { form: "take", receivers: "explicit", creditedKinds: ARRAY }],
+  ["drop", { form: "drop", receivers: "explicit", creditedKinds: ARRAY }],
+  ["count", { form: "count", receivers: "explicit", creditedKinds: ARRAY }],
+  ["to_h", { form: "toH", receivers: "explicit", creditedKinds: ARRAY }],
+  ["zip", { form: "zip", receivers: "explicit", creditedKinds: ARRAY }],
+  ["sort", { form: "sort", receivers: "explicit", creditedKinds: ARRAY }],
+  ["keys", { form: "keys", receivers: "explicit", creditedKinds: HASH }],
+  ["values", { form: "values", receivers: "explicit", creditedKinds: HASH }],
+  ["transform_values", { form: "transformValues", receivers: "explicit", creditedKinds: HASH }],
+  ["each_value", { form: "eachValue", receivers: "explicit", creditedKinds: HASH }],
+  ["values_at", { form: "valuesAt", receivers: "explicit", creditedKinds: HASH }],
+  ["dup", { form: "dup", receivers: "explicit", creditedKinds: HASH }],
+  ["except", { form: "except", receivers: "explicit", creditedKinds: HASH }],
+  ["to_i", { form: "toI", receivers: "explicit", creditedKinds: NUMERIC_OR_STRING }],
+  ["to_f", { form: "toF", receivers: "explicit", creditedKinds: NUMERIC_OR_STRING }],
+  ["round", { form: "round", receivers: "explicit", creditedKinds: NUMERIC }],
+  ["nan?", { form: "isNaN", receivers: "explicit", creditedKinds: NUMERIC }],
+  ["strip", { form: "trim", receivers: "explicit", creditedKinds: STRING }],
+  ["rstrip", { form: "trimEnd", receivers: "explicit", creditedKinds: STRING }],
+  ["chomp", { form: "chomp", receivers: "explicit", creditedKinds: STRING }],
   [
     "sleep",
     {

@@ -663,6 +663,54 @@ describe("significantMissingCalls", () => {
     ).toBe(true);
   });
 
+  it("significantCallsForReceivers credits a native value form only on its proven receiver kind", () => {
+    const rows: [string, string, string][] = [
+      ["compact", "compact", "array"],
+      ["uniq", "uniq", "array"],
+      ["union", "union", "array"],
+      ["take", "take", "array"],
+      ["drop", "drop", "array"],
+      ["count", "count", "array"],
+      ["to_h", "toH", "array"],
+      ["zip", "zip", "array"],
+      ["sort", "sort", "array"],
+      ["keys", "keys", "hash"],
+      ["values", "values", "hash"],
+      ["transform_values", "transformValues", "hash"],
+      ["each_value", "eachValue", "hash"],
+      ["values_at", "valuesAt", "hash"],
+      ["dup", "dup", "hash"],
+      ["except", "except", "hash"],
+      ["to_i", "toI", "numeric"],
+      ["to_i", "toI", "string"],
+      ["to_f", "toF", "string"],
+      ["round", "round", "numeric"],
+      ["nan?", "isNaN", "numeric"],
+      ["strip", "trim", "string"],
+      ["rstrip", "trimEnd", "string"],
+      ["chomp", "chomp", "string"],
+    ];
+    for (const [name, form, kind] of rows) {
+      const base = new Set([name]);
+      const forms = new Set([form]);
+      const sig = (kinds: string[], f: Set<string> = forms) =>
+        significantCallsForReceivers({ [name]: kinds }, base, f).has(name);
+      expect(sig([kind])).toBe(false);
+      expect(sig([kind], new Set())).toBe(true);
+      expect(sig(["ivar"])).toBe(true);
+      expect(sig([kind, "local"])).toBe(true);
+      expect(sig(["formless"])).toBe(true);
+      expect(significantCallsForReceivers({}, base, forms).has(name)).toBe(true);
+    }
+  });
+
+  it("significantCallsForReceivers never credits Hash#slice to a destructure or an object literal", () => {
+    const forms = new Set(["except", "dup", "spread"]);
+    expect(
+      significantCallsForReceivers({ slice: ["hash"] }, new Set(["slice"]), forms).has("slice"),
+    ).toBe(true);
+  });
+
   it("significantCallsForReceivers keeps a ported call on another receiver", () => {
     const forms = new Set(invokeForms(["records"]));
     expect(

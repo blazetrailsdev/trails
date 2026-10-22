@@ -3048,6 +3048,25 @@ class ApiExtractor
   # `delete` answers a boolean.
   BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update].freeze
 
+  # The calls whose native form ports one arm only, each with the test a site
+  # must pass to take it: `uniq` / `sort` without a block (`[...new Set(xs)]`,
+  # `.sort()`), `count` with one (`.filter(fn).length`), `round` without digits
+  # and `chomp` with a literal argument. A site on any other arm records the
+  # kind `formless` in place of its proven class, so no form credits it.
+  FORM_ARMS = {
+    "uniq" => ->(has_block, _args) { !has_block },
+    "sort" => ->(has_block, _args) { !has_block },
+    "count" => ->(has_block, _args) { has_block },
+    "round" => ->(_has_block, args) { args.all? { |arg| arg.nil? || arg == [:arg_paren, nil] } }
+  }.freeze
+
+  def form_arm?(name, has_block, args)
+    return string_literal_arg?(args) if name == "chomp"
+
+    arm = FORM_ARMS[name]
+    arm.nil? || arm.call(has_block, args)
+  end
+
   def block_pass?(args)
     args.any? do |arg|
       arg = arg[1] if arg.is_a?(Array) && arg[0] == :arg_paren
@@ -4399,6 +4418,7 @@ class ApiExtractor
        !(recv && native_promise_call?(name, recv)) &&
        !(name == "with_index" && has_block && indexed_iterator_receiver?(recv, args))
       kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
+      kind = "formless" unless form_arm?(name, has_block || block_pass?(args), args)
       calls << name unless kind == "literal-new"
       (@call_receivers[name] ||= Set.new) << kind
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"

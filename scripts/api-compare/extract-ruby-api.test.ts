@@ -3737,6 +3737,44 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
+  it("records a site on an arm no native form ports as formless", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/core.rb": `
+        class Core
+          def ported
+            [1].uniq
+            [2].sort
+            [3].count { |x| x }
+            1.5.round
+            "a\\n".chomp("\\n")
+          end
+
+          def formless
+            [1].uniq { |x| x }
+            [2].sort { |a, b| b <=> a }
+            [3].count
+            1.5.round(1)
+            "a".chomp
+          end
+        end
+      `,
+    });
+    expect(c["Core#ported"]).toEqual({
+      uniq: ["array"],
+      sort: ["array"],
+      count: ["array"],
+      round: ["numeric"],
+      chomp: ["string"],
+    });
+    expect(c["Core#formless"]).toEqual({
+      uniq: ["formless"],
+      sort: ["formless"],
+      count: ["formless"],
+      round: ["formless"],
+      chomp: ["formless"],
+    });
+  });
+
   it("names HashWithIndifferentAccess.new with at most one argument an hwia-new", () => {
     const c = rubyCallReceivers({
       "lib/active_support/core.rb": `

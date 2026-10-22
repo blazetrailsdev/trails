@@ -2360,6 +2360,79 @@ describe("body call capture", () => {
     expect(m.callSeq!.some((c) => c.startsWith("@"))).toBe(false);
   });
 
+  it("marks the native value forms an Array, Hash, Numeric or String call ports as", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        ported(xs: unknown[], ys: unknown[], h: Record<string, number>, n: number, s: string) {
+          xs.filter((x) => x != null);
+          [...new Set(xs)];
+          Array.from(new Set([...xs, ...ys]));
+          xs.slice(0, 2);
+          xs.slice(2);
+          xs.filter((x) => x === 1).length;
+          Object.fromEntries(xs as [string, number][]);
+          xs.map((x, i) => [x, ys[i]]);
+          xs.toSorted();
+          Object.keys(h);
+          Object.fromEntries(Object.entries(h).map(([k, v]) => [k, v + 1]));
+          for (const v of Object.values(h)) use(v);
+          ["a"].map((k) => h[k]);
+          const copy = { ...h };
+          const { a, "b": b, ...rest } = h;
+          Math.trunc(n);
+          Number.parseInt(s, 10);
+          Number.parseFloat(s);
+          Math.sign(n) * Math.round(Math.abs(n));
+          Number.isNaN(n);
+          s.trim();
+          s.trimEnd();
+          s.endsWith("x") ? s.slice(0, -1) : s;
+        }
+        unported(xs: unknown[], h: Record<string, number>, n: number, s: string, k: string) {
+          xs.filter((x) => x !== 1);
+          xs.slice(1, 2);
+          xs.sort((a, b) => 0);
+          Number.parseInt(s);
+          Math.round(n);
+          const { [k]: picked, ...others } = h;
+          const { only } = h;
+          return { a: h.a };
+        }
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls ?? [];
+    for (const form of [
+      "compact",
+      "uniq",
+      "union",
+      "take",
+      "drop",
+      "count",
+      "toH",
+      "zip",
+      "sort",
+      "keys",
+      "values",
+      "transformValues",
+      "eachValue",
+      "valuesAt",
+      "dup",
+      "except",
+      "toI",
+      "toF",
+      "round",
+      "isNaN",
+      "trim",
+      "trimEnd",
+      "chomp",
+    ]) {
+      expect(calls("ported")).toContain(`@${form}`);
+    }
+    for (const form of ["compact", "take", "drop", "sort", "toI", "round", "except", "dup"]) {
+      expect(calls("unported")).not.toContain(`@${form}`);
+    }
+  });
+
   it("marks an unshift() call as a native form", () => {
     const cls = extractFromSource(
       `class Foo {

@@ -16,7 +16,10 @@ const artifact: Artifact = {
   packages: [],
   mismatches: [
     row("activesupport", "inflector/inflections.ts", "to_regex", "escape → escape|_escape"),
-    row("i18n", "backend/base.ts", "translate", "each_key → each_key|_each_key"),
+    {
+      ...row("i18n", "backend/base.ts", "translate", "each_key → each_key|_each_key"),
+      receivers: { each_key: ["hash"] },
+    },
     row("actiondispatch", "routing/inspector.ts", "normalize_filter", "escape → escape|_escape"),
   ],
 };
