@@ -21,3 +21,12 @@ describe("SubscriptionAdapter::Base", () => {
     expect(new Base(server).identifier()).toBe("custom");
   });
 });
+
+describe("SubscriptionAdapter::Base#identifier", () => {
+  it("overwrites a stored false, as Ruby ||= does", () => {
+    const cable: Record<string, unknown> = { id: false };
+    expect(new Base({ logger: null, config: { cable } }).identifier()).toBe(
+      `ActionCable-PID-${Process.pid}`,
+    );
+  });
+});

@@ -27,7 +27,8 @@ export class SubscriberMap {
   }
 
   removeSubscriber(channel: string, subscriber: Subscriber): void {
-    this.subscribers[channel] = (this.subscribers[channel] ??= []).filter((s) => s !== subscriber);
+    const list = (this.subscribers[channel] ??= []);
+    for (let i = list.length - 1; i >= 0; i--) if (list[i] === subscriber) list.splice(i, 1);
 
     if (this.subscribers[channel].length === 0) {
       delete this.subscribers[channel];

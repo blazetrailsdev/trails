@@ -39,7 +39,10 @@ export class Base {
   }
 
   identifier(): unknown {
-    return (this.server.config.cable.id ??= `ActionCable-PID-${Process.pid}`);
+    const cable = this.server.config.cable;
+    return cable.id != null && cable.id !== false
+      ? cable.id
+      : (cable.id = `ActionCable-PID-${Process.pid}`);
   }
 }
 
