@@ -13,6 +13,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/bcrypt": "workspace:*",
+    "@blazetrails/builder": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-session": "workspace:*",
