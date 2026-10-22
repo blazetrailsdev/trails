@@ -2622,7 +2622,7 @@ describe("FormWithActsLikeFormForTest", () => {
 
     stub(I18n, "t", mock, [], () => {
       formWith({ model: post() }, (f) => {
-        f.fields("comments", {}, (cf) => {
+        f.fields("comments", (cf) => {
           concat(cf.label("body"));
         });
       });
@@ -2664,7 +2664,7 @@ describe("FormWithActsLikeFormForTest", () => {
     formWith({ model: post() }, (f) => {
       concat(f.textField("title"));
       concat(
-        f.fields("comments", {}, (cf) => {
+        f.fields("comments", (cf) => {
           concat(cf.textField("name"));
           yieldedComments.push(cf.object);
         }),
@@ -2938,7 +2938,7 @@ describe("FormWithActsLikeFormForTest", () => {
       concat(postForm.textarea("body"));
 
       concat(
-        postForm.fields(undefined, { model: comment }, (commentFields) => {
+        postForm.fields({ model: comment }, (commentFields) => {
           concat(commentFields.textField("name"));
         }),
       );
@@ -2961,7 +2961,7 @@ describe("FormWithActsLikeFormForTest", () => {
   it("form with and fields with non nested association and without object", () => {
     formWith({ model: post() }, (f) => {
       concat(
-        f.fields("category", {}, (c) => {
+        f.fields("category", (c) => {
           concat(c.textField("name"));
         }),
       );

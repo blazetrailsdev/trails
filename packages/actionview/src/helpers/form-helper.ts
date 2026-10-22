@@ -279,13 +279,18 @@ export function fieldsFor(
 export function fields(
   this: FormHelperHost,
   scope: unknown = null,
-  { model = null, ...rest }: { model?: unknown; [key: string]: unknown } = {},
+  options: { model?: unknown; [key: string]: unknown } | ((builder: FormBuilder) => unknown) = {},
   block?: (builder: FormBuilder) => unknown,
 ): SafeBuffer | null {
-  const options: Record<string, unknown> = Object.assign(
+  if (isPlainObject(scope))
+    [scope, options, block] = [null, scope as Record<string, unknown>, options as never];
+  if (typeof options === "function") [options, block] = [{}, options];
+  let model: unknown = options["model"] ?? null;
+  options = Object.assign(
     { allowMethodNamesOutsideObject: true, skipDefaultIds: !formWithGeneratesIds },
-    rest,
+    options,
   );
+  delete options["model"];
 
   if (model != null && model !== false) {
     model = _objectForFormBuilder(model);
@@ -845,9 +850,14 @@ export class FormBuilder {
 
   fields(
     scope: unknown = null,
-    { model = null, ...options }: { model?: unknown; [key: string]: unknown } = {},
+    options: { model?: unknown; [key: string]: unknown } | ((builder: FormBuilder) => unknown) = {},
     block?: (builder: FormBuilder) => unknown,
   ): unknown {
+    if (isPlainObject(scope))
+      [scope, options, block] = [null, scope as Record<string, unknown>, options as never];
+    if (typeof options === "function") [options, block] = [{}, options];
+    const { model = null, ...rest }: { model?: unknown; [key: string]: unknown } = options;
+    options = rest;
     options["allowMethodNamesOutsideObject"] = true;
     options["skipDefaultIds"] = !formWithGeneratesIds;
 
