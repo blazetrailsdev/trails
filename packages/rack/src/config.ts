@@ -3,16 +3,16 @@ import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 export class Config {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private block: (env: Record<string, any>) => void;
 
-  constructor(app: RackApp, block: (env: Record<string, any>) => void) {
+  constructor(app: RackApp | { call: RackApp }, block: (env: Record<string, any>) => void) {
     this.app = app;
     this.block = block;
   }
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     this.block(env);
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
   }
 }

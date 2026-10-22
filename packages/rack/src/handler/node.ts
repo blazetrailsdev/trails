@@ -54,7 +54,7 @@ export class Node {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  static async run(app: RackApp, options: Options = {}): Promise<HttpServer> {
+  static async run(app: RackApp | RackMiddleware, options: Options = {}): Promise<HttpServer> {
     const handler = new Node(app);
     const http = await getHttpAsync();
     const server = http.createServer((req, res) => {

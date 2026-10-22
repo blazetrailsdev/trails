@@ -19,10 +19,10 @@ class DefaultMutex implements Mutex {
 }
 
 export class Lock {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private mutex: Mutex;
 
-  constructor(app: RackApp, mutex?: Mutex) {
+  constructor(app: RackApp | { call: RackApp }, mutex?: Mutex) {
     this.app = app;
     this.mutex = mutex || new DefaultMutex();
   }
@@ -31,7 +31,7 @@ export class Lock {
     this.mutex.lock();
     let returned: [number, RackHeaders, any] | undefined;
     try {
-      const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+      const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
       response.push(new BodyProxy(response.pop(), () => this.unlock()));
       returned = response;
       return returned;

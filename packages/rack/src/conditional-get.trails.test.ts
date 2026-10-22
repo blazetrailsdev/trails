@@ -8,7 +8,7 @@ async function status(ifModifiedSince: string, lastModified: string): Promise<nu
     { "last-modified": lastModified, "content-type": "text/plain" },
     ["TEST"],
   ]);
-  const res = await new MockRequest((env) => app.call(env)).get("/", {
+  const res = await new MockRequest(app).get("/", {
     HTTP_IF_MODIFIED_SINCE: ifModifiedSince,
   });
   return res.status;

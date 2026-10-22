@@ -6,22 +6,19 @@ import { MockRequest } from "./mock-request.js";
 import { Lint } from "./lint.js";
 
 const length = 6;
-const app = (env: any) =>
-  new Lint(
-    async () =>
-      [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any,
-  ).call(env);
-const appWithoutLength = (env: any) =>
-  new Lint(async () => [200, { "content-type": "text/html" }, []] as any).call(env);
+const app = new Lint(
+  async () =>
+    [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any,
+);
+const appWithoutLength = new Lint(async () => [200, { "content-type": "text/html" }, []] as any);
 const appWithoutLint = async () =>
   [200, { "content-type": "text/html", "content-length": String(length) }, ["foobar"]] as any;
-const appWithZeroLength = (env: any) =>
-  new Lint(
-    async () => [200, { "content-type": "text/html", "content-length": "0" }, []] as any,
-  ).call(env);
+const appWithZeroLength = new Lint(
+  async () => [200, { "content-type": "text/html", "content-length": "0" }, []] as any,
+);
 
 it("log to rack.errors by default", async () => {
-  const res = await new MockRequest((env) => new CommonLogger(app).call(env)).get("/");
+  const res = await new MockRequest(new CommonLogger(app)).get("/");
   expect(res.errors!.length === 0).toBeFalsy();
   expect(res.errors).toMatch(/"GET \/ HTTP\/1\.1" 200 6 /);
 });
@@ -33,7 +30,7 @@ it("log to anything with +write+", async () => {
       this.str += s;
     },
   };
-  await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/");
+  await new MockRequest(new CommonLogger(app, log)).get("/");
   expect(log.str).toMatch(/"GET \/ HTTP\/1\.1" 200 6 /);
 });
 
@@ -49,26 +46,24 @@ it("work with standard library logger", async () => {
       logdev.write(msg + "\n");
     },
   };
-  await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/");
+  await new MockRequest(new CommonLogger(app, log)).get("/");
   expect(logdev.str).toMatch(/"GET \/ HTTP\/1\.1" 200 6 /);
 });
 
 it("log - content length if header is missing", async () => {
-  const res = await new MockRequest((env) => new CommonLogger(appWithoutLength).call(env)).get("/");
+  const res = await new MockRequest(new CommonLogger(appWithoutLength)).get("/");
   expect(res.errors!.length === 0).toBeFalsy();
   expect(res.errors).toMatch(/"GET \/ HTTP\/1\.1" 200 - /);
 });
 
 it("log - content length if header is zero", async () => {
-  const res = await new MockRequest((env) => new CommonLogger(appWithZeroLength).call(env)).get(
-    "/",
-  );
+  const res = await new MockRequest(new CommonLogger(appWithZeroLength)).get("/");
   expect(res.errors!.length === 0).toBeFalsy();
   expect(res.errors).toMatch(/"GET \/ HTTP\/1\.1" 200 - /);
 });
 
 it("log - records host from X-Forwarded-For header", async () => {
-  const res = await new MockRequest((env) => new CommonLogger(app).call(env)).get("/", {
+  const res = await new MockRequest(new CommonLogger(app)).get("/", {
     HTTP_X_FORWARDED_FOR: "203.0.113.0",
   });
   expect(res.errors!.length === 0).toBeFalsy();
@@ -76,7 +71,7 @@ it("log - records host from X-Forwarded-For header", async () => {
 });
 
 it("log - records host from RFC 7239 forwarded for header", async () => {
-  const res = await new MockRequest((env) => new CommonLogger(app).call(env)).get("/", {
+  const res = await new MockRequest(new CommonLogger(app)).get("/", {
     HTTP_FORWARDED: "for=203.0.113.0",
   });
   expect(res.errors!.length === 0).toBeFalsy();
@@ -93,7 +88,7 @@ it("log in common log format", async () => {
   const t = 0;
   const now = vi.spyOn(Time, "now").mockImplementation(() => Time.at(t));
   try {
-    await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/", {
+    await new MockRequest(new CommonLogger(app, log)).get("/", {
       QUERY_STRING: "foo=bar",
     });
   } finally {
@@ -121,14 +116,11 @@ it("escapes non printable characters including newline", async () => {
       logdev.write(msg + "\n");
     },
   };
-  await new MockRequest((env) => new CommonLogger(appWithoutLint, log).call(env)).request(
-    "GET\x1f",
-    "/hello",
-  );
+  await new MockRequest(new CommonLogger(appWithoutLint, log)).request("GET\x1f", "/hello");
 
   expect(logdev.str).toMatch(/GET\\x1f \/hello HTTP\/1\.1/);
 
-  await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/", {
+  await new MockRequest(new CommonLogger(app, log)).get("/", {
     REMOTE_USER: "foo\nbar",
     QUERY_STRING: "bar\nbaz",
   });
@@ -149,7 +141,7 @@ it("log path with PATH_INFO", async () => {
       logdev.write(msg + "\n");
     },
   };
-  await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/hello");
+  await new MockRequest(new CommonLogger(app, log)).get("/hello");
   expect(logdev.str).toMatch(/"GET \/hello HTTP\/1\.1" 200 6 /);
 });
 
@@ -165,7 +157,7 @@ it("log path with SCRIPT_NAME", async () => {
       logdev.write(msg + "\n");
     },
   };
-  await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/path", {
+  await new MockRequest(new CommonLogger(app, log)).get("/path", {
     ":script_name": "/script",
   });
   expect(logdev.str).toMatch(/"GET \/script\/path HTTP\/1\.1" 200 6 /);
@@ -183,7 +175,7 @@ it("log path with SERVER_PROTOCOL", async () => {
       logdev.write(msg + "\n");
     },
   };
-  await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/path", {
+  await new MockRequest(new CommonLogger(app, log)).get("/path", {
     ":http_version": "HTTP/1.0",
   });
   expect(logdev.str).toMatch(/"GET \/path HTTP\/1\.0" 200 6 /);

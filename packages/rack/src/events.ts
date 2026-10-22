@@ -64,10 +64,10 @@ export class BufferedResponse extends Raw {
 }
 
 export class Events {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private handlers: EventHandler[];
 
-  constructor(app: RackApp, handlers: EventHandler[]) {
+  constructor(app: RackApp | { call: RackApp }, handlers: EventHandler[]) {
     this.app = app;
     this.handlers = handlers;
   }
@@ -80,9 +80,11 @@ export class Events {
     let response: BufferedResponse | undefined;
     try {
       let status: number, headers: RackHeaders;
-      [status, headers, body] = await (rbFSend(this.app, "call", request.env) as ReturnType<
-        typeof this.app
-      >);
+      [status, headers, body] = await (rbFSend(
+        this.app,
+        "call",
+        request.env,
+      ) as ReturnType<RackApp>);
       response = this.makeResponse(status, headers, body);
       this.onCommit(request, response);
     } catch (e) {

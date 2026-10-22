@@ -6,19 +6,19 @@ import { REQUEST_METHOD, ETAG, CONTENT_TYPE, CONTENT_LENGTH } from "./constants.
 import type { RackApp } from "./mock-request.js";
 
 export class ConditionalGet {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const method = env[REQUEST_METHOD];
     if (method !== "GET" && method !== "HEAD") {
-      return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+      return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
     }
 
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     const [status, headers, body] = response;
 
     if (status === 200 && this.fresh(env, headers)) {

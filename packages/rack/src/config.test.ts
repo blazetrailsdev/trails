@@ -13,6 +13,6 @@ it("accept a block that modifies the environment", async () => {
   const app = new Config(inner, (env) => {
     env["greeting"] = "hello";
   });
-  const response = await new MockRequest((env) => app.call(env)).get("/");
+  const response = await new MockRequest(app).get("/");
   expect(response.body).toBe("hello");
 });

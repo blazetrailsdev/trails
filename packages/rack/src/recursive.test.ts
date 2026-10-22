@@ -1,5 +1,6 @@
 import { it, expect } from "vitest";
 import { Recursive, ForwardRequest } from "./recursive.js";
+import { Lint } from "./lint.js";
 import { URLMap } from "./urlmap.js";
 import { MockRequest } from "./mock-request.js";
 import { RACK_RECURSIVE_INCLUDE } from "./constants.js";
@@ -30,13 +31,11 @@ const app4 = async () => {
 };
 
 function recursive(map: Record<string, any>) {
-  return new Recursive((env) => new URLMap(map).call(env));
+  return new Lint(new Recursive(new URLMap(map)));
 }
 
 it("allow for subrequests", async () => {
-  const res = await new MockRequest((env) =>
-    recursive({ "/app1": app1, "/app2": app2 }).call(env),
-  ).get("/app2");
+  const res = await new MockRequest(recursive({ "/app1": app1, "/app2": app2 })).get("/app2");
   expect(res.status).toBe(200);
   expect(res.body).toBe("App2App1");
 });
@@ -44,11 +43,9 @@ it("allow for subrequests", async () => {
 it("raise error on requests not below the app", async () => {
   const outerMap = new URLMap({
     "/app1": app1,
-    "/app": (env: any) => recursive({ "/1": app1, "/2": app2 }).call(env),
+    "/app": recursive({ "/1": app1, "/2": app2 }),
   });
-  await expect(new MockRequest((env) => outerMap.call(env)).get("/app/2")).rejects.toThrow(
-    /can only include below/,
-  );
+  await expect(new MockRequest(outerMap).get("/app/2")).rejects.toThrow(/can only include below/);
 });
 
 it("support forwarding", async () => {
@@ -58,11 +55,11 @@ it("support forwarding", async () => {
     "/app4": app4,
   });
 
-  let res = await new MockRequest((env) => app.call(env)).get("/app3");
+  let res = await new MockRequest(app).get("/app3");
   expect(res.status).toBe(200);
   expect(res.body).toBe("App1");
 
-  res = await new MockRequest((env) => app.call(env)).get("/app4");
+  res = await new MockRequest(app).get("/app4");
   expect(res.status).toBe(200);
   expect(res.body).toBe("App1");
   expect(res.headers["x-path-info"]).toBe("/quux");

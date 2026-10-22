@@ -5,9 +5,9 @@ import { BodyProxy } from "./body-proxy.js";
 import type { RackApp } from "./mock-request.js";
 
 export class TempfileReaper {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -16,7 +16,7 @@ export class TempfileReaper {
 
     let response: [number, RackHeaders, any];
     try {
-      response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+      response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     } catch (e) {
       env[RACK_TEMPFILES]?.forEach((tempfile: any) => tempfile.closeBang());
       throw e;
