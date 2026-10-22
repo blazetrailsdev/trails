@@ -128,6 +128,39 @@ describe("capture's callers await an async block", () => {
     expect(html).toContain(sync);
   });
 
+  it("select", async () => {
+    const view = makeView();
+    (view as unknown as { post: object }).post = { category: null };
+    const html = String(
+      await view.select("post", "category", null, {}, {}, async () => {
+        view.outputBuffer!.safeAppend(await view.render({ plain: '<option value="a">a</option>' }));
+      }),
+    );
+    expect(html).toBe(
+      '<select name="post[category]" id="post_category"><option value="a">a</option></select>',
+    );
+  });
+
+  it("collection_checkboxes", async () => {
+    const view = makeView();
+    (view as unknown as { post: object }).post = { tagIds: [] };
+    const html = String(
+      await view.collectionCheckboxes(
+        "post",
+        "tagIds",
+        [{ id: 1, name: "one" }],
+        "id",
+        "name",
+        { includeHidden: false },
+        {},
+        async () => {
+          view.outputBuffer!.safeAppend(await view.render({ plain: "<b>rendered</b>" }));
+        },
+      ),
+    );
+    expect(html).toBe("<b>rendered</b>");
+  });
+
   it("StreamingBuffer#capture awaits an async block", async () => {
     const written: string[] = [];
     const buffer = new StreamingBuffer((value) => written.push(value));

@@ -1009,6 +1009,10 @@ export class FormBuilder {
     return rbObjRespondTo(this.object, `${associationName}_attributes=`);
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
   private fieldsForWithNestedAttributes(
     associationName: string,
     association: unknown,
@@ -1029,6 +1033,7 @@ export class FormBuilder {
     if (rbObjRespondTo(association, "toAry")) {
       const explicitChildIndex = options["childIndex"];
       const output = new SafeBuffer();
+      let pending: Promise<void> | null = null;
       for (const child of association as Iterable<unknown>) {
         if (explicitChildIndex != null && explicitChildIndex !== false) {
           if (rbObjRespondTo(explicitChildIndex, "call")) {
@@ -1043,8 +1048,15 @@ export class FormBuilder {
           options,
           block,
         );
-        if (content != null) output.concat(content);
+        if (content instanceof Promise || pending !== null) {
+          pending = (pending ?? Promise.resolve())
+            .then(() => content)
+            .then((content) => {
+              if (content != null) output.concat(content);
+            });
+        } else if (content != null) output.concat(content);
       }
+      if (pending !== null) return pending.then(() => output);
       return output;
     } else if (association != null && association !== false) {
       return this.fieldsForNestedModel(name, association, options, block);
