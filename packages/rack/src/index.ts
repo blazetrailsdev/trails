@@ -1,3 +1,5 @@
+import type { HttpSocket } from "@blazetrails/ruby-compat";
+
 export { RELEASE, release } from "./version.js";
 export { RELEASE as VERSION } from "./version.js";
 
@@ -5,7 +7,9 @@ export type RackEnv = Record<string, unknown>;
 
 export type RackBody = AsyncIterable<string | Uint8Array> | Iterable<string | Uint8Array>;
 
-export type RackResponse = [number, Record<string, string | string[]>, RackBody];
+export type RackHeaders = Record<string, string | string[] | ((stream: HttpSocket) => unknown)>;
+
+export type RackResponse = [number, RackHeaders, RackBody];
 
 export type RackApp = (env: RackEnv) => Promise<RackResponse>;
 

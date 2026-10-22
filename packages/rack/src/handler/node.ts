@@ -240,7 +240,7 @@ export class Node {
 /** @noRailsEquivalent PERMANENT */
 function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]> {
   const sent: Record<string, string | string[]> = {};
-  const setCookie = headers[SET_COOKIE];
+  const setCookie = headers[SET_COOKIE] as string | string[] | undefined;
   if (setCookie) {
     sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
   }
@@ -248,7 +248,7 @@ function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]
   for (const [key, value] of Object.entries(headers)) {
     if (key.startsWith("rack.")) continue;
     if (key === SET_COOKIE) continue;
-    sent[key] = Array.isArray(value) ? value.join(", ") : value;
+    sent[key] = Array.isArray(value) ? value.join(", ") : (value as string);
   }
   return sent;
 }

@@ -1,5 +1,5 @@
 import { Exception, StandardError, rbFSend } from "@blazetrails/ruby-compat";
-import type { RackApp, RackEnv, RackResponse, RackBody } from "./index.js";
+import type { RackApp, RackEnv, RackHeaders, RackResponse, RackBody } from "./index.js";
 import { BodyProxy } from "./body-proxy.js";
 import { Request } from "./request.js";
 import { Raw } from "./response.js";
@@ -79,7 +79,7 @@ export class Events {
     let body: RackBody;
     let response: BufferedResponse | undefined;
     try {
-      let status: number, headers: Record<string, string | string[]>;
+      let status: number, headers: RackHeaders;
       [status, headers, body] = await (rbFSend(this.app, "call", request.env) as ReturnType<
         typeof this.app
       >);
@@ -124,11 +124,7 @@ export class Events {
   }
 
   /** @internal */
-  private makeResponse(
-    status: number,
-    headers: Record<string, string | string[]>,
-    body: RackBody,
-  ): BufferedResponse {
+  private makeResponse(status: number, headers: RackHeaders, body: RackBody): BufferedResponse {
     return new BufferedResponse(status, headers, body);
   }
 }

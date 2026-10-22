@@ -344,10 +344,10 @@ describe("Rack::Handler::Node", () => {
           200,
           {
             "content-type": "text/event-stream",
-            "rack.hijack": ((stream: HttpSocket) => {
+            "rack.hijack": (stream: HttpSocket) => {
               stream.on("close", sawClose);
               stream.write("data: one\n\n");
-            }) as unknown as string,
+            },
           },
           ["never written"],
         ],
@@ -491,10 +491,10 @@ describe("Rack::Handler::Node", () => {
           200,
           {
             "content-type": "text/event-stream",
-            "rack.hijack": ((stream: HttpSocket) => {
+            "rack.hijack": (stream: HttpSocket) => {
               stream.write("data: one\n\n");
               stream.end();
-            }) as unknown as string,
+            },
           },
           ignored,
         ],

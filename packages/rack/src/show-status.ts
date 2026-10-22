@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import { rbFSend, rbInspect, rbObjRespondTo, toI } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_SHOWSTATUS_DETAIL } from "./constants.js";
 import { HTTP_STATUS_CODES, escapeHtml } from "./utils.js";
@@ -22,7 +23,7 @@ export class ShowStatus {
     this.template = TEMPLATE;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [status, headers, body] = response;
     const empty = Number(toI(headers[CONTENT_LENGTH])) <= 0;

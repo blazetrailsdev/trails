@@ -81,7 +81,7 @@ export class ServerTiming {
       headerInfo.push(`${name};dur=${duration.toFixed(2)}`);
     }
 
-    const existing = headers[SERVER_TIMING];
+    const existing = headers[SERVER_TIMING] as string | string[];
     if (isPresent(existing)) {
       headerInfo.unshift(existing);
     }

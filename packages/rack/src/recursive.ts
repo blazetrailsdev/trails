@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import { ArgumentError, StringIO, URI, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
 import type { Generic } from "@blazetrails/ruby-compat";
 import {
@@ -40,12 +41,12 @@ export class Recursive {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     return rbObjDup(this)._call(env);
   }
 
   /** @internal */
-  async _call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async _call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     this.scriptName = env[SCRIPT_NAME];
     try {
       return await (rbFSend(this.app, "call", {
@@ -58,10 +59,7 @@ export class Recursive {
     }
   }
 
-  async include(
-    env: Record<string, any>,
-    path: string,
-  ): Promise<[number, Record<string, string | string[]>, any]> {
+  async include(env: Record<string, any>, path: string): Promise<[number, RackHeaders, any]> {
     if (
       !(
         path.indexOf(this.scriptName) === 0 &&

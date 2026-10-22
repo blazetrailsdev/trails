@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { BodyProxy } from "./body-proxy.js";
@@ -11,7 +12,7 @@ export class ConditionalGet {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const method = env[REQUEST_METHOD];
     if (method !== "GET" && method !== "HEAD") {
       return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
@@ -32,10 +33,7 @@ export class ConditionalGet {
     return response;
   }
 
-  private fresh(
-    env: Record<string, any>,
-    headers: Record<string, string | string[]>,
-  ): boolean | undefined {
+  private fresh(env: Record<string, any>, headers: RackHeaders): boolean | undefined {
     const noneMatch = env["HTTP_IF_NONE_MATCH"];
     if (noneMatch) {
       return this.isEtagMatches(noneMatch, headers);
@@ -46,11 +44,11 @@ export class ConditionalGet {
     }
   }
 
-  private isEtagMatches(noneMatch: string, headers: Record<string, string | string[]>): boolean {
+  private isEtagMatches(noneMatch: string, headers: RackHeaders): boolean {
     return headers[ETAG] === noneMatch;
   }
 
-  private modifiedSince(modifiedSince: Time, headers: Record<string, string | string[]>): boolean {
+  private modifiedSince(modifiedSince: Time, headers: RackHeaders): boolean {
     const header = headers["last-modified"];
     const lastModified = this.toRfc2822(typeof header === "string" ? header : undefined);
     return lastModified != null && modifiedSince.compare(lastModified)! >= 0;
