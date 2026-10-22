@@ -676,6 +676,9 @@ importers:
 
   scripts/guides-typecheck:
     dependencies:
+      '@blazetrails/actioncable':
+        specifier: workspace:*
+        version: link:../../packages/actioncable
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../../packages/actionpack
