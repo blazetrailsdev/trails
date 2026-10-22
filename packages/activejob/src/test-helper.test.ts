@@ -323,8 +323,8 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
   });
 
   const someOtherAndLogging = async (): Promise<void> => {
-    await (HelloJob.set({ queue: ":some_queue" }) as Configured).performLater();
-    await (HelloJob.set({ queue: ":other_queue" }) as Configured).performLater();
+    await HelloJob.set({ queue: ":some_queue" }).performLater();
+    await HelloJob.set({ queue: ":other_queue" }).performLater();
     await LoggingJob.performLater();
   };
 
@@ -361,20 +361,20 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
       t.assertEnqueuedJobs(2, { queue: ":default" }, async () => {
         await HelloJob.performLater();
         await LoggingJob.performLater();
-        await (HelloJob.set({ queue: ":other_queue" }) as Configured).performLater();
-        await (LoggingJob.set({ queue: ":other_queue" }) as Configured).performLater();
+        await HelloJob.set({ queue: ":other_queue" }).performLater();
+        await LoggingJob.set({ queue: ":other_queue" }).performLater();
       }),
     );
   });
 
   it("assert enqueued job with priority option", async ({ testCase: t }: HelperContext) => {
     await t.assertEnqueuedWith({ job: HelloJob, priority: 10 }, () =>
-      (HelloJob.set({ priority: 10 }) as Configured).performLater(),
+      HelloJob.set({ priority: 10 }).performLater(),
     );
 
     await assertRaises([Assertion], {}, () =>
       t.assertEnqueuedWith({ job: HelloJob, priority: 10 }, () =>
-        (HelloJob.set({ priority: 5 }) as Configured).performLater(),
+        HelloJob.set({ priority: 5 }).performLater(),
       ),
     );
   });
@@ -601,8 +601,8 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
   it("assert no enqueued jobs with queue option", async ({ testCase: t }: HelperContext) => {
     await assertNothingRaised(() =>
       t.assertNoEnqueuedJobs({ queue: ":default" }, async () => {
-        await (HelloJob.set({ queue: ":other_queue" }) as Configured).performLater();
-        await (LoggingJob.set({ queue: ":other_queue" }) as Configured).performLater();
+        await HelloJob.set({ queue: ":other_queue" }).performLater();
+        await LoggingJob.set({ queue: ":other_queue" }).performLater();
       }),
     );
   });
@@ -612,7 +612,7 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
   }: HelperContext) => {
     const error = await assertRaises([Assertion], {}, () =>
       t.assertNoEnqueuedJobs({ queue: ":other_queue" }, () =>
-        (HelloJob.set({ queue: ":other_queue" }) as Configured).performLater(),
+        HelloJob.set({ queue: ":other_queue" }).performLater(),
       ),
     );
 
@@ -620,14 +620,14 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
   });
 
   const otherOtherSomeLogging = async (): Promise<void> => {
-    await (HelloJob.set({ queue: ":other_queue" }) as Configured).performLater();
-    await (HelloJob.set({ queue: ":other_queue" }) as Configured).performLater();
-    await (LoggingJob.set({ queue: ":some_queue" }) as Configured).performLater();
+    await HelloJob.set({ queue: ":other_queue" }).performLater();
+    await HelloJob.set({ queue: ":other_queue" }).performLater();
+    await LoggingJob.set({ queue: ":some_queue" }).performLater();
   };
   const otherSomeSomeLogging = async (): Promise<void> => {
-    await (HelloJob.set({ queue: ":other_queue" }) as Configured).performLater();
-    await (HelloJob.set({ queue: ":some_queue" }) as Configured).performLater();
-    await (LoggingJob.set({ queue: ":some_queue" }) as Configured).performLater();
+    await HelloJob.set({ queue: ":other_queue" }).performLater();
+    await HelloJob.set({ queue: ":some_queue" }).performLater();
+    await LoggingJob.set({ queue: ":some_queue" }).performLater();
   };
 
   it("assert no enqueued jobs with only and queue option", async ({
@@ -671,7 +671,7 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
   }: HelperContext) => {
     const error = await assertRaises([ArgumentError], {}, () =>
       t.assertNoEnqueuedJobs({ only: HelloJob, except: HelloJob, queue: ":some_queue" }, () =>
-        (HelloJob.set({ queue: ":other_queue" }) as Configured).performLater(),
+        HelloJob.set({ queue: ":other_queue" }).performLater(),
       ),
     );
 
@@ -680,18 +680,18 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
 
   it("assert enqueued with", async ({ testCase: t }: HelperContext) => {
     await t.assertEnqueuedWith({ job: LoggingJob, queue: "default" }, () =>
-      (LoggingJob.set({ waitUntil: noon(tomorrow()) }) as Configured).performLater(),
+      LoggingJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
     );
   });
 
   it("assert enqueued with with no block", async ({ testCase: t }: HelperContext) => {
-    await (LoggingJob.set({ waitUntil: noon(tomorrow()) }) as Configured).performLater();
+    await LoggingJob.set({ waitUntil: noon(tomorrow()) }).performLater();
     await t.assertEnqueuedWith({ job: LoggingJob, queue: "default" });
   });
 
   it("assert enqueued with when queue name is symbol", async ({ testCase: t }: HelperContext) => {
     await t.assertEnqueuedWith({ job: LoggingJob, queue: ":default" }, () =>
-      (LoggingJob.set({ waitUntil: noon(tomorrow()) }) as Configured).performLater(),
+      LoggingJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
     );
   });
 
@@ -701,7 +701,7 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
 
   it("assert enqueued with returns", async ({ testCase: t }: HelperContext) => {
     const job = (await t.assertEnqueuedWith({ job: LoggingJob }, () =>
-      (LoggingJob.set({ waitUntil: minutes(5).fromNow() }) as Configured).performLater(1, 2, 3, {
+      LoggingJob.set({ waitUntil: minutes(5).fromNow() }).performLater(1, 2, 3, {
         keyword: true,
       }),
     )) as LoggingJob;
@@ -713,12 +713,9 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
   });
 
   it("assert enqueued with with no block returns", async ({ testCase: t }: HelperContext) => {
-    await (LoggingJob.set({ waitUntil: minutes(5).fromNow() }) as Configured).performLater(
-      1,
-      2,
-      3,
-      { keyword: true },
-    );
+    await LoggingJob.set({ waitUntil: minutes(5).fromNow() }).performLater(1, 2, 3, {
+      keyword: true,
+    });
     const job = (await t.assertEnqueuedWith({ job: LoggingJob })) as LoggingJob;
 
     assertInstanceOf(LoggingJob, job);
@@ -767,7 +764,7 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
   it("assert enqueued with args", async ({ testCase: t }: HelperContext) => {
     await assertRaises([ArgumentError], {}, () =>
       t.assertEnqueuedWith({ class: LoggingJob } as AssertEnqueuedWithOptions, () =>
-        (NestedJob.set({ waitUntil: noon(tomorrow()) }) as Configured).performLater(),
+        NestedJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
       ),
     );
   });
@@ -780,9 +777,9 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
       queue: "important",
     };
 
-    await (
-      facets.job.set({ queue: facets.queue, waitUntil: facets.at }) as Configured
-    ).performLater(...facets.args);
+    await facets.job
+      .set({ queue: facets.queue, waitUntil: facets.at })
+      .performLater(...facets.args);
 
     for (const [facet, value] of Object.entries(facets)) {
       const matcher = (jobValue: unknown): boolean => rbEqual(jobValue, value);
@@ -838,37 +835,35 @@ describe.skipIf(!isAdapterIs("test"))("EnqueuedJobsTest", () => {
 
   it("assert enqueued with with no block args", async ({ testCase: t }: HelperContext) => {
     await assertRaises([ArgumentError], {}, async () => {
-      await (NestedJob.set({ waitUntil: noon(tomorrow()) }) as Configured).performLater();
+      await NestedJob.set({ waitUntil: noon(tomorrow()) }).performLater();
       await t.assertEnqueuedWith({ class: LoggingJob } as AssertEnqueuedWithOptions);
     });
   });
 
   it("assert enqueued with with at option", async ({ testCase: t }: HelperContext) => {
     await t.assertEnqueuedWith({ job: HelloJob, at: noon(tomorrow()) }, () =>
-      (HelloJob.set({ waitUntil: noon(tomorrow()) }) as Configured).performLater(),
+      HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
     );
   });
 
   it("assert enqueued with with relative at option", async ({ testCase: t }: HelperContext) => {
     await t.assertEnqueuedWith({ job: HelloJob, at: minutes(5).fromNow() }, () =>
-      (HelloJob.set({ wait: minutes(5) }) as Configured).performLater(),
+      HelloJob.set({ wait: minutes(5) }).performLater(),
     );
   });
 
   it("assert enqueued with with no block with at option", async ({
     testCase: t,
   }: HelperContext) => {
-    await (HelloJob.set({ waitUntil: noon(tomorrow()) }) as Configured).performLater();
+    await HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater();
     await t.assertEnqueuedWith({ job: HelloJob, at: noon(tomorrow()) });
   });
 
   it("assert enqueued with wait until with performed", async ({ testCase: t }: HelperContext) => {
     await t.assertEnqueuedWith({ job: LoggingJob }, () =>
       t.performEnqueuedJobs({ only: HelloJob }, async () => {
-        await (HelloJob.set({ waitUntil: noon(tomorrow()) }) as Configured).performLater("david");
-        await (LoggingJob.set({ waitUntil: noon(tomorrow()) }) as Configured).performLater(
-          "enqueue",
-        );
+        await HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater("david");
+        await LoggingJob.set({ waitUntil: noon(tomorrow()) }).performLater("enqueue");
       }),
     );
     await t.assertEnqueuedJobs(1);

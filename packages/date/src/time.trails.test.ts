@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Date as RbDate, DateTime } from "./date.js";
 import { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
-import { Rational, env, rbFSend, rbObjRespondTo, setEnv } from "@blazetrails/ruby-compat";
+import { Rational, env, rbFSend, rbObjRespondTo, setEnv, toF } from "@blazetrails/ruby-compat";
 
 describe("Time#utc?, #getutc and #getlocal on an Instant and a JS Date", () => {
   afterEach(() => {
@@ -910,5 +910,11 @@ describe("Date#iso8601, DateTime#iso8601 and Time#xmlschema on a Temporal seat",
     const now = DateTime.now();
     const parsed = DateTime.iso8601(rbFSend(now, "iso8601", 9) as string);
     expect(String(parsed)).toBe(String(now));
+  });
+});
+
+describe("Time.at with a boxed Float", () => {
+  it("reads an integral Float from toF as its seconds", () => {
+    expect(Time.at(toF(946684800)).toI()).toBe(946684800);
   });
 });

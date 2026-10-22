@@ -147,7 +147,7 @@ describe("ActiveJob::Core", () => {
       ) {}
     }
     rbModConstSet(ActiveJob, "ConfiguredJob", ConfiguredJob);
-    const configured = HelloJob.set({ wait: 0 }) as ConfiguredJob;
+    const configured = HelloJob.set({ wait: 0 }) as unknown as ConfiguredJob;
     expect(configured).toBeInstanceOf(ConfiguredJob);
     expect(configured.jobClass).toBe(HelloJob);
     expect(configured.options).toEqual({ wait: 0 });
