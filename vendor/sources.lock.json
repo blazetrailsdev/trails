@@ -40,6 +40,10 @@
       "ref": "v1.0.4",
       "sha": "cdf0e659c87f81e5d2b393cff3569f870bd71c47"
     },
+    "mini_magick": {
+      "ref": "v5.2.0",
+      "sha": "34433dc21cd4df544b33e67c111ff0ea36312d34"
+    },
     "minitest": {
       "ref": "v5.27.0",
       "sha": "819e9b5f873d7ab6d4edfeaed48542279367ff93"

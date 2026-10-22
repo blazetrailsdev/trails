@@ -4,6 +4,8 @@ packages/rack/test/cgi/test.gz binary
 packages/actionpack/src/test-helpers/fixtures/multipart/* binary
 # Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures: magic-byte detection reads them exactly.
 packages/marcel/src/test-helpers/fixtures/** binary
+# Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures: ImageMagick reads them.
+packages/mini-magick/src/test-helpers/fixtures/** binary
 
 # Shell scripts must keep LF endings even on Windows checkouts; CRLF makes
 # them unparseable by /usr/bin/env in Linux containers.
