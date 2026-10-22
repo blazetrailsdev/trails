@@ -81,17 +81,10 @@ export class Node {
       let hijacked = false;
       const release = (): HttpSocket => {
         hijacked = true;
-        unhijacked.delete(socket!);
         return socket!;
       };
       env[RACK_IS_HIJACK] = socket != null;
-      if (env[RACK_IS_HIJACK]) {
-        env[RACK_HIJACK] = release;
-        unhijacked.add(socket!);
-        socket!.on("close", () => {
-          unhijacked.delete(socket!);
-        });
-      }
+      if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
 
       try {
         const [status, headers, body] = await (rbFSend(

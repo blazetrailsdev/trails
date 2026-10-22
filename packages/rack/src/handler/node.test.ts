@@ -401,16 +401,18 @@ describe("Rack::Handler::Node", () => {
       expect(rejections).toEqual([]);
     });
 
-    it("closes a socket it still owns on shutdown, and waits for the app to close one it hijacked", async () => {
+    it("lets an in-flight response finish on shutdown, and waits for the app to close a socket it hijacked", async () => {
       let hijackedIo: HttpSocket | null = null;
+      let answer!: () => void;
+      const answered = new Promise<void>((resolve) => (answer = resolve));
       const server = await Node.run(
         async (env) => {
           if (env.PATH_INFO === "/taken") {
             hijackedIo = (env[RACK_HIJACK] as () => HttpSocket)();
             return [-1, {}, [""]];
           }
-          await new Promise(() => {});
-          return [200, {}, [""]];
+          await answered;
+          return [200, { "content-length": "4" }, ["done"]];
         },
         { Port: 0, Host: "127.0.0.1" },
       );
@@ -418,18 +420,18 @@ describe("Rack::Handler::Node", () => {
       const port = address && typeof address === "object" ? address.port : 0;
       const url = `http://127.0.0.1:${port}`;
       const taken = await rawSocket(url, "/taken");
-      const pending = await rawSocket(url, "/pending");
-      const pendingClosed = new Promise<void>((resolve) => pending.on("close", () => resolve()));
+      const inFlight = rawGet(url, "/pending");
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       let stopped = false;
       const shutdown = Node.shutdown().then(() => {
         stopped = true;
       });
-      await pendingClosed;
+      answer();
+      const { text } = await inFlight;
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(pending.destroyed).toBe(true);
+      expect(text.endsWith("\r\n\r\ndone")).toBe(true);
       expect(taken.destroyed).toBe(false);
       expect(stopped).toBe(false);
 
