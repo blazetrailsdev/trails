@@ -18,8 +18,9 @@ export class TimeObjectSerializer extends ObjectSerializer {
       | Temporal.PlainDateTime
       | Temporal.ZonedDateTime,
   ): Record<string, unknown> {
-    if (!("iso8601" in time)) time = new DateTime(time);
-    return super.serialize({ value: time.iso8601(TimeObjectSerializer.NANO_PRECISION) });
+    let rbTime = time;
+    if (!("iso8601" in rbTime)) rbTime = new DateTime(rbTime);
+    return super.serialize({ value: rbTime.iso8601(TimeObjectSerializer.NANO_PRECISION) });
   }
 }
 rbModConstSet(Serializers, "TimeObjectSerializer", TimeObjectSerializer);

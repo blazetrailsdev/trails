@@ -11,8 +11,9 @@ export class DateSerializer extends ObjectSerializer {
 
   /** @inventedArm if — CONVERGEABLE activejob-date-serializers-serialize-temporal-dates */
   serialize(date: Date | Temporal.PlainDate): Record<string, unknown> {
-    if (!(date instanceof Date)) date = new Date(date);
-    return super.serialize({ value: date.iso8601() });
+    let rbDate = date;
+    if (!(rbDate instanceof Date)) rbDate = new Date(rbDate);
+    return super.serialize({ value: rbDate.iso8601() });
   }
 
   deserialize(hash: Record<string, unknown> | Map<string, unknown>): Date {

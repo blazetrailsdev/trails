@@ -5,6 +5,7 @@ import { Base } from "../base.js";
 import { AsyncAdapter } from "./async-adapter.js";
 
 const threads: Thread[] = [];
+const resumedOn: Thread[] = [];
 
 class ThreadRecordingJob extends Base {
   static toString(): string {
@@ -14,7 +15,7 @@ class ThreadRecordingJob extends Base {
   async perform(): Promise<void> {
     const thread = Thread.current();
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(Thread.current()).toBe(thread);
+    resumedOn.push(Thread.current());
     threads.push(thread);
   }
 }
@@ -27,6 +28,7 @@ describe("AsyncAdapter", () => {
     await adapter.enqueue(new ThreadRecordingJob());
     await adapter.shutdown();
     expect(threads).toHaveLength(2);
+    expect(resumedOn).toEqual(threads);
     expect(threads[0]).not.toBe(threads[1]);
   });
 
