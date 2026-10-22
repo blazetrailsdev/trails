@@ -13,7 +13,7 @@ import {
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
 
-import { isBlank, isPresent } from "@blazetrails/activesupport";
+import { isBlank, isPresent, toParam } from "@blazetrails/activesupport";
 
 import { ActiveModelInstanceTag } from "../active-model-helper.js";
 import { FormTagHelper, type FormTagHelperHost } from "../form-tag-helper.js";
@@ -121,8 +121,8 @@ export class Base {
         : Object.hasOwn(this._templateObject, preMatch)
           ? (this._templateObject as unknown as Record<string, unknown>)[preMatch]
           : null;
-    if (object != null && object !== false && rbObjRespondTo(object, "toParam")) {
-      return (object as { toParam(): unknown }).toParam();
+    if (object != null && object !== false) {
+      return toParam(object);
     } else {
       throw new ArgumentError(
         `object[] naming but object param and @object var don't exist or don't respond to to_param: ${rbInspect(object)}`,
