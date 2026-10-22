@@ -12,6 +12,7 @@ import {
   Hash,
   rbFSend,
   rbModConstSet,
+  rbModDeprecateConstant,
   rbModDefineMethod,
 } from "@blazetrails/ruby-compat";
 import { rbCallSuper } from "./codegen-runtime.js";
@@ -244,7 +245,7 @@ export class Tool {
         }
       },
     );
-    Tool.deprecateConstant(rbStrSend(tool, "capitalize")[0]);
+    rbModDeprecateConstant(Tool, rbStrSend(tool, "capitalize")[0] as string);
   }
 }
 rbModConstSet(MiniMagick, "Tool", Tool);

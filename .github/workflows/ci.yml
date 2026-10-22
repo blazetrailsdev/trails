@@ -880,6 +880,12 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
+      # packages/mini-magick's specs shell out to ImageMagick, as
+      # mini_magick's own do (mini_magick/shell.rb).
+      - name: Install ImageMagick
+        run: |
+          command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
+          convert -version | head -1
       # scripts/parity/pipeline/query/node spawns the dump runners as real subprocesses;
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
@@ -918,6 +924,7 @@ jobs:
           packages/html-sanitizer
           packages/i18n
           packages/marcel
+          packages/mini-magick
           packages/msgpack
           packages/nokogiri
           packages/ruby-compat
@@ -1125,6 +1132,10 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Install ImageMagick
+        run: |
+          command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
+          convert -version | head -1
       - name: Run vitest with coverage (non-AR packages)
         run: >
           pnpm vitest run
@@ -1140,6 +1151,7 @@ jobs:
           packages/globalid
           packages/i18n
           packages/marcel
+          packages/mini-magick
           packages/msgpack
           packages/nokogiri
           packages/html-sanitizer
