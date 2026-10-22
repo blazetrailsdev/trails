@@ -40,11 +40,12 @@ export const Callbacks = defineModule({}) as {
 };
 extend(Callbacks, Concern);
 include(Callbacks, ASCallbacks);
-Object.defineProperty(Callbacks, "ClassMethods", { value: ClassMethods });
-
-Concern.included.call(Callbacks as never, null, function (this: CallbacksClass) {
+(
+  Callbacks as unknown as { included(base: null, block: (this: CallbacksClass) => void): void }
+).included(null, function (this: CallbacksClass) {
   this.defineCallbacks("subscribe");
   this.defineCallbacks("unsubscribe");
 });
+Object.defineProperty(Callbacks, "ClassMethods", { value: ClassMethods });
 
 rbModConstSet(Channel, "Callbacks", Callbacks);

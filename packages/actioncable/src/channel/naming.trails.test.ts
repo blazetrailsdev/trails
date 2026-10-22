@@ -46,9 +46,15 @@ describe("ActionCable::Channel::Naming constant names", () => {
     );
   });
 
+  it("raises for an anonymous channel class rather than inventing a name", () => {
+    const Anonymous = class extends ChatChannel {};
+    Object.defineProperty(Anonymous, "name", { value: "" });
+    expect(() => (Anonymous as unknown as { channelName: string }).channelName).toThrow(TypeError);
+  });
+
   it("answers null for an unknown or malformed name", () => {
-    expect(safeConstantize("Chat::NoSuchChannel") ?? null).toBeNull();
-    expect(safeConstantize("NoSuchChannel") ?? null).toBeNull();
-    expect(safeConstantize("not a constant") ?? null).toBeNull();
+    expect(safeConstantize("Chat::NoSuchChannel")).toBeUndefined();
+    expect(safeConstantize("NoSuchChannel")).toBeUndefined();
+    expect(safeConstantize("not a constant")).toBeUndefined();
   });
 });
