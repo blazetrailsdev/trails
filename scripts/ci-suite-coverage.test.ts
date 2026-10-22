@@ -1382,6 +1382,10 @@ describe("CI runs every tooling test suite", () => {
     expect((await runGate("packages/activesupport/src/index.ts")).actioncable_affected).toBe(
       "true",
     );
+    for (const dep of ["i18n", "nokogiri", "rack-session", "rack-test", "html-sanitizer"]) {
+      expect((await runGate(`packages/${dep}/src/index.ts`)).actioncable_affected).toBe("true");
+    }
+    expect((await runGate("packages/trailties/src/index.ts")).actioncable_affected).toBe("false");
     expect((await runGate(cable)).actionpack_affected).toBe("false");
   });
 
