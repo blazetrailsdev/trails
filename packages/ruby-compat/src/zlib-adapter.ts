@@ -211,16 +211,11 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
       const stream = zlib.createGzip();
       let headerSeen = false;
       let failure: Error | null = null;
-      let pending: Uint8Array[] = [];
+      let pending = new Uint8Array();
       const writeRaw = (): void => {
         if (failure !== null || pending.length === 0) return;
-        const dst = new Uint8Array(pending.reduce((n, chunk) => n + chunk.length, 0));
-        let offset = 0;
-        for (const chunk of pending) {
-          dst.set(chunk, offset);
-          offset += chunk.length;
-        }
-        pending = [];
+        const dst = pending;
+        pending = new Uint8Array();
         try {
           io.write(dst);
         } catch (err) {
@@ -230,14 +225,11 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
       const handle: GzipWriterHandle = {
         mtime: null,
         write: (data) => stream.write(data),
-        flush: () =>
-          new Promise<void>((res, rej) =>
-            stream.flush(() => {
-              writeRaw();
-              if (failure !== null) rej(failure);
-              else res();
-            }),
-          ),
+        flush: async () => {
+          await new Promise<void>((res) => stream.flush(res));
+          writeRaw();
+          if (failure !== null) throw failure;
+        },
         finish: async () => {
           stream.end();
           await ended;
@@ -253,7 +245,10 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
             setGzipHeaderMtime(bytes, handle.mtime ?? Math.floor(Date.now() / 1000));
           }
         }
-        pending.push(bytes);
+        const buf = new Uint8Array(pending.length + bytes.length);
+        buf.set(pending);
+        buf.set(bytes, pending.length);
+        pending = buf;
       });
       const ended = new Promise<void>((res) => {
         stream.on("end", () => res());

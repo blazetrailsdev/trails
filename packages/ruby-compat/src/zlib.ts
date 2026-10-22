@@ -157,7 +157,7 @@ class GzipWriter extends GzipFile<File | Tempfile> {
  * stream a chunk at a time, answering what each chunk completes.
  */
 class Inflate {
-  private readonly input: Uint8Array[] = [];
+  private input = new Uint8Array();
   private produced = 0;
 
   constructor(private readonly windowBits = 15) {}
@@ -172,15 +172,12 @@ class Inflate {
 
   /** `rb_inflate_inflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2145`). */
   inflate(string: string | Uint8Array): Uint8Array {
-    this.input.push(
-      typeof string === "string" ? Uint8Array.from(string, (c) => c.charCodeAt(0)) : string,
-    );
-    const src = new Uint8Array(this.input.reduce((n, chunk) => n + chunk.length, 0));
-    let offset = 0;
-    for (const chunk of this.input) {
-      src.set(chunk, offset);
-      offset += chunk.length;
-    }
+    const bytes =
+      typeof string === "string" ? Uint8Array.from(string, (c) => c.charCodeAt(0)) : string;
+    const src = new Uint8Array(this.input.length + bytes.length);
+    src.set(this.input);
+    src.set(bytes, this.input.length);
+    this.input = src;
     let out: Uint8Array;
     try {
       out = getZlib().inflateStream(src, this.windowBits);
@@ -297,6 +294,11 @@ export const Zlib = {
    * `Zlib::Inflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4725`), whose one-shot
    * `inflate` (`rb_inflate_s_inflate`, `zlib.c:2044`) answers the inflated bytes
    * as a binary String, held as its bytes, raising `Zlib::Error` on a malformed stream.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Inflate`.
+   */
+  /**
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4725` `cInflate`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Inflate`.
    */

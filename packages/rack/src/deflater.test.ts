@@ -1,25 +1,14 @@
 import { it, expect } from "vitest";
 import { File, StringIO, Zlib } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
-import { Deflater, type DeflaterOptions } from "./deflater.js";
+import { Deflater } from "./deflater.js";
 import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
 
-type Options = {
-  appStatus?: number;
-  appBody?: any;
-  requestHeaders?: Record<string, string>;
-  responseHeaders?: Record<string, string>;
-  deflaterOptions?: DeflaterOptions;
-  skipBodyVerify?: boolean;
-};
-
-type Block = (status: number, headers: Record<string, any>, body: any) => unknown;
+type Options = Record<string, any>;
 
 function binary(bytes: Uint8Array): string {
-  let str = "";
-  for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
-  return str;
+  return bytes.reduce((str, byte) => str + String.fromCharCode(byte), "");
 }
 
 async function buildResponse(
@@ -49,7 +38,7 @@ async function verify(
   expectedBody: any,
   acceptEncoding: string | Record<string, string | null>,
   options: Options = {},
-  block?: Block,
+  block?: (status: number, headers: Record<string, any>, body: any) => unknown,
 ): Promise<void> {
   let expectedEncoding: string | null;
   if (typeof acceptEncoding === "object") {
@@ -119,12 +108,7 @@ function deflateOrGzip() {
 }
 
 it("be able to deflate bodies that respond to each", async () => {
-  const appBody = {
-    each(block: (part: string) => void) {
-      block("foo");
-      block("bar");
-    },
-  };
+  const appBody = { each: (block: (part: string) => unknown) => [block("foo"), block("bar")] };
 
   await verify(200, "foobar", deflateOrGzip(), { appBody }, (_status, headers) => {
     expect(headers).toEqual({
@@ -166,13 +150,7 @@ it("should not update vary response header if it includes * or accept-encoding",
 });
 
 it("be able to deflate bodies that respond to each and contain empty chunks", async () => {
-  const appBody = {
-    each(block: (part: string) => void) {
-      block("foo");
-      block("");
-      block("bar");
-    },
-  };
+  const appBody = { each: (b: (part: string) => unknown) => [b("foo"), b(""), b("bar")] };
 
   await verify(200, "foobar", deflateOrGzip(), { appBody }, (_status, headers) => {
     expect(headers).toEqual({
@@ -184,12 +162,7 @@ it("be able to deflate bodies that respond to each and contain empty chunks", as
 });
 
 it("flush deflated chunks to the client as they become ready", async () => {
-  const appBody = {
-    each(block: (part: string) => void) {
-      block("foo");
-      block("bar");
-    },
-  };
+  const appBody = { each: (block: (part: string) => unknown) => [block("foo"), block("bar")] };
 
   await verify(
     200,
@@ -214,12 +187,7 @@ it("flush deflated chunks to the client as they become ready", async () => {
 });
 
 it("does not raise when a client aborts reading", async () => {
-  const appBody = {
-    each(block: (part: string) => void) {
-      block("foo");
-      block("bar");
-    },
-  };
+  const appBody = { each: (block: (part: string) => unknown) => [block("foo"), block("bar")] };
   const opts = { skipBodyVerify: true };
   await verify(200, appBody, "gzip", opts, async (_status, headers, body) => {
     expect(headers).toEqual({
@@ -255,12 +223,7 @@ it("be able to deflate String bodies", async () => {
 });
 
 it("be able to gzip bodies that respond to each", async () => {
-  const appBody = {
-    each(block: (part: string) => void) {
-      block("foo");
-      block("bar");
-    },
-  };
+  const appBody = { each: (block: (part: string) => unknown) => [block("foo"), block("bar")] };
 
   await verify(200, "foobar", "gzip", { appBody }, (_status, headers) => {
     expect(headers).toEqual({
@@ -288,12 +251,7 @@ it("be able to gzip files", async () => {
 });
 
 it("flush gzipped chunks to the client as they become ready", async () => {
-  const appBody = {
-    each(block: (part: string) => void) {
-      block("foo");
-      block("bar");
-    },
-  };
+  const appBody = { each: (block: (part: string) => unknown) => [block("foo"), block("bar")] };
 
   await verify(200, appBody, "gzip", { skipBodyVerify: true }, async (_status, headers, body) => {
     expect(headers).toEqual({
