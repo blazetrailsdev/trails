@@ -54,7 +54,7 @@ export class ThreadPoolExecutor {
     this.maxLength = maxThreads;
     this.maxQueue = maxQueue;
     this.fallbackPolicy = fallbackPolicy;
-    this.idletime = idletime;
+    this.idletime = Math.trunc(idletime);
     this.autoTerminate = autoTerminate;
   }
 
@@ -66,7 +66,7 @@ export class ThreadPoolExecutor {
     const task = () => block(...args);
     if (!this.isRunning()) {
       task();
-    } else if (this._ready.length > 0) {
+    } else if (this._running >= this.minLength && this._ready.length > 0) {
       this.scheduledTaskCount += 1;
       this._ready.pop()!(task);
     } else if (this._running < this.maxLength) {

@@ -44,7 +44,7 @@ describe("ThreadPoolExecutor", () => {
       maxThreads: 2,
       maxQueue: 0,
       fallbackPolicy: "caller_runs",
-      idletime: 0.05,
+      idletime: 1,
     });
     const threads: Thread[] = [];
     const task = () => void threads.push(Thread.current());
@@ -55,10 +55,27 @@ describe("ThreadPoolExecutor", () => {
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(threads[1]).toBe(threads[0]);
 
-    await new Promise((resolve) => setTimeout(resolve, 80));
+    executor.shutdown();
+    expect(await executor.waitForTermination(1)).toBe(true);
+  });
+
+  it("truncates idletime to whole seconds and retires an idle worker after it", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 0,
+      maxThreads: 2,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+      idletime: 0.9,
+    });
+    expect(executor.idletime).toBe(0);
+    const threads: Thread[] = [];
+    const task = () => void threads.push(Thread.current());
+
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 20));
     executor.post(task);
     await new Promise((resolve) => setTimeout(resolve, 5));
-    expect(threads[2]).not.toBe(threads[0]);
+    expect(threads[1]).not.toBe(threads[0]);
 
     executor.shutdown();
     expect(await executor.waitForTermination(1)).toBe(true);
@@ -70,16 +87,37 @@ describe("ThreadPoolExecutor", () => {
       maxThreads: 2,
       maxQueue: 0,
       fallbackPolicy: "caller_runs",
-      idletime: 0.02,
+      idletime: 0,
     });
     const threads: Thread[] = [];
     const task = () => void threads.push(Thread.current());
 
     executor.post(task);
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await new Promise((resolve) => setTimeout(resolve, 20));
     executor.post(task);
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(threads[1]).toBe(threads[0]);
+
+    executor.shutdown();
+    expect(await executor.waitForTermination(1)).toBe(true);
+  });
+
+  it("grows the pool to minThreads before reusing an idle worker", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 2,
+      maxThreads: 2,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+      idletime: 1,
+    });
+    const threads: Thread[] = [];
+    const task = () => void threads.push(Thread.current());
+
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(threads[1]).not.toBe(threads[0]);
 
     executor.shutdown();
     expect(await executor.waitForTermination(1)).toBe(true);
