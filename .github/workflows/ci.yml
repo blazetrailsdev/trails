@@ -1037,7 +1037,7 @@ jobs:
   # browser.trails.test.ts mocks playwright, so it needs no binary.
   # webkit, firefox and webdriverio are not installed.
   system-tests:
-    name: System Tests
+    name: System Tests (chromium)
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
