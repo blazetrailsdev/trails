@@ -125,7 +125,7 @@ export function buildTagValues(...args: unknown[]): Array<string | SafeBuffer> {
   return tagValues;
 }
 
-export function tag(this: TagHelperHost): TagBuilder;
+export function tag(this: TagHelperHost): ElementTagBuilder;
 export function tag(
   this: TagHelperHost,
   name: string,
@@ -376,10 +376,8 @@ type TagElement = {
   (...args: unknown[]): SafeBuffer;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- the element methods `define_element` / `define_void_element` / `define_self_closing_element` generate (tag_helper.rb).
-export interface TagBuilder extends Record<TagElementName, TagElement> {}
+type ElementTagBuilder = TagBuilder & Record<TagElementName, TagElement>;
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class TagBuilder {
   static defineElement(
     name: string,

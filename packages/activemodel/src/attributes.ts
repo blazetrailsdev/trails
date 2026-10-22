@@ -4,6 +4,7 @@ import {
   include,
   type CodeGenerator,
   included,
+  type Included,
 } from "@blazetrails/activesupport";
 import { type Hash, keys, rbCallSuper, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
@@ -122,7 +123,10 @@ export function setDefineMethodAttribute(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ActiveModel::AttributeMethods` (attributes.rb:8); the class/interface merge is how `include()` surfaces on the type side.
-export interface Attributes {
+export interface Attributes extends Pick<
+  Included<typeof AttributeMethods>,
+  "isAttributeMethod" | "matchedAttributeMethod" | "missingAttribute" | "_readAttribute"
+> {
   methodMissing(
     ...args: Parameters<(typeof AttributeMethods)["methodMissing"]>
   ): ReturnType<(typeof AttributeMethods)["methodMissing"]>;
@@ -133,22 +137,6 @@ export interface Attributes {
   isRespondTo(
     ...args: Parameters<(typeof AttributeMethods)["isRespondTo"]>
   ): ReturnType<(typeof AttributeMethods)["isRespondTo"]>;
-  /** @internal */
-  isAttributeMethod(
-    ...args: Parameters<(typeof AttributeMethods)["isAttributeMethod"]>
-  ): ReturnType<(typeof AttributeMethods)["isAttributeMethod"]>;
-  /** @internal */
-  matchedAttributeMethod(
-    ...args: Parameters<(typeof AttributeMethods)["matchedAttributeMethod"]>
-  ): ReturnType<(typeof AttributeMethods)["matchedAttributeMethod"]>;
-  /** @internal */
-  missingAttribute(
-    ...args: Parameters<(typeof AttributeMethods)["missingAttribute"]>
-  ): ReturnType<(typeof AttributeMethods)["missingAttribute"]>;
-  /** @internal */
-  _readAttribute(
-    ...args: Parameters<(typeof AttributeMethods)["_readAttribute"]>
-  ): ReturnType<(typeof AttributeMethods)["_readAttribute"]>;
 
   /** @internal */
   _writeAttribute(name: string, value: unknown): void;
