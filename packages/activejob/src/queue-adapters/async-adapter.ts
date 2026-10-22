@@ -20,8 +20,7 @@ interface AsyncAdapterJob {
 
 type ExecutorOptions = Record<string, unknown>;
 
-/** @internal */
-class JobWrapper {
+export class JobWrapper {
   static toString(): string {
     return "ActiveJob::QueueAdapters::AsyncAdapter::JobWrapper";
   }
@@ -38,8 +37,7 @@ class JobWrapper {
   }
 }
 
-/** @internal */
-class Scheduler {
+export class Scheduler {
   static toString(): string {
     return "ActiveJob::QueueAdapters::AsyncAdapter::Scheduler";
   }
