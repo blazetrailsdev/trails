@@ -122,6 +122,7 @@ export abstract class XmlBase {
   protected abstract _endTag(sym: string): void;
 
   /** @internal */
+  /** @missingRailsCall dummy? — CONVERGEABLE port-builder-xml-events-and-remaining-tests */
   protected _escape(text: string): string {
     const result = XChar.encode(text);
     try {
