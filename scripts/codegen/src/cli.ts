@@ -25,12 +25,19 @@ import { Emitter } from "./emit.js";
 import { Resolver } from "./resolve.js";
 import { TypeOracle } from "./types.js";
 import { runtimeShim, DECLINED_SHIM } from "./runtime-shim.js";
-import { GEM, GEM_LIB, GEN_DIR, ORACLE_PATH, PKG_DIR, ROOT, SYNTH_SEATS } from "./gem.js";
+import {
+  GEM,
+  GEM_LIB,
+  GEM_LIB_DIRS,
+  GEN_DIR,
+  ORACLE_PATH,
+  PKG_DIR,
+  ROOT,
+  SYNTH_SEATS,
+} from "./gem.js";
 import { nonNullPass } from "./nonnull-pass.js";
 import { typePass } from "./type-pass.js";
 import { augmentSeatTypes } from "./seat-types.js";
-
-const LIB = GEM_LIB;
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -111,20 +118,25 @@ function listJson(dir: string): string[] {
 
 const t0 = Date.now();
 rmSync(irDir, { recursive: true, force: true });
-const rubyFiles = execFileSync("bash", [
-  "-c",
-  `cd ${LIB} && ls ${GEM.rubyRoot}.rb && find ${GEM.rubyRoot} -name '*.rb' | sort`,
-])
-  .toString()
-  .trim()
-  .split("\n");
+// Each source directory's `<root>.rb` and `<root>/**/*.rb`, by absolute path.
+const rubyPaths = GEM_LIB_DIRS.flatMap((dir) =>
+  execFileSync("bash", [
+    "-c",
+    `cd ${dir} && { ls ${GEM.rubyRoot}.rb 2>/dev/null; find ${[GEM.rubyRoot, ...(GEM.extraRoots ?? [])].join(" ")} -name '*.rb' 2>/dev/null | sort; }`,
+  ])
+    .toString()
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((f) => path.join(dir, f)),
+);
 execFileSync(
   "ruby",
   [
     path.join(ROOT, "scripts/codegen/ruby/build-ir.rb"),
-    LIB,
+    GEM_LIB_DIRS.join(":"),
     irDir,
-    ...rubyFiles.map((f) => path.join(LIB, f)),
+    ...rubyPaths,
   ],
   { stdio: ["ignore", "inherit", "inherit"] },
 );

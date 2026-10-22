@@ -895,8 +895,12 @@ end
 
 require "set"
 $expansion_failures = []
-lib_root, out_dir, *files = ARGV
-files = Dir[File.join(lib_root, "**/*.rb")].sort if files.empty?
+lib_roots_arg, out_dir, *files = ARGV
+# Several source roots, `:`-separated (a gem's lib and an engine's app/models);
+# each file is named by its path under the root it is in.
+lib_roots = lib_roots_arg.split(":")
+lib_root = lib_roots.first
+files = lib_roots.flat_map { |r| Dir[File.join(r, "**/*.rb")] }.sort if files.empty?
 totals = Hash.new(0)
 env = CodegenIR::ConstEnv.new
 parsed = files.to_h { |f| [f, Prism.parse_file(f)] }
@@ -917,7 +921,8 @@ Dir[File.join(am_lib, "active_model/callbacks.rb")].each do |f|
 end
 expansions = Hash.new(0)
 files.each do |f|
-  rel = f.delete_prefix(lib_root).delete_prefix("/")
+  root = lib_roots.find { |r| f.start_with?(r + "/") } || lib_root
+  rel = f.delete_prefix(root).delete_prefix("/")
   result = parsed[f]
   b = CodegenIR::Builder.new(result.source, env)
   ir = { file: rel, body: b.build_program(result.value) }

@@ -10,7 +10,7 @@ import ts from "typescript-5";
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { GEM, ROOT, handNamespaceFqns, handSeatMembers } from "./gem.js";
+import { GEM, PKG_DIR, ROOT, handNamespaceFqns, handSeatMembers } from "./gem.js";
 import { walk } from "./ir.js";
 import { TS_CLASS_RENAMES, rubyFileToTs } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES, tsConstantRenameKey } from "./constant-renames.js";
@@ -323,6 +323,28 @@ export class Resolver {
     return undefined;
   }
 
+  private depsMemo?: Set<string>;
+
+  /**
+   * `@blazetrails/<pkg>` for a Ruby framework root (`ActiveRecord` →
+   * `@blazetrails/activerecord`) the generated package lists as a dependency in
+   * its package.json, with its exports known; undefined otherwise.
+   */
+  dependencyPackage(root: string): string | undefined {
+    if (!this.depsMemo) {
+      let deps: Record<string, string>;
+      try {
+        deps =
+          JSON.parse(readFileSync(path.join(PKG_DIR, "package.json"), "utf8")).dependencies ?? {};
+      } catch {
+        deps = {};
+      }
+      this.depsMemo = new Set(Object.keys(deps));
+    }
+    const spec = `@blazetrails/${root.toLowerCase()}`;
+    return this.depsMemo.has(spec) && this.pkgExports(spec).size ? spec : undefined;
+  }
+
   constRef(p: string[], nesting: string[], ctx: Ctx, lw: Lowerer): string {
     let hit = this.index.resolveConst(p, nesting);
     // A test support file reopening a dependency class (`ActiveSupport::TestCase`
@@ -470,6 +492,16 @@ export class Resolver {
       if (this.pkgExports("@blazetrails/date").has(root))
         return lw.imp(ctx, "@blazetrails/date", root, `Ruby${root}`);
       if (JS_GLOBALS[root]) return JS_GLOBALS[root];
+    }
+    // A framework gem the generated package depends on (solid_queue's
+    // `ActiveRecord::Base`, `ActiveJob::Arguments`): its export, imported, as
+    // any dependency's. Only a gem without that dependency reads it at call time.
+    {
+      const spec = this.dependencyPackage(root);
+      if (spec && rest.length) {
+        const flat = this.flatExportRef(spec, rest, root, ctx, lw);
+        if (flat !== undefined) return flat;
+      }
     }
     // Another framework gem's root (`ActiveRecord` in activejob's
     // `enqueue_after_transaction_commit.rb`) is read off `TopLevel` at call

@@ -24,6 +24,18 @@ export interface GemConfig {
    * `symbolize_keys` rule). The hand activejob port's spelling.
    */
   dataHashColon?: boolean;
+  /**
+   * The gem's source directories, relative to its vendored root: `lib`, and for
+   * an engine its models (`app/models`, solid_queue). Each file is named by its
+   * path under its directory (`solid_queue/job.rb`), so lib and app share a tree.
+   */
+  libDirs?: string[];
+  /**
+   * Other top-level directories of the gem's lib it ports besides `rubyRoot`:
+   * solid_queue's `active_job/` (its queue adapter and `ConcurrencyControls`,
+   * which it adds to ActiveJob).
+   */
+  extraRoots?: string[];
   /** The vendored gem directory and the trails package name (`activerecord`). */
   gem: string;
   /** The gem's top-level Ruby file and directory under lib (`active_record`). */
@@ -135,6 +147,19 @@ GEMS.builder = {
   pkg: "builder",
 };
 
+// solid_queue (rails/solid_queue v1.1.3, vendor/rails/v8.0.2/Gemfile.lock:586),
+// RFC 0196: the database-backed ActiveJob backend, an engine whose models are
+// in app/models.
+GEMS.solid_queue = {
+  gem: "solid_queue",
+  rubyRoot: "solid_queue",
+  namespace: "SolidQueue",
+  vendor: "solid_queue/v1.1.3",
+  pkg: "solid-queue",
+  libDirs: ["lib", "app/models"],
+  extraRoots: ["active_job"],
+};
+
 const name = process.env.CODEGEN_GEM ?? "activerecord";
 const cfg = GEMS[name];
 if (!cfg) throw new Error(`CODEGEN_GEM=${name}: known gems are ${Object.keys(GEMS).join(", ")}`);
@@ -145,6 +170,10 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const GEM_ROOT = GEM.vendor ?? `rails/v8.0.2/${GEM.gem}`;
 /** `vendor/rails/v8.0.2/<gem>/lib`. */
 export const GEM_LIB = path.join(ROOT, "vendor", GEM_ROOT, "lib");
+/** Every source directory of the gem (`GemConfig.libDirs`), `GEM_LIB` first. */
+export const GEM_LIB_DIRS = (GEM.libDirs ?? ["lib"]).map((d) =>
+  path.join(ROOT, "vendor", GEM_ROOT, d),
+);
 /** `packages/<gem>`, the hand port. */
 export const PKG_DIR = path.join(ROOT, "packages", GEM.pkg ?? GEM.gem);
 /** `packages/<gem>/codegen-out`, where a run writes. */
