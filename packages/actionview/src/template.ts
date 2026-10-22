@@ -217,7 +217,7 @@ export class Template {
   }
 
   get shortIdentifier(): string {
-    if (this._shortIdentifier !== undefined) return this._shortIdentifier;
+    if (this._shortIdentifier) return this._shortIdentifier;
     if (TopLevel.Trails === undefined) return (this._shortIdentifier = this.identifier);
     const prefix = `${TopLevel.Trails.root() ?? ""}/`;
     return (this._shortIdentifier = this.identifier.startsWith(prefix)

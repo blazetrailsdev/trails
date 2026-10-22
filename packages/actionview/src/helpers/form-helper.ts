@@ -1033,7 +1033,7 @@ export class FormBuilder {
     if (rbObjRespondTo(association, "toAry")) {
       const explicitChildIndex = options["childIndex"];
       const output = new SafeBuffer();
-      let pending: Promise<void> | null = null;
+      const contents: unknown[] = [];
       for (const child of association as Iterable<unknown>) {
         if (explicitChildIndex != null && explicitChildIndex !== false) {
           if (rbObjRespondTo(explicitChildIndex, "call")) {
@@ -1048,16 +1048,16 @@ export class FormBuilder {
           options,
           block,
         );
-        if (content instanceof Promise || pending !== null) {
-          pending = (pending ?? Promise.resolve())
-            .then(() => content)
-            .then((content) => {
-              if (content != null) output.concat(content);
-            });
-        } else if (content != null) output.concat(content);
+        contents.push(content);
       }
-      if (pending !== null) return pending.then(() => output);
-      return output;
+      const concatAll = (settled: unknown[]) => {
+        for (const content of settled) if (content != null) output.concat(content as SafeBuffer);
+        return output;
+      };
+      if (contents.some((content) => content instanceof Promise)) {
+        return Promise.all(contents).then(concatAll);
+      }
+      return concatAll(contents);
     } else if (association != null && association !== false) {
       return this.fieldsForNestedModel(name, association, options, block);
     }
