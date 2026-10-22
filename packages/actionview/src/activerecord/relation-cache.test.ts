@@ -51,8 +51,7 @@ describe("RelationCacheTest", () => {
     tc.setup();
   });
 
-  // BLOCKED: relation-fragment-cache-name-awaits-async-cache-key
-  it.skip("cache relation other", async () => {
+  it("cache relation other", async () => {
     await assertQueriesCount(1, false, async () => {
       await tc.cache(Project.all(), {}, () => {
         tc.concat("Hello World");

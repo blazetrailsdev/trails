@@ -42,6 +42,10 @@ export interface CacheFragmentNameOptions {
   digestPath?: string | null;
 }
 
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm cacheKeyWithVersion — PERMANENT
+ */
 export async function cache(
   this: CacheHelperHost,
   name: unknown = {},
@@ -51,6 +55,12 @@ export async function cache(
   if ("performCaching" in this.controller && this.controller.performCaching) {
     await CachingRegistry.trackCaching(async () => {
       const nameOptions = slice(options, "skipDigest");
+      const cacheKeyWithVersion = (name as { cacheKeyWithVersion?: () => unknown } | null)
+        ?.cacheKeyWithVersion;
+      if (typeof cacheKeyWithVersion === "function") {
+        const resolved = cacheKeyWithVersion.call(name);
+        if (resolved instanceof Promise) name = await resolved;
+      }
       this.safeConcat(
         await fragmentFor.call(this, this.cacheFragmentName(name, nameOptions), options, block),
       );
