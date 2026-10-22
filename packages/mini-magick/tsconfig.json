@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../vitest-matchers"
+    }
+  ]
+}
