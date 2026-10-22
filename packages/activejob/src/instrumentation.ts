@@ -75,7 +75,9 @@ export const Instrumentation = defineModule(
 extend(Instrumentation, Concern);
 
 (
-  Instrumentation as unknown as { included(base: null, block: (this: never) => void): void }
+  Instrumentation as unknown as {
+    included(base: null, block: (this: InstrumentationClass) => void): void;
+  }
 ).included(null, function (this: InstrumentationClass) {
   this.aroundEnqueue(
     block(function (this: InstrumentationJob, _: unknown, block: () => unknown) {

@@ -13,15 +13,14 @@ interface TimezonesClass {
 export const Timezones = {};
 extend(Timezones, Concern);
 
-(Timezones as unknown as { included(base: null, block: (this: never) => void): void }).included(
-  null,
-  function (this: TimezonesClass) {
-    this.aroundPerform(
-      rbBlock(function (job: TimezonesJob, block: () => unknown) {
-        return useZone(job.timezone, block);
-      }),
-    );
-  },
-);
+(
+  Timezones as unknown as { included(base: null, block: (this: TimezonesClass) => void): void }
+).included(null, function (this: TimezonesClass) {
+  this.aroundPerform(
+    rbBlock(function (job: TimezonesJob, block: () => unknown) {
+      return useZone(job.timezone, block);
+    }),
+  );
+});
 
 rbModConstSet(ActiveJob, "Timezones", Timezones);
