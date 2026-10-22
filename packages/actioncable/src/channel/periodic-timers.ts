@@ -109,7 +109,6 @@ export const PeriodicTimers = defineModule(
   {},
   {},
   {
-    /** @internal */
     get activePeriodicTimers(): Timer[] {
       const self = this as unknown as PeriodicTimersChannel;
       return (self._activePeriodicTimers ??= []);
