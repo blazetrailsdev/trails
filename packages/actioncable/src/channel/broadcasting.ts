@@ -21,30 +21,33 @@ export class ClassMethods {
   }
 
   static broadcastingFor(this: BroadcastingClass, model: unknown): string {
-    return serializeBroadcasting([this.channelName, model]) as string;
+    return (this as unknown as typeof ClassMethods).serializeBroadcasting([
+      this.channelName,
+      model,
+    ]) as string;
+  }
+
+  /** @internal */
+  private static serializeBroadcasting(object: unknown): unknown {
+    if (Array.isArray(object)) {
+      return object.map((m) => this.serializeBroadcasting(m)).join(":");
+    } else if (rbObjRespondTo(object, "toGidParam")) {
+      return (object as { toGidParam(): string }).toGidParam();
+    } else {
+      return toParam(object);
+    }
   }
 }
 
-/** @internal */
-function serializeBroadcasting(object: unknown): unknown {
-  if (Array.isArray(object)) {
-    return object.map((m) => serializeBroadcasting(m)).join(":");
-  } else if (rbObjRespondTo(object, "toGidParam")) {
-    return (object as { toGidParam(): string }).toGidParam();
-  } else {
-    return toParam(object);
-  }
+export function broadcastingFor(this: unknown, model: unknown): string {
+  return (rbObjClass(this) as unknown as BroadcastingClass).broadcastingFor(model);
 }
 
-export const Broadcasting = defineModule({
-  broadcastingFor(model: unknown): string {
-    return (rbObjClass(this) as unknown as BroadcastingClass).broadcastingFor(model);
-  },
+export function broadcastTo(this: unknown, model: unknown, message: unknown): Promise<unknown> {
+  return (rbObjClass(this) as unknown as BroadcastingClass).broadcastTo(model, message);
+}
 
-  broadcastTo(model: unknown, message: unknown): Promise<unknown> {
-    return (rbObjClass(this) as unknown as BroadcastingClass).broadcastTo(model, message);
-  },
-});
+export const Broadcasting = defineModule({ broadcastingFor, broadcastTo });
 extend(Broadcasting, Concern);
 Object.defineProperty(Broadcasting, "ClassMethods", { value: ClassMethods });
 

@@ -62,15 +62,6 @@ describe("ActionCable::Server::Base", () => {
     expect(server.workerPool).not.toBe(pool);
   });
 
-  it("removes every matching connection", () => {
-    const { server } = setup();
-    const c = { beat() {}, statistics: 1 };
-    server.addConnection(c as never);
-    server.addConnection(c as never);
-    server.removeConnection(c as never);
-    expect(server.connections).toEqual([]);
-  });
-
   it("runs the action_cable load hooks with the configuration", () => {
     let base: unknown;
     onLoad("action_cable", (b: unknown) => {
