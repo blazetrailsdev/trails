@@ -5,6 +5,7 @@ import type * as ArgumentsModule from "./arguments.js";
 import type * as SerializersModule from "./serializers.js";
 import type * as QueueAdaptersModule from "./queue-adapters.js";
 import type { AbstractAdapter } from "./queue-adapters/abstract-adapter.js";
+import type { AsyncAdapter } from "./queue-adapters/async-adapter.js";
 import type { InlineAdapter } from "./queue-adapters/inline-adapter.js";
 import type { TestAdapter } from "./queue-adapters/test-adapter.js";
 import type { BigDecimalSerializer } from "./serializers/big-decimal-serializer.js";
@@ -28,6 +29,8 @@ import type { QueueName } from "./queue-name.js";
 import type { QueueAdapter } from "./queue-adapter.js";
 import type * as QueueAdapterModule from "./queue-adapter.js";
 import type { QueuePriority } from "./queue-priority.js";
+import type * as TestCaseModule from "./test-case.js";
+import type * as TestHelperModule from "./test-helper.js";
 import type { ObjectSerializer } from "./serializers/object-serializer.js";
 
 export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
@@ -61,6 +64,8 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
   "active_job/serializers/range_serializer": () => import("./serializers/range-serializer.js"),
   "active_job/serializers/big_decimal_serializer": () =>
     import("./serializers/big-decimal-serializer.js"),
+  "active_job/test_case": () => import("./test-case.js"),
+  "active_job/test_helper": () => import("./test-helper.js"),
 };
 
 export interface SerializerLike {
@@ -89,6 +94,8 @@ export const ActiveJob = { name: "ActiveJob", loadPath } as AutoloadModule & {
   Execution: typeof Execution;
   QueuePriority: typeof QueuePriority;
   Serializers: typeof Serializers;
+  TestCase: typeof TestCaseModule.TestCase;
+  TestHelper: typeof TestHelperModule.TestHelper;
 };
 registerConstant("ActiveJob", ActiveJob);
 extend(ActiveJob, Autoload);
@@ -110,6 +117,7 @@ export const QueueAdapters = { name: "ActiveJob::QueueAdapters", loadPath } as A
   AbstractAdapter: typeof AbstractAdapter;
   InlineAdapter: typeof InlineAdapter;
   TestAdapter: typeof TestAdapter;
+  AsyncAdapter: typeof AsyncAdapter;
 };
 extend(QueueAdapters, Autoload);
 

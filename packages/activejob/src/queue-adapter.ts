@@ -1,5 +1,6 @@
 import {
   Concern,
+  DescendantsTracker,
   classAttribute,
   delegate,
   demodulize,
@@ -11,6 +12,7 @@ import {
   ArgumentError,
   classModule,
   deleteSuffix,
+  rbClassSuperclass,
   rbModConstSet,
   rbModName,
   rbObjClass,
@@ -73,6 +75,10 @@ export class ClassMethods {
   static assignAdapter(this: QueueAdapterClass, adapterName: string, queueAdapter: unknown): void {
     this._queueAdapterName = adapterName;
     this._queueAdapter = queueAdapter;
+    let klass = this as unknown as Parameters<typeof DescendantsTracker.registerSubclass>[1];
+    for (let superclass; (superclass = rbClassSuperclass(klass)); klass = superclass) {
+      DescendantsTracker.registerSubclass(superclass, klass);
+    }
   }
 
   /** @internal */
