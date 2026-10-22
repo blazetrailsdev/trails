@@ -1,4 +1,11 @@
-import { getHttpAsync, stderr, StringIO, Thread, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  getHttpAsync,
+  stderr,
+  StringIO,
+  TCPSocket,
+  Thread,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import type { HttpRequest, HttpResponse, HttpServer, HttpSocket } from "@blazetrails/ruby-compat";
 import {
   HTTPS,
@@ -79,9 +86,10 @@ export class Node {
       const env = await this.requestEnv(req, new StringIO(await readBody(req)));
       const socket = res.socket;
       let hijacked = false;
-      const release = (): HttpSocket => {
+      let io: TCPSocket | undefined;
+      const release = (): TCPSocket => {
         hijacked = true;
-        return socket!;
+        return (io ??= new TCPSocket(socket!));
       };
       env[RACK_IS_HIJACK] = socket != null;
       if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
@@ -96,8 +104,9 @@ export class Node {
           if (hijacked) return;
           const partial = headers[RACK_HIJACK];
           if (env[RACK_IS_HIJACK] && typeof partial === "function") {
-            release().write(responseHead(status, sentHeaders(headers)));
-            await partial(socket!);
+            const stream = release();
+            stream.write(responseHead(status, sentHeaders(headers)));
+            await partial(stream);
             return;
           }
           res.writeHead(status, sentHeaders(headers));
@@ -123,6 +132,7 @@ export class Node {
     return new Thread(async (): Promise<void> => {
       let hijacked = false;
       let started = false;
+      let io: TCPSocket | undefined;
       const discard = (): void => {
         socket.destroy();
       };
@@ -130,6 +140,7 @@ export class Node {
         hijacked = true;
         unhijacked.delete(socket);
         socket.removeListener("error", discard);
+        io ??= new TCPSocket(socket);
       };
       socket.on("error", discard);
       unhijacked.add(socket);
@@ -141,9 +152,9 @@ export class Node {
       try {
         const env = await this.requestEnv(req, new StringIO(""));
         env[RACK_IS_HIJACK] = true;
-        env[RACK_HIJACK] = (): HttpSocket => {
+        env[RACK_HIJACK] = (): TCPSocket => {
           release();
-          return socket;
+          return io!;
         };
 
         const [status, headers, body] = await (rbFSend(
@@ -158,7 +169,7 @@ export class Node {
             started = true;
             socket.write(responseHead(status, sentHeaders(headers)));
             release();
-            await (partial as (stream: HttpSocket) => unknown)(socket);
+            await (partial as (stream: TCPSocket) => unknown)(io!);
             return;
           }
           started = true;

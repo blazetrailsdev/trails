@@ -469,7 +469,13 @@ export {
 } from "./backtrace-location.js";
 export { ThreadError } from "./thread-error.js";
 export { Timeout } from "./timeout.js";
-export { CachedThreadPool, ThreadPoolExecutor } from "./thread-pool-executor.js";
+export {
+  CachedThreadPool,
+  globalIoExecutor,
+  RejectedExecutionError,
+  ThreadPoolExecutor,
+} from "./thread-pool-executor.js";
+export { BasicSocket, TCPSocket } from "./socket.js";
 export { ImmediateExecutor } from "./immediate-executor.js";
 export { ScheduledTask } from "./scheduled-task.js";
 export { Concurrent } from "./concurrent/map.js";
@@ -478,6 +484,8 @@ import "./concurrent/cyclic-barrier.js";
 import "./concurrent/event.js";
 import "./concurrent/atomic-boolean.js";
 import "./concurrent/read-write-lock.js";
+export { AtomicFixnum } from "./concurrent/atomic-fixnum.js";
+export { TimerTask } from "./concurrent/timer-task.js";
 export type { MonitorMixin } from "./monitor.js";
 
 export { Tempfile } from "./tempfile.js";

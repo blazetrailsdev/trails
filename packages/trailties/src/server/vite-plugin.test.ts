@@ -62,7 +62,7 @@ describe("trailsPlugin", () => {
       const middlewares: any[] = [];
       const fakeServer = {
         config: { server: { port: 3000 } },
-        httpServer: { address: () => ({ port: 3000 }) },
+        httpServer: { address: () => ({ port: 3000 }), on: () => {} },
         middlewares: { use: (fn: any) => middlewares.push(fn) },
       };
 
@@ -89,7 +89,7 @@ describe("trailsPlugin", () => {
       const middlewares: any[] = [];
       const fakeServer = {
         config: { server: { port: 3000 } },
-        httpServer: { address: () => ({ port: 3000 }) },
+        httpServer: { address: () => ({ port: 3000 }), on: () => {} },
         middlewares: { use: (fn: any) => middlewares.push(fn) },
       };
 
