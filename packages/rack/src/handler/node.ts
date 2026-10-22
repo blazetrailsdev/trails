@@ -81,33 +81,46 @@ export class Node {
       let hijacked = false;
       const release = (): HttpSocket => {
         hijacked = true;
-        res.detachSocket!(socket!);
+        unhijacked.delete(socket!);
         return socket!;
       };
-      env[RACK_IS_HIJACK] = socket != null && res.detachSocket !== undefined;
-      if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
+      env[RACK_IS_HIJACK] = socket != null;
+      if (env[RACK_IS_HIJACK]) {
+        env[RACK_HIJACK] = release;
+        unhijacked.add(socket!);
+        socket!.on("close", () => {
+          unhijacked.delete(socket!);
+        });
+      }
 
-      const [status, headers, body] = await (rbFSend(
-        this.app,
-        "call",
-        env,
-      ) as Promise<RackResponse>);
       try {
-        if (hijacked) return;
-        const partial = headers[RACK_HIJACK] as unknown;
-        if (env[RACK_IS_HIJACK] && typeof partial === "function") {
-          release().write(responseHead(status, sentHeaders(headers)));
-          await (partial as (stream: HttpSocket) => unknown)(socket!);
-          return;
-        }
-        res.writeHead(status, sentHeaders(headers));
-        for await (const chunk of body) {
+        const [status, headers, body] = await (rbFSend(
+          this.app,
+          "call",
+          env,
+        ) as Promise<RackResponse>);
+        try {
           if (hijacked) return;
-          res.write(chunk);
+          const partial = headers[RACK_HIJACK];
+          if (env[RACK_IS_HIJACK] && typeof partial === "function") {
+            release().write(responseHead(status, sentHeaders(headers)));
+            await partial(socket!);
+            return;
+          }
+          res.writeHead(status, sentHeaders(headers));
+          for await (const chunk of body) {
+            if (hijacked) return;
+            res.write(chunk);
+          }
+          res.end();
+        } finally {
+          await closeBody(body);
         }
-        res.end();
-      } finally {
-        await closeBody(body);
+      } catch (error) {
+        if (!hijacked) throw error;
+        stderr.write(
+          `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        );
       }
     }).value();
   }
@@ -240,15 +253,16 @@ export class Node {
 /** @noRailsEquivalent PERMANENT */
 function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]> {
   const sent: Record<string, string | string[]> = {};
-  const setCookie = headers[SET_COOKIE] as string | string[] | undefined;
-  if (setCookie) {
+  const setCookie = headers[SET_COOKIE];
+  if (setCookie && typeof setCookie !== "function") {
     sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
   }
 
   for (const [key, value] of Object.entries(headers)) {
     if (key.startsWith("rack.")) continue;
     if (key === SET_COOKIE) continue;
-    sent[key] = Array.isArray(value) ? value.join(", ") : (value as string);
+    if (typeof value === "function") continue;
+    sent[key] = Array.isArray(value) ? value.join(", ") : value;
   }
   return sent;
 }

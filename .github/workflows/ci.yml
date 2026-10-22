@@ -2189,7 +2189,7 @@ jobs:
         run: node scripts/ci/bg-gates.mjs summary
 
   rails-comparison-scoped:
-    name: Rails API/Test Comparison (thor)
+    name: Rails API/Test Comparison (scoped)
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&

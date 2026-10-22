@@ -13,6 +13,10 @@ esac
 
 only="with_entries(select(.key == \"$pkg\"))"
 LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths | jq -c "$only")
+if [ "$LIB_PATHS_JSON" = "{}" ]; then
+  echo "::error::$pkg has no vendored lib path, so it is not enrolled in the compare tooling and cannot be compared alone"
+  exit 1
+fi
 LIB_ENTRY_FILES_JSON=$(pnpm --silent vendor:fetch --print-lib-entry-files | jq -c "$only")
 TEST_PATHS_JSON=$(pnpm --silent vendor:fetch --print-test-paths | jq -c "$only")
 LOCKFILE_PATH="$PWD/vendor/sources.lock.json"
@@ -56,10 +60,6 @@ assertions after test-compare: $tests/lint-assertion-mismatches.ts --no-regen --
 SPEC
 )
 
-if [ "$LIB_PATHS_JSON" = "{}" ]; then
-  echo "::error::$pkg has no vendored lib path, so it is not enrolled in the compare tooling and cannot be compared alone"
-  exit 1
-fi
 spec="$scoped"$'\n'"$unscoped"
 
 printf "unscoped %s\n" "${unscoped_reasons[@]}"

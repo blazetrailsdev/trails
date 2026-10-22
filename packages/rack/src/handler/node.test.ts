@@ -373,6 +373,71 @@ describe("Rack::Handler::Node", () => {
       expect(text).not.toContain("never written");
     });
 
+    it("reports an error raised after a hijack and leaves the socket to the app", async () => {
+      const rejections: unknown[] = [];
+      const onRejection = (reason: unknown): void => void rejections.push(reason);
+      process.on("unhandledRejection", onRejection);
+      let text = "";
+      try {
+        await serving(
+          async (env) => {
+            const io = (env[RACK_HIJACK] as () => HttpSocket)();
+            setTimeout(() => {
+              io.write("still mine");
+              io.end();
+            }, 30);
+            throw new Error("after hijack");
+          },
+          async (url) => {
+            ({ text } = await rawGet(url, "/taken"));
+          },
+        );
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      } finally {
+        process.off("unhandledRejection", onRejection);
+      }
+
+      expect(text).toBe("still mine");
+      expect(rejections).toEqual([]);
+    });
+
+    it("closes a socket it still owns on shutdown, and waits for the app to close one it hijacked", async () => {
+      let hijackedIo: HttpSocket | null = null;
+      const server = await Node.run(
+        async (env) => {
+          if (env.PATH_INFO === "/taken") {
+            hijackedIo = (env[RACK_HIJACK] as () => HttpSocket)();
+            return [-1, {}, [""]];
+          }
+          await new Promise(() => {});
+          return [200, {}, [""]];
+        },
+        { Port: 0, Host: "127.0.0.1" },
+      );
+      const address = server.address();
+      const port = address && typeof address === "object" ? address.port : 0;
+      const url = `http://127.0.0.1:${port}`;
+      const taken = await rawSocket(url, "/taken");
+      const pending = await rawSocket(url, "/pending");
+      const pendingClosed = new Promise<void>((resolve) => pending.on("close", () => resolve()));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      let stopped = false;
+      const shutdown = Node.shutdown().then(() => {
+        stopped = true;
+      });
+      await pendingClosed;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(pending.destroyed).toBe(true);
+      expect(taken.destroyed).toBe(false);
+      expect(stopped).toBe(false);
+
+      hijackedIo!.destroy();
+      await shutdown;
+      expect(stopped).toBe(true);
+    });
+
     it("answers a request that does not hijack exactly as before", async () => {
       let text = "";
       await serving(
