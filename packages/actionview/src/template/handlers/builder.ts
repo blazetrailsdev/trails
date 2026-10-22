@@ -15,7 +15,7 @@ export class Builder implements TemplateHandler {
     this.requireEngine();
     return (
       "const xml = new Builder.XmlMarkup({ indent: 2, target: outputBuffer.raw() });" +
-      `${source};\n` +
+      `${source};` +
       "return outputBuffer.toString();"
     );
   }
