@@ -27,6 +27,8 @@ import { ClassMethods as QueueAdapterClassMethods, QueueAdapter } from "./queue-
 import "./queue-adapters.js";
 import { ClassMethods as QueueNameClassMethods, QueueName } from "./queue-name.js";
 import { ClassMethods as QueuePriorityClassMethods, QueuePriority } from "./queue-priority.js";
+import { Timezones } from "./timezones.js";
+import { Translation } from "./translation.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base
@@ -38,7 +40,10 @@ export interface Base
     Exceptions,
     Rescuable,
     Included<typeof ASCallbacks>,
-    Pick<Included<typeof Instrumentation>, "instrument"> {}
+    Pick<Included<typeof Instrumentation>, "instrument"> {
+  get logger(): unknown;
+  set logger(logger: unknown);
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
@@ -89,7 +94,6 @@ export class Base {
   declare static logger: unknown;
   declare static logArguments: boolean;
   declare static isLogArguments: boolean;
-  declare logger: unknown;
   declare static rescueHandlers: unknown[][];
 
   /**
@@ -128,6 +132,8 @@ include(Base, Callbacks);
 include(Base, Exceptions);
 include(Base, Instrumentation);
 include(Base, Logging);
+include(Base, Timezones);
+include(Base, Translation);
 rbModConstSet(ActiveJob, "Base", Base);
 
 runLoadHooks("active_job", Base);

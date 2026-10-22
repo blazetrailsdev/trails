@@ -185,4 +185,24 @@ describe("delegate", () => {
     ]);
     expect(new Order().name()).toBe("Ada");
   });
+
+  it("gives a reader and writer pair one accessor", () => {
+    class Adapter {
+      x = 1;
+    }
+    class Helper {
+      adapter = new Adapter();
+      someMethod() {
+        return this.adapter;
+      }
+      declare x: number;
+    }
+    delegate.call(Helper.prototype, "x", "x=", { to: "someMethod" });
+
+    const helper = new Helper();
+    expect(helper.x).toBe(1);
+    helper.x = 2;
+    expect(helper.adapter.x).toBe(2);
+    expect(helper.x).toBe(2);
+  });
 });

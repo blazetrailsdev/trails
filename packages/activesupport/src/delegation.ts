@@ -162,9 +162,18 @@ export namespace Delegation {
           (_ as Record<string, unknown>)[attr] = arg;
         };
         iseqLocationSetup(set, file, line);
+        const reader = Object.getOwnPropertyDescriptor(owner, methodName.slice(0, -1));
+        const readerValue = reader?.value as ((this: unknown) => unknown) | undefined;
         Object.defineProperty(owner, methodName.slice(0, -1), {
           configurable: true,
           enumerable,
+          get:
+            reader?.get ??
+            (typeof readerValue === "function"
+              ? function (this: unknown) {
+                  return readerValue.call(this);
+                }
+              : undefined),
           set,
         });
         continue;
