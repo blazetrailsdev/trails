@@ -43,8 +43,8 @@ export interface CacheFragmentNameOptions {
 }
 
 /**
- * @inventedArm if — PERMANENT
- * @inventedArm cacheKeyWithVersion — PERMANENT
+ * @inventedArm if — CONVERGEABLE cache-fragment-name-awaits-nested-relation-keys
+ * @inventedArm cacheKeyWithVersion — CONVERGEABLE cache-fragment-name-awaits-nested-relation-keys
  */
 export async function cache(
   this: CacheHelperHost,
