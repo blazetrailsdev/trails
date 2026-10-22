@@ -28,6 +28,9 @@ import {
   SPLAT_YIELD_ONE,
   asyncEnumBody,
 } from "./mappings/core-methods.js";
+import type { CallSite } from "./mappings/call-site.js";
+import { KERNEL_FUNCTIONS } from "./mappings/kernel.js";
+import { OBJECT_METHODS } from "./mappings/object-methods.js";
 import { OP_SPELL, OPERATORS } from "./mappings/operators.js";
 import {
   GemIndex,
@@ -288,10 +291,6 @@ export interface InlineHook {
 function symColonHere(ctx: Ctx): boolean {
   return !!ctx.f.symbolColon && (!!GEM.symbolColon || ctx.f.rubyFile.startsWith("test/"));
 }
-const FLAT_ASSERTION_MODULES = new Set([
-  "ActiveSupport::Testing::Assertions",
-  "Minitest::Assertions",
-]);
 
 export class Lowerer {
   constructor(
@@ -3624,6 +3623,19 @@ export class Lowerer {
       return `${this.rc(ctx, "rbModName")}(${r})`;
 
     const rc = (x: string) => this.rc(ctx, x);
+    const site = (r0: string | null, R0: string): CallSite => ({
+      lw: this,
+      ctx,
+      n,
+      name,
+      r: r0,
+      R: R0,
+      recvNode,
+      nav,
+      args,
+      argList,
+      rc,
+    });
 
     // ── module functions of a dependency namespace (`ActiveSupport::Inflector.underscore`,
     // `Array.wrap`) are package functions; decided before any receiver-helper
@@ -3648,444 +3660,15 @@ export class Lowerer {
         );
         return `${this.as(ctx, macro)}.call(${[ctx.selfExpr, ...a].join(", ")})`;
       }
-      switch (name) {
-        // A module or class body's `extend M` / `include M` (outside the class
-        // emitter's own handling) is ruby-compat's `extend(self, M)` / `include(self, M)`.
-        case "extend":
-        case "include":
-          // Minitest's and ActiveSupport's assertion modules are flat functions in
-          // trails (activesupport testing/assertions.ts), carried by the test host
-          // that stands in for `ActiveSupport::TestCase`; there is no module value.
-          if (
-            name === "include" &&
-            n.args.length === 1 &&
-            n.args[0].k === "const" &&
-            FLAT_ASSERTION_MODULES.has(n.args[0].path.filter((x: string) => x).join("::"))
-          ) {
-            this.stat(ctx, "flat-assertion-module");
-            return `void "include ${n.args[0].path.filter((x: string) => x).join("::")}: the test host's"`;
-          }
-          if (ctx.selfKind === "static" && n.args.length)
-            return n.args
-              .map((a: N) => `${rc(name)}(${ctx.selfExpr}, ${this.expr(a, ctx)})`)
-              .join(", ");
-          break;
-        // `delegate :m, to: :t` run as a statement with `self` a class (`included
-        // do`): activesupport `delegate` on the instance side, the hand port's
-        // `delegate.call(base.prototype, "m", { to: "class" })` (activerecord core.ts).
-        case "delegate":
-          if (ctx.selfKind === "static" && n.args.some((a: N) => a.k === "sym")) {
-            const names = n.args
-              .filter((a: N) => a.k === "sym")
-              .map((a: N) => JSON.stringify(tsMethodName(a.value)));
-            const opts = n.args.filter((a: N) => a.k !== "sym").map((a: N) => this.argExpr(a, ctx));
-            return `${this.as(ctx, "delegate")}.call(${ctx.selfExpr}.prototype, ${[...names, ...opts].join(", ")})`;
-          }
-          break;
-        // `Kernel#DelegateClass(superclass)` is ruby-compat's `DelegateClass`.
-        case "DelegateClass":
-          return `${rc("DelegateClass")}(${argList()})`;
-        case "raise":
-        case "fail":
-          return `${rc("rbRaise")}(${argList()})`;
-        case "block_given?":
-          return `(${ctx.blockVar ?? "block"} != null)`;
-        // Kernel#BigDecimal(value, ndigits) (bigdecimal.c `f_BigDecimal`).
-        case "BigDecimal":
-          return `new ${this.rc(ctx, "BigDecimal")}(${argList()})`;
-        case "lambda":
-        case "proc":
-          if (n.block?.k === "block") return this.arrow(n.block.params, n.block.body, ctx);
-          break;
-        case "require":
-        case "require_relative":
-          return "undefined";
-        case "loop":
-          if (n.block?.k === "block") return this.iife({ k: "seq", body: [n] }, ctx);
-          break;
-        case "binding":
-        case "eval":
-        case "instance_eval":
-        case "class_eval":
-        case "module_eval":
-        case "instance_exec":
-        case "class_exec":
-        case "define_method":
-          if (name === "class_eval" && !n.args.length && n.block?.k === "block")
-            return this.classEvalBlock(ctx.selfExpr, n, ctx);
-          if (
-            name === "define_method" &&
-            ctx.methodSelf &&
-            n.block?.k === "block" &&
-            n.args.length === 1
-          )
-            return `${rc("rbDefineMethod")}(${ctx.selfExpr}, ${this.methodNameArg(n.args[0], ctx)}, ${this.arrow(
-              n.block.params ?? [],
-              n.block.body,
-              this.child(ctx, {
-                selfExpr: ctx.methodSelf,
-                selfKind: "instance",
-                methodSelf: undefined,
-              }),
-            )})`;
-          if (
-            name === "define_method" ||
-            name === "instance_exec" ||
-            name === "instance_eval" ||
-            name === "class_eval"
-          )
-            return `${rc(snakeToCamel("rb_" + name))}(${ctx.selfExpr}, ${argList()})`;
-          return this.decline(ctx, "ruby-eval", n, name);
-        case "method_defined?":
-        case "public_method_defined?":
-          // Module#method_defined? on self (a class body or `class_eval` block).
-          return `${rc("rbModMethodDefined")}(${[ctx.selfExpr, this.methodNameArg(n.args[0], ctx), ...n.args.slice(1).map((a: N) => this.expr(a, ctx))].join(", ")})`;
-        case "puts":
-        case "warn":
-          return `console.warn(${argList()})`;
-        case "format":
-        case "sprintf":
-          return `${rc("rbFormat")}(${argList()})`;
-        case "Array":
-          return `${rc("rbFArray")}(${argList()})`;
-        case "Integer":
-          return `${rc("rbInteger")}(${argList()})`;
-        case "Float":
-          return `${rc("rbFloat")}(${argList()})`;
-        case "String":
-          return `String(${argList()})`;
-        case "freeze":
-          return ctx.selfExpr;
-        case "catch":
-        case "throw": {
-          // A Symbol tag keeps its colon (`kernelThrow(":abort")`, the hand
-          // port's spelling, and what activesupport's callbacks catch): a catch
-          // tag is matched by identity, so it follows the Symbol convention.
-          const parts = args();
-          if (n.args[0]?.k === "sym") parts[0] = JSON.stringify(`:${n.args[0].value}`);
-          return `${rc("rbF" + name[0].toUpperCase() + name.slice(1))}(${parts.join(", ")})`;
-        }
-      }
+      const kernel = KERNEL_FUNCTIONS[name]?.(site(null, ctx.selfExpr));
+      if (kernel != null) return kernel;
       if (this.isLocal(ctx, name) && n.args.length === 0) return jsIdent(name);
     }
 
     // ── universal object protocol (receiver-agnostic)
     const R = r ?? ctx.selfExpr;
-    switch (name) {
-      // A Ruby Symbol is a JS string (CLAUDE.md), so `to_sym` on a String or
-      // Symbol is the value itself, whatever the receiver's static type, unless
-      // the gem defines its own `to_sym`.
-      // ActiveSupport `Object#try` / `try!` (core_ext/object/try.rb): activesupport
-      // `tryCall(x, "m", …)` / `tryBang`, the method name as its TS spelling (the
-      // hand port's `tryCall(scope, "proxyAssociation")`); a block form is `tryWith`.
-      case "try":
-      case "try!":
-        if (r !== null && !this.index.methodNames.has(name)) {
-          if (n.args[0]?.k === "sym") {
-            const rest = n.args.slice(1).map((x: N) => this.argExpr(x, ctx));
-            const fn = this.as(ctx, name === "try" ? "tryCall" : "tryBang");
-            return `${fn}(${[r, JSON.stringify(tsMethodName(n.args[0].value)), ...rest].join(", ")})`;
-          }
-          if (name === "try" && n.args.length === 0 && n.block)
-            return `${this.as(ctx, "tryWith")}(${r}, ${this.blockArg(n.block, ctx)})`;
-        }
-        break;
-      // `Module#const_get` / `const_defined?` / `const_set` (object.c
-      // rb_mod_const_get …) are ruby-compat's, with the module as first argument.
-      case "const_get":
-      case "const_defined?":
-      case "const_set":
-        if (!this.index.methodNames.has(name)) {
-          const fn: string = (
-            {
-              const_get: "rbModConstGet",
-              "const_defined?": "rbModConstDefined",
-              const_set: "rbModConstSet",
-            } as Record<string, string>
-          )[name];
-          return `${rc(fn)}(${[R, ...args()].join(", ")})`;
-        }
-        break;
-      case "to_sym":
-        if (r !== null && n.args.length === 0 && !n.block && !this.index.methodNames.has("to_sym"))
-          return ctx.f.symbolColon ? `${rc("stringToSym")}(${r})` : r;
-        break;
-      case "nil?":
-        return `(${R} == null)`;
-      case "is_a?":
-      case "kind_of?":
-      case "instance_of?":
-        if (n.args.length === 1 && n.args[0].k === "const")
-          return `(${this.typeTest(n.args[0], R, ctx)})`;
-        return `${rc("rbObjIsKindOf")}(${R}, ${argList()})`;
-      case "respond_to?":
-        // The name asked about is the TS member's (`:permitted?` is `isPermitted`).
-        if (n.args[0]?.k === "sym")
-          return `${rc("rbObjRespondTo")}(${[R, JSON.stringify(tsMethodName(n.args[0].value)), ...n.args.slice(1).map((x: N) => this.argExpr(x, ctx))].join(", ")})`;
-        // A Ruby method name known only at run time (`QUEUE_ADAPTER_METHODS`'s
-        // `:enqueue_at`) is translated to the TS member name when asked.
-        // docs/ruby-ts-conventions.md: snake_case is camelCase, `x?` is `isX`.
-        {
-          const tsName = `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${this.argExpr(n.args[0], ctx)}))`;
-          return `${rc("rbObjRespondTo")}(${[R, tsName, ...n.args.slice(1).map((x: N) => this.argExpr(x, ctx))].join(", ")})`;
-        }
-      // Class#descendants / #subclasses (core_ext/class/subclasses.rb) are
-      // activesupport's DescendantsTracker functions on a constant receiver.
-      case "descendants":
-      case "subclasses":
-        if (n.args.length === 0 && recvNode?.k === "const" && GEM.gem === "activejob")
-          return `${this.as(ctx, name)}(${R})`;
-        break;
-      // Object#acts_like? (core_ext/object/acts_like.rb), on any receiver nil included.
-      case "acts_like?":
-        if (n.args.length === 1)
-          return `${this.as(ctx, "actsLike")}.call(${R}, ${this.argExpr(n.args[0], ctx)})`;
-        break;
-      case "present?":
-        return `${this.as(ctx, "isPresent")}(${R})`;
-      case "blank?":
-        return `${this.as(ctx, "isBlank")}(${R})`;
-      case "presence":
-        return `${this.as(ctx, "presence")}(${R})`;
-      case "dup":
-        return `${rc("rbObjDup")}(${R})`;
-      case "clone":
-        return `${rc("rbObjClone")}(${R})`;
-      case "send":
-      case "__send__":
-        // A literal name is the TS member's (`:deserialize_arguments_if_needed`
-        // is `deserializeArgumentsIfNeeded`), awaited when a gem def of it is async.
-        if (n.args[0]?.k === "sym") {
-          const sym: string = n.args[0].value;
-          const call = `${rc("rbFSend")}(${[R, JSON.stringify(tsMethodName(sym)), ...n.args.slice(1).map((x: N) => this.argExpr(x, ctx))].join(", ")})`;
-          if ([...this.resolver.asyncDefs].some((k) => k.endsWith(`#${sym}`))) {
-            if (ctx.asyncBox) ctx.asyncBox.awaits = true;
-            return `(await ${call})`;
-          }
-          return call;
-        }
-        // `MAGIC.send(method) { … }` where `method` is a parameter every call of
-        // this method passes a literal Symbol (`magic_match(io, :find)` /
-        // `(io, :select)`, magic.rb:87, :94): the call each one names.
-        if (n.args[0]?.k === "lvar" && ctx.defName) {
-          const i = (ctx.defParams ?? []).findIndex((p) => p.name === n.args[0].name);
-          const syms = i >= 0 ? this.posSyms.get(ctx.defName)?.get(i) : null;
-          if (syms && syms.size >= 1 && syms.size <= 3) {
-            const v = this.expr(n.args[0], ctx);
-            const arms = [...syms].map((sym) => ({
-              sym,
-              code: this.expr({ ...n, name: sym, args: n.args.slice(1) }, ctx),
-            }));
-            return arms
-              .slice(0, -1)
-              .reduceRight(
-                (acc, a) => `${v} === ${JSON.stringify(a.sym)} ? ${a.code} : ${acc}`,
-                arms.at(-1)!.code,
-              );
-          }
-        }
-        // `MAGIC.send(method) { |type, matches| … }` (marcel magic.rb:131): an
-        // Array iterator yields one element, which a block of several
-        // parameters splats (vm_callee_setup_block_arg); JS's `find` / `select`
-        // pass (element, index, array).
-        if (
-          n.block?.k === "block" &&
-          n.block.params.length >= 2 &&
-          n.block.params.every((p: Param) => p.kind === "req" && p.name)
-        ) {
-          const plain = n.args.map((x: N) => this.argExpr(x, ctx));
-          const f = this.blockArg(n.block, ctx);
-          return `${rc("rbFSend")}(${[R, ...plain, `(x: unknown) => (${f})(...(Array.isArray(x) ? x : [x]))`].join(", ")})`;
-        }
-        return `${rc("rbFSend")}(${R}, ${argList()})`;
-      // Ruby `Range#cover?` is ruby-compat Range's `cover`.
-      case "cover?":
-        if (n.args.length === 1) return `${R}${nav}cover(${this.argExpr(n.args[0], ctx)})`;
-        break;
-      case "public_send":
-        return `${rc("rbFPublicSend")}(${R}, ${argList()})`;
-      case "class":
-        if (n.args.length === 0) {
-          const own =
-            (!recvNode || recvNode.k === "self") && ctx.selfKind === "instance" && ctx.owner
-              ? this.resolver.exportNames.get(ctx.owner)
-              : undefined;
-          // `self.class` is ruby-compat's `rbObjClass` (the hand port's spelling,
-          // activejob core.ts), typed as the class it is written in.
-          if (own && this.index.scopes.get(ctx.owner!)?.kind === "class") {
-            const ref = this.resolver.fqnRef(ctx.owner!, ctx, this);
-            return `(${rc("rbObjClass")}(${R}) as unknown as typeof ${ref})`;
-          }
-          return `${rc("rbObjClass")}(${R})`;
-        }
-        break;
-      case "freeze":
-        if (n.args.length === 0)
-          return recvNode?.k === "str" || recvNode?.k === "dstr" ? R : `Object.freeze(${R})`;
-        break;
-      case "frozen?":
-        return `Object.isFrozen(${R})`;
-      case "tap":
-        if (n.block?.k === "block") {
-          const p = n.block.params[0]?.name ?? "_";
-          const scope: Scope = { locals: new Set([p]), parent: ctx.scope };
-          const inner = this.child(ctx, {
-            scope,
-            fnScope: scope,
-            inBlock: true,
-            nested: false,
-            asyncBox: { awaits: false },
-          });
-          const body = this.block(this.seqBody(n.block.body), inner, false);
-          const hz: Set<string> | undefined = scope.hoisted;
-          if (hz?.size) body.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
-          const asy = inner.asyncBox!.awaits;
-          if (asy && ctx.asyncBox) ctx.asyncBox.awaits = true;
-          const fn = `(${asy ? "async " : ""}(${jsIdent(p)}) => {\n${indent([...body, `return ${jsIdent(p)};`]).join("\n")}\n})(${R})`;
-          return asy ? `(await ${fn})` : fn;
-        }
-        break;
-      case "then":
-      case "yield_self":
-        if (n.block?.k === "block")
-          return `(${this.arrow(n.block.params, n.block.body, ctx)})(${R})`;
-        break;
-      case "instance_variable_get":
-        return `${rc("rbIvarGet")}(${R}, ${argList()})`;
-      case "instance_variable_set":
-        return `${rc("rbIvarSet")}(${R}, ${argList()})`;
-      case "instance_variable_defined?":
-        return `${rc("rbIvarDefined")}(${R}, ${argList()})`;
-      case "singleton_class":
-        return `(${rc("rbObjSingletonClass")}(${R}) as any)`;
-      // `Module#ancestors` on a class: ruby-compat walks the prototype chain and
-      // the modules `include` spliced into it.
-      case "ancestors":
-        if (n.args.length === 0 && !this.index.methodNames.has("ancestors"))
-          return `${rc("rbModAncestors")}(${R})`;
-        break;
-      // `klass.singleton_class.public_instance_methods(false)`: a JS class's
-      // singleton class is its own statics (CLAUDE.md "singleton_class is a
-      // per-object subclass"), so the class's own public static names, in Ruby
-      // spelling for an `include?(:_queue_adapter)` test.
-      case "public_instance_methods":
-        if (
-          n.recv?.k === "call" &&
-          n.recv.name === "singleton_class" &&
-          n.recv.args.length === 0 &&
-          n.args.length === 1 &&
-          n.args[0].k === "false"
-        )
-          // A class_attribute written on the class (its own `__class_attr_<name>`
-          // storage, class_attribute.ts) is the singleton reader Ruby's setter defines.
-          return `Object.getOwnPropertyNames(${this.expr(n.recv.recv, ctx)}).filter((n) => !["length", "name", "prototype"].includes(n)).map((n) => n.replace(/^__class_attr_/, "")).map((n) => ((u: string) => (n.startsWith("_") && !u.startsWith("_") ? "_" + u : u))(${this.as(ctx, "underscore")}(n)))`;
-        break;
-      // `3.seconds` on a numeric literal: activesupport's `Numeric#seconds`
-      // (core_ext/numeric/time.rb) is `ActiveSupport::Duration.seconds(self)`.
-      case "month":
-      case "months":
-      case "year":
-      case "years":
-      case "second":
-      case "seconds":
-      case "minute":
-      case "minutes":
-      case "hour":
-      case "hours":
-      case "day":
-      case "days":
-      case "week":
-      case "weeks":
-      case "fortnight":
-      case "fortnights":
-        if (n.args.length === 0 && (n.recv?.k === "int" || n.recv?.k === "float")) {
-          const unit = name.endsWith("s") ? name : name + "s";
-          return `${this.imp(ctx, "@blazetrails/activesupport", "Duration")}.${unit}(${this.expr(n.recv, ctx)})`;
-        }
-        // On a value that may be an Integer or a Duration (`options[:wait].seconds`):
-        // Duration's `method_missing` reaches the Integer's (duration.rb), so either way
-        // it is a Duration of that many units.
-        // Plural units only: a singular `second` / `day` on an untyped value is as
-        // likely `Array#second` (core_ext/array/access.rb).
-        if (
-          n.args.length === 0 &&
-          r !== null &&
-          name.endsWith("s") &&
-          !this.index.methodNames.has(name) &&
-          !this.typeOf(recvNode, ctx)
-        ) {
-          const unit = name.endsWith("s") ? name : name + "s";
-          const D = this.as(ctx, "Duration");
-          return `${D}.${unit}(${this.withOnce(r, (x) => `(${x} instanceof ${D} ? ${x}.value : ${x})`)})`;
-        }
-        break;
-      // `"59.123456789".to_r` on a decimal literal: the Rational String#to_r
-      // (rational.c `string_to_r`) answers, folded to its numerator and denominator.
-      case "to_r":
-        if (n.args.length === 0 && n.recv?.k === "str" && /^-?\d+(\.\d+)?$/.test(n.recv.value)) {
-          const [i, fr = ""] = n.recv.value.split(".");
-          return `${this.rc(ctx, "rational")}(${BigInt(i + fr)}n, ${10n ** BigInt(fr.length)}n)`;
-        }
-        break;
-      // `Hash#values_at` (hash.c rb_hash_values_at) on a hash value: ruby-compat's.
-      case "values_at":
-        if (r !== null && !this.index.methodNames.has(name))
-          return `${rc("valuesAt")}(${[R, ...args()].join(", ")})`;
-        break;
-      // `Hash#with_indifferent_access` (core_ext/hash/indifferent_access.rb) is
-      // activesupport's flat `withIndifferentAccess(hash)`.
-      case "with_indifferent_access":
-        if (n.args.length === 0 && r !== null && !this.index.methodNames.has(name))
-          return `${this.imp(ctx, "@blazetrails/activesupport", "withIndifferentAccess")}(${R})`;
-        break;
-      // `Integer#ordinalize` / `#ordinal` (core_ext/integer/inflections.rb) are
-      // `ActiveSupport::Inflector.ordinalize(self)`: activesupport's flat export.
-      case "ordinalize":
-      case "ordinal":
-        if (n.args.length === 0 && r !== null && !this.index.methodNames.has(name))
-          return `${this.imp(ctx, "@blazetrails/activesupport", name)}(${R})`;
-        break;
-      // `Numeric#div` (numeric.c `num_div`) is the floored quotient.
-      case "div":
-        if (n.args.length === 1 && !this.index.methodNames.has("div"))
-          return `Math.floor(${R} / ${argList()})`;
-        break;
-      // Ruby `Exception#backtrace` / `#set_backtrace` are ruby-compat's
-      // `excBacktrace` / `excSetBacktrace` (error.c `exc_backtrace`).
-      case "backtrace":
-        if (n.args.length === 0) return `${rc("excBacktrace")}(${R})`;
-        break;
-      case "set_backtrace":
-        if (n.args.length === 1) return `${rc("excSetBacktrace")}(${R}, ${argList()})`;
-        break;
-      case "equal?":
-        return `(${R} === ${argList()})`;
-      case "hash":
-        if (n.args.length === 0) return `${rc("rbHash")}(${R})`;
-        break;
-      case "eql?":
-        return `${rc("rbEql")}(${R}, ${argList()})`;
-      case "inspect":
-        return `${rc("rbInspect")}(${R})`;
-      case "to_s":
-        if (n.args.length === 0) {
-          // `Symbol#to_s` drops the colon (`rb_sym2str`) where the file keeps it.
-          if (ctx.f.symbolColon) {
-            const v = /^[A-Za-z_$][\w$]*$/.test(R) ? R : null;
-            const body = (x: string) =>
-              `${rc("isSymbol")}(${x}) ? ${rc("symbolToS")}(${x}) : ${rc("rbObjAsString")}(${x})`;
-            return v ? `(${body(v)})` : `((v) => ${body("v")})(${R})`;
-          }
-          // A value known not to be nil, a String / Number / Boolean, is JS `String(x)`.
-          const t = this.typeOf(recvNode, ctx);
-          if (t?.k === "prim" && t.name !== "null" && !t.nullable) return `String(${r})`;
-          return `${rc("rbObjAsString")}(${R})`;
-        }
-        break;
-      case "fetch":
-        if (r !== null) return `${rc("fetch")}(${R}, ${argList()})`;
-        break;
-    }
+    const objectMethod = OBJECT_METHODS[name]?.(site(r, R));
+    if (objectMethod != null) return objectMethod;
 
     // ── `Mod.x` where `def self.x` is a gem module function → the exported function.
     if (recvNode?.k === "const") {
