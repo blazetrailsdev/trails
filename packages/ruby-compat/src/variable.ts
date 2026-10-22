@@ -21,6 +21,7 @@ import { Interrupt, SignalException } from "./signal-exception.js";
 import { StandardError } from "./standard-error.js";
 import { Hash } from "./hash.js";
 import { warn } from "./kernel-warn.js";
+import { verbose } from "./verbose.js";
 import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
 import { RCLASS_CONST_TBL, classpaths, rbCBasicObject, rbCSymbol, rbModName } from "./object.js";
@@ -293,7 +294,7 @@ const CONST_DEPRECATED = new WeakMap<object, Set<string>>();
  */
 export function rbModDeprecateConstant<T extends object>(obj: T, ...argv: string[]): T {
   if (argv.length === 0) {
-    warn("deprecate_constant with no argument is just ignored");
+    if (verbose() === true) warn("deprecate_constant with no argument is just ignored");
     return obj;
   }
   for (const id of argv) {
@@ -312,8 +313,10 @@ export function rbModDeprecateConstant<T extends object>(obj: T, ...argv: string
  * `rb_const_warn_if_deprecated` (`vendor/ruby/v3.3.11/variable.c:3104-3117`):
  * a `:deprecated`-category warning for a read of a constant
  * {@link rbModDeprecateConstant} flagged.
+ *
+ * @noRailsEquivalent PERMANENT
  */
-function rbConstWarnIfDeprecated(klass: object, id: string): void {
+export function rbConstWarnIfDeprecated(klass: object, id: string): void {
   if (CONST_DEPRECATED.get(klass)?.has(id)) {
     if (klass === Object) {
       warn(`constant ::${id} is deprecated`, { category: ":deprecated" });
