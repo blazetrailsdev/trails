@@ -218,8 +218,8 @@ export class Template {
 
   get shortIdentifier(): string {
     if (this._shortIdentifier) return this._shortIdentifier;
-    if (TopLevel.Trails === undefined) return (this._shortIdentifier = this.identifier);
-    const prefix = `${TopLevel.Trails.root() ?? ""}/`;
+    if (!rbObjRespondTo(TopLevel.Trails, "root")) return (this._shortIdentifier = this.identifier);
+    const prefix = `${TopLevel.Trails!.root() ?? ""}/`;
     return (this._shortIdentifier = this.identifier.startsWith(prefix)
       ? this.identifier.slice(prefix.length)
       : this.identifier);

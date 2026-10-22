@@ -24227,13 +24227,6 @@
   },
   {
     "package": "activemodel",
-    "rubyFile": "serializers/json.rb",
-    "rubyName": "serializable_hash",
-    "digest": "4dba7909f52532e5",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activemodel",
     "rubyFile": "translation.rb",
     "rubyName": "human_attribute_name",
     "digest": "27b8673a4d98c4af",
