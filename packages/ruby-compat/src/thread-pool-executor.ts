@@ -21,6 +21,10 @@ export class ThreadPoolExecutor {
   /** @noRailsEquivalent PERMANENT */
   readonly fallbackPolicy: "caller_runs";
   /** @noRailsEquivalent PERMANENT */
+  readonly idletime: number;
+  /** @noRailsEquivalent PERMANENT */
+  readonly autoTerminate: boolean;
+  /** @noRailsEquivalent PERMANENT */
   scheduledTaskCount = 0;
   /** @noRailsEquivalent PERMANENT */
   completedTaskCount = 0;
@@ -35,20 +39,26 @@ export class ThreadPoolExecutor {
     maxThreads,
     maxQueue,
     fallbackPolicy,
+    idletime = 60,
+    autoTerminate = true,
   }: {
     minThreads: number;
     maxThreads: number;
     maxQueue: number;
     fallbackPolicy: "caller_runs";
+    idletime?: number;
+    autoTerminate?: boolean;
   }) {
     this.minLength = minThreads;
     this.maxLength = maxThreads;
     this.maxQueue = maxQueue;
     this.fallbackPolicy = fallbackPolicy;
+    this.idletime = idletime;
+    this.autoTerminate = autoTerminate;
   }
 
   /** @noRailsEquivalent PERMANENT */
-  post<A extends unknown[]>(...argsAndTask: [...args: A, task: (...args: A) => unknown]): void {
+  post<A extends unknown[]>(...argsAndTask: [...args: A, task: (...args: A) => unknown]): true {
     const args = argsAndTask.slice(0, -1) as A;
     const block = argsAndTask[argsAndTask.length - 1] as ((...args: A) => unknown) | undefined;
     if (typeof block !== "function") throw new ArgumentError("no block given");
@@ -65,6 +75,7 @@ export class ThreadPoolExecutor {
     } else {
       task();
     }
+    return true;
   }
 
   private isRunning(): boolean {

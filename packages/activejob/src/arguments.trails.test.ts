@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { HashWithIndifferentAccess, constantize } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, constantize, days, weeks } from "@blazetrails/activesupport";
+import { Date, DateTime } from "@blazetrails/date";
 import {
   Hash,
+  Range,
   hashAref,
+  rbEqual,
   update,
   rbHashSRuby2KeywordsHash,
   rbModConstSet,
@@ -203,5 +206,19 @@ describe("ActiveJob::Arguments GlobalID arm", () => {
     const error = await deserialize([{ _aj_globalid: "gid://aj/Person/404" }]).catch((e) => e);
     expect(error).toBeInstanceOf(DeserializationError);
     expect((error as Error).cause).toBeInstanceOf(Person.RecordNotFound);
+  });
+});
+
+describe("ActiveJob::Arguments with Temporal-valued dates", () => {
+  // BLOCKED: activejob-date-serializers-serialize-temporal-dates
+  it.skip("round-trips the Temporal-valued ranges of argument_serialization_test.rb:72-75", async () => {
+    for (const arg of [
+      new Range<unknown>(days(10).ago(), Date.today()),
+      new Range(weeks(4).ago(DateTime.current()), DateTime.current()),
+    ]) {
+      expect(rbEqual([arg], await deserialize(JSON.parse(JSON.stringify(serialize([arg])))))).toBe(
+        true,
+      );
+    }
   });
 });

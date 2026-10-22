@@ -1343,7 +1343,9 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
       if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
     }
     if (p === Uint8Array.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
-    if (p === String.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
+    if (p === String.prototype && (c === rbCString || classSearchAncestor(rbCString, c))) {
+      return true;
+    }
     if (p === globalThis.Set.prototype && c === registeredConstant("Set")) return true;
     if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
   }

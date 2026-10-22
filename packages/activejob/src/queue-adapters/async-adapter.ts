@@ -18,7 +18,41 @@ interface AsyncAdapterJob {
   serialize(): Record<string, unknown>;
 }
 
-type ExecutorOptions = Record<string, unknown>;
+type ExecutorOptions = Partial<ConstructorParameters<typeof ThreadPoolExecutor>[0]>;
+
+export class AsyncAdapter extends AbstractAdapter {
+  static toString(): string {
+    return "ActiveJob::QueueAdapters::AsyncAdapter";
+  }
+
+  declare static JobWrapper: typeof JobWrapper;
+  declare static Scheduler: typeof Scheduler;
+
+  private _scheduler: Scheduler;
+
+  constructor(executorOptions: ExecutorOptions = {}) {
+    super();
+    this._scheduler = new Scheduler(executorOptions);
+  }
+
+  override async enqueue(job: AsyncAdapterJob): Promise<unknown> {
+    return await this._scheduler.enqueue(new JobWrapper(job), { queueName: job.queueName });
+  }
+
+  override async enqueueAt(job: AsyncAdapterJob, timestamp: number): Promise<unknown> {
+    return await this._scheduler.enqueueAt(new JobWrapper(job), timestamp, {
+      queueName: job.queueName,
+    });
+  }
+
+  async shutdown({ wait = true }: { wait?: boolean } = {}): Promise<boolean | null> {
+    return await this._scheduler.shutdown({ wait });
+  }
+
+  set immediate(immediate: boolean) {
+    this._scheduler.immediate = immediate;
+  }
+}
 
 export class JobWrapper {
   static toString(): string {
@@ -44,7 +78,7 @@ export class Scheduler {
 
   static readonly DEFAULT_EXECUTOR_OPTIONS = Object.freeze({
     minThreads: 0,
-    maxThreads: toI(getEnv("RAILS_MAX_THREADS", "5")),
+    maxThreads: Number(toI(getEnv("RAILS_MAX_THREADS", "5"))),
     autoTerminate: true,
     idletime: 60,
     maxQueue: 0,
@@ -61,7 +95,7 @@ export class Scheduler {
     this._asyncExecutor = new ThreadPoolExecutor({
       ...Scheduler.DEFAULT_EXECUTOR_OPTIONS,
       ...options,
-    } as ConstructorParameters<typeof ThreadPoolExecutor>[0]);
+    });
   }
 
   enqueue(job: JobWrapper, { queueName: _queueName }: { queueName: unknown }): unknown {
@@ -81,47 +115,15 @@ export class Scheduler {
     }
   }
 
-  async shutdown({ wait = true }: { wait?: boolean } = {}): Promise<void> {
+  async shutdown({ wait = true }: { wait?: boolean } = {}): Promise<boolean | null> {
     this._asyncExecutor.shutdown();
-    if (wait) await this._asyncExecutor.waitForTermination();
+    return wait ? await this._asyncExecutor.waitForTermination() : null;
   }
 
   executor(): ImmediateExecutor | ThreadPoolExecutor {
     return this.immediate ? this._immediateExecutor : this._asyncExecutor;
   }
 }
-
-export class AsyncAdapter extends AbstractAdapter {
-  static toString(): string {
-    return "ActiveJob::QueueAdapters::AsyncAdapter";
-  }
-
-  static readonly JobWrapper = JobWrapper;
-  static readonly Scheduler = Scheduler;
-
-  private _scheduler: Scheduler;
-
-  constructor(executorOptions: ExecutorOptions = {}) {
-    super();
-    this._scheduler = new Scheduler(executorOptions);
-  }
-
-  override async enqueue(job: AsyncAdapterJob): Promise<unknown> {
-    return await this._scheduler.enqueue(new JobWrapper(job), { queueName: job.queueName });
-  }
-
-  override async enqueueAt(job: AsyncAdapterJob, timestamp: number): Promise<unknown> {
-    return await this._scheduler.enqueueAt(new JobWrapper(job), timestamp, {
-      queueName: job.queueName,
-    });
-  }
-
-  async shutdown({ wait = true }: { wait?: boolean } = {}): Promise<void> {
-    await this._scheduler.shutdown({ wait });
-  }
-
-  set immediate(immediate: boolean) {
-    this._scheduler.immediate = immediate;
-  }
-}
+rbModConstSet(AsyncAdapter, "JobWrapper", JobWrapper);
+rbModConstSet(AsyncAdapter, "Scheduler", Scheduler);
 rbModConstSet(QueueAdapters, "AsyncAdapter", AsyncAdapter);
