@@ -157,7 +157,7 @@ export class Job extends Record {
     return ((await this.readyExecution) ??
       (await this.claimedExecution) ??
       (await this.failedExecution) ??
-      (await this.blockedExecution) ??
-      (await this.scheduledExecution)) as Execution | null;
+      (await this.scheduledExecution) ??
+      (await this.blockedExecution)) as Execution | null;
   }
 }

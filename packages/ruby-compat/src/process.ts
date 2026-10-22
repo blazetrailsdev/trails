@@ -177,13 +177,14 @@ function makeClockResult(milliseconds: number, unit: string): number {
 
 /**
  * `rb_f_sleep` (`vendor/ruby/v3.3.11/process.c:5055`), `Kernel#sleep` with an
- * interval: waits that many seconds and answers the whole seconds slept. A
- * JS thread cannot block, so the wait is a timer the caller awaits.
+ * interval: waits that many seconds and answers `time(0) - beg`, the
+ * whole-second wall-clock difference. A JS thread cannot block, so the wait is
+ * a timer the caller awaits.
  *
  * @noRailsEquivalent PERMANENT
  */
 export async function rbFSleep(duration: number): Promise<number> {
-  const beg = Date.now();
+  const beg = Math.floor(Date.now() / 1000);
   await new Promise((resolve) => setTimeout(resolve, duration * 1000));
-  return Math.trunc((Date.now() - beg) / 1000);
+  return Math.floor(Date.now() / 1000) - beg;
 }

@@ -10,10 +10,9 @@ import { SolidQueue } from "./solid-queue.js";
 import type { Job } from "./job.js";
 import type { Relation } from "@blazetrails/activerecord";
 
-const JSON_OVERHEAD = 256;
-
 export class FailedExecution extends Execution {
   declare static dispatchJobs: typeof DispatchingClassMethods.dispatchJobs;
+  static readonly JSON_OVERHEAD = 256;
   declare error: { [key: string]: unknown } | null;
   declare private _exception: Error | null | undefined;
 
@@ -114,7 +113,7 @@ export class FailedExecution extends Execution {
         column.limit! -
         new TextEncoder().encode(this.exceptionClassName()).length -
         new TextEncoder().encode(this.exceptionMessage()).length -
-        JSON_OVERHEAD
+        FailedExecution.JSON_OVERHEAD
       );
     }
     return null;
