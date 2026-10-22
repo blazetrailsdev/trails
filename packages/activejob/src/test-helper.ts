@@ -13,6 +13,7 @@ import {
 import { Time } from "@blazetrails/date";
 import {
   ArgumentError,
+  aryDelete,
   Range,
   classModule,
   fetch,
@@ -468,7 +469,10 @@ export function performedJobsWith(
   return this.jobsWith(this.performedJobs, { only, except, queue }, block);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm then — PERMANENT
+ */
 export async function flushEnqueuedJobs(
   this: TestHelper,
   { only = null, except = null, queue = null, at = null }: JobsWithOptions = {},
@@ -477,10 +481,7 @@ export async function flushEnqueuedJobs(
   const count = this.enqueuedJobsWith({ only, except, queue, at }, (payload) => {
     performed = performed.then(async () => {
       const queueAdapter = this.queueAdapter() as TestAdapter;
-      const enqueuedJobs = queueAdapter.enqueuedJobs;
-      for (let i = enqueuedJobs.length - 1; i >= 0; i--) {
-        if (rbEqual(enqueuedJobs[i], payload)) enqueuedJobs.splice(i, 1);
-      }
+      aryDelete(queueAdapter.enqueuedJobs, payload);
       queueAdapter.performedJobs.push(payload);
       const job = (await this.instantiateJob(payload, { skipDeserializeArguments: true })) as {
         performNow(): Promise<unknown>;
