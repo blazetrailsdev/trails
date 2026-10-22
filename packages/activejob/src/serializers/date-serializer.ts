@@ -1,3 +1,4 @@
+import type { Temporal } from "@blazetrails/date";
 import { Date, dNewByFrags } from "@blazetrails/date";
 import { hashAref, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Serializers } from "../namespaces.js";
@@ -8,7 +9,9 @@ export class DateSerializer extends ObjectSerializer {
     return "ActiveJob::Serializers::DateSerializer";
   }
 
-  serialize(date: Date): Record<string, unknown> {
+  /** @inventedArm if — CONVERGEABLE activejob-date-serializers-serialize-temporal-dates */
+  serialize(date: Date | Temporal.PlainDate): Record<string, unknown> {
+    if (!(date instanceof Date)) date = new Date(date);
     return super.serialize({ value: date.iso8601() });
   }
 

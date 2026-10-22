@@ -30,6 +30,7 @@ export class ThreadPoolExecutor {
   completedTaskCount = 0;
   private _running = 0;
   private readonly _queue: (() => unknown)[] = [];
+  private readonly _ready: ((task: (() => unknown) | undefined) => void)[] = [];
   private _stopped = false;
   private readonly _stoppedEvent: (() => void)[] = [];
 
@@ -65,6 +66,9 @@ export class ThreadPoolExecutor {
     const task = () => block(...args);
     if (!this.isRunning()) {
       task();
+    } else if (this._ready.length > 0) {
+      this.scheduledTaskCount += 1;
+      this._ready.pop()!(task);
     } else if (this._running < this.maxLength) {
       this._running += 1;
       this.scheduledTaskCount += 1;
@@ -86,6 +90,7 @@ export class ThreadPoolExecutor {
   shutdown(): true {
     if (this.isRunning()) {
       this._stopped = true;
+      for (const ready of this._ready.splice(0)) ready(undefined);
       if (this._running === 0) this._setStoppedEvent();
     }
     return true;
@@ -114,20 +119,34 @@ export class ThreadPoolExecutor {
     for (const set of this._stoppedEvent.splice(0)) set();
   }
 
-  private _runWorker(task: () => unknown): void {
-    const thread = new Thread(async () => {
-      try {
-        await task();
-      } catch {
-        return;
+  private _runWorker(first: () => unknown): void {
+    new Thread(async () => {
+      let task: (() => unknown) | undefined = first;
+      while (task) {
+        await Promise.resolve()
+          .then(task)
+          .catch(() => null);
+        this.completedTaskCount += 1;
+        task = this._queue.shift() ?? (await this._nextTask());
       }
-    });
-    void Promise.resolve(thread.value()).then(() => {
-      this.completedTaskCount += 1;
-      const next = this._queue.shift();
-      if (next) this._runWorker(next);
-      else this._running -= 1;
+      this._running -= 1;
       if (this._stopped && this._running === 0) this._setStoppedEvent();
+    });
+  }
+
+  private _nextTask(): Promise<(() => unknown) | undefined> {
+    if (this._stopped) return Promise.resolve(undefined);
+    return new Promise((resolve) => {
+      const ready = (task: (() => unknown) | undefined) => {
+        clearTimeout(timer as ReturnType<typeof setTimeout>);
+        resolve(task);
+      };
+      const timer: unknown = setTimeout(() => {
+        this._ready.splice(this._ready.indexOf(ready), 1);
+        resolve(undefined);
+      }, this.idletime * 1000);
+      (timer as { unref?: () => unknown }).unref?.();
+      this._ready.push(ready);
     });
   }
 }

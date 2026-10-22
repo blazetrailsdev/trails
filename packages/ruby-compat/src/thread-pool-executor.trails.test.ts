@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Thread } from "./thread.js";
 import { ThreadPoolExecutor } from "./thread-pool-executor.js";
 
 describe("ThreadPoolExecutor", () => {
@@ -35,5 +36,31 @@ describe("ThreadPoolExecutor", () => {
 
     expect(order).toEqual(["d", "a", "b", "c"]);
     expect(peak).toBe(3);
+  });
+
+  it("keeps an idle worker for idletime and hands it the next task", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 0,
+      maxThreads: 2,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+      idletime: 0.05,
+    });
+    const threads: Thread[] = [];
+    const task = () => void threads.push(Thread.current());
+
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(threads[1]).toBe(threads[0]);
+
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(threads[2]).not.toBe(threads[0]);
+
+    executor.shutdown();
+    expect(await executor.waitForTermination(1)).toBe(true);
   });
 });
