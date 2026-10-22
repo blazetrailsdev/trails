@@ -403,9 +403,9 @@ ${frames
 export class ShowExceptions {
   static readonly CONTEXT = 7;
 
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -415,7 +415,7 @@ export class ShowExceptions {
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     try {
-      return await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+      return await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     } catch (e: any) {
       const exceptionString = this.dumpException(e);
 

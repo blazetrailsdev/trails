@@ -6,18 +6,22 @@ import type { RackApp } from "./mock-request.js";
 const DEFAULT_CACHE_CONTROL = "max-age=0, private, must-revalidate";
 
 export class ETag {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private noCacheControl: string | null;
   private cacheControl: string | null;
 
-  constructor(app: RackApp, noCacheControl?: string | null, cacheControl?: string | null) {
+  constructor(
+    app: RackApp | { call: RackApp },
+    noCacheControl?: string | null,
+    cacheControl?: string | null,
+  ) {
     this.app = app;
     this.noCacheControl = noCacheControl ?? null;
     this.cacheControl = arguments.length < 3 ? DEFAULT_CACHE_CONTROL : (cacheControl ?? null);
   }
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     const [status, headers, body] = response;
 
     let digest: string | null = null;

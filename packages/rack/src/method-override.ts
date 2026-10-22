@@ -12,9 +12,9 @@ const HTTP_METHODS = ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS", "PATCH"
 const ALLOWED_METHODS = ["POST"];
 
 export class MethodOverride {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -31,7 +31,7 @@ export class MethodOverride {
         env[REQUEST_METHOD] = method;
       }
     }
-    return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
+    return rbFSend(this.app, "call", env) as ReturnType<RackApp>;
   }
 
   private methodOverride(env: Record<string, any>): string | null {

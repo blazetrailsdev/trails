@@ -31,12 +31,12 @@ it("allow multiple timers to be set", async () => {
     await new Promise((r) => setTimeout(r, 10));
     return [200, { "content-type": "text/plain" }, "Hello, World!"] as any;
   };
-  let app: any = new Runtime(inner, "App");
+  let app = new Runtime(inner, "App");
   for (let i = 0; i < 5; i++) {
     const prev = app;
-    app = new Runtime((env: any) => prev.call(env), String(i));
+    app = new Runtime(prev, String(i));
   }
-  const outer = new Runtime((env: any) => app.call(env), "All");
+  const outer = new Runtime(app, "All");
   const [, headers] = await outer.call(request());
   expect(headers["x-runtime-app"]).toMatch(/[\d.]+/);
   expect(headers["x-runtime-all"]).toMatch(/[\d.]+/);

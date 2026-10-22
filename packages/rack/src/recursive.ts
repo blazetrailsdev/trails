@@ -34,10 +34,10 @@ export class ForwardRequest extends Error {
 }
 
 export class Recursive {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private scriptName!: string;
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
@@ -52,7 +52,7 @@ export class Recursive {
       return await (rbFSend(this.app, "call", {
         ...env,
         [RACK_RECURSIVE_INCLUDE]: this.include.bind(this),
-      }) as ReturnType<typeof this.app>);
+      }) as ReturnType<RackApp>);
     } catch (req) {
       if (req instanceof ForwardRequest) return this.call({ ...env, ...req.env });
       throw req;
@@ -78,6 +78,6 @@ export class Recursive {
       CONTENT_TYPE: "",
       [RACK_INPUT]: new StringIO(""),
     };
-    return rbFSend(this.app, "call", newEnv) as ReturnType<typeof this.app>;
+    return rbFSend(this.app, "call", newEnv) as ReturnType<RackApp>;
   }
 }

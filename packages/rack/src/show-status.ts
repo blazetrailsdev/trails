@@ -15,16 +15,16 @@ type TemplateBinding = {
 };
 
 export class ShowStatus {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
   private template: (binding: TemplateBinding) => string;
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
     this.template = TEMPLATE;
   }
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     const [status, headers, body] = response;
     const empty = Number(toI(headers[CONTENT_LENGTH])) <= 0;
 

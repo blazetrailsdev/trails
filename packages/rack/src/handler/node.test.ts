@@ -5,13 +5,16 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/ruby-compat";
 import { b, TCPSocket } from "@blazetrails/ruby-compat";
-import type { RackApp, RackBody, RackEnv } from "../index.js";
+import type { RackApp, RackBody, RackEnv, RackMiddleware } from "../index.js";
 import { RACK_ERRORS, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "../constants.js";
 import { Files } from "../files.js";
 import { Lint } from "../lint.js";
 import { Node } from "./node.js";
 
-async function serving(app: RackApp, body: (url: string) => Promise<void>): Promise<void> {
+async function serving(
+  app: RackApp | RackMiddleware,
+  body: (url: string) => Promise<void>,
+): Promise<void> {
   const server = await Node.run(app, { Port: 0, Host: "127.0.0.1" });
   const address = server.address();
   const port = address && typeof address === "object" ? address.port : 0;
@@ -237,7 +240,7 @@ describe("Rack::Handler::Node", () => {
       fs.writeFileSync(path.join(root, "image.png"), png);
       const files = new Files(root);
       try {
-        await serving((env) => files.call(env) as ReturnType<RackApp>, body);
+        await serving(files, body);
       } finally {
         fs.rmSync(root, { recursive: true });
       }

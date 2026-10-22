@@ -4,14 +4,14 @@ import { CONTENT_LENGTH, TRANSFER_ENCODING, STATUS_WITH_NO_ENTITY_BODY } from ".
 import type { RackApp } from "./mock-request.js";
 
 export class ContentLength {
-  private app: RackApp;
+  private app: RackApp | { call: RackApp };
 
-  constructor(app: RackApp) {
+  constructor(app: RackApp | { call: RackApp }) {
     this.app = app;
   }
 
   async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
-    const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
+    const response = await (rbFSend(this.app, "call", env) as ReturnType<RackApp>);
     const [status, headers] = response;
     let [, , body] = response;
 

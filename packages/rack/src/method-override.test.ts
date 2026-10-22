@@ -59,7 +59,7 @@ it("store the original REQUEST_METHOD prior to overriding", async () => {
   const app = new MethodOverride(async (env) => {
     return [200, {}, [env["rack.methodoverride.original_method"] || "none"]];
   });
-  const res = await new MockRequest((env) => app.call(env)).post("/", {
+  const res = await new MockRequest(app).post("/", {
     ":input": "_method=put",
   });
   expect(res.body).toBe("POST");
@@ -96,7 +96,7 @@ it("writes error to RACK_ERRORS when using incompatible multipart encoding", asy
   const app = new MethodOverride(async (env) => {
     return [200, {}, [env["REQUEST_METHOD"]]];
   });
-  const res = await new MockRequest((env) => app.call(env)).post("/", {
+  const res = await new MockRequest(app).post("/", {
     CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
     ":input": "not valid multipart",
   });
@@ -107,7 +107,7 @@ it("not modify REQUEST_METHOD for POST requests when the params are unparseable 
   const app = new MethodOverride(async (env) => {
     return [200, {}, [env["REQUEST_METHOD"]]];
   });
-  const res = await new MockRequest((env) => app.call(env)).post("/", {
+  const res = await new MockRequest(app).post("/", {
     ":input": "_method=PUT&" + "a".repeat(50) + "=1",
   });
   expect(res.body).toBe("PUT");
@@ -117,7 +117,7 @@ it("not modify REQUEST_METHOD for POST requests when the params are unparseable"
   const app = new MethodOverride(async (env) => {
     return [200, {}, [env["REQUEST_METHOD"]]];
   });
-  const res = await new MockRequest((env) => app.call(env)).post("/", {
+  const res = await new MockRequest(app).post("/", {
     CONTENT_TYPE: "application/x-www-form-urlencoded",
     ":input": "_method=DELETE",
   });
@@ -128,7 +128,7 @@ it("not set form input when the content type is JSON", async () => {
   const app = new MethodOverride(async (env) => {
     return [200, {}, [env["REQUEST_METHOD"]]];
   });
-  const res = await new MockRequest((env) => app.call(env)).post("/", {
+  const res = await new MockRequest(app).post("/", {
     CONTENT_TYPE: "application/json",
     ":input": '{"_method":"PUT"}',
   });
