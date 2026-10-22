@@ -7,15 +7,19 @@ import {
   extend,
   classAttribute,
   Concern,
-  type Included,
 } from "@blazetrails/activesupport";
 
 interface ConversionRecord {
   isPersisted(): boolean;
-  toKey(): unknown[] | null;
+  toKey(...args: Parameters<typeof toKey>): ReturnType<typeof toKey>;
 }
 
-export type Conversion = Included<typeof Conversion>;
+export interface Conversion {
+  toModel<T>(this: T): T;
+  toKey(...args: Parameters<typeof toKey>): ReturnType<typeof toKey>;
+  toParam(...args: Parameters<typeof toParam>): ReturnType<typeof toParam>;
+  toPartialPath(...args: Parameters<typeof toPartialPath>): ReturnType<typeof toPartialPath>;
+}
 
 export function toModel<T>(this: T): T {
   return this;

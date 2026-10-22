@@ -1,4 +1,11 @@
-import { ArgumentError, File, rbBlockGivenP, rbFBinding, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  File,
+  RuntimeError,
+  rbBlockGivenP,
+  rbFBinding,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
 
 type RackApp = { call(env: Record<string, any>): any } | ((env: Record<string, any>) => any);
@@ -35,7 +42,7 @@ export class Builder {
     if (config.charCodeAt(0) === 0xfeff) config = config.slice(1);
 
     if (/^#\\(.*)/m.test(config)) {
-      throw new Error(
+      throw new RuntimeError(
         `Parsing options from the first comment line is no longer supported: ${path}`,
       );
     }
@@ -137,7 +144,7 @@ export class Builder {
    */
   toApp(): RackApp {
     let app = this._map ? this.generateMap(this._run, this._map) : this._run;
-    if (!app) throw new Error("missing run or map statement");
+    if (!app) throw new RuntimeError("missing run or map statement");
     if (this._freezeApp) Object.freeze(app);
     app = this._use.reduceRight((a, e) => {
       const x = e(a);
