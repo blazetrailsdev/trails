@@ -496,6 +496,14 @@ export const OBJECT_METHOD_TABLE: Record<string, (self: never, ...args: never[])
   Object.create(null);
 
 /**
+ * `BasicObject#instance_exec` (`rb_obj_instance_exec`,
+ * `vendor/ruby/v3.3.11/vm_eval.c:2089`): yields `args` to the trailing block
+ * with `self` as the receiver.
+ */
+OBJECT_METHOD_TABLE.instanceExec = (self: unknown, ...args: unknown[]): unknown =>
+  (args.pop() as (...a: unknown[]) => unknown).apply(self, args);
+
+/**
  * The methods a package defines on `Enumerable`, keyed by the camelCased Ruby
  * name, which {@link rbFSend} dispatches and {@link basicObjRespondTo} answers
  * for on the receivers `each` is bound for: a JS array, a `Set`, and a `Map`

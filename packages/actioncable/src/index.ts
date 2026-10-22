@@ -18,3 +18,5 @@ import "./server/configuration.js";
 import "./subscription-adapter/base.js";
 import "./subscription-adapter/subscriber-map.js";
 import "./subscription-adapter/channel-prefix.js";
+import "./connection/stream.js";
+import "./server/worker.js";
