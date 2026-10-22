@@ -23,6 +23,8 @@ if (!Object.hasOwn(adapters, adapter)) {
 }
 await adapters[adapter]();
 
+await import("@blazetrails/activesupport/testing/autorun");
+
 export function isAdapterIs(...adapterClassSymbols: string[]): boolean {
   return adapterClassSymbols.map(String).includes(Base.queueAdapterName);
 }
