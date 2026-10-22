@@ -1,4 +1,4 @@
-import { center, first, rstrip } from "@blazetrails/ruby-compat";
+import { first } from "@blazetrails/ruby-compat";
 import type { Result } from "../../result.js";
 
 export class ExplainPrettyPrinter {
@@ -10,7 +10,12 @@ export class ExplainPrettyPrinter {
 
     const pp: string[] = [];
 
-    pp.push(rstrip(center(header, width)));
+    pp.push(
+      header
+        .padStart(header.length + Math.floor(Math.max(width - header.length, 0) / 2))
+        .padEnd(width)
+        .trimEnd(),
+    );
     pp.push("-".repeat(width));
 
     pp.push(...lines.map((line) => ` ${line}`));

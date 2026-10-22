@@ -20,7 +20,6 @@ import {
   ArgumentError,
   Error as URIError,
   URI,
-  rbCheckStringType,
   rbInspect,
   stringDelete,
 } from "@blazetrails/ruby-compat";
@@ -146,8 +145,8 @@ export function _computeRedirectToLocation(
   options: unknown,
 ): string {
   let location: string;
-  if (SCHEME_OR_PROTOCOL_RELATIVE_RE.test(rbCheckStringType(options) ?? "")) {
-    location = rbCheckStringType(options)!;
+  if (typeof options === "string" && SCHEME_OR_PROTOCOL_RELATIVE_RE.test(options)) {
+    location = options;
   } else if (typeof options === "string") {
     location = request.protocol + request.hostWithPort() + options;
   } else if (typeof options === "function") {
