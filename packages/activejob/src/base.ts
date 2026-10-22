@@ -20,6 +20,7 @@ import { ClassMethods as ExceptionsClassMethods, Exceptions } from "./exceptions
 import { ClassMethods as ExecutionClassMethods, Execution } from "./execution.js";
 import "./configured-job.js";
 import { Instrumentation } from "./instrumentation.js";
+import "./log-subscriber.js";
 import { Logging } from "./logging.js";
 import { ActiveJob } from "./namespaces.js";
 import { ClassMethods as QueueAdapterClassMethods, QueueAdapter } from "./queue-adapter.js";
