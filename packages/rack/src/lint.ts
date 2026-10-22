@@ -13,6 +13,9 @@ import {
   rbObjAsString,
   rbStrDump,
   isPlainHash,
+  Hash,
+  eachPair,
+  rbObjIsKindOf,
   kernelInteger,
   IO,
   Encoding,
@@ -60,7 +63,7 @@ export class InputWrapper {
   gets(...args: unknown[]): unknown {
     if (args.length !== 0) throw new LintError("rack.input#gets called with arguments");
     const v = this._input.gets();
-    if (!(v == null || typeof v === "string")) {
+    if (!(v == null || typeof v === "string" || v instanceof Uint8Array)) {
       throw new LintError("rack.input#gets didn't return a String");
     }
     return v;
@@ -93,11 +96,12 @@ export class InputWrapper {
     return v;
   }
 
-  each(...args: [...unknown[], (line: string) => unknown]): unknown {
-    const block = args.pop() as (line: string) => unknown;
+  each(...args: [...unknown[], (line: string | Uint8Array) => unknown]): unknown {
+    const block = args.pop() as (line: string | Uint8Array) => unknown;
     if (args.length !== 0) throw new LintError("rack.input#each called with arguments");
     return this._input.each((line: unknown) => {
-      if (typeof line !== "string") throw new LintError("rack.input#each didn't yield a String");
+      if (!(typeof line === "string" || line instanceof Uint8Array))
+        throw new LintError("rack.input#each didn't yield a String");
       block(line);
     });
   }
@@ -136,7 +140,7 @@ export class StreamWrapper {
   static readonly REQUIRED_METHODS = [
     "read",
     "write",
-    "<<",
+    "append",
     "flush",
     "close",
     "closeRead",
@@ -540,7 +544,7 @@ export class Wrapper {
   }
 
   checkHeaders(headers: Record<string, any>): void {
-    if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
+    if (!rbObjIsKindOf(headers, Hash)) {
       throw new LintError(
         `headers object should be a hash, but isn't (got ${rbObjClassname(headers)} as headers)`,
       );
@@ -550,12 +554,12 @@ export class Wrapper {
       throw new LintError("headers object should not be frozen, but is");
     }
 
-    for (const [key, value] of Object.entries(headers)) {
+    eachPair(headers, (key: unknown, value: any) => {
       if (typeof key !== "string") {
         throw new LintError(`header key must be a string, was ${rbObjClassname(key)}`);
       }
 
-      if (key.startsWith("rack.")) continue;
+      if (key.startsWith("rack.")) return;
 
       if (key === "status") throw new LintError("header must not contain status");
       if (/[(),/:;<=>?@[\\\]{}\p{Cc}]/u.test(key)) {
@@ -572,7 +576,7 @@ export class Wrapper {
           `a header value must be a String or Array of Strings, but the value of '${key}' is a ${rbObjClassname(value)}`,
         );
       }
-    }
+    });
   }
 
   checkHeaderValue(key: string, value: string): void {

@@ -94,5 +94,5 @@ it("close the body on cascade", async () => {
   const closer = (_env: Record<string, any>) => [404, {}, body];
   const c = new Cascade([closer, app3], [404]);
   expect((await new MockRequest(c).get("/foo")).isOk).toBeTruthy();
-  expect(body.closed).toBeTruthy();
+  expect(body.isClosed()).toBeTruthy();
 });

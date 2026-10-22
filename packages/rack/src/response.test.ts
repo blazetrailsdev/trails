@@ -637,24 +637,24 @@ it("calls close on #body", () => {
   const res = new Response();
   res.body = new StringIO();
   res.close();
-  expect(res.body.closed).toBeTruthy();
+  expect(res.body.isClosed()).toBeTruthy();
 });
 
 it("calls close on #body when 204 or 304", () => {
   const res = new Response();
   res.body = new StringIO();
   res.finish();
-  expect(res.body.closed).toBeFalsy();
+  expect(res.body.isClosed()).toBeFalsy();
 
   res.status = 204;
   let [, , b] = res.finish();
-  expect(res.body.closed).toBeTruthy();
+  expect(res.body.isClosed()).toBeTruthy();
   expect(b).not.toEqual(res.body);
 
   res.body = new StringIO();
   res.status = 304;
   [, , b] = res.finish();
-  expect(res.body.closed).toBeTruthy();
+  expect(res.body.isClosed()).toBeTruthy();
   expect(b).not.toEqual(res.body);
 });
 
@@ -664,7 +664,7 @@ it("doesn't call close on #body when 205", () => {
   res.body = new StringIO();
   res.status = 205;
   res.finish();
-  expect(res.body.closed).toBeFalsy();
+  expect(res.body.isClosed()).toBeFalsy();
 });
 
 it("doesn't clear #body when 101 and streaming", () => {

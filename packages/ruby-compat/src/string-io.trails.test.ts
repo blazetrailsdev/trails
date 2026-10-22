@@ -51,9 +51,9 @@ describe("StringIO", () => {
 
   it("closes", () => {
     const io = new StringIO();
-    expect(io.closed).toBe(false);
+    expect(io.isClosed()).toBe(false);
     io.close();
-    expect(io.closed).toBe(true);
+    expect(io.isClosed()).toBe(true);
   });
   it("round-trips an arbitrary byte sequence through read, sizing it in bytes", () => {
     const bytes = Array.from({ length: 256 }, (_, i) => i);
