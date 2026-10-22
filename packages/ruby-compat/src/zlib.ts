@@ -1,5 +1,6 @@
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
+import type { StringIO } from "./string-io.js";
 import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
 import { b } from "./string/b.js";
 import { StandardError } from "./standard-error.js";
@@ -37,12 +38,20 @@ class GzipFile<IO extends { close(): void } = File> {
  * `Zlib::GzipReader` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4877`); `open` is
  * `gzfile_s_open(argc, argv, klass, "rb")` (`zlib.c:3871`).
  */
-class GzipReader extends GzipFile<File> {
+class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
   private readonly z: GzipReaderHandle;
 
-  constructor(io: File) {
+  constructor(io: File | StringIO<Uint8Array>) {
     super(io);
     this.z = getZlib().gzipReader(io);
+  }
+
+  /**
+   * `rb_gzfile_mtime` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3272`), as seconds
+   * since the epoch, the number `GzipWriter#mtime` answers too.
+   */
+  get mtime(): number {
+    return this.z.mtime;
   }
 
   static open(filename: string): GzipReader;
@@ -137,6 +146,58 @@ class GzipWriter extends GzipFile<File | Tempfile> {
     }
     await this.z.finish();
     await super.close();
+  }
+}
+
+/**
+ * `Zlib::Inflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4725`). Its one-shot
+ * `inflate` (`rb_inflate_s_inflate`, `zlib.c:2044`) answers the inflated bytes
+ * as a binary String, held as its bytes, raising `Zlib::Error` on a malformed
+ * stream. An instance (`rb_inflate_initialize`, `zlib.c:1991`) inflates a
+ * stream a chunk at a time, answering what each chunk completes. Node has no
+ * synchronous streaming inflater, so each call re-inflates the accumulated
+ * input to a `Z_SYNC_FLUSH` point and answers the new tail: quadratic in the
+ * stream's length, and `finish` has nothing left to flush.
+ */
+class Inflate {
+  private input = new Uint8Array();
+  private produced = 0;
+
+  constructor(private readonly windowBits = 15) {}
+
+  static inflate(src: string): Uint8Array {
+    try {
+      return getZlib().inflate(Uint8Array.from(src, (c) => c.charCodeAt(0)));
+    } catch (error) {
+      throw new ZError((error as Error).message);
+    }
+  }
+
+  /** `rb_inflate_inflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2145`). */
+  inflate(string: string | Uint8Array): Uint8Array {
+    const bytes =
+      typeof string === "string" ? Uint8Array.from(string, (c) => c.charCodeAt(0)) : string;
+    const src = new Uint8Array(this.input.length + bytes.length);
+    src.set(this.input);
+    src.set(bytes, this.input.length);
+    this.input = src;
+    let out: Uint8Array;
+    try {
+      out = getZlib().inflateStream(src, this.windowBits);
+    } catch (error) {
+      throw new ZError((error as Error).message);
+    }
+    const ret = out.slice(this.produced);
+    this.produced = out.length;
+    return ret;
+  }
+
+  /**
+   * `rb_zstream_finish` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:1409`). Every
+   * chunk was inflated to a sync point as it arrived, so nothing is left.
+   */
+  finish(): Uint8Array {
+    return new Uint8Array();
   }
 }
 
@@ -239,15 +300,14 @@ export const Zlib = {
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Inflate`.
    */
-  Inflate: {
-    inflate(src: string): Uint8Array {
-      try {
-        return getZlib().inflate(Uint8Array.from(src, (c) => c.charCodeAt(0)));
-      } catch (error) {
-        throw new ZError((error as Error).message);
-      }
-    },
-  },
+  Inflate,
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4783` — zlib.h's `MAX_WBITS`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::MAX_WBITS`.
+   */
+  MAX_WBITS: 15,
 
   /**
    * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:507` `rb_zlib_crc32`, which is

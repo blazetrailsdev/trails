@@ -2368,16 +2368,13 @@ describe("selectMisplacedFile", () => {
   });
 
   it("never clusters a bucket registered as a name collision", () => {
-    for (const bucketKey of NAME_COLLISION_CLUSTERS) {
-      expect(
-        selectMisplacedFile(hits(["deprecation.ts", 6], ["b.ts", 1]), 10, bucketKey),
-      ).toBeNull();
-    }
     // Only-shrink registry: `activesupport:deprecation/deprecators.rb` left it
     // when `deprecation/deprecators.ts` landed.
     expect(NAME_COLLISION_CLUSTERS.has("activesupport:deprecation/deprecators.rb")).toBe(false);
-    expect(NAME_COLLISION_CLUSTERS.has("actionview:dependency_tracker/ruby_tracker.rb")).toBe(true);
-    expect(NAME_COLLISION_CLUSTERS.size).toBe(1);
+    expect(NAME_COLLISION_CLUSTERS.has("actionview:dependency_tracker/ruby_tracker.rb")).toBe(
+      false,
+    );
+    expect(NAME_COLLISION_CLUSTERS.size).toBe(0);
   });
 
   it("leaves an unregistered bucket's cluster alone", () => {
