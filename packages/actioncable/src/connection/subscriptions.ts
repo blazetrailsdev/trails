@@ -7,9 +7,10 @@ import {
 import {
   RuntimeError,
   excBacktrace,
-  rbClassInheritedP,
+  hashDelete,
   rbInspect,
   rbModConstSet,
+  rbModGt,
   rbObjClassname,
 } from "@blazetrails/ruby-compat";
 import { ActionCable, Connection } from "../namespaces.js";
@@ -63,7 +64,11 @@ export class Subscriptions {
     } catch (e) {
       await this.connection.rescueWithHandler(e);
       this.logger.error(
-        `Could not execute command from (${rbInspect(data)}) [${rbObjClassname(e)} - ${(e as Error).message}]: ${(excBacktrace(e as Error) ?? []).slice(0, 5).join(" | ")}`,
+        `Could not execute command from (${rbInspect(data)}) [${rbObjClassname(e)} - ${(e as Error).message}]: ${excBacktrace(
+          e as Error,
+        )!
+          .slice(0, 5)
+          .join(" | ")}`,
       );
     }
   }
@@ -81,11 +86,7 @@ export class Subscriptions {
     ) as SubscriptionClass | null;
 
     const Base = (ActionCable.Channel as unknown as { Base: SubscriptionClass }).Base;
-    if (
-      subscriptionKlass != null &&
-      Base !== subscriptionKlass &&
-      rbClassInheritedP(subscriptionKlass, Base)
-    ) {
+    if (subscriptionKlass != null && rbModGt(Base, subscriptionKlass)) {
       const subscription = new subscriptionKlass(this.connection, idKey, idOptions);
       this.subscriptions[idKey] = subscription;
       await subscription.subscribeToChannel();
@@ -101,9 +102,7 @@ export class Subscriptions {
 
   async removeSubscription(subscription: Subscription): Promise<Subscription | undefined> {
     await subscription.unsubscribeFromChannel();
-    const removed = this.subscriptions[subscription.identifier];
-    delete this.subscriptions[subscription.identifier];
-    return removed;
+    return hashDelete(this.subscriptions, subscription.identifier) as Subscription | undefined;
   }
 
   async performAction(data: Data): Promise<void> {
@@ -115,7 +114,8 @@ export class Subscriptions {
   }
 
   async unsubscribeFromAll(): Promise<void> {
-    for (const [, channel] of Object.entries(this.subscriptions)) {
+    for (const [id, channel] of Object.entries(this.subscriptions)) {
+      void id;
       await this.removeSubscription(channel);
     }
   }

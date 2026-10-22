@@ -1,4 +1,5 @@
 import {
+  ARRAY_METHOD_TABLE,
   flatten,
   rbModConstSet,
   rbModDefineMethod,
@@ -28,28 +29,32 @@ export interface TaggedLoggerProxy {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TaggedLoggerProxy {
+  /** @internal */
   private logger: SeverityLogger;
-  #tags: unknown[];
+  private _tags: unknown[];
 
   get tags(): unknown[] {
-    return this.#tags;
+    return this._tags;
   }
 
   constructor(logger: unknown, { tags }: { tags: unknown[] }) {
     this.logger = logger as SeverityLogger;
-    this.#tags = flatten(tags);
+    this._tags = flatten(tags);
   }
 
   addTags(...tags: unknown[]): unknown[] {
-    this.#tags = [...this.tags, ...flatten(tags)];
-    return (this.#tags = uniq(this.tags));
+    this._tags = [...this._tags, ...flatten(tags)];
+    this._tags = uniq(this.tags);
+    return this._tags;
   }
 
   tag<T>(logger: unknown, block: () => T): T {
     if (rbObjRespondTo(logger, "tagged")) {
-      const currentTags = this.tags.filter(
-        (tag) => !(logger as TaggableLogger).formatter.currentTags.includes(tag),
-      );
+      const difference = ARRAY_METHOD_TABLE.difference as (
+        self: unknown[],
+        ...argv: unknown[][]
+      ) => unknown[];
+      const currentTags = difference(this.tags, (logger as TaggableLogger).formatter.currentTags);
       return (logger as TaggableLogger).tagged(...currentTags, block) as T;
     } else {
       return block();

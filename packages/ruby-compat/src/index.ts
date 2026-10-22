@@ -245,6 +245,8 @@ export {
   isModuleIncluded,
   rbModAncestors,
   rbClassInheritedP,
+  rbModGe,
+  rbModGt,
   rbObjIsKindOf,
   rbModInstanceMethod,
   rbModPublicInstanceMethod,

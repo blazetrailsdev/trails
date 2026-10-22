@@ -90,6 +90,17 @@ describe("ActionCable::Connection::Subscriptions", () => {
     );
   });
 
+  it("logs the TypeError for a constant that is not a module", async () => {
+    registerConstant("SubscriptionsTestNotAModule", "a string");
+    const { subscriptions, logged } = buildConnection();
+    await subscriptions.executeCommand({
+      command: "subscribe",
+      identifier: identifier(7, "SubscriptionsTestNotAModule"),
+    });
+    expect(subscriptions.identifiers).toEqual([]);
+    expect(logged.at(-1)).toMatch(/\[TypeError - compared with non class\/module\]/);
+  });
+
   it("logs an unrecognized command", async () => {
     const { subscriptions, logged } = buildConnection();
     await subscriptions.executeCommand({ command: "bogus" });

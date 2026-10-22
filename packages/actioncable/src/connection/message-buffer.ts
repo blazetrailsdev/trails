@@ -11,7 +11,7 @@ export class MessageBuffer {
   private readonly connection: MessageBufferConnection;
   /** @internal */
   private readonly bufferedMessages: string[];
-  #processing?: boolean;
+  private _processing?: boolean;
 
   constructor(connection: MessageBufferConnection) {
     this.connection = connection;
@@ -33,11 +33,11 @@ export class MessageBuffer {
   }
 
   isProcessing(): boolean | undefined {
-    return this.#processing;
+    return this._processing;
   }
 
   processBang(): void {
-    this.#processing = true;
+    this._processing = true;
     this.receiveBufferedMessages();
   }
 

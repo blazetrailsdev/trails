@@ -1,7 +1,15 @@
 import { camelize, constantize } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { CONTENT_TYPE } from "@blazetrails/rack";
-import { LoadError, block, fetch, rbModConstSet, rbObjClass } from "@blazetrails/ruby-compat";
+import {
+  LoadError,
+  block,
+  excBacktrace,
+  excSetBacktrace,
+  fetch,
+  rbModConstSet,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
 import { ActionCable, Server } from "../namespaces.js";
 
 type RackResponse = [number, Record<string, string>, unknown[]];
@@ -48,7 +56,7 @@ export class Configuration {
 
     const pathToAdapter = `action_cable/subscription_adapter/${adapter}`;
     const require = async (path: string): Promise<void> => {
-      const load = ActionCable.loadPath[path];
+      const load = ActionCable.SubscriptionAdapter.loadPath[path];
       if (load === undefined) {
         throw Object.assign(new LoadError(`cannot load such file -- ${path}`), { path });
       }
@@ -67,15 +75,17 @@ export class Configuration {
       if (!(e instanceof LoadError)) throw e;
       const klass = rbObjClass(e) as typeof LoadError;
       if ((e as LoadError & { path?: string | null }).path === pathToAdapter) {
-        throw new klass(
+        const error = new klass(
           `Could not load the '${adapter}' Action Cable pubsub adapter. Ensure that the adapter is spelled correctly in config/cable.yml and that you've added the necessary adapter gem to your Gemfile.`,
-          { cause: e },
         );
+        excSetBacktrace(error, excBacktrace(e));
+        throw error;
       } else {
-        throw new klass(
+        const error = new klass(
           `Error loading the '${adapter}' Action Cable pubsub adapter. Missing a gem it depends on? ${e.message}`,
-          { cause: e },
         );
+        excSetBacktrace(error, excBacktrace(e));
+        throw error;
       }
     }
 
