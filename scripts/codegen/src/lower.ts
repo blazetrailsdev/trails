@@ -23,6 +23,12 @@ import { operatorSpelling } from "../../api-compare/operator-order-spelling.js";
 import type { N, Param } from "./ir.js";
 import { walk } from "./ir.js";
 import {
+  ASYNC_ENUM,
+  CORE_METHODS,
+  SPLAT_YIELD_ONE,
+  asyncEnumBody,
+} from "./mappings/core-methods.js";
+import {
   GemIndex,
   fullAncestors,
   lexicalChain,
@@ -6057,554 +6063,26 @@ export class Lowerer {
           : /^[\w$]+(\.[\w$]+)*$/.test(r)
             ? `(${enumOf(r)})`
             : `((x) => ${enumOf("x")})(${r})`;
-    switch (name) {
-      case "clear":
-        // Array#clear / Hash#clear (array.c rb_ary_clear, hash.c rb_hash_clear)
-        // empty the receiver in place and answer it; a Map or Set has its own.
-        if (n.args.length === 0 && !blk) {
-          if (recvType?.k === "array") return this.withOnce(r, (x) => `(${x}.length = 0, ${x})`);
-          if (recvType?.k === "hash" && !recvType.map)
-            return this.withOnce(
-              r,
-              (x) => `(Object.keys(${x}).forEach((k) => delete ${x}[k]), ${x})`,
-            );
-          return this.withOnce(
-            r,
-            (x) => `(Array.isArray(${x}) ? (${x}.length = 0) : ${x}.clear(), ${x})`,
-          );
-        }
-        break;
-      case "grep":
-        // `x.grep(C)` keeps the elements `C === e` holds for (enum.c grep_i).
-        if (n.args.length === 1 && !blk && n.args[0].k === "const") {
-          const t = this.typeTest(n.args[0], "e", ctx);
-          if (t) return `${E}${nav}filter((e: any) => ${t})`;
-        }
-        break;
-      case "map":
-      case "collect":
-        if (blk) return `${E}${nav}map(${fn()})`;
-        break;
-      case "flat_map":
-      case "collect_concat":
-        if (blk) return `${E}${nav}flatMap(${fn()})`;
-        break;
-      case "select":
-      case "filter":
-      case "find_all":
-        if (blk) return `${E}${nav}filter(${fn()})`;
-        break;
-      case "reject":
-        // `reject(&:closed?)`: the predicate sent to each element; a Ruby
-        // predicate's value is a boolean in practice, as `cond` treats it.
-        if (blk?.k === "symproc" && /\?$/.test(blk.name)) {
-          const m = this.callName(blk.name);
-          return `${E}${nav}filter((x) => !x.${m}())`;
-        }
-        // Typed variadic so forwarding `...xs` into a one-parameter block type-checks.
-        if (blk)
-          return `${E}${nav}filter((...xs: any[]) => !${this.truthy(`((${fn()}) as (...a: any[]) => unknown)(...xs)`, true)})`;
-        break;
-      case "detect":
-      case "find":
-        if (blk && n.args.length === 0) return `${E}${nav}find(${fn()})`;
-        break;
-      case "any?":
-      case "all?":
-      case "none?":
-        // `h.all? { |key, value| }`: Ruby splats each yielded pair across the
-        // block's parameters (as `each` above); JS `every` passes (element, index).
-        if (
-          blk?.k === "block" &&
-          blk.params.length >= 2 &&
-          blk.params.every((p: Param) => p.kind === "req" && p.name)
-        ) {
-          const one: Param[] = [
-            {
-              kind: "req",
-              name: undefined,
-              destructure: blk.params.map((p: Param) => p.name!),
-            } as Param,
-          ];
-          const m = n.name === "all?" ? "every" : "some";
-          return `${n.name === "none?" ? "!" : ""}${this.entries(r, ctx, recvNode)}.${m}(${this.arrow(one, blk.body, ctx)})`;
-        }
-        // `x&.any? { }` is nil for a nil `x`, where `?.` reads `undefined`.
-        if (n.name === "all?") {
-          if (blk) return nav ? `(${E}${nav}every(${fn()}) ?? null)` : `${E}.every(${fn()})`;
-          break;
-        }
-        if (n.name === "none?") {
-          if (blk && !nav) return `!${E}.some(${fn()})`;
-          break;
-        }
-        if (blk) return nav ? `(${E}${nav}some(${fn()}) ?? null)` : `${E}.some(${fn()})`;
-        if (n.args.length === 0) return `${E}${nav}some((x: any) => x != null && x !== false)`;
-        break;
-      case "each":
-        // Ruby splats one yielded pair across a block's parameters (`|label, value|`),
-        // and a Hash yields `[key, value]`; JS forEach would pass (element, index).
-        if (
-          blk?.k === "block" &&
-          blk.params.length >= 2 &&
-          blk.params.every((p: Param) => p.kind === "req" && p.name)
-        ) {
-          const one: Param[] = [
-            {
-              kind: "req",
-              name: undefined,
-              destructure: blk.params.map((p: Param) => p.name!),
-            } as Param,
-          ];
-          return `${this.entries(r, ctx, recvNode)}.forEach(${this.arrow(one, blk.body, ctx)})`;
-        }
-        if (blk) return `${R}${nav}forEach(${fn()})`;
-        break;
-      case "each_with_index":
-        if (blk) return `${R}${nav}forEach(${fn()})`;
-        break;
-      case "each_with_object":
-        // enum.c enum_each_with_object: yields each element with the memo, answers the memo.
-        if (blk && n.args.length === 1) {
-          const [memo, f] = args();
-          return `${this.entries(r, ctx, recvNode)}.reduce((memo: any, x: any) => ((${f})(x, memo), memo), ${memo})`;
-        }
-        break;
-      case "inject":
-      case "reduce":
-        // enum.c enum_inject with a block: Array#reduce, which seeds with the
-        // first element as Ruby does; an empty receiver with no seed is nil in
-        // Ruby, where JS throws.
-        if (blk && n.args.length <= 1 && !this.mayBeMap(recvNode, ctx)) {
-          const xs = this.entries(r, ctx, recvNode);
-          if (n.args.length === 1) return `${xs}.reduce(${fn()}, ${this.expr(n.args[0], ctx)})`;
-          return this.withOnce(xs, (x) => `(${x}.length === 0 ? null : ${x}.reduce(${fn()}))`);
-        }
-        return `${rc("inject")}(${r}, ${args().join(", ")})`;
-      case "include?":
-      case "member?":
-        if (n.args.length === 1 && !blk && hashNamed(recvNode))
-          return this.hasKeyForm(recvNode, r, args()[0], ctx);
-        if (n.args.length === 1 && !blk) return `${E}${nav}includes(${args()[0]})`;
-        break;
-      case "key?":
-      case "has_key?":
-        if (n.args.length === 1) return this.hasKeyForm(recvNode, r, args()[0], ctx);
-        break;
-      case "size":
-      case "length":
-        if (n.args.length === 0 && !blk && hashNamed(recvNode)) return `${rc("size")}(${r})`;
-        // In a ported test an untyped receiver may be a Set (`Serializers.serializers`).
-        if (
-          n.args.length === 0 &&
-          !blk &&
-          ctx.f.rubyFile.startsWith("test/") &&
-          !["array", "prim"].includes(this.typeOf(recvNode, ctx)?.k ?? "")
-        )
-          return this.withOnce(
-            r,
-            (x) =>
-              `(${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map ? ${x}.size : ${x}.length)`,
-          );
-        if (n.args.length === 0 && !blk) return `${R}${nav}length`;
-        break;
-      case "empty?":
-        if (n.args.length === 0) return `${rc("isEmpty")}(${r})`;
-        break;
-      case "first":
-        if (blk) break;
-        // ActiveSupport String#first(limit) (core_ext/string/access.rb); an
-        // Array's `first(n)` is `take(ary, n)`, ruby-compat's `first` takes none.
-        if (recvIsString()) return `${this.as(ctx, "first")}(${[r, ...args()].join(", ")})`;
-        if (n.args.length === 1 && this.typeOf(recvNode, ctx)?.k === "array")
-          return `${rc("take")}(${r}, ${args()[0]})`;
-        return `${rc("first")}(${[r, ...args()].join(", ")})`;
-      case "last":
-        if (blk) break;
-        if (recvIsString()) return `${this.as(ctx, "last")}(${[r, ...args()].join(", ")})`;
-        return `${rc("last")}(${[r, ...args()].join(", ")})`;
-      case "join":
-        // Array#join (array.c rb_ary_join) converts each element by its Ruby
-        // `to_s` (a Hash's is `inspect`); JS join gives `[object Object]` (activejob).
-        if (GEM.gem === "activejob" && nav === ".")
-          return `${rc("aryJoin")}(${[r, ...args()].join(", ")})`;
-        return `${R}${nav}join(${args().join(", ")})`;
-      case "drop":
-        if (!blk && n.args.length === 1) return `${rc("drop")}(${r} as unknown[], ${args()[0]})`;
-        break;
-      case "compact":
-        // Hash#compact (hash.c rb_hash_compact) on a plain object is activesupport's.
-        if (!blk && n.args.length === 0 && recvNode.k === "hash")
-          return `${this.imp(ctx, "@blazetrails/activesupport", "compact", "hashCompact")}(${r})`;
-        if (!blk && n.args.length === 0) return `${rc("compact")}(${r})`;
-        break;
-      case "uniq":
-        if (!blk && n.args.length === 0) return `${rc("uniq")}(${r})`;
-        break;
-      case "flatten":
-        return `${R}${nav}flat(${n.args.length ? args()[0] : "Infinity"})`;
-      case "keys":
-        if (n.args.length === 0) return `Object.keys(${r})`;
-        break;
-      case "values":
-        if (n.args.length === 0) return `Object.values(${r})`;
-        break;
-      // The native spread / `Object.assign` copies only a plain object's own
-      // keys, so an argument that may be a Map (a caller's Hash) keeps the helper.
-      case "merge":
-        if (!blk && n.args.length === 1 && this.plainHash(n.args[0], ctx))
-          return `{ ...${R}, ...${args()[0]} }`;
-        if (!blk && n.args.length === 1) return `${rc("merge")}(${r}, ${args()[0]})`;
-        break;
-      case "merge!":
-      case "update":
-        if (!blk && n.args.length === 1 && name === "merge!" && this.plainHash(n.args[0], ctx))
-          return `Object.assign(${r}, ${args()[0]})`;
-        if (!blk && n.args.length === 1) return `${rc("update")}(${r}, ${args()[0]})`;
-        break;
-      case "to_sym":
-      case "to_str":
-        if (n.args.length === 0) return r;
-        break;
-      case "to_i":
-        if (n.args.length === 0) return `${rc("rbToI")}(${r})`;
-        break;
-      case "to_f":
-        // A value with its own `to_f` (a Ruby Time) answers it; `Number(time)` is NaN.
-        if (n.args.length === 0) {
-          const t = this.typeOf(recvNode, ctx);
-          return t?.k === "prim" ? `Number(${r})` : `${rc("toF")}(${r})`;
-        }
-        break;
-      case "to_a":
-        if (n.args.length === 0) return `${rc("rbToA")}(${r})`;
-        break;
-      case "to_h":
-        // An Array of pairs is a plain-object Hash (CLAUDE.md "A Ruby Hash is a
-        // plain object"); `toH` answers a Map-backed Hash.
-        if (n.args.length === 0 && !blk && recvType?.k === "array")
-          return `Object.fromEntries(${r})`;
-        if (n.args.length === 0 && !blk) return `${rc("rbToH")}(${r})`;
-        break;
-      case "start_with?":
-        return `${R}${nav}startsWith(${args().join(", ")})`;
-      case "end_with?":
-        return `${R}${nav}endsWith(${args().join(", ")})`;
-      case "downcase":
-        return `${R}${nav}toLowerCase()`;
-      case "upcase":
-        return `${R}${nav}toUpperCase()`;
-      case "strip":
-        return `${R}${nav}trim()`;
-      case "split":
-        // string.c rb_str_split_m: a limit keeps the remainder in the last field,
-        // trailing empty fields drop, and `" "` / no pattern split awk-style;
-        // JS `split` does none of these.
-        if (nav === "?.")
-          return this.withOnce(
-            r,
-            (x) =>
-              `(${x} == null ? ${x} : (${rc("rbStrSend")}(${[x, '"split"', ...args()].join(", ")})[0] as string[]))`,
-          );
-        return `(${rc("rbStrSend")}(${[r, '"split"', ...args()].join(", ")})[0] as string[])`;
-      case "sub":
-        if (!blk) return `${R}${nav}replace(${args().join(", ")})`;
-        break;
-      case "gsub":
-        if (!blk && n.args.length === 2) return `${rc("gsub")}(${r}, ${args().join(", ")})`;
-        break;
-      case "match?":
-        if (n.args.length === 1 && recvNode.k === "regex") return `${R}.test(${args()[0]})`;
-        return `${rc("isMatch")}(${r}, ${args().join(", ")})`;
-      case "zero?":
-        return `(${r} === 0)`;
-      case "push":
-      case "unshift":
-        return `${R}${nav}${name}(${args().join(", ")})`;
-      case "pop":
-      case "shift":
-        if (n.args.length === 0) return `${R}${nav}${name}()`;
-        break;
-      case "concat":
-        if (n.args.length === 1) return `${R}${nav}push(...${args()[0]})`;
-        break;
-      case "call":
-        if (
-          recvNode.k === "lvar" &&
-          jsIdent(recvNode.name) === ctx.blockVar &&
-          ctx.asyncBox &&
-          ctx.defName &&
-          this.resolver.asyncYielders.has(ctx.defName)
-        ) {
-          ctx.asyncBox.awaits = true;
-          return `(await ${R}${nav === "?." ? "?." : ""}(${args().join(", ")}))`;
-        }
-        if (recvNode.k !== "self") return `${R}${nav === "?." ? "?." : ""}(${args().join(", ")})`;
-        break;
-      case "delete":
-        // `Hash#delete` / `Array#delete` answer the removed value (hash.c
-        // rb_hash_delete_m, array.c rb_ary_delete): ruby-compat `hashDelete` /
-        // `aryDelete`, by the receiver's type (a Hash when it is not known).
-        // An untyped receiver in activejob (`queue_adapter.enqueued_jobs`) is
-        // dispatched at run time by the shim's `rbDelete`.
-        if (n.args.length === 1 && !blk && !recvType)
-          return this.withOnce(
-            r,
-            (x) =>
-              `(Array.isArray(${x}) ? ${rc("aryDelete")}(${x}, ${args()[0]}) : ${rc("hashDelete")}(${x}, ${args()[0]}))`,
-          );
-        if (n.args.length === 1 && !blk)
-          return `${rc(this.typeOf(recvNode, ctx)?.k === "array" ? "aryDelete" : "hashDelete")}(${r}, ${args()[0]})`;
-        break;
-      case "sort_by":
-        // enum.c enum_sort_by: stable, the keys compared by `<=>`.
-        if (blk)
-          return `[...${E}].map((x: any) => [(${fn()})(x), x]).sort((a: any, b: any) => ${rc("cmp")}(a[0], b[0]) ?? 0).map((p: any) => p[1])`;
-        break;
-      case "tally":
-        // enum.c enum_tally: a Hash keyed by the element itself, so a Map.
-        if (!blk && n.args.length === 0)
-          return `${E}${nav}reduce((h: Map<any, number>, x: any) => h.set(x, (h.get(x) ?? 0) + 1), new Map())`;
-        break;
-      case "group_by":
-        if (blk) return `${rc("groupBy")}(${r}, ${fn()})`;
-        break;
-      case "index_by":
-        if (blk) return `${this.as(ctx, "indexBy")}(${r}, ${fn()})`;
-        break;
-      case "sum":
-        return `${rc("sum")}(${[r, ...args()].join(", ")})`;
-      case "count":
-        if (n.args.length === 0 && !blk) return `${R}${nav}length`;
-        // Enumerable#count with a block (enum.c count_iter_i): the elements it holds for.
-        if (n.args.length === 0 && blk) {
-          const f = fn();
-          if (f && !f.startsWith("async ")) return `${E}${nav}filter(${f}).length`;
-        }
-        break;
-      case "max":
-      case "min":
-        if (!blk && n.args.length === 0) return `${rc(name)}(${r})`;
-        break;
-      case "map!":
-        // array.c rb_ary_collect_bang: each element replaced in place; answers the receiver.
-        if (blk && !this.index.methodNames.has(name))
-          return this.withOnce(
-            r,
-            (x) => `(${x}.splice(0, ${x}.length, ...${x}.map(${fn()})), ${x})`,
-          );
-        break;
-      case "flatten!":
-        // array.c rb_ary_flatten_bang: nil when nothing was nested.
-        if (!blk && n.args.length <= 1 && !this.index.methodNames.has(name)) {
-          const d = n.args.length ? args()[0] : "Infinity";
-          return this.withOnce(
-            r,
-            (x) =>
-              `(${x}.some(Array.isArray) ? (${x}.splice(0, ${x}.length, ...${x}.flat(${d})), ${x}) : null)`,
-          );
-        }
-        break;
-      case "times":
-        // numeric.c int_dotimes: yields 0...n in order and answers n.
-        if (blk && n.args.length === 0) {
-          const f = fn()!;
-          const i = blk.k === "block" && !blk.params.length ? "" : "i";
-          if (f.startsWith("async ")) {
-            if (ctx.asyncBox) ctx.asyncBox.awaits = true;
-            return `(await (async (n: number) => { for (let i = 0; i < n; i++) await (${f})(${i}); return n; })(${r}))`;
-          }
-          return `((n: number) => { for (let i = 0; i < n; i++) (${f})(${i}); return n; })(${r})`;
-        }
-        break;
-      case "with_index":
-        if (this.index.methodNames.has(name)) return null;
-        // `ary.map.with_index { |x, i| }` (and each / select): the JS array
-        // method already passes the index, so the enumerator chain is one call.
-        {
-          const JS_INDEXED: Record<string, string> = {
-            map: "map",
-            each: "forEach",
-            select: "filter",
-          };
-          const inner = recvNode?.k === "call" ? recvNode : null;
-          if (
-            blk &&
-            n.args.length === 0 &&
-            inner &&
-            JS_INDEXED[inner.name] &&
-            inner.recv &&
-            !inner.block &&
-            inner.args.length === 0
-          ) {
-            const ir = this.expr(inner.recv, ctx);
-            return `${needsParens(ir) ? `(${ir})` : ir}.${JS_INDEXED[inner.name]}(${fn()})`;
-          }
-        }
-      // fallthrough
-      case "each_slice":
-      case "each_index":
-      case "zip":
-      case "partition":
-      case "min_by":
-      case "max_by":
-      case "transform_values":
-      case "transform_keys":
-      case "slice":
-      case "except":
-      case "dig":
-      case "filter_map":
-      case "each_value":
-      case "each_key":
-      case "each_pair":
-      case "values_at":
-      case "sort":
-      case "reverse":
-      case "intersect?":
-      case "symbolize_keys":
-      case "stringify_keys":
-      case "deep_dup":
-      case "to_set":
-      case "sum_by":
-      case "chars":
-      case "lines":
-      case "squish":
-      case "underscore":
-      case "camelize":
-      case "classify":
-      case "constantize":
-      case "safe_constantize":
-      case "demodulize":
-      case "pluralize":
-      case "singularize":
-      case "humanize":
-      case "foreign_key":
-      case "tableize":
-      case "parameterize":
-      case "in?":
-      case "abs":
-      case "round":
-      case "ceil":
-      case "floor":
-      case "between?":
-      case "succ":
-      case "upto":
-      case "downto":
-      case "step":
-      case "ljust":
-      case "rjust":
-      case "center":
-      case "chomp":
-      case "chop":
-      case "lstrip":
-      case "rstrip":
-      case "tr":
-      case "delete_prefix":
-      case "delete_suffix":
-      case "unpack1":
-      case "pack":
-      case "bytesize":
-      case "encoding":
-      case "force_encoding":
-      case "valid_encoding?":
-      case "ascii_only?":
-      case "b":
-      case "scan":
-      case "positive?":
-      case "negative?":
-      case "odd?":
-      case "even?":
-      case "integer?":
-      case "finite?":
-      case "nan?":
-      case "minmax":
-      case "cycle":
-      case "rotate":
-      case "sample":
-      case "shuffle":
-      case "fill":
-      case "insert":
-      case "delete_at":
-      case "delete_if":
-      case "keep_if":
-      case "select!":
-      case "reject!":
-      case "uniq!":
-      case "compact!":
-      case "sort!":
-      case "reverse!":
-      case "concat!":
-      case "replace":
-      case "invert":
-      case "key":
-      case "assoc":
-      case "store":
-      case "default":
-      case "compare_by_identity":
-      case "extract!":
-      case "extract_options!":
-      case "in_groups_of":
-      case "split_at":
-      case "each_char":
-      case "each_line":
-      case "each_byte":
-      case "start":
-      case "freeze!":
-      case "with_object":
-        if (this.index.methodNames.has(name)) return null;
-        return `${rc(rbCoreFn(name))}(${[r, ...args()].join(", ")})`;
-    }
-    return null;
+    const rule = CORE_METHODS[name];
+    if (!rule) return null;
+    return rule({
+      lw: this,
+      ctx,
+      n,
+      name,
+      recvNode,
+      r,
+      R,
+      E,
+      nav,
+      blk,
+      recvType,
+      args,
+      fn,
+      rc,
+      recvIsString,
+    });
   }
-}
-
-/**
- * The body of an Enumerable method whose block awaits, run in order as Ruby's
- * iteration is (enum.c, array.c), over `xs` with the block `g`; `self` is the
- * receiver and `a0…` its arguments. `null` where the method has no native body.
- */
-function asyncEnumBody(name: string, argc: number): string | null {
-  const T = (v: string) => `(${v} != null && ${v} !== false)`;
-  switch (argc === 0 ? name : argc === 1 ? `${name}/1` : "") {
-    case "each":
-    case "each_pair":
-      return "for (const x of xs) await g(x); return self;";
-    case "each_with_index":
-      return "for (let i = 0; i < xs.length; i++) await g(xs[i], i); return self;";
-    case "map":
-    case "collect":
-      return "const out: unknown[] = []; for (const x of xs) out.push(await g(x)); return out;";
-    case "flat_map":
-    case "collect_concat":
-      return "const out: unknown[] = []; for (const x of xs) out.push(...[await g(x)].flat()); return out;";
-    case "select":
-    case "filter":
-      return `const out: unknown[] = []; for (const x of xs) { const v = await g(x); if ${T("v")} out.push(x); } return out;`;
-    case "reject":
-      return `const out: unknown[] = []; for (const x of xs) { const v = await g(x); if (!${T("v")}) out.push(x); } return out;`;
-    case "filter_map":
-      return `const out: unknown[] = []; for (const x of xs) { const v = await g(x); if ${T("v")} out.push(v); } return out;`;
-    case "find":
-    case "detect":
-      return `for (const x of xs) { const v = await g(x); if ${T("v")} return x; } return null;`;
-    case "any?":
-      return `for (const x of xs) { const v = await g(x); if ${T("v")} return true; } return false;`;
-    case "all?":
-      return `for (const x of xs) { const v = await g(x); if (!${T("v")}) return false; } return true;`;
-    case "none?":
-      return `for (const x of xs) { const v = await g(x); if ${T("v")} return false; } return true;`;
-    case "count":
-      return `let n = 0; for (const x of xs) { const v = await g(x); if ${T("v")} n++; } return n;`;
-    case "each_with_object/1":
-      return "for (const x of xs) await g(x, a0); return a0;";
-    case "inject/1":
-    case "reduce/1":
-      return "let acc = a0; for (const x of xs) acc = await g(acc, x); return acc;";
-    // hash.c rb_hash_transform_values on a plain-object Hash (a Map keeps the helper).
-    case "transform_values":
-      return "const out: Record<string, unknown> = {}; for (const [k, v] of Object.entries(self ?? {})) out[k] = await g(v); return out;";
-  }
-  return null;
 }
 
 /** ActiveSupport::Testing::TimeHelpers' methods (testing/time_helpers.rb). */
@@ -6616,18 +6094,6 @@ const TIME_HELPERS = new Set([
   "unfreeze_time",
 ]);
 
-/** Enumerable methods whose awaiting block is run sequentially by `rbAsyncEnum`. */
-const ASYNC_ENUM = new Set(
-  "map collect flat_map collect_concat each each_with_index each_with_object select filter reject find detect any? all? none? sum inject reduce each_value each_pair each_key filter_map group_by index_by sort_by count transform_values".split(
-    " ",
-  ),
-);
-
-const SPLAT_YIELD_ONE = new Set(
-  "map collect flat_map collect_concat select filter find_all reject find detect sort_by min_by max_by group_by partition filter_map sum count".split(
-    " ",
-  ),
-);
 /** Operator → the named member spellings a typed receiver may define. */
 const OP_SPELL: Record<string, string[]> = {
   "[]": ["get", "at", "fetch"],
@@ -6792,7 +6258,7 @@ const ATTR_MACROS: Record<string, string> = {
   thread_cattr_accessor: "threadMattrAccessor",
 };
 
-function rbCoreFn(name: string): string {
+export function rbCoreFn(name: string): string {
   const base = name.replace(/\?$/, "").replace(/!$/, "Bang");
   const camel = snakeToCamel(base);
   const out = name.endsWith("?") ? "is" + camel[0].toUpperCase() + camel.slice(1) : camel;
@@ -6875,7 +6341,7 @@ export type { Ctx, Scope };
  * A local Rails names as a Hash (`hash`, `h`, `job_hash`): `size` / `include?`
  * read its keys (`Hash#size`, `Hash#include?` is `key?`), not an Array's.
  */
-function hashNamed(n: N | null): boolean {
+export function hashNamed(n: N | null): boolean {
   return n?.k === "lvar" && /^(hash|h|\w+_hash)$/.test(n.name);
 }
 
