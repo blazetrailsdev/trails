@@ -11,14 +11,14 @@ import {
 
 interface ConversionRecord {
   isPersisted(): boolean;
-  toKey(): unknown[] | null;
+  toKey(...args: Parameters<typeof toKey>): ReturnType<typeof toKey>;
 }
 
 export interface Conversion {
   toModel<T>(this: T): T;
-  toKey(): unknown[] | null;
-  toParam(): string | null;
-  toPartialPath(): string;
+  toKey(...args: Parameters<typeof toKey>): ReturnType<typeof toKey>;
+  toParam(...args: Parameters<typeof toParam>): ReturnType<typeof toParam>;
+  toPartialPath(...args: Parameters<typeof toPartialPath>): ReturnType<typeof toPartialPath>;
 }
 
 export function toModel<T>(this: T): T {
