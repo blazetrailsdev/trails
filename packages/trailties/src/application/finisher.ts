@@ -293,14 +293,10 @@ async function collectJobs(dir: string, prefix: string): Promise<void> {
       await collectJobs(full, `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}::`);
       continue;
     }
-    if (!/^.+[-_]job\.(?:ts|js)$/.test(entry)) continue;
+    if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;
     const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
     for (const value of Object.values(mod)) {
-      if (
-        typeof value === "function" &&
-        value.name.endsWith("Job") &&
-        value.prototype instanceof JobBase
-      ) {
+      if (typeof value === "function" && value.prototype instanceof JobBase) {
         registerConstant(`${prefix}${value.name}`, value);
       }
     }

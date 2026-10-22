@@ -12,9 +12,23 @@ export class JobGenerator extends NamedBase {
   declare options: JobGeneratorOptions;
 
   static {
+    this.classOption("queue", {
+      type: "string",
+      default: "default",
+      desc: "The queue name for the generated job",
+    });
+    this.classOption("parent", {
+      type: "string",
+      default: "ApplicationJob",
+      desc: "The parent class for the generated job",
+    });
     this.checkClassCollision({ suffix: "Job" });
+    this.hookFor("testFramework");
     this.commands().push("createJobFile");
   }
+
+  /** @internal */
+  private _applicationJobFileName?: string;
 
   constructor(options: JobGeneratorOptions) {
     super(options);
@@ -49,19 +63,8 @@ export class JobGenerator extends NamedBase {
    * @missingRailsCall mountable_engine? — CONVERGEABLE scaffold-controller-hooks-test-framework-and-engine-arms
    */
   private applicationJobFileName(): string {
-    return `app/jobs/application-job${this.ext()}`;
+    return (this._applicationJobFileName ??= `app/jobs/application-job${this.ext()}`);
   }
 }
 
 Object.defineProperty(JobGenerator, "name", { value: "Rails::Generators::JobGenerator" });
-JobGenerator.classOption("queue", {
-  type: "string",
-  default: "default",
-  desc: "The queue name for the generated job",
-});
-JobGenerator.classOption("parent", {
-  type: "string",
-  default: "ApplicationJob",
-  desc: "The parent class for the generated job",
-});
-JobGenerator.hookFor("testFramework");
