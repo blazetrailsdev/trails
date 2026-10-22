@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { noon, tomorrow } from "@blazetrails/activesupport/core-ext/date/calculations";
-import { isAdapterIs } from "../test-helpers/helper.js";
-import { Base } from "../base.js";
-import { HelloJob } from "../test-helpers/jobs/hello-job.js";
-import { JobBuffer } from "../test-helpers/support/job-buffer.js";
-import type { AsyncAdapter } from "./async-adapter.js";
+import { isAdapterIs } from "./test-helpers/helper.js";
+import { Base } from "./base.js";
+import { HelloJob } from "./test-helpers/jobs/hello-job.js";
+import { JobBuffer } from "./test-helpers/support/job-buffer.js";
+import type { AsyncAdapter } from "./queue-adapters/async-adapter.js";
 
 describe.skipIf(!isAdapterIs("async"))("AsyncAdapterTest", () => {
   beforeEach(() => {
