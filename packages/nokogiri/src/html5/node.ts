@@ -30,6 +30,10 @@ export class Node {
     readonly document: unknown = null,
   ) {}
 
+  get pointerId(): Parse5Node {
+    return this._node;
+  }
+
   get type(): number {
     if (this._node.nodeName === "#text") return Node.TEXT_NODE;
     if (this._node.nodeName === "#comment") return Node.COMMENT_NODE;

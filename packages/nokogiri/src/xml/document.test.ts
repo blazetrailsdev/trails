@@ -22,7 +22,7 @@ describe("Nokogiri::XML::Document", () => {
   });
 
   it("root node has children", () => {
-    doc = XmlDocument.parse("<root><a/><b/></root>");
+    const doc = XmlDocument.parse("<root><a/><b/></root>");
     const children = doc.root.children;
     expect(children).toHaveLength(2);
     expect(children[0].name).toBe("a");
@@ -109,5 +109,18 @@ describe("Nokogiri::XML::Searchable", () => {
     expect(space.isBlank()).toBe(true);
     expect(a.isBlank()).toBe(false);
     expect(text.isBlank()).toBe(false);
+  });
+  it("union dedups the same libxml node by pointer_id", () => {
+    const doc = XmlDocument.parse("<root><a/><b/></root>");
+    const union = doc.css("a, root > a");
+    expect(union.length).toBe(1);
+    expect(doc.css("a").plus(doc.css("a")).length).toBe(1);
+  });
+
+  it("css defaults its namespaces to the root's", () => {
+    const doc = XmlDocument.parse('<root xmlns="urn:x" xmlns:y="urn:y"><a/><y:b/></root>');
+    expect(doc.root.namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
+    expect(doc.css("a").length).toBe(1);
+    expect(doc.css("y|b").length).toBe(1);
   });
 });

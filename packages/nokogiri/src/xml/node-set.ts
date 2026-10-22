@@ -41,7 +41,7 @@ export class NodeSet implements Iterable<Node> {
   }
 
   css(...args: unknown[]): NodeSet {
-    const [rules, handler, ns] = extractParams(args);
+    const [rules, handler, ns] = extractParams.call(this as unknown as SearchableHost, args);
     const paths = cssRulesToXpath(this as unknown as SearchableHost, rules, ns);
 
     return this._list.reduce(
@@ -54,7 +54,7 @@ export class NodeSet implements Iterable<Node> {
   plus(nodeSet: NodeSet): NodeSet {
     const list = [...this._list];
     for (const node of nodeSet) {
-      if (!list.some((x) => x._node === node._node)) list.push(node);
+      if (!list.some((x) => x.pointerId === node.pointerId)) list.push(node);
     }
     return new NodeSet(this.document, list);
   }
