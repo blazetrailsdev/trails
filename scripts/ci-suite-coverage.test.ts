@@ -457,11 +457,11 @@ function gateRegex(yml: string, name: string): RegExp {
  *    committed call-mismatch shards. mixin-declaration-drift and
  *    non-transactional-row-writes are not kept: they read only
  *    packages/activerecord/.
- *  - rails-comparison skips and rails-comparison-thor runs in its place:
- *    scripts/ci/thor-comparison.sh fetches, extracts and compares the
+ *  - rails-comparison skips and rails-comparison-scoped runs in its place:
+ *    scripts/ci/scoped-comparison.sh fetches, extracts and compares the
  *    `thor` package alone. Each gate it runs is scoped (`--package thor`,
  *    scripts/api-compare/scope.ts) unless it reads no artifact; each
- *    whole-surface script it does not run is in THOR_COMPARISON_SKIPS below,
+ *    whole-surface script it does not run is in SCOPED_COMPARISON_SKIPS below,
  *    with the reason. The vendor cache is restore-only there, so a thor-only
  *    fetch is never saved under the key rails-comparison shares. The ci
  *    aggregate accepts each job's skip only on the other's side of thor_only.
@@ -478,6 +478,9 @@ function gateRegex(yml: string, name: string): RegExp {
  *  - virtualized-dx-type-tests and leaf-tests' DX type step skip, and
  *    unit-tests keeps only the thor_only guard set, for the same reasons.
  *    The ci aggregate accepts each skip only when actioncable_only is true.
+ *  - rails-comparison still runs: actioncable has no vendored lib path until
+ *    it is enrolled in the compare tooling, and scripts/ci/scoped-comparison.sh
+ *    refuses a package it cannot extract alone.
  *
  *  case "${{ github.event_name }}" in
  *  Website label opt-in. The Website job otherwise gates only on
@@ -507,21 +510,22 @@ type GateOpts = { cwd?: string; base?: string; head?: string };
 const SCOPED_ONLY_CALL = "bash scripts/ci/scoped-only.sh";
 
 /**
- * The whole-surface comparison scripts scripts/ci/thor-comparison.sh does not
- * run, each with why a thor-only diff cannot move its answer. The population
+ * The whole-surface comparison scripts scripts/ci/scoped-comparison.sh does not
+ * run, each with why a diff confined to a scoped package (thor, actioncable)
+ * cannot move its answer. The population
  * premises are asserted by scripts/api-compare/scope.test.ts: param-name-mark's
  * GATED_PACKAGES (which the block-param ratchet gates by too), and the
  * dependency rules. The receipt-audit package and the
  * method-order and test-name lint paths, which ci.yml states, are asserted by
  * the test that reads this table.
  */
-const THOR_COMPARISON_SKIPS: Record<string, string> = {
-  "scripts/api-compare/lint-param-names.ts": "thor is not in its GATED_PACKAGES",
-  "scripts/api-compare/lint-block-params.ts": "thor is not in its GATED_PACKAGES",
-  "scripts/api-compare/lint-deps.ts": "no dependency rule names thor",
+const SCOPED_COMPARISON_SKIPS: Record<string, string> = {
+  "scripts/api-compare/lint-param-names.ts": "no scoped package is in its GATED_PACKAGES",
+  "scripts/api-compare/lint-block-params.ts": "no scoped package is in its GATED_PACKAGES",
+  "scripts/api-compare/lint-deps.ts": "no dependency rule names a scoped package",
   "scripts/api-compare/receipt-audit.ts": "runs for --package activerecord only",
   "scripts/build-rails-file-structure-manifest.ts": "method order: arel and activemodel only",
-  "scripts/build-rails-test-names-manifest.ts": "test names: no thor path is enrolled",
+  "scripts/build-rails-test-names-manifest.ts": "test names: no scoped package path is enrolled",
   "scripts/parity/conventions-doc.ts": "generated from conventions.ts",
   "scripts/test-deps/rails-test-deps.ts": "reads packages/activerecord only",
   "scripts/test-deps/build-fixture-baseline.ts": "reads packages/activerecord only",
@@ -1444,34 +1448,59 @@ describe("CI runs every tooling test suite", () => {
       "needs.changes.outputs.thor_only";
 
     expect(flat(wf.jobs["rails-comparison"].if).trim()).toBe(`${gated} != 'true'`);
-    expect(flat(wf.jobs["rails-comparison-thor"].if).trim()).toBe(`${gated} == 'true'`);
-    expect(wf.jobs.ci.needs).toContain("rails-comparison-thor");
+    expect(flat(wf.jobs["rails-comparison-scoped"].if).trim()).toBe(`${gated} == 'true'`);
+    expect(wf.jobs.ci.needs).toContain("rails-comparison-scoped");
     expect(aggregate).toContain(
       'if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then continue',
     );
     expect(aggregate).toContain(
-      'rails-comparison-thor) if [ "$COMPARISON_AFFECTED" = "false" ] || ' +
+      'rails-comparison-scoped) if [ "$COMPARISON_AFFECTED" = "false" ] || ' +
         '[ "$THOR_ONLY" != "true" ]; then continue',
     );
 
-    const steps = wf.jobs["rails-comparison-thor"].steps as { uses?: string; run?: string }[];
+    const job = wf.jobs["rails-comparison-scoped"];
+    expect(job.env).toEqual({ SCOPED_PACKAGE: "thor", SCOPED_SOURCE: "thor" });
+    const steps = job.steps as { uses?: string; run?: string }[];
     expect(steps.map((step) => step.uses)).toContain("actions/cache/restore@v4");
     expect(steps.map((step) => step.uses)).not.toContain("actions/cache@v4");
-    expect(steps.map((step) => step.run)).toContain("pnpm vendor:fetch --source thor");
+    expect(steps.map((step) => step.run)).toContain('pnpm vendor:fetch --source "$SCOPED_SOURCE"');
+    expect(steps.map((step) => step.run)).toContain(
+      'bash scripts/ci/scoped-comparison.sh "$SCOPED_PACKAGE"',
+    );
   });
 
-  it("accounts for every whole-surface comparison script in the thor driver", async () => {
+  it("keeps the full comparison for an actioncable-only diff until actioncable is enrolled", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const wf = parseYaml(yml);
+    const runGate = await gateRunner(yml);
+    const cable = await runGate("packages/actioncable/src/version.ts");
+    expect(cable.actioncable_only).toBe("true");
+    expect(cable.comparison_affected).toBe("true");
+    expect(wf.jobs["rails-comparison"].if).not.toContain("actioncable_only");
+    expect(wf.jobs["rails-comparison-scoped"].if).not.toContain("actioncable_only");
+
+    await expect(
+      execFileAsync("bash", [
+        path.join(REPO_ROOT, "scripts/ci/scoped-comparison.sh"),
+        "actioncable",
+      ]),
+    ).rejects.toMatchObject({
+      stdout: expect.stringContaining("not enrolled in the compare tooling"),
+    });
+  });
+
+  it("accounts for every whole-surface comparison script in the scoped driver", async () => {
     const wf = parseYaml(await readFile(CI_YML, "utf8"));
     const steps = wf.jobs["rails-comparison"].steps as { run?: string }[];
     const scripts = new Set(
       steps.flatMap((step) => (step.run ?? "").match(/scripts\/[\w/-]+\.ts/g) ?? []),
     );
-    const driver = (await readFile(path.join(REPO_ROOT, "scripts/ci/thor-comparison.sh"), "utf8"))
+    const driver = (await readFile(path.join(REPO_ROOT, "scripts/ci/scoped-comparison.sh"), "utf8"))
       .replaceAll("$api/", "scripts/api-compare/")
       .replaceAll("$tests/", "scripts/test-compare/");
 
     const run = [...scripts].filter((script) => driver.includes(script));
-    const skipped = Object.keys(THOR_COMPARISON_SKIPS);
+    const skipped = Object.keys(SCOPED_COMPARISON_SKIPS);
 
     expect(scripts.size).toBeGreaterThan(30);
     expect([...scripts].filter((s) => !run.includes(s) && !skipped.includes(s))).toEqual([]);

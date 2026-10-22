@@ -5,7 +5,7 @@ import {
   rbFSend,
   rbInspect,
 } from "@blazetrails/ruby-compat";
-import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackApp, RackEnv, RackHeaders, RackResponse } from "@blazetrails/rack";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
 import { deepDup, wrap } from "@blazetrails/activesupport";
@@ -84,7 +84,7 @@ export class Middleware {
       : CONTENT_SECURITY_POLICY;
   }
 
-  private policyPresent(headers: Record<string, string | string[]>): boolean {
+  private policyPresent(headers: RackHeaders): boolean {
     return (
       headers[CONTENT_SECURITY_POLICY] != null ||
       headers[CONTENT_SECURITY_POLICY_REPORT_ONLY] != null

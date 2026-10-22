@@ -71,9 +71,7 @@ export const TopLevel: {
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
       envConfig(): Record<string, unknown>;
       executor: { wrap<T>(block: () => T): T };
-      call(
-        env: Record<string, unknown>,
-      ): Promise<[number, Record<string, string | string[]>, unknown]>;
+      call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
     } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;

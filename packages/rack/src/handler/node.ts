@@ -77,21 +77,43 @@ export class Node {
   service(req: HttpRequest, res: HttpResponse): Promise<void> {
     return new Thread(async (): Promise<void> => {
       const env = await this.requestEnv(req, new StringIO(await readBody(req)));
-      env[RACK_IS_HIJACK] = false;
+      const socket = res.socket;
+      let hijacked = false;
+      const release = (): HttpSocket => {
+        hijacked = true;
+        return socket!;
+      };
+      env[RACK_IS_HIJACK] = socket != null;
+      if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
 
-      const [status, headers, body] = await (rbFSend(
-        this.app,
-        "call",
-        env,
-      ) as Promise<RackResponse>);
       try {
-        res.writeHead(status, sentHeaders(headers));
-        for await (const chunk of body) {
-          res.write(chunk);
+        const [status, headers, body] = await (rbFSend(
+          this.app,
+          "call",
+          env,
+        ) as Promise<RackResponse>);
+        try {
+          if (hijacked) return;
+          const partial = headers[RACK_HIJACK];
+          if (env[RACK_IS_HIJACK] && typeof partial === "function") {
+            release().write(responseHead(status, sentHeaders(headers)));
+            await partial(socket!);
+            return;
+          }
+          res.writeHead(status, sentHeaders(headers));
+          for await (const chunk of body) {
+            if (hijacked) return;
+            res.write(chunk);
+          }
+          res.end();
+        } finally {
+          await closeBody(body);
         }
-        res.end();
-      } finally {
-        await closeBody(body);
+      } catch (error) {
+        if (!hijacked) throw error;
+        stderr.write(
+          `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        );
       }
     }).value();
   }
@@ -225,13 +247,14 @@ export class Node {
 function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]> {
   const sent: Record<string, string | string[]> = {};
   const setCookie = headers[SET_COOKIE];
-  if (setCookie) {
+  if (setCookie && typeof setCookie !== "function") {
     sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
   }
 
   for (const [key, value] of Object.entries(headers)) {
     if (key.startsWith("rack.")) continue;
     if (key === SET_COOKIE) continue;
+    if (typeof value === "function") continue;
     sent[key] = Array.isArray(value) ? value.join(", ") : value;
   }
   return sent;

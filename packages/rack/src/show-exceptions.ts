@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import {
   File,
   rbFSend,
@@ -412,7 +413,7 @@ export class ShowExceptions {
     return !this.acceptsHtml(env);
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     try {
       return await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     } catch (e: any) {

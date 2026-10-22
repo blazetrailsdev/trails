@@ -2188,8 +2188,8 @@ jobs:
         if: always()
         run: node scripts/ci/bg-gates.mjs summary
 
-  rails-comparison-thor:
-    name: Rails API/Test Comparison (thor)
+  rails-comparison-scoped:
+    name: Rails API/Test Comparison (scoped)
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
@@ -2197,6 +2197,9 @@ jobs:
       needs.changes.outputs.thor_only == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SCOPED_PACKAGE: thor
+      SCOPED_SOURCE: thor
     permissions:
       contents: read
       actions: read
@@ -2216,12 +2219,12 @@ jobs:
         with:
           path: vendor/*/*/
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
-      - name: Fetch the thor source
-        run: pnpm vendor:fetch --source thor
-      - name: Thor comparison
+      - name: Fetch the scoped package's source
+        run: pnpm vendor:fetch --source "$SCOPED_SOURCE"
+      - name: Scoped comparison
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash scripts/ci/thor-comparison.sh
+        run: bash scripts/ci/scoped-comparison.sh "$SCOPED_PACKAGE"
 
   schema-parity-rails:
     name: Schema Parity (Rails side)
@@ -2446,7 +2449,7 @@ jobs:
       - maria-tests
       - website
       - rails-comparison
-      - rails-comparison-thor
+      - rails-comparison-scoped
       - schema-parity-rails
       - schema-parity-trails
       - schema-parity-diff
@@ -2600,7 +2603,7 @@ jobs:
                     continue
                   fi
                   ;;
-                rails-comparison-thor)
+                rails-comparison-scoped)
                   if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" != "true" ]; then
                     continue
                   fi

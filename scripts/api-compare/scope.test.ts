@@ -55,10 +55,12 @@ describe("scopedMarks", () => {
   });
 });
 
-describe("the gates scripts/ci/thor-comparison.sh skips", () => {
-  it("judge populations thor is outside of", () => {
-    expect(PARAM_NAME_GATED).not.toContain("thor");
-    expect([...GATE_ENFORCED_PACKAGES]).not.toContain("thor");
-    expect(DEP_RULES.map((rule) => rule.package)).not.toContain("thor");
+describe("the gates scripts/ci/scoped-comparison.sh skips", () => {
+  it("judge populations thor and actioncable are outside of", () => {
+    for (const pkg of ["thor", "actioncable"]) {
+      expect(PARAM_NAME_GATED).not.toContain(pkg);
+      expect([...GATE_ENFORCED_PACKAGES]).not.toContain(pkg);
+      expect(DEP_RULES.map((rule) => rule.package)).not.toContain(pkg);
+    }
   });
 });

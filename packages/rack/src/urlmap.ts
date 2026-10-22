@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import {
   CONTENT_TYPE,
   HTTP_HOST,
@@ -48,7 +49,7 @@ export class URLMap {
       });
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const path = env[PATH_INFO];
     const scriptName = env[SCRIPT_NAME];
     const httpHost = env[HTTP_HOST];

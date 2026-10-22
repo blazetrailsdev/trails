@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import { ETAG, CACHE_CONTROL } from "./constants.js";
 import { Digest, rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
@@ -15,7 +16,7 @@ export class ETag {
     this.cacheControl = arguments.length < 3 ? DEFAULT_CACHE_CONTROL : (cacheControl ?? null);
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [status, headers, body] = response;
 
@@ -46,7 +47,7 @@ export class ETag {
   }
 
   /** @internal */
-  private skipCaching(headers: Record<string, string | string[]>): boolean {
+  private skipCaching(headers: RackHeaders): boolean {
     return ETAG in headers || "last-modified" in headers;
   }
 

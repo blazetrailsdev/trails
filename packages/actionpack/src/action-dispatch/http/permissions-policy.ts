@@ -1,5 +1,5 @@
 import { ArgumentError, hashDelete, rbFSend, rbInspect } from "@blazetrails/ruby-compat";
-import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackApp, RackEnv, RackHeaders, RackResponse } from "@blazetrails/rack";
 import { FEATURE_POLICY } from "../constants.js";
 import { ActionDispatch } from "../../namespaces.js";
 import { deepDup } from "@blazetrails/activesupport";
@@ -57,7 +57,7 @@ export class Middleware {
     return response;
   }
 
-  private policyPresent(headers: Record<string, string | string[]>): boolean {
+  private policyPresent(headers: RackHeaders): boolean {
     return headers[FEATURE_POLICY] != null;
   }
 
