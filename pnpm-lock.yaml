@@ -463,6 +463,12 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
+  packages/mini-magick:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/msgpack:
     dependencies:
       '@blazetrails/date':

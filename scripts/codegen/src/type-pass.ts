@@ -741,6 +741,13 @@ export class TypePass {
         if (!target) continue;
         if (ts.isParameter(target) || ts.isVariableDeclaration(target)) {
           if (target.type) continue;
+          // A `for (const x of …)` binding takes no annotation.
+          if (
+            ts.isVariableDeclaration(target) &&
+            ts.isVariableDeclarationList(target.parent) &&
+            (ts.isForOfStatement(target.parent.parent) || ts.isForInStatement(target.parent.parent))
+          )
+            continue;
           const name = target.name;
           edits.push({ pos: name.getEnd(), end: name.getEnd(), text: ": unknown" });
         } else if (ts.isFunctionLike(target) && !target.type) {

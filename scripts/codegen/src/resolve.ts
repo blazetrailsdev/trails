@@ -823,6 +823,12 @@ export function rubyFileToTsAr(rubyFile: string): string {
     // A test outside `cases/` (`test/serializers/time_with_zone_serializer_test.rb`)
     // sits beside the lib file it tests.
     if (rel.endsWith("_test")) return `${kebab(rel).replace(/-test$/, "")}.test.ts`;
+    // An RSpec spec (`spec/lib/mini_magick/tool_spec.rb`) sits beside the lib file
+    // it specs (`tool.ts`); `spec/lib/mini_magick_spec.rb` beside the entry.
+    if (rel.endsWith("_spec") && rel.startsWith("lib/")) {
+      const lib = rel.slice("lib/".length).replace(new RegExp(`^${GEM.rubyRoot}/`), "");
+      return `${kebab(lib).replace(/-spec$/, "")}.test.ts`;
+    }
     return `test-helpers/${kebab(rel)}.ts`;
   }
   const root = GEM.rubyRoot;

@@ -31,6 +31,8 @@ export interface GemConfig {
   skipTests?: Record<string, string>;
   /** The package directory under `packages/`, where it differs from `gem` (`image-processing`). */
   pkg?: string;
+  /** The gem's test directory beside `lib/`: `test` (Minitest), or `spec` (RSpec). */
+  testDir?: string;
   /**
    * A Ruby library the gem binds, by its top-level constant, as the npm package
    * standing in for it: the default export, initialised once per file
@@ -89,6 +91,18 @@ GEMS.image_processing = {
       },
     },
   },
+};
+
+// mini_magick (minimagick/minimagick v5.2.0, vendor/rails/v8.0.2/Gemfile.lock:352),
+// RFC 0202: shells out to ImageMagick; its specs are RSpec.
+GEMS.mini_magick = {
+  gem: "mini_magick",
+  rubyRoot: "mini_magick",
+  namespace: "MiniMagick",
+  vendor: "mini_magick/v5.2.0",
+  hand: false,
+  pkg: "mini-magick",
+  testDir: "spec",
 };
 
 const name = process.env.CODEGEN_GEM ?? "activerecord";

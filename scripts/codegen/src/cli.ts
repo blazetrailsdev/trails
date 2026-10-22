@@ -142,7 +142,7 @@ const files: IrFile[] = listJson(irDir)
 {
   const want = arg("--tests");
   if (want) {
-    const TEST = path.join(GEM_LIB, "..", "test");
+    const TEST = path.join(GEM_LIB, "..", GEM.testDir ?? "test");
     const seen = new Set<string>();
     const queue = want
       .split(",")
@@ -155,7 +155,7 @@ const files: IrFile[] = listJson(irDir)
       const src = readFileSync(path.join(TEST, rel), "utf8");
       // `require "helper"` (Rails) or `require 'test_helper'` (marcel): the
       // suite's helper on the test load path.
-      for (const m of src.matchAll(/^\s*require ["']((?:test_)?helper)["']/gm))
+      for (const m of src.matchAll(/^\s*require ["']((?:test_|spec_)?helper)["']/gm))
         queue.push(`${m[1]}.rb`);
       // helper.rb's `require "adapters/#{@adapter}"`: each adapter trails runs the
       // suite under (Rakefile:5, less the queue gems it does not port).
@@ -512,13 +512,18 @@ if (!process.argv.includes("--no-nonnull"))
 // `--no-prettier` skips it.
 if (!process.argv.includes("--no-prettier")) {
   const t = Date.now();
-  execFileSync(
-    path.join(ROOT, "node_modules/.bin/prettier"),
-    // Only .prettierignore: prettier also reads .gitignore by default, which
-    // lists codegen-out, and an ignored path is skipped without a word.
-    ["--write", "--log-level", "warn", "--ignore-path", ".prettierignore", `${outDir}/**/*.ts`],
-    { cwd: ROOT, stdio: "inherit" },
-  );
+  // A file prettier cannot parse is a generator bug: reported, not fatal.
+  try {
+    execFileSync(
+      path.join(ROOT, "node_modules/.bin/prettier"),
+      // Only .prettierignore: prettier also reads .gitignore by default, which
+      // lists codegen-out, and an ignored path is skipped without a word.
+      ["--write", "--log-level", "warn", "--ignore-path", ".prettierignore", `${outDir}/**/*.ts`],
+      { cwd: ROOT, stdio: "inherit" },
+    );
+  } catch {
+    report.prettierFailed = true;
+  }
   report.prettierMs = Date.now() - t;
 }
 report.unseatedConstants = emitter.unseated;

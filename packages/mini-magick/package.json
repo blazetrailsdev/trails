@@ -1,0 +1,30 @@
+{
+  "name": "@blazetrails/mini-magick",
+  "version": "0.1.0",
+  "description": "ImageMagick command lines for Trails, mirroring the mini_magick gem",
+  "type": "module",
+  "main": "dist/mini-magick.js",
+  "types": "dist/mini-magick.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/mini-magick.d.ts",
+      "default": "./dist/mini-magick.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

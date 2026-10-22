@@ -55,6 +55,10 @@ interface Unit {
   /** statements from `class << self` */
   sbody: N[];
   struct?: { members: string[]; keyword_init: boolean } | null;
+  /** An RSpec spec: the constant `RSpec.describe` names (`described_class`). */
+  describedClass?: N;
+  /** An RSpec spec (`RSpec.describe`), as opposed to a Minitest one. */
+  rspec?: boolean;
 }
 
 export interface FileResult {
@@ -862,6 +866,10 @@ export class Emitter {
    */
   isTestSupport(fqn: string): boolean {
     const sc = this.index.scopes.get(fqn);
+    // A helper module under the suite's support/ (mini_magick's `Helpers`, which
+    // `RSpec.configure { config.include Helpers }` gives every example).
+    if (sc?.kind === "module" && [...sc.files].every((x) => x.startsWith("test/support/")))
+      return true;
     if (!sc || sc.kind !== "class") return false;
     if (![...sc.files].every((x) => x.startsWith("test/"))) return false;
     // Minitest's own classes reopened by a test helper (image_processing's
@@ -996,6 +1004,24 @@ export class Emitter {
         lvars.has(iv.slice(1)) ? `self${base[0].toUpperCase()}${base.slice(1)}` : base,
       );
     }
+    // RSpec `subject` / `let(:x)` / `let!(:x)` (at any depth) and
+    // `described_class`: describe-scoped `let`s and the spec's constant.
+    const specLocals = new Map<string, string>();
+    const specLets: string[] = [];
+    if (u.rspec) {
+      walk(u.body, (n) => {
+        if (n.k !== "call" || n.recv !== null || n.block?.k !== "block") return;
+        if (!["subject", "let", "let!"].includes(n.name)) return;
+        const nm =
+          n.args[0]?.k === "sym" ? n.args[0].value : n.name === "subject" ? "subject" : null;
+        if (!nm) return;
+        const js = jsIdent(propName(nm));
+        if (!specLets.includes(js)) specLets.push(js);
+        specLocals.set(nm, js);
+        if (n.name === "subject") specLocals.set("subject", js);
+      });
+      if (u.describedClass) specLocals.set("described_class", this.lw.expr(u.describedClass, hctx));
+    }
     // Helper defs of the test class, and the support class's functions.
     const helpers = new Map<string, N>();
     for (const s of [...u.body, ...u.sbody])
@@ -1028,6 +1054,7 @@ export class Emitter {
         selfExpr: "this",
         ivarLocals,
         testFns: testFns(),
+        ...(u.rspec ? { specLocals } : {}),
         ...over,
       });
     const helperText = (): string[] => {
@@ -1043,11 +1070,15 @@ export class Emitter {
     const helperLines = helperText();
 
     const body = (b: N, locals: string[]): string[] => {
-      const ctx = ctxFor({ testMode: true, asyncBox: { awaits: false } });
+      const ctx = ctxFor({ testMode: true, asyncBox: { awaits: false }, testTail: [] });
       // The function body a local's assignments are counted in (`const` for one).
       ctx.scope.body = b;
       for (const l of locals) ctx.scope.locals.add(l);
-      const lines = this.lw.block(this.lw.seqBody(b), ctx, false);
+      const lines = [
+        ...this.lw.block(this.lw.seqBody(b), ctx, false),
+        // rspec-mocks message expectations, verified as the example ends.
+        ...(ctx.testTail ?? []),
+      ];
       const hz: Set<string> | undefined = ctx.scope.hoisted;
       if (hz?.size)
         lines.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: unknown`).join(", ")};`);
@@ -1105,9 +1136,32 @@ export class Emitter {
         } else if (s.k === "def" && /^test_/.test(s.name)) {
           it(JSON.stringify(s.name.replace(/^test_/, "").replace(/_/g, " ")), s.body);
         } else if (
+          u.rspec &&
           s.k === "call" &&
           s.recv === null &&
-          s.name === "describe" &&
+          ["subject", "let", "let!"].includes(s.name) &&
+          s.block?.k === "block"
+        ) {
+          // RSpec `subject { … }` / `let(:x) { … }`: the value, set for each
+          // example before it runs (in definition order, outer first).
+          const nm = s.args[0]?.k === "sym" ? s.args[0].value : "subject";
+          const ctx = ctxFor({ testMode: true, asyncBox: { awaits: false } });
+          for (const l of loopLocals) ctx.scope.locals.add(l);
+          const seq = this.lw.seqBody(s.block.body);
+          const value =
+            seq.length === 1
+              ? this.lw.expr(seq[0], ctx)
+              : `await (${this.lw.arrow([], s.block.body, ctx)})()`;
+          const asy = ctx.asyncBox!.awaits || value.startsWith("await") ? "async " : "";
+          out.push(
+            `${vitest("beforeEach")}(${asy}() => {`,
+            `  ${specLocals.get(nm)} = ${value};`,
+            "});",
+          );
+        } else if (
+          s.k === "call" &&
+          s.recv === null &&
+          (s.name === "describe" || s.name === "context") &&
           s.args.length >= 1 &&
           s.block?.k === "block"
         ) {
@@ -1203,7 +1257,14 @@ export class Emitter {
       }
     };
     emitBody(u.body, out, null);
-    const lets = [...ivarLocals.values()].map((x) => `let ${x}: unknown;`);
+    const lets = [...ivarLocals.values(), ...specLets].map((x) => `let ${x}: unknown;`);
+    // rspec-mocks' doubles are reset after each example.
+    if (out.some((l) => l.includes(".spyOn(")))
+      out.unshift(
+        `${vitest("afterEach")}(() => {`,
+        `  ${this.lw.imp(hctx, "vitest", "vi")}.restoreAllMocks();`,
+        "});",
+      );
     // A test class that nests constants (`SerializersTest::DummySerializer`,
     // which a test `constantize`s by that name) is still their namespace.
     const nests = [...this.index.scopes.keys()].some((k) => k.startsWith(`${u.fqn}::`));
@@ -1379,6 +1440,17 @@ export class Emitter {
       const hctx = this.baseCtx({ nesting: [] } as unknown as Unit, f, {});
       this.lw.imp(hctx, "@root/test-helpers/helper.js", "", "");
     }
+    // An RSpec spec's `require "spec_helper"` (mini_magick): it loads the gem
+    // and the support files, for their effect.
+    if (
+      /^test\/.*_spec\.rb$/.test(file.file) &&
+      (file.body?.k === "seq" ? file.body.body : [file.body]).some(
+        (s: N) => s?.k === "call" && s.name === "require" && s.args[0]?.value === "spec_helper",
+      )
+    ) {
+      const hctx = this.baseCtx({ nesting: [] } as unknown as Unit, f, {});
+      this.lw.imp(hctx, "@root/test-helpers/spec-helper.js", "", "");
+    }
     // A library file's `require`s of other gem files: side-effect imports in
     // Ruby's order, each followed by the files it requires at its end.
     if (!file.file.startsWith("test/")) {
@@ -1410,7 +1482,10 @@ export class Emitter {
           s.k === "call" &&
           !["require", "require_relative"].includes(s.name) &&
           rootConst(s.recv)?.path.filter((x: string) => x)[0] !== undefined &&
-          rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "ENV",
+          rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "ENV" &&
+          // RSpec's own configuration and DSL (`RSpec.configure`, `RSpec.describe`,
+          // `RSpec::Matchers.define`): vitest's describe / it / setupFiles replace it.
+          rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "RSpec",
       );
       const stmts = file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : [];
       const fake = { nesting: [], fqn: undefined, body: [], sbody: [] } as unknown as Unit;
@@ -1419,7 +1494,16 @@ export class Emitter {
       // top-level `describe` is a vitest one, its helpers those the test helper
       // reopens Minitest::Test / Minitest::Spec with.
       for (const s of stmts) {
-        if (!(s.k === "call" && s.recv === null && s.name === "describe" && s.block?.k === "block"))
+        const rspecRecv =
+          s.recv?.k === "const" && s.recv.path.filter((x: string) => x).join("::") === "RSpec";
+        if (
+          !(
+            s.k === "call" &&
+            (s.recv === null || rspecRecv) &&
+            s.name === "describe" &&
+            s.block?.k === "block"
+          )
+        )
           continue;
         const spec = {
           kind: "class",
@@ -1428,8 +1512,16 @@ export class Emitter {
           superclass: null,
           body: this.lw.seqBody(s.block.body),
           sbody: [],
+          // RSpec's `described_class`: the constant a top-level describe names.
+          describedClass: s.args[0]?.k === "const" ? s.args[0] : undefined,
+          rspec: rspecRecv,
         } as unknown as Unit;
-        const sups = Emitter.SPEC_SUPPORT.filter((x) => this.isTestSupport(x));
+        const sups = [
+          ...Emitter.SPEC_SUPPORT,
+          ...[...this.index.scopes.keys()].filter(
+            (k) => this.index.scopes.get(k)?.kind === "module",
+          ),
+        ].filter((x) => this.isTestSupport(x));
         chunks.push(
           this.emitNativeTest(
             spec,
