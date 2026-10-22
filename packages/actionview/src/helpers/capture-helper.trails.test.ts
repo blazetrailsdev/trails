@@ -102,7 +102,7 @@ describe("capture's callers await an async block", () => {
 
   it("an async block's nil or plain-string value renders as the sync block's does", async () => {
     const view = makeView();
-    const tag = view.tag() as unknown as { div(block: () => unknown): unknown };
+    const tag = view.tag();
     const callers: [string, (block: () => unknown) => unknown][] = [
       ["content_tag", (block) => view.contentTag("div", null, null, undefined, block)],
       ["tag builder", (block) => tag.div(block)],

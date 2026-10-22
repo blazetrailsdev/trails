@@ -1298,10 +1298,7 @@ describe("RenderTest", () => {
   test("partial with form builder and invalid model custom field error proc", async () => {
     const oldProc = Base.fieldErrorProc;
     Base.fieldErrorProc = function (html) {
-      // BLOCKED: render-test-controller-gaps-remaining
-      return (this.tag() as unknown as { div(...args: unknown[]): unknown }).div(html, {
-        class: "errors",
-      });
+      return this.tag().div(html, { class: "errors" });
     };
     try {
       await testCase.get("partialWithFormBuilderAndInvalidModel");
@@ -1454,8 +1451,7 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — annotations not emitted on controller render
-  test.skip("template annotations", async () => {
+  test("template annotations", async () => {
     await withAnnotationsEnabled(() => testCase.get("greeting"));
     expect(testCase.response.body).toContain("<!-- BEGIN");
     expect(testCase.response.body).toContain("<!-- END");
@@ -1469,8 +1465,7 @@ describe("RenderTest", () => {
     expect(stringSplit(testCase.response.body, "\n").length).toBe(1);
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — annotations not emitted on controller render
-  test.skip("line offset with annotations enabled", async () => {
+  test("line offset with annotations enabled", async () => {
     let exc: unknown;
     try {
       await withAnnotationsEnabled(() => testCase.get("renderLineOffset"));
