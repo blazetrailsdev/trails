@@ -1,5 +1,3 @@
-import { NotImplementedError } from "@blazetrails/ruby-compat";
-
 import { SyntaxError } from "./syntax-error.js";
 
 const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
@@ -8,6 +6,7 @@ export type NodeKind =
   | "root"
   | "element"
   | "attribute"
+  | "namespace"
   | "text"
   | "comment"
   | "processing-instruction";
@@ -18,6 +17,7 @@ export interface Tree<N> {
   parent(node: N): N | null;
   children(node: N): N[];
   attributes(node: N): N[];
+  namespaces(node: N): N[];
   localName(node: N): string;
   qualifiedName(node: N): string;
   namespaceUri(node: N): string | null;
@@ -65,7 +65,7 @@ type Ast =
   | { type: "path"; absolute: boolean; filter: Ast | null; steps: Step[] };
 
 interface Step {
-  axis: string;
+  axis: Axis;
   test:
     | { type: "name"; prefix: string | null; local: string }
     | { type: "node"; kind: string; literal: string | null };
@@ -87,7 +87,13 @@ const AXES = [
   "preceding",
   "preceding-sibling",
   "self",
-];
+] as const;
+
+type Axis = (typeof AXES)[number];
+
+function isAxis(name: string): name is Axis {
+  return (AXES as readonly string[]).includes(name);
+}
 
 function invalid(): never {
   throw new SyntaxError("ERROR: Invalid expression");
@@ -257,9 +263,7 @@ class Parser {
     if (t.type === "literal" || t.type === "number" || t.type === "var") return true;
     if (t.type === "op") return t.value === "(";
     return (
-      this.isOp("(", 1) &&
-      !NODE_TYPES.includes(t.value) &&
-      !(this.isOp("::", 1) && AXES.includes(t.value))
+      this.isOp("(", 1) && !NODE_TYPES.includes(t.value) && !(this.isOp("::", 1) && isAxis(t.value))
     );
   }
 
@@ -325,14 +329,14 @@ class Parser {
         predicates: [],
       };
     }
-    let axis = "child";
+    let axis: Axis = "child";
     if (this.isOp("@")) {
       this.pos++;
       axis = "attribute";
     } else {
       const t = this.peek();
       if (t?.type === "name" && this.isOp("::", 1)) {
-        if (!AXES.includes(t.value)) invalid();
+        if (!isAxis(t.value)) invalid();
         axis = t.value;
         this.pos += 2;
       }
@@ -460,6 +464,7 @@ class Evaluator<N> {
       let i = 0;
       const visit = (n: N) => {
         this.orderIndex!.set(this.tree.key(n), i++);
+        for (const ns of this.tree.namespaces(n)) this.orderIndex!.set(this.tree.key(ns), i++);
         for (const a of this.tree.attributes(n)) this.orderIndex!.set(this.tree.key(a), i++);
         for (const c of this.tree.children(n)) visit(c);
       };
@@ -620,7 +625,7 @@ class Evaluator<N> {
     });
   }
 
-  private axis(axis: string, node: N): N[] {
+  private axis(axis: Axis, node: N): N[] {
     const t = this.tree;
     const descendants = (n: N): N[] => this.descendants(n);
     const ancestors = (n: N): N[] => {
@@ -630,7 +635,9 @@ class Evaluator<N> {
     };
     const siblings = (n: N): [N[], N[]] => {
       const parent = t.parent(n);
-      if (parent === null || t.kind(n) === "attribute") return [[], []];
+      if (parent === null || t.kind(n) === "attribute" || t.kind(n) === "namespace") {
+        return [[], []];
+      }
       const all = t.children(parent);
       const key = t.key(n);
       const i = all.findIndex((c) => t.key(c) === key);
@@ -655,6 +662,8 @@ class Evaluator<N> {
         return [node, ...ancestors(node)];
       case "attribute":
         return t.attributes(node);
+      case "namespace":
+        return t.namespaces(node);
       case "following-sibling":
         return siblings(node)[1];
       case "preceding-sibling":
@@ -673,8 +682,6 @@ class Evaluator<N> {
         }
         return this.sorted(result).reverse();
       }
-      default:
-        throw new NotImplementedError(`the ${axis} axis is not supported`);
     }
   }
 
@@ -707,7 +714,8 @@ class Evaluator<N> {
         (test.literal === null || t.localName(node) === test.literal)
       );
     }
-    const principal = step.axis === "attribute" ? "attribute" : "element";
+    const principal =
+      step.axis === "attribute" ? "attribute" : step.axis === "namespace" ? "namespace" : "element";
     if (kind !== principal) return false;
     let uri: string | null = null;
     if (test.prefix !== null) {
@@ -752,7 +760,10 @@ class Evaluator<N> {
     if (list.length === 0) return "";
     const n = list[0];
     const kind = this.tree.kind(n);
-    return kind === "element" || kind === "attribute" || kind === "processing-instruction"
+    return kind === "element" ||
+      kind === "attribute" ||
+      kind === "namespace" ||
+      kind === "processing-instruction"
       ? this.tree.localName(n)
       : "";
   }
@@ -788,7 +799,10 @@ const CORE_FUNCTIONS: Record<string, CoreFunction<unknown>> = {
     const list = this.contextList(nodes, context.node);
     if (list.length === 0) return "";
     const kind = this.tree.kind(list[0]);
-    return kind === "element" || kind === "attribute" || kind === "processing-instruction"
+    return kind === "element" ||
+      kind === "attribute" ||
+      kind === "namespace" ||
+      kind === "processing-instruction"
       ? this.tree.qualifiedName(list[0])
       : "";
   },

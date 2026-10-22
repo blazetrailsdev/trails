@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { I18n, isHtmlSafe } from "@blazetrails/activesupport";
+import { I18n, assertCalledWith, isHtmlSafe } from "@blazetrails/activesupport";
 import { Hash } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "./handlers.js";
-import { Tse } from "./handlers/tse.js";
+import { TSE } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { localize, translate as translateHelper } from "../helpers/translation-helper.js";
 
@@ -36,7 +36,7 @@ describe("TranslationHelperTest", () => {
   const render = async (template: string) => String(await view.render({ template })).trim();
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     I18n.backend().storeTranslations("en", {
       translations: {
         templates: {
@@ -88,6 +88,9 @@ describe("TranslationHelperTest", () => {
 
   it("delegates localize to i18n", () => {
     const time = Time.utc(2008, 7, 8, 12, 18, 38);
+    assertCalledWith(I18n, "localize", [time, { locale: "en" }], {}, () => {
+      localize(time, { locale: "en" });
+    });
     expect(localize(time, { locale: "en" })).toBe("Tue, 08 Jul 2008 12:18:38 +0000");
   });
 

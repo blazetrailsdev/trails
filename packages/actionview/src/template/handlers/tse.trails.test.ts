@@ -1,8 +1,8 @@
 import { compileJs } from "@blazetrails/tse-compiler";
 import { describe, it, expect } from "vitest";
-import { Tse } from "./tse.js";
+import { TSE } from "./tse.js";
 
-const tse = new Tse();
+const tse = new TSE();
 const translateLocation = tse.translateLocation.bind(tse);
 const firstColumnOf = (source: string, compiled: string, errorColumn: number) =>
   translateLocation(

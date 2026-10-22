@@ -5,7 +5,7 @@ import { LookupContext } from "../lookup-context.js";
 import { setTemplateCompiler, Template } from "../template.js";
 import { buildViews } from "@blazetrails/trails-tsc";
 import { TemplateHandlers } from "./handlers.js";
-import { Tse } from "./handlers/tse.js";
+import { TSE } from "./handlers/tse.js";
 import { shippedTemplateCompiler } from "../test-helpers/setup-compile-template.js";
 
 const fixture = (name: string): string =>
@@ -46,7 +46,7 @@ describe("Templates are precompiled", () => {
 
   it("raises NotImplementedError for a string-source template in shipped code", async () => {
     shipped();
-    const template = new Template("<%= 1 %>", "inline template", new Tse(), {
+    const template = new Template("<%= 1 %>", "inline template", new TSE(), {
       locals: [],
       format: ":html",
     });
@@ -55,7 +55,7 @@ describe("Templates are precompiled", () => {
   });
 
   it("compiles a string-source template with the test compiler installed", async () => {
-    const template = new Template("<%= 1 + 1 %>", "inline template", new Tse(), {
+    const template = new Template("<%= 1 + 1 %>", "inline template", new TSE(), {
       locals: [],
       format: ":html",
     });
@@ -112,14 +112,14 @@ describe("Templates are precompiled", () => {
     const root = fixture("precompiled-options");
     const saved = [
       Base.annotateRenderedViewWithFilenames,
-      Tse.tseTrimMode,
-      Tse.stripTrailingNewlines,
-      Tse.escapeIgnoreList,
+      TSE.tseTrimMode,
+      TSE.stripTrailingNewlines,
+      TSE.escapeIgnoreList,
     ] as const;
     Base.annotateRenderedViewWithFilenames = true;
-    Tse.tseTrimMode = "<>";
-    Tse.stripTrailingNewlines = true;
-    Tse.escapeIgnoreList = [Template.Types.get(":text") as unknown as string];
+    TSE.tseTrimMode = "<>";
+    TSE.stripTrailingNewlines = true;
+    TSE.escapeIgnoreList = [Template.Types.get(":text") as unknown as string];
     try {
       await buildViews({ cwd: root });
       const rendered: Record<string, string> = {};
@@ -132,7 +132,7 @@ describe("Templates are precompiled", () => {
         const fromString = new Template(
           template.source,
           template.identifier.slice(root.length + 1),
-          new Tse(),
+          new TSE(),
           {
             locals: [],
             format: template.format,
@@ -148,9 +148,9 @@ describe("Templates are precompiled", () => {
     } finally {
       [
         Base.annotateRenderedViewWithFilenames,
-        Tse.tseTrimMode,
-        Tse.stripTrailingNewlines,
-        Tse.escapeIgnoreList,
+        TSE.tseTrimMode,
+        TSE.stripTrailingNewlines,
+        TSE.escapeIgnoreList,
       ] = saved;
     }
   });

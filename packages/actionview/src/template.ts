@@ -20,7 +20,7 @@ import { SyntaxErrorInTemplate, TemplateError, WrongEncodingError } from "./temp
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Html } from "./template/handlers/html.js";
 import { Raw } from "./template/handlers/raw.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 import { SimpleType } from "./template/types.js";
 import { File as SourcesFile } from "./template/sources/file.js";
 import { type BacktraceLocation, type Spot } from "./template/handlers/tse.js";
@@ -106,7 +106,7 @@ export interface TemplateOptions {
 export class Template {
   static {
     TemplateHandlers.registerDefaultTemplateHandler("raw", new Raw());
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     TemplateHandlers.registerTemplateHandler("html", new Html());
     TemplateHandlers.registerTemplateHandler("ruby", {
       call: (_: unknown, source: string) => source,

@@ -247,7 +247,21 @@ describe("CaptureHelperTest", () => {
     expect(buffer === av.outputBuffer).toBeTruthy();
   });
 
-  it.skip("with output buffer sets proper encoding", () => {});
+  // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — an OutputBuffer holds a JS string, which has no encoding to force or read.
+  it.skip("with output buffer sets proper encoding", () => {
+    av.outputBuffer = new OutputBuffer();
+    const buffer = av.outputBuffer as unknown as {
+      encoding: string;
+      forceEncoding(encoding: string): void;
+    };
+
+    const altEncoding = buffer.encoding === "US-ASCII" ? "UTF-8" : "US-ASCII";
+    buffer.forceEncoding(altEncoding);
+
+    av.withOutputBuffer(null, () => {
+      expect((av.outputBuffer as unknown as { encoding: string }).encoding).toBe(altEncoding);
+    });
+  });
 
   it("with output buffer does not assume there is an output buffer", () => {
     expect(av.outputBuffer!.isEmpty()).toBeTruthy();

@@ -5,7 +5,7 @@ import { TSETracker } from "../dependency-tracker/tse-tracker.js";
 import { PathSet } from "../path-set.js";
 import type { Template } from "../template.js";
 import { TemplateHandlers, type TemplateHandler } from "../template/handlers.js";
-import { Tse } from "../template/handlers/tse.js";
+import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 
 const NeckbeardTracker = {
@@ -20,7 +20,7 @@ class FakeTemplate {
 
   constructor(source: string, handler: TemplateHandler | null | "tse" = Neckbeard) {
     this.source = source;
-    this.handler = handler === "tse" ? new Tse() : handler;
+    this.handler = handler === "tse" ? new TSE() : handler;
   }
 
   type(): string[] {

@@ -6,14 +6,14 @@ import { PathSet } from "./path-set.js";
 import { Template } from "./template.js";
 import { EncodingError, WrongEncodingError } from "./template/error.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
 describe("Template#compile! across DetailsKey.clear", () => {
   class ViewPathsOwner {}
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {
@@ -49,12 +49,12 @@ describe("Template#compile", () => {
   });
 
   it("names the compiled source after the identifier without evaluating it", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     const g = globalThis as { __templateIdentifierEvaluated?: boolean };
     const t = new Template(
       "hi",
       "posts/show.html.tse\nglobalThis.__templateIdentifierEvaluated = true;",
-      new Tse(),
+      new TSE(),
       { locals: [], format: ":html" },
     );
     expect(String(await t.render(new (Base.withEmptyTemplateCache())(null, {}, null)))).toBe("hi");
@@ -88,7 +88,7 @@ describe("Template#compiled_source", () => {
 describe("Template#compiled_source resolves top-level constants", () => {
   const renderTse = async (source: string): Promise<string> =>
     String(
-      await new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(
+      await new Template(source, "t", new TSE(), { locals: [], format: ":html" }).render(
         new (Base.withEmptyTemplateCache())(null, {}, null),
         {},
       ),

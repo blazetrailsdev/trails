@@ -40,11 +40,10 @@ type Accessors = {
   set handlers(value: DetailWriter);
   get locale(): unknown;
   set locale(value: DetailWriter);
-  defaultLocale(): DetailValue;
-  defaultFormats(): DetailValue;
-  defaultVariants(): DetailValue;
-  defaultHandlers(): DetailValue;
 };
+
+/** @noRailsEquivalent CONVERGEABLE lookup-context-register-detail-accessors-typed-on-merge */
+type DefaultAccessors = Record<"defaultLocale" | "defaultFormats", () => DetailValue>;
 
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
 
@@ -139,7 +138,11 @@ export class DetailsKey {
   }
 }
 
-export class LookupContext extends (Object as unknown as new () => Accessors) {
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Accessors` (`actionview/lib/action_view/lookup_context.rb:228`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface LookupContext extends Accessors {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class LookupContext {
   static DetailsKey: typeof DetailsKey;
   static Accessors: typeof Accessors;
 
@@ -183,7 +186,6 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
     details: DetailsMap = {},
     prefixes: string[] = [],
   ) {
-    super();
     this._prefixes = prefixes;
     this._details = this.initializeDetails({}, details);
     this._viewPaths = this.buildViewPaths(viewPaths);
@@ -204,10 +206,10 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
     this._prefixes = value;
   }
 
-  override get locale(): string | null {
+  get locale(): string | null {
     return (this._details.locale[0] as string | undefined) ?? null;
   }
-  override set locale(value: string | null) {
+  set locale(value: string | null) {
     if (value != null) {
       const config = rbObjRespondTo(I18n.config(), "originalConfig")
         ? (I18n.config() as unknown as { originalConfig: ReturnType<typeof I18n.config> })
@@ -216,16 +218,23 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
       config.locale = isSymbol(value) ? symbolToS(value) : value;
     }
 
-    super.locale = this.defaultLocale();
+    const defaultLocale = (this as unknown as DefaultAccessors).defaultLocale();
+    const detail: DetailValue = isPresent(defaultLocale)
+      ? kernelArray(defaultLocale as (string | symbol)[])
+      : (this as unknown as DefaultAccessors).defaultLocale();
+    if (!rbEqual(detail, this._details.locale)) this._setDetail("locale", detail);
   }
 
-  override get formats(): DetailValue {
-    return super.formats;
+  get formats(): DetailValue {
+    return this._details.formats ?? [];
   }
-  override set formats(values: DetailValue | null | undefined) {
+  set formats(values: DetailValue | null | undefined) {
     if (values) {
       let arr = [...values];
-      if (arr.includes("*/*")) arr = arr.filter((v) => v !== "*/*").concat(this.defaultFormats());
+      if (arr.includes("*/*"))
+        arr = arr
+          .filter((v) => v !== "*/*")
+          .concat((this as unknown as DefaultAccessors).defaultFormats());
       arr = Array.from(new Set(arr));
 
       if (!Template.Types.isValidSymbols(arr)) {
@@ -241,7 +250,10 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
       }
       values = arr;
     }
-    super.formats = values;
+    const detail: DetailValue = isPresent(values)
+      ? kernelArray(values as (string | symbol)[])
+      : (this as unknown as DefaultAccessors).defaultFormats();
+    if (!rbEqual(detail, this._details.formats)) this._setDetail("formats", detail);
   }
   get htmlFallbackForJs(): boolean {
     return this._htmlFallbackForJs;

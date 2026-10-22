@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, it } from "vitest";
 import { assertEqual, assertNil } from "@blazetrails/activesupport";
 import { FixtureResolver } from "../../testing/resolvers.js";
 import { TemplateHandlers } from "../handlers.js";
-import { Tse } from "../handlers/tse.js";
+import { TSE } from "../handlers/tse.js";
 
 describe("FixtureResolverTest", () => {
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {

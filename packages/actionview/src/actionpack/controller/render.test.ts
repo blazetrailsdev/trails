@@ -937,7 +937,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("test");
   });
 
-  // BLOCKED: template/handlers/builder.rb is unported (scripts/parity/unported-files/actionview.ts)
+  // BLOCKED: port-builder-template-handler
   test.skip("render xml", async () => {
     await testCase.get("renderXmlHello");
     expect(testCase.response.body).toBe(
@@ -946,7 +946,7 @@ describe("RenderTest", () => {
     expect(testCase.response.mediaType).toBe("application/xml");
   });
 
-  // BLOCKED: template/handlers/builder.rb is unported (scripts/parity/unported-files/actionview.ts)
+  // BLOCKED: port-builder-template-handler
   test.skip("render xml as string template", async () => {
     await testCase.get("renderXmlHelloAsStringTemplate");
     expect(testCase.response.body).toBe(
@@ -960,7 +960,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<p>This is grand!</p>\n");
   });
 
-  // BLOCKED: template/handlers/builder.rb is unported (scripts/parity/unported-files/actionview.ts)
+  // BLOCKED: port-builder-template-handler
   test.skip("render xml with partial", async () => {
     await testCase.get("builderPartialTest");
     expect(testCase.response.body).toBe("<test>\n  <hello/>\n</test>\n");
@@ -971,7 +971,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: template/handlers/builder.rb is unported (scripts/parity/unported-files/actionview.ts)
+  // BLOCKED: port-builder-template-handler
   test.skip("render xml with layouts", async () => {
     await testCase.get("builderLayoutTest");
     expect(testCase.response.body).toBe(
@@ -1189,7 +1189,7 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: template/handlers/builder.rb is unported (scripts/parity/unported-files/actionview.ts)
+  // BLOCKED: port-builder-template-handler
   test.skip("overwriting rendering relative file with extension", async () => {
     await testCase.get("helloWorldFromRxmlUsingTemplate");
     expect(testCase.response.body).toBe("<html>\n  <p>Hello</p>\n</html>\n");

@@ -7330,6 +7330,16 @@ describe("declaringFile (RFC 0126)", () => {
     );
   });
 
+  it("qualifies a package extracted from inside this one's src by that package", () => {
+    const trailties = packageSrcDir("trailties");
+    expect(declaringFile(symbolAt(`${packageSrcDir("thor")}/error.ts`), trailties)).toBe(
+      "pkg:thor:error.ts",
+    );
+    expect(declaringFile(symbolAt(`${trailties}/generators/base.ts`), trailties)).toBe(
+      "generators/base.ts",
+    );
+  });
+
   it("marks a TypeScript lib global external", () => {
     // `class Cleaner extends Error` — no package entity is `Error`, and the
     // walk must follow nothing rather than proximity-guess between same-named

@@ -33,6 +33,20 @@ export class XmlNode {
     readonly document: unknown,
   ) {}
 
+  get pointerId(): number {
+    return (this._node as unknown as { _nodePtr: number })._nodePtr;
+  }
+
+  get namespaces(): Record<string, string> {
+    if (!(this._node instanceof LibXmlElement)) return {};
+    const hash: Record<string, string> = {};
+    for (const [prefix, href] of Object.entries(this._node.namespaces)) {
+      const key = prefix ? `xmlns:${prefix}` : "xmlns";
+      hash[key] = href;
+    }
+    return hash;
+  }
+
   get name(): string {
     if (this._node instanceof LibXmlElement) return this._node.name;
     if (this._node instanceof LibXmlText) return "#text";
