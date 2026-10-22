@@ -105,6 +105,17 @@ GEMS.mini_magick = {
   testDir: "spec",
 };
 
+// builder (rails/builder v3.3.0, vendor/rails/v8.0.2/Gemfile.lock:156):
+// actionview's `.builder` templates and activesupport's `to_xml`.
+GEMS.builder = {
+  gem: "builder",
+  rubyRoot: "builder",
+  namespace: "Builder",
+  vendor: "builder/v3.3.0",
+  hand: false,
+  pkg: "builder",
+};
+
 const name = process.env.CODEGEN_GEM ?? "activerecord";
 const cfg = GEMS[name];
 if (!cfg) throw new Error(`CODEGEN_GEM=${name}: known gems are ${Object.keys(GEMS).join(", ")}`);

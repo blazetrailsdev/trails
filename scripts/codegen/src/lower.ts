@@ -170,6 +170,11 @@ interface Ctx {
   /** fqn of the class/module whose body we are in. */
   owner?: string;
   selfKind: "instance" | "static" | "module" | "top";
+  /**
+   * Inside `class << obj; self; end.class_eval do … end`: `obj`, which a
+   * `define_method` body there runs as (its self is the instance, not the class).
+   */
+  methodSelf?: string;
   /** Inside a `function (this: any)` (an `instance_exec`ed block): `this` is not a type. */
   thisAny?: boolean;
   selfExpr: string;
@@ -376,6 +381,7 @@ export class Lowerer {
       rbToH: "toH",
       rbFormat: "format",
       jsDefineMethod: "rbModDefineMethod",
+      encoding: "rbObjEncoding",
     };
     const name = RENAMES[name0] ?? name0;
     if (
@@ -1912,6 +1918,8 @@ export class Lowerer {
         // names as the hand ports import them (trailties thor/shell/basic.ts).
         if (n.name === "$stdout" || n.name === "$stderr")
           return this.imp(ctx, "@blazetrails/ruby-compat", n.name.slice(1), n.name);
+        // `$KCODE` was removed in Ruby 1.9 (NEWS-1.9.1): an unset global reads nil.
+        if (n.name === "$KCODE") return "null";
         return this.decline(ctx, "gvar", n, n.name);
       case "gasgn":
         return this.decline(ctx, "gvar", n, n.name ?? `$${n.n}`);
@@ -1934,6 +1942,19 @@ export class Lowerer {
         return `${this.expr(n.scope, ctx)}.${n.name}`;
       case "casgn":
         if (!n.path) return this.decline(ctx, "unhandled-node", n, "dynamic constant assignment");
+        // A constant assigned inside an expression (builder version.rb's
+        // `VERSION_NUMBERS = [VERSION_MAJOR = 3, …]`): its own module-level const,
+        // declared before the expression that reads it.
+        if (
+          n.path.length === 1 &&
+          !this.index.resolveConst(n.path, ctx.nesting) &&
+          ["int", "float", "str", "sym", "true", "false", "nil"].includes(n.value?.k)
+        ) {
+          (ctx.f.prelude ??= new Set()).add(
+            `export const ${n.path[0]} = ${this.expr(n.value, ctx)};`,
+          );
+          return n.path[0];
+        }
         return `(${this.constRef({ k: "const", path: n.path }, ctx)} = ${this.expr(n.value, ctx)})`;
       case "and":
         return this.andExpr(n, ctx);
@@ -1943,6 +1964,14 @@ export class Lowerer {
         return `!${this.wrapCond(n.value, ctx)}`;
       case "defined":
         return this.definedExpr(n, ctx);
+      case "sclass": {
+        // `class << self; self; end` (pre-1.9 `singleton_class`): the object's
+        // singleton class (CLAUDE.md, "`singleton_class` is a per-object subclass").
+        const b = this.seqBody(n.body);
+        if (b.length === 1 && b[0].k === "self")
+          return `${this.rc(ctx, "rbObjSingletonClass")}(${this.expr(n.target, ctx)})`;
+        return this.decline(ctx, "unhandled-node", n, "sclass");
+      }
       case "if": {
         const t = this.seqBody(n.then);
         const e = this.seqBody(n.else);
@@ -2177,8 +2206,29 @@ export class Lowerer {
   ivar(name: string, ctx: Ctx): string {
     const local = ctx.ivarLocals?.get(name);
     if (local) return local;
-    return `${ctx.selfExpr}._${propName(name.slice(1)).replace(/^_/, "")}`;
+    return `${ctx.selfExpr}.${this.ivarField(name, ctx.owner)}`;
   }
+
+  /**
+   * The field an ivar is stored in: `@level` is `_level`. Where a method of the
+   * class or its ancestors already has that name (builder xmlbase.rb's `@indent`
+   * beside its private `_indent`), a second underscore keeps them apart.
+   */
+  ivarField(name: string, owner?: string | null): string {
+    const field = `_${propName(name.replace(/^@/, "")).replace(/^_/, "")}`;
+    if (!owner) return field;
+    const memo = (this.ivarClash ??= new Map<string, Set<string>>());
+    let names = memo.get(owner);
+    if (!names) {
+      names = new Set();
+      for (const a of rubyAncestors(this.index, owner))
+        for (const d of this.index.scopes.get(a)?.defs.keys() ?? []) names.add(this.callName(d));
+      memo.set(owner, names);
+    }
+    return names.has(field) ? `_${field}` : field;
+  }
+
+  private ivarClash?: Map<string, Set<string>>;
 
   cvar(name: string, ctx: Ctx): string {
     this.stat(ctx, "cvar");
@@ -3218,8 +3268,40 @@ export class Lowerer {
     return null;
   }
 
+  /**
+   * `mod.class_eval do … end` (`rb_mod_module_eval`, vm_eval.c): the block runs
+   * with `mod` as self.
+   */
+  classEvalBlock(mod: string, n: N, ctx: Ctx): string {
+    const k = this.tmp(ctx, "mod");
+    const f = this.arrow(
+      [{ kind: "req", name: k }],
+      n.block.body,
+      this.child(ctx, {
+        selfExpr: k,
+        selfKind: "static",
+        methodSelf: n.recv?.k === "sclass" ? this.expr(n.recv.target, ctx) : undefined,
+      }),
+    );
+    return `(${f})(${mod})`;
+  }
+
   callInner(n: N, ctx: Ctx): string {
     const name: string = n.name;
+    // `klass.method_defined?(m)` (builder xchar.rb:14): Module#method_defined?.
+    if (
+      n.recv &&
+      ["method_defined?", "public_method_defined?"].includes(name) &&
+      n.args.length >= 1
+    )
+      return `${this.rc(ctx, "rbModMethodDefined")}(${this.expr(n.recv, ctx)}, ${n.args.map((a: N) => this.expr(a, ctx)).join(", ")})`;
+    if (
+      n.recv &&
+      ["class_eval", "module_eval"].includes(name) &&
+      !n.args.length &&
+      n.block?.k === "block"
+    )
+      return this.classEvalBlock(this.expr(n.recv, ctx), n, ctx);
     // `Class.new(Super) { … }` is a class expression; its receiver is never read.
     const classNew =
       n.recv?.k === "const" &&
@@ -3230,6 +3312,11 @@ export class Lowerer {
     if (r !== null && !classNew && !n.safe) r = this.nonNullRecv(n.recv, r, ctx);
     if (r !== null && (n.recv.k === "int" || n.recv.k === "float")) r = `(${r})`;
     const recvNode: N | null = n.recv;
+    // `h.each` with no block (hash.c rb_hash_each_pair's RETURN_SIZED_ENUMERATOR):
+    // an Enumerator over the same elements, which the Enumerable call it feeds
+    // (builder xchar.rb:100 `CP1252.each.inject`) reads as their Array.
+    if (r !== null && name === "each" && !n.block && !n.args.length && !n.safe)
+      return this.entries(r, ctx, recvNode);
     const args = (): string[] => {
       const a = n.args.map((x: N) => this.argExpr(x, ctx));
       if (n.block) {
@@ -3395,6 +3482,23 @@ export class Lowerer {
         case "instance_exec":
         case "class_exec":
         case "define_method":
+          if (name === "class_eval" && !n.args.length && n.block?.k === "block")
+            return this.classEvalBlock(ctx.selfExpr, n, ctx);
+          if (
+            name === "define_method" &&
+            ctx.methodSelf &&
+            n.block?.k === "block" &&
+            n.args.length === 1
+          )
+            return `${rc("rbDefineMethod")}(${ctx.selfExpr}, ${this.expr(n.args[0], ctx)}, ${this.arrow(
+              n.block.params ?? [],
+              n.block.body,
+              this.child(ctx, {
+                selfExpr: ctx.methodSelf,
+                selfKind: "instance",
+                methodSelf: undefined,
+              }),
+            )})`;
           if (
             name === "define_method" ||
             name === "instance_exec" ||
@@ -3403,6 +3507,10 @@ export class Lowerer {
           )
             return `${rc(snakeToCamel("rb_" + name))}(${ctx.selfExpr}, ${argList()})`;
           return this.decline(ctx, "ruby-eval", n, name);
+        case "method_defined?":
+        case "public_method_defined?":
+          // Module#method_defined? on self (a class body or `class_eval` block).
+          return `${rc("rbModMethodDefined")}(${ctx.selfExpr}, ${argList()})`;
         case "puts":
         case "warn":
           return `console.warn(${argList()})`;
@@ -5134,6 +5242,14 @@ export class Lowerer {
                 ? `${x} + ${b}`
                 : `(typeof ${x} === "string" ? ${x} + ${b} : Array.isArray(${x}) ? (${x}.push(${b}), ${x}) : ${x} instanceof globalThis.Set ? ${x}.add(${b}) : ${x}.append(${b}))`;
           if (n.recv.k === "lvar") return `(${r} = ${app(r)})`;
+          // An ivar holding a String (builder xmlmarkup.rb's `@target << text`) is
+          // written back in the String arm only: another receiver's `<<` answers
+          // what it likes, which must not replace the ivar.
+          if (n.recv.k === "ivar") {
+            if (t?.k === "prim" && t.name === "string") return `(${r} = ${r} + ${b})`;
+            if (!t)
+              return `(typeof ${r} === "string" ? (${r} = ${r} + ${b}) : Array.isArray(${r}) ? (${r}.push(${b}), ${r}) : ${r} instanceof globalThis.Set ? ${r}.add(${b}) : ${r}.append(${b}))`;
+          }
           return this.withOnce(r, app);
         }
       case "+":
@@ -6133,6 +6249,8 @@ export class Lowerer {
       case "bytesize":
       case "encoding":
       case "force_encoding":
+      case "valid_encoding?":
+      case "ascii_only?":
       case "b":
       case "scan":
       case "positive?":

@@ -882,6 +882,18 @@ export class Emitter {
     return [...this.index.scopes.values()].some((x) => x.superclassFqn === fqn);
   }
 
+  /**
+   * A test class: a `TestCase`, `Minitest::Test` itself, or a subclass of a gem
+   * test support class (builder's `class TestEvents < Builder::Test`).
+   */
+  isTestClass(u: Unit): boolean {
+    const p: string[] = (u.superclass?.path ?? []).filter((x: string) => x);
+    if (/(^|::)TestCase$/.test(p.join("::")) || p.join("::") === "Minitest::Test") return true;
+    if (u.superclass?.k !== "const") return false;
+    const hit = this.index.resolveConst(u.superclass.path, u.nesting);
+    return hit?.kind === "scope" && this.isTestSupport(hit.fqn);
+  }
+
   /** The defs a test support class contributes, by name: a singleton def wins its instance twin. */
   supportDefs(u: Unit): Map<string, N> {
     const out = new Map<string, N>();
@@ -1407,11 +1419,7 @@ export class Emitter {
         chunks.push(this.emitTestSupport(u, f));
         continue;
       }
-      if (
-        file.file.startsWith("test/") &&
-        u.kind === "class" &&
-        /(^|::)TestCase$/.test((u.superclass?.path ?? []).join("::"))
-      ) {
+      if (file.file.startsWith("test/") && u.kind === "class" && this.isTestClass(u)) {
         const native = this.nativeTestSupport(u);
         // A native test class is a `describe`, not a constant to seat.
         if (native !== false) nativeUnits.add(u.fqn);
@@ -1432,7 +1440,8 @@ export class Emitter {
     // A test's `require "helper"` loads `adapters/#{ENV["AJ_ADAPTER"] ||= "inline"}`
     // (activejob/test/helper.rb:9-17): the default adapter's file, for its effect.
     if (
-      (file.file.startsWith("test/cases/") || /^test\/.*_test\.rb$/.test(file.file)) &&
+      (file.file.startsWith("test/cases/") ||
+        /^test\/(?:.*_test|(?:.*\/)?test_[^/]*)\.rb$/.test(file.file)) &&
       (file.body?.k === "seq" ? file.body.body : [file.body]).some(
         (s: N) => s?.k === "call" && s.name === "require" && s.args[0]?.value === "helper",
       )
@@ -1895,6 +1904,8 @@ export class Emitter {
         ...body,
       ];
     }
+    if (isCtor && this.methodMissingRoot(u.fqn))
+      body = [...body, ...this.methodMissingTrap(u, ctx)];
     if (isCtor) {
       // JS forbids `this` before `super()`; Ruby often sets ivars first. Hoist the
       // super call when its arguments do not read `this` (CLAUDE.md, the
@@ -2286,7 +2297,7 @@ export class Emitter {
       } else if (s.k === "lasgn") {
         // A local of the class body (marcel tables.rb:2391 `b = Hash.new { … }`),
         // read by the constants after it: a module-scope binding ahead of the class.
-        bodyLocals.push(...this.lw.stmt(s, ctxStatic, false));
+        this.bodyLocal(s, name, ctxStatic, bodyLocals, members);
       } else if (s.k === "casgn" && s.path?.length === 1) {
         members.push(`static ${s.path[0]}: any = ${this.lw.expr(s.value, ctxStatic)};`);
       } else if (
@@ -2773,7 +2784,7 @@ export class Emitter {
         walk(d.node?.body ?? null, (nd) => {
           if (nd.k === "def") return false;
           if (nd.k !== "ivar" && nd.k !== "iasgn") return;
-          const field = `_${propName(String(nd.name).slice(1)).replace(/^_/, "")}`;
+          const field = this.lw.ivarField(String(nd.name), cs);
           if (
             own.stat.has(field) ||
             members.some((m) => new RegExp(`^static (?:get |set )?${field}\\b`).test(m))
@@ -2852,6 +2863,63 @@ export class Emitter {
 
   /** `declare _x: T;` for each typed ivar; `declare` emits no field initializer. */
   /**
+   * A local of a class body. Ahead of the class, unless its value reads the
+   * class (builder xchar.rb:100 reads `XChar::CP1252`): then it is declared
+   * ahead and assigned in a `static {}` block where Ruby's statement stands, so
+   * the static fields before it are set first.
+   */
+  bodyLocal(s: N, name: string, ctx: Ctx, bodyLocals: string[], members: string[]): void {
+    const lines = this.lw.stmt(s, ctx, false);
+    const m =
+      lines.length === 1
+        ? /^(?:let|const) ([\w$]+)(?:: [^=]+)? = ([\s\S]*);$/.exec(lines[0])
+        : null;
+    if (!m || !new RegExp(`\\b${name}\\b`).test(m[2])) {
+      bodyLocals.push(...lines);
+      return;
+    }
+    bodyLocals.push(`let ${m[1]}: unknown;`);
+    members.push(`static {\n  ${m[1]} = ${m[2]};\n}`);
+  }
+
+  /**
+   * Whether `fqn` defines `method_missing` and no gem ancestor does: its
+   * constructor returns the Proxy that reaches it (CLAUDE.md, "Ruby protocol
+   * methods with a different JS mechanism").
+   */
+  methodMissingRoot(fqn: string): boolean {
+    if (!this.index.scopes.get(fqn)?.defs.has("method_missing")) return false;
+    return !rubyAncestors(this.index, fqn).some(
+      (a) => a !== fqn && this.index.scopes.get(a)?.defs.has("method_missing"),
+    );
+  }
+
+  /**
+   * `BasicObject#method_missing` dispatch (vm_eval.c:2570) for a class that
+   * defines it: a name the object does not answer is a function calling
+   * `methodMissing` with the Ruby name, except the names JS itself probes
+   * (`PROTOCOL_PROBES`), and, where the class defines `respond_to_missing?`,
+   * a name it does not claim.
+   */
+  methodMissingTrap(u: Unit, ctx: Ctx): string[] {
+    const probes = this.lw.imp(ctx, "@blazetrails/ruby-compat", "PROTOCOL_PROBES");
+    const sc = this.index.scopes.get(u.fqn)!;
+    const short = u.fqn.split("::").at(-1)!;
+    const claims = sc.defs.has("respond_to_missing?")
+      ? ` || !(receiver as ${short}).isRespondToMissing(name, false)`
+      : "";
+    return [
+      "return new Proxy(this, {",
+      "  get(target, name, receiver) {",
+      `    if (typeof name === "symbol" || name in target || ${probes}.has(name)${claims})`,
+      "      return Reflect.get(target, name, receiver);",
+      `    return (...args: unknown[]) => (receiver as ${short}).methodMissing(name, ...args);`,
+      "  },",
+      "});",
+    ];
+  }
+
+  /**
    * The instance fields the class's ancestors (superclasses and included
    * modules, in the gem) already declare: each ivar their methods assign, and
    * each `attr_*`'s storage. A subclass that declares one again with another
@@ -2867,12 +2935,11 @@ export class Emitter {
       if (a === fqn) continue;
       const sc = this.index.scopes.get(a);
       if (!sc) continue;
-      for (const at of sc.attrs) out.add(`_${propName(at).replace(/^_/, "")}`);
+      for (const at of sc.attrs) out.add(this.lw.ivarField(at, fqn));
       for (const d of sc.defs.values())
         walk(d.node?.body ?? null, (n) => {
           if (n.k === "def") return false;
-          if (n.k === "iasgn" || n.k === "ivar")
-            out.add(`_${propName(String(n.name).slice(1)).replace(/^_/, "")}`);
+          if (n.k === "iasgn" || n.k === "ivar") out.add(this.lw.ivarField(String(n.name), fqn));
         });
     }
     memo.set(fqn, out);
@@ -3095,7 +3162,7 @@ export class Emitter {
       } else if (s.k === "lasgn") {
         // A local of the class body (marcel tables.rb:2391 `b = Hash.new { … }`),
         // read by the constants after it: a module-scope binding ahead of the class.
-        bodyLocals.push(...this.lw.stmt(s, ctxStatic, false));
+        this.bodyLocal(s, name, ctxStatic, bodyLocals, members);
       } else if (s.k === "casgn" && s.path?.length === 1) {
         members.push(`static ${s.path[0]}: any = ${this.lw.expr(s.value, ctxStatic)};`);
       } else if (

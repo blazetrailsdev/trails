@@ -823,6 +823,8 @@ export function rubyFileToTsAr(rubyFile: string): string {
     // A test outside `cases/` (`test/serializers/time_with_zone_serializer_test.rb`)
     // sits beside the lib file it tests.
     if (rel.endsWith("_test")) return `${kebab(rel).replace(/-test$/, "")}.test.ts`;
+    // Rake::TestTask's default pattern, `test/test_*.rb` (builder's `test_xchar.rb`).
+    if (/(^|\/)test_[^/]+$/.test(rel)) return `${kebab(rel).replace(/(^|\/)test-/, "$1")}.test.ts`;
     // An RSpec spec (`spec/lib/mini_magick/tool_spec.rb`) sits beside the lib file
     // it specs (`tool.ts`); `spec/lib/mini_magick_spec.rb` beside the entry.
     if (rel.endsWith("_spec") && rel.startsWith("lib/")) {

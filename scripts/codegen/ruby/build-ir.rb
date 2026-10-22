@@ -63,11 +63,94 @@ module CodegenIR
       return [] if node.nil?
       if node.is_a?(Prism::StatementsNode)
         return node.body.flat_map do |n|
+          # A class-body or top-level guard on the running Ruby's own features
+          # (`if ::String.method_defined?(:encode)`, builder xmlbase.rb:131): MRI
+          # 3.3.11 answers it the same way every time, so only the branch it takes is
+          # ported.
+          # `A, B = value` in a module body (builder xchar.rb:100): each constant
+          # is a constant of the module, so it is one `casgn` per target off a
+          # class-body local holding the value.
+          if in_body? && n.is_a?(Prism::MultiWriteNode) && n.rest.nil? && n.rights.empty? &&
+             n.lefts.all? { |t| t.is_a?(Prism::ConstantTargetNode) }
+            tmp = "_#{n.lefts.map { |t| t.name.to_s.downcase }.join("_")}"
+            l = line(n)
+            next [{ k: "lasgn", name: tmp, value: expr(n.value), l: l },
+                  *n.lefts.each_with_index.map do |t, i|
+                    { k: "casgn", path: [t.name.to_s], l: l,
+                      value: { k: "call", recv: { k: "lvar", name: tmp }, name: "[]", args: [{ k: "int", value: i.to_s }], block: nil, safe: false, l: l } }
+                  end]
+          end
+          if (taken = folded_branch(n)) != :unfolded
+            next taken.nil? ? [] : taken
+          end
           (in_body? && @env && (x = MacroExpander.new(self, @env, cur_fqn).expand(n))) ? x : [expr(n)]
         end
       end
       return stmts(node.statements) if node.is_a?(Prism::BeginNode) && node.rescue_clause.nil? && node.ensure_clause.nil? && node.else_clause.nil?
       [expr(node)]
+    end
+
+    # The statements of the branch a folded `if` / `unless` takes (nil for none),
+    # or :unfolded when its condition does not fold.
+    def folded_branch(n)
+      return :unfolded unless n.is_a?(Prism::IfNode) || n.is_a?(Prism::UnlessNode)
+      v = fold_feature_test(n.predicate)
+      return :unfolded if v.nil?
+      v = !v if n.is_a?(Prism::UnlessNode)
+      taken = v ? n.statements : (n.is_a?(Prism::IfNode) ? n.subsequent : n.else_clause)
+      taken = taken.statements if taken.is_a?(Prism::ElseNode)
+      return nil if taken.nil?
+      if taken.is_a?(Prism::IfNode)
+        inner = folded_branch(taken)
+        return inner == :unfolded ? [expr(taken)] : inner
+      end
+      stmts(taken)
+    end
+
+    CORE_REFLECTION = %i[method_defined? public_method_defined? instance_method private_method_defined?].freeze
+
+    # true / false for a predicate the running MRI answers for itself — a core
+    # class's `method_defined?(:m)` and `$KCODE` (removed in 1.9, so `nil`) —
+    # combined through `!` / `not` / `and` / `or`; nil for anything else.
+    def fold_feature_test(node)
+      case node
+      when Prism::ParenthesesNode
+        b = node.body
+        b.is_a?(Prism::StatementsNode) && b.body.size == 1 ? fold_feature_test(b.body[0]) : nil
+      when Prism::AndNode
+        l = fold_feature_test(node.left)
+        r = fold_feature_test(node.right)
+        return false if l == false || r == false
+        l && r ? true : nil
+      when Prism::OrNode
+        l = fold_feature_test(node.left)
+        r = fold_feature_test(node.right)
+        return true if l == true || r == true
+        l == false && r == false ? false : nil
+      when Prism::GlobalVariableReadNode
+        node.name == :$KCODE ? false : nil
+      when Prism::CallNode
+        if node.name == :! && node.receiver && !node.arguments
+          v = fold_feature_test(node.receiver)
+          return v.nil? ? nil : !v
+        end
+        if node.name == :== && node.receiver.is_a?(Prism::GlobalVariableReadNode) && node.receiver.name == :$KCODE
+          return false
+        end
+        return nil unless CORE_REFLECTION.include?(node.name) && node.arguments&.arguments&.size == 1
+        recv = node.receiver
+        return nil unless recv.is_a?(Prism::ConstantReadNode) ||
+                          (recv.is_a?(Prism::ConstantPathNode) && recv.parent.nil?)
+        arg = node.arguments.arguments[0]
+        name = case arg
+               when Prism::SymbolNode then arg.unescaped
+               when Prism::StringNode then arg.unescaped
+               end
+        return nil unless name
+        klass = Object.const_get(recv.name) if Object.const_defined?(recv.name)
+        return nil unless klass.is_a?(Module) && klass.name == recv.name.to_s && Object.const_source_location(recv.name) == []
+        node.name == :instance_method ? klass.method_defined?(name) : klass.public_send(node.name, name)
+      end
     end
 
     def seq(node)
@@ -178,7 +261,13 @@ module CodegenIR
     end
 
     def call(node)
-      recv = node.receiver ? expr(node.receiver) : nil
+      # `::Kernel::block_given?` / `Kernel.fail` (a BasicObject subclass reaches
+      # Kernel's module functions through the constant, builder xmlbase.rb:59): the
+      # same function a bare call reaches.
+      kernel = node.receiver.is_a?(Prism::ConstantReadNode) ||
+               (node.receiver.is_a?(Prism::ConstantPathNode) && node.receiver.parent.nil?)
+      kernel &&= node.receiver.name == :Kernel && %i[block_given? fail raise].include?(node.name)
+      recv = node.receiver && !kernel ? expr(node.receiver) : nil
       name = node.name.to_s
       a = args(node.arguments)
       b = block(node.block)
@@ -321,10 +410,13 @@ module CodegenIR
       when Prism::AndNode then { k: "and", left: expr(node.left), right: expr(node.right) }
       when Prism::OrNode then { k: "or", left: expr(node.left), right: expr(node.right) }
       when Prism::DefinedNode then { k: "defined", value: expr(node.value), src: src(node) }
-      when Prism::IfNode
+      when Prism::IfNode, Prism::UnlessNode
+        if (taken = folded_branch(node)) != :unfolded
+          next_val = taken.nil? || taken.empty? ? { k: "nil" } : (taken.size == 1 ? taken[0] : { k: "seq", body: taken })
+          return next_val
+        end
+        return { k: "if", cond: { k: "not", value: expr(node.predicate) }, then: seq(node.statements), else: node.else_clause ? seq(node.else_clause.statements) : nil, l: line(node) } if node.is_a?(Prism::UnlessNode)
         { k: "if", cond: expr(node.predicate), then: seq(node.statements), else: else_of(node.subsequent), l: line(node) }
-      when Prism::UnlessNode
-        { k: "if", cond: { k: "not", value: expr(node.predicate) }, then: seq(node.statements), else: node.else_clause ? seq(node.else_clause.statements) : nil, l: line(node) }
       when Prism::ElseNode then seq(node.statements)
       when Prism::WhileNode then { k: "while", cond: expr(node.predicate), body: seq(node.statements), do_while: node.begin_modifier?, l: line(node) }
       when Prism::UntilNode then { k: "while", cond: { k: "not", value: expr(node.predicate) }, body: seq(node.statements), do_while: node.begin_modifier?, l: line(node) }
@@ -353,8 +445,12 @@ module CodegenIR
         sup = node.superclass
         struct = struct_new?(sup) ? struct_members(sup) : nil
         superclass = struct ? nil : (sup && expr(sup))
+        # `class XmlBase < BasicObject`: a JS class that extends nothing is the
+        # nearest root, so it keeps no superclass and records the fact.
+        basic = superclass && superclass[:k] == "const" && superclass[:path].reject(&:empty?) == ["BasicObject"]
+        superclass = nil if basic
         body = with_ctx(:body, path ? qualify_path(path) : cur_fqn) { seq(node.body) }
-        { k: "class", path: path, superclass: superclass, struct: struct, body: body, l: line(node) }
+        { k: "class", path: path, superclass: superclass, struct: struct, body: body, l: line(node), basic_object: basic || nil }
       when Prism::SingletonClassNode
         { k: "sclass", target: expr(node.expression), body: seq(node.body), l: line(node) }
       when Prism::DefNode
