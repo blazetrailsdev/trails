@@ -2651,3 +2651,10 @@ describe("Module#include of a plain module that includes modules", () => {
     expect((obj as { root(): string }).root()).toBe("leaf");
   });
 });
+
+describe("rbObjIsKindOf with a defineModule module", () => {
+  it("answers Module for a defineModule object and not for a bare object", () => {
+    expect(rbObjIsKindOf(defineModule({}), Module)).toBe(true);
+    expect(rbObjIsKindOf({}, Module)).toBe(false);
+  });
+});

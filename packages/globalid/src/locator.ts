@@ -59,7 +59,7 @@ export class BaseLocator {
       idsByModel.get(gid.modelClass)!.push(gid.modelId);
     }
 
-    const recordsByModelNameAndId: Record<string, Record<string, unknown>> = {};
+    const recordsByModelNameAndId = Object.create(null) as Record<string, Record<string, unknown>>;
 
     for (const [model, ids] of idsByModel) {
       const records = await this.findRecords(model, ids, {
