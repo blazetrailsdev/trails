@@ -27,6 +27,7 @@ export class EnqueueErrorJob extends Base {
   }
 
   static EnqueueErrorAdapter = EnqueueErrorAdapter;
+  declare static disableTestAdapter: () => void;
 
   perform(): void {
     throw new Error("This should never be called");

@@ -172,6 +172,19 @@ describe("Object#inspect", () => {
 });
 
 describe("Object#to_s", () => {
+  it("answers rb_any_to_s for an instance with no to_s of its own", () => {
+    class Foo {
+      static toString(): string {
+        return "Foo";
+      }
+    }
+    expect(toS(new Foo())).toMatch(/^#<Foo:0x[0-9a-f]+>$/);
+  });
+
+  it("answers Set#inspect for a Set", () => {
+    expect(toS(new Set([1]))).toBe(inspect(new Set([1])));
+  });
+
   it("accepts a to_s answer that is a String and never calls to_str on it", () => {
     class Str extends stringSuperclass("eql") {
       toS(): this {
