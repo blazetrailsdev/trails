@@ -1,7 +1,7 @@
 import { describe, expect, it, type TestContext } from "vitest";
 import "./queue-adapters/test-adapter.js";
 import type { TestAdapter } from "./queue-adapters/test-adapter.js";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { ArgumentError, registerConstant } from "@blazetrails/ruby-compat";
 import { TestCase } from "./test-case.js";
 import type { TestHelper } from "./test-helper.js";
 import { isAdapterIs } from "./test-helpers/helper.js";
@@ -44,5 +44,17 @@ describe.skipIf(!isAdapterIs("test"))("TestHelperPerformedJobsTest", () => {
     expect(adapter.enqueuedJobs).toHaveLength(0);
     await t.assertPerformedJobs(2);
     await t.assertPerformedWith({ job: HelloJob, args: ["b"] });
+  });
+
+  it("raises unknown keyword from every kwarg assertion", async ({ testCase }: TestContext) => {
+    const t = testCase as unknown as TestHelper;
+    const bogus = { bogus: 1 } as never;
+    const err = new ArgumentError("unknown keyword: :bogus");
+    await expect(t.assertEnqueuedJobs(0, bogus)).rejects.toThrow(err);
+    await expect(t.assertNoEnqueuedJobs(bogus)).rejects.toThrow(err);
+    await expect(t.assertPerformedJobs(0, bogus)).rejects.toThrow(err);
+    await expect(t.assertNoPerformedJobs(bogus)).rejects.toThrow(err);
+    await expect(t.assertPerformedWith(bogus)).rejects.toThrow(err);
+    await expect(t.performEnqueuedJobs(bogus)).rejects.toThrow(err);
   });
 });

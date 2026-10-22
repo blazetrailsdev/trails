@@ -281,9 +281,9 @@ export class LogSubscriber extends BaseLogSubscriber {
   /** @internal */
   private enqueuedJobsMessage(adapter: unknown, enqueuedJobs: LoggedJob[]): string {
     const enqueuedCount = enqueuedJobs.length;
-    const jobClassesCounts = Object.entries(
-      tally(enqueuedJobs.map((job) => rbObjClass(job) as never)),
-    ).sort(([, a], [, b]) => b - a);
+    const jobClassesCounts = [...tally(enqueuedJobs.map((job) => rbObjClass(job)))].sort(
+      ([, a], [, b]) => b - a,
+    );
     return (
       `Enqueued ${enqueuedCount} ${pluralize("job", enqueuedCount)} to ${ActiveJob.adapterName(adapter)}` +
       ` (${jobClassesCounts.map(([klass, count]) => `${count} ${klass}`).join(", ")})`

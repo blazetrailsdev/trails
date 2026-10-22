@@ -127,12 +127,14 @@ export function queueAdapterForTest(): unknown {
   return null;
 }
 
+/** @inventedArm rbGetKwargs — PERMANENT */
 export async function assertEnqueuedJobs(
   this: TestHelper,
   number: number,
-  { only = null, except = null, queue = null }: JobsWithOptions = {},
+  { only = null, except = null, queue = null, ...keywordHash }: JobsWithOptions = {},
   block: (() => unknown) | null = null,
 ): Promise<void> {
+  rbGetKwargs(keywordHash, []);
   this.requireActiveJobTestAdapterBang("assert_enqueued_jobs");
 
   let actualCount: number;
@@ -151,22 +153,26 @@ export async function assertEnqueuedJobs(
   assertEqual(number, actualCount, `${number} jobs expected, but ${actualCount} were enqueued`);
 }
 
+/** @inventedArm rbGetKwargs — PERMANENT */
 export async function assertNoEnqueuedJobs(
   this: TestHelper,
-  { only = null, except = null, queue = null }: JobsWithOptions = {},
+  { only = null, except = null, queue = null, ...keywordHash }: JobsWithOptions = {},
   block: (() => unknown) | null = null,
 ): Promise<void> {
+  rbGetKwargs(keywordHash, []);
   this.requireActiveJobTestAdapterBang("assert_no_enqueued_jobs");
 
   await this.assertEnqueuedJobs(0, { only, except, queue }, block);
 }
 
+/** @inventedArm rbGetKwargs — PERMANENT */
 export async function assertPerformedJobs(
   this: TestHelper,
   number: number,
-  { only = null, except = null, queue = null }: JobsWithOptions = {},
+  { only = null, except = null, queue = null, ...keywordHash }: JobsWithOptions = {},
   block: (() => unknown) | null = null,
 ): Promise<void> {
+  rbGetKwargs(keywordHash, []);
   this.requireActiveJobTestAdapterBang("assert_performed_jobs");
 
   let performedJobsSize: number;
@@ -189,11 +195,13 @@ export async function assertPerformedJobs(
   );
 }
 
+/** @inventedArm rbGetKwargs — PERMANENT */
 export async function assertNoPerformedJobs(
   this: TestHelper,
-  { only = null, except = null, queue = null }: JobsWithOptions = {},
+  { only = null, except = null, queue = null, ...keywordHash }: JobsWithOptions = {},
   block: (() => unknown) | null = null,
 ): Promise<void> {
+  rbGetKwargs(keywordHash, []);
   this.requireActiveJobTestAdapterBang("assert_no_performed_jobs");
 
   await this.assertPerformedJobs(0, { only, except, queue }, block);
@@ -274,6 +282,7 @@ export async function assertEnqueuedWith(
   return await this.instantiateJob(matchingJob!);
 }
 
+/** @inventedArm rbGetKwargs — PERMANENT */
 export async function assertPerformedWith(
   this: TestHelper,
   {
@@ -282,9 +291,11 @@ export async function assertPerformedWith(
     at = null,
     queue = null,
     priority = null,
+    ...keywordHash
   }: AssertEnqueuedWithOptions = {},
   block: (() => unknown) | null = null,
 ): Promise<unknown> {
+  rbGetKwargs(keywordHash, []);
   this.requireActiveJobTestAdapterBang("assert_performed_with");
 
   const expected: Payload = Object.fromEntries(
@@ -346,11 +357,13 @@ export async function assertPerformedWith(
   return await this.instantiateJob(matchingJob!);
 }
 
+/** @inventedArm rbGetKwargs — PERMANENT */
 export async function performEnqueuedJobs(
   this: TestHelper,
-  { only = null, except = null, queue = null, at = null }: JobsWithOptions = {},
+  { only = null, except = null, queue = null, at = null, ...keywordHash }: JobsWithOptions = {},
   block: (() => unknown) | null = null,
 ): Promise<unknown> {
+  rbGetKwargs(keywordHash, []);
   if (block == null) {
     this.requireActiveJobTestAdapterBang("perform_enqueued_jobs (without a block)");
     return await this.flushEnqueuedJobs({ only, except, queue, at });
