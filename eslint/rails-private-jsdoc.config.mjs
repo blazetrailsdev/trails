@@ -18,7 +18,7 @@ import unbackedInternalNeedsReceipt from "./unbacked-internal-needs-receipt.mjs"
 import rubyCompatNeedsMriCitation from "./ruby-compat-needs-mri-citation.mjs";
 
 export default [
-  { ignores: ["packages/marcel/src/test-helpers/fixtures/**"] },
+  { ignores: ["packages/marcel/src/test-helpers/fixtures/**", "packages/rack/test/cgi/assets/**"] },
   // Plugin registration is global (no `files`): ESLint refuses to redefine a
   // plugin, so the two rule blocks below cannot each declare it.
   {

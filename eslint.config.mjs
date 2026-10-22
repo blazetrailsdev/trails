@@ -140,6 +140,8 @@ export default defineConfig(
       "packages/actionpack/src/test-helpers/fixtures/公共/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
       "packages/marcel/src/test-helpers/fixtures/**",
+      // Byte-for-byte copies of vendor/rack/v3.1.14/test/cgi/assets.
+      "packages/rack/test/cgi/assets/**",
       "**/dist-test/**",
       "**/.trails/**",
       "packages/website/static/**",
