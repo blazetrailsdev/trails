@@ -4,7 +4,8 @@
  * whole gem, recorded before any body is lowered, so a constant or self-call
  * resolves no matter which file it is defined in.
  */
-import { GEM } from "./gem.js";
+import { GEM, GEM_SCHEMA } from "./gem.js";
+import { pluralize, readSchema, type Column } from "./schema.js";
 import type { IrFile, N } from "./ir.js";
 
 export interface DefInfo {
@@ -51,6 +52,12 @@ export interface ScopeInfo {
   /** Short TS name it is exported as from `primaryFile`'s TS twin. */
   exportName?: string;
   lexicalParent?: string;
+  /**
+   * The ActiveRecord macros its body (or an `included do` block) runs:
+   * `belongs_to` / `has_one` / `has_many` / `has_and_belongs_to_many` and
+   * `scope`, and the coded columns of `serialize` / `store`, each with its call node.
+   */
+  arMacros?: { macro: string; name: string; node: any }[];
 }
 
 export interface ConstInfo {
@@ -117,6 +124,16 @@ export class GemIndex {
   /** `class << obj; prepend M` inside a method: M joins the class `obj` is an instance of. */
   objectMixins: { mod: string[]; prepend: boolean; nesting: string[] }[] = [];
   aliases = new Map<string, string>();
+  /** GemConfig.schema's tables. */
+  tables: Map<string, Column[]> = GEM_SCHEMA ? readSchema(GEM_SCHEMA) : new Map();
+  /** Every column of those tables: a model reads each as a snake_case attribute property. */
+  columnNames = new Set([...this.tables.values()].flat().map((c) => c.name));
+
+  /** The table a model class reads its columns from, by Rails' naming (`solid_queue_jobs`). */
+  tableOf(fqn: string): Column[] | undefined {
+    const short = fqn.replace(new RegExp(`^${GEM.namespace}::`), "").replace(/::/g, "_");
+    return this.tables.get(`${GEM.tablePrefix ?? ""}${pluralize(underscore(short))}`);
+  }
 
   /** Every method name defined anywhere in the gem → whether it is only an attr. */
   /** `testZero`: zero-argument-callable defs in a test helper module (`test_helper.rb`), only ever sent to a test's `self`. */
@@ -342,6 +359,15 @@ export class GemIndex {
         for (const a of node.args) if (a.k === "const") s.includes.push(a.path);
         if (name === "prepend")
           for (const a of node.args) if (a.k === "const") s.prepends.push(a.path);
+      } else if (
+        !singleton &&
+        /^(belongs_to|has_one|has_many|has_and_belongs_to_many|scope|serialize|store)$/.test(
+          name,
+        ) &&
+        syms.length
+      ) {
+        (s.arMacros ??= []).push({ macro: name, name: syms[0], node });
+        if (/^(belongs_to|has_)/.test(name)) this.noteMethod(syms[0], "attr");
       } else if (name === "ruby2_keywords" && !singleton) {
         for (const a of node.args) if (a.k === "sym") (s.ruby2Keywords ??= new Set()).add(a.value);
       } else if (name === "extend") {
@@ -372,6 +398,7 @@ export class GemIndex {
   }
 
   finish(rubyFileToTs: (f: string) => string): void {
+    for (const c of this.columnNames) this.noteMethod(c, "attr");
     for (const s of this.scopes.values()) {
       const files = [...s.files];
       const want = underscore(s.fqn.replace(new RegExp(`^${GEM.namespace}::`), "")) + ".rb";

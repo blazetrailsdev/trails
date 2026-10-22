@@ -2488,13 +2488,15 @@ export class Emitter {
       members.unshift(`static toString(): string {\n  return ${JSON.stringify(u.fqn)};\n}`);
     const head = `export class ${name}${ext} {`;
     const mix = this.mixinDecls(u, f, name, members);
-    const sig = [...this.ivarDecls(u, f, members), ...mix.statics];
+    const model = this.modelDecls(u, f, name, members);
+    const sig = [...this.ivarDecls(u, f, members), ...mix.statics, ...model.fields];
     const text = [
       ...bodyLocals,
       head,
       ...indent([...sig, ...pairSetters(dedupeMembers(members)).flatMap((m) => ["", m])]),
       "}",
       ...(mix.iface ? [mix.iface] : []),
+      ...(model.iface ? [model.iface] : []),
       ...after,
     ].join("\n");
     return { text, defs };
@@ -2613,6 +2615,109 @@ export class Emitter {
       const hit = this.index.resolveConst(p, chain);
       return hit?.kind === "scope" && rubyAncestors(this.index, hit.fqn).includes(mod);
     });
+  }
+
+  /**
+   * What an ActiveRecord model reads that its class body does not define: the
+   * columns of its table (GemConfig.schema), as snake_case attribute fields;
+   * its `scope`s, as `declare static` relation methods; and the readers of the
+   * associations it (or an `included do` block of a module it includes)
+   * declares: a collection as an `AssociationProxy` field, a singular
+   * association as a get/set pair in an interface merged with the class
+   * (CLAUDE.md, "Generated attribute readers are properties"), as the hand
+   * activerecord test models write them.
+   */
+  modelDecls(
+    u: Unit,
+    f: FileCtx,
+    name: string,
+    members: string[],
+  ): { fields: string[]; iface: string | null } {
+    const sc = this.index.scopes.get(u.fqn);
+    if (!sc || sc.kind !== "class" || !this.index.tables.size) return { fields: [], iface: null };
+    const ctx = this.baseCtx(u, f, {});
+    const inherited = new Set(sc.superclassFqn ? rubyAncestors(this.index, sc.superclassFqn) : []);
+    const sources = rubyAncestors(this.index, u.fqn).filter(
+      (m) => m === u.fqn || (!inherited.has(m) && this.index.scopes.get(m)?.kind === "module"),
+    );
+    const own = new Set<string>();
+    for (const m of members) {
+      const hit = /^(?:override )?(static )?(?:async )?(?:get |set )?\*?([\w$]+)\(/.exec(m);
+      if (hit) own.add(`${hit[1] ?? ""}${hit[2]}`);
+    }
+    const ar = (n: string) => this.lw.impType(ctx, "@blazetrails/activerecord", n);
+    const chain = [...lexicalChain(this.index, sc.lexicalParent), sc.fqn];
+    const classRef = (assoc: string, opts: N | undefined, collection: boolean): string => {
+      const cn = opts?.pairs?.find((p: any) => p.key?.value === "class_name")?.value;
+      const path =
+        cn?.k === "str"
+          ? cn.value.split("::")
+          : [
+              (collection ? singularize(assoc) : assoc)
+                .split("_")
+                .map((w: string) => w[0].toUpperCase() + w.slice(1))
+                .join(""),
+            ];
+      const hit = this.index.resolveConst(path, chain);
+      const e = hit?.kind === "scope" ? this.resolver.exportNames.get(hit.fqn) : undefined;
+      if (!e) return ar("Base");
+      return e.tsFile === f.tsFile
+        ? e.name
+        : this.lw.impType(ctx, `@root/${e.tsFile.replace(/\.ts$/, ".js")}`, e.name);
+    };
+    const fields: string[] = [];
+    const accessors: string[] = [];
+    const seen = new Set<string>();
+    // A column `serialize` / `store` decodes holds the Ruby value its coder loads.
+    const coded = new Set<string>();
+    for (const m of sources)
+      for (const mac of this.index.scopes.get(m)?.arMacros ?? []) {
+        const opts = mac.node.args.find((a: N) => a.k === "kwargs" || a.k === "hash");
+        if (mac.macro === "serialize" || mac.macro === "store") {
+          coded.add(mac.name);
+          continue;
+        }
+        if (mac.macro === "scope") {
+          const n = tsMethodName(mac.name);
+          if (own.has(`static ${n}`) || seen.has(`static ${n}`)) continue;
+          seen.add(`static ${n}`);
+          fields.push(`declare static ${n}: (...args: unknown[]) => ${ar("Relation")}<${name}>;`);
+          continue;
+        }
+        const n = propName(mac.name);
+        if (own.has(n) || seen.has(n)) continue;
+        seen.add(n);
+        const collection = mac.macro === "has_many" || mac.macro === "has_and_belongs_to_many";
+        const t = classRef(mac.name, opts, collection);
+        if (collection) fields.push(`declare ${n}: ${ar("AssociationProxy")}<${t}>;`);
+        else
+          accessors.push(
+            `get ${n}(): ${t} | null | Promise<${t} | null>;`,
+            `set ${n}(value: ${t} | null);`,
+          );
+      }
+    const COLUMN_TYPES: Record<string, string> = {
+      string: "string",
+      text: "string",
+      integer: "number",
+      bigint: "number",
+      float: "number",
+      decimal: "number",
+      boolean: "boolean",
+    };
+    for (const c of this.index.tableOf(u.fqn) ?? []) {
+      if (own.has(c.name) || seen.has(c.name)) continue;
+      seen.add(c.name);
+      const t = coded.has(c.name)
+        ? "unknown"
+        : (COLUMN_TYPES[c.type] ??
+          (c.type === "datetime" ? this.lw.impType(ctx, "@blazetrails/date", "Time") : "unknown"));
+      fields.push(`declare ${c.name}: ${t}${c.null && t !== "unknown" ? " | null" : ""};`);
+    }
+    const iface = accessors.length
+      ? `// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging\nexport interface ${name} {\n${indent(accessors).join("\n")}\n}`
+      : null;
+    return { fields, iface };
   }
 
   /**
@@ -3954,4 +4059,11 @@ export function dedupeMembers(members: string[]): string[] {
 function rootConst(n: N | null | undefined): N | undefined {
   while (n?.k === "call") n = n.recv;
   return n?.k === "const" ? n : undefined;
+}
+
+/** ActiveSupport's `singularize` for the regular plurals a collection association is named with. */
+function singularize(s: string): string {
+  if (s.endsWith("ies")) return s.slice(0, -3) + "y";
+  if (/(s|x|z|ch|sh)es$/.test(s)) return s.slice(0, -2);
+  return s.replace(/s$/, "");
 }

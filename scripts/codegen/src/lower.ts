@@ -1196,8 +1196,12 @@ export class Lowerer {
       const depSet =
         n.recv?.k === "const" ? this.resolver.depFlatSetter(n.recv.path, n.name, ctx, this) : null;
       if (depSet) return tail ? [`${depSet}(${v});`, `return ${v};`] : [`${depSet}(${v});`];
-      const line = `${recv}${n.safe ? "?" : ""}.${this.attrName(n.name.slice(0, -1))} = ${v};`;
-      return tail ? [line, `return ${recv}.${this.attrName(n.name.slice(0, -1))};`] : [line];
+      const an =
+        (!n.recv || n.recv.k === "self") && this.selfColumn(n.name.slice(0, -1), ctx)
+          ? n.name.slice(0, -1)
+          : this.attrName(n.name.slice(0, -1));
+      const line = `${recv}${n.safe ? "?" : ""}.${an} = ${v};`;
+      return tail ? [line, `return ${recv}.${an};`] : [line];
     }
     if (n.name === "[]=" && isExecutionContext(n.recv) && n.args.length === 2) {
       const set = `${this.expr(n.recv, ctx)}.setKey(${n.args.map((a: N) => this.expr(a, ctx)).join(", ")})`;
@@ -1481,22 +1485,31 @@ export class Lowerer {
       if (t?.k === "array") return `...${this.expr(a.value, ctx)}`;
       return `...${this.aryEnsure(this.expr(a.value, ctx), ctx)}`;
     }
-    if (a.k === "kwargs") return this.kwargs(a.pairs, ctx);
+    if (a.k === "kwargs") return this.kwargs(a.pairs, ctx, !!a.columnKeys);
     if (a.k === "fwdargs") return `...args`;
     if (a.k === "blockpass" || a.k === "symproc") return this.blockArg(a, ctx);
     return this.expr(a, ctx);
   }
 
-  kwargs(pairs: any[], ctx: Ctx): string {
+  kwargs(pairs: any[], ctx: Ctx, columnKeys = false): string {
     const parts = pairs.map((p) => {
       if (p.splat) return `...${this.expr(p.splat, ctx)}`;
       if (p.key.k === "sym")
-        return `${propKey(jsIdent(p.key.value).replace(/_$/, ""))}: ${this.expr(p.value, ctx)}`;
+        return columnKeys
+          ? `${propKey(p.key.value)}: ${this.columnHashValue(p.value, ctx)}`
+          : `${propKey(jsIdent(p.key.value).replace(/_$/, ""))}: ${this.expr(p.value, ctx)}`;
       // A String key (`super("value" => v)`) is a plain property key.
       if (p.key.k === "str") return `${propKey(p.key.value)}: ${this.expr(p.value, ctx)}`;
       return `[${this.expr(p.key, ctx)}]: ${this.expr(p.value, ctx)}`;
     });
     return `{ ${parts.join(", ")} }`;
+  }
+
+  /** A column hash's value: a nested Hash (`where.not(failed_execution: { id: nil })`) keys columns too. */
+  columnHashValue(v: N, ctx: Ctx): string {
+    return v.k === "hash" && !v.pairs.some((p: any) => p.splat)
+      ? this.kwargs(v.pairs, ctx, true)
+      : this.expr(v, ctx);
   }
 
   /** `camelKeys`: an option hash, whose Symbol keys are camelCase (CLAUDE.md, the option-key rule). */
@@ -1537,7 +1550,9 @@ export class Lowerer {
         };
         return `(x: any) => ${this.expr(call, inner)}`;
       }
-      return `(x: any) => x.${this.callName(name)}${this.isAttrLike(name) || this.fileReadsAsProperty(name, ctx) ? "" : "()"}`;
+      return this.isAttrLike(name)
+        ? `(x: any) => x.${this.attrProp(name)}`
+        : `(x: any) => x.${this.callName(name)}${this.fileReadsAsProperty(name, ctx) ? "" : "()"}`;
     }
     if (b.k === "blockpass") {
       if (b.value.k === "fwdblock") return ctx.blockVar ?? "block";
@@ -2053,7 +2068,7 @@ export class Lowerer {
       case "splat":
         return `...${this.expr(n.value, ctx)}`;
       case "kwargs":
-        return this.kwargs(n.pairs, ctx);
+        return this.kwargs(n.pairs, ctx, !!n.columnKeys);
       case "fwdargs":
         return "...args";
       case "def":
@@ -2356,6 +2371,38 @@ export class Lowerer {
   fileReadsAsProperty(name: string, ctx: Ctx): boolean {
     const kinds = this.resolver.types.kindsInFile(ctx.f.tsFile, this.callName(name));
     return kinds.size > 0 && !kinds.has("method");
+  }
+
+  /**
+   * An attribute's property name: a schema column keeps its snake_case column
+   * name, as an ActiveRecord model declares it (`declare parent_id: number`).
+   */
+  /**
+   * Whether `self` in this method is a model whose table has column `name`:
+   * the owner class, or a class including the owner module
+   * (`Job::ConcurrencyControls#concurrency_key` reads `solid_queue_jobs`'s).
+   */
+  selfColumn(name: string, ctx: Ctx): boolean {
+    const bare = name.replace(/[?!]$/, "");
+    if (!ctx.owner || !this.index.columnNames.has(bare)) return false;
+    const has = (fqn: string) => !!this.index.tableOf(fqn)?.some((c) => c.name === bare);
+    if (has(ctx.owner)) return true;
+    for (const sc of this.index.scopes.values())
+      if (
+        sc.kind === "class" &&
+        sc.fqn !== ctx.owner &&
+        rubyAncestors(this.index, sc.fqn).includes(ctx.owner) &&
+        has(sc.fqn)
+      )
+        return true;
+    return false;
+  }
+
+  attrProp(name: string): string {
+    const bare = name.replace(/[?!]$/, "");
+    return this.index.columnNames.has(bare) && !this.index.methodNames.get(bare)?.def
+      ? bare
+      : propName(bare);
   }
 
   isAttrLike(name: string, otherRecv = false): boolean {
@@ -3231,6 +3278,22 @@ export class Lowerer {
   }
 
   /**
+   * An ActiveRecord call whose Hash argument is keyed by column (`where(job_id:
+   * ids)`, `order(priority: :asc)`, `create!(queue_name: …)`): in a gem with a
+   * schema its keys are the snake_case column names trails' models use, not
+   * camelCase option keys.
+   */
+  columnHashArgs(n: N): N {
+    if (!this.index.columnNames.size || !AR_COLUMN_HASH_CALLS.has(n.name)) return n;
+    return {
+      ...n,
+      args: n.args.map((a: N) =>
+        a.k === "kwargs" || a.k === "hash" ? { ...a, k: "kwargs", columnKeys: true } : a,
+      ),
+    };
+  }
+
+  /**
    * Whether this file's data hashes keep Symbol keys' colons: the gem asks for it
    * (GemConfig.dataHashColon) and the hand twin of the file writes them that way
    * (activejob's test_adapter.rb / test_helper.rb, whose job hashes meet the
@@ -3297,7 +3360,7 @@ export class Lowerer {
   }
 
   callInner(n0: N, ctx: Ctx): string {
-    const n: N = this.dataHashArg(this.dataSubscript(n0, ctx), ctx);
+    const n: N = this.columnHashArgs(this.dataHashArg(this.dataSubscript(n0, ctx), ctx));
     const name: string = n.name;
     // `klass.method_defined?(m)` (builder xchar.rb:14): Module#method_defined?.
     if (
@@ -3967,10 +4030,19 @@ export class Lowerer {
       !resolved &&
       n.args.length === 0 &&
       !n.block &&
+      (!recvNode || recvNode.k === "self") &&
+      !name.endsWith("?") &&
+      this.selfColumn(name, ctx)
+    )
+      return `${recv}${nav}${name}`;
+    if (
+      !resolved &&
+      n.args.length === 0 &&
+      !n.block &&
       !depConstRecv &&
       this.isAttrLike(name, recvNode != null && recvNode.k !== "self")
     )
-      return `${recv}${nav}${propName(name.replace(/[?!]$/, ""))}`;
+      return `${recv}${nav}${this.attrProp(name)}`;
     // A block passed to a gem method whose optional positionals the call skips
     // (`instrument(:enqueue, &block)` against `instrument(operation, payload = {}, &block)`):
     // each skipped slot is `undefined`, so the block lands in its own slot
@@ -5245,5 +5317,35 @@ function typedSplat(args: string, paramsOf: string): string {
   }
   return `...(${args.slice(3)} as ${paramsOf})`;
 }
+
+/** ActiveRecord methods whose Hash argument names columns (or associations, for `where`). */
+const AR_COLUMN_HASH_CALLS = new Set([
+  "where",
+  "not",
+  "rewhere",
+  "order",
+  "reorder",
+  "find_by",
+  "find_by!",
+  "find_or_create_by",
+  "find_or_create_by!",
+  "find_or_initialize_by",
+  "create",
+  "create!",
+  "update",
+  "update!",
+  "update_all",
+  "update_columns",
+  "update_column",
+  "insert",
+  "insert!",
+  "insert_all",
+  "insert_all!",
+  "upsert",
+  "upsert_all",
+  "exists?",
+  "missing",
+  "assign_attributes",
+]);
 
 const OPTIONS_NAME = /^@?(options|opts|.*_options)$/;

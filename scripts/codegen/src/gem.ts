@@ -36,6 +36,14 @@ export interface GemConfig {
    * which it adds to ActiveJob).
    */
   extraRoots?: string[];
+  /**
+   * An engine's database schema, relative to its vendored root: its models'
+   * columns, and the table each model reads them from (Rails' attribute
+   * methods come from the table, not the class body).
+   */
+  schema?: string;
+  /** The engine's `isolate_namespace` table prefix (`solid_queue_`). */
+  tablePrefix?: string;
   /** The vendored gem directory and the trails package name (`activerecord`). */
   gem: string;
   /** The gem's top-level Ruby file and directory under lib (`active_record`). */
@@ -158,6 +166,8 @@ GEMS.solid_queue = {
   pkg: "solid-queue",
   libDirs: ["lib", "app/models"],
   extraRoots: ["active_job"],
+  schema: "lib/generators/solid_queue/install/templates/db/queue_schema.rb",
+  tablePrefix: "solid_queue_",
 };
 
 const name = process.env.CODEGEN_GEM ?? "activerecord";
@@ -174,6 +184,8 @@ export const GEM_LIB = path.join(ROOT, "vendor", GEM_ROOT, "lib");
 export const GEM_LIB_DIRS = (GEM.libDirs ?? ["lib"]).map((d) =>
   path.join(ROOT, "vendor", GEM_ROOT, d),
 );
+/** `GemConfig.schema`, resolved. */
+export const GEM_SCHEMA = GEM.schema ? path.join(ROOT, "vendor", GEM_ROOT, GEM.schema) : null;
 /** `packages/<gem>`, the hand port. */
 export const PKG_DIR = path.join(ROOT, "packages", GEM.pkg ?? GEM.gem);
 /** `packages/<gem>/codegen-out`, where a run writes. */
