@@ -298,9 +298,6 @@ describe("TagHelperTest", () => {
       '<a href="create">Create</a>',
     );
     expect(contentTag("a", "Create", { href: "create" }).htmlSafe).toBeTruthy();
-    expect(contentTag("a", "Create", { href: "create" }).toString()).toEqual(
-      contentTag("a", "Create", { href: "create" }).toString(),
-    );
     expect(contentTag("p", "<script>evil_js</script>").toString()).toEqual(
       "<p>&lt;script&gt;evil_js&lt;/script&gt;</p>",
     );
@@ -316,9 +313,6 @@ describe("TagHelperTest", () => {
     const t = tag() as any;
     expect(t.div("Content", { id: "post_1" }).toString()).toEqual('<div id="post_1">Content</div>');
     expect(t.div("Content", { id: "post_1" }).htmlSafe).toBeTruthy();
-    expect(t.div("Content", { id: "post_1" }).toString()).toEqual(
-      t.div("Content", { id: "post_1" }).toString(),
-    );
     expect(t.p("<script>evil_js</script>").toString()).toEqual(
       "<p>&lt;script&gt;evil_js&lt;/script&gt;</p>",
     );
