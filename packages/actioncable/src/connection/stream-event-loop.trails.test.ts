@@ -61,6 +61,19 @@ describe("ActionCable::Connection::StreamEventLoop", () => {
     expect(io.count()).toBe(0);
   });
 
+  it("closes the stream when receive raises, and deregisters when that close raises too", () => {
+    const loop = new StreamEventLoop();
+    const io = new FakeIo();
+    const s = stream(true);
+    s.receive = () => {
+      throw new Error("bad frame");
+    };
+    loop.attach(io, s);
+    expect(() => io.emit("data", "x")).not.toThrow();
+    expect(s.closes).toBe(1);
+    expect(io.count()).toBe(0);
+  });
+
   it("detach removes the listeners and closes the io", () => {
     const loop = new StreamEventLoop();
     const io = new FakeIo();

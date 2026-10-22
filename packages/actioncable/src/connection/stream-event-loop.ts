@@ -37,21 +37,30 @@ export class StreamEventLoop {
   }
 
   attach(io: Io, stream: Stream): void {
-    const monitor: Monitor = {
-      data: (incoming) => {
-        stream.receive(incoming);
-      },
-      end: () => {
-        stream.close();
-      },
-      error: () => {
+    const handle =
+      (read: (incoming?: unknown) => void) =>
+      (incoming?: unknown): void => {
         try {
-          stream.close();
+          read(incoming);
         } catch {
-          for (const [event, listener] of Object.entries(monitor)) io.off(event, listener);
-          this._map.delete(io);
+          try {
+            stream.close();
+          } catch {
+            for (const [event, listener] of Object.entries(monitor)) io.off(event, listener);
+            this._map.delete(io);
+          }
         }
-      },
+      };
+    const monitor: Monitor = {
+      data: handle((incoming) => {
+        stream.receive(incoming);
+      }),
+      end: handle(() => {
+        stream.close();
+      }),
+      error: handle((error) => {
+        throw error;
+      }),
     };
     this._map.set(io, monitor);
     for (const [event, listener] of Object.entries(monitor)) io.on(event, listener);
