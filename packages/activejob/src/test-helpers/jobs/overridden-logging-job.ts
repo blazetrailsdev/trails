@@ -12,11 +12,10 @@ export class OverriddenLoggingJob extends Base {
   perform(dummy: unknown): void {
     (this.logger as Logger).info(`Dummy, here is it: ${rbObjAsString(dummy)}`);
   }
-}
-Object.defineProperty(OverriddenLoggingJob.prototype, "logger", {
-  get(this: OverriddenLoggingJob): unknown {
+
+  // @ts-expect-error TS2611: Base declares `logger` as a cattr_accessor property.
+  get logger(): unknown {
     return (this._logger ??= TaggedLogging.new(new Logger(null)));
-  },
-  configurable: true,
-});
+  }
+}
 registerConstant("OverriddenLoggingJob", OverriddenLoggingJob);
