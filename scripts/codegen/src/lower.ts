@@ -16,7 +16,7 @@
  * carrying the Ruby source, so the output still parses and the gap is counted.
  */
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "../../parity/conventions.js";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { RUBY_COMPAT_EXPORTS } from "../../parity/ruby-compat.js";
 import { operatorSpelling } from "../../api-compare/operator-order-spelling.js";
@@ -30,7 +30,14 @@ import {
   rubyAncestors,
   type ScopeInfo,
 } from "./gem-index.js";
-import { GEM, ROOT, coreExtSends, handNamespaceAutoloads, handNamespaceFqns } from "./gem.js";
+import {
+  GEM,
+  PKG_DIR,
+  ROOT,
+  coreExtSends,
+  handNamespaceAutoloads,
+  handNamespaceFqns,
+} from "./gem.js";
 import type { Resolver } from "./resolve.js";
 import { isBool, isObjectLike, type TypeRef } from "./types.js";
 
@@ -639,7 +646,10 @@ export class Lowerer {
         const v =
           n.value?.k === "hash" && OPTIONS_NAME.test(name)
             ? this.hashLit(n.value.pairs, ctx, true)
-            : this.expr(n.value, ctx);
+            : this.expr(
+                this.subscriptedLocal(name, ctx) ? this.colonKeysRoot(n.value) : n.value,
+                ctx,
+              );
         ctx.assigning = prevAssigning;
         const line = `${this.decl(ctx, name, v)} = ${v};`;
         this.noteLocalType(ctx, name, n.value);
@@ -942,7 +952,9 @@ export class Lowerer {
         return [`${this.ivar(t.name, ctx)} = ${v};`];
       case "call":
         if (t.name === "[]")
-          return [`${this.expr(t.recv, ctx)}[${this.expr(t.args[0], ctx)}] = ${v};`];
+          return [
+            `${this.expr(t.recv, ctx)}[${this.expr(this.dataSubscript(t, ctx).args[0], ctx)}] = ${v};`,
+          ];
         return [`${this.expr(t.recv, ctx)}.${this.attrName(t.name)} = ${v};`];
       case "mtarget": {
         const tmp = this.tmp(ctx, "inner");
@@ -1022,14 +1034,17 @@ export class Lowerer {
         return this.constRef(t, ctx);
       case "call":
         if (t.name === "[]")
-          return `${this.expr(t.recv, ctx)}[${t.args.map((a: N) => this.expr(a, ctx)).join(", ")}]`;
+          return `${this.expr(t.recv, ctx)}[${this.dataSubscript(t, ctx)
+            .args.map((a: N) => this.expr(a, ctx))
+            .join(", ")}]`;
         return `${this.expr(t.recv, ctx)}.${this.attrName(t.name)}`;
     }
     return this.decline(ctx, "unhandled-node", t, `lvalue ${t.k}`);
   }
 
   /** Statement-position special forms: `each` → for-of, raise, attr writes. */
-  callStmt(n: N, ctx: Ctx, tail: boolean): string[] | null {
+  callStmt(n0: N, ctx: Ctx, tail: boolean): string[] | null {
+    const n: N = this.dataSubscript(n0, ctx);
     if (
       n.recv &&
       n.block?.k === "block" &&
@@ -1521,7 +1536,7 @@ export class Lowerer {
   }
 
   /** `camelKeys`: an option hash, whose Symbol keys are camelCase (CLAUDE.md, the option-key rule). */
-  hashLit(pairs: any[], ctx: Ctx, camelKeys = false): string {
+  hashLit(pairs: any[], ctx: Ctx, camelKeys = false, colonKeys = false): string {
     if (!pairs.length) return "{}";
     // An Integer key (`{ 1 => 2 }`) does not survive as a JS object key, which
     // is always a string: the literal is a ruby-compat `Hash` (a Map).
@@ -1533,7 +1548,7 @@ export class Lowerer {
     const parts = pairs.map((p) => {
       if (p.splat) return `...${this.expr(p.splat, ctx)}`;
       if (p.key.k === "sym")
-        return symColonHere(ctx)
+        return symColonHere(ctx) || colonKeys
           ? `${JSON.stringify(":" + p.key.value)}: ${this.expr(p.value, ctx)}`
           : `${propKey(camelKeys && /^[a-z_][a-z0-9_]*$/.test(p.key.value) ? propName(p.key.value) : p.key.value)}: ${this.expr(p.value, ctx)}`;
       if (p.key.k === "str") return `${propKey(p.key.value)}: ${this.expr(p.value, ctx)}`;
@@ -1558,7 +1573,7 @@ export class Lowerer {
         };
         return `(x: any) => ${this.expr(call, inner)}`;
       }
-      return `(x: any) => x.${this.callName(name)}${this.isAttrLike(name) ? "" : "()"}`;
+      return `(x: any) => x.${this.callName(name)}${this.isAttrLike(name) || this.fileReadsAsProperty(name, ctx) ? "" : "()"}`;
     }
     if (b.k === "blockpass") {
       if (b.value.k === "fwdblock") return ctx.blockVar ?? "block";
@@ -1635,6 +1650,37 @@ export class Lowerer {
     if (hz?.size) stmts.unshift(`let ${[...hz].map((h) => `${jsIdent(h)}: unknown`).join(", ")};`);
     const asy = inner.asyncBox!.awaits ? "async " : "";
     return `${exported ? "export " : ""}${asy}function ${name}(${ps}) {\n${indent(stmts).join("\n")}\n}`;
+  }
+
+  /** `n` with each keyword lambda whose body reads `self` marked `selfFn`. */
+  markSelfLambdas(n: N): N {
+    const readsSelf = (body: N): boolean =>
+      /"k":"(self|ivar)"|"recv":null,"name":"[a-z_]\w*[?!]?","args":\[\],"block":null,"safe":false,"l":\d+,"vcall":true/.test(
+        JSON.stringify(body ?? null),
+      );
+    if (
+      !n.args.some(
+        (a: N) =>
+          a.k === "kwargs" &&
+          a.pairs.some((p: N) => p.value?.k === "lambda" && readsSelf(p.value.body)),
+      )
+    )
+      return n;
+    return {
+      ...n,
+      args: n.args.map((a: N) =>
+        a.k === "kwargs"
+          ? {
+              ...a,
+              pairs: a.pairs.map((p: N) =>
+                p.value?.k === "lambda" && readsSelf(p.value.body)
+                  ? { ...p, value: { ...p.value, selfFn: true } }
+                  : p,
+              ),
+            }
+          : a,
+      ),
+    };
   }
 
   /**
@@ -1900,7 +1946,7 @@ export class Lowerer {
       case "array":
         return `[${n.elems.map((e: N) => (e.k === "splat" ? `...${this.expr(e.value, ctx)}` : this.expr(e, ctx))).join(", ")}]`;
       case "hash":
-        return this.hashLit(n.pairs, ctx);
+        return this.hashLit(n.pairs, ctx, false, !!n.colonKeys);
       case "range":
         return `new ${this.rc(ctx, "Range")}(${n.from ? this.expr(n.from, ctx) : "null"}, ${n.to ? this.expr(n.to, ctx) : "null"}, ${n.exclusive})`;
       case "srcfile":
@@ -2032,6 +2078,7 @@ export class Lowerer {
         return y;
       }
       case "lambda":
+        if (n.selfFn) return this.selfFunction(n.params, n.body, ctx);
         if (n.libLambda) return this.arrow(n.params, n.body, this.child(ctx, { testMode: false }));
         return this.arrow(n.params, n.body, ctx);
       case "block":
@@ -2338,6 +2385,15 @@ export class Lowerer {
    * `job.scheduled_at` a method). Outside it: the type oracle declares the
    * name only as a getter or property on the dependency classes it knows.
    */
+  /**
+   * Whether the hand twin of this file reads `name` as a property on every
+   * object it types (its classes and the host interfaces for `this`).
+   */
+  fileReadsAsProperty(name: string, ctx: Ctx): boolean {
+    const kinds = this.resolver.types.kindsInFile(ctx.f.tsFile, this.callName(name));
+    return kinds.size > 0 && !kinds.has("method");
+  }
+
   isAttrLike(name: string, otherRecv = false): boolean {
     // A reader `def x` whose writer a gem scope declares (`attr_writer :priority`)
     // is one accessor (the module getter half), read as a property.
@@ -3048,6 +3104,11 @@ export class Lowerer {
       const fn = this.imp(ctx, `@root/${topFile.replace(/\.ts$/, ".js")}`, tsMethodName(n.name));
       return `${fn}(${n.args.map((x: N) => this.argExpr(x, ctx)).join(", ")})`;
     }
+    // A class-body macro's keyword lambda that reads `self` (`class_attribute
+    // :queue_name, default: -> { self.class.default_queue_name }`) is kept and
+    // `instance_exec`ed on an instance later (queue_name.rb:62-63): a `this`-bound
+    // function, not an arrow closing over the class.
+    if (n.recv === null && ctx.selfKind === "static") n = this.markSelfLambdas(n);
     if (!ctx.testMode) return this.callInner(n, ctx);
     // A lambda a test passes as a keyword value (`only: ->(job) { … }`) is a
     // filter the gem calls synchronously (`filter_as_proc(only).call(job)`):
@@ -3300,6 +3361,107 @@ export class Lowerer {
   }
 
   /**
+   * A data hash's Symbol subscript (`job_data[:job]`, `expected[:at]`) keeps the
+   * colon, as a String key: a local, block parameter or non-option parameter
+   * receiver (GemConfig.dataHashColon). An option hash (`options[:wait]`) keeps
+   * its bare camelCase key.
+   */
+  dataSubscript(n: N, ctx: Ctx): N {
+    if (
+      !this.dataHashFile(ctx) ||
+      !["[]", "[]=", "fetch", "key?", "delete", "dig"].includes(n.name) ||
+      n.args[0]?.k !== "sym" ||
+      n.recv?.k !== "lvar" ||
+      OPTIONS_NAME.test(n.recv.name)
+    )
+      return n;
+    return { ...n, args: [{ k: "str", value: `:${n.args[0].value}` }, ...n.args.slice(1)] };
+  }
+
+  /**
+   * `job_to_hash(job, at: timestamp)` where `job_to_hash(job, extras = {})` merges
+   * `extras` into a data hash (test_adapter.rb:34,39-45): the braceless hash is a
+   * positional Hash, keeping its Symbol keys' colons.
+   */
+  dataHashArg(n: N, ctx: Ctx): N {
+    const last = n.args?.[n.args.length - 1];
+    if (!this.dataHashFile(ctx) || last?.k !== "kwargs" || last.pairs.some((p: N) => p.splat))
+      return n;
+    const own = this.writerOwner(n.name, n.recv ?? { k: "self" }, ctx);
+    const d: N | undefined = own?.defs.get(n.name) ?? own?.sdefs.get(n.name);
+    const param = d?.params?.[n.args.length - 1];
+    if (param?.kind !== "opt" || param.default?.k !== "hash" || param.default.pairs.length)
+      return n;
+    let merged = false;
+    const visit = (x: unknown): void => {
+      if (merged || !x || typeof x !== "object") return;
+      const nd = x as N;
+      if (
+        nd.k === "call" &&
+        ["merge", "merge!", "update"].includes(nd.name) &&
+        nd.args?.[0]?.k === "lvar" &&
+        nd.args[0].name === param.name
+      )
+        merged = true;
+      for (const v of Object.values(nd)) visit(v);
+    };
+    visit(d?.node?.body);
+    if (!merged) return n;
+    return {
+      ...n,
+      args: [...n.args.slice(0, -1), { k: "hash", pairs: last.pairs, colonKeys: true }],
+    };
+  }
+
+  /**
+   * Whether this file's data hashes keep Symbol keys' colons: the gem asks for it
+   * (GemConfig.dataHashColon) and the hand twin of the file writes them that way
+   * (activejob's test_adapter.rb / test_helper.rb, whose job hashes meet the
+   * String keys of `job.serialize`; instrumentation.rb's payload stays bare).
+   */
+  dataHashFile(ctx: Ctx): boolean {
+    if (!GEM.dataHashColon) return false;
+    const memo = (this.dataHashMemo ??= new Map<string, boolean>());
+    let hit = memo.get(ctx.f.tsFile);
+    if (hit === undefined) {
+      const twin = path.join(PKG_DIR, "src", ctx.f.tsFile);
+      hit = existsSync(twin) && /\[":[a-z_]+"\]|":[a-z_]+":/.test(readFileSync(twin, "utf8"));
+      memo.set(ctx.f.tsFile, hit);
+    }
+    return hit;
+  }
+
+  private dataHashMemo?: Map<string, boolean>;
+
+  /** Whether the current method subscripts local `name` with a Symbol key. */
+  subscriptedLocal(name: string, ctx: Ctx): boolean {
+    if (!this.dataHashFile(ctx) || OPTIONS_NAME.test(name)) return false;
+    let hit = false;
+    const visit = (x: unknown): void => {
+      if (hit || !x || typeof x !== "object") return;
+      const nd = x as N;
+      if (
+        nd.k === "call" &&
+        (nd.name === "[]" || nd.name === "[]=") &&
+        nd.recv?.k === "lvar" &&
+        nd.recv.name === name &&
+        nd.args?.[0]?.k === "sym"
+      )
+        hit = true;
+      for (const v of Object.values(nd)) visit(v);
+    };
+    visit(ctx.fnScope?.body);
+    return hit;
+  }
+
+  /** The hash literal at the root of `v` (`{ … }.compact`), marked to keep Symbol keys' colons. */
+  colonKeysRoot(v: N): N {
+    if (v?.k === "hash") return { ...v, colonKeys: true };
+    if (v?.k === "call" && v.recv) return { ...v, recv: this.colonKeysRoot(v.recv) };
+    return v;
+  }
+
+  /**
    * `mod.class_eval do … end` (`rb_mod_module_eval`, vm_eval.c): the block runs
    * with `mod` as self.
    */
@@ -3317,7 +3479,8 @@ export class Lowerer {
     return `(${f})(${mod})`;
   }
 
-  callInner(n: N, ctx: Ctx): string {
+  callInner(n0: N, ctx: Ctx): string {
+    const n: N = this.dataHashArg(this.dataSubscript(n0, ctx), ctx);
     const name: string = n.name;
     // `klass.method_defined?(m)` (builder xchar.rb:14): Module#method_defined?.
     if (
@@ -4356,9 +4519,7 @@ export class Lowerer {
       n.args.length === 0 &&
       !n.block
     ) {
-      const kinds = this.resolver.types.kindsInFile(ctx.f.tsFile, this.callName(name));
-      if (kinds.size && ![...kinds].includes("method"))
-        return `${recv}${nav}${this.callName(name)}`;
+      if (this.fileReadsAsProperty(name, ctx)) return `${recv}${nav}${this.callName(name)}`;
     }
     if (
       recvNode?.k === "call" &&

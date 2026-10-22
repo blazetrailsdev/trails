@@ -17,6 +17,13 @@ export interface GemConfig {
    * (CLAUDE.md, "A Ruby Symbol is a JS string").
    */
   symbolColon?: boolean;
+  /**
+   * Symbol keys of the gem's data hashes keep their colon (`job_data[:job]` is
+   * `jobData[":job"]`), where they meet String keys (`job.serialize`) and are
+   * read back by key; option hashes keep bare camelCase keys (CLAUDE.md, the
+   * `symbolize_keys` rule). The hand activejob port's spelling.
+   */
+  dataHashColon?: boolean;
   /** The vendored gem directory and the trails package name (`activerecord`). */
   gem: string;
   /** The gem's top-level Ruby file and directory under lib (`active_record`). */
@@ -61,7 +68,12 @@ export interface External {
 
 const GEMS: Record<string, GemConfig> = {
   activerecord: { gem: "activerecord", rubyRoot: "active_record", namespace: "ActiveRecord" },
-  activejob: { gem: "activejob", rubyRoot: "active_job", namespace: "ActiveJob" },
+  activejob: {
+    gem: "activejob",
+    rubyRoot: "active_job",
+    namespace: "ActiveJob",
+    dataHashColon: true,
+  },
 };
 
 // image_processing (janko/image_processing v1.14.0, vendor/rails/v8.0.2/Gemfile.lock:289),
