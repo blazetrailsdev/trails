@@ -214,6 +214,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/builder':
+        specifier: workspace:*
+        version: link:../builder
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
@@ -424,6 +427,9 @@ importers:
 
   packages/builder:
     dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

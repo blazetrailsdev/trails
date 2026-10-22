@@ -5,6 +5,7 @@ import { LookupContext } from "../lookup-context.js";
 import { setTemplateCompiler, Template } from "../template.js";
 import { buildViews } from "@blazetrails/trails-tsc";
 import { TemplateHandlers } from "./handlers.js";
+import { Builder } from "./handlers/builder.js";
 import { TSE } from "./handlers/tse.js";
 import { shippedTemplateCompiler } from "../test-helpers/setup-compile-template.js";
 
@@ -90,6 +91,22 @@ describe("Templates are precompiled", () => {
     shipped();
     const template = find(fixture("precompiled"), "banner", "greetings");
     expect(String(await template.render(view()))).toBe("<em>static</em>\n");
+  });
+
+  it("renders a file-backed builder template from the module build-views emitted", async () => {
+    shipped();
+    const template = new LookupContext([`${fixture("precompiled")}/app/views`], {
+      formats: [":xml"],
+    }).findTemplate("feed", ["greetings"], false, [], {}) as Template;
+    expect(String(await template.render(view()))).toBe("<html>\n  <p>Hello</p>\n</html>\n");
+  });
+
+  it("compiles a builder template with the test compiler installed", async () => {
+    const template = new Template('xml.p("Hello")', "builder template", new Builder(), {
+      locals: [],
+      format: ":xml",
+    });
+    expect(String(await template.render(view()))).toBe("<p>Hello</p>\n");
   });
 
   it("precompiles a file under a handler the application registers", async () => {

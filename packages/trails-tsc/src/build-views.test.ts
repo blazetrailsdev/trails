@@ -93,6 +93,25 @@ describe("buildViews", () => {
     expect(fs.existsSync(path.join(cwd, ".trails/views-manifest.ts"))).toBe(false);
   });
 
+  it("emits a module wrapping Handlers::Builder's compiled source for a .builder template", async () => {
+    const cwd = mkScratch();
+    write(cwd, "app/views/feeds/index.xml.builder", 'xml.p("Hello");\n');
+
+    const { files } = await buildViews({ cwd });
+
+    expect(files).toEqual(["feeds/index.xml.builder"]);
+    const base = path.join(cwd, ".trails/views/feeds/index.xml.builder");
+    const js = fs.readFileSync(base + ".js", "utf8");
+    expect(js).toContain(
+      'new (__lookup("Builder").XmlMarkup)({ indent: 2, target: outputBuffer.raw() })',
+    );
+    expect(js).toContain("return outputBuffer.toString();");
+    const map = JSON.parse(fs.readFileSync(base + ".js.map", "utf8"));
+    expect(path.resolve(path.dirname(base), map.sources[0])).toBe(
+      path.join(cwd, "app/views/feeds/index.xml.builder"),
+    );
+  });
+
   it("writes only the runtime module and its map beside each template when built in place", async () => {
     const cwd = mkScratch();
     write(cwd, "templates/rescues/show.html.tse", "<%= 1 %>");
