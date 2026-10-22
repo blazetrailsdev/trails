@@ -49,7 +49,9 @@ export class BasicSocket extends IO {
    * delivered so far. With no length it answers all of them, an empty
    * ASCII-8BIT String once the peer has finished; with one, at most that
    * many, and `nil` at end of file. A closed read side raises `IOError`
-   * (`io.c:1029` `rb_io_check_char_readable`).
+   * (`io.c:1029` `rb_io_check_char_readable`). The `outbuf` argument is not
+   * supported and is ignored. Bytes are buffered as they arrive, with no
+   * limit, because the adapter's socket offers no pause.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -57,7 +59,7 @@ export class BasicSocket extends IO {
   override read(length: null, str?: Uint8Array | null): string | Uint8Array;
   override read(length: number, str?: Uint8Array | null): Uint8Array | null;
   override read(length: number | null, str?: Uint8Array | null): string | Uint8Array | null;
-  override read(length?: number | null, str?: Uint8Array | null): string | Uint8Array | null {
+  override read(length?: number | null, _str?: Uint8Array | null): string | Uint8Array | null {
     if (this._closed || this._readClosed) throw new IOError("closed stream");
     const buffered = this._rbuf.reduce((n, chunk) => n + chunk.length, 0);
     if (length == null) length = buffered;
@@ -72,7 +74,6 @@ export class BasicSocket extends IO {
       if (take === chunk.length) this._rbuf.shift();
       else this._rbuf[0] = chunk.subarray(take);
     }
-    if (str) str.set(out.subarray(0, str.length));
     return out;
   }
 
