@@ -7,7 +7,7 @@ import { Template } from "./template.js";
 import { StrictLocalsError, SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Raw } from "./template/handlers/raw.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 
 const echo: TemplateHandler = {
   call: (_template, source) =>
@@ -73,7 +73,7 @@ describe("ActionView::Template (smoke)", () => {
     const raw = new Template("<b>", "r", new Raw(), { locals: [], format: ":html" });
     expect(String(await raw.render(view(), {}))).toBe("<b>");
 
-    const tse = new Template("hi", "w", new Tse(), { locals: [], format: ":html" });
+    const tse = new Template("hi", "w", new TSE(), { locals: [], format: ":html" });
     const buffer = new OutputBuffer();
     expect(await tse.render(view(), {}, buffer)).toBeNull();
     expect(buffer.toStr()).toBe("hi");
@@ -130,7 +130,7 @@ describe("ActionView::Template (smoke)", () => {
   });
 
   it("spot reports a location inside the compiled source", async () => {
-    const t = new Template("<%= 1 %>", "posts/show", new Tse(), {
+    const t = new Template("<%= 1 %>", "posts/show", new TSE(), {
       locals: [],
       format: ":html",
     });
@@ -182,7 +182,7 @@ describe("ActionView::Template (smoke)", () => {
 
     it("reaches the Tse handler's translate_location", async () => {
       const source = "<%= 1 %>\n<%= boom %>\n";
-      const handler = new Tse();
+      const handler = new TSE();
       const hook = vi.spyOn(handler, "translateLocation");
       const t = new Template(source, "t", handler, { locals: [], format: ":html" });
       const s = spot();
@@ -197,7 +197,7 @@ describe("ActionView::Template (smoke)", () => {
       extra;
 
     const template = (source: string): Template =>
-      new Template(source, "t", new Tse(), { locals: [], format: ":html" });
+      new Template(source, "t", new TSE(), { locals: [], format: ":html" });
 
     const render = async (
       source: string,

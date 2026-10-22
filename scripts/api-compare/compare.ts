@@ -107,6 +107,7 @@ import {
   COPY_HOOKS,
   OPERATORS,
   TS_CLASS_RENAMES,
+  applyTokenRenames,
   isArityOverridden,
   isRubyOnlyClass,
   isScopedSkip,
@@ -3246,6 +3247,10 @@ export function resolveTsClassForRuby(
   if (!resolved) {
     const rename = TS_CLASS_RENAMES[short];
     if (rename) resolved = tsByFileName.get(`${expectedFile}::${rename}`);
+  }
+  if (!resolved) {
+    const renamed = applyTokenRenames(short);
+    if (renamed !== short) resolved = tsByFileName.get(`${expectedFile}::${renamed}`);
   }
   return resolved;
 }

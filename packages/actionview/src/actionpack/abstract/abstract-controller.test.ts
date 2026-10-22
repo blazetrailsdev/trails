@@ -6,7 +6,7 @@ import { Rendering } from "../../rendering.js";
 import { Layouts } from "../../layouts.js";
 import { ClassMethods as ViewPathsClassMethods, type ViewPathsClass } from "../../view-paths.js";
 import { MissingTemplate } from "../../template/error.js";
-import { Tse } from "../../template/handlers/tse.js";
+import { TSE } from "../../template/handlers/tse.js";
 
 const { ActionNotFound } = AbstractController;
 
@@ -114,11 +114,11 @@ describe("TestRenderingController", () => {
 
   test("stripping final newline works", async () => {
     try {
-      Tse.stripTrailingNewlines = true;
+      TSE.stripTrailingNewlines = true;
       await controller.process("withFinalNewline");
       expect(String(controller.responseBody)).toBe("Hello from with_final_newline.erb");
     } finally {
-      Tse.stripTrailingNewlines = false;
+      TSE.stripTrailingNewlines = false;
     }
   });
 

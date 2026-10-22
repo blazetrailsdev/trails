@@ -4678,7 +4678,9 @@ export function extractClass(
       if (clause.token === ts.SyntaxKind.ExtendsKeyword) {
         const expr = clause.types[0] && unwrapTsExpression(clause.types[0].expression);
         if (!expr) continue;
-        superclass = expr.getText();
+        superclass = ts.isIdentifier(expr)
+          ? importedName(expr, node.getSourceFile())
+          : expr.getText();
         if (srcDir !== undefined) {
           superclassFile = declaringFile(resolveDeclarationSymbol(checker, expr), srcDir);
         }

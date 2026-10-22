@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "./handlers.js";
-import { Tse } from "./handlers/tse.js";
+import { TSE } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 
 class Customer {
@@ -14,7 +14,7 @@ describe("Base#render collection: inside a template", () => {
   let view: Base;
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     const resolver = new FixtureResolver({
       "test/_customer.html.tse": "Hello: <%= customer.name %>",
       "test/_list.html.tse": '<%= render({ partial: "test/customer", collection: customers }) %>',

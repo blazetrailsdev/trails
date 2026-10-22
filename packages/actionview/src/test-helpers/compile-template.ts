@@ -11,7 +11,7 @@ import { Encoding } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { OutputBuffer } from "../buffers.js";
 import { WrongEncodingError } from "../template/error.js";
-import { Tse } from "../template/handlers/tse.js";
+import { TSE } from "../template/handlers/tse.js";
 import type { Template } from "../template.js";
 
 type StandIn = (
@@ -25,7 +25,7 @@ export async function compileTemplate(
   source: string,
 ): Promise<{ default: StandIn }> {
   const { ts, mappings } =
-    template.handler instanceof Tse
+    template.handler instanceof TSE
       ? virtualizeTseWithDeltas(template.handler.stripTrailingNewlines ? chomp(source) : source, {
           view: "any",
           localsSignature: template.strictLocalsBang(),

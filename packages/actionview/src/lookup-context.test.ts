@@ -7,7 +7,7 @@ import { FixtureResolver } from "./testing/resolvers.js";
 import { Template } from "./template.js";
 import { TemplatePath } from "./template-path.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 
 async function render(ctx: LookupContext, options: RenderOptions) {
   const view = new (DetailsKey.viewContextClass())(ctx, {}, null);
@@ -138,7 +138,7 @@ describe("Base#render (trails)", () => {
   }
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {
@@ -181,7 +181,7 @@ describe("Base#render (trails)", () => {
   it("is reachable from a template rendered through renderTemplate", async () => {
     const ctx = contextWith({ "posts/_form": "form!" });
     const out = await render(ctx, {
-      template: new Template('<%= render({ partial: "form" }) %>', "posts/index", new Tse(), {
+      template: new Template('<%= render({ partial: "form" }) %>', "posts/index", new TSE(), {
         locals: [],
         virtualPath: "posts/index",
         format: ":html",
@@ -204,7 +204,7 @@ describe("LookupContext#render with a layout", () => {
   }
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
 
   afterEach(() => {

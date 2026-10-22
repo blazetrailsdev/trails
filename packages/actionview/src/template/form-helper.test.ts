@@ -40,7 +40,7 @@ import {
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "./handlers.js";
-import { Tse } from "./handlers/tse.js";
+import { TSE } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import {
   FormBuilder,
@@ -643,7 +643,7 @@ describe("FormHelperTest", () => {
   });
 
   it("label with block in erb", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     try {
       const erbView = Base.withEmptyTemplateCache().withViewPaths(
         [
