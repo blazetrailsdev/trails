@@ -5402,16 +5402,20 @@ export class Lowerer {
       // it, a Hash's pairs, and anything else (an Array, a String) as is.
       `${x} instanceof globalThis.Set || ${x} instanceof globalThis.Map || ${x} instanceof ${this.rc(ctx, "Enumerator")} ? [...${x}] : ` +
       `Object.getPrototypeOf(${x}) === Object.prototype ? Object.entries(${x} as object) : (${x} as unknown[])`;
-    const E =
-      recvType?.k === "array"
-        ? R
-        : // `x.each_object(File)` and its kin without a block answer an
-          // Enumerator (enumerator.c rb_enumeratorize): its elements.
-          recvNode?.k === "call" && /^each(_|$)/.test(recvNode.name) && !recvNode.block
-          ? `[...(${r} as Iterable<unknown>)]`
-          : /^[\w$]+(\.[\w$]+)*$/.test(r)
-            ? `(${enumOf(r)})`
-            : `((x) => ${enumOf("x")})(${r})`;
+    // The receiver as an Array of its elements, built only when a rule reads it:
+    // the conversion imports ruby-compat's `Enumerator`.
+    let e: string | undefined;
+    const elements = () =>
+      (e ??=
+        recvType?.k === "array"
+          ? R
+          : // `x.each_object(File)` and its kin without a block answer an
+            // Enumerator (enumerator.c rb_enumeratorize): its elements.
+            recvNode?.k === "call" && /^each(_|$)/.test(recvNode.name) && !recvNode.block
+            ? `[...(${r} as Iterable<unknown>)]`
+            : /^[\w$]+(\.[\w$]+)*$/.test(r)
+              ? `(${enumOf(r)})`
+              : `((x) => ${enumOf("x")})(${r})`);
     const rule = CORE_METHODS[name];
     if (!rule) return null;
     return rule({
@@ -5422,7 +5426,9 @@ export class Lowerer {
       recvNode,
       r,
       R,
-      E,
+      get E() {
+        return elements();
+      },
       nav,
       blk,
       recvType,
