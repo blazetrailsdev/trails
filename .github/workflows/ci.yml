@@ -863,10 +863,6 @@ jobs:
       needs.changes.outputs.unit_tests_affected == 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.unit_runs_on) }}
     timeout-minutes: 20
-    # 2-way file-level shard on hosted, one leg on an idle self-hosted runner
-    # (same shape as sqlite-tests). It runs on nearly every PR and its single
-    # ~9-min vitest step was the critical path of most non-AR PRs. The two
-    # activejob adapter passes split one per leg; with one leg it runs both.
     strategy:
       fail-fast: false
       matrix:
