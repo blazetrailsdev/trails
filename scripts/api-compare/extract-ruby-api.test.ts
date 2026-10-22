@@ -128,6 +128,26 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     }
   }
 
+  it("files a module_function def as one module method, as module_function :name does", () => {
+    const fixtures = {
+      "action_cable.rb": `
+        module ActionCable
+          module_function def server
+            @server ||= 1
+          end
+          def ping; end
+          module_function :ping
+        end
+      `,
+    };
+    const names = (edge: string) =>
+      (rubyIncludes(fixtures, edge)["ActionCable"] as unknown as { name: string }[]).map(
+        (m) => m.name,
+      );
+    expect(names("classMethods")).toEqual(["server", "ping"]);
+    expect(names("instanceMethods")).toEqual([]);
+  });
+
   it("does not attribute an on_load block's include to the enclosing class", () => {
     // railtie.rb:271-273 — the module is included into ActiveJob::Base when
     // active_job loads, NOT into ActiveRecord::Railtie. Attributing it to the
