@@ -7,7 +7,6 @@ import {
   encode,
   isPlainHash,
   isSymbol,
-  rbBlockGivenP,
   rbObjAsString,
   rbObjSingletonClass,
   stringToSym,
@@ -48,7 +47,8 @@ export abstract class XmlBase {
   }
 
   tagBang(sym: string, ...args: unknown[]): Target {
-    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (xml: XmlBase) => unknown) : null;
+    const block =
+      typeof args.at(-1) === "function" ? (args.pop() as (xml: XmlBase) => unknown) : null;
     let text: string | null = null;
     let attrs: Record<string, unknown> | null = null;
     if (isSymbol(args[0]))

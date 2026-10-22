@@ -1,4 +1,4 @@
-import { isSymbol, rbBlockGivenP, rbObjAsString, symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, rbObjAsString, symbolToS } from "@blazetrails/ruby-compat";
 import { IllegalBlockError, type Target, XmlBase } from "./xmlbase.js";
 
 function lshift(target: Target, text: string): Target {
@@ -32,12 +32,13 @@ export class XmlMarkup extends XmlBase {
   }
 
   commentBang(commentText: unknown, block?: unknown): void {
-    this._ensureNoBlock(rbBlockGivenP(block));
+    this._ensureNoBlock(typeof block === "function");
     this._special("<!-- ", " -->", commentText, null);
   }
 
   declareBang(inst: string, ...args: unknown[]): void {
-    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (xml: XmlBase) => unknown) : null;
+    const block =
+      typeof args.at(-1) === "function" ? (args.pop() as (xml: XmlBase) => unknown) : null;
     this._indent();
     this._target = lshift(this._target, `<!${isSymbol(inst) ? symbolToS(inst) : inst}`);
     for (const arg of args) {
@@ -62,7 +63,7 @@ export class XmlMarkup extends XmlBase {
     attrs: Record<string, unknown> = {},
     block?: unknown,
   ): void {
-    this._ensureNoBlock(rbBlockGivenP(block));
+    this._ensureNoBlock(typeof block === "function");
     if (directiveTag === ":xml") {
       const a = { version: "1.0", encoding: "UTF-8" };
       attrs = { ...a, ...attrs };
@@ -78,12 +79,12 @@ export class XmlMarkup extends XmlBase {
   }
 
   cdataBang(text: string, block?: unknown): void {
-    this._ensureNoBlock(rbBlockGivenP(block));
+    this._ensureNoBlock(typeof block === "function");
     this._special("<![CDATA[", "]]>", text.replaceAll("]]>", "]]]]><![CDATA[>"), null);
   }
 
   cdataValueBang(open: string, text: string, block?: unknown): void {
-    this._ensureNoBlock(rbBlockGivenP(block));
+    this._ensureNoBlock(typeof block === "function");
     this._special(
       `<${open}>`,
       `</${open}>`,

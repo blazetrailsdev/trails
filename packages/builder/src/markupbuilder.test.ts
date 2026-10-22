@@ -1,4 +1,4 @@
-import { ArgumentError, block } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { XmlMarkup } from "./xmlmarkup.js";
 
@@ -39,7 +39,7 @@ describe("TestMarkup", () => {
   });
 
   it("nested", () => {
-    xml.outer(block((x: XmlMarkup) => x.inner("x")));
+    xml.outer((x: XmlMarkup) => x.inner("x"));
     expect(xml.targetBang()).toBe("<outer><inner>x</inner></outer>");
   });
 
@@ -57,10 +57,7 @@ describe("TestMarkup", () => {
   it("mixed quotes for attrs", () => {
     xml = new XmlMarkup({ quote: ":single" });
     const x = new XmlMarkup({ target: xml, quote: ":double" });
-    xml.ref(
-      { id: 12 },
-      block(() => x.link({ id: 13 })),
-    );
+    xml.ref({ id: 12 }, () => x.link({ id: 13 }));
     expect(xml.targetBang()).toBe(`<ref id='12'><link id="13"/></ref>`);
   });
 
@@ -82,10 +79,7 @@ describe("TestMarkup", () => {
 
   it("mixed attribute escaping with nested builders", () => {
     const x = new XmlMarkup({ target: xml });
-    xml.ref(
-      { id: ":H&amp;R" },
-      block(() => x.element({ tag: "Long&Short" })),
-    );
+    xml.ref({ id: ":H&amp;R" }, () => x.element({ tag: "Long&Short" }));
     expect(xml.targetBang()).toBe('<ref id="H&amp;R"><element tag="Long&amp;Short"/></ref>');
   });
 
@@ -107,58 +101,43 @@ describe("TestMarkup", () => {
   });
 
   it("complex", () => {
-    xml.body(
-      { bg: "#ffffff" },
-      block((x: XmlMarkup) => x.title("T", { style: "red" })),
-    );
+    xml.body({ bg: "#ffffff" }, (x: XmlMarkup) => x.title("T", { style: "red" }));
     expect(xml.targetBang()).toBe(`<body bg="#ffffff"><title style="red">T</title></body>`);
   });
 
   it("funky symbol", () => {
-    xml.tagBang(
-      "non-ruby-token",
-      { id: 1 },
-      block((x: XmlMarkup) => x.ok()),
-    );
+    xml.tagBang("non-ruby-token", { id: 1 }, (x: XmlMarkup) => x.ok());
     expect(xml.targetBang()).toBe(`<non-ruby-token id="1"><ok/></non-ruby-token>`);
   });
 
   it("tag can handle private method", () => {
-    xml.tagBang(
-      "loop",
-      { id: 1 },
-      block((x: XmlMarkup) => x.ok()),
-    );
+    xml.tagBang("loop", { id: 1 }, (x: XmlMarkup) => x.ok());
     expect(xml.targetBang()).toBe(`<loop id="1"><ok/></loop>`);
   });
 
   it("no explicit marker", () => {
-    xml.p(block((x: XmlMarkup) => x.b("HI")));
+    xml.p((x: XmlMarkup) => x.b("HI"));
     expect(xml.targetBang()).toBe("<p><b>HI</b></p>");
   });
 
   it("reference local vars", () => {
     const n = 3;
-    xml.ol(
-      block((x: XmlMarkup) => {
-        for (let i = 0; i < n; i++) x.li(n);
-      }),
-    );
+    xml.ol((x: XmlMarkup) => {
+      for (let i = 0; i < n; i++) x.li(n);
+    });
     expect(xml.targetBang()).toBe("<ol><li>3</li><li>3</li><li>3</li></ol>");
   });
 
   it("reference methods", () => {
-    xml.title(block((x: XmlMarkup) => x.a(block(() => x.b(_name())))));
+    xml.title((x: XmlMarkup) => x.a(() => x.b(_name())));
     expect(xml.targetBang()).toBe("<title><a><b>bob</b></a></title>");
   });
 
   it("append text", () => {
-    xml.p(
-      block((x: XmlMarkup) => {
-        x.br();
-        x.textBang("HI");
-      }),
-    );
+    xml.p((x: XmlMarkup) => {
+      x.br();
+      x.textBang("HI");
+    });
     expect(xml.targetBang()).toBe("<p><br/>HI</p>");
   });
 
@@ -166,10 +145,7 @@ describe("TestMarkup", () => {
     let ex: Error | undefined;
     expect(() => {
       try {
-        xml.h1(
-          "data1",
-          block(() => xml.b()),
-        );
+        xml.h1("data1", () => xml.b());
       } catch (e) {
         ex = e as Error;
         throw e;
@@ -180,23 +156,19 @@ describe("TestMarkup", () => {
   });
 
   it("capitalized method", () => {
-    xml.P(
-      block((x: XmlMarkup) => {
-        x.B("hi");
-        x.BR();
-        x.EM(block(() => x.textBang("world")));
-      }),
-    );
+    xml.P((x: XmlMarkup) => {
+      x.B("hi");
+      x.BR();
+      x.EM(() => x.textBang("world"));
+    });
     expect(xml.targetBang()).toBe("<P><B>hi</B><BR/><EM>world</EM></P>");
   });
 
   it("escaping", () => {
-    xml.div(
-      block((x: XmlMarkup) => {
-        x.textBang("<hi>");
-        x.em("H&R Block");
-      }),
-    );
+    xml.div((x: XmlMarkup) => {
+      x.textBang("<hi>");
+      x.em("H&R Block");
+    });
     expect(xml.targetBang()).toBe(`<div>&lt;hi&gt;<em>H&amp;R Block</em></div>`);
   });
 
@@ -219,13 +191,10 @@ describe("TestMarkup", () => {
   });
 
   it("non escaping", () => {
-    xml.div(
-      { "ns:xml": ":&xml;" },
-      block((x: XmlMarkup) => {
-        x.append("<h&i>");
-        x.em("H&R Block");
-      }),
-    );
+    xml.div({ "ns:xml": ":&xml;" }, (x: XmlMarkup) => {
+      x.append("<h&i>");
+      x.em("H&R Block");
+    });
     expect(xml.targetBang()).toBe(`<div ns:xml="&xml;"><h&i><em>H&amp;R Block</em></div>`);
   });
 
@@ -236,7 +205,7 @@ describe("TestMarkup", () => {
 
   it("stacked builders", () => {
     const b = new XmlMarkup({ target: xml });
-    b.div(block(() => xml.span(block(() => xml.a("text", { href: "ref" })))));
+    b.div(() => xml.span(() => xml.a("text", { href: "ref" })));
     expect(xml.targetBang()).toBe('<div><span><a href="ref">text</a></span></div>');
   });
 });
