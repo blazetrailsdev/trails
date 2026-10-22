@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { HttpSocket } from "./http-adapter.js";
 import { EOFError } from "./eof-error.js";
-import { SystemCallError } from "./errno.js";
+import { Errno } from "./errno.js";
+import { IO } from "./io.js";
 import { IOError } from "./io-error.js";
 import { TCPSocket } from "./socket.js";
 
@@ -48,7 +49,8 @@ describe("TCPSocket", () => {
     const { socket, emit } = fakeSocket();
     const io = new TCPSocket(socket);
     expect(io.readNonblock(4096, null, { exception: false })).toBe("wait_readable");
-    expect(() => io.readNonblock(4096)).toThrow(SystemCallError);
+    expect(() => io.readNonblock(4096)).toThrow(IO.EAGAINWaitReadable);
+    expect(() => io.readNonblock(4096)).toThrow(Errno.EAGAIN);
     emit("data", new Uint8Array([1, 2, 3]));
     expect(io.readNonblock(2, null, { exception: false })).toEqual(new Uint8Array([1, 2]));
     expect(io.readNonblock(4096, null, { exception: false })).toEqual(new Uint8Array([3]));

@@ -8,6 +8,7 @@ import { IOError } from "./io-error.js";
 import { ArgumentError } from "./argument-error.js";
 import { stderr, stdout, type WriteStream } from "./process-adapter.js";
 import { verbose } from "./verbose.js";
+import { Errno } from "./errno.js";
 import { format } from "./kernel-format.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/v3.3.11/io.c:8880`) is called through. */
@@ -518,6 +519,19 @@ export const ioObjects = new Set<WeakRef<IO>>();
 const ioObjectsSweep = new FinalizationRegistry<WeakRef<IO>>((ref) => ioObjects.delete(ref));
 
 /**
+ * `IO::EAGAINWaitReadable` (`vendor/ruby/v3.3.11/io.c:15389`), the
+ * `Errno::EAGAIN` `read_nonblock` raises when a read would block.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO::EAGAINWaitReadable`.
+ */
+class EAGAINWaitReadable extends Errno.EAGAIN {
+  constructor(mesg?: string) {
+    super(mesg);
+    this.name = "IO::EAGAINWaitReadable";
+  }
+}
+
+/**
  * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
  * Rails writes a credentials file through this class —
@@ -531,6 +545,9 @@ const ioObjectsSweep = new FinalizationRegistry<WeakRef<IO>>((ref) => ioObjects.
  * class this file's export lives in.
  */
 export class IO {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly EAGAINWaitReadable = EAGAINWaitReadable;
+
   /**
    * `vendor/ruby/v3.3.11/file.c:7848` — `File::Constants::NULL`, which `IO`
    * includes (`file.c:7773`), so it is `IO::NULL` and `File::NULL`:

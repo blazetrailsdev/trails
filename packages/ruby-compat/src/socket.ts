@@ -1,7 +1,6 @@
 import type { HttpSocket } from "./http-adapter.js";
 import { ArgumentError } from "./argument-error.js";
 import { EOFError } from "./eof-error.js";
-import { SystemCallError } from "./errno.js";
 import { IO } from "./io.js";
 import { IOError } from "./io-error.js";
 
@@ -109,9 +108,7 @@ export class BasicSocket extends IO {
     if (this._rbufLength === 0) {
       if (!this._eof) {
         if (!exception) return "wait_readable";
-        const error = new SystemCallError("Resource temporarily unavailable - read would block");
-        error.errno = 11;
-        throw error;
+        throw new IO.EAGAINWaitReadable("read would block");
       }
       if (buf) buf.fill(0);
       if (!exception) return null;
