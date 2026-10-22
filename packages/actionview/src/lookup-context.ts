@@ -40,9 +40,9 @@ type Accessors = {
   set handlers(value: DetailWriter);
   get locale(): unknown;
   set locale(value: DetailWriter);
-  defaultLocale(): DetailValue;
-  defaultFormats(): DetailValue;
 };
+
+type DefaultAccessors = Record<"defaultLocale" | "defaultFormats", () => DetailValue>;
 
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
 
@@ -217,10 +217,10 @@ export class LookupContext {
       config.locale = isSymbol(value) ? symbolToS(value) : value;
     }
 
-    const defaultLocale = this.defaultLocale();
+    const defaultLocale = (this as unknown as DefaultAccessors).defaultLocale();
     const detail: DetailValue = isPresent(defaultLocale)
       ? kernelArray(defaultLocale as (string | symbol)[])
-      : this.defaultLocale();
+      : (this as unknown as DefaultAccessors).defaultLocale();
     if (!rbEqual(detail, this._details.locale)) this._setDetail("locale", detail);
   }
 
@@ -230,7 +230,10 @@ export class LookupContext {
   set formats(values: DetailValue | null | undefined) {
     if (values) {
       let arr = [...values];
-      if (arr.includes("*/*")) arr = arr.filter((v) => v !== "*/*").concat(this.defaultFormats());
+      if (arr.includes("*/*"))
+        arr = arr
+          .filter((v) => v !== "*/*")
+          .concat((this as unknown as DefaultAccessors).defaultFormats());
       arr = Array.from(new Set(arr));
 
       if (!Template.Types.isValidSymbols(arr)) {
@@ -248,7 +251,7 @@ export class LookupContext {
     }
     const detail: DetailValue = isPresent(values)
       ? kernelArray(values as (string | symbol)[])
-      : this.defaultFormats();
+      : (this as unknown as DefaultAccessors).defaultFormats();
     if (!rbEqual(detail, this._details.formats)) this._setDetail("formats", detail);
   }
   get htmlFallbackForJs(): boolean {

@@ -62,7 +62,10 @@ describe("LookupContextTest", () => {
     try {
       Base.defaultFormats = [":foo", ":bar"];
 
-      assertEqual([":foo", ":bar"], new LookupContext([]).defaultFormats());
+      assertEqual(
+        [":foo", ":bar"],
+        (new LookupContext([]) as unknown as { defaultFormats(): unknown }).defaultFormats(),
+      );
     } finally {
       Base.defaultFormats = formats;
     }

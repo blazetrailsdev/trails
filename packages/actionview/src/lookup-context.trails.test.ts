@@ -15,7 +15,10 @@ describe("LookupContext", () => {
 
   it("defines a default_<name> reader for each registered detail", () => {
     const ctx = new LookupContext([]) as LookupContext &
-      Record<"defaultVariants" | "defaultHandlers", () => unknown>;
+      Record<
+        "defaultLocale" | "defaultFormats" | "defaultVariants" | "defaultHandlers",
+        () => unknown
+      >;
     expect(ctx.defaultLocale()).toEqual([":en"]);
     expect(ctx.defaultFormats()).toEqual([":html", ":text", ":js", ":css", ":xml", ":json"]);
     expect(ctx.defaultVariants()).toEqual([]);

@@ -173,7 +173,9 @@ export class TemplateRenderer<Rendered = Promise<RenderedTemplate>> extends Abst
         if (!(e instanceof MissingTemplate)) throw e;
         const allDetails = {
           ...this.details,
-          formats: this.lookupContext.defaultFormats() as readonly string[],
+          formats: (
+            this.lookupContext as unknown as { defaultFormats(): readonly string[] }
+          ).defaultFormats(),
         };
         if (!this.templateExists(layout, [], false, keys, allDetails)) throw e;
         return null;
