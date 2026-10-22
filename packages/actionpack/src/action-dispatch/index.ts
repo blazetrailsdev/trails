@@ -102,7 +102,7 @@ export {
   ParamsTooDeepError,
 } from "./http/param-error.js";
 export { RequestId, type RequestIdOptions } from "./middleware/request-id.js";
-export { ExceptionWrapper } from "./middleware/exception-wrapper.js";
+export { ExceptionWrapper, SourceMapLocation } from "./middleware/exception-wrapper.js";
 export { ShowExceptions } from "./middleware/show-exceptions.js";
 export { DebugExceptions } from "./middleware/debug-exceptions.js";
 export { AssumeSSL } from "./middleware/assume-ssl.js";
