@@ -557,8 +557,6 @@ export default defineConfig({
             "packages/activerecord/**",
             "packages/solid-queue/**",
             "packages/trailties/**",
-            // BLOCKED: mini-magick-cli-tool-shortcuts
-            "packages/mini-magick/src/image.test.ts",
             ...SHARED_EXCLUDE,
           ],
           globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
