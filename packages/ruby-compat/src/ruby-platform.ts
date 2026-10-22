@@ -41,3 +41,12 @@ export function RUBY_PLATFORM(): string {
 export function RUBY_ENGINE(): string {
   return "ruby";
 }
+
+/**
+ * `RUBY_VERSION` (`vendor/ruby/v3.3.11/version.c:95`): the MRI version the
+ * ported sources are vendored at. A String, as Ruby's is: unlike
+ * {@link RUBY_PLATFORM} it reads nothing from the host.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const RUBY_VERSION = "3.3.11";
