@@ -11,6 +11,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface GemConfig {
+  /**
+   * The gem's library branches on Symbol-ness (builder's
+   * `args.first.kind_of?(::Symbol)`), so every file keeps a Symbol's colon
+   * (CLAUDE.md, "A Ruby Symbol is a JS string").
+   */
+  symbolColon?: boolean;
   /** The vendored gem directory and the trails package name (`activerecord`). */
   gem: string;
   /** The gem's top-level Ruby file and directory under lib (`active_record`). */
@@ -113,6 +119,7 @@ GEMS.builder = {
   namespace: "Builder",
   vendor: "builder/v3.3.0",
   hand: false,
+  symbolColon: true,
   pkg: "builder",
 };
 

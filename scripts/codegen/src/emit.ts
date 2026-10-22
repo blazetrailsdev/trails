@@ -1395,6 +1395,7 @@ export class Emitter {
       // activejob's serializers sit behind Arguments and read the same Symbols.
       if (GEM.gem === "activejob" && /^active_job\/serializers/.test(file.file))
         f.symbolColon = true;
+      if (GEM.symbolColon) f.symbolColon = true;
     }
     const units = orderBySuperclass(
       collectUnits(file).filter((u) => this.emits(u, file.file)),
@@ -2908,12 +2909,14 @@ export class Emitter {
     const claims = sc.defs.has("respond_to_missing?")
       ? ` || !(receiver as ${short}).isRespondToMissing(name, false)`
       : "";
+    // The name reaches `method_missing` as a Symbol.
+    const sym = GEM.symbolColon ? '":" + name' : "name";
     return [
       "return new Proxy(this, {",
       "  get(target, name, receiver) {",
       `    if (typeof name === "symbol" || name in target || ${probes}.has(name)${claims})`,
       "      return Reflect.get(target, name, receiver);",
-      `    return (...args: unknown[]) => (receiver as ${short}).methodMissing(name, ...args);`,
+      `    return (...args: unknown[]) => (receiver as ${short}).methodMissing(${sym}, ...args);`,
       "  },",
       "});",
     ];

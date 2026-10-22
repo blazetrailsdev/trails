@@ -272,7 +272,7 @@ export interface InlineHook {
  * Symbol literals and Symbol hash keys (`":a"`), as the hand tests write them.
  */
 function symColonHere(ctx: Ctx): boolean {
-  return !!ctx.f.symbolColon && ctx.f.rubyFile.startsWith("test/");
+  return !!ctx.f.symbolColon && (!!GEM.symbolColon || ctx.f.rubyFile.startsWith("test/"));
 }
 
 const RB_CORE_CLASSES: Record<string, string> = {
@@ -1405,10 +1405,29 @@ export class Lowerer {
   interpolate(p: N, ctx: Ctx): string {
     const e = this.expr(p, ctx);
     const t = this.typeOf(p, ctx);
+    // A Symbol interpolates its name (`rb_sym2str`), without the colon the file keeps.
+    if (
+      GEM.symbolColon &&
+      !["str", "dstr", "int", "float"].includes(p.k) &&
+      !(t?.k === "prim" && t.name !== "string")
+    )
+      return "${" + this.symName(e, ctx, `${needsParens(e) ? `(${e})` : e} ?? ""`) + "}";
     if (["str", "dstr", "int", "float"].includes(p.k) || t?.k === "prim") return "${" + e + "}";
     if (p.k === "const" || (t?.k === "class" && t.static) || t?.k === "gemClass")
       return "${" + `${this.rc(ctx, "rbObjAsString")}(${e})` + "}";
     return "${" + `${needsParens(e) ? `(${e})` : e} ?? ""` + "}";
+  }
+
+  /**
+   * A value that may be a colon-kept Symbol, as the name Ruby reads off it
+   * (`rb_sym2str`); `other` is the expression for any other value.
+   */
+  symName(e: string, ctx: Ctx, other: string = e): string {
+    const body = (x: string, o: string) =>
+      `(${this.rc(ctx, "isSymbol")}(${x}) ? ${this.rc(ctx, "symbolToS")}(${x}) : ${o})`;
+    return /^[\w$]+(\.[\w$]+)*$/.test(e)
+      ? body(e, other)
+      : `((v) => ${body("v", other.split(e).join("v"))})(${e})`;
   }
 
   /**
@@ -3268,6 +3287,13 @@ export class Lowerer {
     return null;
   }
 
+  /** A method name argument (`define_method(sym)`): a Symbol's name, its colon dropped. */
+  methodNameArg(a: N, ctx: Ctx): string {
+    if (a.k === "sym") return JSON.stringify(a.value);
+    const e = this.expr(a, ctx);
+    return ctx.f.symbolColon ? this.symName(e, ctx) : e;
+  }
+
   /**
    * `mod.class_eval do … end` (`rb_mod_module_eval`, vm_eval.c): the block runs
    * with `mod` as self.
@@ -3490,7 +3516,7 @@ export class Lowerer {
             n.block?.k === "block" &&
             n.args.length === 1
           )
-            return `${rc("rbDefineMethod")}(${ctx.selfExpr}, ${this.expr(n.args[0], ctx)}, ${this.arrow(
+            return `${rc("rbDefineMethod")}(${ctx.selfExpr}, ${this.methodNameArg(n.args[0], ctx)}, ${this.arrow(
               n.block.params ?? [],
               n.block.body,
               this.child(ctx, {
@@ -3510,7 +3536,7 @@ export class Lowerer {
         case "method_defined?":
         case "public_method_defined?":
           // Module#method_defined? on self (a class body or `class_eval` block).
-          return `${rc("rbModMethodDefined")}(${ctx.selfExpr}, ${argList()})`;
+          return `${rc("rbModMethodDefined")}(${[ctx.selfExpr, this.methodNameArg(n.args[0], ctx), ...n.args.slice(1).map((a: N) => this.expr(a, ctx))].join(", ")})`;
         case "puts":
         case "warn":
           return `console.warn(${argList()})`;
