@@ -15,3 +15,6 @@ import "./connection/subscriptions.js";
 import "./connection/message-buffer.js";
 import "./connection/tagged-logger-proxy.js";
 import "./server/configuration.js";
+import "./subscription-adapter/base.js";
+import "./subscription-adapter/subscriber-map.js";
+import "./subscription-adapter/channel-prefix.js";
