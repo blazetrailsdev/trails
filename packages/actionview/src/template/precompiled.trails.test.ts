@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/activesupport";
 import { afterEach, describe, expect, it } from "vitest";
 import { LoadError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
@@ -116,6 +117,8 @@ describe("Templates are precompiled", () => {
       TSE.stripTrailingNewlines,
       TSE.escapeIgnoreList,
     ] as const;
+    const savedTrails = TopLevel.Trails;
+    TopLevel.Trails = { root: () => root } as unknown as typeof TopLevel.Trails;
     Base.annotateRenderedViewWithFilenames = true;
     TSE.tseTrimMode = "<>";
     TSE.stripTrailingNewlines = true;
@@ -152,6 +155,7 @@ describe("Templates are precompiled", () => {
         TSE.stripTrailingNewlines,
         TSE.escapeIgnoreList,
       ] = saved;
+      TopLevel.Trails = savedTrails;
     }
   });
 });
