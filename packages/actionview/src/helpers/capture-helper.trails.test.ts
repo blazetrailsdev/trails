@@ -4,6 +4,7 @@ import { Base } from "../base.js";
 import { StreamingBuffer } from "../buffers.js";
 import { LookupContext } from "../lookup-context.js";
 import { pictureTag } from "./asset-tag-helper.js";
+import { collectionCheckboxes, select } from "./form-options-helper.js";
 import { javascriptTag } from "./javascript-helper.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 
@@ -132,7 +133,7 @@ describe("capture's callers await an async block", () => {
     const view = makeView();
     (view as unknown as { post: object }).post = { category: null };
     const html = String(
-      await view.select("post", "category", null, {}, {}, async () => {
+      await select.call(view as never, "post", "category", null, {}, {}, async () => {
         view.outputBuffer!.safeAppend(await view.render({ plain: '<option value="a">a</option>' }));
       }),
     );
@@ -145,7 +146,8 @@ describe("capture's callers await an async block", () => {
     const view = makeView();
     (view as unknown as { post: object }).post = { tagIds: [] };
     const html = String(
-      await view.collectionCheckboxes(
+      await collectionCheckboxes.call(
+        view as never,
         "post",
         "tagIds",
         [{ id: 1, name: "one" }],
