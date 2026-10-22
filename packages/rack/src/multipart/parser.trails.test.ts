@@ -109,3 +109,16 @@ describe("Parser#tag_multipart_encoding", () => {
     expect(new Request(env).POST).toEqual({ Iñtërnâtiônàlizætiøn: "value" });
   });
 });
+
+describe("Parser::MULTIPART_CONTENT_TYPE", () => {
+  it("matches a content-type value holding a bare CR, as Ruby's . does", () => {
+    const input = `--AaB03x\r\nContent-Disposition: form-data; name="file"; filename="a.txt"\r\nContent-Type: text/plain\r; x=1\r\n\r\ncontents\r\n--AaB03x--\r\n`;
+    const env = MockRequest.envFor("/", {
+      ":method": "POST",
+      ":input": Buffer.from(input, "latin1"),
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    });
+    const file = (new Request(env).POST as Record<string, { type: string }>).file;
+    expect(file.type).toBe("text/plain\r; x=1");
+  });
+});

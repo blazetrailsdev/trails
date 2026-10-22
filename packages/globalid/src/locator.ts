@@ -1,6 +1,7 @@
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID, type ParseOptions } from "./signed-global-id.js";
 import { GID } from "./uri/gid.js";
+import { indexBy } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   compact,
@@ -50,36 +51,32 @@ export class BaseLocator {
   }
 
   async locateMany(gids: GlobalID[], options: LocateOptions = {}): Promise<unknown[]> {
-    const idsByClass = new Map<LocatorModel, unknown[]>();
-    const allowed: Array<{ gid: GlobalID; klass: LocatorModel }> = [];
+    const idsByModel = new Map<LocatorModel, unknown[]>();
+
     for (const gid of gids) {
       if (!this.modelIdIsValid(gid)) continue;
-      const klass = gid.modelClass;
-      allowed.push({ gid, klass });
-      const ids = idsByClass.get(klass) ?? [];
-      ids.push(gid.modelId);
-      idsByClass.set(klass, ids);
+      if (!idsByModel.has(gid.modelClass)) idsByModel.set(gid.modelClass, []);
+      idsByModel.get(gid.modelClass)!.push(gid.modelId);
     }
 
-    const byClassAndId = new Map<string, Map<string, unknown>>();
-    for (const [klass, ids] of idsByClass) {
-      const records = await this.findRecords(klass, ids, {
+    const recordsByModelNameAndId: Record<string, Record<string, unknown>> = {};
+
+    for (const [model, ids] of idsByModel) {
+      const records = await this.findRecords(model, ids, {
         ignoreMissing: options.ignoreMissing,
         includes: options.includes,
       });
-      const byId = new Map<string, unknown>();
-      for (const rec of records) {
-        byId.set(idKey((rec as { id: unknown }).id), rec);
-      }
-      byClassAndId.set(klass.name, byId);
+
+      const recordsById = indexBy(records as Array<{ id: unknown }>, (record) =>
+        Array.isArray(record.id) ? String(record.id.map(String)) : String(record.id),
+      );
+
+      recordsByModelNameAndId[model.name] = recordsById;
     }
 
-    const result: unknown[] = [];
-    for (const { gid, klass } of allowed) {
-      const rec = byClassAndId.get(klass.name)?.get(idKey(gid.modelId));
-      if (rec !== undefined) result.push(rec);
-    }
-    return result;
+    return gids
+      .map((gid) => recordsByModelNameAndId[gid.modelName][String(gid.modelId)])
+      .filter((record) => record != null && record !== false);
   }
 
   /** @internal */
@@ -262,10 +259,6 @@ export function _resetLocators(): void {
 }
 
 type Ctor = new (...args: never[]) => unknown;
-
-function idKey(id: unknown): string {
-  return Array.isArray(id) ? JSON.stringify(id.map(String)) : String(id);
-}
 
 type LocatorInvalidModelIdError = typeof InvalidModelIdError;
 

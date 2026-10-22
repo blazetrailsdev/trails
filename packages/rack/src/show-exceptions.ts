@@ -459,7 +459,7 @@ export class ShowExceptions {
     const frames = this.backtrace(exception)
       .map((line) => {
         const frame = new Frame();
-        const m = /(.*?):(\d+)(:in `(.*)')?/.exec(line);
+        const m = /([^\n]*?):(\d+)(:in `([^\n]*)')?/.exec(line);
         if (m) {
           frame.setFilename(m[1]);
           frame.setLineno(parseInt(m[2], 10));

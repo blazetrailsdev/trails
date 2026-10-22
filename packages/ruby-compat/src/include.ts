@@ -1258,7 +1258,8 @@ export function rbModAncestors(mod: { prototype: object } | ModuleObject): objec
 /**
  * `rb_obj_is_kind_of` (`vendor/ruby/v3.3.11/object.c:889`), `Object#kind_of?`
  * and `Module#===`: whether `c` is in the ancestry of `obj`'s class. A plain
- * object is a module's seat, as `include()` takes one, and JS's own `Set` is
+ * object is a module once seated or built by `defineModule`, as `include()`
+ * takes one, and JS's own `Set` is
  * the seat of the `Set` that reopens it (`class Set extends JsSet`). A Symbol
  * is a colon-spelled string, whose class `rbObjClass` answers as `String`, so
  * `Symbol === obj` and `String === obj` are answered by the spelling.
@@ -1274,7 +1275,13 @@ export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
   ) {
     return true;
   }
-  if (c === Module && isPlainHash(obj) && classpaths.has(obj)) return true;
+  if (
+    c === Module &&
+    isPlainHash(obj) &&
+    (classpaths.has(obj) || Object.hasOwn(obj, moduleVisibility))
+  ) {
+    return true;
+  }
   const cl = rbObjClass(obj) as { prototype: object };
 
   if (cl === c) return true;
