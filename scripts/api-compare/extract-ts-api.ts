@@ -7371,6 +7371,9 @@ function collectCalls(
   };
   const visit = (n: ts.Node): void => {
     for (const [form, receiver] of nativeHashForms(n)) addHashForm(form, receiver);
+    if (!skipHoistedClosures) {
+      for (const form of nativeValueForms(n)) names.add(`${NATIVE_FORM_PREFIX}${form}`);
+    }
     if (!skipHoistedClosures && isPlainObjectConstruction(n)) {
       names.add(`${NATIVE_FORM_PREFIX}object`);
     }
@@ -7611,6 +7614,199 @@ function nativeHashForms(
     return [["in", n.arguments[0], key === undefined ? undefined : describeArg(key, [])]];
   }
   if (callee === "Object.assign") return [["assign", n.arguments[0]]];
+  return [];
+}
+
+function unwrapped(e: ts.Expression): ts.Expression {
+  while (ts.isParenthesizedExpression(e) || ts.isNonNullExpression(e) || ts.isAsExpression(e)) {
+    e = e.expression;
+  }
+  return e;
+}
+
+function callbackParams(e: ts.Expression | undefined): string[] | undefined {
+  if (e === undefined || !(ts.isArrowFunction(e) || ts.isFunctionExpression(e))) return undefined;
+  const names: string[] = [];
+  for (const p of e.parameters) {
+    if (!ts.isIdentifier(p.name)) return undefined;
+    names.push(p.name.text);
+  }
+  return names;
+}
+
+function callbackResult(e: ts.Expression): ts.Expression | undefined {
+  if (!(ts.isArrowFunction(e) || ts.isFunctionExpression(e))) return undefined;
+  if (!ts.isBlock(e.body)) return unwrapped(e.body);
+  const [stmt] = e.body.statements;
+  return e.body.statements.length === 1 && stmt !== undefined && ts.isReturnStatement(stmt)
+    ? stmt.expression && unwrapped(stmt.expression)
+    : undefined;
+}
+
+function isIdent(e: ts.Node | undefined, name: string): boolean {
+  return e !== undefined && ts.isIdentifier(e) && e.text === name;
+}
+
+function isNotNullTest(e: ts.Expression | undefined, param: string): boolean {
+  if (e === undefined || !ts.isBinaryExpression(e)) return false;
+  if (e.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsToken) return false;
+  const isNull = (x: ts.Expression): boolean => x.kind === ts.SyntaxKind.NullKeyword;
+  return (isIdent(e.left, param) && isNull(e.right)) || (isNull(e.left) && isIdent(e.right, param));
+}
+
+function setOperand(e: ts.Expression | undefined): ts.Expression | undefined {
+  if (e === undefined) return undefined;
+  const n = unwrapped(e);
+  return ts.isNewExpression(n) && n.expression.getText() === "Set" && n.arguments?.length === 1
+    ? unwrapped(n.arguments[0])
+    : undefined;
+}
+
+function setRoundTripForms(operand: ts.Expression | undefined): string[] {
+  if (operand === undefined) return [];
+  const union =
+    ts.isArrayLiteralExpression(operand) &&
+    operand.elements.length >= 2 &&
+    operand.elements.every(ts.isSpreadElement);
+  return union ? ["union"] : ["uniq"];
+}
+
+function nativeValueForms(n: ts.Node): string[] {
+  if (ts.isArrayLiteralExpression(n)) {
+    const [only] = n.elements;
+    return n.elements.length === 1 && only !== undefined && ts.isSpreadElement(only)
+      ? setRoundTripForms(setOperand(only.expression))
+      : [];
+  }
+  if (ts.isObjectLiteralExpression(n)) {
+    const [only] = n.properties;
+    return n.properties.length === 1 && only !== undefined && ts.isSpreadAssignment(only)
+      ? ["dup"]
+      : [];
+  }
+  if (ts.isObjectBindingPattern(n)) {
+    const last = n.elements.at(-1);
+    if (last?.dotDotDotToken === undefined || n.elements.length < 2) return [];
+    const literal = n.elements
+      .slice(0, -1)
+      .every(
+        (el) =>
+          el.dotDotDotToken === undefined &&
+          (el.propertyName === undefined ||
+            ts.isIdentifier(el.propertyName) ||
+            ts.isStringLiteral(el.propertyName)),
+      );
+    return literal ? ["except"] : [];
+  }
+  if (ts.isForOfStatement(n)) {
+    const iterated = unwrapped(n.expression);
+    return ts.isCallExpression(iterated) && iterated.expression.getText() === "Object.values"
+      ? ["eachValue"]
+      : [];
+  }
+  if (ts.isPropertyAccessExpression(n) && n.name.text === "length") {
+    const counted = unwrapped(n.expression);
+    return ts.isCallExpression(counted) &&
+      ts.isPropertyAccessExpression(counted.expression) &&
+      counted.expression.name.text === "filter"
+      ? ["count"]
+      : [];
+  }
+  if (ts.isConditionalExpression(n)) {
+    const test = unwrapped(n.condition);
+    const sliced = unwrapped(n.whenTrue);
+    if (!ts.isCallExpression(test) || !ts.isPropertyAccessExpression(test.expression)) return [];
+    if (test.expression.name.text !== "endsWith" || test.arguments.length !== 1) return [];
+    if (!ts.isCallExpression(sliced) || !ts.isPropertyAccessExpression(sliced.expression)) {
+      return [];
+    }
+    const subject = test.expression.expression.getText();
+    const suffix = test.arguments[0];
+    const [start, end] = sliced.arguments;
+    const suffixLength = ts.isStringLiteral(suffix) ? `${suffix.text.length}` : undefined;
+    const chomped =
+      sliced.expression.name.text === "slice" &&
+      sliced.expression.expression.getText() === subject &&
+      unwrapped(n.whenFalse).getText() === subject &&
+      start?.getText() === "0" &&
+      end !== undefined &&
+      (end.getText() === `-${suffix.getText()}.length` ||
+        (suffixLength !== undefined && end.getText() === `-${suffixLength}`));
+    return chomped ? ["chomp"] : [];
+  }
+  if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.AsteriskToken) {
+    const callee = (e: ts.Expression | undefined): string | undefined => {
+      const call = e && unwrapped(e);
+      return call !== undefined && ts.isCallExpression(call)
+        ? call.expression.getText()
+        : undefined;
+    };
+    const rounded = unwrapped(n.right);
+    const halfAway =
+      callee(n.left) === "Math.sign" &&
+      callee(rounded) === "Math.round" &&
+      callee((rounded as ts.CallExpression).arguments[0]) === "Math.abs";
+    return halfAway ? ["round"] : [];
+  }
+  if (!ts.isCallExpression(n)) return [];
+  const callee = n.expression.getText();
+  const args = n.arguments;
+  switch (callee) {
+    case "Array.from":
+      return args.length === 1 ? setRoundTripForms(setOperand(args[0])) : [];
+    case "Object.keys":
+      return ["keys"];
+    case "Object.values":
+      return ["values"];
+    case "Object.fromEntries": {
+      const mapped = args[0] && unwrapped(args[0]);
+      const transform =
+        mapped !== undefined &&
+        ts.isCallExpression(mapped) &&
+        ts.isPropertyAccessExpression(mapped.expression) &&
+        mapped.expression.name.text === "map" &&
+        mapped.expression.expression.getText().startsWith("Object.entries(");
+      return transform ? ["toH", "transformValues"] : ["toH"];
+    }
+    case "Number.parseInt":
+      return args.length === 2 && args[1].getText() === "10" ? ["toI"] : [];
+    case "Number.parseFloat":
+      return ["toF"];
+    case "Number.isNaN":
+      return ["isNaN"];
+  }
+  if (!ts.isPropertyAccessExpression(n.expression)) return [];
+  const method = n.expression.name.text;
+  const [first, second] = args;
+  switch (method) {
+    case "slice":
+      if (args.length === 1) return ["drop"];
+      return args.length === 2 && first.getText() === "0" ? ["take"] : [];
+    case "trim":
+    case "trimEnd":
+      return args.length === 0 ? [method] : [];
+    case "filter": {
+      const [param] = callbackParams(first) ?? [];
+      return param !== undefined && isNotNullTest(callbackResult(first), param) ? ["compact"] : [];
+    }
+    case "map": {
+      const params = callbackParams(first);
+      const result = first && callbackResult(first);
+      if (params === undefined || result === undefined) return [];
+      if (params.length === 1 && ts.isElementAccessExpression(result)) {
+        return isIdent(result.argumentExpression, params[0]) ? ["valuesAt"] : [];
+      }
+      const zipped =
+        params.length === 2 &&
+        second === undefined &&
+        ts.isArrayLiteralExpression(result) &&
+        result.elements.length === 2 &&
+        isIdent(result.elements[0], params[0]) &&
+        ts.isElementAccessExpression(result.elements[1]) &&
+        isIdent(result.elements[1].argumentExpression, params[1]);
+      return zipped ? ["zip"] : [];
+    }
+  }
   return [];
 }
 
