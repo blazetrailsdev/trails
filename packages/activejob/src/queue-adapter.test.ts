@@ -52,6 +52,7 @@ describe("QueueAdapterTest", () => {
   });
 
   it("should default to :async adapter if no adapters are set at all", () => {
+    // BLOCKED: queue-adapter-test-default-async-disables-test-adapter — Base.disableTestAdapter() is unported
     const queueAdapterWas = Base._queueAdapter;
     const queueAdapterNameWas = Base._queueAdapterName;
     Base._queueAdapter = Base._queueAdapterName = null;
