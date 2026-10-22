@@ -14,7 +14,7 @@ function files(...args: ConstructorParameters<typeof Files>): Lint {
 }
 
 it("can be used without root", async () => {
-  const app = new Files(null as unknown as string);
+  const app = new Files(null);
 
   const request = new Request(MockRequest.envFor("/cgi/test"));
 
@@ -317,16 +317,14 @@ it("default to a mime type of text/plain", async () => {
 });
 
 it("allow the default mime type to be set", async () => {
-  const req = new MockRequest(
-    new Lint(new Files(DOCROOT, null as never, "application/octet-stream")),
-  );
+  const req = new MockRequest(new Lint(new Files(DOCROOT, null, "application/octet-stream")));
   const res = await req.get("/cgi/test");
   expect(res.isSuccessful).toBeTruthy();
   expect(res.get("content-type")).toBe("application/octet-stream");
 });
 
 it("not set content-type if the mime type is not set", async () => {
-  const req = new MockRequest(new Lint(new Files(DOCROOT, null as never, null)));
+  const req = new MockRequest(new Lint(new Files(DOCROOT, null, null)));
   const res = await req.get("/cgi/test");
   expect(res.isSuccessful).toBeTruthy();
   expect(res.get("content-type")).toBeUndefined();

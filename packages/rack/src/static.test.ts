@@ -184,7 +184,7 @@ it("return 304 if gzipped file isn't modified since last serve", async () => {
 });
 
 it("supports serving fixed cache-control (legacy option)", async () => {
-  const opts = { ...OPTIONS, cache_control: "public" };
+  const opts = { ...OPTIONS, cacheControl: "public" };
   const request = new MockRequest(_static(new DummyApp(), opts));
   const res = await request.get("/cgi/test");
   expect(res.isOk).toBeTruthy();
@@ -194,7 +194,7 @@ it("supports serving fixed cache-control (legacy option)", async () => {
 const HEADER_OPTIONS: StaticOptions = {
   urls: ["/cgi"],
   root: root,
-  header_rules: [
+  headerRules: [
     ["all", { "cache-control": "public, max-age=100" }],
     ["fonts", { "cache-control": "public, max-age=200" }],
     [["png", "jpg"], { "cache-control": "public, max-age=300" }],
@@ -244,8 +244,8 @@ it("supports flexible header rules provided as Regexp", async () => {
 it("prioritizes header rules over fixed cache-control setting (legacy option)", async () => {
   const opts: StaticOptions = {
     ...OPTIONS,
-    cache_control: "public, max-age=24",
-    header_rules: [["all", { "cache-control": "public, max-age=42" }]],
+    cacheControl: "public, max-age=24",
+    headerRules: [["all", { "cache-control": "public, max-age=42" }]],
   };
 
   const request = new MockRequest(_static(new DummyApp(), opts));
