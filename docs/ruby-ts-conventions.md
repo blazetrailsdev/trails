@@ -181,8 +181,10 @@ anything else takes the plain kebab-case rule.
 
 parity:api never expects a TS counterpart for these Ruby methods:
 
-- Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity (`object_id`, `equal?`, `class`), reflection (`instance_of?`, `instance_variable_get` / `instance_variable_set` / `instance_variables`), dispatch (`send`, `public_send`, `tap`, `yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), and `clone`.
-  - `clone`, `object_id`, `class`, `send`, `public_send`, `tap`, `yield_self`, `instance_of?`, `equal?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `to_i`, `to_f`, `to_r`, `to_c`
+- Ruby core object methods outside `PROTOCOL_DEFINITION_NAMES`: identity (`object_id`, `equal?`, `class`), reflection (`instance_of?`, `instance_variable_get` / `instance_variable_set` / `instance_variables`), dispatch (`tap`, `yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), and `clone`.
+  - `clone`, `object_id`, `class`, `tap`, `yield_self`, `instance_of?`, `equal?`, `instance_variable_get`, `instance_variable_set`, `instance_variables`, `to_i`, `to_f`, `to_r`, `to_c`
+- PERMANENT — dispatch by name and visibility reflection. trails has no runtime visibility, so `send` / `public_send` dispatch alike and the `*_methods` / `*_method_defined?` readers have no fact to report (CLAUDE.md § "Method visibility is compile-time only"). A dispatch with a literal name is spelled as the direct member call (CLAUDE.md § "A dispatch by name is spelled directly").
+  - `send`, `public_send`, `public_method_defined?`, `private_method_defined?`, `protected_method_defined?`, `public_methods`, `private_methods`, `protected_methods`, `public_instance_methods`, `public_instance_method`
 - Scored per definition in `PROTOCOL_DEFINITION_ENROLLED_PACKAGES`, and skipped elsewhere only until that package's burndown story enrolls it (RFC 0156): these translate directly, so a Ruby file defining one expects it in the mirroring TS file.
   - `inspect`, `pretty_print`, `dup`, `initialize_copy`, `initialize_dup`, `encode_with`, `init_with`, `to_a`, `to_h`, `to_hash`
 - PERMANENT for scoring by name — JS spells `is_a?` as `instanceof`, customised by `static [Symbol.hasInstance]` on the class tested AGAINST, so `TimeWithZone#is_a?(Time)` ports as a hook on `Time`. A same-named `isA` is judged against its Rails body per class (CLAUDE.md § "Ruby protocol methods with a different JS mechanism").
