@@ -24,6 +24,7 @@ import {
   rbObjIsKindOf,
   round,
   StandardError,
+  Exception,
   rtest,
   toI,
   transformValues,
@@ -222,7 +223,7 @@ export class LogSubscriber extends BaseLogSubscriber {
       try {
         return (arg as { toGlobalId(): unknown }).toGlobalId();
       } catch (error) {
-        if (!(error instanceof StandardError)) throw error;
+        if (error instanceof Exception && !(error instanceof StandardError)) throw error;
         return arg;
       }
     } else {
