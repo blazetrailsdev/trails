@@ -1056,16 +1056,16 @@ jobs:
         id: playwright-cache
         uses: actions/cache@v4
         with:
-          # Only the browser lives here. Its apt dependencies are installed
-          # system-wide, so `install-deps` runs on a hit too.
           path: ~/.cache/ms-playwright
           key: ms-playwright-v1-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
-      - name: Install chromium's system dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: pnpm exec playwright-core install-deps chromium
-      - name: Install chromium and its system dependencies
+      # No `--with-deps`: that is an `apt-get update` against the Azure Ubuntu
+      # mirror, which intermittently stalls until the job's timeout and
+      # cancels the whole run. The runner image ships Chrome, so chromium's
+      # shared libraries are already installed; a missing one fails loudly at
+      # launch instead.
+      - name: Install chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: pnpm exec playwright-core install --with-deps chromium
+        run: pnpm exec playwright-core install chromium
       - run: pnpm vitest run --project system
 
   trailties-tests:
