@@ -64,6 +64,7 @@ export function rbObjClass(obj: unknown): Klass {
   if (typeof obj === "number") return Number.isInteger(obj) ? rbCInteger : rbCFloat;
   if (obj instanceof Number) return rbCFloat;
   if (typeof obj === "string") return rbCString;
+  if (obj instanceof String && obj.constructor === String) return rbCString;
   if (obj instanceof Uint8Array) {
     const klass = obj.constructor;
     const nodeBuffer = (globalThis as { Buffer?: unknown }).Buffer;

@@ -1295,3 +1295,18 @@ describe("rbClassAttachedObject", () => {
     expect(() => rbClassAttachedObject(Foo)).toThrow("`Foo' is not a singleton class");
   });
 });
+
+describe("a JS String object as a Ruby String", () => {
+  class MyString extends String {}
+
+  it("classes a bare String object as String and a subclass as itself", () => {
+    expect(rbObjClass(new String("a"))).toBe(rbCString);
+    expect(rbObjClass(new MyString("a"))).toBe(MyString);
+  });
+
+  it("answers kind_of?(String) for a String subclass and keeps Object above it", () => {
+    expect(rbObjIsKindOf(new MyString("a"), rbCString)).toBe(true);
+    expect(rbObjIsKindOf(new MyString("a"), Object)).toBe(true);
+    expect(rbObjIsKindOf(new MyString("a"), rbCSymbol)).toBe(false);
+  });
+});

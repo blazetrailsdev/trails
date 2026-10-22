@@ -306,7 +306,7 @@ export async function sendStream(
 export async function newControllerThread(
   this: LiveControllerHost,
   block: () => void | Promise<void>,
-): Promise<void> {
+): Promise<boolean> {
   return liveThreadPoolExecutor().post(() => {
     const t2 = Thread.current();
     t2.abortOnException = true;

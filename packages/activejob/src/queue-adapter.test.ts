@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ArgumentError, Mutex, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { QueueAdapters } from "./namespaces.js";
+import { AsyncAdapter } from "./queue-adapters/async-adapter.js";
 import "./test-helpers/helper.js";
 
 class StubOneAdapter {
@@ -50,7 +51,19 @@ describe("QueueAdapterTest", () => {
     expect(childJobThree.queueAdapter).toBe(baseQueueAdapter);
   });
 
-  it.skip("should default to :async adapter if no adapters are set at all", () => {});
+  it("should default to :async adapter if no adapters are set at all", () => {
+    // BLOCKED: queue-adapter-test-default-async-disables-test-adapter — Base.disableTestAdapter() is unported
+    const queueAdapterWas = Base._queueAdapter;
+    const queueAdapterNameWas = Base._queueAdapterName;
+    Base._queueAdapter = Base._queueAdapterName = null;
+    try {
+      expect(Base.queueAdapterName).toBe("async");
+      expect(Base.queueAdapter).toBeInstanceOf(AsyncAdapter);
+    } finally {
+      Base._queueAdapter = queueAdapterWas;
+      Base._queueAdapterName = queueAdapterNameWas;
+    }
+  });
 
   it("should extract a reasonable name from a class instance", () => {
     const childJob = class extends Base {};

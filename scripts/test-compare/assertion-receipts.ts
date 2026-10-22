@@ -49,6 +49,16 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (CLAUDE.md § "A Ruby Symbol is a JS string, never a JS `Symbol`"; template/tag_helper_test.rb:233)',
     },
   ],
+  "activejob:cases/argument_serialization_test.rb › ArgumentSerializationTest › should maintain a functional duration":
+    [
+      {
+        kind: "assert_kind_of",
+        value: null,
+        as: "assert_equal",
+        reason:
+          'argument_serialization_test.rb:215 `assert_kind_of Hash, duration.parts` — a Ruby Hash is a plain JS object (CLAUDE.md, "A Ruby Hash is a plain object unless it needs a `Hash` feature"), which no JS `instanceof` can test; the port asserts `rbObjIsKindOf(duration.parts, Hash)` equals true',
+      },
+    ],
   "actionview:template/output_safety_helper_test.rb › OutputSafetyHelperTest › safe_join should return the safe string separated by $, when second argument is not passed":
     [
       {

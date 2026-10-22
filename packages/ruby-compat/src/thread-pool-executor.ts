@@ -21,11 +21,16 @@ export class ThreadPoolExecutor {
   /** @noRailsEquivalent PERMANENT */
   readonly fallbackPolicy: "caller_runs";
   /** @noRailsEquivalent PERMANENT */
+  readonly idletime: number;
+  /** @noRailsEquivalent PERMANENT */
+  readonly autoTerminate: boolean;
+  /** @noRailsEquivalent PERMANENT */
   scheduledTaskCount = 0;
   /** @noRailsEquivalent PERMANENT */
   completedTaskCount = 0;
   private _running = 0;
   private readonly _queue: (() => unknown)[] = [];
+  private readonly _ready: ((task: (() => unknown) | undefined) => void)[] = [];
   private _stopped = false;
   private readonly _stoppedEvent: (() => void)[] = [];
 
@@ -35,26 +40,44 @@ export class ThreadPoolExecutor {
     maxThreads,
     maxQueue,
     fallbackPolicy,
+    idletime = 60,
+    autoTerminate = true,
   }: {
     minThreads: number;
     maxThreads: number;
     maxQueue: number;
     fallbackPolicy: "caller_runs";
+    idletime?: number;
+    autoTerminate?: boolean;
   }) {
     this.minLength = minThreads;
     this.maxLength = maxThreads;
     this.maxQueue = maxQueue;
     this.fallbackPolicy = fallbackPolicy;
+    this.idletime = Math.trunc(idletime);
+    this.autoTerminate = autoTerminate;
+
+    if (this.maxLength < 0) throw new ArgumentError("`max_threads` cannot be less than 0");
+    if (this.maxLength > 2147483647) {
+      throw new ArgumentError("`max_threads` cannot be greater than 2147483647");
+    }
+    if (this.minLength < 0) throw new ArgumentError("`min_threads` cannot be less than 0");
+    if (this.minLength > this.maxLength) {
+      throw new ArgumentError("`min_threads` cannot be more than `max_threads`");
+    }
   }
 
   /** @noRailsEquivalent PERMANENT */
-  post<A extends unknown[]>(...argsAndTask: [...args: A, task: (...args: A) => unknown]): void {
+  post<A extends unknown[]>(...argsAndTask: [...args: A, task: (...args: A) => unknown]): true {
     const args = argsAndTask.slice(0, -1) as A;
     const block = argsAndTask[argsAndTask.length - 1] as ((...args: A) => unknown) | undefined;
     if (typeof block !== "function") throw new ArgumentError("no block given");
     const task = () => block(...args);
     if (!this.isRunning()) {
       task();
+    } else if (this._running >= this.minLength && this._ready.length > 0) {
+      this.scheduledTaskCount += 1;
+      this._ready.pop()!(task);
     } else if (this._running < this.maxLength) {
       this._running += 1;
       this.scheduledTaskCount += 1;
@@ -65,6 +88,7 @@ export class ThreadPoolExecutor {
     } else {
       task();
     }
+    return true;
   }
 
   private isRunning(): boolean {
@@ -75,6 +99,7 @@ export class ThreadPoolExecutor {
   shutdown(): true {
     if (this.isRunning()) {
       this._stopped = true;
+      for (const ready of this._ready.splice(0)) ready(undefined);
       if (this._running === 0) this._setStoppedEvent();
     }
     return true;
@@ -103,20 +128,36 @@ export class ThreadPoolExecutor {
     for (const set of this._stoppedEvent.splice(0)) set();
   }
 
-  private _runWorker(task: () => unknown): void {
-    const thread = new Thread(async () => {
-      try {
-        await task();
-      } catch {
-        return;
+  private _runWorker(first: () => unknown): void {
+    new Thread(async () => {
+      let task: (() => unknown) | undefined = first;
+      while (task) {
+        await Promise.resolve()
+          .then(task)
+          .catch(() => null);
+        this.completedTaskCount += 1;
+        task = this._queue.shift() ?? (await this._nextTask());
       }
-    });
-    void Promise.resolve(thread.value()).then(() => {
-      this.completedTaskCount += 1;
-      const next = this._queue.shift();
-      if (next) this._runWorker(next);
-      else this._running -= 1;
+      this._running -= 1;
       if (this._stopped && this._running === 0) this._setStoppedEvent();
+    });
+  }
+
+  private _nextTask(): Promise<(() => unknown) | undefined> {
+    if (this._stopped) return Promise.resolve(undefined);
+    return new Promise((resolve) => {
+      const ready = (task: (() => unknown) | undefined) => {
+        clearTimeout(timer as ReturnType<typeof setTimeout>);
+        resolve(task);
+      };
+      const timer: unknown = setTimeout(() => {
+        if (this._running - this.minLength > 0) {
+          this._ready.splice(this._ready.indexOf(ready), 1);
+          resolve(undefined);
+        }
+      }, this.idletime * 1000);
+      (timer as { unref?: () => unknown }).unref?.();
+      this._ready.push(ready);
     });
   }
 }

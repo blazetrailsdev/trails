@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Thread } from "./thread.js";
 import { ThreadPoolExecutor } from "./thread-pool-executor.js";
 
 describe("ThreadPoolExecutor", () => {
@@ -35,5 +36,113 @@ describe("ThreadPoolExecutor", () => {
 
     expect(order).toEqual(["d", "a", "b", "c"]);
     expect(peak).toBe(3);
+  });
+
+  it("keeps an idle worker for idletime and hands it the next task", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 0,
+      maxThreads: 2,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+      idletime: 1,
+    });
+    const threads: Thread[] = [];
+    const task = () => void threads.push(Thread.current());
+
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(threads[1]).toBe(threads[0]);
+
+    executor.shutdown();
+    expect(await executor.waitForTermination(1)).toBe(true);
+  });
+
+  it("truncates idletime to whole seconds and retires an idle worker after it", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 0,
+      maxThreads: 2,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+      idletime: 0.9,
+    });
+    expect(executor.idletime).toBe(0);
+    const threads: Thread[] = [];
+    const task = () => void threads.push(Thread.current());
+
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(threads[1]).not.toBe(threads[0]);
+
+    executor.shutdown();
+    expect(await executor.waitForTermination(1)).toBe(true);
+  });
+
+  it("keeps minThreads idle workers past idletime", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 1,
+      maxThreads: 2,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+      idletime: 0,
+    });
+    const threads: Thread[] = [];
+    const task = () => void threads.push(Thread.current());
+
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(threads[1]).toBe(threads[0]);
+
+    executor.shutdown();
+    expect(await executor.waitForTermination(1)).toBe(true);
+  });
+
+  it("grows the pool to minThreads before reusing an idle worker", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 2,
+      maxThreads: 2,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+      idletime: 1,
+    });
+    const threads: Thread[] = [];
+    const task = () => void threads.push(Thread.current());
+
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    executor.post(task);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(threads[1]).not.toBe(threads[0]);
+
+    executor.shutdown();
+    expect(await executor.waitForTermination(1)).toBe(true);
+  });
+
+  it("validates its thread bounds as ns_initialize does", () => {
+    const opts = { maxQueue: 0, fallbackPolicy: "caller_runs" as const };
+    expect(() => new ThreadPoolExecutor({ ...opts, minThreads: 0, maxThreads: -1 })).toThrow(
+      "`max_threads` cannot be less than 0",
+    );
+    expect(() => new ThreadPoolExecutor({ ...opts, minThreads: 2, maxThreads: 1 })).toThrow(
+      "`min_threads` cannot be more than `max_threads`",
+    );
+  });
+
+  it("queues a task it has no worker for when maxThreads is 0", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 0,
+      maxThreads: 0,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+    });
+    let ran = false;
+    expect(executor.post(() => (ran = true))).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(ran).toBe(false);
   });
 });
