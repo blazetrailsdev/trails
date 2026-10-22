@@ -20,6 +20,7 @@ import {
   include,
   rbCallSuper,
   rbEql,
+  rbGetKwargs,
   rbEqual,
   rbInspect,
   rbModConstSet,
@@ -197,6 +198,7 @@ export async function assertNoPerformedJobs(
   await this.assertPerformedJobs(0, { only, except, queue }, block);
 }
 
+/** @inventedArm rbGetKwargs — PERMANENT */
 export async function assertEnqueuedWith(
   this: TestHelper,
   {
@@ -205,9 +207,11 @@ export async function assertEnqueuedWith(
     at = null,
     queue = null,
     priority = null,
+    ...keywordHash
   }: AssertEnqueuedWithOptions = {},
   block: (() => unknown) | null = null,
 ): Promise<unknown> {
+  rbGetKwargs(keywordHash, []);
   this.requireActiveJobTestAdapterBang("assert_enqueued_with");
 
   const expected: Payload = Object.fromEntries(

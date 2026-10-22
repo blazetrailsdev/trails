@@ -179,6 +179,7 @@ function subsecNanoseconds(sec: number | Rational): number {
 function numExact(v: unknown): Rational {
   if (v instanceof Rational) return v;
   if (typeof v === "bigint") return new Rational(v, 1);
+  if (v instanceof Number) return fToR(v.valueOf());
   if (typeof v !== "number") {
     throw new TypeError(
       `can't convert ${(v as object)?.constructor?.name ?? String(v)} into an exact number`,
