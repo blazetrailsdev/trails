@@ -1,4 +1,5 @@
 import {
+  EOFError,
   getHttpAsync,
   stderr,
   StringIO,
@@ -147,10 +148,47 @@ export class Node {
       socket.on("close", () => {
         unhijacked.delete(socket);
       });
-      if (head.length > 0) socket.unshift(head);
 
       try {
-        const env = await this.requestEnv(req, new StringIO(""));
+        const length = Number(header(req, "content-length") ?? 0);
+        let input: string | Uint8Array = "";
+        if (!(length > 0)) {
+          if (head.length > 0) socket.unshift(head);
+        } else {
+          if (length > MAX_BODY_SIZE) throw new Error("Request body too large");
+          const bodyBytes = new Uint8Array(length);
+          let n = Math.min(length, head.length);
+          bodyBytes.set(head.subarray(0, n));
+          if (head.length > n) socket.unshift(head.subarray(n));
+          if (n < length) {
+            await new Promise<void>((resolve, reject) => {
+              const onEnd = (): void => {
+                socket.removeListener("data", onData);
+                socket.removeListener("end", onEnd);
+                socket.removeListener("close", onEnd);
+                reject(new EOFError("end of file reached"));
+              };
+              const onData = (chunk: Uint8Array): void => {
+                const take = Math.min(length - n, chunk.length);
+                bodyBytes.set(chunk.subarray(0, take), n);
+                n += take;
+                if (n < length) return;
+                socket.pause();
+                socket.removeListener("data", onData);
+                socket.removeListener("end", onEnd);
+                socket.removeListener("close", onEnd);
+                if (take < chunk.length) socket.unshift(chunk.subarray(take));
+                resolve();
+              };
+              socket.on("data", onData);
+              socket.on("end", onEnd);
+              socket.on("close", onEnd);
+              socket.resume();
+            });
+          }
+          input = bodyBytes;
+        }
+        const env = await this.requestEnv(req, new StringIO(input));
         env[RACK_IS_HIJACK] = true;
         env[RACK_HIJACK] = (): TCPSocket => {
           release();
