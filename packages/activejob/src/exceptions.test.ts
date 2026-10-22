@@ -6,7 +6,7 @@ import {
   travelTo,
 } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { Kernel, toF } from "@blazetrails/ruby-compat";
+import { Kernel, rbModConstGet, rbObjClass, StandardError, toF } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "./test-helpers/helper.js";
 import { Base } from "./base.js";
@@ -23,12 +23,8 @@ import { Person } from "./test-helpers/models/person.js";
 import { JobBuffer } from "./test-helpers/support/job-buffer.js";
 
 function isAdapterSkipsScheduling(queueAdapter: unknown): boolean {
-  return [InlineAdapter, AsyncAdapter].includes(
-    (queueAdapter as object).constructor as typeof InlineAdapter,
-  );
+  return ([InlineAdapter, AsyncAdapter] as unknown[]).includes(rbObjClass(queueAdapter));
 }
-
-const AfterDiscardErrors = AfterDiscardRetryJob as unknown as Record<string, new () => Error>;
 
 describe.skipIf(isAdapterSkipsScheduling(Base.queueAdapter))("ExceptionsTest", () => {
   beforeEach(() => {
@@ -387,7 +383,9 @@ describe.skipIf(isAdapterSkipsScheduling(Base.queueAdapter))("ExceptionsTest", (
   it("#after_discard block is run when an unhandled error is raised", async () => {
     await expect(
       AfterDiscardRetryJob.performLater("AfterDiscardRetryJob::UnhandledError", 2),
-    ).rejects.toThrow(AfterDiscardErrors.UnhandledError);
+    ).rejects.toThrow(
+      rbModConstGet(AfterDiscardRetryJob, "UnhandledError") as typeof StandardError,
+    );
 
     expect(JobBuffer.lastValue()).toBe(
       "Ran after_discard for job. Message: AfterDiscardRetryJob::UnhandledError",
@@ -405,7 +403,9 @@ describe.skipIf(isAdapterSkipsScheduling(Base.queueAdapter))("ExceptionsTest", (
   it("#after_discard block is only run once when an error class and its superclass are handled by separate #retry_on calls", async () => {
     await expect(
       AfterDiscardRetryJob.performLater("AfterDiscardRetryJob::ChildAfterDiscardError", 6),
-    ).rejects.toThrow(AfterDiscardErrors.ChildAfterDiscardError);
+    ).rejects.toThrow(
+      rbModConstGet(AfterDiscardRetryJob, "ChildAfterDiscardError") as typeof StandardError,
+    );
     expect(JobBuffer.values().slice(-2)).toEqual([
       "Raised AfterDiscardRetryJob::ChildAfterDiscardError for the 5th time",
       "Ran after_discard for job. Message: AfterDiscardRetryJob::ChildAfterDiscardError",
