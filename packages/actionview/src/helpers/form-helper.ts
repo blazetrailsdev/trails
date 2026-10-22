@@ -1117,6 +1117,7 @@ onLoad("action_view", (base: unknown) => {
 });
 
 export class FormHelper {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 }
 

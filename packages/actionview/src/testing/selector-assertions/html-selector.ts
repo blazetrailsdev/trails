@@ -13,9 +13,11 @@ export interface EqualityTests {
   maximum?: number;
 }
 
+/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export class HTMLSelector {
   private static readonly context = new SubstitutionContext();
 
+  /** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
   cssSelector!: string;
   readonly tests: EqualityTests;
   message: unknown;
@@ -44,6 +46,7 @@ export class HTMLSelector {
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
   isSelectingNoBody(): boolean {
     return this._selector === "body" && this.tests.count === 0;
   }

@@ -5,6 +5,7 @@ import { Testing } from "../testing.js";
 type Fragment = Html5DocumentFragment | Html5Node;
 type Attr = Html5Node["attributeNodes"][number];
 
+/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export function assertDomEqual(
   expected: unknown,
   actual: unknown,
@@ -19,6 +20,7 @@ export function assertDomEqual(
   assert(compareDoms(expectedDom, actualDom, strict), message);
 }
 
+/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export function assertDomNotEqual(
   expected: unknown,
   actual: unknown,
