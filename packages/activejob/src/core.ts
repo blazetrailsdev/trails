@@ -1,3 +1,4 @@
+import type { ConfiguredJob } from "./configured-job.js";
 import { constantize, I18n, seconds, zone } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { rbModName, rbObjClass, toF, toI } from "@blazetrails/ruby-compat";
@@ -28,10 +29,10 @@ export class ClassMethods {
     return job;
   }
 
-  static set(this: unknown, options: SetOptions = {}): unknown {
+  static set(this: unknown, options: SetOptions = {}): ConfiguredJob {
     return new (
       ActiveJob as unknown as {
-        ConfiguredJob: new (jobClass: unknown, options: SetOptions) => unknown;
+        ConfiguredJob: new (jobClass: unknown, options: SetOptions) => ConfiguredJob;
       }
     ).ConfiguredJob(this, options);
   }

@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { aryJoin, registerConstant } from "@blazetrails/ruby-compat";
 import type { Logger } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 
@@ -8,7 +8,7 @@ export class LoggingJob extends Base {
   }
 
   perform(...dummy: unknown[]): void {
-    (this.logger as Logger).info(`Dummy, here is it: ${dummy.join(" ")}`);
+    (this.logger as Logger).info(`Dummy, here is it: ${aryJoin(dummy, " ")}`);
   }
 
   get jobId(): string {
