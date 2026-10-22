@@ -59,19 +59,22 @@ function isLoggerTaggedByActiveJob(this: LoggingJob): boolean {
 export const Logging = defineModule({ performNow }, {}, { tagLogger, isLoggerTaggedByActiveJob });
 extend(Logging, Concern);
 
-Concern.included.call(Logging as never, null, function (this: LoggingClass) {
-  cattrAccessor.call(this, "logger", {
-    default: TaggedLogging.new(new Logger(STDOUT as never)),
-  });
+(Logging as unknown as { included(base: null, block: (this: never) => void): void }).included(
+  null,
+  function (this: LoggingClass) {
+    cattrAccessor.call(this, "logger", {
+      default: TaggedLogging.new(new Logger(STDOUT as never)),
+    });
 
-  classAttribute.call(this, "logArguments", { instanceAccessor: false, default: true });
+    classAttribute.call(this, "logArguments", { instanceAccessor: false, default: true });
 
-  this.aroundEnqueue(
-    { prepend: true },
-    rbBlock(function (this: LoggingJob, _: unknown, block: () => unknown) {
-      return this.tagLogger(block);
-    }),
-  );
-});
+    this.aroundEnqueue(
+      { prepend: true },
+      rbBlock(function (this: LoggingJob, _: unknown, block: () => unknown) {
+        return this.tagLogger(block);
+      }),
+    );
+  },
+);
 
 rbModConstSet(ActiveJob, "Logging", Logging);
