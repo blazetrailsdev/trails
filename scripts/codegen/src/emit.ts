@@ -13,6 +13,7 @@
  *   CONST = v            → `static CONST = v` / `export const CONST = v`
  *   other class-body call→ `static { this.macro(...) }`
  */
+import { VITEST_MATCHERS } from "./mappings/vitest-matchers.js";
 import { rubyMethodToTsIgnoringSkip } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES } from "./constant-renames.js";
 import { TS_CLASS_RENAMES } from "../../parity/conventions.js";
@@ -1675,9 +1676,7 @@ export class Emitter {
     // the way the hand tests do (activejob argument-serialization.test.ts).
     if (
       tsFile.endsWith(".test.ts") &&
-      /\.(toEqualRuby|toBeRubyTruthy|toBeRubyFalsy|toBeWithinDelta|toBeEmpty|toBeExactInstanceOf|toRespondTo|toStartWith|toEndWith|toInclude|toContainExactly|toHaveKey|toBeBetween|toChange|toYieldControl|toYieldWithNoArgs|toYieldWithArgs|toYieldSuccessiveArgs|toOutput)\(/.test(
-        chunks.join("\n"),
-      )
+      new RegExp(`\\.(${VITEST_MATCHERS.join("|")})\\(`).test(chunks.join("\n"))
     )
       header.unshift('import type {} from "@blazetrails/vitest-matchers";');
     const text =
