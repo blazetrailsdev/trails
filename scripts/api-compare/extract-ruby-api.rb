@@ -2322,16 +2322,10 @@ class ApiExtractor
   # (CLAUDE.md § "Method visibility is compile-time only"). The arm, and the
   # calls inside it, are dropped from the calls, call-argument and skeleton
   # facts every gate compares, and the entry is marked `visibilityArms`.
-  VISIBILITY_PARAM_NAMES = %w[include_private include_private_methods include_all priv].freeze
-  VISIBILITY_FLAG_METHODS = %w[respond_to? respond_to_missing?].freeze
+  VISIBILITY_PARAM_NAMES = %w[include_private include_private_methods include_all include_priv priv].freeze
 
-  def visibility_params(entry)
-    names = VISIBILITY_PARAM_NAMES.dup
-    if VISIBILITY_FLAG_METHODS.include?(entry[:name])
-      positional = entry[:params].reject { |p| %w[keyword keyword_required keyword_rest block rest].include?(p[:kind]) }
-      names << positional[1][:name] if positional[1]
-    end
-    names
+  def visibility_params(_entry)
+    VISIBILITY_PARAM_NAMES
   end
 
   # The body with every visibility-only `elsif` arm spliced out of its chain,
@@ -2377,7 +2371,7 @@ class ApiExtractor
   end
 
   def trailing_true_call?(node)
-    args = node[0] == :super || node[0] == :method_add_arg ? node[node[0] == :super ? 1 : 2] : nil
+    args = { super: 1, method_add_arg: 2, command: 2, command_call: 4 }[node[0]]&.then { |i| node[i] }
     args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
     return false unless args.is_a?(Array) && args[0] == :args_add_block && args[1].is_a?(Array)
 

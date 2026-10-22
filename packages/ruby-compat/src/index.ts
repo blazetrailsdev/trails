@@ -65,6 +65,7 @@ export {
   rbCTime,
   rbCTrueClass,
   rbObjClass,
+  rbClassOf,
   rbObjIsProc,
   rbModName,
   rbModSingletonP,

@@ -7,6 +7,7 @@ import {
   normalizeArgs,
   pairCallSites,
   resolveCalleeSigs,
+  VISIBILITY_PARAMS,
 } from "./call-args.js";
 
 function site(name: string, args: string[], flags: string[] = []): CallSite {
@@ -1708,6 +1709,19 @@ describe("compareCallArgs visibility flag", () => {
     );
     const forwarded = site("respond_to_missing?", ["id:name", "id:include_private"]);
     expect(compareCallArgs(forwarded, site("respondToMissing", ["id:name"])).verdict).toBe("match");
+  });
+
+  it("keeps methods(false), which is not a visibility flag", () => {
+    expect(compareCallArgs(site("methods", ["bool:false"]), site("methods", [])).verdict).toBe(
+      "mismatch",
+    );
+  });
+
+  it("shares its visibility parameters with extract-ruby-api.rb", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const rb = await readFile(new URL("./extract-ruby-api.rb", import.meta.url), "utf-8");
+    const names = /VISIBILITY_PARAM_NAMES = %w\[([^\]]*)\]/.exec(rb)![1].split(/\s+/);
+    expect([...VISIBILITY_PARAMS].map((p) => p.slice(3)).sort()).toEqual(names.sort());
   });
 
   it("still compares a non-boolean second argument", () => {

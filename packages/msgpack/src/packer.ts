@@ -13,6 +13,7 @@ import {
   rbCString,
   rbCSymbol,
   rbClassInheritedP,
+  rbClassOf,
   rbFSend,
   rbInspect,
   isStruct,
@@ -38,16 +39,6 @@ export type PackerExtRegistry = Map<unknown, PackerExtType>;
 
 const encoder = new Encoder();
 const floatEncoder = new Encoder({ forceIntegerToFloat: true });
-
-const FL_SINGLETON = Symbol.for("@blazetrails/ruby-compat:FL_SINGLETON");
-
-function rbClassOf(obj: unknown): unknown {
-  if (typeof obj === "object" && obj !== null) {
-    const proto = Object.getPrototypeOf(obj);
-    if (proto !== null && Object.hasOwn(proto, FL_SINGLETON)) return proto[FL_SINGLETON];
-  }
-  return rbObjClass(obj);
-}
 
 function rbAbsintSize(val: bigint): [number, number] {
   const v = val < 0n ? -val : val;

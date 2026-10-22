@@ -2401,20 +2401,20 @@ describe("Module#include of a Module with a named included", () => {
 describe("extend on an object", () => {
   it("includes the module into the object's singleton class", async () => {
     const { Module, extend, rbClassInheritedP } = await import("./include.js");
-    const { rbObjSingletonClass } = await import("./object.js");
+    const { rbClassOf } = await import("./object.js");
     const Mod = new Module().include({ m: () => 1 });
     const obj = extend({}, Mod);
-    expect(rbObjSingletonClass(obj)).not.toBe(Object);
-    expect(rbClassInheritedP(rbObjSingletonClass(obj), Mod)).toBe(true);
+    expect(rbClassOf(obj)).not.toBe(Object);
+    expect(rbClassInheritedP(rbClassOf(obj), Mod)).toBe(true);
     expect(obj.constructor).toBe(Object);
   });
 
   it("includes a plain module into the object's singleton class", async () => {
     const { defineModule, extend, rbClassInheritedP } = await import("./include.js");
-    const { rbObjSingletonClass } = await import("./object.js");
+    const { rbClassOf } = await import("./object.js");
     const Mod = defineModule({ m: () => 1 });
     const obj = extend({}, Mod);
-    expect(rbClassInheritedP(rbObjSingletonClass(obj), Mod)).toBe(true);
+    expect(rbClassInheritedP(rbClassOf(obj), Mod)).toBe(true);
   });
 
   it("keeps the object's own prototype beneath its singleton class", async () => {
@@ -2426,18 +2426,18 @@ describe("extend on an object", () => {
 
   it("extends a null-prototype object, a Hash, through a Hash singleton class", async () => {
     const { defineModule, extend, rbClassInheritedP } = await import("./include.js");
-    const { rbObjSingletonClass, rbObjClass } = await import("./object.js");
+    const { rbClassOf, rbObjClass } = await import("./object.js");
     const { Hash } = await import("./hash.js");
     const Mod = defineModule({ m: () => 1 });
     const obj = extend(Object.create(null) as object, Mod);
-    expect(rbClassInheritedP(rbObjSingletonClass(obj), Mod)).toBe(true);
+    expect(rbClassInheritedP(rbClassOf(obj), Mod)).toBe(true);
     expect(rbObjClass(obj)).toBe(Hash);
   });
 
   it("puts a class module a plain module includes on the singleton class", async () => {
     const { classModule, defineModule, extend, include, rbClassInheritedP, rbModAncestors } =
       await import("./include.js");
-    const { rbObjSingletonClass } = await import("./object.js");
+    const { rbClassOf } = await import("./object.js");
     class Nested {
       static readonly [classModule] = true;
       n(): number {
@@ -2447,10 +2447,10 @@ describe("extend on an object", () => {
     const Mod = defineModule({});
     include(Mod, Nested);
     const obj = extend({}, Mod);
-    expect(rbClassInheritedP(rbObjSingletonClass(obj), Nested)).toBe(true);
-    expect(
-      rbModAncestors(rbObjSingletonClass(obj)).some((m) => m !== Nested && Object.hasOwn(m, "n")),
-    ).toBe(false);
+    expect(rbClassInheritedP(rbClassOf(obj), Nested)).toBe(true);
+    expect(rbModAncestors(rbClassOf(obj)).some((m) => m !== Nested && Object.hasOwn(m, "n"))).toBe(
+      false,
+    );
   });
 
   it("raises FrozenError for a frozen object", async () => {

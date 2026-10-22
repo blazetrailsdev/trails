@@ -540,11 +540,17 @@ const VISIBILITY_FLAG_CALLS = new Set([
   "method_defined?",
 ]);
 
-/** The parameters a Rails body forwards as that visibility flag. */
-const VISIBILITY_PARAMS = new Set([
+/** `methods(false)` asks for singleton methods only (`rb_obj_methods`,
+ *  `vendor/ruby/v3.3.11/class.c:1960`), so only `true` is a visibility flag. */
+const METHODS_LISTS = new Set(["methods", "public_methods"]);
+
+/** The parameters a Rails body forwards as that visibility flag; kept equal to
+ *  extract-ruby-api.rb's `VISIBILITY_PARAM_NAMES` by call-args.test.ts. */
+export const VISIBILITY_PARAMS = new Set([
   "id:include_private",
   "id:include_private_methods",
   "id:include_all",
+  "id:include_priv",
   "id:priv",
 ]);
 
@@ -555,7 +561,8 @@ function withoutVisibilityFlag(ruby: CallSite, ts: CallSite): CallSite {
   if (!VISIBILITY_FLAG_CALLS.has(ruby.name)) return ruby;
   const last = ruby.args[ruby.args.length - 1];
   if (last === undefined || ts.args[ts.args.length - 1] === last) return ruby;
-  if (!last.startsWith("bool:") && !VISIBILITY_PARAMS.has(last)) return ruby;
+  const flag = METHODS_LISTS.has(ruby.name) ? last === "bool:true" : last.startsWith("bool:");
+  if (!flag && !VISIBILITY_PARAMS.has(last)) return ruby;
   return { ...ruby, args: ruby.args.slice(0, -1) };
 }
 

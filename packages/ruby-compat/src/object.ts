@@ -204,6 +204,23 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
 }
 
 /**
+ * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`):
+ * the singleton class when the object has one, where {@link rbObjClass}
+ * skips it, and the class {@link rbObjClass} answers otherwise.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassOf(obj: unknown): Klass {
+  if (typeof obj === "object" && obj !== null) {
+    const proto = Object.getPrototypeOf(obj);
+    if (proto !== null && Object.hasOwn(proto, FL_SINGLETON)) {
+      return proto[FL_SINGLETON] as Klass;
+    }
+  }
+  return rbObjClass(obj);
+}
+
+/**
  * `T_ICLASS` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:140`), the
  * type of the hidden class an `include` or `extend` splices into an ancestry. A link
  * carries the module it stands for under this key.

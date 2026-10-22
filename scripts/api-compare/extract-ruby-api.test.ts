@@ -313,6 +313,14 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
           def probe(method)
             super(method, true)
           end
+
+          def bare?(method, include_all = false)
+            if super
+              true
+            elsif !include_all and respond_to? method, true
+              false
+            end
+          end
         end
       `,
     };
@@ -327,6 +335,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#other?"]).toEqual(["if", "ref:super", "if", "ref:ready?"]);
     const marks = rubyField(fixtures, "visibilityArms");
     expect(marks["Foo#respond_to?"]).toBe(true);
+    expect(marks["Foo#bare?"]).toBe(true);
     expect(marks["Foo#other?"]).toBeNull();
     expect(rubyField(fixtures, "callArgs")["Foo#probe"]).toEqual([
       expect.objectContaining({ name: "super", args: ["id:method", "bool:true"] }),

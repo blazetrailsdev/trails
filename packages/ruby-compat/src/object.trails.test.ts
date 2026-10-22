@@ -12,6 +12,7 @@ import {
   rbCTrueClass,
   rbCClass,
   rbObjClass,
+  rbClassOf,
   rbObjSingletonClass,
   rbClassAttachedObject,
   rbCDate,
@@ -1178,8 +1179,18 @@ describe("rb_class_inherited_p, rb_class_of and rb_absint_size", () => {
     expect(() => rbClassInheritedP(Sub, 1)).toThrow("compared with non class/module");
   });
 
-  it("ranks a Uint8Array subclass under String", () => {
+  it("answers the singleton class once an object has one", () => {
+    const obj = new Sub();
+    expect(rbClassOf(obj)).toBe(Sub);
+    const singleton = rbObjSingletonClass(obj);
+    expect(rbClassOf(obj)).toBe(singleton);
+    expect(rbClassInheritedP(singleton, Base)).toBe(true);
+    expect(rbClassOf(1)).toBe(rbCInteger);
+
     class Blob extends Uint8Array {}
+    expect(rbClassOf(Uint8Array.of(1))).toBe(rbCString);
+    expect(rbClassOf(Blob.of(1))).toBe(Blob);
+    expect(rbClassOf(Buffer.from([1]))).toBe(rbCString);
     expect(rbObjIsKindOf(Blob.of(1), rbCString)).toBe(true);
     expect(rbClassInheritedP(Blob, rbCString)).toBe(true);
     expect(rbModAncestors(Blob)).toContain(rbCString);
