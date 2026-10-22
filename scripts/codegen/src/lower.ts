@@ -1045,6 +1045,10 @@ export class Lowerer {
   /** Statement-position special forms: `each` → for-of, raise, attr writes. */
   callStmt(n0: N, ctx: Ctx, tail: boolean): string[] | null {
     const n: N = this.dataSubscript(n0, ctx);
+    {
+      const app = tail ? null : this.appendStmt(n, ctx);
+      if (app) return app;
+    }
     if (
       n.recv &&
       n.block?.k === "block" &&
@@ -1406,6 +1410,8 @@ export class Lowerer {
     }
     if (n.k === "defined") {
       const e = this.expr(n, ctx);
+      // An ivar / constant test is already a boolean (`(x !== undefined)`).
+      if (isBoolExpr(e)) return e;
       return `${needsParens(e) ? `(${e})` : e} != null`;
     }
     return this.truthy(this.expr(n, ctx));
@@ -3358,6 +3364,40 @@ export class Lowerer {
     if (a.k === "sym") return JSON.stringify(a.value);
     const e = this.expr(a, ctx);
     return ctx.f.symbolColon ? this.symName(e, ctx) : e;
+  }
+
+  /**
+   * `x << v` / `x.clear` as a statement on a receiver of unknown type: Ruby's
+   * in-place append / empty (string.c rb_str_concat, array.c rb_ary_push,
+   * rb_ary_clear), as an `if` chain rather than an unused conditional
+   * expression. A String receiver is written back where it can be (a local or
+   * ivar); elsewhere a JS string has nothing to mutate.
+   */
+  appendStmt(n: N, ctx: Ctx): string[] | null {
+    if (!n.recv || n.block || n.safe) return null;
+    const isAppend = n.name === "<<" && n.args.length === 1;
+    const isClear = n.name === "clear" && n.args.length === 0;
+    if (!isAppend && !isClear) return null;
+    if (n.recv.k === "self" || n.recv.k === "str" || n.recv.k === "dstr") return null;
+    if (this.typeOf(n.recv, ctx)) return null;
+    if (this.resolver.member(n, n.recv, ctx, this)) return null;
+    const r = this.expr(n.recv, ctx);
+    if (!/^[\w$]+(\.[\w$]+)*$/.test(r)) return null;
+    const assignable = n.recv.k === "ivar";
+    if (isClear)
+      return [
+        `if (Array.isArray(${r})) ${r}.length = 0;`,
+        ...(assignable ? [`else if (typeof ${r} === "string") ${r} = "";`] : []),
+        `else ${r}.clear();`,
+      ];
+    const v = this.expr(n.args[0], ctx);
+    const b = needsParens(v) ? `(${v})` : v;
+    return [
+      ...(assignable ? [`if (typeof ${r} === "string") ${r} = ${r} + ${b};`] : []),
+      `${assignable ? "else " : ""}if (Array.isArray(${r})) ${r}.push(${b});`,
+      `else if (${r} instanceof globalThis.Set) ${r}.add(${b});`,
+      `else ${r}.append(${b});`,
+    ];
   }
 
   /**
@@ -5385,6 +5425,12 @@ export class Lowerer {
       case "<=>":
         return `${rc("cmp")}(${r}, ${a[0]})`;
       case "[]":
+        // A gem class defining `[]` (mini_magick image/info.rb `Info#[]`) answers it.
+        if (
+          (!n.recv || n.recv.k === "self") &&
+          this.resolver.member(n, n.recv, ctx, this)?.kind === "method"
+        )
+          return `${r}.${this.callName("[]")}(${a.join(", ")})`;
         // `IsolatedExecutionState[k]` is its `get(k)` (activesupport, the hand
         // port's `explain-registry.ts` idiom): the object has no index signature.
         if (isIsolatedExecutionState(n.recv) && a.length === 1) return `${r}.get(${a[0]})`;
@@ -5431,6 +5477,9 @@ export class Lowerer {
         return `${rc("rbAref")}(${r}, ${a.join(", ")})`;
       case "<<":
         if (n.recv.k === "str" || n.recv.k === "dstr") return `(${r} + ${a[0]})`;
+        // A gem class defining `<<` (mini_magick tool.rb:135 `Tool#<<`) answers it.
+        if (this.resolver.member(n, n.recv, ctx, this)?.kind === "method")
+          return `${needsParens(r) ? `(${r})` : r}.${this.callName("<<")}(${a[0]})`;
         // A JS string cannot be appended to in place (CLAUDE.md "Ruby Strings are JS
         // string primitives"): a local is reassigned the result, which for an
         // Array is the same receiver.
@@ -5446,7 +5495,10 @@ export class Lowerer {
               : t?.k === "prim" && t.name === "string"
                 ? `${x} + ${b}`
                 : `(typeof ${x} === "string" ? ${x} + ${b} : Array.isArray(${x}) ? (${x}.push(${b}), ${x}) : ${x} instanceof globalThis.Set ? ${x}.add(${b}) : ${x}.append(${b}))`;
-          if (n.recv.k === "lvar") return `(${r} = ${app(r)})`;
+          // A local known to hold a String is reassigned the result; one of
+          // unknown type (a yielded `Tool`) is not, as nothing would read it.
+          if (n.recv.k === "lvar" && t?.k === "prim" && t.name === "string")
+            return `(${r} = ${app(r)})`;
           // An ivar holding a String (builder xmlmarkup.rb's `@target << text`) is
           // written back in the String arm only: another receiver's `<<` answers
           // what it likes, which must not replace the ivar.

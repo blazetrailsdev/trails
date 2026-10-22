@@ -1671,6 +1671,15 @@ export class Emitter {
       for (const s of u.late) chunks.push(...this.lw.stmt(s, ctx, false));
     }
     const header = this.imports(f);
+    // A test using a `@blazetrails/vitest-matchers` matcher opts into its types
+    // the way the hand tests do (activejob argument-serialization.test.ts).
+    if (
+      tsFile.endsWith(".test.ts") &&
+      /\.(toEqualRuby|toBeRubyTruthy|toBeRubyFalsy|toBeWithinDelta|toBeEmpty|toBeExactInstanceOf|toRespondTo|toStartWith|toEndWith|toInclude|toContainExactly|toHaveKey|toBeBetween|toChange|toYieldControl|toYieldWithNoArgs|toYieldWithArgs|toYieldSuccessiveArgs|toOutput)\(/.test(
+        chunks.join("\n"),
+      )
+    )
+      header.unshift('import type {} from "@blazetrails/vitest-matchers";');
     const text =
       [...header, ...(f.prelude?.size ? ["", ...f.prelude] : []), "", ...chunks].join("\n") + "\n";
     return { rubyFile: file.file, tsFile, text, ctx: f, defs, units: units.length };
@@ -2967,7 +2976,10 @@ export class Emitter {
       if (inherited.has(field)) continue;
       if (members.some((m) => new RegExp(`^(?:get |set |static )?${field}\\b`).test(m))) continue;
       const ts = this.lw.tsType(t, ctx);
-      out.push(`declare ${field}: ${ts === "any" ? "unknown" : ts};`);
+      // `any`, or `{}` (any non-nullish value), says nothing a reader can use.
+      out.push(
+        `declare ${field}: ${ts === "any" || /^\{\}( \| null)?$/.test(ts) ? "unknown" : ts};`,
+      );
     }
     // An ivar only an `attr_*` accessor or a read touches (`@filter`, set through
     // `attr_writer`) is still the instance's storage: declared, `unknown` until

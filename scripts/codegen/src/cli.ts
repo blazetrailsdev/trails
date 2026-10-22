@@ -520,7 +520,9 @@ if (!process.argv.includes("--no-types"))
   report.typePass = typePass(
     outDir,
     path.join(PKG_DIR, "tsconfig.json"),
-    path.join(PKG_DIR, "src"),
+    // A gem with no hand port (`hand: false`) has no twin to transplant from:
+    // its src/ may hold an earlier generated copy, which is not ground truth.
+    GEM.hand === false ? undefined : path.join(PKG_DIR, "src"),
   );
 // The signature index: a nullable argument or receiver meeting a non-null
 // parameter or member takes `!` (nonnull-pass.ts). `--no-nonnull` skips it.

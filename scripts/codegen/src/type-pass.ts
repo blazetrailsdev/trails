@@ -206,6 +206,8 @@ export class TypePass {
       .createPrinter({ removeComments: true })
       .printNode(ts.EmitHint.Unspecified, node, at.getSourceFile());
     if (/\bany\b|\(Anonymous|__object|__type|\bthis\b/.test(text) || text.length > 400) return null;
+    // `{}` (any non-nullish value) says nothing a reader can use.
+    if (/^\{\}( \| null| \| undefined)*$/.test(text)) return null;
     let ok = true;
     const sf = at.getSourceFile();
     const wanted: [string, string][] = [];
@@ -257,7 +259,7 @@ export class TypePass {
     const set = new Set<string>();
     for (const t of types) for (const p of splitUnion(t)) set.add(p);
     if (!set.size) return "unknown";
-    if (set.has("unknown")) return "unknown";
+    if (set.has("unknown") || set.has("{}")) return "unknown";
     // A function type in a union is parenthesized (TS1385).
     const wrap = (x: string) =>
       set.size > 1 && /=>/.test(x) && !/^\(.*\)$/.test(x) ? `(${x})` : x;
@@ -1217,6 +1219,7 @@ export class TypePass {
         .createPrinter({ removeComments: true })
         .printNode(ts.EmitHint.Unspecified, node, genSf);
       if (/\bany\b|\(Anonymous|__object|__type|\bthis\b/.test(out) || out.length > 400) return null;
+      if (/^\{\}( \| null| \| undefined)*$/.test(out)) return null;
       let ok = true;
       const wanted: [string, string][] = [];
       out = out.replace(/import\("([^"]+)"\)\.([\w$]+)/g, (m0, spec: string, name: string) => {
