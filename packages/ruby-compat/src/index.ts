@@ -406,7 +406,7 @@ export { rbStrEnumerateLines } from "./string/each.js";
 export { rbStrDump, rbStrHex, rbStrToF, rbStrToI } from "./string/convert.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
-export { strCount } from "./string/tr.js";
+export { strCount, trTrans } from "./string/tr.js";
 export {
   center,
   deleteSuffix,

@@ -1587,6 +1587,7 @@ the capability, in a different place. Each is decided here, and each but
 | `action_dispatch/testing/integration.rb`              | Proxy (proto chain)   |
 | `thor/core_ext/hash_with_indifferent_access.rb`       | Proxy (proto chain)   |
 | `rack/multipart/uploaded_file.rb`                     | Proxy                 |
+| `builder/xmlbase.rb`                                  | Proxy (misses only)   |
 
 Rules that apply across the table:
 
@@ -1607,6 +1608,9 @@ Rules that apply across the table:
   `method_missing`. Thor's HWIA reads a missed name as `self[method]` with
   Ruby truthiness, and a missed assignment as `[]=` (so a frozen hash raises
   `FrozenError`); its one-argument compare arm is reached only by `rbFSend`.
+- A `Proxy (misses only)` row reaches `method_missing` only for a name the
+  object does not already answer, so a builder tag named `constructor`,
+  `toString` or `append` is written `xml.tagBang(name)`, Ruby's `tag!`.
 - A "named method, no trap" row answers only an explicit `methodMissing` call.
   A "nothing" row with a dispatch-dependent Rails test is a gap, filed against
   its package; the rows are decided per class, not ratified.

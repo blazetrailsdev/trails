@@ -903,6 +903,7 @@ jobs:
           packages/activemodel
           packages/activesupport
           packages/bcrypt
+          packages/builder
           packages/date
           packages/did-you-mean
           packages/globalid
@@ -1107,6 +1108,7 @@ jobs:
           packages/activemodel
           packages/activesupport
           packages/bcrypt
+          packages/builder
           packages/date
           packages/did-you-mean
           packages/globalid

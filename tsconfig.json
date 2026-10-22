@@ -44,6 +44,7 @@
     { "path": "packages/actioncable" },
     { "path": "packages/did-you-mean" },
     { "path": "packages/i18n" },
+    { "path": "packages/builder" },
     { "path": "packages/marcel" },
     { "path": "packages/html-sanitizer" },
     { "path": "packages/nokogiri" },
