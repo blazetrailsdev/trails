@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isIn } from "@blazetrails/activesupport";
 import { block } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import "./test-helpers/helper.js";
@@ -9,10 +10,10 @@ describe("CallbacksTest", () => {
   it("perform callbacks", async () => {
     const performedCallbackJob = new CallbackJob("A-JOB-ID");
     await performedCallbackJob.performNow();
-    expect(performedCallbackJob.history).toContain("CallbackJob ran before_perform");
-    expect(performedCallbackJob.history).toContain("CallbackJob ran after_perform");
-    expect(performedCallbackJob.history).toContain("CallbackJob ran around_perform_start");
-    expect(performedCallbackJob.history).toContain("CallbackJob ran around_perform_stop");
+    expect(isIn("CallbackJob ran before_perform", performedCallbackJob.history)).toBeTruthy();
+    expect(isIn("CallbackJob ran after_perform", performedCallbackJob.history)).toBeTruthy();
+    expect(isIn("CallbackJob ran around_perform_start", performedCallbackJob.history)).toBeTruthy();
+    expect(isIn("CallbackJob ran around_perform_stop", performedCallbackJob.history)).toBeTruthy();
   });
 
   it("perform return value", async () => {
@@ -45,10 +46,10 @@ describe("CallbacksTest", () => {
 
   it("enqueue callbacks", async () => {
     const enqueuedCallbackJob = (await CallbackJob.performLater()) as CallbackJob;
-    expect(enqueuedCallbackJob.history).toContain("CallbackJob ran before_enqueue");
-    expect(enqueuedCallbackJob.history).toContain("CallbackJob ran after_enqueue");
-    expect(enqueuedCallbackJob.history).toContain("CallbackJob ran around_enqueue_start");
-    expect(enqueuedCallbackJob.history).toContain("CallbackJob ran around_enqueue_stop");
+    expect(isIn("CallbackJob ran before_enqueue", enqueuedCallbackJob.history)).toBeTruthy();
+    expect(isIn("CallbackJob ran after_enqueue", enqueuedCallbackJob.history)).toBeTruthy();
+    expect(isIn("CallbackJob ran around_enqueue_start", enqueuedCallbackJob.history)).toBeTruthy();
+    expect(isIn("CallbackJob ran around_enqueue_stop", enqueuedCallbackJob.history)).toBeTruthy();
   });
 
   it("#enqueue returns false when before_enqueue aborts callback chain", async () => {
