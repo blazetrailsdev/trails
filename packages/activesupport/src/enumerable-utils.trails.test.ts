@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Hash } from "@blazetrails/ruby-compat";
-import { indexWith, pluck } from "./enumerable-utils.js";
+import { indexWith, pluck, tally } from "./enumerable-utils.js";
 
 describe("Enumerable#pluck sends each element []", () => {
   class Row {
@@ -32,6 +32,17 @@ describe("Enumerable#index_with answers a plain object for String elements", () 
     expect([...(mixed as Hash<unknown, unknown>)]).toEqual([
       ["a", "a"],
       [1, 1],
+    ]);
+  });
+});
+
+describe("Enumerable#tally keys on element identity", () => {
+  it("counts two distinct elements sharing a toString separately", () => {
+    const a = { toString: () => "Job" };
+    const b = { toString: () => "Job" };
+    expect([...tally([a, b, a])]).toEqual([
+      [a, 2],
+      [b, 1],
     ]);
   });
 });
