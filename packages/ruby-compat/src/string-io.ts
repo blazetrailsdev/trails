@@ -1,5 +1,6 @@
 import { Encoding } from "./encoding.js";
 import { EOFError } from "./eof-error.js";
+import { IOError } from "./io-error.js";
 import { print as ioPrint, puts as ioPuts } from "./io.js";
 import { b } from "./string/b.js";
 import { strNew } from "./string/bytes.js";
@@ -26,7 +27,8 @@ export class StringIO<S extends string | Uint8Array = string> {
   private _string: Uint8Array;
   private _binary: boolean;
   private _pos = 0;
-  private _closed = false;
+  private _readable = true;
+  private _writable = true;
   /** `ptr->enc` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1823`). */
   private enc: Encoding | null = null;
 
@@ -236,10 +238,39 @@ export class StringIO<S extends string | Uint8Array = string> {
   }
 
   close(): void {
-    this._closed = true;
+    this._readable = false;
+    this._writable = false;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#close_read`
+   * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:520`).
+   */
+  closeRead(): null {
+    if (!this._readable) throw new IOError("closing non-duplex IO for reading");
+    this._readable = false;
+    return null;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#close_write`
+   * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:541`).
+   */
+  closeWrite(): null {
+    if (!this._writable) throw new IOError("closing non-duplex IO for writing");
+    this._writable = false;
+    return null;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#closed?`
+   * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:559`).
+   */
+  isClosed(): boolean {
+    return !this._readable && !this._writable;
   }
 
   get closed(): boolean {
-    return this._closed;
+    return this.isClosed();
   }
 }
