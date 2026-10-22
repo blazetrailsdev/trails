@@ -374,6 +374,7 @@ export {
   rbGvSet,
   rbModConstGet,
   rbModConstants,
+  rbModDeprecateConstant,
   rbConstMissing,
   rbModConstMissing,
   rbPathToClass,

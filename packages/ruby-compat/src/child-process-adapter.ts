@@ -58,6 +58,20 @@ export interface ChildProcessAdapter {
     command: string,
     env: Record<string, string | undefined>,
   ): Promise<[output: string, status: WaitStatus]>;
+  /**
+   * Runs the child with stdin, stdout and stderr on three pipes, as
+   * `Open3.popen3` wires them (`vendor/ruby/v3.3.11/lib/open3.rb:218-235`),
+   * writes `stdinData` to stdin and closes it (`open3.rb:670-675`), and
+   * resolves with what it wrote to each. With no `args`, `command` is a command
+   * line for `/bin/sh -c`; with `args` it is the program, exec'd with that argv
+   * and no shell, as {@link ChildProcessAdapter.system} spawns it.
+   */
+  capture3?(
+    command: string,
+    env: Record<string, string | undefined>,
+    args: string[] | null,
+    stdinData: string,
+  ): Promise<[stdout: string, stderr: string, status: WaitStatus]>;
 }
 
 const registry = new Map<string, ChildProcessAdapter>();
@@ -111,8 +125,9 @@ type NodeReadable = {
 
 type NodeChild = {
   pid?: number;
-  stdin: { end(): void } | null;
+  stdin: { end(data?: string): void; on(event: "error", listener: () => void): void } | null;
   stdout: NodeReadable | null;
+  stderr: NodeReadable | null;
   on(event: "error", listener: (error: Error) => void): void;
   on(event: "close", listener: (code: number | null, signal: string | null) => void): void;
 };
@@ -129,12 +144,19 @@ function spawnChild(
   env: Record<string, string | undefined>,
   stdio: unknown,
   read: (chunk: string) => void,
+  input?: string,
+  readErr?: (chunk: string) => void,
 ): Promise<WaitStatus> {
   return new Promise((resolve) => {
     const child = cp.spawn(file, args, { env, stdio });
-    child.stdin?.end();
+    child.stdin?.on("error", () => {});
+    child.stdin?.end(input);
     child.stdout?.setEncoding("utf8");
     child.stdout?.on("data", read);
+    if (readErr !== undefined) {
+      child.stderr?.setEncoding("utf8");
+      child.stderr?.on("data", readErr);
+    }
     child.on("error", (error) =>
       resolve({ pid: child.pid ?? null, status: null, signal: null, error }),
     );
@@ -193,6 +215,26 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         },
       );
       return [output, status];
+    },
+    async capture3(command, env, args, stdinData) {
+      let stdout = "";
+      let stderr = "";
+      const [file, argv] = args == null ? ["/bin/sh", ["-c", command]] : [command, args];
+      const status = await spawnChild(
+        cp,
+        file,
+        argv,
+        env,
+        ["pipe", "pipe", "pipe"],
+        (chunk) => {
+          stdout += chunk;
+        },
+        stdinData,
+        (chunk) => {
+          stderr += chunk;
+        },
+      );
+      return [stdout, stderr, status];
     },
   };
 }
