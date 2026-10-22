@@ -42,6 +42,7 @@
     { "path": "packages/globalid" },
     { "path": "packages/activejob" },
     { "path": "packages/actioncable" },
+    { "path": "packages/solid-queue" },
     { "path": "packages/did-you-mean" },
     { "path": "packages/i18n" },
     { "path": "packages/builder" },
