@@ -285,20 +285,19 @@ async function loadJobs(paths: Root): Promise<void> {
 async function collectJobs(dir: string, prefix: string): Promise<void> {
   const fs = getFs();
   const p = getPath();
-  if (!fs.readdir || !fs.stat || !p.pathToFileURL) return;
-
-  for (const entry of await fs.readdir(dir)) {
+  for (const entry of await fs.readdir!(dir)) {
     const full = p.join(dir, entry);
-    if ((await fs.stat(full)).isDirectory()) {
+    if ((await fs.stat!(full)).isDirectory()) {
       await collectJobs(full, `${prefix}${camelize(underscore(entry.replace(/-/g, "_")))}::`);
       continue;
     }
-    if (!/\.(?:ts|js)$/.test(entry) || /\.d\.ts$/.test(entry)) continue;
-    const mod = (await import(p.pathToFileURL(full).href)) as Record<string, unknown>;
-    for (const value of Object.values(mod)) {
-      if (typeof value === "function" && value.prototype instanceof JobBase) {
-        registerConstant(`${prefix}${value.name}`, value);
-      }
+    const match = entry.match(/^(.+)\.(?:ts|js)$/);
+    if (!match || /\.d\.ts$/.test(entry)) continue;
+    const mod = (await import(p.pathToFileURL!(full).href)) as Record<string, unknown>;
+    const cname = camelize(underscore(match[1].replace(/-/g, "_")));
+    const value = mod[cname];
+    if (typeof value === "function" && value.prototype instanceof JobBase) {
+      registerConstant(`${prefix}${cname}`, value);
     }
   }
 }

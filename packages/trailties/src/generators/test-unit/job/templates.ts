@@ -16,6 +16,6 @@ export class ${this.className().split("::").join("")}JobTest extends ActiveJob.T
 `;
 };
 
-export const TEMPLATES: Record<"unit_test", Template> = {
+export const TEMPLATES = {
   unit_test: unitTest,
 };
