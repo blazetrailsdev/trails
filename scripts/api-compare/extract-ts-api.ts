@@ -3831,10 +3831,25 @@ function onLoadHookModule(expr: ts.Expression): string | undefined {
 
 /**
  * The module a top-level `included do ... end` port hangs its block on:
- * `X.included(null, fn)` or `X[included] = fn`, where the block's `this` is the
- * includer and so names no entity itself.
+ * `X.included(null, fn)`, `Concern.included.call(X, null, fn)` or
+ * `X[included] = fn`, where the block's `this` is the includer and so names no
+ * entity itself.
  */
 function includedHookOwner(expr: ts.Expression): string | undefined {
+  if (
+    ts.isCallExpression(expr) &&
+    ts.isPropertyAccessExpression(expr.expression) &&
+    expr.expression.name.text === "call" &&
+    ts.isPropertyAccessExpression(expr.expression.expression) &&
+    ts.isIdentifier(expr.expression.expression.expression) &&
+    expr.expression.expression.expression.text === "Concern" &&
+    expr.expression.expression.name.text === "included"
+  ) {
+    let owner: ts.Expression | undefined = expr.arguments[0];
+    while (owner && (ts.isParenthesizedExpression(owner) || ts.isAsExpression(owner)))
+      owner = owner.expression;
+    return owner && ts.isIdentifier(owner) ? owner.text : undefined;
+  }
   const hook =
     ts.isCallExpression(expr) && ts.isPropertyAccessExpression(expr.expression)
       ? expr.expression

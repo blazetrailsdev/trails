@@ -7851,7 +7851,22 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
         };
         Deduplicable.defineMethod("deduplicate", function () {});
       `,
+      "logging.ts": `
+        import { cattrAccessor, Concern, extend, Module } from "@blazetrails/activesupport";
+        export const Logging = new Module();
+        extend(Logging, Concern);
+        Concern.included.call(Logging as never, null, function (this: object) {
+          cattrAccessor.call(this, "logger", { default: null });
+        });
+        Logging.defineMethod("tagLogger", function () {});
+      `,
     });
+    expect(
+      [
+        ...info.modules["logging.ts:Logging"].classMethods,
+        ...info.modules["logging.ts:Logging"].instanceMethods,
+      ].some((m) => m.name === "logger"),
+    ).toBe(true);
     const seats = (c: ClassInfo, name: string) =>
       [...c.classMethods, ...c.instanceMethods]
         .filter((m) => m.name === name)

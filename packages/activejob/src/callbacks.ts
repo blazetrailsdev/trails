@@ -56,9 +56,7 @@ Object.defineProperty(Callbacks, "ClassMethods", { value: ClassMethods });
 include(rbObjSingletonClass(Callbacks), ASCallbacks);
 (rbObjSingletonClass(Callbacks) as unknown as CallbacksClass).defineCallbacks("execute");
 
-(
-  Callbacks as unknown as { included(base: null, block: (this: CallbacksClass) => void): void }
-).included(null, function (this: CallbacksClass) {
+Concern.included.call(Callbacks as never, null, function (this: CallbacksClass) {
   this.defineCallbacks("perform", { skipAfterCallbacksIfTerminated: true });
   this.defineCallbacks("enqueue", { skipAfterCallbacksIfTerminated: true });
 });
