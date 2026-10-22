@@ -2330,6 +2330,11 @@ classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
 const rbMComparable = {};
 classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
 
+/**
+ * `rb_cModule` (`vendor/ruby/v3.3.11/object.c:4202`), `Class`'s superclass.
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCModule = Module;
 Object.setPrototypeOf(rbCClass, Module);
 Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
 

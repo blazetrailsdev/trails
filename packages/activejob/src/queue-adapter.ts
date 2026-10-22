@@ -10,9 +10,9 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
-  Module,
   classModule,
   deleteSuffix,
+  rbCModule,
   rbClassSuperclass,
   rbModConstSet,
   rbModName,
@@ -37,7 +37,7 @@ export function adapterName(adapter: unknown): string {
     return (adapter as { queueAdapterName: string }).queueAdapterName;
   }
 
-  const adapterClass = rbObjIsKindOf(adapter, Module) ? adapter : rbObjClass(adapter);
+  const adapterClass = rbObjIsKindOf(adapter, rbCModule) ? adapter : rbObjClass(adapter);
   const name = demodulize(rbModName(adapterClass as object) as string);
   return `${deleteSuffix(name, "Adapter")}`;
 }
