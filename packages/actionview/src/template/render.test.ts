@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ORIGINAL_LOCALES } from "../test-helpers/abstract-unit.js";
 
-import { ActionController, Mime } from "@blazetrails/actionpack";
+import { ActionController, Mime, SourceMapLocation } from "@blazetrails/actionpack";
 
 import { Base } from "../base.js";
 import { Template } from "../template.js";
@@ -32,6 +32,8 @@ import {
   chomp,
   stringSplit,
   rbInspect,
+  rbCInteger,
+  rbObjClass,
 } from "@blazetrails/ruby-compat";
 import { MissingTemplate, TemplateError } from "./error.js";
 import { Digestor } from "../digestor.js";
@@ -130,6 +132,12 @@ const fixtures: Record<string, string> = {
   "test/_raise_indentation.html.tse":
     '<p>First paragraph</p>\n<p>Second paragraph</p>\n<p>Third paragraph</p>\n<p>Fourth paragraph</p>\n<p>Fifth paragraph</p>\n<p>Sixth paragraph</p>\n<p>Seventh paragraph</p>\n<p>Eight paragraph</p>\n<p>Ninth paragraph</p>\n<p>Tenth paragraph</p>\n<%= (() => { throw new Error("error here!"); })() %>\n<p>Eleventh paragraph</p>\n<p>Twelfth paragraph</p>',
   "test/_raise.html.tse": "<%= doesnt_exist %>",
+  "test/runtime_error.html.tse":
+    "<h1>Oh no!</h1>\nThis template has a runtime error\n<b>\n  <%= method_that_does_not_exist %>\n</b>\nYikes!\n",
+  "test/unparseable_runtime_error.html.tse":
+    "<h1>Oh no!</h1>\nThis template has a runtime error\n<b>\n  <% if (true) { %>\n    <%= method_that_does_not_exist %>\n  <% } %>\n</b>\nYikes!\n",
+  "test/unparseable_runtime_error_2.html.tse":
+    "<h1>Oh no!</h1>\nThis template has a runtime error\n<b>\n  <% if (true) { %>\n    <%= method_that_does_not_exist %>a\n  <% } %>\n</b>\nYikes!\n",
   "test/sub_template_raise.html.tse": '<%= render({ partial: "test/raise" }) %>',
   "test/_klass.tse":
     '<%= klass === null ? "NilClass" : klass === false ? "FalseClass" : klass.constructor.name %>',
@@ -784,14 +792,41 @@ describe("CachedViewRenderTest", () => {
     assertEqual("1:    <%= foo(", e.annotatedSourceCode()[0].trim());
   });
 
-  // BLOCKED: render-runtime-error-spot-tests-reach-source-map-location
-  it.skip("render runtime error", () => {});
+  it("render runtime error", async () => {
+    const ex = await assertRaises([TemplateError], {}, () =>
+      view.render({ template: "test/runtime_error" }),
+    );
+    const erbBtl = ex.backtraceLocations()![0];
 
-  // BLOCKED: render-runtime-error-spot-tests-reach-source-map-location
-  it.skip("render location conditional append", () => {});
+    const translatingFrame = new SourceMapLocation(erbBtl, ex.template as Template);
+    const translatedSpot = translatingFrame.spot(ex.cause);
 
-  // BLOCKED: render-runtime-error-spot-tests-reach-source-map-location
-  it.skip("render location conditional append 2", () => {});
+    assertEqual(6, translatedSpot!.firstColumn);
+  });
+
+  it("render location conditional append", async () => {
+    const ex = await assertRaises([TemplateError], {}, () =>
+      view.render({ template: "test/unparseable_runtime_error" }),
+    );
+    const erbBtl = ex.backtraceLocations()![0];
+
+    const translatingFrame = new SourceMapLocation(erbBtl, ex.template as Template);
+    const translatedSpot = translatingFrame.spot(ex.cause);
+
+    assertEqual(8, translatedSpot!.firstColumn);
+  });
+
+  it("render location conditional append 2", async () => {
+    const ex = await assertRaises([TemplateError], {}, () =>
+      view.render({ template: "test/unparseable_runtime_error_2" }),
+    );
+    const erbBtl = ex.backtraceLocations()![0];
+
+    const translatingFrame = new SourceMapLocation(erbBtl, ex.template as Template);
+    const translatedSpot = translatingFrame.spot(ex.cause);
+
+    expect(rbObjClass(translatedSpot!.firstColumn)).toBe(rbCInteger);
+  });
 
   it("render renderable does not mask nomethoderror from within render in", async () => {
     const renderable = {

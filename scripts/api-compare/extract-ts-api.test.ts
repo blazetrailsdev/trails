@@ -7851,7 +7851,22 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
         };
         Deduplicable.defineMethod("deduplicate", function () {});
       `,
+      "logging.ts": `
+        import { cattrAccessor, Concern, extend, Module } from "@blazetrails/activesupport";
+        export const Logging = new Module();
+        extend(Logging, Concern);
+        Concern.included.call(Logging as never, null, function (this: object) {
+          cattrAccessor.call(this, "logger", { default: null });
+        });
+        Logging.defineMethod("tagLogger", function () {});
+      `,
     });
+    expect(
+      [
+        ...info.modules["logging.ts:Logging"].classMethods,
+        ...info.modules["logging.ts:Logging"].instanceMethods,
+      ].some((m) => m.name === "logger"),
+    ).toBe(true);
     const seats = (c: ClassInfo, name: string) =>
       [...c.classMethods, ...c.instanceMethods]
         .filter((m) => m.name === name)
@@ -8337,5 +8352,20 @@ describe("a top-level rbModDefineMethod seat", () => {
     });
     const [seat] = fileFunctionsOf(info, "object.ts");
     expect(seat.noRailsEquivalent).toMatch(/^PERMANENT/);
+  });
+
+  it("records one seat per name a for-of literal list defines", () => {
+    const info = extractFromFiles("/p", {
+      "proxy.ts": `
+        for (const severity of ["debug", "info"] as const) {
+          rbModDefineMethod(Proxy, severity, function (message: unknown = null) {
+            return this.log(severity, message);
+          });
+        }
+      `,
+    });
+    const seats = fileFunctionsOf(info, "proxy.ts");
+    expect(seats.map((s) => s.name)).toEqual(["debug", "info"]);
+    expect(seats[0].callSeq).toEqual(["log"]);
   });
 });

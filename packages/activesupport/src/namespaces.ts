@@ -96,6 +96,7 @@ export const TopLevel: {
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
   ActiveRecord?: {
     Railties: { ControllerRuntime?: object };
+    Base?: { logger: unknown };
     afterAllTransactionsCommit(block: () => unknown): unknown;
   };
   ActionCable?: { name?: string; Engine?: unknown; server?(): unknown };

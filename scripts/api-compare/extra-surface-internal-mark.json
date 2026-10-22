@@ -1,10 +1,10 @@
 {
   "abstractcontroller": 33,
-  "actioncable": 5,
+  "actioncable": 32,
   "actioncontroller": 182,
   "actiondispatch": 777,
   "actionpackversion": 0,
-  "actionview": 424,
+  "actionview": 422,
   "activemodel": 239,
   "activerecord": 2219,
   "arel": 288,

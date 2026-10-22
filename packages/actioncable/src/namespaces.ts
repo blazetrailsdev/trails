@@ -17,6 +17,7 @@ extend(Channel, Autoload);
 
 export const SubscriptionAdapter = {
   name: "ActionCable::SubscriptionAdapter",
+  loadPath: {},
 } as AutoloadModule;
 extend(SubscriptionAdapter, Autoload);
 

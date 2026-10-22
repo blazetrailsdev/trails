@@ -25,8 +25,13 @@ identifier keys, the keys must intersect `RENDER_TYPE_KEYS` and lie inside
 `ALL_KNOWN_KEYS` (camelCase), and the argument list is split at top-level
 commas only, so a nested hash or a `key:` inside a string or ternary is not
 read as an option. `renderDependencies` then takes `render_calls`'
-`object:`/`collection:`-without-`partial:` skip (`:21-24`). The template
-itself is still found by `ERBTracker`'s regexes, so the answer keeps
-`ERBTracker`'s shape (no `_` prefix). No full JS parse is run, so a regex
+`object:`/`collection:`-without-`partial:` skip (`:21-24`). The template is
+`renderCallTemplate(options[renderType])` (`render_call_template`, `:97-135`):
+a plain string, a backtick literal with each `${}` as `*`, or an
+identifier/member chain or call, and a call with no template is skipped
+(`:18-19`). A String `spacerTemplate:` or `layout:` is added as written
+(`:26-32`). A `render` inside a string literal is not scanned, except inside a
+backtick's `${}`. The answer keeps `ERBTracker`'s shape (no `_` prefix). An
+argument list ends at a top-level ` do`, where Ruby's block begins. No full JS parse is run, so a regex
 literal, a JS comment, or a backtick nested inside `${}` in a render call's
 arguments can still be misread.

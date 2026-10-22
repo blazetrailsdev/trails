@@ -3,9 +3,13 @@ import {
   Encoding,
   forceEncoding,
   rbObjRespondTo,
+  Hash,
   StringIO,
+  Struct,
   Tempfile,
+  toEnum,
 } from "@blazetrails/ruby-compat";
+import type {} from "@blazetrails/vitest-matchers";
 import { Lint, LintError } from "./lint.js";
 import { MockRequest, type RackApp } from "./mock-request.js";
 
@@ -359,35 +363,153 @@ it("notice status errors", async () => {
 });
 
 it("notice header errors", async () => {
-  const lint = (headers: unknown) =>
-    new Lint(async () => [200, headers as Record<string, string>, []]).call(env({}));
-
-  await expect(lint(Object.freeze({}))).rejects.toThrow(
-    "headers object should not be frozen, but is",
+  const obj = new (class Object {
+    each() {}
+  })();
+  let p = (async () => {
+    const io = new StringIO("a");
+    io.binmode();
+    return new Lint(async (env) => {
+      env["rack.input"].each((_x: string) => {});
+      return [200, obj as any, []];
+    }).call(env({ "rack.input": io }));
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toBe(
+    "headers object should be a hash, but isn't (got Object as headers)",
   );
-  await expect(lint({ status: "404" })).rejects.toThrow(/must not contain status/);
-  for (const invalidHeader of ["(", ",", "/", "@", "\\", "{", "\x7F", "\x01"]) {
-    await expect(lint({ [invalidHeader]: "text/plain" })).rejects.toThrow(
-      `invalid header name: ${invalidHeader}`,
+  p = new Lint(async () => [200, Object.freeze({}), []]).call(env({}));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toBe("headers object should not be frozen, but is");
+
+  p = new Lint(async () => [200, new Hash<any, any>().set(true, false) as any, []]).call(env({}));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toBe("header key must be a string, was TrueClass");
+
+  p = new Lint(async () => [200, { status: "404" }, []]).call(env({}));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toMatch(/must not contain status/);
+
+  const invalidHeaders = [
+    ...Array.from({ length: 32 }, (_, i) => String.fromCharCode(i)),
+    ...["(", ")", ",", "/", ":", ";", "<", "=", ">", "?", "@", "[", "\\", "]", "{", "}", "\x7F"],
+  ];
+  for (const invalidHeader of invalidHeaders) {
+    p = new Lint(async () => [200, { [invalidHeader]: "text/plain" }, []]).call(env({}));
+    await expect(p, `on invalid header: ${invalidHeader}`).rejects.toThrow(LintError);
+    expect((await p.catch((e) => e)).message).toBe(`invalid header name: ${invalidHeader}`);
+  }
+  const upper = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+  for (const invalidHeader of upper) {
+    p = new Lint(async () => [200, { [invalidHeader]: "text/plain" }, []]).call(env({}));
+    await expect(p, `on invalid header: ${invalidHeader}`).rejects.toThrow(LintError);
+    expect((await p.catch((e) => e)).message).toBe(
+      `uppercase character in header name: ${invalidHeader}`,
     );
   }
-  await expect(lint({ A: "text/plain" })).rejects.toThrow("uppercase character in header name: A");
-  await expect(lint({ foo: new (class Object {})() })).rejects.toThrow(
+  const validHeaders = Array.from({ length: 128 }, (_, i) => String.fromCharCode(i)).filter(
+    (c) => !invalidHeaders.includes(c) && !upper.includes(c),
+  );
+  for (const validHeader of validHeaders) {
+    expect(
+      (await new Lint(async () => [200, { [validHeader]: "text/plain" }, []]).call(env({})))[0],
+    ).toBe(200);
+  }
+
+  p = new Lint(async () => [200, { foo: new (class Object {})() as any }, []]).call(env({}));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toBe(
     "a header value must be a String or Array of Strings, but the value of 'foo' is a Object",
   );
-  await expect(lint({ "foo-bar": "text\0plain" })).rejects.toThrow(/invalid header/);
-  await expect(
-    lint([
+
+  p = new Lint(async () => [200, { "foo-bar": "text\0plain" }, []]).call(env({}));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toMatch(/invalid header/);
+
+  p = new Lint(async () => [
+    200,
+    [
       ["content-type", "text/plain"],
       ["content-length", "0"],
-    ]),
-  ).rejects.toThrow("headers object should be a hash, but isn't (got Array as headers)");
+    ] as any,
+    [],
+  ]).call(env({}));
+  await expect(p).rejects.toThrow(LintError);
+  expect((await p.catch((e) => e)).message).toBe(
+    "headers object should be a hash, but isn't (got Array as headers)",
+  );
 });
 
 it("notice rack.early_hints errors", async () => {
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const e = env({ "rack.early_hints": "not a function" });
-  await expect(app.call(e)).rejects.toThrow(LintError);
+  const app = (value: unknown) => {
+    const app = new Lint(async (env) => {
+      env["rack.early_hints"](value);
+      return [200, {}, []];
+    });
+    return () => app.call(env({ "rack.early_hints": () => {} }));
+  };
+  const message = async (p: Promise<unknown>) => ((await p.catch((e) => e)) as Error).message;
+
+  let p = app(new (class Object {})())();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe(
+    "headers object should be a hash, but isn't (got Object as headers)",
+  );
+
+  p = app(Object.freeze({}))();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("headers object should not be frozen, but is");
+
+  p = app(new Hash<any, any>().set(true, false))();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("header key must be a string, was TrueClass");
+
+  p = app({ status: "404" })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toMatch(/must not contain status/);
+
+  const invalidHeaders = [
+    ...Array.from({ length: 32 }, (_, i) => String.fromCharCode(i)),
+    ...["(", ")", ",", "/", ":", ";", "<", "=", ">", "?", "@", "[", "\\", "]", "{", "}", "\x7F"],
+  ];
+  for (const invalidHeader of invalidHeaders) {
+    p = app({ [invalidHeader]: "text/plain" })();
+    await expect(p, `on invalid header: ${invalidHeader}`).rejects.toThrow(LintError);
+    expect(await message(p)).toBe(`invalid header name: ${invalidHeader}`);
+  }
+
+  const upper = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+  for (const invalidHeader of upper) {
+    p = app({ [invalidHeader]: "text/plain" })();
+    await expect(p, `on invalid header: ${invalidHeader}`).rejects.toThrow(LintError);
+    expect(await message(p)).toBe(`uppercase character in header name: ${invalidHeader}`);
+  }
+
+  const validHeaders = Array.from({ length: 128 }, (_, i) => String.fromCharCode(i)).filter(
+    (c) => !invalidHeaders.includes(c) && !upper.includes(c),
+  );
+  for (const validHeader of validHeaders) {
+    expect((await app({ [validHeader]: "text/plain" })())[0]).toBe(200);
+  }
+
+  p = app({ foo: new (class Object {})() })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe(
+    "a header value must be a String or Array of Strings, but the value of 'foo' is a Object",
+  );
+
+  p = app({ "foo-bar": "text\0plain" })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toMatch(/invalid header/);
+
+  p = app([
+    ["content-type", "text/plain"],
+    ["content-length", "0"],
+  ])();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe(
+    "headers object should be a hash, but isn't (got Array as headers)",
+  );
 });
 
 it("notice content-type errors", async () => {
@@ -423,31 +545,16 @@ it("notice content-length errors", async () => {
 
 it("responds to to_path", async () => {
   const body = {
+    each() {},
     toPath() {
-      return "/tmp/file";
+      return import.meta.url;
     },
-    forEach(cb: any) {
-      cb("data");
-    },
-    close() {},
   };
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, body]);
-  const [, , b] = await app.call(env({}));
-  expect(b).toBeDefined();
-});
+  const app: RackApp = async () => [200, {}, body];
 
-it("handles body.to_path returning nil", async () => {
-  const body = {
-    forEach(cb: any) {
-      cb("ok");
-    },
-    toPath() {
-      return null;
-    },
-  };
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, body]);
-  const [status] = await app.call(env({}));
-  expect(status).toBe(200);
+  const lintBody = (await new Lint(app).call(env({})))[2];
+  expect(lintBody).toRespondTo("toPath");
+  expect(lintBody.toPath()).toBe(import.meta.url);
 });
 
 it("notice body errors", async () => {
@@ -460,16 +567,30 @@ it("notice body errors", async () => {
       ]).call(env({}))
     )[2];
 
-  const nonString = await bodyOf([1, 2, 3], "3");
-  expect(() => nonString.each(() => {})).toThrow(/yielded non-string/);
+  const message = async (p: Promise<unknown>) => ((await p.catch((e) => e)) as Error).message;
 
-  const object = await bodyOf(new (class Object {})(), "3");
-  expect(rbObjRespondTo(object, "toAry")).toBe(false);
-  expect(() => object.each(() => {})).toThrow("Enumerable Body must respond to each");
+  let p = (async () => {
+    const body = await bodyOf([1, 2, 3], "3");
+    body.each((_part: string) => {});
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toMatch(/yielded non-string/);
 
-  const empty = await bodyOf([], "0");
-  empty.each(() => {});
-  expect(() => empty.each(() => {})).toThrow("Response body must only be invoked once (each)");
+  p = (async () => {
+    const body = await bodyOf(new (class Object {})(), "3");
+    expect(rbObjRespondTo(body, "toAry")).toBe(false);
+    body.each((_part: string) => {});
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("Enumerable Body must respond to each");
+
+  p = (async () => {
+    const body = await bodyOf([], "0");
+    body.each((_part: string) => {});
+    body.each((_part: string) => {});
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("Response body must only be invoked once (each)");
 
   const stackedLint = (app: RackApp, block: (body: any) => any) =>
     new Lint(async (env) => {
@@ -477,6 +598,85 @@ it("notice body errors", async () => {
       response[2] = block(response[2]);
       return response;
     });
+
+  const yielderApp: RackApp = async () => {
+    const input = {
+      each(yieldBlock: (s: string) => void) {
+        for (let i = 0; i < 10; i++) yieldBlock("foo");
+      },
+    };
+    return [200, { "content-type": "text/plain", "content-length": "30" }, input];
+  };
+
+  let body = (
+    await stackedLint(
+      yielderApp,
+      (body) =>
+        new (class extends Struct.new("body") {
+          each(block: (part: string) => void) {
+            (this.body as any).each((part: string) => block(part.toUpperCase()));
+            (this.body as any).close();
+          }
+        })(body),
+    ).call(env({}))
+  )[2];
+  body.each((part: string) => expect(part).toBe("FOO"));
+  body.close();
+
+  p = (async () => {
+    const body = (await stackedLint(yielderApp, (body) => toEnum(body).toA()).call(env({})))[2];
+    body.each(() => {});
+    body.close();
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toMatch(/Middleware must not call #each directly/);
+
+  p = (async () => {
+    const body = (
+      await stackedLint(
+        yielderApp,
+        (body) =>
+          new (class extends Struct.new("body") {
+            each(block: (part: string) => void) {
+              const parts = toEnum<string>(this.body as object).toA();
+              for (let i = 0; i < parts.length; i += 2) block(parts.slice(i, i + 2).join(""));
+            }
+          })(body),
+      ).call(env({}))
+    )[2];
+    body.each(() => {});
+    body.close();
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toMatch(/New body must yield at least once per iteration of old body/);
+
+  p = (async () => {
+    const body = (
+      await stackedLint(
+        yielderApp,
+        (body) =>
+          new (class extends Struct.new("body") {
+            each(block: (part: string) => void) {
+              (this.body as any).each((part: string) => block(part));
+            }
+          })(body),
+      ).call(env({}))
+    )[2];
+    body.each(() => {});
+    body.close();
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toMatch(/Body has not been closed/);
+
+  const staticApp: RackApp = async () => {
+    const input = Array(10).fill("foo");
+    return [200, { "content-type": "text/plain", "content-length": "30" }, input];
+  };
+
+  body = (await stackedLint(staticApp, (body) => body.toAry()).call(env({})))[2];
+  body.each(() => {});
+  body.close();
+
   const arrayMismatch: RackApp = async () => {
     const input = {
       toAry: () => Array(10).fill("bar"),
@@ -486,9 +686,48 @@ it("notice body errors", async () => {
     };
     return [200, { "content-type": "text/plain", "content-length": "30" }, input];
   };
-  await expect(stackedLint(arrayMismatch, (body) => body.toAry()).call(env({}))).rejects.toThrow(
-    /#to_ary not identical to contents produced by calling #each/,
-  );
+  p = (async () => {
+    const body = (await stackedLint(arrayMismatch, (body) => body.toAry()).call(env({})))[2];
+    body.each(() => {});
+    body.close();
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toMatch(/#to_ary not identical to contents produced by calling #each/);
+
+  p = (async () => {
+    const toPath = {
+      each() {},
+      toPath() {
+        return "non-existent";
+      },
+    };
+    const body = await bodyOf(toPath, "0");
+    body.each((_part: string) => {});
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("The file identified by body.to_path does not exist");
+
+  p = (async () => {
+    const body = await bodyOf(new (class Object {})(), "0");
+    body.call(null);
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("Streaming Body must respond to call");
+
+  p = (async () => {
+    const body = await bodyOf({ call() {} }, "0");
+    body.call(new StringIO());
+    body.call(null);
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("Response body must only be invoked once (call)");
+
+  p = (async () => {
+    const body = await bodyOf({ call() {} }, "0");
+    body.call(null);
+  })();
+  await expect(p).rejects.toThrow(LintError);
+  expect(await message(p)).toBe("Stream must respond to read");
 });
 
 it("notice input handling errors", async () => {
@@ -677,39 +916,6 @@ it("notices when request env doesn't have a valid rack.hijack callback", async (
   expect((await p.catch((e) => e)).message).toMatch(/rack.hijack must respond to call/);
 });
 
-it("handles valid rack.hijack env", async () => {
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const e = env({ "rack.hijack?": true, "rack.hijack": () => ({}) });
-  const [status] = await app.call(e);
-  expect(status).toBe(200);
-});
-
-it("notices when rack.hijack env entry does not respond to #call", async () => {
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const e = env({ "rack.hijack?": true, "rack.hijack": 42 });
-  await expect(app.call(e)).rejects.toThrow(LintError);
-});
-
-it("notices when rack.hijack env entry does not return an IO", async () => {
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const e = env({ "rack.hijack?": true, "rack.hijack": () => "not-io" });
-  const [status] = await app.call(e);
-  expect(status).toBe(200);
-});
-
-it("handles valid rack.hijack response header", async () => {
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const [status] = await app.call(env({ "rack.hijack?": true, "rack.hijack": () => ({}) }));
-  expect(status).toBe(200);
-});
-
-it("allows non-hijack responses when server supports hijacking", async () => {
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const e = env({ "rack.hijack?": true, "rack.hijack": () => ({}) });
-  const [status] = await app.call(e);
-  expect(status).toBe(200);
-});
-
 it("notices when the response headers don't have a valid rack.hijack callback", async () => {
   const p = new Lint(async () => [
     201,
@@ -722,26 +928,6 @@ it("notices when the response headers don't have a valid rack.hijack callback", 
   ]).call(env({ "rack.hijack?": true }));
   await expect(p).rejects.toThrow(LintError);
   expect((await p.catch((e) => e)).message).toBe("rack.hijack header must respond to #call");
-});
-
-it("notices when the response headers has a rack.hijack callback with hijacking being supported", async () => {
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const e = env({
-    "rack.hijack?": true,
-    "rack.hijack": () => ({
-      read() {
-        return "";
-      },
-    }),
-  });
-  const [status] = await app.call(e);
-  expect(status).toBe(200);
-});
-
-it("notices rack.response_finished errors", async () => {
-  const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
-  const e = env({ "rack.response_finished": "not an array" });
-  await expect(app.call(e)).rejects.toThrow(LintError);
 });
 
 it("pass valid rack.response_finished", async () => {
@@ -759,15 +945,6 @@ it("pass valid rack.response_finished", async () => {
       )
     )[0],
   ).toBe(200);
-});
-
-it("notices when the response protocol is not an array of strings", async () => {
-  const app = new Lint(async () => [
-    200,
-    { "content-type": "text/plain", "rack.protocol": "h2" },
-    ["OK"],
-  ]);
-  await expect(app.call(env({}))).rejects.toThrow(LintError);
 });
 
 it("notices when the response protocol is specified in the response but not in the request", async () => {

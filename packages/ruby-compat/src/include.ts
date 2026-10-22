@@ -1340,6 +1340,29 @@ export function rbClassInheritedP(mod: unknown, arg: unknown): boolean | null {
   return null;
 }
 
+/**
+ * `rb_mod_ge` (`vendor/ruby/v3.3.11/object.c:1862`), `Module#>=`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModGe(mod: unknown, arg: unknown): boolean | null {
+  if (typeof arg !== "function" && (typeof arg !== "object" || arg === null)) {
+    throw new TypeError("compared with non class/module");
+  }
+
+  return rbClassInheritedP(arg, mod);
+}
+
+/**
+ * `rb_mod_gt` (`vendor/ruby/v3.3.11/object.c:1885`), `Module#>`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModGt(mod: unknown, arg: unknown): boolean | null {
+  if (mod === arg) return false;
+  return rbModGe(mod, arg);
+}
+
 /** `class_search_ancestor` (`vendor/ruby/v3.3.11/object.c:935`). */
 function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
   for (let p: object | null = cl.prototype; p; p = Object.getPrototypeOf(p) as object | null) {

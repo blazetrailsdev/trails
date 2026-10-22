@@ -49,7 +49,8 @@
       "@blazetrails/activesupport/test-case": ["../../activesupport/src/test-case.ts"],
       "@blazetrails/globalid/signed-global-id": ["../../globalid/src/signed-global-id.ts"],
       "@blazetrails/activejob": ["../../activejob/src/index.ts"],
-      "@blazetrails/actioncable": ["../../actioncable/src/index.ts"]
+      "@blazetrails/actioncable": ["../../actioncable/src/index.ts"],
+      "@blazetrails/solid-queue": ["../../solid-queue/src/index.ts"]
     }
   },
   "include": ["."]

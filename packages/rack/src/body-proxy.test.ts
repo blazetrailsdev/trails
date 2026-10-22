@@ -16,7 +16,7 @@ it("call close on the wrapped body", () => {
   const body = new StringIO();
   const proxy = new BodyProxy(body, () => {});
   proxy.close();
-  expect(body.closed).toBeTruthy();
+  expect(body.isClosed()).toBeTruthy();
 });
 
 it("only call close on the wrapped body if it responds to close", () => {

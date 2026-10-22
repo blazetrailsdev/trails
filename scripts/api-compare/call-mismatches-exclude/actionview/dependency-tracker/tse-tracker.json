@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actionview",
-    "tsFile": "dependency-tracker/tse-tracker.ts",
-    "rubyName": "add_static_dependency",
-    "call": "new",
-    "reason": "StringScanner.new is Ruby stdlib; blocked on activesupport-has-two-private-stringscanner-copies (the shared Ruby-core scanner), until then an index walk keeping pre_match's whole-string semantics."
-  }
-]

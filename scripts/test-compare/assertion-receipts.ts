@@ -31,6 +31,15 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "actionview:template/render_test.rb › render location conditional append 2": [
+    {
+      kind: "assert_instance_of",
+      value: null,
+      as: "assert_equal",
+      reason:
+        "template/render_test.rb:254 `assert_instance_of Integer` — a Ruby Integer is a JS number primitive, which is not `instanceof` any class, so the port asserts `rbObjClass` answers `rbCInteger`",
+    },
+  ],
   "actionview:template/tag_helper_test.rb › TagHelperTest › content tag": [
     {
       kind: "assert_equal",

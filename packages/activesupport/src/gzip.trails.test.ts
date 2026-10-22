@@ -18,7 +18,7 @@ describe("GzipTest", () => {
     stream.write("compress me!");
     stream.close();
 
-    expect(stream.closed).toBe(false);
+    expect(stream.isClosed()).toBe(false);
     expect(stream.read()).toEqual(b("compress me!"));
   });
 });

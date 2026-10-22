@@ -208,6 +208,7 @@ describe("vendor/sources.ts", () => {
       "marcel",
       "thor",
       "i18n",
+      "solid-queue",
     ]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
@@ -390,6 +391,7 @@ describe("vendor/sources.ts", () => {
         "rack-session",
         "rack-test",
         "sqlite3",
+        "solid-queue",
         "thor",
         "trailties",
       ].sort(),
@@ -434,6 +436,7 @@ describe("vendor/sources.ts", () => {
         "rack-session",
         "rack-test",
         "ruby-compat",
+        "solid-queue",
         "thor",
         "trailties",
       ].sort(),

@@ -1,84 +1,98 @@
 import { it, expect } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
+import { File, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
 import { Cascade } from "./cascade.js";
+import { Files } from "./files.js";
+import { Lint } from "./lint.js";
 import { MockRequest } from "./mock-request.js";
+import { URLMap } from "./urlmap.js";
 
-const notFoundApp = async () => [404, { "content-type": "text/plain" }, ["Not Found"]] as any;
-const methodNotAllowedApp = async () => [405, {}, []] as any;
-const okApp = async () => [200, { "content-type": "text/plain" }, ["OK"]] as any;
-const forbiddenApp = async () => [403, {}, ["Forbidden"]] as any;
+function cascade(...args: ConstructorParameters<typeof Cascade>) {
+  return new Lint(new Cascade(...args));
+}
+
+const docroot = File.expandPath(File.join(__dirname, "..", "test"));
+const app1 = new Files(docroot);
+
+const app2 = new URLMap({
+  "/crash": (_env: Record<string, any>) => {
+    throw new RuntimeError("boom");
+  },
+});
+
+const app3 = new URLMap({
+  "/foo": (_env: Record<string, any>) => [200, { "content-type": "text/plain" }, [""]],
+});
 
 it("dispatch onward on 404 and 405 by default", async () => {
-  const cascade = new Cascade([notFoundApp, methodNotAllowedApp, okApp]);
-  const response = await new MockRequest((env) => cascade.call(env)).get("/foo");
-  expect(response.status).toBe(200);
+  const c = cascade([app1, app2, app3]);
+  expect((await new MockRequest(c).get("/cgi/test")).isOk).toBeTruthy();
+  expect((await new MockRequest(c).get("/foo")).isOk).toBeTruthy();
+  expect((await new MockRequest(c).get("/toobad")).isNotFound).toBeTruthy();
+  expect((await new MockRequest(c).get("/cgi/../..")).isClientError).toBeTruthy();
+
+  expect((await new MockRequest(c).put("/foo")).isOk).toBeTruthy();
 });
 
 it("dispatch onward on whatever is passed", async () => {
-  const cascade = new Cascade([forbiddenApp, notFoundApp], [404, 403]);
-  const response = await new MockRequest((env) => cascade.call(env)).get("/bla");
-  expect(response.status).toBe(404);
+  const c = cascade([app1, app2, app3], [404, 403]);
+  expect((await new MockRequest(c).get("/cgi/../bla")).isNotFound).toBeTruthy();
 });
 
 it("include? returns whether app is included", () => {
-  const cascade = new Cascade([notFoundApp, okApp]);
-  expect(cascade.isInclude(notFoundApp)).toBe(true);
-  expect(cascade.isInclude(okApp)).toBe(true);
-  expect(cascade.isInclude(forbiddenApp)).toBe(false);
+  const c = new Cascade([app1, app2]);
+  expect(c.isInclude(app1)).toBe(true);
+  expect(c.isInclude(app2)).toBe(true);
+  expect(c.isInclude(app3)).toBe(false);
 });
 
 it("return 404 if empty", async () => {
-  const cascade = new Cascade([]);
-  const response = await new MockRequest((env) => cascade.call(env)).get("/");
-  expect(response.status).toBe(404);
+  expect((await new MockRequest(cascade([])).get("/")).isNotFound).toBeTruthy();
 });
 
 it("uses new response object if empty", async () => {
-  const cascade = new Cascade([]);
-  let res = await cascade.call({});
-  expect(res[0]).toBe(404);
-  expect(res[1]["content-type"]).toBe("text/plain");
-  expect(res[2]).toEqual([]);
+  const app = new Cascade([]);
+  let res: any = await app.call("/" as any);
+  let [s, h, body] = res;
+  expect(s).toBe(404);
+  expect(h["content-type"]).toBe("text/plain");
+  expect(body).toBeEmpty();
 
   res[0] = 200;
-  res[1]["content-type"] = "text/html";
-  res[2].push("a");
+  h["content-type"] = "text/html";
+  body.push("a");
 
-  res = await cascade.call({});
-  expect(res[0]).toBe(404);
-  expect(res[1]["content-type"]).toBe("text/plain");
-  expect(res[2]).toEqual([]);
+  res = await app.call("/" as any);
+  [s, h, body] = res;
+  expect(s).toBe(404);
+  expect(h["content-type"]).toBe("text/plain");
+  expect(body).toBeEmpty();
 });
 
 it("returns final response if all responses are cascaded", async () => {
-  const cascade = new Cascade([]);
-  cascade.add(methodNotAllowedApp);
-  const res = await cascade.call({});
-  expect(res[0]).toBe(405);
+  const app = new Cascade([]);
+  app.add((_env: Record<string, any>) => [405, {}, []]);
+  expect((await app.call({}))[0]).toBe(405);
 });
 
 it("append new app", async () => {
-  const cascade = new Cascade([], [404, 403]);
-  let res = await new MockRequest((env) => cascade.call(env)).get("/");
-  expect(res.status).toBe(404);
-
-  cascade.add(notFoundApp);
-  res = await new MockRequest((env) => cascade.call(env)).get("/");
-  expect(res.status).toBe(404);
-
-  cascade.add(okApp);
-  res = await new MockRequest((env) => cascade.call(env)).get("/");
-  expect(res.status).toBe(200);
+  const c = new Cascade([], [404, 403]);
+  expect((await new MockRequest(c).get("/")).isNotFound).toBeTruthy();
+  c.add(app2);
+  expect((await new MockRequest(c).get("/cgi/test")).isNotFound).toBeTruthy();
+  expect((await new MockRequest(c).get("/cgi/../bla")).isNotFound).toBeTruthy();
+  c.add(app1);
+  expect((await new MockRequest(c).get("/cgi/test")).isOk).toBeTruthy();
+  expect((await new MockRequest(c).get("/cgi/../..")).isClientError).toBeTruthy();
+  expect((await new MockRequest(c).get("/foo")).isNotFound).toBeTruthy();
+  c.add(app3);
+  expect((await new MockRequest(c).get("/foo")).isOk).toBeTruthy();
 });
 
 it("close the body on cascade", async () => {
-  let closed = false;
-  const body = {
-    close() {
-      closed = true;
-    },
-  };
-  const closerApp = async () => [404, {}, body] as any;
-  const cascade = new Cascade([closerApp, okApp], [404]);
-  await new MockRequest((env) => cascade.call(env)).get("/foo");
-  expect(closed).toBe(true);
+  const body = new StringIO();
+  const closer = (_env: Record<string, any>) => [404, {}, body];
+  const c = new Cascade([closer, app3], [404]);
+  expect((await new MockRequest(c).get("/foo")).isOk).toBeTruthy();
+  expect(body.isClosed()).toBeTruthy();
 });

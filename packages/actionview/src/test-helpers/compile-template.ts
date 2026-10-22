@@ -1,4 +1,5 @@
 import {
+  chainLineMappings,
   decodeLineMappings,
   transpileTse,
   tseHandlerScope,
@@ -33,15 +34,10 @@ export async function compileTemplate(
         })
       : virtualizeHandler(handlerCode(template, source), source);
   const { outputText, sourceMapText } = transpileTse(ts);
-  const tseLine = new Map<number, number>();
-  for (const m of mappings) if (!tseLine.has(m.genLine)) tseLine.set(m.genLine, m.srcLine);
-  const jsToTse = new Map<number, number>();
-  for (const m of decodeLineMappings(
-    (JSON.parse(sourceMapText) as { mappings: string }).mappings,
-  )) {
-    const line = tseLine.get(m.srcLine);
-    if (line !== undefined && !jsToTse.has(m.genLine)) jsToTse.set(m.genLine, line);
-  }
+  const chained = chainLineMappings(
+    decodeLineMappings((JSON.parse(sourceMapText) as { mappings: string }).mappings),
+    mappings,
+  );
   const url = `tse-template-${++compiled}`;
   const exports: { default?: StandIn } = {};
   new Function(
@@ -59,10 +55,14 @@ export async function compileTemplate(
           error.stack = error.stack.replace(
             new RegExp(`${url}:(\\d+)(:\\d+)?`, "gu"),
             (whole, line: string, column: string | undefined) => {
-              const source = jsToTse.get(Number(line) - FUNCTION_HEADER_LINES);
-              return source === undefined
-                ? whole
-                : `${template.identifier}:${source + 1}${column ?? ""}`;
+              const jsLine = Number(line) - FUNCTION_HEADER_LINES;
+              const jsColumn = Number(column?.slice(1) ?? 1) - 1;
+              const m = chained
+                .filter((c) => c.genLine === jsLine && (c.genCol ?? 0) <= jsColumn)
+                .at(-1);
+              if (m === undefined) return whole;
+              const tseColumn = (m.srcCol ?? 0) + jsColumn - (m.genCol ?? 0);
+              return `${template.identifier}:${m.srcLine + 1}:${tseColumn + 1}`;
             },
           );
         }

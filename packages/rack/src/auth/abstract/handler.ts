@@ -4,11 +4,11 @@ import type { RackApp } from "../../mock-request.js";
 
 export class AbstractHandler {
   realm: string;
-  protected app: RackApp;
+  protected app: RackApp | { call: RackApp };
   protected authenticator: (...args: any[]) => boolean | Promise<boolean>;
 
   constructor(
-    app: RackApp,
+    app: RackApp | { call: RackApp },
     realm?: string,
     authenticator?: (...args: any[]) => boolean | Promise<boolean>,
   ) {
