@@ -15,13 +15,7 @@ vi.mock("./time-helpers.js", async (importOriginal) => {
 import { Assertion, Skip, UnexpectedError } from "./assertions.js";
 import { _takeAssertions, assertNot, assertRaises } from "./assertions.js";
 import { TestCase } from "../test-case.js";
-import {
-  Module,
-  include,
-  iseqLocationSetup,
-  rbObjMethod,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { iseqLocationSetup, rbObjMethod, registerConstant } from "@blazetrails/ruby-compat";
 
 function testCase(): typeof TestCase {
   return class extends TestCase {};
@@ -165,15 +159,16 @@ describe("TestCase lifecycle hooks", () => {
     ran: string[],
     block: () => unknown,
   ): Promise<void> {
-    const Fixtures = new Module();
-    Fixtures.defineMethod("beforeSetup", async () => {
-      await Promise.resolve();
-      ran.push("before_setup");
-    });
-    Fixtures.defineMethod("afterTeardown", () => ran.push("after_teardown"));
+    const Fixtures = {
+      async beforeSetup() {
+        await Promise.resolve();
+        ran.push("before_setup");
+      },
+      afterTeardown: () => ran.push("after_teardown"),
+    };
     const proto = klass.prototype;
     const parent = Object.getPrototypeOf(proto);
-    include(klass, Fixtures);
+    Object.setPrototypeOf(proto, Object.assign(Object.create(parent), Fixtures));
     try {
       await block();
     } finally {

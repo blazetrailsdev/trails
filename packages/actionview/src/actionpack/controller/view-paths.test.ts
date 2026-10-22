@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import "../../test-helpers/abstract-unit.js";
 import { File, getPath, rbModConstSet, rbObjIvarSet } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
+
 import { ActionController, ActionDispatch, type RouteSet } from "@blazetrails/actionpack";
 import { Base } from "../../base.js";
 import { DetailsKey } from "../../lookup-context.js";
@@ -76,7 +76,7 @@ class ViewLoadPathsTest extends ActionController.TestCase {
 }
 
 rbModConstSet(Object, "ViewLoadPathsTest", ViewLoadPathsTest);
-const Test = rbModConstSet(ViewLoadPathsTest, "Test", new Module());
+const Test = rbModConstSet(ViewLoadPathsTest, "Test", {});
 
 class SubController extends ActionController.Base {
   static {

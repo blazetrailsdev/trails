@@ -1,4 +1,4 @@
-import { Module, NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
+import { NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
@@ -181,7 +181,7 @@ describe("AbstractController::Collector — the method_missing splice", () => {
       }
     }
     include(Late, Collector);
-    include(Late, new Module((mod) => mod.defineMethod("extra", () => "extra")));
+    include(Late, { extra: () => "extra" });
     const c = new Late() as Late & { extra(): string; unknown(): void; html(): unknown };
     expect(c.extra()).toBe("extra");
     expect(c.html()).toBe(Mime.get(":html")!);

@@ -103,11 +103,11 @@ class HelpersTypoController extends Base {
 }
 await ActionPackTestSuiteUtils.requireHelpers(HelpersTypoController.helpersPath);
 
-const LocalAbcHelper = new Module().include({
+const LocalAbcHelper = {
   a(): void {},
   b(): void {},
   c(): void {},
-});
+};
 
 function body(response: RackResponse): string {
   return (response.at(-1) as unknown as Response).body;

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { registerModel } from "./index.js";
-import { Module, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
+import { registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Base } from "./base.js";
 import { Entry } from "./test-helpers/models/entry.js";
@@ -44,7 +44,7 @@ describe("DelegatedTypeTest (trails)", () => {
         this.attribute("entryable_type", "string");
       }
     }
-    const Access = new Module();
+    const Access = {};
     registerConstant("Access", Access);
     class NoticeMessage extends Base {
       static {
@@ -69,7 +69,7 @@ describe("DelegatedTypeTest (trails)", () => {
   });
 
   it("buildEntryable preserves namespaced foreign_type", () => {
-    const Access = new Module();
+    const Access = {};
     registerConstant("Access", Access);
     class NoticeMessage extends Base {
       static {

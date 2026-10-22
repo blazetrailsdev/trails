@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { include, Module } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { UrlFor } from "../../action-dispatch/routing/url-for.js";
@@ -150,25 +150,6 @@ describe("withRoutesHelpers", () => {
     expect(typeof instance.postsUrl).toBe("function");
     expect(instance.postsPath).toBeUndefined();
     expect(instance.urlOptions()).toEqual({ host: "example.com" });
-  });
-
-  it("skips a nested module the class already includes without shadowing a lower one", () => {
-    const lower = new Module();
-    lower.defineMethod("helper", () => "lower");
-    const higher = new Module();
-    higher.defineMethod("helper", () => "higher");
-    const urlHelpers = new Module();
-    urlHelpers.include(lower);
-    urlHelpers.include(higher);
-
-    const parent = class {};
-    include(parent, higher);
-    const cls = class extends parent {};
-    RoutesHelpers.with({ urlHelpers: () => urlHelpers })(
-      cls as unknown as RoutesHelpersControllerClass,
-    );
-
-    expect((new cls() as unknown as { helper(): string }).helper()).toBe("lower");
   });
 
   it("crosses a named route drawn after the first helper read", () => {

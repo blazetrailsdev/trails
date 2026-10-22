@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { NameError, NoMethodError } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
+import { classModule, NameError, NoMethodError } from "@blazetrails/ruby-compat";
+
 import { Delegation, DelegationError } from "./delegation.js";
 import { delegate } from "./module-ext.js";
 
@@ -69,15 +69,12 @@ describe("Delegation.generate", () => {
   });
 
   it("looks the method up on a module named by as", () => {
-    const Nameable = new Module((mod) => {
-      mod.moduleEval((m) => {
-        Object.assign(m, {
-          rename(first: string, last: string) {
-            return `${first} ${last}`;
-          },
-        });
-      });
-    });
+    class Nameable {
+      static readonly [classModule] = true;
+      rename(first: string, last: string) {
+        return `${first} ${last}`;
+      }
+    }
     class Order {
       customer = {
         rename(first: string, last: string) {

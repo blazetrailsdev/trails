@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNotRespondTo, assertNothingRaised, extend } from "@blazetrails/activesupport";
-import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Errors } from "./errors.js";
 import { I18n } from "./i18n.js";
 import { Naming, type ModelName, type ModelLike } from "./naming.js";
 import { Error as ModelError } from "./error.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
-const ErrorTest = new Module();
+const ErrorTest = {};
 registerConstant("ErrorTest", ErrorTest);
 
 class Person {

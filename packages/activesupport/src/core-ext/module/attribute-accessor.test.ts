@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { include, Module, NameError } from "@blazetrails/ruby-compat";
+import { classModule, include, NameError } from "@blazetrails/ruby-compat";
 
 import {
   cattrAccessor,
@@ -21,7 +21,9 @@ describe("ModuleAttributeAccessorTest", () => {
   let object: any;
 
   beforeEach(() => {
-    const m = (module = new Module() as any);
+    const m = (module = class {
+      static readonly [classModule] = true;
+    } as any);
     mattrAccessor.call(m, "foo");
     mattrAccessor.call(m, "bar", { instanceWriter: false });
     mattrReader.call(m, "shaq", { instanceReader: false });
