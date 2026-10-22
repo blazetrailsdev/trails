@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import {
   Duration,
   HashWithIndifferentAccess,
@@ -83,7 +84,7 @@ async function assertArgumentsUnchanged(...args: unknown[]): Promise<void> {
 }
 
 async function assertArgumentsRoundtrip(args: unknown[]): Promise<void> {
-  expect(rbEqual(args, await performRoundTrip(args))).toBe(true);
+  expect(await performRoundTrip(args)).toEqualRuby(args);
 }
 
 async function performRoundTrip(args: unknown[]): Promise<unknown[]> {
@@ -197,8 +198,8 @@ describe("ArgumentSerializationTest", () => {
       const deserialized = (
         await ActiveJob.Arguments.deserialize(JSON.parse(JSON.stringify(serialized)))
       )[0];
-      expect((deserialized as object).constructor).toBe(MyString);
-      expect(rbEqual(myString, deserialized)).toBe(true);
+      expect(deserialized).toBeExactInstanceOf(MyString);
+      expect(deserialized).toEqualRuby(myString);
     } finally {
       Serializers._additionalSerializers = originalSerializers;
     }
@@ -210,8 +211,8 @@ describe("ArgumentSerializationTest", () => {
     const deserialized = (
       await ActiveJob.Arguments.deserialize(JSON.parse(JSON.stringify(serialized)))
     )[0];
-    expect(typeof deserialized).toBe("string");
-    expect(rbEqual(stringWithoutSerializer, deserialized)).toBe(true);
+    expect(deserialized).toBeExactInstanceOf(String);
+    expect(deserialized).toEqualRuby(stringWithoutSerializer);
   });
 
   it("serialize a hash", () => {
@@ -253,9 +254,13 @@ describe("ArgumentSerializationTest", () => {
     const stringKey = { a: 1 };
     const indifferentAccess = withIndifferentAccess({ ":a": 1 });
 
-    expect((await performRoundTrip([symbolKey]))[0]).not.toBeInstanceOf(HashWithIndifferentAccess);
-    expect((await performRoundTrip([stringKey]))[0]).not.toBeInstanceOf(HashWithIndifferentAccess);
-    expect(((await performRoundTrip([indifferentAccess]))[0] as object).constructor).toBe(
+    expect((await performRoundTrip([symbolKey]))[0]).not.toBeExactInstanceOf(
+      HashWithIndifferentAccess,
+    );
+    expect((await performRoundTrip([stringKey]))[0]).not.toBeExactInstanceOf(
+      HashWithIndifferentAccess,
+    );
+    expect((await performRoundTrip([indifferentAccess]))[0]).toBeExactInstanceOf(
       HashWithIndifferentAccess,
     );
   });
@@ -263,9 +268,7 @@ describe("ArgumentSerializationTest", () => {
   it("should maintain time with zone", async () => {
     await useZone("Alaska", async () => {
       const timeWithZone = Time.new(2002, 10, 31, 2, 2, 2).inTimeZone();
-      expect(((await performRoundTrip([timeWithZone]))[0] as object).constructor).toBe(
-        TimeWithZone,
-      );
+      expect((await performRoundTrip([timeWithZone]))[0]).toBeExactInstanceOf(TimeWithZone);
       await assertArgumentsUnchanged(timeWithZone);
     });
   });
@@ -273,7 +276,7 @@ describe("ArgumentSerializationTest", () => {
   it("should maintain a functional duration", async () => {
     const duration = (await performRoundTrip([years(1)]))[0] as Duration;
     expect(rbObjIsKindOf(duration.parts, Hash)).toBe(true);
-    expect(rbEqual(years(2), duration.plus(years(1)))).toBe(true);
+    expect(duration.plus(years(1))).toEqualRuby(years(2));
   });
 
   it("should disallow non-string/symbol hash keys", () => {
@@ -317,12 +320,14 @@ describe("ArgumentSerializationTest", () => {
 
   it("raises a friendly SerializationError for records without ids", () => {
     let err: unknown;
-    try {
-      ActiveJob.Arguments.serialize([new Person(null)]);
-    } catch (e) {
-      err = e;
-    }
-    expect(err).toBeInstanceOf(SerializationError);
-    expect((err as Error).message).toContain("Unable to serialize Person without an id.");
+    expect(() => {
+      try {
+        ActiveJob.Arguments.serialize([new Person(null)]);
+      } catch (e) {
+        err = e;
+        throw e;
+      }
+    }).toThrow(SerializationError);
+    expect((err as Error).message).toMatch("Unable to serialize Person without an id.");
   });
 });
