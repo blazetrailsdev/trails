@@ -125,6 +125,7 @@ export abstract class XmlBase {
   /**
    * @internal
    * @missingRailsCall dummy? — CONVERGEABLE port-builder-xml-events-and-remaining-tests
+   * @inventedArm decode — PERMANENT
    */
   protected _escape(text: string): string {
     const result = XChar.encode(text);

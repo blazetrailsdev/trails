@@ -70,11 +70,12 @@ const ENCODING_BINARY = Encoding.find("BINARY")!;
 const ENCODING_UTF8 = Encoding.find("UTF-8")!;
 const ENCODING_ISO1 = Encoding.find("ISO-8859-1")!;
 
+/** @missingRailsCall valid_encoding? — PERMANENT */
 function unicode(string: string | Uint8Array): string {
   if (rbObjEncoding(string) === ENCODING_BINARY) {
     const bytes = string as Uint8Array;
     if (bytes.every((b) => b < 0x80)) {
-      return String.fromCharCode(...bytes);
+      return new TextDecoder(ENCODING_UTF8.name).decode(bytes);
     } else {
       try {
         return new TextDecoder(ENCODING_UTF8.name, { fatal: true }).decode(bytes);
