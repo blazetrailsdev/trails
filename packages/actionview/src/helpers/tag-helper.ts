@@ -580,6 +580,10 @@ export class TagBuilder {
     return this.tagOption(key, value, escape);
   }
 
+  private respondToMissing(..._args: unknown[]): boolean {
+    return true;
+  }
+
   private methodMissing(called: string, ...args: unknown[]): SafeBuffer | Promise<SafeBuffer> {
     const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
       | TagBlock

@@ -9,7 +9,13 @@ import {
   escapeOnce,
   TagBuilder,
 } from "../helpers/tag-helper.js";
-import { ArgumentError, CGI, publicInstanceMethods, rbObjMethod } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  BigDecimal,
+  CGI,
+  publicInstanceMethods,
+  rbObjMethod,
+} from "@blazetrails/ruby-compat";
 import { assertRespondTo, htmlSafe, SafeBuffer, withOptions } from "@blazetrails/activesupport";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { raw } from "../helpers/output-safety-helper.js";
@@ -110,7 +116,7 @@ describe("TagHelperTest", () => {
   });
 
   it("tag builder renders unknown html elements", () => {
-    expect(typeof (tag() as any).turbo_frame).toBe("function");
+    expect(tag()).toRespondTo("turbo_frame");
 
     expect((tag() as any).turbo_frame("Rendered", { id: "rendered" }).toString()).toEqual(
       '<turbo-frame id="rendered">Rendered</turbo-frame>',
@@ -375,15 +381,16 @@ describe("TagHelperTest", () => {
   });
 
   it("content tag with block and options out of tse", () => {
-    expect(contentTag("div", { class: "green" }, null, true, () => "Hello world!").toString()).toBe(
+    assertDomEqual(
       '<div class="green">Hello world!</div>',
+      String(contentTag("div", { class: "green" }, null, true, () => "Hello world!")),
     );
   });
 
   it("tag builder with block and options out of tse", () => {
-    const t = tag() as any;
-    expect(t.div({ class: "green" }, () => "Hello world!").toString()).toBe(
+    assertDomEqual(
       '<div class="green">Hello world!</div>',
+      String((tag() as any).div({ class: "green" }, () => "Hello world!")),
     );
   });
 
@@ -542,8 +549,8 @@ describe("TagHelperTest", () => {
   });
 
   it("token list and class names returns an html safe string", () => {
-    expect(tokenList("a value").htmlSafe).toBe(true);
-    expect(classNames("a value").htmlSafe).toBe(true);
+    expect(tokenList("a value").htmlSafe).toBeTruthy();
+    expect(classNames("a value").htmlSafe).toBeTruthy();
   });
 
   it("token list and class names only html escape once", () => {
@@ -566,33 +573,24 @@ describe("TagHelperTest", () => {
   });
 
   it("content tag with data attributes", () => {
-    const result = contentTag("p", "limelight", {
-      data: {
-        number: 1,
-        string: "hello",
-        string_with_quotes: 'double"quote"party"',
-      },
-    });
-    expect(result.toString()).toContain('data-number="1"');
-    expect(result.toString()).toContain('data-string="hello"');
-    expect(result.toString()).toContain(
-      'data-string-with-quotes="double&quot;quote&quot;party&quot;"',
+    assertDomEqual(
+      '<p data-number="1" data-string="hello" data-string-with-quotes="double&quot;quote&quot;party&quot;">limelight</p>',
+      String(
+        contentTag("p", "limelight", {
+          data: { number: 1, string: "hello", string_with_quotes: 'double"quote"party"' },
+        }),
+      ),
     );
   });
 
   it("tag builder with data attributes", () => {
-    const t = tag() as any;
-    const result = t.p("limelight", {
-      data: {
-        number: 1,
-        string: "hello",
-        string_with_quotes: 'double"quote"party"',
-      },
-    });
-    expect(result.toString()).toContain('data-number="1"');
-    expect(result.toString()).toContain('data-string="hello"');
-    expect(result.toString()).toContain(
-      'data-string-with-quotes="double&quot;quote&quot;party&quot;"',
+    assertDomEqual(
+      '<p data-number="1" data-string="hello" data-string-with-quotes="double&quot;quote&quot;party&quot;">limelight</p>',
+      String(
+        (tag() as any).p("limelight", {
+          data: { number: 1, string: "hello", string_with_quotes: 'double"quote"party"' },
+        }),
+      ),
     );
   });
 
@@ -612,7 +610,10 @@ describe("TagHelperTest", () => {
   });
 
   it("escape once", () => {
-    expect(escapeOnce("1 < 2 &amp; 3").toString()).toBe("1 &lt; 2 &amp; 3");
+    expect(escapeOnce("1 < 2 &amp; 3").toString()).toEqual("1 &lt; 2 &amp; 3");
+    expect(escapeOnce(" &#X27; &#x27; &#x03BB; &#X03bb; \" ' < > ").toString()).toEqual(
+      " &#X27; &#x27; &#x03BB; &#X03bb; &quot; &#39; &lt; &gt; ",
+    );
   });
 
   it("tag honors html safe for param values", () => {
@@ -646,23 +647,26 @@ describe("TagHelperTest", () => {
   });
 
   it("tag does not honor html safe double quotes as attributes", () => {
-    const result = contentTag("p", "content", {
-      title: htmlSafe('"'),
-    });
-    expect(result.toString()).toBe('<p title="&quot;">content</p>');
+    assertDomEqual(
+      '<p title="&quot;">content</p>',
+      String(contentTag("p", "content", { title: htmlSafe('"') })),
+    );
   });
 
   it("data tag does not honor html safe double quotes as attributes", () => {
-    const result = contentTag("p", "content", {
-      data: { title: htmlSafe('"') },
-    });
-    expect(result.toString()).toBe('<p data-title="&quot;">content</p>');
+    assertDomEqual(
+      '<p data-title="&quot;">content</p>',
+      String(contentTag("p", "content", { data: { title: htmlSafe('"') } })),
+    );
   });
 
   it("skip invalid escaped attributes", () => {
     for (const escaped of ["&1;", "&#1dfa3;", "& #123;"]) {
-      expect((tag("a", { href: escaped }) as SafeBuffer).toString()).toBe(
+      expect(String(tag("a", { href: escaped }))).toEqual(
         `<a href="${escaped.replace(/&/g, "&amp;")}" />`,
+      );
+      expect(String((tag() as any).a({ href: escaped }))).toEqual(
+        `<a href="${escaped.replace(/&/g, "&amp;")}"></a>`,
       );
     }
   });
@@ -691,80 +695,65 @@ describe("TagHelperTest", () => {
   });
 
   it("data attributes", () => {
-    const result = (
-      tag("a", {
-        data: {
-          a_float: 3.14,
-          a_number: 1,
-          string: "hello",
-          symbol: "foo",
-          array: [1, 2, 3],
-          hash: { key: "value" },
-          string_with_quotes: 'double"quote"party"',
-        },
-      }) as SafeBuffer
-    ).toString();
-    expect(result).toContain('data-a-float="3.14"');
-    expect(result).toContain('data-a-number="1"');
-    expect(result).toContain('data-string="hello"');
-    expect(result).toContain('data-symbol="foo"');
-    expect(result).toContain('data-array="[1,2,3]"');
-    expect(result).toContain('data-hash="{&quot;key&quot;:&quot;value&quot;}"');
-    expect(result).toContain('data-string-with-quotes="double&quot;quote&quot;party&quot;"');
+    const data = {
+      a_float: 3.14,
+      a_big_decimal: new BigDecimal("-123.456"),
+      a_number: 1,
+      string: "hello",
+      symbol: "foo",
+      array: [1, 2, 3],
+      hash: { key: "value" },
+      string_with_quotes: 'double"quote"party"',
+    };
+    assertDomEqual(
+      '<a data-a-float="3.14" data-a-big-decimal="-123.456" data-a-number="1" data-array="[1,2,3]" data-hash="{&quot;key&quot;:&quot;value&quot;}" data-string-with-quotes="double&quot;quote&quot;party&quot;" data-string="hello" data-symbol="foo" />',
+      String(tag("a", { data })),
+    );
+    assertDomEqual(
+      '<a data-a-float="3.14" data-a-big-decimal="-123.456" data-a-number="1" data-array="[1,2,3]" data-hash="{&quot;key&quot;:&quot;value&quot;}" data-string-with-quotes="double&quot;quote&quot;party&quot;" data-string="hello" data-symbol="foo" />',
+      String((tag() as any).a({ data })),
+    );
   });
 
   it("aria attributes", () => {
-    const result = (
-      tag("a", {
-        aria: {
-          nil: null,
-          a_float: 3.14,
-          a_number: 1,
-          truthy: true,
-          falsey: false,
-          string: "hello",
-          symbol: "foo",
-          array: [1, 2, 3],
-          empty_array: [],
-          hash: { a: true, b: "truthy", falsey: false, nil: null },
-          empty_hash: {},
-          tokens: ["a", { b: true, c: false }],
-          empty_tokens: [{ a: false }],
-          string_with_quotes: 'double"quote"party"',
-        },
-      }) as SafeBuffer
-    ).toString();
-    expect(result).toContain('aria-a-float="3.14"');
-    expect(result).toContain('aria-a-number="1"');
-    expect(result).toContain('aria-truthy="true"');
-    expect(result).toContain('aria-falsey="false"');
-    expect(result).toContain('aria-string="hello"');
-    expect(result).toContain('aria-symbol="foo"');
-    expect(result).toContain('aria-array="1 2 3"');
-    expect(result).not.toContain("aria-empty-array");
-    expect(result).toContain('aria-hash="a b"');
-    expect(result).not.toContain("aria-empty-hash");
-    expect(result).toContain('aria-tokens="a b"');
-    expect(result).not.toContain("aria-empty-tokens");
-    expect(result).toContain('aria-string-with-quotes="double&quot;quote&quot;party&quot;"');
-    expect(result).not.toContain("aria-nil");
+    const aria = {
+      nil: null,
+      a_float: 3.14,
+      a_big_decimal: new BigDecimal("-123.456"),
+      a_number: 1,
+      truthy: true,
+      falsey: false,
+      string: "hello",
+      symbol: "foo",
+      array: [1, 2, 3],
+      empty_array: [],
+      hash: { a: true, b: "truthy", falsey: false, nil: null },
+      empty_hash: {},
+      tokens: ["a", { b: true, c: false }],
+      empty_tokens: [{ a: false }],
+      string_with_quotes: 'double"quote"party"',
+    };
+    assertDomEqual(
+      '<a aria-a-float="3.14" aria-a-big-decimal="-123.456" aria-a-number="1" aria-truthy="true" aria-falsey="false" aria-array="1 2 3" aria-hash="a b" aria-tokens="a b" aria-string-with-quotes="double&quot;quote&quot;party&quot;" aria-string="hello" aria-symbol="foo" />',
+      String(tag("a", { aria })),
+    );
+
+    assertDomEqual(
+      '<a aria-a-float="3.14" aria-a-big-decimal="-123.456" aria-a-number="1" aria-truthy="true" aria-falsey="false" aria-array="1 2 3" aria-hash="a b" aria-tokens="a b" aria-string-with-quotes="double&quot;quote&quot;party&quot;" aria-string="hello" aria-symbol="foo" />',
+      String((tag() as any).a({ aria })),
+    );
   });
 
   it("link to data nil equal", () => {
-    const div1 = contentTag("div", "test", {
-      "data-tooltip": null,
-    });
-    const div2 = contentTag("div", "test", {
-      data: { tooltip: null },
-    });
-    expect(div1.toString()).toBe(div2.toString());
+    const divType1 = contentTag("div", "test", { "data-tooltip": null });
+    const divType2 = contentTag("div", "test", { data: { tooltip: null } });
+    assertDomEqual(String(divType1), String(divType2));
   });
 
   it("tag builder link to data nil equal", () => {
-    const t = tag() as any;
-    const div1 = t.div("test", { "data-tooltip": null });
-    const div2 = t.div("test", { data: { tooltip: null } });
-    expect(div1.toString()).toBe(div2.toString());
+    const divType1 = (tag() as any).div("test", { "data-tooltip": null });
+    const divType2 = (tag() as any).div("test", { data: { tooltip: null } });
+    assertDomEqual(String(divType1), String(divType2));
   });
 
   it("tag builder allow call via method object", () => {
@@ -792,11 +781,9 @@ describe("TagHelperTest", () => {
 
   it("tag builder do not modify html safe options", () => {
     const htmlSafeStr = htmlSafe('"');
-    expect((tag("p", { value: htmlSafeStr }) as SafeBuffer).toString()).toBe(
-      '<p value="&quot;" />',
-    );
-    expect(htmlSafeStr.toString()).toBe('"');
-    expect(htmlSafeStr.htmlSafe).toBe(true);
+    expect(String(tag("p", { value: htmlSafeStr }))).toEqual('<p value="&quot;" />');
+    expect(htmlSafeStr.toString()).toEqual('"');
+    expect(htmlSafeStr.htmlSafe).toBeTruthy();
   });
 
   it("tag builder with options builds p elements", () => {
@@ -812,42 +799,38 @@ describe("TagHelperTest", () => {
     expect(str).toBe('<input value="123 456" />');
   });
 
-  it("tag attributes nil", () => {
-    const t = tag() as any;
-    expect(t.attributes(null).toString()).toBe("");
+  it("tag attributes nil", async () => {
+    expect(await renderTse('<input type="text" <%= tag().attributes(null) %>>')).toEqual(
+      '<input type="text" >',
+    );
   });
 
-  it("tag attributes empty", () => {
-    const t = tag() as any;
-    expect(t.attributes({}).toString()).toBe("");
+  it("tag attributes empty", async () => {
+    expect(await renderTse('<input type="text" <%= tag().attributes({}) %>>')).toEqual(
+      '<input type="text" >',
+    );
   });
 
-  it("tag attributes escapes values", () => {
-    const t = tag() as any;
-    const result = t.attributes({ xss: '"><script>alert()</script>' }).toString();
-    expect(result).toContain('xss="&quot;&gt;&lt;script&gt;alert()&lt;/script&gt;"');
+  it("tag attributes escapes values", async () => {
+    const expectedOutput =
+      '<input type="text" xss="&quot;&gt;&lt;script&gt;alert()&lt;/script&gt;">';
+
+    expect(
+      await renderTse(
+        `<input type="text" <%= tag().attributes({ xss: '"><script>alert()</script>' }) %>>`,
+      ),
+    ).toEqual(expectedOutput);
   });
 
-  it("tag attributes inlines html attributes", () => {
-    const t = tag() as any;
-    const result = t
-      .attributes({
-        value: null,
-        name: "name",
-        "aria-hidden": false,
-        aria: { label: "label" },
-        data: { input_value: "data" },
-        required: true,
-      })
-      .toString();
-    expect(result).toContain('name="name"');
-    expect(result).toContain('aria-hidden="false"');
-    expect(result).toContain('aria-label="label"');
-    expect(result).toContain('data-input-value="data"');
-    expect(result).toContain('required="required"');
-    expect(result).not.toMatch(/(?<![- ])value="/);
-    expect(result).not.toMatch(/^value="/);
-    expect(result).not.toContain(' value="');
+  it("tag attributes inlines html attributes", async () => {
+    const expectedOutput =
+      '<input type="text" name="name" aria-hidden="false" aria-label="label" data-input-value="data" required="required">';
+
+    expect(
+      await renderTse(
+        '<input type="text" <%= tag().attributes({ value: null, name: "name", "aria-hidden": false, aria: { label: "label" }, data: { input_value: "data" }, required: true }) %>>',
+      ),
+    ).toEqual(expectedOutput);
   });
 
   it("tag options", () => {
@@ -968,7 +951,6 @@ describe("TagHelperTest", () => {
   });
 
   it("respond to", () => {
-    const t = tag() as any;
-    expect("any_tag" in t).toBe(true);
+    expect(tag()).toRespondTo("any_tag");
   });
 });
