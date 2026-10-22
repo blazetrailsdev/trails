@@ -58,6 +58,7 @@
       "@blazetrails/html-sanitizer": ["../../html-sanitizer/src/index.ts"],
       "@blazetrails/msgpack": ["../../msgpack/src/index.ts"],
       "@blazetrails/nokogiri": ["../../nokogiri/src/index.ts"],
+      "@blazetrails/builder": ["../../builder/src/builder.ts"],
       "@blazetrails/bcrypt": ["../../bcrypt/src/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"],
       "@blazetrails/did-you-mean": ["../../did-you-mean/src/index.ts"],

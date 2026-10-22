@@ -34,7 +34,8 @@
     "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
-    "@blazetrails/tse-compiler": "workspace:*"
+    "@blazetrails/tse-compiler": "workspace:*",
+    "@blazetrails/builder": "workspace:*"
   },
   "devDependencies": {
     "@blazetrails/actionpack": "workspace:*",

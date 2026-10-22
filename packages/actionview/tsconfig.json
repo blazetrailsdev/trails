@@ -8,6 +8,7 @@
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/test-helpers", "src/test-case.ts"],
   "references": [
+    { "path": "../builder" },
     { "path": "../ruby-compat" },
     { "path": "../activesupport" },
     { "path": "../date" },

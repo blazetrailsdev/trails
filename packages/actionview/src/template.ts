@@ -19,6 +19,7 @@ import { ActionView } from "./namespaces.js";
 import { SyntaxErrorInTemplate, TemplateError, WrongEncodingError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Html } from "./template/handlers/html.js";
+import { Builder } from "./template/handlers/builder.js";
 import { Raw } from "./template/handlers/raw.js";
 import { TSE } from "./template/handlers/tse.js";
 import { SimpleType } from "./template/types.js";
@@ -108,6 +109,7 @@ export class Template {
     TemplateHandlers.registerDefaultTemplateHandler("raw", new Raw());
     TemplateHandlers.registerTemplateHandler("tse", new TSE());
     TemplateHandlers.registerTemplateHandler("html", new Html());
+    TemplateHandlers.registerTemplateHandler("builder", new Builder());
     TemplateHandlers.registerTemplateHandler("ruby", {
       call: (_: unknown, source: string) => source,
     });
