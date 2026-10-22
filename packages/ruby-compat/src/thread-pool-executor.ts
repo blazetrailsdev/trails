@@ -56,6 +56,15 @@ export class ThreadPoolExecutor {
     this.fallbackPolicy = fallbackPolicy;
     this.idletime = Math.trunc(idletime);
     this.autoTerminate = autoTerminate;
+
+    if (this.maxLength < 0) throw new ArgumentError("`max_threads` cannot be less than 0");
+    if (this.maxLength > 2147483647) {
+      throw new ArgumentError("`max_threads` cannot be greater than 2147483647");
+    }
+    if (this.minLength < 0) throw new ArgumentError("`min_threads` cannot be less than 0");
+    if (this.minLength > this.maxLength) {
+      throw new ArgumentError("`min_threads` cannot be more than `max_threads`");
+    }
   }
 
   /** @noRailsEquivalent PERMANENT */

@@ -122,4 +122,27 @@ describe("ThreadPoolExecutor", () => {
     executor.shutdown();
     expect(await executor.waitForTermination(1)).toBe(true);
   });
+
+  it("validates its thread bounds as ns_initialize does", () => {
+    const opts = { maxQueue: 0, fallbackPolicy: "caller_runs" as const };
+    expect(() => new ThreadPoolExecutor({ ...opts, minThreads: 0, maxThreads: -1 })).toThrow(
+      "`max_threads` cannot be less than 0",
+    );
+    expect(() => new ThreadPoolExecutor({ ...opts, minThreads: 2, maxThreads: 1 })).toThrow(
+      "`min_threads` cannot be more than `max_threads`",
+    );
+  });
+
+  it("queues a task it has no worker for when maxThreads is 0", async () => {
+    const executor = new ThreadPoolExecutor({
+      minThreads: 0,
+      maxThreads: 0,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+    });
+    let ran = false;
+    expect(executor.post(() => (ran = true))).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(ran).toBe(false);
+  });
 });
