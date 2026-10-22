@@ -14129,27 +14129,6 @@
   {
     "package": "actionview",
     "rubyFile": "dependency_tracker/erb_tracker.rb",
-    "rubyName": "add_dependencies",
-    "digest": "58d1ddc6ba4e1214",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "dependency_tracker/erb_tracker.rb",
-    "rubyName": "add_dynamic_dependency",
-    "digest": "6fc396ebd1a95ad3",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "dependency_tracker/erb_tracker.rb",
-    "rubyName": "add_static_dependency",
-    "digest": "0f6208db4058609e",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actionview",
-    "rubyFile": "dependency_tracker/erb_tracker.rb",
     "rubyName": "call",
     "digest": "1a66356439cdd53d",
     "ref": "v8.0.2"
