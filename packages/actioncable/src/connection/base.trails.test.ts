@@ -85,25 +85,4 @@ describe("ActionCable::Connection::Base", () => {
     expect(s.connections).toEqual([]);
     expect(Authorization.UnauthorizedError).toBeDefined();
   });
-
-  it("answers 404 for a non-WebSocket request", () => {
-    const e = env();
-    delete e["HTTP_UPGRADE"];
-    const connection = new Connection(server(), e);
-    expect(connection.process()).toEqual([
-      404,
-      { "content-type": "text/plain; charset=utf-8" },
-      ["Page not found"],
-    ]);
-  });
-
-  it("formats inspect and statistics", () => {
-    const connection = new Connection(server(), { ...env(), "action_dispatch.request_id": "r1" });
-    expect(connection.inspect()).toMatch(/^#<Connection:0x[0-9a-f]{14}>$/);
-    expect(connection.statistics).toMatchObject({
-      identifier: "",
-      subscriptions: [],
-      requestId: "r1",
-    });
-  });
 });

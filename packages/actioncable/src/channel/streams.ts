@@ -37,28 +37,15 @@ interface StreamsChannel {
   transmit(data: unknown, options: { via: string }): unknown;
   reject(): unknown;
   broadcastingFor(model: unknown): string;
-  streamFrom(
-    broadcasting: unknown,
-    callback?: Handler | null,
-    options?: { coder?: Coder | null },
-    block?: Handler,
-  ): void;
-  streamFor(model: unknown, callback?: Handler | null, options?: { coder?: Coder | null }): void;
-  stopStreamFrom(broadcasting: string): Promise<void>;
-  workerPoolStreamHandler(
-    broadcasting: string,
-    userHandler: Handler | null | undefined,
-    options: { coder: Coder | null },
-  ): Handler;
-  streamHandler(
-    broadcasting: string,
-    userHandler: Handler | null | undefined,
-    options: { coder: Coder | null },
-  ): Handler;
-  defaultStreamHandler(broadcasting: string, options: { coder: Coder | null }): Handler;
-  streamDecoder(handler: Handler | undefined, options: { coder: Coder | null }): Handler;
-  streamTransmitter(handler: Handler | undefined, options: { broadcasting: string }): Handler;
-  identityHandler(): Handler;
+  streamFrom: typeof streamFrom;
+  streamFor: typeof streamFor;
+  stopStreamFrom: typeof stopStreamFrom;
+  workerPoolStreamHandler: typeof workerPoolStreamHandler;
+  streamHandler: typeof streamHandler;
+  defaultStreamHandler: typeof defaultStreamHandler;
+  streamDecoder: typeof streamDecoder;
+  streamTransmitter: typeof streamTransmitter;
+  identityHandler: typeof identityHandler;
 }
 
 type StreamOptions = { coder?: Coder | null };
