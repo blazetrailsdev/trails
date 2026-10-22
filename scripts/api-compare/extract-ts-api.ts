@@ -7617,7 +7617,6 @@ function nativeHashForms(
   return [];
 }
 
-/** `x`, through the parentheses and assertions a port wraps a value in. */
 function unwrapped(e: ts.Expression): ts.Expression {
   while (ts.isParenthesizedExpression(e) || ts.isNonNullExpression(e) || ts.isAsExpression(e)) {
     e = e.expression;
@@ -7625,7 +7624,6 @@ function unwrapped(e: ts.Expression): ts.Expression {
   return e;
 }
 
-/** The parameter names of a callback, when every one is a plain identifier. */
 function callbackParams(e: ts.Expression | undefined): string[] | undefined {
   if (e === undefined || !(ts.isArrowFunction(e) || ts.isFunctionExpression(e))) return undefined;
   const names: string[] = [];
@@ -7636,7 +7634,6 @@ function callbackParams(e: ts.Expression | undefined): string[] | undefined {
   return names;
 }
 
-/** The expression a callback answers: an expression body, or a lone `return`. */
 function callbackResult(e: ts.Expression): ts.Expression | undefined {
   if (!(ts.isArrowFunction(e) || ts.isFunctionExpression(e))) return undefined;
   if (!ts.isBlock(e.body)) return unwrapped(e.body);
@@ -7650,7 +7647,6 @@ function isIdent(e: ts.Node | undefined, name: string): boolean {
   return e !== undefined && ts.isIdentifier(e) && e.text === name;
 }
 
-/** `x != null` (either operand order), the null test Ruby's `compact` makes. */
 function isNotNullTest(e: ts.Expression | undefined, param: string): boolean {
   if (e === undefined || !ts.isBinaryExpression(e)) return false;
   if (e.operatorToken.kind !== ts.SyntaxKind.ExclamationEqualsToken) return false;
@@ -7658,7 +7654,6 @@ function isNotNullTest(e: ts.Expression | undefined, param: string): boolean {
   return (isIdent(e.left, param) && isNull(e.right)) || (isNull(e.left) && isIdent(e.right, param));
 }
 
-/** A `new Set(x)`'s argument. */
 function setOperand(e: ts.Expression | undefined): ts.Expression | undefined {
   if (e === undefined) return undefined;
   const n = unwrapped(e);
@@ -7667,8 +7662,6 @@ function setOperand(e: ts.Expression | undefined): ts.Expression | undefined {
     : undefined;
 }
 
-/** `[...new Set(xs)]` / `Array.from(new Set(xs))`: `uniq`, and `union` where
- *  the set is built from a literal of two or more spreads. */
 function setRoundTripForms(operand: ts.Expression | undefined): string[] {
   if (operand === undefined) return [];
   const union =
@@ -7678,12 +7671,6 @@ function setRoundTripForms(operand: ts.Expression | undefined): string[] {
   return union ? ["union"] : ["uniq"];
 }
 
-/**
- * The value-level native forms a node is, beside the Hash forms
- * {@link nativeHashForms} records with a receiver: each the whole port of a
- * Ruby Array, Hash, Numeric or String call that `NATIVE_FORM_ANALOGUES`
- * (enumerable-idioms.ts) credits on a proven receiver kind only.
- */
 function nativeValueForms(n: ts.Node): string[] {
   if (ts.isArrayLiteralExpression(n)) {
     const [only] = n.elements;

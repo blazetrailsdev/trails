@@ -3048,11 +3048,6 @@ class ApiExtractor
   # `delete` answers a boolean.
   BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update].freeze
 
-  # The calls whose native form ports one arm only, each with the test a site
-  # must pass to take it: `uniq` / `sort` without a block (`[...new Set(xs)]`,
-  # `.sort()`), `count` with one (`.filter(fn).length`), `round` without digits
-  # and `chomp` with a literal argument. A site on any other arm records the
-  # kind `formless` in place of its proven class, so no form credits it.
   FORM_ARMS = {
     "uniq" => ->(has_block, _args) { !has_block },
     "sort" => ->(has_block, _args) { !has_block },
