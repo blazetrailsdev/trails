@@ -1,7 +1,15 @@
 import "./global-id.js";
-import { include, onLoad, OrderedOptions, squish } from "@blazetrails/activesupport";
+import {
+  type ClassMethods as CallbacksClassMethods,
+  include,
+  onLoad,
+  OrderedOptions,
+  squish,
+} from "@blazetrails/activesupport";
 import {
   block,
+  eachPair,
+  union,
   rbModName,
   rbObjClass,
   except,
@@ -31,10 +39,6 @@ declare module "../trailtie/configuration.js" {
   interface Configuration {
     activeJob: ActiveJobConfig;
   }
-}
-
-interface ExecuteCallbacksHost {
-  setCallback(name: string, ...filterList: unknown[]): void;
 }
 
 export class Trailtie extends BaseTrailtie {
@@ -95,13 +99,16 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_job.set_configs", (app) => {
-      const options = app.config.activeJob;
+      let options: Record<string, unknown> = app.config.activeJob as unknown as Record<
+        string,
+        unknown
+      >;
       if (options.queueAdapter == null || options.queueAdapter === false) {
         options.queueAdapter = Trails.env["test?"]() ? "test" : "async";
       }
 
       this.config.afterInitialize(() => {
-        options.each((k, v) => {
+        eachPair(options, (k, v) => {
           k = `${k}=`;
           if (rbObjRespondTo(ActiveJob, k)) {
             rbFSend(ActiveJob, k, v);
@@ -110,14 +117,14 @@ export class Trailtie extends BaseTrailtie {
       });
 
       onLoad("active_job", function (this: typeof Base) {
-        const configs = except(
-          options.toH(),
+        options = except(
+          (options as unknown as ActiveJobConfig).toH(),
           "logQueryTagsAroundPerform",
           "customSerializers",
           "enqueueAfterTransactionCommit",
         );
 
-        Object.entries(configs).forEach(([k, v]) => {
+        eachPair(options, (k, v) => {
           k = `${k}=`;
           if (rbObjRespondTo(ActiveJob, k)) {
             rbFSend(ActiveJob, k, v);
@@ -134,11 +141,11 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_job.set_reloader_hook", (app) => {
       onLoad("active_job", () => {
-        (rbObjSingletonClass(Callbacks) as unknown as ExecuteCallbacksHost).setCallback(
+        (rbObjSingletonClass(Callbacks) as unknown as CallbacksClassMethods).setCallback(
           "execute",
           "around",
           { prepend: true },
-          block((_: unknown, inner: () => unknown) => app.reloader.wrap(async () => await inner())),
+          block((_: unknown, inner: () => unknown) => app.reloader.wrap(() => inner())),
         );
       });
     });
@@ -150,8 +157,7 @@ export class Trailtie extends BaseTrailtie {
         app.config.activeJob.logQueryTagsAroundPerform;
 
       if (queryLogsTagsEnabled) {
-        const queryLogTags = app.config.activeRecord.queryLogTags;
-        app.config.activeRecord.queryLogTags = [...new Set([...queryLogTags, "job"])];
+        app.config.activeRecord.queryLogTags = union(app.config.activeRecord.queryLogTags, ["job"]);
 
         onLoad("active_record", () => {
           QueryLogs.taggings = {

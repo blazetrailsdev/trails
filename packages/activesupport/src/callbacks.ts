@@ -951,6 +951,7 @@ export interface ClassMethods<T extends object = object> {
     callback: AroundCallback<T> | CallbackObject,
     options?: CallbackOptions<T>,
   ): void;
+  setCallback(name: string, ...filterList: FilterListEntry<T>[]): void;
   skipCallback(name: string, ...filterList: FilterListEntry<T>[]): void;
   resetCallbacks(name: string): void;
 }

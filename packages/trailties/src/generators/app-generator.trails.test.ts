@@ -94,6 +94,14 @@ describe("AppGenerator (trails-only)", () => {
     expect(
       File.read(File.join(tmpDir, "my-app", "config", "environments", "development.ts")),
     ).toMatch(/this\.config\.activeJob\.verboseEnqueueLogs = true;/);
+
+    await new AppGenerator({
+      cwd: tmpDir,
+      output: () => {},
+      appPath: "skipped-app",
+      skipActiveJob: true,
+    }).run();
+    expect(File.isExist(File.join(tmpDir, "skipped-app", "app", "jobs"))).toBe(false);
   });
 
   it("keeps skipEslint nil when not passed, distinct from an explicit false", () => {
