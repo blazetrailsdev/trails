@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# The Rails API/Test Comparison for a diff confined to one package:
-#   bash scripts/ci/scoped-comparison.sh <package>
-# Every gate below is scoped to the package (`--package`, scripts/api-compare/
-# scope.ts) except these, which take no --package:
-#   inlined   reads the pairs the scoped compare wrote, so it is scoped by them
-#   reasons   reads the committed @missingRailsCall tags and baseline reasons
-#   legacy    greps the repo for retired script names
-# The whole-surface scripts it does not run are SCOPED_COMPARISON_SKIPS in
-# scripts/ci-suite-coverage.test.ts, each with its reason.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
@@ -15,8 +6,6 @@ export CI_BG_DIR="${CI_BG_DIR:-$(mktemp -d)}"
 
 pkg="${1:?usage: scoped-comparison.sh <package>}"
 
-# thor is a pseudo-package living under trailties (PACKAGE_DIR_OVERRIDES in
-# scripts/api-compare/config.ts); every other package is packages/<pkg>/src.
 case "$pkg" in
   thor) src=packages/trailties/src/thor ;;
   *) src="packages/$pkg/src" ;;
@@ -31,6 +20,11 @@ export LIB_PATHS_JSON LIB_ENTRY_FILES_JSON TEST_PATHS_JSON LOCKFILE_PATH
 
 api='pnpm exec tsx scripts/api-compare'
 tests='pnpm exec tsx scripts/test-compare'
+unscoped_reasons=(
+  "inlined: takes no --package; reads the pairs the scoped compare wrote"
+  "reasons: takes no --package; reads committed @missingRailsCall tags and baseline reasons"
+  "legacy: takes no --package; greps the repo for retired script names"
+)
 unscoped=$(
   cat <<SPEC
 reasons: pnpm exec tsx scripts/api-compare/lint-missing-rails-call-reasons.ts
@@ -62,18 +56,14 @@ assertions after test-compare: $tests/lint-assertion-mismatches.ts --no-regen --
 SPEC
 )
 
-# A package with no vendored lib path is not yet enrolled in the compare
-# tooling (actioncable until enroll-actioncable-in-compare-tooling-and-parity-
-# gates lands): there is no Ruby side to extract, and every scoped gate's
-# --package refuses it. Say so and run what does not read an artifact, rather
-# than passing a scoped gate over nothing.
 if [ "$LIB_PATHS_JSON" = "{}" ]; then
-  echo "::warning::$pkg is not enrolled in the compare tooling; ran only its unscoped gates"
+  echo "::warning::$pkg has no vendored lib path, so it is not enrolled in the compare tooling; ran only its unscoped gates"
   spec="$unscoped"
 else
   spec="$scoped"$'\n'"$unscoped"
 fi
 
+printf "unscoped %s\n" "${unscoped_reasons[@]}"
 node scripts/ci/bg-gates.mjs start <<<"$spec"
 status=0
 while IFS= read -r id; do

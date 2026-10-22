@@ -2189,9 +2189,6 @@ jobs:
         if: always()
         run: node scripts/ci/bg-gates.mjs summary
 
-  # One job for every package a *_only flag scopes. SCOPED_PACKAGE names it;
-  # SCOPED_SOURCE is the vendored source holding its Ruby (actioncable is a
-  # package of the rails source, not a source of its own).
   rails-comparison-scoped:
     name: Rails API/Test Comparison (${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'actioncable' }})
     needs: changes
