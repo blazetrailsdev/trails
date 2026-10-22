@@ -1,8 +1,8 @@
 import { kernelArray } from "@blazetrails/activesupport";
 import {
-  type Comparable,
+  cmp,
   fetch,
-  greaterThan,
+  rbCmpint,
   rbModConstSet,
   rbObjClass,
   rbObjIsProc,
@@ -109,7 +109,7 @@ export class TestAdapter extends AbstractAdapter {
   /** @internal */
   private isFilteredTime(job: TestAdapterJob): boolean | null {
     return this.at != null && job.scheduledAt != null
-      ? greaterThan.call(job.scheduledAt as Comparable, this.at)
+      ? rbCmpint(cmp(job.scheduledAt, this.at), job.scheduledAt, this.at) > 0
       : null;
   }
 
