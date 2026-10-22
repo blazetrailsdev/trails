@@ -13,22 +13,21 @@ interface EventTarget {
   onClose(reason: string, code: number): unknown;
 }
 
-interface EventLoop {
-  attach(io: never, stream: Stream): unknown;
-  detach(io: never, stream: Stream): unknown;
-}
+type EventLoop = ConstructorParameters<typeof Stream>[0];
 
 type DriverInstance = ReturnType<typeof Driver.http>;
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
+/** @noRailsEquivalent PERMANENT */
 export function driverRequest(env: Env): Parameters<typeof Driver.http>[0] {
   const headers: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
-    if (key.startsWith("HTTP_")) {
-      headers[key.slice(5).toLowerCase().replaceAll("_", "-")] = String(value);
+    if (key.startsWith("HTTP_") || key === "CONTENT_TYPE" || key === "CONTENT_LENGTH") {
+      headers[
+        key
+          .replace(/^HTTP_/, "")
+          .toLowerCase()
+          .replaceAll("_", "-")
+      ] = String(value);
     }
   }
   return {
@@ -61,13 +60,13 @@ export class ClientSocket {
 
   readonly env: Env;
   readonly url: string;
-  private eventTarget: EventTarget;
-  private eventLoop: EventLoop;
-  private driver: DriverInstance | null;
-  private driverStarted: boolean | null;
-  private closeParams: [string, number];
-  private readyState: number;
-  private stream: Stream;
+  private _eventTarget: EventTarget;
+  private _eventLoop: EventLoop;
+  private _driver: DriverInstance | null;
+  private _driverStarted: boolean | null;
+  private _closeParams: [string, number];
+  private _readyState: number;
+  private _stream: Stream;
 
   constructor(
     env: Env,
@@ -76,17 +75,17 @@ export class ClientSocket {
     protocols: readonly string[],
   ) {
     this.env = env;
-    this.eventTarget = eventTarget;
-    this.eventLoop = eventLoop;
+    this._eventTarget = eventTarget;
+    this._eventLoop = eventLoop;
 
     this.url = ClientSocket.determineUrl(this.env);
 
-    this.driver = this.driverStarted = null;
-    this.closeParams = ["", 1006];
+    this._driver = this._driverStarted = null;
+    this._closeParams = ["", 1006];
 
-    this.readyState = ClientSocket.CONNECTING;
+    this._readyState = ClientSocket.CONNECTING;
 
-    const driver = (this.driver = Driver.http(driverRequest(this.env), { protocols }));
+    const driver = (this._driver = Driver.http(driverRequest(this.env), { protocols }));
     driver.io.on("data", (data) => this.write(data));
 
     driver.on("open", (_e) => this.open());
@@ -94,20 +93,20 @@ export class ClientSocket {
     driver.on("close", (e) => this.beginClose(e.reason, e.code));
     driver.on("error", (e) => this.emitError(e.message));
 
-    this.stream = new Stream(this.eventLoop as never, this);
+    this._stream = new Stream(eventLoop, this);
   }
 
   startDriver(): void {
-    if (this.driver == null || this.driverStarted) return;
-    this.stream.hijackRackSocket();
+    if (this._driver == null || this._driverStarted) return;
+    this._stream.hijackRackSocket();
 
     const callback = this.env["async.callback"] as ((response: unknown) => unknown) | undefined;
     if (callback != null) {
-      callback([101, {}, this.stream]);
+      callback([101, {}, this._stream]);
     }
 
-    this.driverStarted = true;
-    this.driver.start();
+    this._driverStarted = true;
+    this._driver.start();
   }
 
   rackResponse(): [number, Record<string, string>, unknown[]] {
@@ -117,20 +116,20 @@ export class ClientSocket {
 
   write(data: Data): unknown {
     try {
-      return this.stream.write(data);
+      return this._stream.write(data);
     } catch (e) {
       return this.emitError((e as Error).message);
     }
   }
 
   transmit(message: unknown): boolean {
-    if (this.readyState > ClientSocket.OPEN) return false;
+    if (this._readyState > ClientSocket.OPEN) return false;
     if (typeof message === "number" || typeof message === "bigint") {
-      return this.driver!.text(message.toString());
+      return this._driver!.text(message.toString());
     } else if (typeof message === "string") {
-      return this.driver!.text(message);
+      return this._driver!.text(message);
     } else if (Array.isArray(message)) {
-      return this.driver!.binary(message);
+      return this._driver!.binary(message);
     } else {
       return false;
     }
@@ -148,12 +147,12 @@ export class ClientSocket {
       );
     }
 
-    if (this.readyState !== ClientSocket.CLOSED) this.readyState = ClientSocket.CLOSING;
-    return this.driver!.close(reason, code);
+    if (this._readyState !== ClientSocket.CLOSED) this._readyState = ClientSocket.CLOSING;
+    return this._driver!.close(reason, code);
   }
 
   parse(data: Data): unknown {
-    return this.driver!.parse(data as Uint8Array);
+    return this._driver!.parse(data as Uint8Array);
   }
 
   clientGone(): void {
@@ -161,51 +160,51 @@ export class ClientSocket {
   }
 
   isAlive(): boolean {
-    return this.readyState === ClientSocket.OPEN;
+    return this._readyState === ClientSocket.OPEN;
   }
 
   get protocol(): string | undefined {
-    return this.driver!.protocol;
+    return this._driver!.protocol;
   }
 
   /** @internal */
   private open(): void {
-    if (this.readyState !== ClientSocket.CONNECTING) return;
-    this.readyState = ClientSocket.OPEN;
+    if (this._readyState !== ClientSocket.CONNECTING) return;
+    this._readyState = ClientSocket.OPEN;
 
-    this.eventTarget.onOpen();
+    this._eventTarget.onOpen();
   }
 
   /** @internal */
   private receiveMessage(data: Data): void {
-    if (this.readyState !== ClientSocket.OPEN) return;
+    if (this._readyState !== ClientSocket.OPEN) return;
 
-    this.eventTarget.onMessage(data);
+    this._eventTarget.onMessage(data);
   }
 
   /** @internal */
   private emitError(message: string): void {
-    if (this.readyState >= ClientSocket.CLOSING) return;
+    if (this._readyState >= ClientSocket.CLOSING) return;
 
-    this.eventTarget.onError(message);
+    this._eventTarget.onError(message);
   }
 
   /** @internal */
   private beginClose(reason: string, code: number): void {
-    if (this.readyState === ClientSocket.CLOSED) return;
-    this.readyState = ClientSocket.CLOSING;
-    this.closeParams = [reason, code];
+    if (this._readyState === ClientSocket.CLOSED) return;
+    this._readyState = ClientSocket.CLOSING;
+    this._closeParams = [reason, code];
 
-    if (this.stream) this.stream.shutdown();
+    if (this._stream) this._stream.shutdown();
     this.finalizeClose();
   }
 
   /** @internal */
   private finalizeClose(): void {
-    if (this.readyState === ClientSocket.CLOSED) return;
-    this.readyState = ClientSocket.CLOSED;
+    if (this._readyState === ClientSocket.CLOSED) return;
+    this._readyState = ClientSocket.CLOSED;
 
-    this.eventTarget.onClose(...this.closeParams);
+    this._eventTarget.onClose(...this._closeParams);
   }
 }
 

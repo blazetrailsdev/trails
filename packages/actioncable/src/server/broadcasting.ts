@@ -15,6 +15,28 @@ interface CoderOptions {
   coder?: Coder | null;
 }
 
+export const Broadcasting = defineModule({
+  broadcast(
+    this: BroadcastingServer & { broadcasterFor: typeof broadcasterFor },
+    broadcasting: unknown,
+    message: unknown,
+    options: CoderOptions = {},
+  ): Promise<unknown> {
+    return this.broadcasterFor(broadcasting, options).broadcast(message);
+  },
+
+  broadcasterFor,
+});
+
+function broadcasterFor(
+  this: BroadcastingServer,
+  broadcasting: unknown,
+  options: CoderOptions = {},
+): Broadcaster {
+  const coder = Object.hasOwn(options, "coder") ? (options.coder ?? null) : ActiveSupportJSON;
+  return new Broadcaster(this, String(broadcasting), { coder });
+}
+
 export class Broadcaster {
   readonly server: BroadcastingServer;
   readonly broadcasting: string;
@@ -43,29 +65,6 @@ export class Broadcaster {
       return await this.server.pubsub.broadcast(this.broadcasting, encoded);
     });
   }
-}
-
-export const Broadcasting = defineModule({
-  broadcast(
-    this: BroadcastingServer & { broadcasterFor: typeof broadcasterFor },
-    broadcasting: unknown,
-    message: unknown,
-    options: CoderOptions = {},
-  ): Promise<unknown> {
-    const coder = Object.hasOwn(options, "coder") ? (options.coder ?? null) : ActiveSupportJSON;
-    return this.broadcasterFor(broadcasting, { coder }).broadcast(message);
-  },
-
-  broadcasterFor,
-});
-
-function broadcasterFor(
-  this: BroadcastingServer,
-  broadcasting: unknown,
-  options: CoderOptions = {},
-): Broadcaster {
-  const coder = Object.hasOwn(options, "coder") ? (options.coder ?? null) : ActiveSupportJSON;
-  return new Broadcaster(this, String(broadcasting), { coder });
 }
 
 rbModConstSet(Broadcasting, "Broadcaster", Broadcaster);
