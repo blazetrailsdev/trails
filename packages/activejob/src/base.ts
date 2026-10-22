@@ -13,7 +13,7 @@ import {
   rbObjClass,
   SecureRandom,
 } from "@blazetrails/ruby-compat";
-import { Callbacks } from "./callbacks.js";
+import { Callbacks, ClassMethods as CallbacksClassMethods } from "./callbacks.js";
 import { ClassMethods, Core } from "./core.js";
 import { Enqueuing, ClassMethods as EnqueuingClassMethods } from "./enqueuing.js";
 import { Exceptions } from "./exceptions.js";
@@ -55,6 +55,13 @@ export class Base {
   /** @internal */
   declare static isQueueAdapter: typeof QueueAdapterClassMethods.isQueueAdapter;
   declare static defaultQueueName: unknown;
+  declare static setCallback: typeof ASCallbacks.ClassMethods.setCallback;
+  declare static beforePerform: typeof CallbacksClassMethods.beforePerform;
+  declare static afterPerform: typeof CallbacksClassMethods.afterPerform;
+  declare static aroundPerform: typeof CallbacksClassMethods.aroundPerform;
+  declare static beforeEnqueue: typeof CallbacksClassMethods.beforeEnqueue;
+  declare static afterEnqueue: typeof CallbacksClassMethods.afterEnqueue;
+  declare static aroundEnqueue: typeof CallbacksClassMethods.aroundEnqueue;
   declare static queueAs: typeof QueueNameClassMethods.queueAs;
   declare static queueNameFromPart: typeof QueueNameClassMethods.queueNameFromPart;
   declare static queueName: unknown;
