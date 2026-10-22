@@ -1,8 +1,20 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, type TestContext } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { include, registerConstant } from "@blazetrails/ruby-compat";
+import { TestHelper } from "./test-helper.js";
 import { isAdapterIs } from "./test-helpers/helper.js";
 import { HelloJob } from "./test-helpers/jobs/hello-job.js";
+import { RetryJob } from "./test-helpers/jobs/retry-job.js";
 import { JobBuffer } from "./test-helpers/support/job-buffer.js";
+
+class InstrumentationTest extends TestCase {
+  static override toString(): string {
+    return "InstrumentationTest";
+  }
+}
+include(InstrumentationTest, TestHelper);
+registerConstant("InstrumentationTest", InstrumentationTest);
 
 async function subscribed(name: string | RegExp, block: () => unknown): Promise<unknown[][]> {
   const events: unknown[][] = [];
@@ -27,14 +39,33 @@ describe("InstrumentationTest", () => {
     expect(events.length).toBe(1);
   });
 
-  if (!isAdapterIs("inline", "sneakers")) {
-    // BLOCKED: port-activejob-test-helper-performed-assertions
-    it.skip("retry emits an enqueue retry event", () => {});
+  it.skipIf(isAdapterIs("inline", "sneakers"))(
+    "retry emits an enqueue retry event",
+    async ({ testCase }: TestContext) => {
+      const t = testCase as unknown as TestHelper;
+      const events = await subscribed("enqueue_retry.active_job", () =>
+        t.performEnqueuedJobs({}, () => RetryJob.performLater("DefaultsError", 2)),
+      );
+      expect(events.length).toBe(1);
+    },
+  );
 
-    // BLOCKED: port-activejob-test-helper-performed-assertions
-    it.skip("retry exhaustion emits a retry_stopped event", () => {});
-  }
+  it.skipIf(isAdapterIs("inline", "sneakers"))(
+    "retry exhaustion emits a retry_stopped event",
+    async ({ testCase }: TestContext) => {
+      const t = testCase as unknown as TestHelper;
+      const events = await subscribed("retry_stopped.active_job", () =>
+        t.performEnqueuedJobs({}, () => RetryJob.performLater("CustomCatchError", 6)),
+      );
+      expect(events.length).toBe(1);
+    },
+  );
 
-  // BLOCKED: port-activejob-test-helper-performed-assertions
-  it.skip("discard emits a discard event", () => {});
+  it("discard emits a discard event", async ({ testCase }: TestContext) => {
+    const t = testCase as unknown as TestHelper;
+    const events = await subscribed("discard.active_job", () =>
+      t.performEnqueuedJobs({}, () => RetryJob.performLater("DiscardableError", 2)),
+    );
+    expect(events.length).toBe(1);
+  });
 });

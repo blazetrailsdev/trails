@@ -23,6 +23,7 @@ import {
   rbObjClass,
   rbObjIsKindOf,
   round,
+  StandardError,
   rtest,
   toI,
   transformValues,
@@ -220,7 +221,8 @@ export class LogSubscriber extends BaseLogSubscriber {
     } else if (rbObjIsKindOf(arg, GlobalID.Identification)) {
       try {
         return (arg as { toGlobalId(): unknown }).toGlobalId();
-      } catch {
+      } catch (error) {
+        if (!(error instanceof StandardError)) throw error;
         return arg;
       }
     } else {
@@ -280,7 +282,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     const enqueuedCount = enqueuedJobs.length;
     const jobClassesCounts = Object.entries(
       tally(enqueuedJobs.map((job) => rbObjClass(job) as never)),
-    ).sort(([, a], [, b]) => -a - -b);
+    ).sort(([, a], [, b]) => b - a);
     return (
       `Enqueued ${enqueuedCount} ${pluralize("job", enqueuedCount)} to ${ActiveJob.adapterName(adapter)}` +
       ` (${jobClassesCounts.map(([klass, count]) => `${count} ${klass}`).join(", ")})`
