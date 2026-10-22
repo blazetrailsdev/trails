@@ -63,7 +63,7 @@ export class InputWrapper {
   gets(...args: unknown[]): unknown {
     if (args.length !== 0) throw new LintError("rack.input#gets called with arguments");
     const v = this._input.gets();
-    if (!(v == null || typeof v === "string")) {
+    if (!(v == null || typeof v === "string" || v instanceof Uint8Array)) {
       throw new LintError("rack.input#gets didn't return a String");
     }
     return v;
