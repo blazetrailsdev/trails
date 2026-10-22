@@ -7,6 +7,7 @@ import {
   rbObjClass,
   rbObjIsProc,
   rtest,
+  toS,
 } from "@blazetrails/ruby-compat";
 import { ActiveJob, QueueAdapters } from "../namespaces.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
@@ -116,7 +117,7 @@ export class TestAdapter extends AbstractAdapter {
   /** @internal */
   private isFilteredQueue(job: TestAdapterJob): boolean | null {
     if (this.queue != null) {
-      return job.queueName !== String(this.queue);
+      return job.queueName !== toS(this.queue);
     }
     return null;
   }

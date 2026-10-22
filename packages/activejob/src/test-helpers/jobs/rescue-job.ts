@@ -19,6 +19,8 @@ export class RescueJob extends Base {
     return "RescueJob";
   }
 
+  declare static OtherError: typeof OtherError;
+
   perform(person: unknown = "david"): void {
     switch (person) {
       case "david":

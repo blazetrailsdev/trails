@@ -136,7 +136,6 @@ describe("AppGenerator", () => {
     expect(exists("config/puma.ts")).toBe(false);
     expect(exists("config/cable.ts")).toBe(false);
     expect(exists("config/storage.ts")).toBe(false);
-    expect(exists("app/jobs")).toBe(false);
     expect(exists("app/mailers")).toBe(false);
     expect(exists("app/channels")).toBe(false);
     expect(exists("app/views/layouts/mailer.html.tse")).toBe(false);

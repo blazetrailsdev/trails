@@ -33,7 +33,6 @@ export type AppBaseOptions = GeneratorOptions & {
 const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
   skipActionCable: true,
   skipActionMailer: true,
-  skipActiveJob: true,
   skipActiveStorage: true,
 };
 

@@ -563,6 +563,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
       '@blazetrails/activemodel':
         specifier: workspace:*
         version: link:../activemodel
