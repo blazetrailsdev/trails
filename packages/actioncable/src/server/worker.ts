@@ -7,6 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  type Block,
   ThreadPoolExecutor,
   excBacktrace,
   isPlainHash,
@@ -19,8 +20,6 @@ import {
 import { ActionCable, Server } from "../namespaces.js";
 import { ActiveRecordConnectionManagement } from "./worker/active-record-connection-management.js";
 
-type Block = (...args: unknown[]) => unknown;
-
 interface Logger {
   error(message: unknown): unknown;
 }
@@ -28,8 +27,9 @@ interface Logger {
 /** @noRailsEquivalent PERMANENT */
 function splitArgs(
   args: unknown[],
-): [unknown[], { connection?: unknown } | null, Block | undefined] {
-  const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as Block) : undefined;
+): [unknown[], { connection?: unknown } | null, Block<unknown> | undefined] {
+  const tail = args.at(-1);
+  const block = rbBlockGivenP(tail) ? (args.pop(), tail) : undefined;
   const last = args.at(-1);
   const options =
     isPlainHash(last) && Object.hasOwn(last, "connection")
@@ -78,7 +78,7 @@ export class Worker {
     }
   }
 
-  asyncExec(receiver: unknown, ...args: unknown[] | [...unknown[], Block]): unknown {
+  asyncExec(receiver: unknown, ...args: unknown[] | [...unknown[], Block<unknown>]): unknown {
     const [rest, options, block] = splitArgs(args);
     if (!options) throw new ArgumentError("missing keyword: :connection");
     return this.asyncInvoke(
@@ -93,7 +93,7 @@ export class Worker {
   asyncInvoke(
     receiver: unknown,
     method: string,
-    ...args: unknown[] | [...unknown[], Block]
+    ...args: unknown[] | [...unknown[], Block<unknown>]
   ): unknown {
     const [rest, options, block] = splitArgs(args);
     const connection = options ? options.connection : receiver;
@@ -105,7 +105,7 @@ export class Worker {
   invoke(
     receiver: unknown,
     method: string,
-    ...args: unknown[] | [...unknown[], Block]
+    ...args: unknown[] | [...unknown[], Block<unknown>]
   ): Promise<unknown> {
     const [rest, options, block] = splitArgs(args);
     if (!options) throw new ArgumentError("missing keyword: :connection");
