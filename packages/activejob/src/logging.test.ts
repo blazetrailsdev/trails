@@ -539,7 +539,7 @@ describe("LoggingTest", () => {
     t.logger.level = WARN;
     await HelloJob.performLater("Dummy");
     expect(t.logger.messages).not.toMatch(/HelloJob/);
-    expect(t.logger.messages).toHaveLength(0);
+    expect(t.logger.messages).toBeEmpty();
 
     t.logger.level = INFO;
     await LoggingJob.performLater("Dummy");
@@ -556,7 +556,7 @@ describe("LoggingTest", () => {
         "Cristian",
       );
       expect(t.logger.messages).not.toMatch(/HelloJob/);
-      expect(t.logger.messages).toHaveLength(0);
+      expect(t.logger.messages).toBeEmpty();
 
       t.logger.level = INFO;
       await (LoggingJob.set({ waitUntil: hours(24).fromNow() }) as Configured).performLater(
@@ -574,7 +574,7 @@ describe("LoggingTest", () => {
       new HelloJob("John"),
     );
     expect(t.logger.messages).not.toMatch(/\(2 HelloJob, 1 LoggingJob\)/);
-    expect(t.logger.messages).toHaveLength(0);
+    expect(t.logger.messages).toBeEmpty();
 
     t.logger.level = INFO;
     await ActiveJob.performAllLater(
@@ -589,7 +589,7 @@ describe("LoggingTest", () => {
     t.logger.level = WARN;
     await t.performEnqueuedJobs({}, () => LoggingJob.performLater("Dummy"));
     expect(t.logger.messages).not.toMatch(/LoggingJob/);
-    expect(t.logger.messages).toHaveLength(0);
+    expect(t.logger.messages).toBeEmpty();
 
     t.logger.level = INFO;
     await t.performEnqueuedJobs({}, () => LoggingJob.performLater("Dummy"));
@@ -602,7 +602,7 @@ describe("LoggingTest", () => {
     t.logger.level = WARN;
     await t.performEnqueuedJobs({}, () => LoggingJob.performLater("Dummy"));
     expect(t.logger.messages).not.toMatch(/Dummy, here is it: Dummy/);
-    expect(t.logger.messages).toHaveLength(0);
+    expect(t.logger.messages).toBeEmpty();
 
     t.logger.level = INFO;
     await t.performEnqueuedJobs({}, () => LoggingJob.performLater("Dummy"));
@@ -615,7 +615,7 @@ describe("LoggingTest", () => {
       t.logger.level = WARN;
       await t.performEnqueuedJobs({}, () => RetryJob.performLater("DefaultsError", 2));
       expect(t.logger.messages).not.toMatch(/RetryJob/);
-      expect(t.logger.messages).toHaveLength(0);
+      expect(t.logger.messages).toBeEmpty();
 
       t.logger.level = INFO;
       await t.performEnqueuedJobs({}, () => RetryJob.performLater("DefaultsError", 2));
@@ -629,7 +629,7 @@ describe("LoggingTest", () => {
     t.logger.level = WARN;
     await t.performEnqueuedJobs({}, () => RescueJob.performLater("david"));
     expect(t.logger.messages).not.toMatch(/RescueJob/);
-    expect(t.logger.messages).toHaveLength(0);
+    expect(t.logger.messages).toBeEmpty();
 
     t.logger.level = INFO;
     await t.performEnqueuedJobs({}, () => RescueJob.performLater("david"));
@@ -644,7 +644,7 @@ describe("LoggingTest", () => {
       t.logger.level = FATAL;
       await t.performEnqueuedJobs({}, () => RetryJob.performLater("CustomCatchError", 6));
       expect(t.logger.messages).not.toMatch(/RetryJob/);
-      expect(t.logger.messages).toHaveLength(0);
+      expect(t.logger.messages).toBeEmpty();
 
       t.logger.level = ERROR;
       await t.performEnqueuedJobs({}, () => RetryJob.performLater("CustomCatchError", 6));
@@ -658,7 +658,7 @@ describe("LoggingTest", () => {
     t.logger.level = FATAL;
     await t.performEnqueuedJobs({}, () => RetryJob.performLater("DiscardableError", 2));
     expect(t.logger.messages).not.toMatch(/RetryJob/);
-    expect(t.logger.messages).toHaveLength(0);
+    expect(t.logger.messages).toBeEmpty();
 
     t.logger.level = ERROR;
     await t.performEnqueuedJobs({}, () => RetryJob.performLater("DiscardableError", 2));
