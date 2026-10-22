@@ -83,10 +83,6 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const grew = exceedances(marks, current, gated);
   const stale = staleMarks(marks, current, gated);
 
-  if (tighten && scope !== null) {
-    console.error("\n--tighten writes every package's mark; run it without --package.\n");
-    return 1;
-  }
   if (tighten) {
     if (grew.length > 0) {
       console.error(
