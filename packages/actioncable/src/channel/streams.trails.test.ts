@@ -51,7 +51,6 @@ include(ChatChannel, Streams);
 type Host = ChatChannel & {
   streamFrom(b: unknown, cb?: unknown, opts?: unknown, block?: Handler): void;
   stopStreamFrom(b: string): Promise<void>;
-  stopAllStreams(): Promise<void>;
   streams: Record<string, Handler>;
 };
 
