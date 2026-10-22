@@ -42,8 +42,6 @@ type Accessors = {
   set locale(value: DetailWriter);
   defaultLocale(): DetailValue;
   defaultFormats(): DetailValue;
-  defaultVariants(): DetailValue;
-  defaultHandlers(): DetailValue;
 };
 
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
