@@ -1,3 +1,4 @@
+import { LocalJumpError } from "./local-jump-error.js";
 import { classpaths } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes } from "./array.js";
 import { Enumerable } from "./enumerable.js";
@@ -494,6 +495,17 @@ export function rbModName(klass: object): string | null {
  */
 export const OBJECT_METHOD_TABLE: Record<string, (self: never, ...args: never[]) => unknown> =
   Object.create(null);
+
+/**
+ * `BasicObject#instance_exec` (`rb_obj_instance_exec`,
+ * `vendor/ruby/v3.3.11/vm_eval.c:2089`): yields `args` to the trailing block
+ * with `self` as the receiver.
+ */
+OBJECT_METHOD_TABLE.instanceExec = (self: unknown, ...args: unknown[]): unknown => {
+  const blk = args.at(-1);
+  if (typeof blk !== "function") throw new LocalJumpError("no block given (yield)");
+  return (blk as (...a: unknown[]) => unknown).apply(self, args.slice(0, -1));
+};
 
 /**
  * The methods a package defines on `Enumerable`, keyed by the camelCased Ruby

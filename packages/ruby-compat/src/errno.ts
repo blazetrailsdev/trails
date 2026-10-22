@@ -258,6 +258,30 @@ class EMFILE extends SystemCallError {
 }
 
 /**
+ * `Errno::ECONNRESET`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
+ * as {@link ENOTTY} is. A write to a socket the peer reset reaches JS as the
+ * host's own error carrying `code: "ECONNRESET"`, which is this class to
+ * `rescue Errno::ECONNRESET`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ECONNRESET`, which Action
+ * Cable rescues without defining.
+ */
+class ECONNRESET extends SystemCallError {
+  static readonly Errno = 104;
+  readonly code = "ECONNRESET";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Connection reset by peer" : `Connection reset by peer - ${mesg}`);
+    this.name = "Errno::ECONNRESET";
+    this.errno = ECONNRESET.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ECONNRESET";
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
@@ -266,6 +290,7 @@ class EMFILE extends SystemCallError {
  */
 export const Errno = {
   EAGAIN,
+  ECONNRESET,
   EEXIST,
   EISDIR,
   EMFILE,
