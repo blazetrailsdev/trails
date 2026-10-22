@@ -695,7 +695,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rails/solid_cache.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:582; RFC 0196-solid-stack.
       ref: "v1.0.7",
     },
     packages: [
@@ -703,7 +702,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "solid-cache",
         libPath: "lib/solid_cache",
         testPath: "test",
-        // No packages/solid-cache yet; enrolled by the story that creates it.
         compareApi: false,
         compareTests: false,
       },
@@ -714,7 +712,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rails/solid_queue.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:586; RFC 0196-solid-stack.
       ref: "v1.1.3",
     },
     packages: [
@@ -722,7 +719,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "solid-queue",
         libPath: "lib/solid_queue",
         testPath: "test",
-        // No packages/solid-queue yet; enrolled by the story that creates it.
         compareApi: false,
         compareTests: false,
       },
@@ -733,7 +729,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rails/solid_cable.git",
-      // vendor/rails/v8.0.2/Gemfile.lock:577; RFC 0196-solid-stack.
       ref: "v3.0.7",
     },
     packages: [
@@ -741,7 +736,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "solid-cable",
         libPath: "lib/solid_cable",
         testPath: "test",
-        // No packages/solid-cable yet; enrolled by the story that creates it.
         compareApi: false,
         compareTests: false,
       },
