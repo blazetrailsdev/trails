@@ -1587,6 +1587,7 @@ the capability, in a different place. Each is decided here, and each but
 | `action_dispatch/testing/integration.rb`              | Proxy (proto chain)   |
 | `thor/core_ext/hash_with_indifferent_access.rb`       | Proxy (proto chain)   |
 | `rack/multipart/uploaded_file.rb`                     | Proxy                 |
+| `builder/xmlbase.rb`                                  | Proxy                 |
 
 Rules that apply across the table:
 

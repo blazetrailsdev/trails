@@ -367,6 +367,26 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "builder",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/builder.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:156 resolves builder (3.3.0), which
+      // ActionView's `Template::Handlers::Builder` requires.
+      ref: "v3.3.0",
+    },
+    packages: [
+      {
+        name: "builder",
+        libPath: "lib/builder",
+        libEntryFile: "lib/builder.rb",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "thor",
     origin: {
       type: "git",
