@@ -3,8 +3,8 @@ import { connect, type Socket } from "node:net";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { HttpRequest, HttpResponse, HttpSocket, StringIO } from "@blazetrails/ruby-compat";
-import { b } from "@blazetrails/ruby-compat";
+import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/ruby-compat";
+import { b, TCPSocket } from "@blazetrails/ruby-compat";
 import type { RackApp, RackBody, RackEnv } from "../index.js";
 import { RACK_ERRORS, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "../constants.js";
 import { Files } from "../files.js";
@@ -315,14 +315,40 @@ describe("Rack::Handler::Node", () => {
       expect(typeof env[RACK_HIJACK]).toBe("function");
     });
 
+    it("full-hijacks through Rack::Lint and gets a TCPSocket", async () => {
+      let lintError: unknown = null;
+      let io: unknown = null;
+      const linted = new Lint(async (env) => {
+        io = (env[RACK_HIJACK] as () => TCPSocket)();
+        (io as TCPSocket).write("HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n");
+        (io as TCPSocket).closeWrite();
+        return [200, { "content-type": "text/plain" }, [""]];
+      });
+      await serving(
+        async (e) => {
+          try {
+            return await linted.call({ ...e, [RACK_ERRORS]: lintableErrors });
+          } catch (error) {
+            lintError = error;
+            return [500, {}, [""]];
+          }
+        },
+        async (url) => void (await rawGet(url, "/linted")),
+      );
+
+      expect(lintError).toBeNull();
+      expect(io).toBeInstanceOf(TCPSocket);
+    });
+
     it("lets the app full-hijack a GET and write a raw HTTP/1 response itself", async () => {
       let text = "";
       await serving(
         async (env) => {
-          const io = (env[RACK_HIJACK] as () => HttpSocket)();
-          io.end(
+          const io = (env[RACK_HIJACK] as () => TCPSocket)();
+          io.write(
             "HTTP/1.1 418 I'm a teapot\r\ncontent-length: 5\r\nconnection: close\r\n\r\nshort",
           );
+          io.closeWrite();
           return [200, {}, ["never written"]];
         },
         async (url) => {
@@ -344,8 +370,8 @@ describe("Rack::Handler::Node", () => {
           200,
           {
             "content-type": "text/event-stream",
-            "rack.hijack": (stream: HttpSocket) => {
-              stream.on("close", sawClose);
+            "rack.hijack": (stream: TCPSocket) => {
+              void stream.waitReadable().then(sawClose);
               stream.write("data: one\n\n");
             },
           },
@@ -381,10 +407,10 @@ describe("Rack::Handler::Node", () => {
       try {
         await serving(
           async (env) => {
-            const io = (env[RACK_HIJACK] as () => HttpSocket)();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
             setTimeout(() => {
               io.write("still mine");
-              io.end();
+              io.closeWrite();
             }, 30);
             throw new Error("after hijack");
           },
@@ -402,13 +428,13 @@ describe("Rack::Handler::Node", () => {
     });
 
     it("lets an in-flight response finish on shutdown, and waits for the app to close a socket it hijacked", async () => {
-      let hijackedIo: HttpSocket | null = null;
+      let hijackedIo: TCPSocket | null = null;
       let answer!: () => void;
       const answered = new Promise<void>((resolve) => (answer = resolve));
       const server = await Node.run(
         async (env) => {
           if (env.PATH_INFO === "/taken") {
-            hijackedIo = (env[RACK_HIJACK] as () => HttpSocket)();
+            hijackedIo = (env[RACK_HIJACK] as () => TCPSocket)();
             return [-1, {}, [""]];
           }
           await answered;
@@ -435,7 +461,7 @@ describe("Rack::Handler::Node", () => {
       expect(taken.destroyed).toBe(false);
       expect(stopped).toBe(false);
 
-      hijackedIo!.destroy();
+      hijackedIo!.close();
       await shutdown;
       expect(stopped).toBe(true);
     });
@@ -485,14 +511,39 @@ describe("Rack::Handler::Node", () => {
       expect(lintError).toBeNull();
     });
 
+    it("full-hijacks an upgrade through Rack::Lint and gets a TCPSocket", async () => {
+      let lintError: unknown = null;
+      let io: unknown = null;
+      const linted = new Lint(async (env) => {
+        io = (env[RACK_HIJACK] as () => TCPSocket)();
+        (io as TCPSocket).write("HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n");
+        (io as TCPSocket).closeWrite();
+        return [200, { "content-type": "text/plain" }, [""]];
+      });
+      await serving(
+        async (e) => {
+          try {
+            return await linted.call({ ...e, [RACK_ERRORS]: lintableErrors });
+          } catch (error) {
+            lintError = error;
+            return [500, {}, [""]];
+          }
+        },
+        async (url) => void (await upgradeRequest(url, "/cable")),
+      );
+
+      expect(lintError).toBeNull();
+      expect(io).toBeInstanceOf(TCPSocket);
+    });
+
     it("hands over the socket and writes nothing itself", async () => {
       const reply = await new Promise<string>((resolve, reject) => {
         serving(
           async (env) => {
-            const io = (env[RACK_HIJACK] as () => HttpSocket)();
-            io.on("data", (chunk) => {
-              io.write(`echo:${Buffer.from(chunk).toString()}`);
-              io.end();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
+            void io.waitReadable().then(() => {
+              io.write(`echo:${Buffer.from(io.read()).toString()}`);
+              io.closeWrite();
             });
             return [-1, {}, [""]];
           },
@@ -510,10 +561,10 @@ describe("Rack::Handler::Node", () => {
       const reply = await new Promise<string>((resolve, reject) => {
         serving(
           async (env) => {
-            const io = (env[RACK_HIJACK] as () => HttpSocket)();
-            io.on("data", (chunk) => {
-              io.write(`head:${Buffer.from(chunk).toString()}`);
-              io.end();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
+            void io.waitReadable().then(() => {
+              io.write(`head:${Buffer.from(io.read()).toString()}`);
+              io.closeWrite();
             });
             return [-1, {}, [""]];
           },
@@ -558,9 +609,9 @@ describe("Rack::Handler::Node", () => {
           200,
           {
             "content-type": "text/event-stream",
-            "rack.hijack": (stream: HttpSocket) => {
+            "rack.hijack": (stream: TCPSocket) => {
               stream.write("data: one\n\n");
-              stream.end();
+              stream.closeWrite();
             },
           },
           ignored,
@@ -639,10 +690,10 @@ describe("Rack::Handler::Node", () => {
       try {
         await serving(
           async (env) => {
-            const io = (env[RACK_HIJACK] as () => HttpSocket)();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
             setTimeout(() => {
               io.write("still mine");
-              io.end();
+              io.closeWrite();
             }, 30);
             throw new Error("after hijack");
           },
@@ -668,8 +719,8 @@ describe("Rack::Handler::Node", () => {
           {
             async *[Symbol.asyncIterator]() {
               yield "first";
-              const io = (env[RACK_HIJACK] as () => HttpSocket)();
-              io.end();
+              const io = (env[RACK_HIJACK] as () => TCPSocket)();
+              io.closeWrite();
               yield "second";
             },
           },
@@ -684,11 +735,11 @@ describe("Rack::Handler::Node", () => {
     });
 
     it("closes a socket it still owns on shutdown, and waits for the app to close one it hijacked", async () => {
-      let hijackedIo: HttpSocket | null = null;
+      let hijackedIo: TCPSocket | null = null;
       const server = await Node.run(
         async (env) => {
           if (env.PATH_INFO === "/taken") {
-            hijackedIo = (env[RACK_HIJACK] as () => HttpSocket)();
+            hijackedIo = (env[RACK_HIJACK] as () => TCPSocket)();
             return [-1, {}, [""]];
           }
           await new Promise(() => {});
@@ -714,7 +765,7 @@ describe("Rack::Handler::Node", () => {
       expect(taken.destroyed).toBe(false);
       expect(stopped).toBe(false);
 
-      hijackedIo!.destroy();
+      hijackedIo!.close();
       await shutdown;
       expect(stopped).toBe(true);
     });

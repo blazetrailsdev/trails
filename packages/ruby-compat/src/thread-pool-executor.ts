@@ -1,12 +1,28 @@
 import { ArgumentError } from "./argument-error.js";
+import { Concurrent } from "./concurrent/map.js";
+import { rbModConstSet } from "./include.js";
+import { StandardError } from "./standard-error.js";
 import { Thread } from "./thread.js";
+
+type FallbackPolicy = "abort" | "discard" | "caller_runs";
+
+/**
+ * concurrent-ruby's `Concurrent::RejectedExecutionError` (not vendored,
+ * `concurrent/errors.rb:42`), what a `:abort` pool raises for a task it will
+ * not take (`vendor/ruby/v3.3.11/error.c:3264` `rb_eStandardError`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class RejectedExecutionError extends StandardError {}
 
 /**
  * concurrent-ruby's `Concurrent::ThreadPoolExecutor`, the pool Rails builds for
  * async queries (`activerecord/lib/active_record.rb:286-294`,
  * `connection_adapters/abstract/connection_pool.rb:716-726`). A task beyond
  * `maxThreads` waits in a queue of at most `maxQueue` (0 is unbounded), and one
- * beyond that runs on the caller (`fallback_policy: :caller_runs`). Each worker
+ * beyond that, or one posted after {@link shutdown}, takes the `fallback_policy`
+ * (`:abort` by default, `executor/abstract_executor_service.rb:91-104`
+ * `fallback_action`). Each worker
  * is a `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897` `thread_s_new`).
  *
  * @noRailsEquivalent PERMANENT
@@ -19,7 +35,9 @@ export class ThreadPoolExecutor {
   /** @noRailsEquivalent PERMANENT */
   readonly maxQueue: number;
   /** @noRailsEquivalent PERMANENT */
-  readonly fallbackPolicy: "caller_runs";
+  readonly fallbackPolicy: FallbackPolicy;
+  /** @noRailsEquivalent PERMANENT */
+  readonly name: string | null;
   /** @noRailsEquivalent PERMANENT */
   readonly idletime: number;
   /** @noRailsEquivalent PERMANENT */
@@ -36,24 +54,30 @@ export class ThreadPoolExecutor {
 
   /** @noRailsEquivalent PERMANENT */
   constructor({
+    name = null,
     minThreads,
     maxThreads,
     maxQueue,
-    fallbackPolicy,
+    fallbackPolicy = "abort",
     idletime = 60,
     autoTerminate = true,
   }: {
+    name?: string | null;
     minThreads: number;
     maxThreads: number;
     maxQueue: number;
-    fallbackPolicy: "caller_runs";
+    fallbackPolicy?: FallbackPolicy;
     idletime?: number;
     autoTerminate?: boolean;
   }) {
+    this.name = name;
     this.minLength = minThreads;
     this.maxLength = maxThreads;
     this.maxQueue = maxQueue;
     this.fallbackPolicy = fallbackPolicy;
+    if (!["abort", "discard", "caller_runs"].includes(fallbackPolicy)) {
+      throw new ArgumentError(`${fallbackPolicy} is not a valid fallback policy`);
+    }
     this.idletime = Math.trunc(idletime);
     this.autoTerminate = autoTerminate;
 
@@ -68,13 +92,13 @@ export class ThreadPoolExecutor {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  post<A extends unknown[]>(...argsAndTask: [...args: A, task: (...args: A) => unknown]): true {
+  post<A extends unknown[]>(...argsAndTask: [...args: A, task: (...args: A) => unknown]): boolean {
     const args = argsAndTask.slice(0, -1) as A;
     const block = argsAndTask[argsAndTask.length - 1] as ((...args: A) => unknown) | undefined;
     if (typeof block !== "function") throw new ArgumentError("no block given");
     const task = () => block(...args);
     if (!this.isRunning()) {
-      task();
+      return this._fallbackAction(task);
     } else if (this._running >= this.minLength && this._ready.length > 0) {
       this.scheduledTaskCount += 1;
       this._ready.pop()!(task);
@@ -86,13 +110,45 @@ export class ThreadPoolExecutor {
       this._queue.push(task);
       this.scheduledTaskCount += 1;
     } else {
-      task();
+      return this._fallbackAction(task);
     }
     return true;
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  append(task: () => unknown): this {
+    this.post(task);
+    return this;
+  }
+
   private isRunning(): boolean {
     return !this._stopped;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isShuttingdown(): boolean {
+    return !(this.isRunning() || this.isShutdown());
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isShutdown(): boolean {
+    return this._stopped && this._running === 0;
+  }
+
+  private _fallbackAction(task: () => unknown): boolean {
+    switch (this.fallbackPolicy) {
+      case "abort":
+        throw new RejectedExecutionError();
+      case "discard":
+        return false;
+      case "caller_runs":
+        try {
+          task();
+        } catch {
+          return true;
+        }
+        return true;
+    }
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -177,11 +233,24 @@ export class ThreadPoolExecutor {
  */
 export class CachedThreadPool extends ThreadPoolExecutor {
   /** @noRailsEquivalent PERMANENT */
-  readonly name: string | null;
-
-  /** @noRailsEquivalent PERMANENT */
   constructor({ name = null }: { name?: string | null } = {}) {
-    super({ minThreads: 0, maxThreads: 2147483647, maxQueue: 0, fallbackPolicy: "caller_runs" });
-    this.name = name;
+    super({ name, minThreads: 0, maxThreads: 2147483647, maxQueue: 0 });
   }
 }
+
+let _globalIoExecutor: CachedThreadPool | undefined;
+
+/**
+ * `Concurrent.global_io_executor` (not vendored, `concurrent/configuration.rb:73-75`):
+ * the one process-wide `CachedThreadPool`, each worker a `Thread.new`
+ * (`vendor/ruby/v3.3.11/thread.c:897` `thread_s_new`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function globalIoExecutor(): CachedThreadPool {
+  return (_globalIoExecutor ??= new CachedThreadPool({ name: "io" }));
+}
+
+Concurrent.globalIoExecutor = globalIoExecutor;
+rbModConstSet(Concurrent, "ThreadPoolExecutor", ThreadPoolExecutor);
+rbModConstSet(Concurrent, "RejectedExecutionError", RejectedExecutionError);

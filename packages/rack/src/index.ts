@@ -1,4 +1,4 @@
-import type { HttpSocket } from "@blazetrails/ruby-compat";
+import type { TCPSocket } from "@blazetrails/ruby-compat";
 
 export { RELEASE, release } from "./version.js";
 export { RELEASE as VERSION } from "./version.js";
@@ -9,9 +9,9 @@ export type RackBody = AsyncIterable<string | Uint8Array> | Iterable<string | Ui
 
 export type RackHeaders =
   | Record<string, string | string[]>
-  | ({ "rack.hijack": (stream: HttpSocket) => unknown } & Record<
+  | ({ "rack.hijack": (stream: TCPSocket) => unknown } & Record<
       string,
-      string | string[] | ((stream: HttpSocket) => unknown)
+      string | string[] | ((stream: TCPSocket) => unknown)
     >);
 
 export type RackResponse = [number, RackHeaders, RackBody];

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Thread } from "./thread.js";
-import { ThreadPoolExecutor } from "./thread-pool-executor.js";
+import { Concurrent } from "./concurrent/map.js";
+import {
+  globalIoExecutor,
+  RejectedExecutionError,
+  ThreadPoolExecutor,
+} from "./thread-pool-executor.js";
 
 describe("ThreadPoolExecutor", () => {
   it("runs at most maxThreads tasks, queues up to maxQueue, then runs on the caller", async () => {
@@ -144,5 +149,79 @@ describe("ThreadPoolExecutor", () => {
     expect(executor.post(() => (ran = true))).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 5));
     expect(ran).toBe(false);
+  });
+
+  it("finishes posted tasks on shutdown, then rejects new ones under its default :abort", async () => {
+    const executor = new ThreadPoolExecutor({
+      name: "ActionCable",
+      minThreads: 1,
+      maxThreads: 2,
+      maxQueue: 0,
+    });
+    expect(executor.name).toBe("ActionCable");
+    expect(executor.fallbackPolicy).toBe("abort");
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let ran = 0;
+    executor.append(async () => {
+      await gate;
+      ran += 1;
+    });
+    executor.append(() => void (ran += 1)).append(() => void (ran += 1));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    executor.shutdown();
+    expect(executor.isShuttingdown()).toBe(true);
+    expect(executor.isShutdown()).toBe(false);
+    expect(() => executor.post(() => null)).toThrow(RejectedExecutionError);
+
+    release();
+    expect(await executor.waitForTermination(1)).toBe(true);
+    expect(ran).toBe(3);
+    expect(executor.isShuttingdown()).toBe(false);
+    expect(executor.isShutdown()).toBe(true);
+    expect(executor.scheduledTaskCount).toBe(3);
+    expect(executor.completedTaskCount).toBe(3);
+  });
+
+  it("counts a task that raised as completed", async () => {
+    const executor = new ThreadPoolExecutor({ minThreads: 1, maxThreads: 1, maxQueue: 0 });
+    executor.post(() => {
+      throw new Error("boom");
+    });
+    executor.post(() => Promise.reject(new Error("boom")));
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(executor.completedTaskCount).toBe(executor.scheduledTaskCount);
+    executor.shutdown();
+  });
+
+  it("rejects an unknown fallback policy and rescues a caller_runs task", () => {
+    expect(
+      () =>
+        new ThreadPoolExecutor({
+          minThreads: 0,
+          maxThreads: 1,
+          maxQueue: 0,
+          fallbackPolicy: "bogus" as "abort",
+        }),
+    ).toThrow("bogus is not a valid fallback policy");
+    const executor = new ThreadPoolExecutor({
+      minThreads: 0,
+      maxThreads: 1,
+      maxQueue: 0,
+      fallbackPolicy: "caller_runs",
+    });
+    executor.shutdown();
+    expect(
+      executor.post(() => {
+        throw new Error("boom");
+      }),
+    ).toBe(true);
+  });
+
+  it("answers one global io executor", () => {
+    expect(globalIoExecutor()).toBe(globalIoExecutor());
+    expect(Concurrent.globalIoExecutor()).toBe(globalIoExecutor());
+    expect(Concurrent.ThreadPoolExecutor).toBe(ThreadPoolExecutor);
   });
 });
