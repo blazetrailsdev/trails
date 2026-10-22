@@ -880,8 +880,6 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - uses: ./.github/actions/cache-build
-      # packages/mini-magick's specs shell out to ImageMagick, as
-      # mini_magick's own do (mini_magick/shell.rb).
       - name: Install ImageMagick
         run: |
           command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
