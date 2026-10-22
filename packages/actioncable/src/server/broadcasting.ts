@@ -37,6 +37,7 @@ function broadcasterFor(
   return new Broadcaster(this, String(broadcasting), { coder });
 }
 
+/** @internal */
 export class Broadcaster {
   readonly server: BroadcastingServer;
   readonly broadcasting: string;

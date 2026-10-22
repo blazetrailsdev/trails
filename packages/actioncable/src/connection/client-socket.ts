@@ -151,8 +151,8 @@ export class ClientSocket {
     return this._driver!.close(reason, code);
   }
 
-  parse(data: Data): unknown {
-    return this._driver!.parse(data as Uint8Array);
+  parse(data: Uint8Array): unknown {
+    return this._driver!.parse(data);
   }
 
   clientGone(): void {
