@@ -32,6 +32,8 @@ import {
   chomp,
   stringSplit,
   rbInspect,
+  rbCInteger,
+  rbObjClass,
 } from "@blazetrails/ruby-compat";
 import { MissingTemplate, TemplateError } from "./error.js";
 import { Digestor } from "../digestor.js";
@@ -823,7 +825,7 @@ describe("CachedViewRenderTest", () => {
     const translatingFrame = new SourceMapLocation(erbBtl, ex.template as Template);
     const translatedSpot = translatingFrame.spot(ex.cause);
 
-    expect(Number.isInteger(translatedSpot!.firstColumn)).toBe(true);
+    expect(rbObjClass(translatedSpot!.firstColumn)).toBe(rbCInteger);
   });
 
   it("render renderable does not mask nomethoderror from within render in", async () => {
