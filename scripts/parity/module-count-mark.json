@@ -20,9 +20,9 @@
     "moduleImport": 0
   },
   "activerecord": {
-    "newModule": 5,
-    "superMethod": 5,
-    "moduleImport": 13
+    "newModule": 4,
+    "superMethod": 3,
+    "moduleImport": 12
   },
   "activesupport": {
     "newModule": 3,
