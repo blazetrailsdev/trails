@@ -21,6 +21,6 @@ extend(ActiveRecordConnectionManagement, Concern);
   }
 ).included(null, function (this: WorkerClass) {
   if (TopLevel.ActiveRecord?.Base != null) {
-    this.setCallback("work", "around", "withDatabaseConnections");
+    this.setCallback("work", "around", ":withDatabaseConnections");
   }
 });

@@ -89,3 +89,11 @@ describe("ActionCable::Server::Worker", () => {
     expect(worker.isStopping()).toBe(true);
   });
 });
+
+describe("ActionCable::Server::Worker kwargs", () => {
+  it("raises missing keyword without connection:", () => {
+    const worker = new Worker();
+    expect(() => worker.invoke({ run() {} }, "run")).toThrow("missing keyword: :connection");
+    expect(() => worker.asyncExec({}, () => {})).toThrow("missing keyword: :connection");
+  });
+});

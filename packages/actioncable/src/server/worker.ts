@@ -6,6 +6,7 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import {
+  ArgumentError,
   ThreadPoolExecutor,
   excBacktrace,
   isPlainHash,
@@ -23,6 +24,7 @@ interface Logger {
   error(message: unknown): unknown;
 }
 
+/** @noRailsEquivalent PERMANENT */
 function splitArgs(
   args: unknown[],
 ): [unknown[], { connection?: unknown } | null, Block | undefined] {
@@ -77,11 +79,12 @@ export class Worker {
 
   asyncExec(receiver: unknown, ...args: unknown[]): unknown {
     const [rest, options, block] = splitArgs(args);
+    if (!options) throw new ArgumentError("missing keyword: :connection");
     return this.asyncInvoke(
       receiver,
       "instanceExec",
       ...rest,
-      { connection: options!.connection },
+      { connection: options.connection },
       ...(block ? [block] : []),
     );
   }
@@ -96,11 +99,14 @@ export class Worker {
 
   invoke(receiver: unknown, method: string, ...args: unknown[]): Promise<unknown> {
     const [rest, options, block] = splitArgs(args);
-    return this.work(options!.connection, async () => {
+    if (!options) throw new ArgumentError("missing keyword: :connection");
+    return this.work(options.connection, async () => {
       try {
         return await rbFSend(receiver, method, ...rest, ...(block ? [block] : []));
       } catch (e) {
-        this.logger.error(`There was an exception - ${rbObjClassname(e)}(${(e as Error).message})`);
+        this.logger.error(
+          `There was an exception - ${rbObjClassname(e)}(${e instanceof Error ? e.message : String(e)})`,
+        );
         this.logger.error((excBacktrace(e as Error) ?? []).join("\n"));
 
         if (rbObjRespondTo(receiver, "handleException")) {
