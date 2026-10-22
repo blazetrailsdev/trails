@@ -280,7 +280,11 @@ it("only support GET, HEAD, and OPTIONS requests", async () => {
     const res = await req[method]("/cgi/test");
     expect(res.isClientError).toBeTruthy();
     expect(res.isMethodNotAllowed).toBeTruthy();
-    expect(res.headers["allow"].split(/, */).sort()).toEqual(["GET", "HEAD", "OPTIONS"]);
+    expect((res.headers["allow"] as string).split(/, */).sort()).toEqual([
+      "GET",
+      "HEAD",
+      "OPTIONS",
+    ]);
   }
 
   const allowed = ["get", "head", "options"] as const;
@@ -295,7 +299,7 @@ it("set Allow correctly for OPTIONS requests", async () => {
   const res = await req.options("/cgi/test");
   expect(res.isSuccessful).toBeTruthy();
   expect(res.headers["allow"]).not.toBe(null);
-  expect(res.headers["allow"].split(/, */).sort()).toEqual(["GET", "HEAD", "OPTIONS"]);
+  expect((res.headers["allow"] as string).split(/, */).sort()).toEqual(["GET", "HEAD", "OPTIONS"]);
 });
 
 it("set content-length correctly for HEAD requests", async () => {
