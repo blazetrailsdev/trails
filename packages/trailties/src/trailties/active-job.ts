@@ -2,6 +2,8 @@ import "./global-id.js";
 import { include, onLoad, OrderedOptions, squish } from "@blazetrails/activesupport";
 import {
   block,
+  rbModName,
+  rbObjClass,
   except,
   rbFSend,
   rbObjRespondTo,
@@ -143,7 +145,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("active_job.query_log_tags", (app) => {
       const queryLogsTagsEnabled =
-        app.config.isRespondTo("activeRecord") &&
+        rbObjRespondTo(app.config, "activeRecord") &&
         app.config.activeRecord.queryLogTagsEnabled &&
         app.config.activeJob.logQueryTagsAroundPerform;
 
@@ -154,10 +156,10 @@ export class Trailtie extends BaseTrailtie {
         onLoad("active_record", () => {
           QueryLogs.taggings = {
             ...QueryLogs.taggings,
-            job: (context) => {
-              const job = context?.job as object | null | undefined;
-              return job != null ? job.constructor.name : undefined;
-            },
+            job: (context) =>
+              context!.job != null && context!.job !== false
+                ? rbModName(rbObjClass(context!.job))
+                : null,
           };
         });
       }
