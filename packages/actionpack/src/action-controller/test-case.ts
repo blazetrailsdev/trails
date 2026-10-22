@@ -549,7 +549,7 @@ export class TestCase extends ActiveSupportTestCase {
 export declare namespace TestCase {
   /** @internal */
   let _controllerClass: ControllerClass | null | undefined;
-  let is_controllerClass: boolean;
+  let _isControllerClass: boolean;
   const tests: BehaviorClassMethods["tests"];
   let controllerClass: ControllerClass | null;
   const determineDefaultControllerClass: BehaviorClassMethods["determineDefaultControllerClass"];

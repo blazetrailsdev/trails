@@ -14,7 +14,7 @@ export class NonActionable extends Error {
 
 export class ActionableError extends Error {
   declare static _actions: Record<string, () => void>;
-  declare static is_actions: boolean;
+  declare static _isActions: boolean;
 
   static {
     classAttribute.call(this, "_actions", { default: {} });

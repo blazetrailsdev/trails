@@ -100,7 +100,7 @@ describe("TestCase._controllerClass", () => {
     class Sub1 extends Base1 {}
     Base1.tests(PostsController);
     expect(Sub1.controllerClass).toBe(PostsController);
-    expect(Sub1.is_controllerClass).toBe(true);
+    expect(Sub1._isControllerClass).toBe(true);
   });
 });
 

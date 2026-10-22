@@ -1715,8 +1715,6 @@ function rubyMethodToTsWithoutUnderscore(
     const literal = collides ? [snakeToCamel(base) + "?"] : [];
     const lead = /^_*/.exec(camel)![0];
     const isPrefixed = lead + "is" + camel.slice(lead.length).replace(/^./, (c) => c.toUpperCase());
-    const generatedIsPrefixed =
-      lead === "" ? [] : ["is" + camel.replace(/^./, (c) => c.toUpperCase())];
     // Names already starting with `is_` collapse to one candidate so
     // `is_number?` → ["isNumber"] (not ["isIsNumber", "isNumber"]).
     // The `isPrefixed` form is intentionally NOT offered as a fallback
@@ -1744,13 +1742,7 @@ function rubyMethodToTsWithoutUnderscore(
       return [...literal, isPrefixed, camel, containment];
     }
     const hasAlias = HAS_PREDICATE_ALIASES.get(name) ?? PLURAL_PREDICATE_ALIASES.get(name);
-    return [
-      ...literal,
-      isPrefixed,
-      ...generatedIsPrefixed,
-      camel,
-      ...(hasAlias === undefined ? [] : [hasAlias]),
-    ];
+    return [...literal, isPrefixed, camel, ...(hasAlias === undefined ? [] : [hasAlias])];
   }
 
   if (name.endsWith("!")) {

@@ -16,7 +16,7 @@ import {
   aroundSaveCollectionAssociation,
   build,
   computePrimaryKey,
-  is_recordChanged,
+  _isRecordChanged,
 } from "./autosave-association.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Prisoner } from "./test-helpers/models/ship.js";
@@ -321,8 +321,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
       _readAttribute: (key: string) => values[key],
       isWillSaveChangeToAttribute: () => false,
     };
-    expect(is_recordChanged(reflection, record, [1, 2])).toBe(false);
-    expect(is_recordChanged(reflection, record, [1, 3])).toBe(true);
+    expect(_isRecordChanged(reflection, record, [1, 2])).toBe(false);
+    expect(_isRecordChanged(reflection, record, [1, 3])).toBe(true);
   });
 });
 
