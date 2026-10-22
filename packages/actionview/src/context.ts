@@ -25,8 +25,28 @@ function _layoutFor(this: Context, name: string | null = null): SafeBuffer | Pro
 }
 
 export const Context = {
-  outputBuffer: null as OutputBuffer | null,
-  viewFlow: null as OutputFlow | null,
+  get outputBuffer(): OutputBuffer | null {
+    return null;
+  },
+  set outputBuffer(value: OutputBuffer | null) {
+    Object.defineProperty(this, "outputBuffer", {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  },
+  get viewFlow(): OutputFlow | null {
+    return null;
+  },
+  set viewFlow(value: OutputFlow | null) {
+    Object.defineProperty(this, "viewFlow", {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  },
   _prepareContext,
   _layoutFor,
 };

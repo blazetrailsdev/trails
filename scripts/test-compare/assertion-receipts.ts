@@ -37,7 +37,7 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
       value: null,
       as: null,
       reason:
-        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/tag_helper_test.rb:220)",
+        'Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (CLAUDE.md § "A Ruby Symbol is a JS string, never a JS `Symbol`"; template/tag_helper_test.rb:220)',
     },
   ],
   "actionview:template/tag_helper_test.rb › TagHelperTest › tag builder with content": [
@@ -46,7 +46,7 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
       value: null,
       as: null,
       reason:
-        "Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (template/tag_helper_test.rb:233)",
+        'Ruby distinguishes a String option key from a Symbol one; a JS object has one key type, so the string-key and symbol-key calls are the same call and the cross-check has nothing to compare (CLAUDE.md § "A Ruby Symbol is a JS string, never a JS `Symbol`"; template/tag_helper_test.rb:233)',
     },
   ],
   "actionview:template/output_safety_helper_test.rb › OutputSafetyHelperTest › safe_join should return the safe string separated by $, when second argument is not passed":
