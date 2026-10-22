@@ -14,7 +14,7 @@ import {
   minutes,
 } from "@blazetrails/activesupport";
 import { noon, tomorrow } from "@blazetrails/activesupport/core-ext/date/calculations";
-import { DateTime, Time } from "@blazetrails/date";
+import { Date, DateTime, Time } from "@blazetrails/date";
 import {
   ArgumentError,
   NotImplementedError,
@@ -45,6 +45,7 @@ import { MultipleKwargsJob } from "./test-helpers/jobs/multiple-kwargs-job.js";
 import { NestedJob } from "./test-helpers/jobs/nested-job.js";
 import { RaisingJob } from "./test-helpers/jobs/raising-job.js";
 import { RescueJob } from "./test-helpers/jobs/rescue-job.js";
+import { RetryJob } from "./test-helpers/jobs/retry-job.js";
 import { Person } from "./test-helpers/models/person.js";
 import { JobBuffer } from "./test-helpers/support/job-buffer.js";
 
@@ -1946,6 +1947,502 @@ describe.runIf(isAdapterIs("test"))("PerformedJobsTest", () => {
         await RescueJob.performLater();
       }),
     );
+  });
+
+  it("assert no performed jobs with only and except option as array", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const error = await assertRaise([ArgumentError], {}, () =>
+      t.assertNoPerformedJobs({ only: [HelloJob, RescueJob], except: [HelloJob, RescueJob] }, () =>
+        LoggingJob.performLater(),
+      ),
+    );
+
+    assertMatch(/`:only` and `:except`/, error.message);
+  });
+
+  it("assert no performed jobs with only option failure", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertNoPerformedJobs({ only: HelloJob }, async () => {
+        await HelloJob.performLater("jeremy");
+        await LoggingJob.performLater();
+      }),
+    );
+
+    assertMatch(/0 .* but 1/, error.message);
+  });
+
+  it("assert no performed jobs with except option failure", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertNoPerformedJobs({ except: LoggingJob }, async () => {
+        await HelloJob.performLater("jeremy");
+        await LoggingJob.performLater();
+      }),
+    );
+
+    assertMatch(/0 .* but 1/, error.message);
+  });
+
+  it("assert no performed jobs with only and except option failure", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const error = await assertRaise([ArgumentError], {}, () =>
+      t.assertNoPerformedJobs({ only: HelloJob, except: HelloJob }, async () => {
+        await HelloJob.performLater("jeremy");
+        await LoggingJob.performLater();
+      }),
+    );
+
+    assertMatch(/`:only` and `:except`/, error.message);
+  });
+
+  it("assert no performed jobs with queue option", async ({ testCase: t }: HelperContext) => {
+    await t.assertNoPerformedJobs({ queue: ":some_queue" }, () =>
+      HelloJob.set({ queue: ":other_queue" }).performLater("jeremy"),
+    );
+  });
+
+  it("assert no performed jobs with queue option failure", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertNoPerformedJobs({ queue: ":some_queue" }, () =>
+        HelloJob.set({ queue: ":some_queue" }).performLater("jeremy"),
+      ),
+    );
+
+    assertMatch(/0 .* but 1/, error.message);
+  });
+
+  it("assert no performed jobs without block with queue option", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await HelloJob.set({ queue: ":other_queue" }).performLater("jeremy");
+
+    await t.performEnqueuedJobs();
+
+    await t.assertNoPerformedJobs({ queue: ":some_queue" });
+  });
+
+  it("assert no performed jobs without block with queue option failure", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await HelloJob.set({ queue: ":some_queue" }).performLater("jeremy");
+
+    await t.performEnqueuedJobs();
+
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertNoPerformedJobs({ queue: ":some_queue" }),
+    );
+
+    assertMatch(/0 .* but 1/, error.message);
+  });
+
+  it("assert no performed jobs with only and queue options", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await t.assertNoPerformedJobs({ only: HelloJob, queue: ":some_queue" }, async () => {
+      await HelloJob.set({ queue: ":other_queue" }).performLater("bogdan");
+      await LoggingJob.set({ queue: ":some_queue" }).performLater("jeremy");
+    });
+  });
+
+  it("assert no performed jobs with only and queue options failure", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertNoPerformedJobs({ only: HelloJob, queue: ":some_queue" }, async () => {
+        await HelloJob.set({ queue: ":some_queue" }).performLater("bogdan");
+        await LoggingJob.set({ queue: ":some_queue" }).performLater("jeremy");
+      }),
+    );
+
+    assertMatch(/0 .* but 1/, error.message);
+  });
+
+  it("assert no performed jobs without block with only and queue options", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await HelloJob.set({ queue: ":other_queue" }).performLater("bogdan");
+    await LoggingJob.set({ queue: ":some_queue" }).performLater("jeremy");
+
+    await t.performEnqueuedJobs();
+
+    await t.assertNoPerformedJobs({ only: HelloJob, queue: ":some_queue" });
+  });
+
+  it("assert no performed jobs without block with only and queue options failure", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await HelloJob.set({ queue: ":some_queue" }).performLater("bogdan");
+    await LoggingJob.set({ queue: ":some_queue" }).performLater("jeremy");
+
+    await t.performEnqueuedJobs();
+
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertNoPerformedJobs({ only: HelloJob, queue: ":some_queue" }),
+    );
+
+    assertMatch(/0 .* but 1/, error.message);
+  });
+
+  it("assert no performed jobs with except and queue options", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await t.assertNoPerformedJobs({ except: HelloJob, queue: ":some_queue" }, async () => {
+      await HelloJob.set({ queue: ":other_queue" }).performLater("bogdan");
+      await HelloJob.set({ queue: ":some_queue" }).performLater("bogdan");
+      await LoggingJob.set({ queue: ":other_queue" }).performLater("jeremy");
+    });
+  });
+
+  it("assert no performed jobs with except and queue options failure", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertNoPerformedJobs({ except: HelloJob, queue: ":some_queue" }, async () => {
+        await HelloJob.set({ queue: ":other_queue" }).performLater("bogdan");
+        await HelloJob.set({ queue: ":some_queue" }).performLater("bogdan");
+        await LoggingJob.set({ queue: ":some_queue" }).performLater("jeremy");
+      }),
+    );
+
+    assertMatch(/0 .* but 1/, error.message);
+  });
+
+  it("assert no performed jobs without block with except and queue options", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await HelloJob.set({ queue: ":other_queue" }).performLater("bogdan");
+    await HelloJob.set({ queue: ":some_queue" }).performLater("bogdan");
+    await LoggingJob.set({ queue: ":other_queue" }).performLater("jeremy");
+
+    await t.performEnqueuedJobs();
+
+    await t.assertNoPerformedJobs({ except: HelloJob, queue: ":some_queue" });
+  });
+
+  it("assert no performed jobs without block with except and queue options failure", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await HelloJob.set({ queue: ":other_queue" }).performLater("bogdan");
+    await HelloJob.set({ queue: ":some_queue" }).performLater("bogdan");
+    await LoggingJob.set({ queue: ":some_queue" }).performLater("jeremy");
+
+    await t.performEnqueuedJobs();
+
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertNoPerformedJobs({ except: HelloJob, queue: ":some_queue" }),
+    );
+
+    assertMatch(/0 .* but 1/, error.message);
+  });
+
+  it("assert performed with", async ({ testCase: t }: HelperContext) => {
+    await t.assertPerformedWith({ job: NestedJob, queue: "default" }, () =>
+      NestedJob.performLater(),
+    );
+  });
+
+  it("assert performed with without block", async ({ testCase: t }: HelperContext) => {
+    await NestedJob.performLater();
+
+    await t.performEnqueuedJobs();
+
+    await t.assertPerformedWith({ job: NestedJob, queue: "default" });
+  });
+
+  it("assert performed with when queue name is symbol", async ({ testCase: t }: HelperContext) => {
+    await t.assertPerformedWith({ job: NestedJob, queue: ":default" }, () =>
+      NestedJob.performLater(),
+    );
+  });
+
+  it("assert performed with returns", async ({ testCase: t }: HelperContext) => {
+    const job = (await t.assertPerformedWith({ job: LoggingJob, queue: "default" }, () =>
+      LoggingJob.performLater({ keyword: ":sym" }),
+    )) as LoggingJob;
+
+    assertInstanceOf(LoggingJob, job);
+    assertNil(job.scheduledAt);
+    assertEqual([{ keyword: ":sym" }], job.arguments);
+    assertEqual("default", job.queueName);
+  });
+
+  it("assert performed with without block returns", async ({ testCase: t }: HelperContext) => {
+    await LoggingJob.performLater({ keyword: ":sym" });
+
+    await t.performEnqueuedJobs();
+
+    const job = (await t.assertPerformedWith({ job: LoggingJob, queue: "default" })) as LoggingJob;
+
+    assertInstanceOf(LoggingJob, job);
+    assertNil(job.scheduledAt);
+    assertEqual([{ keyword: ":sym" }], job.arguments);
+    assertEqual("default", job.queueName);
+  });
+
+  it("assert performed with failure", async ({ testCase: t }: HelperContext) => {
+    await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: LoggingJob }, () => HelloJob.performLater()),
+    );
+
+    await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: HelloJob, queue: "low" }, () =>
+        HelloJob.set({ queue: "important" }).performLater(),
+      ),
+    );
+  });
+
+  it("assert performed with without block failure", async ({ testCase: t }: HelperContext) => {
+    await HelloJob.performLater();
+
+    await t.performEnqueuedJobs();
+
+    await assertRaise([Assertion], {}, () => t.assertPerformedWith({ job: LoggingJob }));
+
+    await HelloJob.set({ queue: "important" }).performLater();
+
+    await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: HelloJob, queue: "low" }),
+    );
+  });
+
+  it("assert performed job with priority option", async ({ testCase: t }: HelperContext) => {
+    await t.assertPerformedWith({ job: HelloJob, priority: 10 }, () =>
+      HelloJob.set({ priority: 10 }).performLater(),
+    );
+
+    await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: HelloJob, priority: 10 }, () =>
+        HelloJob.set({ priority: 5 }).performLater(),
+      ),
+    );
+  });
+
+  it("assert performed with with at option", async ({ testCase: t }: HelperContext) => {
+    await t.assertPerformedWith({ job: HelloJob, at: noon(tomorrow()) }, () =>
+      HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
+    );
+
+    await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: HelloJob, at: noon(Date.today()) }, () =>
+        HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater(),
+      ),
+    );
+  });
+
+  it("assert performed with with relative at option", async ({ testCase: t }: HelperContext) => {
+    await t.assertPerformedWith({ job: HelloJob, at: minutes(5).fromNow() }, () =>
+      HelloJob.set({ wait: minutes(5) }).performLater(),
+    );
+
+    await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: HelloJob, at: minutes(2).fromNow() }, () =>
+        HelloJob.set({ wait: minutes(1) }).performLater(),
+      ),
+    );
+  });
+
+  it("assert performed with without block with at option", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater();
+
+    await t.performEnqueuedJobs();
+
+    await t.assertPerformedWith({ job: HelloJob, at: noon(tomorrow()) });
+
+    await HelloJob.set({ waitUntil: noon(tomorrow()) }).performLater();
+
+    await t.performEnqueuedJobs();
+
+    await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: HelloJob, at: noon(Date.today()) }),
+    );
+  });
+
+  it("assert performed with with hash arg", async ({ testCase: t }: HelperContext) => {
+    await t.assertPerformedWith(
+      { job: MultipleKwargsJob, args: [{ argument1: 1, argument2: { a: 1, b: 2 } }] },
+      () => MultipleKwargsJob.performLater({ argument2: { b: 2, a: 1 }, argument1: 1 }),
+    );
+  });
+
+  it("assert performed with supports matcher procs", async ({ testCase: t }: HelperContext) => {
+    const facets = {
+      job: HelloJob,
+      args: ["Rails"],
+      at: noon(tomorrow()),
+      queue: "important",
+    };
+
+    await facets.job
+      .set({ queue: facets.queue, waitUntil: facets.at })
+      .performLater(...facets.args);
+    await t.performEnqueuedJobs();
+
+    for (const [facet, value] of Object.entries(facets)) {
+      const matcher = (jobValue: unknown): boolean => rbEqual(jobValue, value);
+      const refuser = (_jobValue: unknown): boolean => false;
+
+      await t.assertPerformedWith({ [facet]: matcher });
+
+      await assertRaises([Assertion], {}, () => t.assertPerformedWith({ [facet]: refuser }));
+    }
+  });
+
+  it("assert performed with time", async ({ testCase: t }: HelperContext) => {
+    const now = Time.now();
+    const args = [{ argument1: { now }, argument2: now }];
+
+    await t.assertPerformedWith({ job: MultipleKwargsJob, args }, () =>
+      MultipleKwargsJob.performLater({ argument1: { now }, argument2: now }),
+    );
+  });
+
+  it("assert performed with date time", async ({ testCase: t }: HelperContext) => {
+    const now = DateTime.now();
+    const args = [{ argument1: { now }, argument2: now }];
+
+    await t.assertPerformedWith({ job: MultipleKwargsJob, args }, () =>
+      MultipleKwargsJob.performLater({ argument1: { now }, argument2: now }),
+    );
+  });
+
+  it("assert performed with time with zone", async ({ testCase: t }: HelperContext) => {
+    const now = Time.now().inTimeZone("Tokyo");
+    const args = [{ argument1: { now }, argument2: now }];
+
+    await t.assertPerformedWith({ job: MultipleKwargsJob, args }, () =>
+      MultipleKwargsJob.performLater({ argument1: { now }, argument2: now }),
+    );
+  });
+
+  it("assert performed with with global id args", async ({ testCase: t }: HelperContext) => {
+    const ricardo = new Person(9);
+    await t.assertPerformedWith({ job: HelloJob, args: [ricardo] }, () =>
+      HelloJob.performLater(ricardo),
+    );
+  });
+
+  it("assert performed with without block with global id args", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const ricardo = new Person(9);
+    await HelloJob.performLater(ricardo);
+    await t.performEnqueuedJobs();
+    await t.assertPerformedWith({ job: HelloJob, args: [ricardo] });
+  });
+
+  it("assert performed with failure with global id args", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const ricardo = new Person(9);
+    const wilma = new Person(11);
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: HelloJob, args: [wilma] }, () => HelloJob.performLater(ricardo)),
+    );
+    assertMatch(
+      `No performed job found with ${rbInspect({ ":job": HelloJob, ":args": [wilma] })}`,
+      error.message,
+    );
+    assertMatch(/Potential matches:.*Person.* @id="9"/, error.message);
+  });
+
+  it("assert performed with without block failure with global id args", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const ricardo = new Person(9);
+    const wilma = new Person(11);
+    await HelloJob.performLater(ricardo);
+    await t.performEnqueuedJobs();
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: HelloJob, args: [wilma] }),
+    );
+
+    assertMatch(
+      `No performed job found with ${rbInspect({ ":job": HelloJob, ":args": [wilma] })}`,
+      error.message,
+    );
+    assertMatch(/Potential matches:.*Person.* @id="9"/, error.message);
+  });
+
+  it("assert performed says no jobs performed", async ({ testCase: t }: HelperContext) => {
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: HelloJob, args: [] }),
+    );
+
+    assertMatch(
+      `No performed job found with ${rbInspect({ ":job": HelloJob, ":args": [] })}`,
+      error.message,
+    );
+    assertMatch(/No jobs were performed/, error.message);
+  });
+
+  it("assert performed when not matching the class shows alteratives", async ({
+    testCase: t,
+  }: HelperContext) => {
+    const ricardo = new Person(9);
+    const wilma = new Person(11);
+    await HelloJob.performLater(ricardo);
+    await t.performEnqueuedJobs();
+    const error = await assertRaise([Assertion], {}, () =>
+      t.assertPerformedWith({ job: MultipleKwargsJob, args: [wilma] }),
+    );
+
+    assertMatch(
+      /No performed job found with .*MultipleKwargsJob.*\[#<Person.* @id=11>\]}/,
+      error.message,
+    );
+    assertMatch(
+      /No jobs of class MultipleKwargsJob were performed, job classes performed: HelloJob/,
+      error.message,
+    );
+  });
+
+  it("assert performed with does not change jobs count", async ({ testCase: t }: HelperContext) => {
+    await t.assertPerformedWith({ job: HelloJob }, () => HelloJob.performLater());
+
+    await t.assertPerformedWith({ job: HelloJob }, () => HelloJob.performLater());
+
+    assertEqual(0, adapterOf(t).enqueuedJobs.length);
+    assertEqual(2, adapterOf(t).performedJobs.length);
+  });
+
+  it("assert performed with without block does not change jobs count", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await HelloJob.performLater();
+    await t.performEnqueuedJobs();
+    await t.assertPerformedWith({ job: HelloJob });
+
+    await HelloJob.performLater();
+    await t.performEnqueuedJobs();
+    await t.assertPerformedWith({ job: HelloJob });
+
+    assertEqual(0, adapterOf(t).enqueuedJobs.length);
+    assertEqual(2, adapterOf(t).performedJobs.length);
+  });
+
+  it("perform_enqueued_jobs doesn't raise if discard_on ActiveJob::DeserializationError", async ({
+    testCase: t,
+  }: HelperContext) => {
+    await RetryJob.performLater(new Person(404), 1);
+
+    await assertNothingRaised(() => t.performEnqueuedJobs({ only: RetryJob }));
+  });
+
+  it("TestAdapter respect max attempts", async ({ testCase: t }: HelperContext) => {
+    await t.performEnqueuedJobs({ only: RaisingJob }, () =>
+      assertRaises([RaisingJob.MyError], {}, () => RaisingJob.performLater()),
+    );
+
+    assertEqual(2, adapterOf(t).performedJobs.length);
   });
 });
 

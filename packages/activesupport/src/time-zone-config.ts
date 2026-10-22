@@ -38,7 +38,7 @@ export function setZoneDefault(zone: TimeZone | null): void {
   _zoneDefault = zone;
 }
 
-export function useZone<T>(timeZone: string | TimeZone, fn: () => T): T {
+export function useZone<T>(timeZone: string | TimeZone | null, fn: () => T): T {
   const newZone = findZoneBang(timeZone);
   let oldZone: TimeZone | null;
   return rbEnsure(

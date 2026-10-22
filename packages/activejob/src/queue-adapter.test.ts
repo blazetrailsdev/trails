@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError, Mutex, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Mutex,
+  extend,
+  rbModConstSet,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { QueueAdapters } from "./namespaces.js";
 import { AsyncAdapter } from "./queue-adapters/async-adapter.js";
+import { TestCase } from "./test-case.js";
+import type { TestQueueAdapterClass } from "./test-helper.js";
 import "./test-helpers/helper.js";
 
 class StubOneAdapter {
@@ -16,6 +24,13 @@ class StubTwoAdapter {
   enqueueAt(..._args: unknown[]): void {}
 }
 rbModConstSet(QueueAdapters, "StubTwoAdapter", StubTwoAdapter);
+
+class QueueAdapterTest extends TestCase {
+  static override toString(): string {
+    return "QueueAdapterTest";
+  }
+}
+registerConstant("QueueAdapterTest", QueueAdapterTest);
 
 describe("QueueAdapterTest", () => {
   it("should forbid nonsense arguments", () => {
@@ -52,7 +67,7 @@ describe("QueueAdapterTest", () => {
   });
 
   it("should default to :async adapter if no adapters are set at all", () => {
-    // BLOCKED: queue-adapter-test-default-async-disables-test-adapter — Base.disableTestAdapter() is unported
+    (Base as typeof Base & TestQueueAdapterClass).disableTestAdapter();
     const queueAdapterWas = Base._queueAdapter;
     const queueAdapterNameWas = Base._queueAdapterName;
     Base._queueAdapter = Base._queueAdapterName = null;
@@ -71,10 +86,12 @@ describe("QueueAdapterTest", () => {
     expect(childJob.queueAdapterName).toBe("stub_one");
   });
 
-  class StubThreeAdapter {
-    static enqueue(..._args: unknown[]): void {}
-    static enqueueAt(..._args: unknown[]): void {}
-  }
+  const StubThreeAdapter = {};
+  extend(StubThreeAdapter, {
+    enqueue(..._args: unknown[]): void {},
+    enqueueAt(..._args: unknown[]): void {},
+  });
+  rbModConstSet(QueueAdapterTest, "StubThreeAdapter", StubThreeAdapter);
 
   it("should extract a reasonable name from a class or module", () => {
     const childJob = class extends Base {};

@@ -6,6 +6,7 @@ import {
   assertEqual,
   _assertNothingRaisedOrWarn,
   classAttribute,
+  delegate,
   extend,
   kernelArray,
   onLoad,
@@ -54,7 +55,7 @@ interface AssertEnqueuedWithOptions {
   priority?: unknown;
 }
 
-interface TestQueueAdapterClass {
+export interface TestQueueAdapterClass {
   _testAdapter: unknown;
   _queueAdapter: unknown;
   enableTestAdapter(testAdapter: unknown): void;
@@ -560,25 +561,13 @@ export function validateOption({ only = null, except = null }: JobsWithOptions =
 export class TestHelper {
   static readonly [classModule] = true;
   static TestQueueAdapter = TestQueueAdapter;
-
-  get enqueuedJobs(): Payload[] {
-    return (this.queueAdapter() as TestAdapter).enqueuedJobs;
-  }
-
-  set enqueuedJobs(enqueuedJobs: Payload[]) {
-    (this.queueAdapter() as TestAdapter).enqueuedJobs = enqueuedJobs;
-  }
-
-  get performedJobs(): Payload[] {
-    return (this.queueAdapter() as TestAdapter).performedJobs;
-  }
-
-  set performedJobs(performedJobs: Payload[]) {
-    (this.queueAdapter() as TestAdapter).performedJobs = performedJobs;
-  }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface TestHelper {
+  get enqueuedJobs(): Payload[];
+  set enqueuedJobs(enqueuedJobs: Payload[]);
+  get performedJobs(): Payload[];
+  set performedJobs(performedJobs: Payload[]);
   beforeSetup: typeof beforeSetup;
   afterTeardown: typeof afterTeardown;
   queueAdapterForTest: typeof queueAdapterForTest;
@@ -605,6 +594,14 @@ export interface TestHelper {
   queueAdapterChangedJobs: typeof queueAdapterChangedJobs;
   validateOption: typeof validateOption;
 }
+delegate.call(
+  TestHelper.prototype,
+  "enqueuedJobs",
+  "enqueuedJobs=",
+  "performedJobs",
+  "performedJobs=",
+  { to: "queueAdapter" },
+);
 Object.assign(TestHelper.prototype, {
   beforeSetup,
   afterTeardown,

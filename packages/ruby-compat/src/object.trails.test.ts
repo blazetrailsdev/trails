@@ -1323,3 +1323,14 @@ describe("a JS String object as a Ruby String", () => {
     expect(rbObjIsKindOf(new MyString("a"), rbCSymbol)).toBe(false);
   });
 });
+
+describe("rbObjIsKindOf(obj, Module)", () => {
+  it("answers a named plain-object module and a class, not a bare hash", () => {
+    class Outer {}
+    const mod = {};
+    rbModConstSet(Outer, "Inner", mod);
+    expect(rbObjIsKindOf(mod, Module)).toBe(true);
+    expect(rbObjIsKindOf(Outer, Module)).toBe(true);
+    expect(rbObjIsKindOf({ a: 1 }, Module)).toBe(false);
+  });
+});
