@@ -33,7 +33,7 @@ import {
   registerConstant,
   unregisterConstant,
 } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
+
 import type { MiddlewareFactory } from "../middleware/stack.js";
 import { RouteSet } from "../routing/route-set.js";
 
@@ -1021,11 +1021,11 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
 describe("HelpersContentSecurityPolicyIntegrationTest", () => {
   type Probe = Record<string, () => boolean>;
 
-  const ApplicationHelper = new Module().include({
+  const ApplicationHelper = {
     isPigsCanFly() {
       return false;
     },
-  });
+  };
   registerConstant("ApplicationHelper", ApplicationHelper);
   afterAll(() => unregisterConstant("ApplicationHelper", ApplicationHelper));
 

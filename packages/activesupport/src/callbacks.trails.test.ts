@@ -1,5 +1,4 @@
 import {
-  Module,
   block,
   defineModule,
   include,
@@ -1327,21 +1326,6 @@ describe("setCallback with a block (trails)", () => {
 });
 
 describe("module singleton-class callbacks (trails)", () => {
-  it("runs an :execute chain defined on a Module's singleton class through the module", async () => {
-    const mod: any = new Module();
-    const singleton: any = rbObjSingletonClass(mod);
-    include(singleton, Callbacks);
-    singleton.defineCallbacks("execute");
-    const log: string[] = [];
-    singleton.setCallback("execute", "before", () => {
-      log.push("before");
-    });
-
-    await mod.runCallbacks("execute", () => log.push("block"));
-
-    expect(log).toEqual(["before", "block"]);
-  });
-
   it("runs an :execute chain defined on a plain-object module's singleton class", async () => {
     const mod: any = defineModule({});
     const singleton: any = rbObjSingletonClass(mod);

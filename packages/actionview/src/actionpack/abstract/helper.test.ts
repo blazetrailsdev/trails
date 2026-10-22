@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import { assertRaises, include } from "@blazetrails/activesupport";
-import { Module, NameError } from "@blazetrails/ruby-compat";
+import { NameError } from "@blazetrails/ruby-compat";
 import { AbstractController } from "@blazetrails/actionpack";
 import { Rendering } from "../../rendering.js";
 import "../../test-helpers/fixtures/helpers/abc-helper.js";
@@ -25,11 +25,11 @@ include(ControllerWithHelpers, AbstractController.Helpers);
 include(ControllerWithHelpers, AbstractController.Rendering);
 include(ControllerWithHelpers, Rendering);
 
-const HelperyTest = new Module().include({
+const HelperyTest = {
   includedMethod(): string {
     return "Included";
   },
-});
+};
 
 class AbstractHelpers extends ControllerWithHelpers {
   withBlock(): unknown {

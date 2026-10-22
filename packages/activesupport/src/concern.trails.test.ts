@@ -1,21 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { Module, extend, include } from "@blazetrails/ruby-compat";
+import { extend, include } from "@blazetrails/ruby-compat";
 import { includedModules } from "@blazetrails/ruby-compat/include";
 import { Concern } from "./concern.js";
 
 describe("Concern on a ruby-compat Module", () => {
   it("includes a Module concern's dependencies, methods and class methods", () => {
-    const Dep = new Module() as Module & Record<string, any>;
+    const Dep = { dep: () => "dep" };
     extend(Dep, Concern);
-    Dep.defineMethod("dep", () => "dep");
 
-    const Outer = new Module() as Module & Record<string, any>;
+    const Outer = { outer: () => "outer", ClassMethods: { klassMethod: () => "class" } };
     extend(Outer, Concern);
     include(Outer, Dep);
-    Outer.defineMethod("outer", () => "outer");
-    Outer.classMethods((mod: Record<string, unknown>) => {
-      mod.klassMethod = () => "class";
-    });
 
     const klass: any = class {};
     include(klass, Outer);

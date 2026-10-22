@@ -9,7 +9,6 @@ import {
 import { Model } from "@blazetrails/activemodel";
 import {
   extend,
-  Module,
   rbObjRespondTo,
   registerConstant,
   unregisterConstant,
@@ -359,7 +358,7 @@ describe("ActionController::Rescue#process_action (rescue.rb:26-31)", () => {
 
 describe("ActionController::Helpers included into ActionController::API", () => {
   it("carries helper, helpers and the class attributes onto a subclass", () => {
-    const ApiWithHelper = new Module().include({ myHelper: () => "helper" });
+    const ApiWithHelper = { myHelper: () => "helper" };
     type WithHelpers = typeof API &
       HelpersClass & { helpers(): { myHelper(): string }; helpersPath: string[] };
     class WithHelpersController extends API {}
@@ -375,7 +374,7 @@ describe("ActionController::Helpers included into ActionController::API", () => 
   });
 
   it("fires the inherited hook for a subclass: default helper module", () => {
-    const helper = new Module().include({ probe: () => "probed" });
+    const helper = { probe: () => "probed" };
     registerConstant("ApiSubclassProbeHelper", helper);
     const paths = ["app/helpers"];
     setHelpersPath(paths);
@@ -398,7 +397,7 @@ type Probe = Record<string, () => unknown>;
 
 describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)", () => {
   it("includes the controller's default helper module with no helper call", () => {
-    registerConstant("DefaultHelperProbeHelper", new Module().include({ probe: () => "probed" }));
+    registerConstant("DefaultHelperProbeHelper", { probe: () => "probed" });
     class DefaultHelperProbeController extends Base {}
     new DefaultHelperProbeController();
     expect((extend({}, DefaultHelperProbeController._helpers) as Probe).probe()).toBe("probed");
@@ -413,7 +412,7 @@ describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)
   it("keeps helpers a subclass declared before the hook fired", () => {
     class DeclaredProbeController extends Base {
       static {
-        this.helper(new Module().include({ declared: () => "declared" }));
+        this.helper({ declared: () => "declared" });
       }
     }
     new DeclaredProbeController();
@@ -421,7 +420,7 @@ describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)
   });
 
   it("skips an anonymous controller class", () => {
-    registerConstant("KlassHelper", new Module().include({ leaked: () => "leaked" }));
+    registerConstant("KlassHelper", { leaked: () => "leaked" });
     const klass = (() => class extends Base {})();
     new klass();
     expect("leaked" in extend({}, klass._helpers)).toBe(false);

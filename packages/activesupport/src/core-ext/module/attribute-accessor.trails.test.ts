@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { extend, include, Module } from "@blazetrails/ruby-compat";
+import { classModule, extend, include } from "@blazetrails/ruby-compat";
 
 import { mattrAccessor, mattrWriter } from "../../module-ext.js";
 
 describe("mattrAccessor on a ruby-compat Module", () => {
   it("reaches includers and extenders through the module's carrier", () => {
-    const M = new Module() as any;
+    const M = class {
+      static readonly [classModule] = true;
+    } as any;
     mattrAccessor.call(M, "x");
     const Includer = class {};
     include(Includer, M);
@@ -22,7 +24,9 @@ describe("mattrAccessor on a ruby-compat Module", () => {
   });
 
   it("a writer-only mattr on a Module leaves an ancestor's reader visible to an includer", () => {
-    const M = new Module() as any;
+    const M = class {
+      static readonly [classModule] = true;
+    } as any;
     mattrWriter.call(M, "x");
     class Parent {
       get x(): unknown {

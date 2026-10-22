@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HTML5 } from "@blazetrails/nokogiri";
-import {
-  include,
-  isModuleIncluded,
-  Module,
-  NoMethodError,
-  rbModName,
-} from "@blazetrails/ruby-compat";
+import { include, isModuleIncluded, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { TestCase } from "../../action-controller/test-case.js";
 import { TemplateAssertions } from "../../action-controller/template-assertions.js";
@@ -77,9 +71,7 @@ describe("ActionDispatch::Assertions", () => {
     routes.draw(function () {
       this.get("/posts", { to: "posts#index", as: "posts" });
     });
-    const Fallback = new Module((mod) => {
-      mod.defineMethod("methodMissing", (selector: string) => `fallback ${selector}`);
-    });
+    const Fallback = { methodMissing: (selector: string) => `fallback ${selector}` };
     class WithSuper extends ActiveSupportTestCase {}
     include(WithSuper, Fallback);
     include(WithSuper, Assertions);
