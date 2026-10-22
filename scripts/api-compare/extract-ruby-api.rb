@@ -1242,7 +1242,11 @@ class ApiExtractor
       @module_function_stack[-1] = true
       return
     end
-    names = extract_symbol_args(args)
+    # `module_function def server` (actioncable/lib/action_cable.rb:77): the
+    # def is the argument, so it is walked first and then moved by its name.
+    defs = args.is_a?(Array) ? args.flatten(1).select { |n| n.is_a?(Array) && n[0] == :def } : []
+    defs.each { |d| walk(d) }
+    names = extract_symbol_args(args) + defs.map { |d| ident_name(d[1]) }.compact
     return if names.empty?
     fqn = current_fqn
     target = @modules[fqn]
