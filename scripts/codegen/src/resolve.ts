@@ -489,6 +489,19 @@ export class Resolver {
     return lw.decline(ctx, "const-unresolved", { k: "const", l: undefined } as N, key);
   }
 
+  /**
+   * Whether the def `fqn#name` is emitted as a getter: it takes no parameters and
+   * the hand port's twin is an accessor (emit.ts, "getter-from-twin"), so every
+   * call site reads it as a property.
+   */
+  emittedGetter(fqn: string, name: string, statik: boolean, params?: Param[]): boolean {
+    if ((params?.length ?? 0) > 0 || name.endsWith("=")) return false;
+    const key = this.oracleKey(fqn);
+    if (!key) return false;
+    const m = this.types.member(key, name, statik);
+    return !!m && (m.owner === key || m.owner.endsWith("#*")) && m.info.kind === "get";
+  }
+
   /** Resolve a call against the gem: self-calls through the owner's ancestors, `Const.m` on gem classes. */
   member(
     n: N,
@@ -525,6 +538,8 @@ export class Resolver {
       if (attrs.has(name)) return { name: propName(name), kind: "property" };
       const d = defs.get(name);
       if (d) {
+        if (this.emittedGetter(s.fqn, name, singleton, d.params))
+          return { name: tsMethodName(name, s.fqn, singleton), kind: "property" };
         return {
           name: tsMethodName(name, s.fqn, singleton),
           kind: "method",
@@ -536,6 +551,8 @@ export class Resolver {
         // ClassMethods of an extended concern
         const cm = this.index.scopes.get(`${s.fqn}::ClassMethods`);
         const cd = cm?.defs.get(name);
+        if (cd && this.emittedGetter(cm!.fqn, name, true, cd.params))
+          return { name: tsMethodName(name, cm!.fqn), kind: "property" };
         if (cd)
           return {
             name: tsMethodName(name, cm!.fqn),

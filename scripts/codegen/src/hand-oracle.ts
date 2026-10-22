@@ -193,7 +193,12 @@ function main(): void {
         ...(params.some(Boolean) ? { params } : {}),
       };
     }
-    if (sigs.length && (ts.isPropertyDeclaration(decl) || ts.isPropertyAssignment(decl))) {
+    if (
+      sigs.length &&
+      (ts.isPropertyDeclaration(decl) ||
+        ts.isPropertyAssignment(decl) ||
+        ts.isPropertySignature(decl))
+    ) {
       const sig = sigs[sigs.length - 1];
       const { inner, async } = unwrapPromise(checker.getReturnTypeOfSignature(sig));
       const params = sig.parameters.map((ps) => refOf(checker.getTypeOfSymbolAtLocation(ps, at)));
@@ -294,7 +299,9 @@ function main(): void {
         const info: ClassInfo = { key, instance: {}, static: {} };
         for (const p of checker.getPropertiesOfType(t)) {
           const m = memberInfo(p, n);
-          if (m && m.kind === "method") info.instance[p.getName()] = m;
+          // A module object's getters (`ClassMethods = { get queueAdapter() … }`) are
+          // read as properties, as its methods are called.
+          if (m && (m.kind === "method" || m.kind === "get")) info.instance[p.getName()] = m;
         }
         if (Object.keys(info.instance).length)
           oracle.classes[key] = { ...info, static: { ...info.instance } };

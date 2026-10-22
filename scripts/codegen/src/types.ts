@@ -103,6 +103,17 @@ export class TypeOracle {
   }
 
   /** The hand port declares instance member `tsName` only as a getter or property, at least once. */
+  /**
+   * The kinds the hand port gives instance member `tsName` in one file (its
+   * classes and the host interfaces typing `this` there: `EnqueuingJob`).
+   */
+  kindsInFile(file: string, tsName: string): Set<string> {
+    const out = new Set<string>();
+    for (const [k, c] of Object.entries(this.o.classes))
+      if (k.startsWith(`${file}#`) && c.instance?.[tsName]) out.add(c.instance[tsName].kind);
+    return out;
+  }
+
   onlyProperty(tsName: string): boolean {
     const ms = this.membersNamed(tsName);
     return ms.length > 0 && ms.every((m) => m.kind !== "method");

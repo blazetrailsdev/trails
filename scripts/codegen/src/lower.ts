@@ -2715,8 +2715,13 @@ export class Lowerer {
     if (!owner.endsWith("::ClassMethods")) return undefined;
     const concern = owner.slice(0, -"::ClassMethods".length);
     const fn = ctx ? this.defTsName(ctx) : "";
+    // A getter's `super` reads the next getter with this class as receiver.
+    const getter =
+      !!ctx?.defName && this.resolver.emittedGetter(owner, ctx.defName, true, ctx.defParams);
     const call = (ref: string) => (args: string) =>
-      `${ref}.${fn}.call(${["this", args].filter(Boolean).join(", ")})`;
+      getter
+        ? `Reflect.get(${ref}, ${JSON.stringify(fn)}, this)`
+        : `${ref}.${fn}.call(${["this", args].filter(Boolean).join(", ")})`;
     for (const sc of this.index.scopes.values()) {
       if (sc.kind !== "class") continue;
       const full = fullAncestors(this.index, sc.fqn);
@@ -4342,6 +4347,19 @@ export class Lowerer {
     const resolved = this.resolver.member(n, recvNode, ctx, this);
     if (resolved?.kind === "property" && n.args.length === 0 && !n.block)
       return `${recv}${nav}${resolved.name}`;
+    // A self-call the hand port's twin of this file reads as a property on every
+    // `this` it types (`EnqueuingJob.queueAdapter`, delegated to the class getter),
+    // though another file's twin of the same name is a method (`TestHelper`).
+    if (
+      (((!recvNode || recvNode.k === "self") && ctx.selfKind !== "static") ||
+        (recvNode?.k === "lvar" && !this.typeOf(recvNode, ctx))) &&
+      n.args.length === 0 &&
+      !n.block
+    ) {
+      const kinds = this.resolver.types.kindsInFile(ctx.f.tsFile, this.callName(name));
+      if (kinds.size && ![...kinds].includes("method"))
+        return `${recv}${nav}${this.callName(name)}`;
+    }
     if (
       recvNode?.k === "call" &&
       recvNode.name === "env" &&

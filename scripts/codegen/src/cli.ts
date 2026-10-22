@@ -224,6 +224,25 @@ for (const f of files) index.add(f);
       index.externalFiles.add(f.file);
   }
 }
+// The oracle reads the hand port, which moves under the generator: rebuild it
+// whenever a hand file is newer than the snapshot.
+{
+  const newest = (d: string): number =>
+    existsSync(d)
+      ? Math.max(
+          0,
+          ...readdirSync(d, { withFileTypes: true }).map((e) =>
+            e.isDirectory() ? newest(path.join(d, e.name)) : statSync(path.join(d, e.name)).mtimeMs,
+          ),
+        )
+      : 0;
+  const hand = newest(path.join(PKG_DIR, "src"));
+  if (hand && (!existsSync(ORACLE_PATH) || statSync(ORACLE_PATH).mtimeMs < hand))
+    execFileSync("pnpm", ["tsx", path.join(ROOT, "scripts/codegen/src/hand-oracle.ts")], {
+      stdio: "inherit",
+      env: process.env,
+    });
+}
 const types = new TypeOracle(ORACLE_PATH);
 const resolver = new Resolver(
   index,

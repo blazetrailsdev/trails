@@ -868,7 +868,14 @@ export class Emitter {
     const sc = this.index.scopes.get(fqn);
     // A helper module under the suite's support/ (mini_magick's `Helpers`, which
     // `RSpec.configure { config.include Helpers }` gives every example).
-    if (sc?.kind === "module" && [...sc.files].every((x) => x.startsWith("test/support/")))
+    // Only a module of instance methods, the ones an include hands every example;
+    // one of singleton methods (activejob's `JobBuffer.add`) is called on itself.
+    if (
+      sc?.kind === "module" &&
+      [...sc.files].every((x) => x.startsWith("test/support/")) &&
+      sc.defs.size > 0 &&
+      sc.sdefs.size === 0
+    )
       return true;
     if (!sc || sc.kind !== "class") return false;
     if (![...sc.files].every((x) => x.startsWith("test/"))) return false;
