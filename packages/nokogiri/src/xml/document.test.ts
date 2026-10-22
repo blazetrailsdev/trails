@@ -122,5 +122,6 @@ describe("Nokogiri::XML::Searchable", () => {
     expect(doc.root.namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
     expect(doc.css("a").length).toBe(1);
     expect(doc.css("y|b").length).toBe(1);
+    expect(doc.root.children[0].namespaces).toEqual({ xmlns: "urn:x", "xmlns:y": "urn:y" });
   });
 });
