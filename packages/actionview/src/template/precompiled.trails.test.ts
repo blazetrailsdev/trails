@@ -4,6 +4,7 @@ import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { setTemplateCompiler, Template } from "../template.js";
 import { buildViews } from "@blazetrails/trails-tsc";
+import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 import { shippedTemplateCompiler } from "../test-helpers/setup-compile-template.js";
 
@@ -89,6 +90,22 @@ describe("Templates are precompiled", () => {
     shipped();
     const template = find(fixture("precompiled"), "banner", "greetings");
     expect(String(await template.render(view()))).toBe("<em>static</em>\n");
+  });
+
+  it("precompiles a file under a handler the application registers", async () => {
+    const root = fixture("precompiled-handlers");
+    try {
+      const { files } = await buildViews({
+        cwd: root,
+        handlers: ["config/initializers/shout-handler.js"],
+      });
+      expect(files).toEqual(["greetings/loud.html.shout"]);
+      shipped();
+      const template = find(root, "loud", "greetings");
+      expect(String(await template.render(view()))).toBe("HELLO <B>THERE</B>\n");
+    } finally {
+      TemplateHandlers.unregisterTemplateHandler("shout");
+    }
   });
 
   it("builds each stand-in with the Tse handler options compile would use", async () => {

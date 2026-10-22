@@ -304,6 +304,8 @@ export function _processRenderTemplateOptions(
 }
 
 export const ClassMethods = {
+  _routes: null as ViewContextRoutes | null,
+  _helpers: null as object | null,
   isInheritViewContextClass,
   buildViewContextClass,
   eagerLoadBang,

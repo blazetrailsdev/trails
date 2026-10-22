@@ -9,7 +9,7 @@ import {
   escapeOnce,
   TagBuilder,
 } from "../helpers/tag-helper.js";
-import { CGI, publicInstanceMethods, rbObjMethod } from "@blazetrails/ruby-compat";
+import { ArgumentError, CGI, publicInstanceMethods, rbObjMethod } from "@blazetrails/ruby-compat";
 import { assertRespondTo, htmlSafe, SafeBuffer, withOptions } from "@blazetrails/activesupport";
 import { FixtureResolver } from "../testing/resolvers.js";
 import { raw } from "../helpers/output-safety-helper.js";
@@ -110,8 +110,9 @@ describe("TagHelperTest", () => {
   });
 
   it("tag builder renders unknown html elements", () => {
-    const t = tag() as any;
-    expect(t.turbo_frame("Rendered", { id: "rendered" }).toString()).toBe(
+    expect(typeof (tag() as any).turbo_frame).toBe("function");
+
+    expect((tag() as any).turbo_frame("Rendered", { id: "rendered" }).toString()).toEqual(
       '<turbo-frame id="rendered">Rendered</turbo-frame>',
     );
   });
@@ -160,69 +161,60 @@ describe("TagHelperTest", () => {
   });
 
   it("tag options converts boolean option", () => {
-    const result = (
-      tag("p", {
-        disabled: true,
-        itemscope: true,
-        multiple: true,
-        readonly: true,
-        allowfullscreen: true,
-        seamless: true,
-        typemustmatch: true,
-        sortable: true,
-        default: true,
-        inert: true,
-        truespeed: true,
-        allowpaymentrequest: true,
-        nomodule: true,
-        playsinline: true,
-      }) as SafeBuffer
-    ).toString();
-    expect(result).toContain('disabled="disabled"');
-    expect(result).toContain('itemscope="itemscope"');
-    expect(result).toContain('multiple="multiple"');
-    expect(result).toContain('readonly="readonly"');
-    expect(result).toContain('allowfullscreen="allowfullscreen"');
-    expect(result).toContain('seamless="seamless"');
-    expect(result).toContain('typemustmatch="typemustmatch"');
-    expect(result).toContain('sortable="sortable"');
-    expect(result).toContain('default="default"');
-    expect(result).toContain('inert="inert"');
-    expect(result).toContain('truespeed="truespeed"');
-    expect(result).toContain('allowpaymentrequest="allowpaymentrequest"');
-    expect(result).toContain('nomodule="nomodule"');
-    expect(result).toContain('playsinline="playsinline"');
+    assertDomEqual(
+      '<p disabled="disabled" itemscope="itemscope" multiple="multiple" readonly="readonly" allowfullscreen="allowfullscreen" seamless="seamless" typemustmatch="typemustmatch" sortable="sortable" default="default" inert="inert" truespeed="truespeed" allowpaymentrequest="allowpaymentrequest" nomodule="nomodule" playsinline="playsinline" />',
+      String(
+        tag("p", {
+          disabled: true,
+          itemscope: true,
+          multiple: true,
+          readonly: true,
+          allowfullscreen: true,
+          seamless: true,
+          typemustmatch: true,
+          sortable: true,
+          default: true,
+          inert: true,
+          truespeed: true,
+          allowpaymentrequest: true,
+          nomodule: true,
+          playsinline: true,
+        }),
+      ),
+    );
   });
 
   it("tag builder options converts boolean option", () => {
-    const t = tag() as any;
-    const result = t
-      .p({
-        disabled: true,
-        itemscope: true,
-        multiple: true,
-        readonly: true,
-        allowfullscreen: true,
-        seamless: true,
-        typemustmatch: true,
-        sortable: true,
-        default: true,
-        inert: true,
-        truespeed: true,
-        allowpaymentrequest: true,
-        nomodule: true,
-        playsinline: true,
-      })
-      .toString();
-    expect(result).toContain('disabled="disabled"');
-    expect(result).toContain('playsinline="playsinline"');
+    assertDomEqual(
+      '<p disabled="disabled" itemscope="itemscope" multiple="multiple" readonly="readonly" allowfullscreen="allowfullscreen" seamless="seamless" typemustmatch="typemustmatch" sortable="sortable" default="default" inert="inert" truespeed="truespeed" allowpaymentrequest="allowpaymentrequest" nomodule="nomodule" playsinline="playsinline" />',
+      String(
+        (tag() as any).p({
+          disabled: true,
+          itemscope: true,
+          multiple: true,
+          readonly: true,
+          allowfullscreen: true,
+          seamless: true,
+          typemustmatch: true,
+          sortable: true,
+          default: true,
+          inert: true,
+          truespeed: true,
+          allowpaymentrequest: true,
+          nomodule: true,
+          playsinline: true,
+        }),
+      ),
+    );
   });
 
   it("tag with dangerous name", () => {
-    for (const char of INVALID_TAG_CHARS.split("").filter((c) => c !== " ")) {
-      expect(() => tag(`asdf-${char}`)).toThrow();
+    for (const char of INVALID_TAG_CHARS) {
+      const tagName = `asdf-${char}`;
+      expect(() => tag(tagName), `expected ${JSON.stringify(tagName)} to be invalid`).toThrow(
+        ArgumentError,
+      );
     }
-    expect(() => tag("asdf- ")).toThrow();
   });
 
   it("tag builder with dangerous name", () => {
@@ -295,32 +287,38 @@ describe("TagHelperTest", () => {
   });
 
   it("content tag", () => {
-    expect(contentTag("a", "Create", { href: "create" }).toString()).toBe(
+    expect(contentTag("a", "Create", { href: "create" }).toString()).toEqual(
       '<a href="create">Create</a>',
     );
-    expect(contentTag("a", "Create", { href: "create" }).htmlSafe).toBe(true);
-    expect(contentTag("p", "<script>evil_js</script>").toString()).toBe(
+    expect(contentTag("a", "Create", { href: "create" }).htmlSafe).toBeTruthy();
+    expect(contentTag("a", "Create", { href: "create" }).toString()).toEqual(
+      contentTag("a", "Create", { href: "create" }).toString(),
+    );
+    expect(contentTag("p", "<script>evil_js</script>").toString()).toEqual(
       "<p>&lt;script&gt;evil_js&lt;/script&gt;</p>",
     );
-    expect(contentTag("p", "<script>evil_js</script>", null, false).toString()).toBe(
+    expect(contentTag("p", "<script>evil_js</script>", null, false).toString()).toEqual(
       "<p><script>evil_js</script></p>",
     );
-    expect(contentTag("div", "test", { "@click": "triggerNav()" }).toString()).toBe(
+    expect(contentTag("div", "test", { "@click": "triggerNav()" }).toString()).toEqual(
       '<div @click="triggerNav()">test</div>',
     );
   });
 
   it("tag builder with content", () => {
     const t = tag() as any;
-    expect(t.div("Content", { id: "post_1" }).toString()).toBe('<div id="post_1">Content</div>');
-    expect(t.div("Content", { id: "post_1" }).htmlSafe).toBe(true);
-    expect(t.p("<script>evil_js</script>").toString()).toBe(
+    expect(t.div("Content", { id: "post_1" }).toString()).toEqual('<div id="post_1">Content</div>');
+    expect(t.div("Content", { id: "post_1" }).htmlSafe).toBeTruthy();
+    expect(t.div("Content", { id: "post_1" }).toString()).toEqual(
+      t.div("Content", { id: "post_1" }).toString(),
+    );
+    expect(t.p("<script>evil_js</script>").toString()).toEqual(
       "<p>&lt;script&gt;evil_js&lt;/script&gt;</p>",
     );
-    expect(t.p("<script>evil_js</script>", { escape: false }).toString()).toBe(
+    expect(t.p("<script>evil_js</script>", { escape: false }).toString()).toEqual(
       "<p><script>evil_js</script></p>",
     );
-    expect(t.input({ pattern: /\w+/ }).toString()).toBe('<input pattern="\\w+">');
+    expect(t.input({ pattern: /\w+/ }).toString()).toEqual('<input pattern="\\w+">');
   });
 
   it("tag builder nested", () => {
@@ -413,14 +411,20 @@ describe("TagHelperTest", () => {
   });
 
   it("content tag with unescaped array class", () => {
-    const str = contentTag("p", "limelight", { class: ["song", "play>"] }, false);
-    expect(str.toString()).toBe('<p class="song play>">limelight</p>');
+    let str = contentTag("p", "limelight", { class: ["song", "play>"] }, false);
+    expect(str.toString()).toEqual('<p class="song play>">limelight</p>');
+
+    str = contentTag("p", "limelight", { class: ["song", ["play>"]] }, false);
+    expect(str.toString()).toEqual('<p class="song play>">limelight</p>');
   });
 
   it("tag builder with unescaped array class", () => {
     const t = tag() as any;
-    const str = t.p("limelight", { class: ["song", "play>"], escape: false });
-    expect(str.toString()).toBe('<p class="song play>">limelight</p>');
+    let str = t.p("limelight", { class: ["song", "play>"], escape: false });
+    expect(str.toString()).toEqual('<p class="song play>">limelight</p>');
+
+    str = t.p("limelight", { class: ["song", ["play>"]], escape: false });
+    expect(str.toString()).toEqual('<p class="song play>">limelight</p>');
   });
 
   it("content tag with empty array class", () => {
@@ -445,69 +449,79 @@ describe("TagHelperTest", () => {
   });
 
   it("content tag with conditional hash classes", () => {
-    let str = contentTag("p", "limelight", {
-      class: { song: true, play: false },
-    });
-    expect(str.toString()).toBe('<p class="song">limelight</p>');
+    let str = contentTag("p", "limelight", { class: { song: true, play: false } });
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
 
-    str = contentTag("p", "limelight", {
-      class: [{ song: true }, { play: false }],
-    });
-    expect(str.toString()).toBe('<p class="song">limelight</p>');
+    str = contentTag("p", "limelight", { class: [{ song: true }, { play: false }] });
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
 
-    str = contentTag("p", "limelight", {
-      class: [{ song: true }, null, false],
-    });
-    expect(str.toString()).toBe('<p class="song">limelight</p>');
+    str = contentTag("p", "limelight", { class: { song: true, play: false } });
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
 
-    str = contentTag("p", "limelight", {
-      class: ["song", { foo: false }],
-    });
-    expect(str.toString()).toBe('<p class="song">limelight</p>');
+    str = contentTag("p", "limelight", { class: [{ song: true }, null, false] });
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
+
+    str = contentTag("p", "limelight", { class: ["song", { foo: false }] });
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
 
     str = contentTag("p", "limelight", { class: [1, 2, 3] });
-    expect(str.toString()).toBe('<p class="1 2 3">limelight</p>');
+    expect(str.toString()).toEqual('<p class="1 2 3">limelight</p>');
 
-    str = contentTag("p", "limelight", {
-      class: { song: true, play: true },
-    });
-    expect(str.toString()).toBe('<p class="song play">limelight</p>');
+    const klass = class {
+      toString(): string {
+        return "1";
+      }
+    };
 
-    str = contentTag("p", "limelight", {
-      class: { song: false, play: false },
-    });
-    expect(str.toString()).toBe('<p class="">limelight</p>');
+    str = contentTag("p", "limelight", { class: [new klass()] });
+    expect(str.toString()).toEqual('<p class="1">limelight</p>');
+
+    str = contentTag("p", "limelight", { class: { song: true, play: true } });
+    expect(str.toString()).toEqual('<p class="song play">limelight</p>');
+
+    str = contentTag("p", "limelight", { class: { song: false, play: false } });
+    expect(str.toString()).toEqual('<p class="">limelight</p>');
   });
 
   it("tag builder with conditional hash classes", () => {
     const t = tag() as any;
     let str = t.p("limelight", { class: { song: true, play: false } });
-    expect(str.toString()).toBe('<p class="song">limelight</p>');
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
 
-    str = t.p("limelight", {
-      class: [{ song: true }, { play: false }],
-    });
-    expect(str.toString()).toBe('<p class="song">limelight</p>');
+    str = t.p("limelight", { class: [{ song: true }, { play: false }] });
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
+
+    str = t.p("limelight", { class: { song: true, play: false } });
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
+
+    str = t.p("limelight", { class: [{ song: true }, null, false] });
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
+
+    str = t.p("limelight", { class: ["song", { foo: false }] });
+    expect(str.toString()).toEqual('<p class="song">limelight</p>');
 
     str = t.p("limelight", { class: { song: true, play: true } });
-    expect(str.toString()).toBe('<p class="song play">limelight</p>');
+    expect(str.toString()).toEqual('<p class="song play">limelight</p>');
 
     str = t.p("limelight", { class: { song: false, play: false } });
-    expect(str.toString()).toBe('<p class="">limelight</p>');
+    expect(str.toString()).toEqual('<p class="">limelight</p>');
   });
 
   it("content tag with unescaped conditional hash classes", () => {
-    const str = contentTag("p", "limelight", { class: { song: true, "play>": true } }, false);
-    expect(str.toString()).toBe('<p class="song play>">limelight</p>');
+    let str = contentTag("p", "limelight", { class: { song: true, "play>": true } }, false);
+    expect(str.toString()).toEqual('<p class="song play>">limelight</p>');
+
+    str = contentTag("p", "limelight", { class: ["song", { "play>": true }] }, false);
+    expect(str.toString()).toEqual('<p class="song play>">limelight</p>');
   });
 
   it("tag builder with unescaped conditional hash classes", () => {
     const t = tag() as any;
-    const str = t.p("limelight", {
-      class: { song: true, "play>": true },
-      escape: false,
-    });
-    expect(str.toString()).toBe('<p class="song play>">limelight</p>');
+    let str = t.p("limelight", { class: { song: true, "play>": true }, escape: false });
+    expect(str.toString()).toEqual('<p class="song play>">limelight</p>');
+
+    str = t.p("limelight", { class: ["song", { "play>": true }], escape: false });
+    expect(str.toString()).toEqual('<p class="song play>">limelight</p>');
   });
 
   it("token list and class names", () => {
@@ -837,8 +851,9 @@ describe("TagHelperTest", () => {
   });
 
   it("tag options", () => {
-    const str = (tag("p", { class: "show", class2: "elsewhere" }) as SafeBuffer).toString();
-    expect(str).toContain("show");
+    const str = String(tag("p", { class: "show", ":class": "elsewhere" }));
+    expect(str).toMatch(/class="show"/);
+    expect(str).toMatch(/class="elsewhere"/);
   });
 
   it("tag options with array of random objects", () => {

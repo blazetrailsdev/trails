@@ -5,7 +5,7 @@ import {
   extend,
   type Extended,
 } from "@blazetrails/activesupport";
-import { Module, rbModConstSet } from "@blazetrails/ruby-compat";
+import { include, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Tags } from "./namespaces.js";
 import { ActiveModelHelper } from "./helpers/active-model-helper.js";
 import { AssetTagHelper } from "./helpers/asset-tag-helper.js";
@@ -41,48 +41,45 @@ import { TextHelper } from "./helpers/text-helper.js";
 import { TranslationHelper } from "./helpers/translation-helper.js";
 import { UrlHelper } from "./helpers/url-helper.js";
 
-type HelpersModule = Module &
-  Autoload.Autoload &
+type HelpersModule = Autoload.Autoload &
   Extended<typeof Autoload> & { Tags: typeof Tags; eagerLoadBang(): Promise<void> };
 
-export const Helpers: HelpersModule = new Module((mod) => {
-  extend(mod, Autoload);
-  const helpers = mod as HelpersModule;
-  helpers.autoload("Tags");
-  rbModConstSet(helpers, "Tags", Tags);
-  Object.defineProperty(helpers, "eagerLoadBang", {
-    value: async function eagerLoadBang(this: HelpersModule): Promise<void> {
-      await Autoload.eagerLoadBang.call(this);
-      await this.Tags.eagerLoadBang();
-    },
-    writable: true,
-    configurable: true,
-  });
+export const Helpers = {} as HelpersModule;
+extend(Helpers, Autoload);
+Helpers.autoload("Tags");
+rbModConstSet(Helpers, "Tags", Tags);
+Object.defineProperty(Helpers, "eagerLoadBang", {
+  value: async function eagerLoadBang(this: HelpersModule): Promise<void> {
+    await Autoload.eagerLoadBang.call(this);
+    await this.Tags.eagerLoadBang();
+  },
+  writable: true,
+  configurable: true,
+});
 
-  extend(mod, Concern);
+extend(Helpers, Concern);
 
-  mod.include(Benchmarkable);
-  mod.include(ActiveModelHelper);
-  mod.include(AssetTagHelper);
-  mod.include(AssetUrlHelper);
-  mod.include(CacheHelper);
-  mod.include(CaptureHelper);
-  mod.include(ContentExfiltrationPreventionHelper);
-  mod.include(ControllerHelper);
-  mod.include(CspHelper);
-  mod.include(CsrfHelper);
-  mod.include(DateHelper);
-  mod.include(DebugHelper);
-  mod.include(FormHelper);
-  mod.include(FormOptionsHelper);
-  mod.include(FormTagHelper);
-  mod.include(JavaScriptHelper);
-  mod.include(NumberHelper);
-  mod.include(OutputSafetyHelper);
-  mod.include(RenderingHelper);
-  mod.include(SanitizeHelper);
-  mod.include(TagHelper);
-  mod.include(TextHelper);
-  mod.include(TranslationHelper);
-  mod.include(UrlHelper);
-}) as HelpersModule;
+include(Helpers, Benchmarkable);
+include(Helpers, ActiveModelHelper);
+include(Helpers, AssetTagHelper);
+include(Helpers, AssetUrlHelper);
+include(Helpers, CacheHelper);
+include(Helpers, CaptureHelper);
+include(Helpers, ContentExfiltrationPreventionHelper);
+include(Helpers, ControllerHelper);
+include(Helpers, CspHelper);
+include(Helpers, CsrfHelper);
+include(Helpers, DateHelper);
+include(Helpers, DebugHelper);
+include(Helpers, FormHelper);
+include(Helpers, FormOptionsHelper);
+include(Helpers, FormTagHelper);
+include(Helpers, JavaScriptHelper);
+include(Helpers, NumberHelper);
+include(Helpers, OutputSafetyHelper);
+include(Helpers, RenderingHelper);
+include(Helpers, SanitizeHelper);
+include(Helpers, TagHelper);
+include(Helpers, TextHelper);
+include(Helpers, TranslationHelper);
+include(Helpers, UrlHelper);
