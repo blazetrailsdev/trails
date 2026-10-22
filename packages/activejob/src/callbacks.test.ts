@@ -5,9 +5,6 @@ import "./test-helpers/helper.js";
 import { AbortBeforeEnqueueJob } from "./test-helpers/jobs/abort-before-enqueue-job.js";
 import { CallbackJob } from "./test-helpers/jobs/callback-job.js";
 
-const enqueue = (job: Base): Promise<unknown> =>
-  (job as unknown as { enqueue(): Promise<unknown> }).enqueue();
-
 describe("CallbacksTest", () => {
   it("perform callbacks", async () => {
     const performedCallbackJob = new CallbackJob("A-JOB-ID");
@@ -55,12 +52,12 @@ describe("CallbacksTest", () => {
   });
 
   it("#enqueue returns false when before_enqueue aborts callback chain", async () => {
-    expect(await enqueue(new AbortBeforeEnqueueJob())).toBe(false);
+    expect(await new AbortBeforeEnqueueJob().enqueue()).toBe(false);
   });
 
   it("#enqueue does not run after_enqueue callbacks when previous callbacks aborted", async () => {
     const job = new AbortBeforeEnqueueJob();
-    await enqueue(job);
+    await job.enqueue();
 
     expect(job.flag).toBeNull();
   });
@@ -74,6 +71,6 @@ describe("CallbacksTest", () => {
 
   it("#enqueue returns self when the job was enqueued", async () => {
     const job = new CallbackJob();
-    expect(await enqueue(job)).toBe(job);
+    expect(await job.enqueue()).toBe(job);
   });
 });
