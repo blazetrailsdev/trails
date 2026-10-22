@@ -9,6 +9,7 @@ GlobalID.setApp("aj");
 
 /** @noRailsEquivalent PERMANENT */
 const adapters: Record<string, () => Promise<unknown>> = {
+  async: () => import("./adapters/async.js"),
   inline: () => import("./adapters/inline.js"),
   test: () => import("./adapters/test.js"),
 };

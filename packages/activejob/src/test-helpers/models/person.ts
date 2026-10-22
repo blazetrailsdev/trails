@@ -1,5 +1,6 @@
 import { Identification } from "@blazetrails/globalid";
 import {
+  type Included,
   include,
   rbEqual,
   rbModConstSet,
@@ -11,6 +12,7 @@ import {
 
 class RecordNotFound extends StandardError {}
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Person {
   static toString(): string {
     return "Person";
@@ -35,6 +37,8 @@ export class Person {
     return otherPerson instanceof Person && rbEqual(toS(this.id), toS(otherPerson.id));
   }
 }
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
+export interface Person extends Included<typeof Identification> {}
 include(Person, Identification);
 registerConstant("Person", Person);
 rbModConstSet(Person, "RecordNotFound", RecordNotFound);

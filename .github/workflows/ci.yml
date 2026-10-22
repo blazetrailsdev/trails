@@ -888,6 +888,11 @@ jobs:
         env:
           AJ_ADAPTER: test
         run: pnpm vitest run packages/activejob
+      # activejob/Rakefile:38-41 runs async_adapter_test.rb only in this lane.
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
+        env:
+          AJ_ADAPTER: async
+        run: pnpm vitest run packages/activejob
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
         env:
           AJ_ADAPTER: inline
