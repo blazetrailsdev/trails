@@ -140,6 +140,26 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Symbol#to_s", { tsExport: "symbolToS", receiver: "symbol" }],
 ]);
 
+/**
+ * `Enumerable#<m>` → the ruby-compat free function that ports it with the Ruby
+ * receiver as argument 1 and the block as a trailing callback: `xs.partition { }`
+ * is `partition(xs, fn)`. Read by the argument gate like a
+ * {@link RECEIVER_KEYED_RUBY_COMPAT_EXPORTS} row whose receiver can be any
+ * kind, because `Enumerable` is mixed into every receiver that has an `each`
+ * (`vendor/ruby/v3.3.11/enum.c:5084`). The call-set gate credits these through
+ * the naming convention already, so this table is the argument gate's alone.
+ */
+export const ENUMERABLE_FREE_FUNCTIONS = new Map<string, string>([
+  ["Enumerable#drop", "drop"],
+  ["Enumerable#each_slice", "eachSlice"],
+  ["Enumerable#first", "first"],
+  ["Enumerable#group_by", "groupBy"],
+  ["Enumerable#partition", "partition"],
+  ["Enumerable#take", "take"],
+  ["Enumerable#uniq", "uniq"],
+  ["Enumerable#zip", "zip"],
+]);
+
 /** ruby-compat exports deliberately NOT in the table, each with the homonym
  *  that makes its bare name unresolvable — the table's burndown, not its scrap
  *  heap: a row leaves it the day the comparator can resolve a receiver. The

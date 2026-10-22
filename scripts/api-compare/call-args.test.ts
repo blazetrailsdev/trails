@@ -1699,3 +1699,48 @@ describe("a native hash form's literal key (RFC 0190)", () => {
     ).toEqual([]);
   });
 });
+
+describe("compareCallArgs visibility flag", () => {
+  it("drops respond_to?(name, true)'s visibility boolean against a one-argument port", () => {
+    const ruby = site("respond_to?", ["id:name", "bool:true"]);
+    expect(compareCallArgs(ruby, site("rbObjRespondTo", ["id:this", "id:name"])).verdict).toBe(
+      "match",
+    );
+    const forwarded = site("respond_to_missing?", ["id:name", "id:include_private"]);
+    expect(compareCallArgs(forwarded, site("respondToMissing", ["id:name"])).verdict).toBe("match");
+  });
+
+  it("still compares a non-boolean second argument", () => {
+    const ruby = site("respond_to?", ["id:name", "id:other"]);
+    expect(compareCallArgs(ruby, site("respondTo", ["id:name"]))).toMatchObject({
+      verdict: "mismatch",
+      class: "shape",
+    });
+  });
+});
+
+describe("compareCallArgs Enumerable free functions", () => {
+  const ts = (name: string, args: string[], flags: string[] = []): CallSite => ({
+    ...site(name, args, flags),
+    rubyCompat: name,
+  });
+
+  it("reads argument 1 as the receiver and a trailing callback as the block", () => {
+    const partition = { ...site("partition", [], ["blockpass", "blockarg=sym:x"]), recv: "id:xs" };
+    expect(compareCallArgs(partition, ts("partition", ["id:xs", "id:fn"])).verdict).not.toBe(
+      "mismatch",
+    );
+    const slice = { ...site("each_slice", ["num:2"], ["block"]), recv: "id:xs" };
+    expect(compareCallArgs(slice, ts("eachSlice", ["id:xs", "num:2", "id:fn"])).verdict).toBe(
+      "match",
+    );
+  });
+
+  it("still flags a differing argument", () => {
+    const slice = { ...site("each_slice", ["num:2"], ["block"]), recv: "id:xs" };
+    expect(compareCallArgs(slice, ts("eachSlice", ["id:xs", "num:3"], ["block"]))).toMatchObject({
+      verdict: "mismatch",
+      class: "shape",
+    });
+  });
+});
