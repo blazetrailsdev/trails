@@ -37,7 +37,10 @@ function argumentList(code: string): [string[], number] {
     } else if (ch === ")" || ch === "]" || ch === "}") {
       if (depth === 0) break;
       depth -= 1;
-    } else if (ch === ";" && depth === 0) {
+    } else if (
+      depth === 0 &&
+      (ch === ";" || (/\s/.test(code[pos - 1] ?? "") && /^do\b/.test(code.slice(pos))))
+    ) {
       break;
     } else if (ch === "," && depth === 0) {
       args.push(code.slice(start, pos).trim());
@@ -124,11 +127,33 @@ export class TSETracker {
     for (const node of parse(this.source).nodes) {
       if (node.kind === "text") continue;
 
-      for (const args of node.value.split(/\brender(?:ToString)?\b/).slice(1)) {
+      const code = node.value;
+      let masked = "";
+      for (let pos = 0; pos < code.length; pos += 1) {
+        const ch = code[pos];
+        if (ch === "'" || ch === '"' || ch === "`") {
+          const start = pos;
+          pos += 1;
+          while (pos < code.length && code[pos] !== ch) pos += code[pos] === "\\" ? 2 : 1;
+          masked += ch + " ".repeat(Math.max(0, Math.min(pos, code.length) - start - 1));
+          if (pos < code.length) masked += ch;
+        } else {
+          masked += ch;
+        }
+      }
+      const calls = [...masked.matchAll(/\brender(?:ToString)?\b/g)];
+
+      for (const [index, call] of calls.entries()) {
+        const args = code.slice(call.index + call[0].length, calls[index + 1]?.index);
         const options = this.renderCallOptions(args);
         if (options == null) continue;
 
-        if ("object" in options || "collection" in options) {
+        const renderType = Object.keys(options).find((key) => RENDER_TYPE_KEYS.includes(key))!;
+        const renderCallTemplate = this.renderCallTemplate(options[renderType]);
+        if (renderCallTemplate == null) continue;
+        const [template, objectTemplate] = renderCallTemplate;
+
+        if ("object" in options || "collection" in options || objectTemplate) {
           if ("object" in options && "collection" in options) continue;
           if (!("partial" in options)) continue;
         }
@@ -142,8 +167,7 @@ export class TSETracker {
         ) {
           this.addStaticDependency(dependencies, spacer.groups?.static, spacer.groups?.quote);
         }
-        const renderType = Object.keys(options).find((key) => RENDER_TYPE_KEYS.includes(key));
-        this.addDependencies(dependencies, args, TSETracker.RENDER_ARGUMENTS);
+        dependencies.push(template);
         if (renderType !== "layout") {
           this.addDependencies(dependencies, args, TSETracker.LAYOUT_DEPENDENCY);
         }
@@ -154,8 +178,7 @@ export class TSETracker {
   }
 
   private renderCallOptions(code: string): Record<string, string | null> | null {
-    let source = code.trimStart();
-    if (source.startsWith("(")) source = source.slice(1);
+    const source = code.startsWith("(") ? code.slice(1) : code.trimStart();
 
     let arguments_ = argumentList(source)[0].map((argument) => {
       let current = argument;
@@ -193,6 +216,57 @@ export class TSETracker {
     if (keys.some((key) => !ALL_KNOWN_KEYS.includes(key))) return null;
 
     return options;
+  }
+
+  private renderCallTemplate(node: string | null): [string, boolean] | null {
+    if (node == null) return null;
+    const objectTemplate = false;
+    let template: string;
+    const string = TSETracker.STRING.exec(node);
+    if (string?.index === 0 && string[0].length === node.length) {
+      const path = string.groups!.static;
+      if (string.groups!.quote === "`" && path.includes("${")) {
+        template = "";
+        let pos = 0;
+        while (pos < path.length) {
+          const interpolation = path.indexOf("${", pos);
+          if (interpolation < 0) {
+            template += path.slice(pos);
+            break;
+          }
+          template += path.slice(pos, interpolation);
+          let unmatchedBrackets = 1;
+          pos = interpolation + 2;
+          while (unmatchedBrackets > 0) {
+            if (pos >= path.length) return null;
+            if (path[pos] === "{") unmatchedBrackets += 1;
+            else if (path[pos] === "}") unmatchedBrackets -= 1;
+            pos += 1;
+          }
+          template += "*";
+        }
+      } else {
+        template = path.includes("/") ? path : `${this.directory}/${path}`;
+      }
+    } else {
+      const chain = TSETracker.VARIABLE_OR_METHOD_CHAIN.exec(node);
+      if (chain?.index !== 0) return null;
+      const callArguments = node.slice(chain[0].length).trimStart();
+      if (
+        callArguments.length > 0 &&
+        !(
+          callArguments.startsWith("(") &&
+          argumentList(callArguments.slice(1))[1] === callArguments.length - 2
+        )
+      ) {
+        return null;
+      }
+      const dependency = chain.groups!.dynamic;
+
+      template = `${pluralize(dependency)}/${singularize(dependency)}`;
+    }
+
+    return [template, objectTemplate];
   }
 
   private addDependencies(renderDependencies: string[], args: string, pattern: RegExp): void {
