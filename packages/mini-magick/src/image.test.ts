@@ -300,7 +300,7 @@ describe("MiniMagick::Image", () => {
     });
 
     it.fails("is not #== nor #eql? to an instance of a different image", (ctx) => {
-      ctx.skip(!!(new Gem.Version(cliVersion()) >= new Gem.Version("7.1.1-35")));
+      ctx.skip(new Gem.Version(cliVersion()).compare(new Gem.Version("7.1.1-35"))! >= 0);
       expect(image).not.toEqualRuby(otherImage);
       expect(image).not.toEqualRuby(otherImage);
     });
@@ -312,7 +312,7 @@ describe("MiniMagick::Image", () => {
     });
 
     it.fails("generates different same hash codes for a different image", async (ctx) => {
-      ctx.skip(!!(new Gem.Version(cliVersion()) >= new Gem.Version("7.1.1-35")));
+      ctx.skip(new Gem.Version(cliVersion()).compare(new Gem.Version("7.1.1-35"))! >= 0);
       expect(await rbHash(image)).not.toEqualRuby(await rbHash(otherImage));
     });
   });
