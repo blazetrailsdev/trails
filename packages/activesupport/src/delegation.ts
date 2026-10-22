@@ -231,12 +231,21 @@ export namespace Delegation {
         Object.defineProperty(value, "length", { value: methodObject.length });
       }
       iseqLocationSetup(value, file, line);
-      Object.defineProperty(owner, methodName, {
-        configurable: true,
-        enumerable,
-        writable: true,
-        value,
-      });
+      const writer = Object.getOwnPropertyDescriptor(owner, methodName)?.set;
+      Object.defineProperty(
+        owner,
+        methodName,
+        writer
+          ? {
+              configurable: true,
+              enumerable,
+              get(this: Record<string, unknown>) {
+                return value.call(this);
+              },
+              set: writer,
+            }
+          : { configurable: true, enumerable, writable: true, value },
+      );
     }
 
     return methodNames;

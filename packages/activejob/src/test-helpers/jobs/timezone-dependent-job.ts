@@ -9,16 +9,14 @@ export class TimezoneDependentJob extends Base {
     return "TimezoneDependentJob";
   }
 
-  perform(now: string): void {
-    const nowInZone = inTimeZone(now) as TimeWithZone;
+  perform(now: string | TimeWithZone): void {
+    now = inTimeZone(now as string) as TimeWithZone;
     const newYear = this.localtime(2018, 1, 1);
 
-    if (cmp(nowInZone, newYear)! >= 0) {
+    if (cmp(now, newYear)! >= 0) {
       JobBuffer.add("Happy New Year!");
     } else {
-      JobBuffer.add(
-        `Just ${Math.floor((newYear as TimeWithZone).minus(nowInZone) / 3600)} hours to go`,
-      );
+      JobBuffer.add(`Just ${Math.floor((newYear as TimeWithZone).minus(now) / 3600)} hours to go`);
     }
   }
 

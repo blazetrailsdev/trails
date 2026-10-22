@@ -55,7 +55,7 @@ interface AssertEnqueuedWithOptions {
   priority?: unknown;
 }
 
-interface TestQueueAdapterClass {
+export interface TestQueueAdapterClass {
   _testAdapter: unknown;
   _queueAdapter: unknown;
   enableTestAdapter(testAdapter: unknown): void;
@@ -564,8 +564,10 @@ export class TestHelper {
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface TestHelper {
-  enqueuedJobs: Payload[];
-  performedJobs: Payload[];
+  get enqueuedJobs(): Payload[];
+  set enqueuedJobs(enqueuedJobs: Payload[]);
+  get performedJobs(): Payload[];
+  set performedJobs(performedJobs: Payload[]);
   beforeSetup: typeof beforeSetup;
   afterTeardown: typeof afterTeardown;
   queueAdapterForTest: typeof queueAdapterForTest;
@@ -592,6 +594,14 @@ export interface TestHelper {
   queueAdapterChangedJobs: typeof queueAdapterChangedJobs;
   validateOption: typeof validateOption;
 }
+delegate.call(
+  TestHelper.prototype,
+  "enqueuedJobs",
+  "enqueuedJobs=",
+  "performedJobs",
+  "performedJobs=",
+  { to: "queueAdapter" },
+);
 Object.assign(TestHelper.prototype, {
   beforeSetup,
   afterTeardown,
@@ -619,12 +629,4 @@ Object.assign(TestHelper.prototype, {
   queueAdapterChangedJobs,
   validateOption,
 });
-delegate.call(
-  TestHelper.prototype,
-  "enqueuedJobs",
-  "enqueuedJobs=",
-  "performedJobs",
-  "performedJobs=",
-  { to: "queueAdapter" },
-);
 rbModConstSet(ActiveJob, "TestHelper", TestHelper);

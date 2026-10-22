@@ -10,6 +10,7 @@ import { Base } from "./base.js";
 import { QueueAdapters } from "./namespaces.js";
 import { AsyncAdapter } from "./queue-adapters/async-adapter.js";
 import { TestCase } from "./test-case.js";
+import type { TestQueueAdapterClass } from "./test-helper.js";
 import "./test-helpers/helper.js";
 
 class StubOneAdapter {
@@ -66,7 +67,7 @@ describe("QueueAdapterTest", () => {
   });
 
   it("should default to :async adapter if no adapters are set at all", () => {
-    (Base as typeof Base & { disableTestAdapter(): void }).disableTestAdapter();
+    (Base as typeof Base & TestQueueAdapterClass).disableTestAdapter();
     const queueAdapterWas = Base._queueAdapter;
     const queueAdapterNameWas = Base._queueAdapterName;
     Base._queueAdapter = Base._queueAdapterName = null;

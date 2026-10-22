@@ -16,7 +16,7 @@ extend(Timezones, Concern);
 Concern.included.call(Timezones as never, null, function (this: TimezonesClass) {
   this.aroundPerform(
     rbBlock(function (job: TimezonesJob, block: () => unknown) {
-      return useZone(job.timezone as string, block);
+      return useZone(job.timezone, block);
     }),
   );
 });
