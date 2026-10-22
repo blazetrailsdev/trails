@@ -5,6 +5,7 @@ import {
   registerChildProcessAdapter,
 } from "./child-process-adapter.js";
 import { Dir } from "./dir.js";
+import { Errno } from "./errno.js";
 import { File } from "./file.js";
 import { FileUtils } from "./file-utils.js";
 import { rbFSystem } from "./kernel-system.js";
@@ -119,5 +120,34 @@ describe("Open3.capture2e", () => {
   it("raises NotImplementedError on an adapter that cannot spawn", async () => {
     withoutSpawn();
     await expect(Open3.capture2e("true")).rejects.toThrow(NotImplementedError);
+  });
+});
+
+describe("Open3.capture3", () => {
+  it("answers stdout and stderr apart, and a Process::Status", async () => {
+    const [stdout, stderr, status] = await Open3.capture3("sh", "-c", "echo out; echo err 1>&2");
+    expect(stdout).toBe("out\n");
+    expect(stderr).toBe("err\n");
+    expect(status).toBeInstanceOf(Process.Status);
+    expect(status.isSuccess()).toBe(true);
+  });
+
+  it("writes stdin_data to the child's stdin", async () => {
+    expect((await Open3.capture3("cat", { stdinData: "piped" }))[0]).toBe("piped");
+    expect((await Open3.capture3("cat"))[0]).toBe("");
+  });
+
+  it("gives the child only env under unsetenv_others", async () => {
+    const [stdout] = await Open3.capture3({ TRAILS_OPEN3_PROBE: "x" }, "/usr/bin/env", {
+      unsetenvOthers: true,
+    });
+    expect(stdout).toContain("TRAILS_OPEN3_PROBE=x\n");
+    expect(stdout).not.toMatch(/^HOME=/m);
+  });
+
+  it("raises Errno::ENOENT for a missing executable", async () => {
+    await expect(Open3.capture3("trails-no-such-program", "--version")).rejects.toBeInstanceOf(
+      Errno.ENOENT,
+    );
   });
 });

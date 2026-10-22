@@ -125,6 +125,18 @@ describe("File", () => {
     expect(File.isExist(path)).toBe(false);
   });
 
+  it("executable? answers the stat's execute bit, and false on a missing path", () => {
+    // vendor/ruby/v3.3.11/file.c:1966.
+    const root = fixture();
+    const path = join(root, "x.sh");
+    writeFileSync(path, "");
+    chmodSync(path, 0o644);
+    expect(File.isExecutable(path)).toBe(false);
+    chmodSync(path, 0o755);
+    expect(File.isExecutable(path)).toBe(true);
+    expect(File.isExecutable("/nope/nope")).toBe(false);
+  });
+
   it("directory? and file? answer false rather than raising on a missing path", () => {
     // vendor/ruby/v3.3.11/file.c:1622.
     expect(File.isDirectory("/nope/nope")).toBe(false);

@@ -20,6 +20,7 @@ import { RuntimeError } from "./runtime-error.js";
 import { Interrupt, SignalException } from "./signal-exception.js";
 import { StandardError } from "./standard-error.js";
 import { Hash } from "./hash.js";
+import { warn } from "./kernel-warn.js";
 import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
 import { RCLASS_CONST_TBL, classpaths, rbCBasicObject, rbCSymbol, rbModName } from "./object.js";
@@ -259,10 +260,16 @@ export function rbModConstMissing(klass: { name?: string } | null, name: string)
  * @noRailsEquivalent PERMANENT
  */
 export function rbConstGet(klass: object, id: string): unknown {
-  if (id in klass) return (klass as Record<string, unknown>)[id];
+  if (id in klass) {
+    let tmp: object | null = klass;
+    while (tmp !== null && !Object.hasOwn(tmp, id)) tmp = Object.getPrototypeOf(tmp) as object;
+    if (tmp !== null) rbConstWarnIfDeprecated(tmp, id);
+    return (klass as Record<string, unknown>)[id];
+  }
   if (typeof klass === "function") {
     for (const tmp of rbModAncestors(klass as unknown as { prototype: object })) {
       if (Object.hasOwn(tmp, id)) {
+        rbConstWarnIfDeprecated(tmp, id);
         return (tmp as Record<string, unknown>)[id];
       }
     }
@@ -271,6 +278,49 @@ export function rbConstGet(klass: object, id: string): unknown {
   const { constMissing } = klass as { constMissing?: (name: string) => unknown };
   if (constMissing !== undefined) return constMissing.call(klass, id);
   return rbModConstMissing(klass, id);
+}
+
+const CONST_DEPRECATED = new WeakMap<object, Set<string>>();
+
+/**
+ * `rb_mod_deprecate_constant` (`vendor/ruby/v3.3.11/variable.c:3892-3896`),
+ * `Module#deprecate_constant`, through `set_const_visibility`
+ * (`variable.c:3786-3825`): each name must be a constant `mod` holds itself,
+ * else `undefined_constant` (`variable.c:3235-3239`) raises `NameError`, and
+ * is flagged `CONST_DEPRECATED` so a later read warns. Answers `mod`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModDeprecateConstant<T extends object>(obj: T, ...argv: string[]): T {
+  if (argv.length === 0) {
+    warn("deprecate_constant with no argument is just ignored");
+    return obj;
+  }
+  for (const id of argv) {
+    if (Object.hasOwn(obj, id)) {
+      let flags = CONST_DEPRECATED.get(obj);
+      if (flags === undefined) CONST_DEPRECATED.set(obj, (flags = new Set()));
+      flags.add(id);
+    } else {
+      throw new NameError(`constant ${rbModName(obj)}::${id} not defined`, id);
+    }
+  }
+  return obj;
+}
+
+/**
+ * `rb_const_warn_if_deprecated` (`vendor/ruby/v3.3.11/variable.c:3104-3117`):
+ * a `:deprecated`-category warning for a read of a constant
+ * {@link rbModDeprecateConstant} flagged.
+ */
+function rbConstWarnIfDeprecated(klass: object, id: string): void {
+  if (CONST_DEPRECATED.get(klass)?.has(id)) {
+    if (klass === Object) {
+      warn(`constant ::${id} is deprecated`, { category: ":deprecated" });
+    } else {
+      warn(`constant ${rbModName(klass)}::${id} is deprecated`, { category: ":deprecated" });
+    }
+  }
 }
 
 /**
@@ -323,6 +373,7 @@ export function rbModConstGet(mod: object, name: string): unknown {
       (typeof c === "object" || typeof c === "function") &&
       Object.hasOwn(c, part)
     ) {
+      rbConstWarnIfDeprecated(c, part);
       c = (c as Record<string, unknown>)[part];
     } else {
       return rbModConstMissing(c as { name?: string } | null, part);

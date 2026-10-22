@@ -9,6 +9,7 @@ import {
   rbConstGet,
   rbModConstGet,
   rbModConstants,
+  rbModDeprecateConstant,
   rbPathToClass,
   registerConstant,
   registeredConstant,
@@ -277,5 +278,22 @@ describe("rb_mod_constants", () => {
   it("includes the superclasses' constants", () => {
     expect(rbModConstants(Child)).toEqual(["Own", "LIMIT", "Nested"]);
     expect(rbModConstants(Nested)).toEqual([]);
+  });
+});
+
+describe("rbModDeprecateConstant", () => {
+  it("records the names, answers the receiver and still reads the constant", () => {
+    class Http {
+      static NOT_FOUND = 404;
+    }
+    expect(rbModDeprecateConstant(Http, "NOT_FOUND")).toBe(Http);
+    expect(rbConstGet(Http, "NOT_FOUND")).toBe(404);
+    expect(rbModConstGet(Http, "NOT_FOUND")).toBe(404);
+  });
+
+  it("raises NameError for a constant the module does not hold", () => {
+    class Http {}
+    expect(() => rbModDeprecateConstant(Http, "GONE")).toThrow(NameError);
+    expect(() => rbModDeprecateConstant(Http, "GONE")).toThrow("constant Http::GONE not defined");
   });
 });

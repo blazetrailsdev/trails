@@ -1,5 +1,6 @@
 import { getChildProcess } from "./child-process-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { isPlainHash } from "./object.js";
 import { Process, rbExecargNew } from "./process.js";
 
 /**
@@ -40,5 +41,44 @@ export class Open3 {
     const [outerr, status] = await adapter.capture2e(command, env);
     if (status.error !== undefined) throw status.error;
     return [outerr, new Process.Status(status)];
+  }
+
+  /**
+   * `Open3.capture3` (`vendor/ruby/v3.3.11/lib/open3.rb:648-681`): the
+   * command's stdout and stderr as two Strings, and its `Process::Status`.
+   * `stdin_data` (default `""`, `open3.rb:655`) is written to the child's
+   * stdin, which is then closed (`open3.rb:670-675`). The remaining options go
+   * to `spawn`, so `unsetenv_others: true` gives the child `env` alone. Several
+   * command Strings are a program and its argv, spawned with no shell.
+   *
+   * A command that cannot be spawned raises what the spawn failed with, as
+   * `Process.spawn` raises `Errno::ENOENT`, and a host with no way to spawn
+   * raises `NotImplementedError`, as {@link Open3.capture2e} does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Open3.capture3`
+   * (`vendor/ruby/v3.3.11/lib/open3.rb:648`).
+   */
+  static async capture3(
+    ...cmd: unknown[]
+  ): Promise<[string, string, InstanceType<typeof Process.Status>]> {
+    let opts: { stdinData?: string | null; unsetenvOthers?: unknown };
+    if (cmd.length > 0 && isPlainHash(cmd[cmd.length - 1])) {
+      opts = { ...(cmd.pop() as typeof opts) };
+    } else {
+      opts = {};
+    }
+
+    const stdinData = opts.stdinData || "";
+    delete opts.stdinData;
+
+    const [command, env, args] = rbExecargNew([...cmd, opts]);
+    const adapter = getChildProcess();
+    if (adapter.capture3 === undefined) {
+      throw new NotImplementedError("spawn() function is unimplemented on this machine");
+    }
+
+    const [stdout, stderr, status] = await adapter.capture3(command, env, args, stdinData);
+    if (status.error !== undefined) throw status.error;
+    return [stdout, stderr, new Process.Status(status)];
   }
 }

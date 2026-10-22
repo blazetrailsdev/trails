@@ -12,6 +12,8 @@ interface SystemCallError extends Error {
  * (`process.c:2511-2538`) takes a trailing Hash as the options and a leading
  * Hash as the env, laid over `ENV` with `nil` unsetting a name. One remaining
  * String is a command line (`args` is `null`); more are a program and its argv.
+ * `unsetenv_others: true` (`process.c:2195-2200`) starts the env empty rather
+ * than from `ENV`, as `rb_execarg_parent_start1` does (`process.c:2887-2892`).
  *
  * @inventedArm throw — CONVERGEABLE rb-exec-getargs-ports-rb-check-argv
  * @noRailsEquivalent PERMANENT — Ruby core `rb_execarg_new`
@@ -23,14 +25,15 @@ export function rbExecargNew(
   prog: string,
   env: Record<string, string | undefined>,
   args: string[] | null,
-  opthash: { out?: string },
+  opthash: { out?: string; unsetenvOthers?: unknown },
 ] {
   const rest = [...argv];
-  let opthash: { out?: string } = {};
+  let opthash: { out?: string; unsetenvOthers?: unknown } = {};
   if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
-    opthash = rest.pop() as { out?: string };
+    opthash = rest.pop() as { out?: string; unsetenvOthers?: unknown };
   }
-  const env: Record<string, string | undefined> = { ...processEnv };
+  const unsetenvOthers = opthash.unsetenvOthers != null && opthash.unsetenvOthers !== false;
+  const env: Record<string, string | undefined> = unsetenvOthers ? {} : { ...processEnv };
   if (rest.length > 0 && isPlainHash(rest[0])) {
     for (const [name, value] of Object.entries(rest.shift() as Record<string, string | null>)) {
       if (value == null) delete env[name];

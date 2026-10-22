@@ -294,6 +294,22 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:1966` `rb_file_executable_p`, which is
+   * `rb_eaccess(fname, X_OK) >= 0`: the backend's `File::Stat#executable?`
+   * (`file.c:2244`), and `false` where the stat fails.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.executable?`
+   * (`vendor/ruby/v3.3.11/file.c:1966`).
+   */
+  static isExecutable(fileName: string): boolean {
+    try {
+      return getFs().statSync(fileName).isExecutable();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:1723` `rb_file_symlink_p`, which `lstat`s the name and
    * answers `false` rather than raising when the `lstat` fails
    * (`file.c:1730`), the way its {@link File.isDirectory} neighbour does.
