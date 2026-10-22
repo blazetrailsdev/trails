@@ -1,5 +1,6 @@
 import { compileJs } from "@blazetrails/tse-compiler";
 import { describe, it, expect } from "vitest";
+import "../../base.js";
 import { TSE } from "./tse.js";
 
 const tse = new TSE();
@@ -80,5 +81,28 @@ describe("translateLocation", () => {
         "<%= x %>",
       ),
     ).toBeNull();
+  });
+});
+
+describe("call", () => {
+  it("strips a leading encoding tag before compiling", () => {
+    const template = { type: "text/html", format: ":html" };
+    const tagged = tse.call(template, "<%# encoding: UTF-8 %>  hello é");
+    expect(tagged).toBe(tse.call(template, "hello é"));
+    expect(tagged).not.toContain("encoding");
+  });
+});
+
+describe("validEncoding", () => {
+  it("re-reads the source in the encoding its tag names", () => {
+    const template = { type: "text/html", format: ":html" };
+    expect(tse.call(template, "<%# encoding: ISO-8859-1 %>é")).toBe(tse.call(template, "Ã©"));
+  });
+
+  it("raises WrongEncodingError when the source is invalid in the tagged encoding", () => {
+    const template = { type: "text/html", format: ":html" };
+    expect(() => tse.call(template, "<%# encoding: Shift_JIS %>\u0080")).toThrow(
+      "Your template was not saved as valid Shift_JIS",
+    );
   });
 });
