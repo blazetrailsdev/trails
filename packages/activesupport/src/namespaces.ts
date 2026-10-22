@@ -96,7 +96,7 @@ export const TopLevel: {
     Railties: { ControllerRuntime?: object };
     afterAllTransactionsCommit(block: () => unknown): unknown;
   };
-  ActionCable?: { Engine?: unknown };
+  ActionCable?: { name?: string; Engine?: unknown; server?(): unknown };
   BCrypt?: {
     Engine: { readonly MIN_COST: number; readonly cost: number };
     Password: {
