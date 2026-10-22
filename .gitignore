@@ -70,6 +70,7 @@ packages/trailties/src/thor/test-helpers/sandbox/
 # Ruby-to-TS generator (scripts/codegen): IR caches, the generated trees and
 # their measurements, and the oracles hand-oracle.ts rebuilds.
 scripts/codegen/.ir*/
+scripts/codegen/.golden/
 scripts/codegen/__pycache__/
 scripts/codegen/data/hand-oracle*.json
 scripts/codegen/measurements*.jsonl
