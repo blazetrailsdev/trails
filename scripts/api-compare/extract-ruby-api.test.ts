@@ -288,6 +288,51 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     return rubyField(fixtures, "skeleton");
   }
 
+  it("drops an elsif arm only include_private distinguishes, and nothing else", () => {
+    const fixtures = {
+      "foo.rb": `
+        class Foo
+          def respond_to?(method, include_private_methods = false)
+            if super
+              true
+            elsif !include_private_methods && super(method, true)
+              false
+            else
+              !matched_attribute_method(method.to_s).nil?
+            end
+          end
+
+          def other?(method, include_private = false)
+            if super
+              true
+            elsif ready?(method)
+              false
+            end
+          end
+
+          def probe(method)
+            super(method, true)
+          end
+        end
+      `,
+    };
+    const s = rubySkeletons(fixtures);
+    expect(s["Foo#respond_to?"]).toEqual([
+      "if",
+      "ref:super",
+      "ref:matched_attribute_method",
+      "ref:to_s",
+      "ref:nil?",
+    ]);
+    expect(s["Foo#other?"]).toEqual(["if", "ref:super", "if", "ref:ready?"]);
+    const marks = rubyField(fixtures, "visibilityArms");
+    expect(marks["Foo#respond_to?"]).toBe(true);
+    expect(marks["Foo#other?"]).toBeNull();
+    expect(rubyField(fixtures, "callArgs")["Foo#probe"]).toEqual([
+      expect.objectContaining({ name: "super", args: ["id:method", "bool:true"] }),
+    ]);
+  });
+
   it("marks a send to a dynamically named setter", () => {
     const s = rubySkeletons({
       "foo.rb": `
