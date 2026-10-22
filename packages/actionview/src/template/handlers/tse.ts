@@ -99,7 +99,10 @@ export class TSE implements TemplateHandler {
     }
   }
 
-  /** @missingRailsCall include? — PERMANENT */
+  /**
+   * @missingRailsCall include? — PERMANENT
+   * @missingRailsArgs encode! — PERMANENT
+   */
   call(template: TseTemplate, source: string): string {
     const ctor = this.constructor as typeof TSE;
     const templateSource = b(source);
@@ -148,12 +151,18 @@ export class TSE implements TemplateHandler {
 
     if (
       typeof string === "string" ||
-      isValidEncoding(String.fromCharCode(...string), rbObjEncoding(string))
+      isValidEncoding(
+        Array.from(string, (byte) => String.fromCharCode(byte)).join(""),
+        rbObjEncoding(string),
+      )
     ) {
       return rbObjEncoding(string);
     }
 
-    throw new WrongEncodingError(String.fromCharCode(...string), rbObjEncoding(string));
+    throw new WrongEncodingError(
+      Array.from(string, (byte) => String.fromCharCode(byte)).join(""),
+      rbObjEncoding(string),
+    );
   }
 
   /** @internal */

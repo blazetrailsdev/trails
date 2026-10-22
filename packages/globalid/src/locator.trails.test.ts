@@ -22,9 +22,9 @@ describe("Locator (trails)", () => {
 
   it("locate_many keeps a composite id distinct from its String spelling", async () => {
     registerConstant("MixedIdModel", MixedIdModel as unknown as LocatorModel);
-    const gid = GlobalID.create(new MixedIdModel(["a", "b"]), { app: "bcx" });
-    const located = (await Locator.locateMany([gid])) as MixedIdModel[];
-    expect(located).toHaveLength(1);
-    expect(located[0].id).toStrictEqual(["a", "b"]);
+    const composite = GlobalID.create(new MixedIdModel(["a", "b"]), { app: "bcx" });
+    const scalar = GlobalID.create(new MixedIdModel("a,b"), { app: "bcx" });
+    const located = (await Locator.locateMany([composite, scalar])) as MixedIdModel[];
+    expect(located.map((record) => record.id)).toStrictEqual([["a", "b"], "a,b"]);
   });
 });

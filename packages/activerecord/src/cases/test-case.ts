@@ -15,6 +15,7 @@ import {
   type CallbackChain,
 } from "@blazetrails/activesupport";
 import {
+  isModuleIncluded,
   Fiber,
   RuntimeError,
   Thread,
@@ -90,10 +91,14 @@ export class TestCase extends ActiveSupportTestCase {
   }
 
   override async afterTeardown(): Promise<void> {
-    try {
+    if (isModuleIncluded(ActiveSupportTestCase, TestFixtures)) {
       await super.afterTeardown();
-    } finally {
-      await this.teardownFixtures();
+    } else {
+      try {
+        await super.afterTeardown();
+      } finally {
+        await this.teardownFixtures();
+      }
     }
     await this.checkConnectionLeaks();
   }
