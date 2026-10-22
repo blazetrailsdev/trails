@@ -118,8 +118,6 @@ export class Job extends Record {
 
   /**
    * @internal
-   * @inlinedFrom SolidQueue::Job::Schedulable#execution solid_queue/v1.1.3/app/models/solid_queue/job/schedulable.rb:43-45
-   * @inlinedFrom SolidQueue::Job::Executable#execution solid_queue/v1.1.3/app/models/solid_queue/job/executable.rb:107-109
    * @missingRailsCall blockedExecution — CONVERGEABLE port-solid-queue-concurrency-controls
    * @missingRailsCall claimedExecution — CONVERGEABLE port-solid-queue-concurrency-controls
    * @missingRailsCall failedExecution — CONVERGEABLE port-solid-queue-concurrency-controls
