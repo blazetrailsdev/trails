@@ -282,6 +282,25 @@ async function writeHandlerShim(shim: HandlerShim, code: string, viewsDir: strin
   await fs.writeFile(shim.outBase + ".ts.map", JSON.stringify(map));
 }
 
+export function chainLineMappings(
+  jsMappings: readonly LineMapping[],
+  tsMappings: readonly LineMapping[],
+): LineMapping[] {
+  const byLine = new Map<number, LineMapping[]>();
+  for (const m of tsMappings) {
+    byLine.set(m.genLine, [...(byLine.get(m.genLine) ?? []), m]);
+  }
+  const mappings: LineMapping[] = [];
+  for (const m of jsMappings) {
+    const line = byLine.get(m.srcLine);
+    if (line === undefined) continue;
+    const t = line.filter((c) => (c.genCol ?? 0) <= (m.srcCol ?? 0)).at(-1) ?? line[0];
+    const srcCol = (t.srcCol ?? 0) + Math.max(0, (m.srcCol ?? 0) - (t.genCol ?? 0));
+    mappings.push({ genLine: m.genLine, genCol: m.genCol, srcLine: t.srcLine, srcCol });
+  }
+  return mappings;
+}
+
 async function chainSourceMap(shim: HandlerShim, viewsDir: string): Promise<void> {
   const jsMap = JSON.parse(await fs.readFile(shim.outBase + ".js.map", "utf8")) as {
     mappings: string;
@@ -289,18 +308,10 @@ async function chainSourceMap(shim: HandlerShim, viewsDir: string): Promise<void
   const tsMap = JSON.parse(await fs.readFile(shim.outBase + ".ts.map", "utf8")) as {
     mappings: string;
   };
-  const byLine = new Map<number, LineMapping[]>();
-  for (const m of decodeLineMappings(tsMap.mappings)) {
-    byLine.set(m.genLine, [...(byLine.get(m.genLine) ?? []), m]);
-  }
-  const mappings: LineMapping[] = [];
-  for (const m of decodeLineMappings(jsMap.mappings)) {
-    const line = byLine.get(m.srcLine);
-    if (line === undefined) continue;
-    const t = line.filter((c) => (c.genCol ?? 0) <= (m.srcCol ?? 0)).at(-1) ?? line[0];
-    const srcCol = (t.srcCol ?? 0) + Math.max(0, (m.srcCol ?? 0) - (t.genCol ?? 0));
-    mappings.push({ genLine: m.genLine, genCol: m.genCol, srcLine: t.srcLine, srcCol });
-  }
+  const mappings = chainLineMappings(
+    decodeLineMappings(jsMap.mappings),
+    decodeLineMappings(tsMap.mappings),
+  );
   const shimDir = path.dirname(shim.outBase);
   const sourceFileName = path
     .relative(shimDir, path.join(viewsDir, shim.rel))

@@ -1133,7 +1133,8 @@ describe("FormWithActsLikeFormForTest", () => {
     }
   });
 
-  it("form with doesnt call private or protected properties on form object skipping value", () => {
+  // PERMANENT-SKIP: CLAUDE.md, "Method visibility is compile-time only (`Module#private`, `basic_obj_respond_to`'s `pub`)"
+  it.skip("form with doesnt call private or protected properties on form object skipping value", () => {
     const obj = new (class {
       private privateProperty(): string {
         return "That would be great.";
@@ -1156,31 +1157,10 @@ describe("FormWithActsLikeFormForTest", () => {
     });
   });
 
-  function activePost(id?: unknown): Post {
-    const p = new Post();
-    Object.assign(p, { active: false });
-    if (id !== undefined) Object.assign(p, { id });
-    return p;
-  }
-
-  const radios = (prefix: string, wrap: boolean): string => {
-    const name = `post${prefix ? `[${prefix}]` : ""}[active]`;
-    const id = `post_${prefix ? `${prefix}_` : ""}active`;
-    const input = (v: string, checked: boolean): string =>
-      `<input ${checked ? "checked='checked' " : ""}name='${name}' type='radio' value='${v}' id='${id}_${v}' />`;
-    const pair = (v: string, checked: boolean): string =>
-      wrap
-        ? `<label for='${id}_${v}'>${input(v, checked)}${v}</label>`
-        : `${input(v, checked)}<label for='${id}_${v}'>${v}</label>`;
-    return (
-      `<input type='hidden' name='${name}' value='' autocomplete='off' />` +
-      pair("true", false) +
-      pair("false", true)
-    );
-  };
-
   it("form with with collection select", () => {
-    formWith({ model: activePost() }, (f) => {
+    const post = new Post();
+    Object.assign(post, { active: false });
+    formWith({ model: post }, (f) => {
       concat(f.collectionSelect("active", [true, false], "toString", "toString"));
     });
 
@@ -1200,18 +1180,33 @@ describe("FormWithActsLikeFormForTest", () => {
   });
 
   it("form with with collection radio buttons", () => {
-    formWith({ model: activePost() }, (f) => {
+    const post = new Post();
+    Object.assign(post, { active: false });
+    formWith({ model: post }, (f) => {
       concat(f.collectionRadioButtons("active", [true, false], "toString", "toString"));
     });
 
-    assertDomEqual(
-      wholeForm("/posts", null, null, {}, () => radios("", false)),
-      rendered,
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () =>
+        "<input type='hidden' name='post[active]' value='' autocomplete='off' />" +
+        "<input name='post[active]' type='radio' value='true' id='post_active_true' />" +
+        "<label for='post_active_true'>true</label>" +
+        "<input checked='checked' name='post[active]' type='radio' value='false' id='post_active_false' />" +
+        "<label for='post_active_false'>false</label>",
     );
+
+    assertDomEqual(expected, rendered);
   });
 
   it("form with with collection radio buttons with custom builder block", () => {
-    formWith({ model: activePost() }, (f) => {
+    const post = new Post();
+    Object.assign(post, { active: false });
+
+    formWith({ model: post }, (f) => {
       const renderedRadioButtons = f.collectionRadioButtons(
         "active",
         [true, false],
@@ -1224,14 +1219,29 @@ describe("FormWithActsLikeFormForTest", () => {
       concat(renderedRadioButtons);
     });
 
-    assertDomEqual(
-      wholeForm("/posts", null, null, {}, () => radios("", true)),
-      rendered,
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () =>
+        "<input type='hidden' name='post[active]' value='' autocomplete='off' />" +
+        "<label for='post_active_true'>" +
+        "<input name='post[active]' type='radio' value='true' id='post_active_true' />" +
+        "true</label>" +
+        "<label for='post_active_false'>" +
+        "<input checked='checked' name='post[active]' type='radio' value='false' id='post_active_false' />" +
+        "false</label>",
     );
+
+    assertDomEqual(expected, rendered);
   });
 
   it("form with with collection radio buttons with custom builder block does not leak the template", () => {
-    formWith({ model: activePost(1) }, (f) => {
+    const post = new Post();
+    Object.assign(post, { active: false, id: 1 });
+
+    formWith({ model: post }, (f) => {
       const renderedRadioButtons = f.collectionRadioButtons(
         "active",
         [true, false],
@@ -1251,7 +1261,13 @@ describe("FormWithActsLikeFormForTest", () => {
       null,
       {},
       () =>
-        radios("", true) +
+        "<input type='hidden' name='post[active]' value='' autocomplete='off' />" +
+        "<label for='post_active_true'>" +
+        "<input name='post[active]' type='radio' value='true' id='post_active_true' />" +
+        "true</label>" +
+        "<label for='post_active_false'>" +
+        "<input checked='checked' name='post[active]' type='radio' value='false' id='post_active_false' />" +
+        "false</label>" +
         "<input name='post[id]' type='hidden' value='1' id='post_id' autocomplete='off' />",
     );
 
@@ -1259,59 +1275,63 @@ describe("FormWithActsLikeFormForTest", () => {
   });
 
   it("form with with index and with collection radio buttons", () => {
-    formWith({ model: activePost(), index: "1" }, (f) => {
+    const post = new Post();
+    Object.assign(post, { active: false });
+
+    formWith({ model: post, index: "1" }, (f) => {
       concat(f.collectionRadioButtons("active", [true, false], "toString", "toString"));
     });
 
-    assertDomEqual(
-      wholeForm("/posts", null, null, {}, () => radios("1", false)),
-      rendered,
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () =>
+        "<input type='hidden' name='post[1][active]' value='' autocomplete='off' />" +
+        "<input name='post[1][active]' type='radio' value='true' id='post_1_active_true' />" +
+        "<label for='post_1_active_true'>true</label>" +
+        "<input checked='checked' name='post[1][active]' type='radio' value='false' id='post_1_active_false' />" +
+        "<label for='post_1_active_false'>false</label>",
     );
+
+    assertDomEqual(expected, rendered);
   });
 
-  function tagPost(tagIds: number[], id?: unknown): Post {
-    const p = new Post();
-    Object.assign(p, { tag_ids: tagIds });
-    if (id !== undefined) Object.assign(p, { id });
-    return p;
-  }
-
-  const checkboxes = (
-    prefix: string,
-    values: number[],
-    checked: number[],
-    wrap: boolean,
-  ): string => {
-    const name = `post${prefix ? `[${prefix}]` : ""}[tag_ids][]`;
-    const id = `post_${prefix ? `${prefix}_` : ""}tag_ids`;
-    let out = `<input name='${name}' type='hidden' value='' autocomplete='off' />`;
-    for (const i of values) {
-      const input = `<input ${checked.includes(i) ? "checked='checked' " : ""}name='${name}' type='checkbox' value='${i}' id='${id}_${i}' />`;
-      out += wrap
-        ? `<label for='${id}_${i}'>${input}Tag ${i}</label>`
-        : `${input}<label for='${id}_${i}'>Tag ${i}</label>`;
-    }
-    return out;
-  };
-
-  const tagCollection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
-
   it("form with with collection checkboxes", () => {
-    formWith({ model: tagPost([1, 3]) }, (f) => {
-      concat(f.collectionCheckboxes("tag_ids", tagCollection, "first", "last"));
+    const post = new Post();
+    Object.assign(post, { tag_ids: [1, 3] });
+    const collection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
+    formWith({ model: post }, (f) => {
+      concat(f.collectionCheckboxes("tag_ids", collection, "first", "last"));
     });
 
-    const expected = wholeForm("/posts", null, null, {}, () =>
-      checkboxes("", [1, 2, 3], [1, 3], false),
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () =>
+        "<input name='post[tag_ids][]' type='hidden' value='' autocomplete='off' />" +
+        "<input checked='checked' name='post[tag_ids][]' type='checkbox' value='1' id='post_tag_ids_1' />" +
+        "<label for='post_tag_ids_1'>Tag 1</label>" +
+        "<input name='post[tag_ids][]' type='checkbox' value='2' id='post_tag_ids_2' />" +
+        "<label for='post_tag_ids_2'>Tag 2</label>" +
+        "<input checked='checked' name='post[tag_ids][]' type='checkbox' value='3' id='post_tag_ids_3' />" +
+        "<label for='post_tag_ids_3'>Tag 3</label>",
     );
+
     assertDomEqual(expected, rendered);
   });
 
   it("form with with collection checkboxes with custom builder block", () => {
-    formWith({ model: tagPost([1, 3]) }, (f) => {
+    const post = new Post();
+    Object.assign(post, { tag_ids: [1, 3] });
+    const collection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
+    formWith({ model: post }, (f) => {
       const renderedCheckboxes = f.collectionCheckboxes(
         "tag_ids",
-        tagCollection,
+        collection,
         "first",
         "last",
         {},
@@ -1321,17 +1341,36 @@ describe("FormWithActsLikeFormForTest", () => {
       concat(renderedCheckboxes);
     });
 
-    const expected = wholeForm("/posts", null, null, {}, () =>
-      checkboxes("", [1, 2, 3], [1, 3], true),
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () =>
+        "<input name='post[tag_ids][]' type='hidden' value='' autocomplete='off' />" +
+        "<label for='post_tag_ids_1'>" +
+        "<input checked='checked' name='post[tag_ids][]' type='checkbox' value='1' id='post_tag_ids_1' />" +
+        "Tag 1</label>" +
+        "<label for='post_tag_ids_2'>" +
+        "<input name='post[tag_ids][]' type='checkbox' value='2' id='post_tag_ids_2' />" +
+        "Tag 2</label>" +
+        "<label for='post_tag_ids_3'>" +
+        "<input checked='checked' name='post[tag_ids][]' type='checkbox' value='3' id='post_tag_ids_3' />" +
+        "Tag 3</label>",
     );
+
     assertDomEqual(expected, rendered);
   });
 
   it("form with with collection checkboxes with custom builder block does not leak the template", () => {
-    formWith({ model: tagPost([1, 3], 1) }, (f) => {
+    const post = new Post();
+    Object.assign(post, { tag_ids: [1, 3], id: 1 });
+    const collection = [1, 2, 3].map((i) => [i, `Tag ${i}`]);
+
+    formWith({ model: post }, (f) => {
       const renderedCheckboxes = f.collectionCheckboxes(
         "tag_ids",
-        tagCollection,
+        collection,
         "first",
         "last",
         {},
@@ -1348,18 +1387,42 @@ describe("FormWithActsLikeFormForTest", () => {
       null,
       {},
       () =>
-        checkboxes("", [1, 2, 3], [1, 3], true) +
+        "<input name='post[tag_ids][]' type='hidden' value='' autocomplete='off' />" +
+        "<label for='post_tag_ids_1'>" +
+        "<input checked='checked' name='post[tag_ids][]' type='checkbox' value='1' id='post_tag_ids_1' />" +
+        "Tag 1</label>" +
+        "<label for='post_tag_ids_2'>" +
+        "<input name='post[tag_ids][]' type='checkbox' value='2' id='post_tag_ids_2' />" +
+        "Tag 2</label>" +
+        "<label for='post_tag_ids_3'>" +
+        "<input checked='checked' name='post[tag_ids][]' type='checkbox' value='3' id='post_tag_ids_3' />" +
+        "Tag 3</label>" +
         "<input name='post[id]' type='hidden' value='1' id='post_id' autocomplete='off' />",
     );
+
     assertDomEqual(expected, rendered);
   });
 
   it("form with index and with collection checkboxes", () => {
-    formWith({ model: tagPost([1]), index: "1" }, (f) => {
-      concat(f.collectionCheckboxes("tag_ids", [[1, "Tag 1"]], "first", "last"));
+    const post = new Post();
+    Object.assign(post, { tag_ids: [1] });
+    const collection = [[1, "Tag 1"]];
+
+    formWith({ model: post, index: "1" }, (f) => {
+      concat(f.collectionCheckboxes("tag_ids", collection, "first", "last"));
     });
 
-    const expected = wholeForm("/posts", null, null, {}, () => checkboxes("1", [1], [1], false));
+    const expected = wholeForm(
+      "/posts",
+      null,
+      null,
+      {},
+      () =>
+        "<input name='post[1][tag_ids][]' type='hidden' value='' autocomplete='off' />" +
+        "<input checked='checked' name='post[1][tag_ids][]' type='checkbox' value='1' id='post_1_tag_ids_1' />" +
+        "<label for='post_1_tag_ids_1'>Tag 1</label>",
+    );
+
     assertDomEqual(expected, rendered);
   });
 

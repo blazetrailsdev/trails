@@ -1,4 +1,5 @@
 import {
+  chainLineMappings,
   decodeLineMappings,
   transpileTse,
   tseHandlerScope,
@@ -33,9 +34,9 @@ export async function compileTemplate(
         })
       : virtualizeHandler(handlerCode(template, source), source);
   const { outputText, sourceMapText } = transpileTse(ts);
-  const tsLines = byLine(mappings);
-  const jsLines = byLine(
+  const chained = chainLineMappings(
     decodeLineMappings((JSON.parse(sourceMapText) as { mappings: string }).mappings),
+    mappings,
   );
   const url = `tse-template-${++compiled}`;
   const exports: { default?: StandIn } = {};
@@ -54,13 +55,14 @@ export async function compileTemplate(
           error.stack = error.stack.replace(
             new RegExp(`${url}:(\\d+)(:\\d+)?`, "gu"),
             (whole, line: string, column: string | undefined) => {
-              const js = locate(
-                jsLines,
-                Number(line) - FUNCTION_HEADER_LINES,
-                Number(column?.slice(1) ?? 1) - 1,
-              );
-              const tse = js && locate(tsLines, js.line, js.column);
-              return tse ? `${template.identifier}:${tse.line + 1}:${tse.column + 1}` : whole;
+              const jsLine = Number(line) - FUNCTION_HEADER_LINES;
+              const jsColumn = Number(column?.slice(1) ?? 1) - 1;
+              const m = chained
+                .filter((c) => c.genLine === jsLine && (c.genCol ?? 0) <= jsColumn)
+                .at(-1);
+              if (m === undefined) return whole;
+              const tseColumn = (m.srcCol ?? 0) + jsColumn - (m.genCol ?? 0);
+              return `${template.identifier}:${m.srcLine + 1}:${tseColumn + 1}`;
             },
           );
         }
@@ -68,25 +70,6 @@ export async function compileTemplate(
       }
     },
   };
-}
-
-type Mapping = ReturnType<typeof decodeLineMappings>[number];
-
-function byLine(mappings: readonly Mapping[]): Map<number, Mapping[]> {
-  const lines = new Map<number, Mapping[]>();
-  for (const m of mappings) lines.set(m.genLine, [...(lines.get(m.genLine) ?? []), m]);
-  return lines;
-}
-
-function locate(
-  lines: Map<number, Mapping[]>,
-  line: number,
-  column: number,
-): { line: number; column: number } | undefined {
-  const segments = lines.get(line);
-  if (segments === undefined) return undefined;
-  const m = segments.filter((c) => (c.genCol ?? 0) <= column).at(-1) ?? segments[0];
-  return { line: m.srcLine, column: (m.srcCol ?? 0) + Math.max(0, column - (m.genCol ?? 0)) };
 }
 
 function handlerCode(template: Template, source: string): string {
