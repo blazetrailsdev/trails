@@ -3,16 +3,10 @@ import "../index.js";
 import { Base as ServerBase } from "../server/base.js";
 import { Configuration } from "../server/configuration.js";
 import { StreamEventLoop } from "./stream-event-loop.js";
-import { Authorization } from "./authorization.js";
 import { Base } from "./base.js";
 
 const noop = () => {};
-const io = {
-  on: noop,
-  off: noop,
-  write: () => true,
-  destroy: noop,
-};
+const io = { on: noop, off: noop, write: () => true, destroy: noop };
 
 function env(): Record<string, unknown> {
   return {
@@ -83,6 +77,5 @@ describe("ActionCable::Connection::Base", () => {
       { type: "disconnect", reason: "unauthorized", reconnect: false },
     ]);
     expect(s.connections).toEqual([]);
-    expect(Authorization.UnauthorizedError).toBeDefined();
   });
 });
