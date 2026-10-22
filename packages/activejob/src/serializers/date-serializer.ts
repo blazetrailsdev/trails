@@ -9,7 +9,7 @@ export class DateSerializer extends ObjectSerializer {
     return "ActiveJob::Serializers::DateSerializer";
   }
 
-  /** @inventedArm if — CONVERGEABLE activejob-date-serializers-serialize-temporal-dates */
+  /** @inventedArm if — PERMANENT */
   serialize(date: Date | Temporal.PlainDate): Record<string, unknown> {
     let rbDate = date;
     if (!(rbDate instanceof Date)) rbDate = new Date(rbDate);

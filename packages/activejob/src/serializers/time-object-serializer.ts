@@ -11,7 +11,7 @@ export class TimeObjectSerializer extends ObjectSerializer {
     return "ActiveJob::Serializers::TimeObjectSerializer";
   }
 
-  /** @inventedArm if — CONVERGEABLE activejob-date-serializers-serialize-temporal-dates */
+  /** @inventedArm if — PERMANENT */
   serialize(
     time:
       | { iso8601(fractionDigits?: number): string }
