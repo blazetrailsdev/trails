@@ -78,7 +78,7 @@ export class Worker {
     }
   }
 
-  asyncExec(receiver: unknown, ...args: unknown[]): unknown {
+  asyncExec(receiver: unknown, ...args: unknown[] | [...unknown[], Block]): unknown {
     const [rest, options, block] = splitArgs(args);
     if (!options) throw new ArgumentError("missing keyword: :connection");
     return this.asyncInvoke(
@@ -90,7 +90,11 @@ export class Worker {
     );
   }
 
-  asyncInvoke(receiver: unknown, method: string, ...args: unknown[]): unknown {
+  asyncInvoke(
+    receiver: unknown,
+    method: string,
+    ...args: unknown[] | [...unknown[], Block]
+  ): unknown {
     const [rest, options, block] = splitArgs(args);
     const connection = options ? options.connection : receiver;
     return this._executor.post(() =>
@@ -98,7 +102,11 @@ export class Worker {
     );
   }
 
-  invoke(receiver: unknown, method: string, ...args: unknown[]): Promise<unknown> {
+  invoke(
+    receiver: unknown,
+    method: string,
+    ...args: unknown[] | [...unknown[], Block]
+  ): Promise<unknown> {
     const [rest, options, block] = splitArgs(args);
     if (!options) throw new ArgumentError("missing keyword: :connection");
     return this.work(options.connection, async () => {
