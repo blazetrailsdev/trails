@@ -307,7 +307,7 @@ export { Complex, complex } from "./complex.js";
 export { NotImplementedError } from "./not-implemented-error.js";
 export { prepend } from "./prepend.js";
 export { Open3 } from "./open3.js";
-export { Process, rbFSleep } from "./process.js";
+export { Process } from "./process.js";
 export {
   SystemExit,
   __INTERNAL_resetProcessAdapter_TEST_ONLY,

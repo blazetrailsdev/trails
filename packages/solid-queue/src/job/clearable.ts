@@ -1,5 +1,5 @@
 import { Concern, extend, isPresent } from "@blazetrails/activesupport";
-import { Range, classModule, rbFSleep } from "@blazetrails/ruby-compat";
+import { Range, classModule } from "@blazetrails/ruby-compat";
 import type { Relation } from "@blazetrails/activerecord";
 import { SolidQueue } from "../solid-queue.js";
 import type { Job } from "../job.js";
@@ -23,7 +23,8 @@ export class ClassMethods {
       const recordsDeleted = await this.clearable({ finishedBefore, className })
         .limit(batchSize)
         .deleteAll();
-      if (sleepBetweenBatches > 0) await rbFSleep(sleepBetweenBatches);
+      if (sleepBetweenBatches > 0)
+        await new Promise((resolve) => setTimeout(resolve, sleepBetweenBatches * 1000));
       if (recordsDeleted === 0) break;
     }
   }

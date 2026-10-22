@@ -1,7 +1,7 @@
 import { Base, registerModel } from "@blazetrails/activerecord";
 import { include, type Included } from "@blazetrails/activesupport";
 import { GlobalID, Identification } from "@blazetrails/globalid";
-import { rbFSleep, registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ApplicationJob } from "./application-job.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below. */
@@ -40,7 +40,7 @@ export class StoreResultJob extends ApplicationJob {
       value,
     });
 
-    if (pause != null) await rbFSleep(pause);
+    if (pause != null) await new Promise((resolve) => setTimeout(resolve, pause * 1000));
     if (exception != null) throw new exception();
 
     await result.updateBang({ status });
