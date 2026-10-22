@@ -125,6 +125,7 @@
     "RFC3986_PARSER",
     "RUBY_ENGINE",
     "RUBY_PLATFORM",
+    "RUBY_VERSION",
     "Range",
     "RangeError",
     "Rational",

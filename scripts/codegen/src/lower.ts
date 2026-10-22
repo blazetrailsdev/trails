@@ -3220,8 +3220,14 @@ export class Lowerer {
 
   callInner(n: N, ctx: Ctx): string {
     const name: string = n.name;
-    let r = n.recv ? this.expr(n.recv, ctx) : null;
-    if (r !== null && !n.safe) r = this.nonNullRecv(n.recv, r, ctx);
+    // `Class.new(Super) { … }` is a class expression; its receiver is never read.
+    const classNew =
+      n.recv?.k === "const" &&
+      n.recv.path.join("::") === "Class" &&
+      name === "new" &&
+      !this.index.resolveConst(n.recv.path, ctx.nesting);
+    let r = n.recv && !classNew ? this.expr(n.recv, ctx) : n.recv ? "Class" : null;
+    if (r !== null && !classNew && !n.safe) r = this.nonNullRecv(n.recv, r, ctx);
     if (r !== null && (n.recv.k === "int" || n.recv.k === "float")) r = `(${r})`;
     const recvNode: N | null = n.recv;
     const args = (): string[] => {
