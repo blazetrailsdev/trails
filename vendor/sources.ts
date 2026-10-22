@@ -690,6 +690,57 @@ export const SOURCES: readonly UpstreamSource[] = [
       },
     ],
   },
+  {
+    name: "solid_cache",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/solid_cache.git",
+      ref: "v1.0.7",
+    },
+    packages: [
+      {
+        name: "solid-cache",
+        libPath: "lib/solid_cache",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "solid_queue",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/solid_queue.git",
+      ref: "v1.1.3",
+    },
+    packages: [
+      {
+        name: "solid-queue",
+        libPath: "lib/solid_queue",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
+    name: "solid_cable",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/solid_cable.git",
+      ref: "v3.0.7",
+    },
+    packages: [
+      {
+        name: "solid-cable",
+        libPath: "lib/solid_cable",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
 ];
 
 /**

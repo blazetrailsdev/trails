@@ -92,6 +92,18 @@
       "ref": "v3_3_11",
       "sha": "1f2d15125a2dc701e1822ed2900eb17899500ec7"
     },
+    "solid_cable": {
+      "ref": "v3.0.7",
+      "sha": "f383a5816271dda411aa36099df5d236110e5600"
+    },
+    "solid_cache": {
+      "ref": "v1.0.7",
+      "sha": "411771527afdc7b8f91b79b15ff12680d1a628a4"
+    },
+    "solid_queue": {
+      "ref": "v1.1.3",
+      "sha": "c46b6de4bf6d7d76eedc5c20274fa9eb0ba0d7ea"
+    },
     "sqlite3": {
       "ref": "v2.6.0",
       "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
