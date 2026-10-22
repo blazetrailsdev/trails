@@ -552,11 +552,14 @@ class TestExtractor
       path = File.expand_path("#{required}.rb", File.dirname(filepath))
       required_sexp = File.file?(path) && Ripper.sexp(File.read(path))
       next unless required_sexp
-      own = @modules
+      own = [@modules, @test_cases, @module_includes, @module_def_gates]
       @modules = {}
+      @test_cases = []
+      @module_includes = {}
+      @module_def_gates = {}
       walk(required_sexp)
       found = @modules
-      @modules = own
+      @modules, @test_cases, @module_includes, @module_def_gates = own
       missing.each { |name| @modules[name] ||= found[name] if found[name] }
     end
   end

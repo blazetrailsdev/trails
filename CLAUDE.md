@@ -1324,7 +1324,7 @@ A Node `net.Socket` is already registered with the process's event loop. It
 emits `data` when readable and buffers every `write` in full, so there is never
 a partial write to carry, no selector to own, no loop thread to spawn and
 nothing to wake. **Node's event loop stands in for the nio4r selector and its
-thread.** As a consequence:
+thread.** The `connection/` port, when it lands, follows these rules:
 
 - The private `spawn`, `run` and `wakeup` are not ported. They are a
   `SCOPED_SKIP_GROUPS` entry in `scripts/parity/conventions.ts` citing this
@@ -1334,18 +1334,19 @@ thread.** As a consequence:
   partial-write arms (`stream.rb:54,65`) and `run`
   (`stream_event_loop.rb:105`), none of which exists here, so a body would be
   an empty stub.
-- `attach` and `detach` keep their names and callers. `attach(io, stream)`
+- `attach` and `detach` keep their Rails names and callers. `attach(io, stream)`
   (`stream_event_loop.rb:30-36`) registers the socket's `data` / `end` /
   `error` listeners, held in `@map` where Rails holds the NIO monitor, and they
   call `stream.receive` and `stream.close` exactly where `run` does
   (`:111-129`). `detach` (`:38-45`) removes them, deletes the map entry and
   closes the socket.
-- `timer`, `post` and `stop` (`:19-28`, `:56-59`) are ordinary ports over
+- `timer`, `post` and `stop` (`:19-28`, `:56-59`) port as ordinary methods over
   ruby-compat's `TimerTask` and `ThreadPoolExecutor`.
 - `Stream#write` calls the socket's `write` and keeps its `@stream_send` arm
   and its `rescue EOFError, Errno::ECONNRESET`. Its `write_nonblock` result
   arms, `@write_lock`, `@write_head` and `@write_buffer` have no counterpart.
-- `Connection::ClientSocket` drives the npm `websocket-driver`, built with
+- `Connection::ClientSocket` drives the npm `websocket-driver` (its own story
+  adds the dependency), built with
   `Driver.http` from a request-shaped object read off the Rack env where Rails
   calls `WebSocket::Driver.rack(self, …)`
   (`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/client_socket.rb:49`);
@@ -1356,12 +1357,13 @@ thread.** As a consequence:
   (`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/web_socket.rb:14`),
   which is `Driver.isWebSocket` on the same request-shaped object.
 
-The files this section covers, so a grep finds every citation:
+The files this section will cover, none ported yet, so a grep finds every
+citation once they are:
 `packages/actioncable/src/connection/stream-event-loop.ts`,
 `connection/stream.ts`, `connection/client-socket.ts`, and
 `connection/web-socket.ts` for that one call.
 
-It does **not** cover `Server::Worker`, which ports line for line over
+It does **not** cover `Server::Worker`, which is to port line for line over
 ruby-compat's `ThreadPoolExecutor`, and it is not a receipt for dropping a
 `synchronize` anywhere else: § "The pool monitor guards only sections that span
 an `await`" still decides those.
