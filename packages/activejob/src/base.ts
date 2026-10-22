@@ -36,7 +36,8 @@ export interface Base
     Execution,
     Exceptions,
     Rescuable,
-    Included<typeof ASCallbacks> {}
+    Included<typeof ASCallbacks>,
+    Pick<Included<typeof Instrumentation>, "instrument"> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {

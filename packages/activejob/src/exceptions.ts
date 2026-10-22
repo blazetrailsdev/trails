@@ -16,7 +16,7 @@ type AfterDiscardProc = (this: unknown, job: unknown, exception: unknown) => unk
 type RetryBlock = (job: unknown, error: unknown) => unknown;
 
 interface ExceptionsJob {
-  executions: number;
+  executions: number | null;
   exceptionExecutions: Record<string, number> | null;
   afterDiscardProcs: AfterDiscardProc[];
   instrument(
@@ -32,7 +32,7 @@ interface ExceptionsJob {
     jitter?: unknown;
   }): unknown;
   determineJitterForDelay(delay: number, jitter: number): number;
-  executionsFor(exceptions: unknown[]): number;
+  executionsFor(exceptions: unknown[]): number | null;
   runAfterDiscardProcs(exception: unknown): Promise<void>;
 }
 
@@ -73,11 +73,11 @@ export class ClassMethods {
       ...exceptions,
       block(async function (this: ExceptionsJob, error: unknown) {
         const executions = this.executionsFor(exceptions);
-        if (attempts === ":unlimited" || executions < attempts) {
+        if (attempts === ":unlimited" || executions! < attempts) {
           return await this.retryJob({
             wait: this.determineDelay({
               secondsOrDurationOrAlgorithm: wait,
-              executions: executions,
+              executions: executions!,
               jitter: jitter,
             }),
             queue: queue,
@@ -122,12 +122,8 @@ export class Exceptions {
   static readonly [classModule] = true;
   declare static ClassMethods: typeof ClassMethods;
   declare afterDiscardProcs: AfterDiscardProc[];
-  declare instrument: ExceptionsJob["instrument"];
-  declare enqueue: ExceptionsJob["enqueue"];
-  declare executions: number | null;
-  declare exceptionExecutions: Record<string, number> | null;
 
-  async retryJob(options: Record<string, unknown> = {}): Promise<unknown> {
+  async retryJob(this: ExceptionsJob, options: Record<string, unknown> = {}): Promise<unknown> {
     const payload: Record<string, unknown> = {};
     if ("error" in options) payload["error"] = options["error"];
     if ("wait" in options) payload["wait"] = options["wait"];
@@ -135,15 +131,18 @@ export class Exceptions {
   }
 
   /** @internal */
-  determineDelay({
-    secondsOrDurationOrAlgorithm,
-    executions,
-    jitter = JITTER_DEFAULT,
-  }: {
-    secondsOrDurationOrAlgorithm: unknown;
-    executions: number;
-    jitter?: unknown;
-  }): unknown {
+  determineDelay(
+    this: ExceptionsJob,
+    {
+      secondsOrDurationOrAlgorithm,
+      executions,
+      jitter = JITTER_DEFAULT,
+    }: {
+      secondsOrDurationOrAlgorithm: unknown;
+      executions: number;
+      jitter?: unknown;
+    },
+  ): unknown {
     jitter =
       jitter === JITTER_DEFAULT
         ? (rbObjClass(this) as unknown as ExceptionsClass).retryJitter
@@ -180,7 +179,7 @@ export class Exceptions {
   }
 
   /** @internal */
-  executionsFor(exceptions: unknown[]): number | null {
+  executionsFor(this: ExceptionsJob, exceptions: unknown[]): number | null {
     const exceptionExecutions = this.exceptionExecutions;
     if (exceptionExecutions != null) {
       const key = rbInspect(exceptions);
