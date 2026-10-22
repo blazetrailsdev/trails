@@ -47,6 +47,62 @@ export class Execution extends Record {
     return Array.from(jobs, (job) => ({ ...this.attributesFromJob(job), job_id: job.id }));
   }
 
+  static async discardAllInBatches({
+    batchSize = 500,
+  }: { batchSize?: number } = {}): Promise<void> {
+    let pending = await this.count();
+    let discarded = 0;
+
+    await SolidQueue.instrument(
+      "discard_all",
+      { batch_size: batchSize, status: this.type(), batches: 0, size: 0 },
+      async (payload) => {
+        while (true) {
+          await this.transaction(async () => {
+            const jobIds = await this.limit(batchSize).order("job_id").lock().pluck("job_id");
+            discarded = await this.discardJobs(jobIds);
+
+            await this.where({ job_id: jobIds }).deleteAll();
+            pending -= discarded;
+
+            payload["size"] = (payload["size"] as number) + discarded;
+            payload["batches"] = (payload["batches"] as number) + 1;
+          });
+
+          if (pending <= 0 || discarded === 0) break;
+        }
+      },
+    );
+  }
+
+  static async discardAllFromJobs(jobs: Relation<Job>): Promise<void> {
+    await SolidQueue.instrument(
+      "discard_all",
+      { jobs_size: await jobs.size(), status: this.type() },
+      async (payload) => {
+        await this.transaction(async () => {
+          const jobIds = await this.lockAllFromJobs(jobs);
+
+          payload["size"] = await this.discardJobs(jobIds);
+          await this.where({ job_id: jobIds }).deleteAll();
+        });
+      },
+    );
+  }
+
+  /** @internal */
+  protected static async lockAllFromJobs(jobs: Relation<Job>): Promise<unknown[]> {
+    return await this.where({ job_id: (await jobs.toArray()).map((job) => job.id) })
+      .order("job_id")
+      .lock()
+      .pluck("job_id");
+  }
+
+  /** @internal */
+  protected static async discardJobs(jobIds: unknown[]): Promise<number> {
+    return await SolidQueue.Job.where({ id: jobIds }).deleteAll();
+  }
+
   type(): string {
     return (this.constructor as typeof Execution).type();
   }

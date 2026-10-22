@@ -1,5 +1,5 @@
-import { Base as ApplicationJob } from "@blazetrails/activejob";
 import { registerConstant } from "@blazetrails/ruby-compat";
+import { ApplicationJob } from "./application-job.js";
 
 export const JobBuffer = {
   values: [] as unknown[],

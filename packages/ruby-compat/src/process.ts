@@ -174,3 +174,16 @@ function makeClockResult(milliseconds: number, unit: string): number {
     throw new ArgumentError(`unexpected unit: ${unit.slice(1)}`);
   }
 }
+
+/**
+ * `rb_f_sleep` (`vendor/ruby/v3.3.11/process.c:5055`), `Kernel#sleep` with an
+ * interval: waits that many seconds and answers the whole seconds slept. A
+ * JS thread cannot block, so the wait is a timer the caller awaits.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export async function rbFSleep(duration: number): Promise<number> {
+  const beg = Date.now();
+  await new Promise((resolve) => setTimeout(resolve, duration * 1000));
+  return Math.trunc((Date.now() - beg) / 1000);
+}

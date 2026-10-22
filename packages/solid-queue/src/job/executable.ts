@@ -4,32 +4,26 @@ import { Time } from "@blazetrails/date";
 import { classModule } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import type { Job } from "../job.js";
+import type { Execution } from "../execution.js";
+import { ConcurrencyControls } from "./concurrency-controls.js";
+import { Retryable } from "./retryable.js";
 import { Schedulable } from "./schedulable.js";
 
 type ExecutableClass = typeof Job;
 
-interface ExecutableJob extends Base {
-  isDue(): boolean;
-}
-
 export class ClassMethods {
-  static async prepareAllForExecution(
-    this: ExecutableClass,
-    jobs: ExecutableJob[],
-  ): Promise<Base[]> {
+  static async prepareAllForExecution(this: ExecutableClass, jobs: Job[]): Promise<Base[]> {
     const due = jobs.filter((job) => job.isDue());
     const notYetDue = jobs.filter((job) => !job.isDue());
     return [...(await this.dispatchAll(due)), ...(await this.scheduleAll(notYetDue))];
   }
 
-  /**
-   * @missingRailsCall isConcurrencyLimited — CONVERGEABLE port-solid-queue-concurrency-controls
-   * @missingRailsCall dispatchAllOneByOne — CONVERGEABLE port-solid-queue-concurrency-controls
-   */
-  static async dispatchAll(this: ExecutableClass, jobs: Base[]): Promise<Base[]> {
-    const withoutConcurrencyLimits = jobs;
+  static async dispatchAll(this: ExecutableClass, jobs: Job[]): Promise<Base[]> {
+    const withConcurrencyLimits = jobs.filter((job) => job.isConcurrencyLimited());
+    const withoutConcurrencyLimits = jobs.filter((job) => !job.isConcurrencyLimited());
 
     await ClassMethods.dispatchAllAtOnce.call(this, withoutConcurrencyLimits);
+    await ClassMethods.dispatchAllOneByOne.call(this, withConcurrencyLimits);
 
     return await ClassMethods.successfullyDispatched.call(this, jobs);
   }
@@ -39,21 +33,35 @@ export class ClassMethods {
     return await SolidQueue.ReadyExecution.createAllFromJobs(jobs);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall dispatchedAndBlocked — CONVERGEABLE port-solid-queue-concurrency-controls
-   */
+  /** @internal */
+  private static async dispatchAllOneByOne(this: ExecutableClass, jobs: Job[]): Promise<void> {
+    for (const job of jobs) await job.dispatch();
+  }
+
+  /** @internal */
   private static async successfullyDispatched(
     this: ExecutableClass,
     jobs: Base[],
   ): Promise<Base[]> {
-    return await ClassMethods.dispatchedAndReady.call(this, jobs);
+    return [
+      ...(await ClassMethods.dispatchedAndReady.call(this, jobs)),
+      ...(await ClassMethods.dispatchedAndBlocked.call(this, jobs)),
+    ];
   }
 
   /** @internal */
   private static async dispatchedAndReady(this: ExecutableClass, jobs: Base[]): Promise<Base[]> {
     return await this.where({
       id: await SolidQueue.ReadyExecution.where({ job_id: jobs.map((job) => job.id) }).pluck(
+        "job_id",
+      ),
+    }).toArray();
+  }
+
+  /** @internal */
+  private static async dispatchedAndBlocked(this: ExecutableClass, jobs: Base[]): Promise<Base[]> {
+    return await this.where({
+      id: await SolidQueue.BlockedExecution.where({ job_id: jobs.map((job) => job.id) }).pluck(
         "job_id",
       ),
     }).toArray();
@@ -66,14 +74,26 @@ export class Executable {
   declare id: number;
   declare finished_at: Time | null;
   declare readyExecution: Promise<Base | null>;
+  declare claimedExecution: Promise<Base | null>;
+  declare failedExecution: Promise<Base | null>;
+  declare acquireConcurrencyLock: () => Promise<boolean>;
+  declare block: () => Promise<Base>;
   declare isDue: () => boolean;
   declare schedule: () => Promise<Base>;
-  declare execution: () => Promise<{ type(): string; discard(): Promise<void> } | null>;
+  declare execution: () => Promise<Execution | null>;
   declare touch: (...names: string[]) => Promise<boolean>;
   declare destroyBang: () => Promise<unknown>;
 
   async isReady(): Promise<boolean> {
     return isPresent(await this.readyExecution);
+  }
+
+  async isClaimed(): Promise<boolean> {
+    return isPresent(await this.claimedExecution);
+  }
+
+  async isFailed(): Promise<boolean> {
+    return isPresent(await this.failedExecution);
   }
 
   async prepareForExecution(): Promise<unknown> {
@@ -83,9 +103,11 @@ export class Executable {
     }
   }
 
-  /** @missingRailsCall acquireConcurrencyLock — CONVERGEABLE port-solid-queue-concurrency-controls */
   async dispatch(): Promise<unknown> {
-    return await this.ready();
+    if (await this.acquireConcurrencyLock()) return await this.ready();
+    else {
+      return await this.block();
+    }
   }
 
   async dispatchBypassingConcurrencyLimits(): Promise<unknown> {
@@ -130,9 +152,12 @@ Object.defineProperty(Executable, "ClassMethods", { value: ClassMethods });
     included(base: null, block: (this: ExecutableClass) => void): void;
   }
 ).included(null, function (this: ExecutableClass) {
+  include(this, Retryable);
   include(this, Schedulable);
+  include(this, ConcurrencyControls);
 
   this.hasOne("readyExecution");
+  this.hasOne("claimedExecution");
 
   this.afterCreate(function (this: Executable) {
     return this.prepareForExecution();

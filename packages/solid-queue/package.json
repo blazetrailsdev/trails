@@ -27,6 +27,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/date": "workspace:*",
+    "@blazetrails/globalid": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
   "engines": {

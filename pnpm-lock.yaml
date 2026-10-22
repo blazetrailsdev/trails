@@ -580,6 +580,9 @@ importers:
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
+      '@blazetrails/globalid':
+        specifier: workspace:*
+        version: link:../globalid
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

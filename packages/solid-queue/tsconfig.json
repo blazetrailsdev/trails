@@ -12,6 +12,7 @@
     { "path": "../activesupport" },
     { "path": "../arel" },
     { "path": "../date" },
+    { "path": "../globalid" },
     { "path": "../ruby-compat" }
   ]
 }
