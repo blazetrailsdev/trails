@@ -75,7 +75,7 @@ export class Stream {
   hijackRackSocket(): unknown {
     if (!this.socketObject.env["rack.hijack"]) return;
 
-    this.rackHijackIo = (this.socketObject.env["rack.hijack"] as () => Io | null)();
+    this.rackHijackIo = (this.socketObject.env["rack.hijack"] as () => Io | null).call(null);
     this.rackHijackIo ??= this.socketObject.env["rack.hijack_io"] as Io;
 
     return this.eventLoop.attach(this.rackHijackIo, this);
