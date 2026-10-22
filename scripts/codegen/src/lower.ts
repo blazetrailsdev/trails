@@ -29,6 +29,14 @@ import {
   asyncEnumBody,
 } from "./mappings/core-methods.js";
 import type { CallSite } from "./mappings/call-site.js";
+import { ATTR_MACROS, CORE_EXT_CALC, TIME_HELPERS } from "./mappings/activesupport.js";
+import { OPERATOR_TS_NAMES, RUBY_COMPAT_RENAMES } from "./mappings/ruby-compat-names.js";
+import {
+  NATIVE_STRING,
+  STRING_ONLY,
+  STRING_RESULT_TYPES,
+  STRING_TABLE,
+} from "./mappings/strings.js";
 import { KERNEL_FUNCTIONS } from "./mappings/kernel.js";
 import { OBJECT_METHODS } from "./mappings/object-methods.js";
 import { OP_SPELL, OPERATORS } from "./mappings/operators.js";
@@ -79,36 +87,7 @@ export function propName(rubyName: string): string {
 export function tsMethodName(rubyName: string, fqn?: string, singleton = false): string {
   const op = fqn ? operatorSpelling(fqn, singleton ? `self.${rubyName}` : rubyName) : undefined;
   if (op && op.length) return op[0];
-  const DEFAULT_OPS: Record<string, string> = {
-    "==": "equals",
-    "[]": "get",
-    "[]=": "set",
-    "<=>": "compareTo",
-    "+": "plus",
-    "-": "minus",
-    "|": "union",
-    "&": "intersect",
-    "<<": "append",
-    "===": "caseEq",
-    "=~": "match",
-    "!": "not",
-    "!=": "notEquals",
-    "*": "times",
-    "/": "divide",
-    "%": "modulo",
-    "<": "lt",
-    ">": "gt",
-    "<=": "lte",
-    ">=": "gte",
-    "+@": "uplus",
-    "-@": "negate",
-    "!~": "notMatch",
-    "~": "bitwiseNot",
-    ">>": "rshift",
-    "^": "xor",
-    "**": "pow",
-  };
-  if (DEFAULT_OPS[rubyName]) return DEFAULT_OPS[rubyName];
+  if (OPERATOR_TS_NAMES[rubyName]) return OPERATOR_TS_NAMES[rubyName];
   if (rubyName === "initialize") return "constructor";
   if (rubyName === "to_s" || rubyName === "to_str") return "toString";
   const c = rubyMethodToTsIgnoringSkip(rubyName);
@@ -367,24 +346,7 @@ export class Lowerer {
 
   /** A ruby-compat helper; falls back to the generated runtime shim (counted as wanted). */
   rc(ctx: Ctx, name0: string): string {
-    // Spellings the lowering asks for that ruby-compat exports under its own
-    // MRI-derived name (scripts/parity/ruby-compat.ts RUBY_COMPAT_EXPORTS).
-    const RENAMES: Record<string, string> = {
-      rbIvarGet: "rbObjIvarGet",
-      rbIvarSet: "rbObjIvarSet",
-      rbIvarDefined: "rbObjIvarDefined",
-      rbInteger: "kernelInteger",
-      rbFloat: "kernelFloat",
-      rbFCatch: "kernelCatch",
-      rbFThrow: "kernelThrow",
-      rbToI: "toI",
-      rbToA: "toA",
-      rbToH: "toH",
-      rbFormat: "format",
-      jsDefineMethod: "rbModDefineMethod",
-      encoding: "rbObjEncoding",
-    };
-    const name = RENAMES[name0] ?? name0;
+    const name = RUBY_COMPAT_RENAMES[name0] ?? name0;
     if (
       this.resolver.pkgExports("@blazetrails/activesupport").has(name) &&
       !this.resolver.pkgExports("@blazetrails/ruby-compat").has(name)
@@ -5472,22 +5434,6 @@ export class Lowerer {
   }
 }
 
-/** ActiveSupport::Testing::TimeHelpers' methods (testing/time_helpers.rb). */
-const TIME_HELPERS = new Set([
-  "travel",
-  "travel_to",
-  "travel_back",
-  "freeze_time",
-  "unfreeze_time",
-]);
-
-/** ruby-compat's STRING_METHOD_TABLE keys (scripts/codegen/data/string-method-table.json). */
-const STRING_TABLE = new Set<string>(
-  JSON.parse(
-    readFileSync(new URL("../data/string-method-table.json", import.meta.url), "utf8"),
-  ) as string[],
-);
-/** Ruby methods only String has (so an untyped receiver of one is a String). */
 /**
  * A callback macro's Symbol filter names a method, and activesupport's port
  * reads a filter as a Symbol only with its leading colon (`Symbol === filter`,
@@ -5540,98 +5486,6 @@ function isExecutionContext(n: N | null | undefined): boolean {
   const path = (n.path as string[]).filter((x) => x);
   return path[path.length - 1] === "ExecutionContext";
 }
-
-/**
- * What a ruby-compat `rbStrSend` call answers, by the Ruby method's documented
- * return (`vendor/ruby/v3.3.11/string.c`): `rbStrSend` is typed `unknown`, so
- * without this a chained call (`s.gsub(..).strip`) fails to type-check. A bang
- * method answers `nil` when it changed nothing.
- */
-const STRING_RESULT_TYPES: Record<string, string> = {
-  ...Object.fromEntries(
-    [
-      "uplus",
-      "gsub",
-      "sub",
-      "append",
-      "plus",
-      "prepend",
-      "insert",
-      "downcase",
-      "upcase",
-      "capitalize",
-      "tr",
-      "strip",
-      "lstrip",
-      "rstrip",
-      "chomp",
-      "chop",
-      "squeeze",
-      "delete",
-      "deletePrefix",
-      "deleteSuffix",
-      "ljust",
-      "rjust",
-      "center",
-      "toSym",
-      "reverse",
-      "succ",
-      "dup",
-    ].map((m) => [m, "string"]),
-  ),
-  ...Object.fromEntries(
-    [
-      "gsubBang",
-      "subBang",
-      "trBang",
-      "stripBang",
-      "downcaseBang",
-      "upcaseBang",
-      "deletePrefixBang",
-      "deleteSuffixBang",
-      "squeezeBang",
-      "chompBang",
-    ].map((m) => [m, "string | null"]),
-  ),
-  get: "string",
-  bytesize: "number",
-  size: "number",
-  count: "number",
-  equals: "boolean",
-  isMatch: "boolean",
-  isEmpty: "boolean",
-  scan: "any[]",
-  bytes: "number[]",
-};
-
-const STRING_ONLY = new Set(
-  "sub sub! gsub gsub! chomp chomp! chop chop! strip strip! lstrip lstrip! rstrip rstrip! squeeze squeeze! tr tr! tr_s delete_prefix delete_prefix! delete_suffix delete_suffix! upcase upcase! downcase downcase! capitalize capitalize! swapcase ljust rjust center scan unpack1 bytesize succ! each_line each_char".split(
-    " ",
-  ),
-);
-/** String methods emitted natively on a value already typed as a string. */
-const NATIVE_STRING = new Set([
-  "split",
-  "length",
-  "isStartWith",
-  "isEndWith",
-  "isInclude",
-  "slice",
-  "concat",
-]);
-
-/** Ruby attribute macros → the activesupport function the extractor credits as `fn.call(Host, "name", opts)`. */
-const ATTR_MACROS: Record<string, string> = {
-  class_attribute: "classAttribute",
-  mattr_accessor: "mattrAccessor",
-  mattr_reader: "mattrReader",
-  mattr_writer: "mattrWriter",
-  cattr_accessor: "cattrAccessor",
-  cattr_reader: "cattrReader",
-  cattr_writer: "cattrWriter",
-  thread_mattr_accessor: "threadMattrAccessor",
-  thread_cattr_accessor: "threadMattrAccessor",
-};
 
 export function rbCoreFn(name: string): string {
   const base = name.replace(/\?$/, "").replace(/!$/, "Bang");
@@ -5750,11 +5604,6 @@ function dateStatics(): Set<string> {
   return dateStaticsMemo;
 }
 
-const CORE_EXT_CALC: Record<string, string> = {
-  Date: "core-ext/date/calculations",
-  Time: "core-ext/time/calculations",
-  DateTime: "core-ext/date-time/calculations",
-};
 const calcMemo = new Map<string, Set<string>>();
 /** Names activesupport's `core-ext/<class>/calculations.ts` exports for `Date` / `Time` / `DateTime`. */
 function calcExports(cls: string): Set<string> {
