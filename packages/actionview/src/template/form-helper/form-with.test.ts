@@ -31,6 +31,8 @@ import {
 import { defaultEnforceUtf8, setDefaultEnforceUtf8 } from "../../helpers/form-tag-helper.js";
 import { urlFor } from "../../helpers/url-helper.js";
 import { FormBuilder as FormBuilderClass, type FormBuilder } from "../../helpers/form-helper.js";
+import { CheckBoxBuilder } from "../../helpers/tags/collection-check-boxes.js";
+import { RadioButtonBuilder } from "../../helpers/tags/collection-radio-buttons.js";
 import { assertDomEqual } from "../../testing/dom-assertions.js";
 
 function withDefaultEnforceUtf8(value: boolean, block: () => void): void {
@@ -1217,7 +1219,7 @@ describe("FormWithActsLikeFormForTest", () => {
         "toString",
         {},
         {},
-        (b) => b.label({}, () => b.radioButton().plus(b.text)),
+        (b) => b.label({}, () => (b as RadioButtonBuilder).radioButton().plus(b.text)),
       );
       concat(renderedRadioButtons);
     });
@@ -1237,7 +1239,7 @@ describe("FormWithActsLikeFormForTest", () => {
         "toString",
         {},
         {},
-        (b) => b.label({}, () => b.radioButton().plus(b.text)),
+        (b) => b.label({}, () => (b as RadioButtonBuilder).radioButton().plus(b.text)),
       );
       concat(renderedRadioButtons);
       concat(f.hiddenField("id"));
@@ -1314,7 +1316,7 @@ describe("FormWithActsLikeFormForTest", () => {
         "last",
         {},
         {},
-        (b) => b.label({}, () => b.checkbox().plus(b.text)),
+        (b) => b.label({}, () => (b as CheckBoxBuilder).checkbox().plus(b.text)),
       );
       concat(renderedCheckboxes);
     });
@@ -1334,7 +1336,7 @@ describe("FormWithActsLikeFormForTest", () => {
         "last",
         {},
         {},
-        (b) => b.label({}, () => b.checkbox().plus(b.text)),
+        (b) => b.label({}, () => (b as CheckBoxBuilder).checkbox().plus(b.text)),
       );
       concat(renderedCheckboxes);
       concat(f.hiddenField("id"));

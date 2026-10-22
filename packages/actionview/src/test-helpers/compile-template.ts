@@ -72,7 +72,7 @@ export async function compileTemplate(
 
 type Mapping = ReturnType<typeof decodeLineMappings>[number];
 
-function byLine(mappings: Mapping[]): Map<number, Mapping[]> {
+function byLine(mappings: readonly Mapping[]): Map<number, Mapping[]> {
   const lines = new Map<number, Mapping[]>();
   for (const m of mappings) lines.set(m.genLine, [...(lines.get(m.genLine) ?? []), m]);
   return lines;
