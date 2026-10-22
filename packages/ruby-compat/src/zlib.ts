@@ -154,7 +154,10 @@ class GzipWriter extends GzipFile<File | Tempfile> {
  * `inflate` (`rb_inflate_s_inflate`, `zlib.c:2044`) answers the inflated bytes
  * as a binary String, held as its bytes, raising `Zlib::Error` on a malformed
  * stream. An instance (`rb_inflate_initialize`, `zlib.c:1991`) inflates a
- * stream a chunk at a time, answering what each chunk completes.
+ * stream a chunk at a time, answering what each chunk completes. Node has no
+ * synchronous streaming inflater, so each call re-inflates the accumulated
+ * input to a `Z_SYNC_FLUSH` point and answers the new tail: quadratic in the
+ * stream's length, and `finish` has nothing left to flush.
  */
 class Inflate {
   private input = new Uint8Array();
@@ -294,11 +297,6 @@ export const Zlib = {
    * `Zlib::Inflate` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4725`), whose one-shot
    * `inflate` (`rb_inflate_s_inflate`, `zlib.c:2044`) answers the inflated bytes
    * as a binary String, held as its bytes, raising `Zlib::Error` on a malformed stream.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Inflate`.
-   */
-  /**
-   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4725` `cInflate`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Inflate`.
    */

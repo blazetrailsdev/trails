@@ -65,7 +65,11 @@ export interface GzipReaderIO {
  * @noRailsEquivalent PERMANENT
  */
 export interface GzipReaderHandle {
-  /** The header's MTIME field, read by `gzfile_read_header` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2743`). */
+  /**
+   * The header's MTIME field, read by `gzfile_read_header`, which raises
+   * "not in gzip format" on a short or unmagic header
+   * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2709-2717,2743`).
+   */
   readonly mtime: number;
   read(): Promise<Uint8Array>;
 }
@@ -274,10 +278,10 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
       const toBytes = (str: string | Uint8Array): Uint8Array =>
         typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
       const header = toBytes(io.read(GZIP_HEADER_LENGTH) ?? new Uint8Array());
-      const mtime =
-        header.length >= GZIP_HEADER_LENGTH
-          ? (header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24)) >>> 0
-          : 0;
+      if (header.length < GZIP_HEADER_LENGTH || header[0] !== 0x1f || header[1] !== 0x8b) {
+        throw new Zlib.GzipFile.Error("not in gzip format");
+      }
+      const mtime = (header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24)) >>> 0;
       stream.write(header);
       const readMore = async (): Promise<void> => {
         let str: string | Uint8Array | null;
