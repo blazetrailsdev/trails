@@ -308,7 +308,7 @@ function scopeLines(
   if (free.length === 0) return [];
   return [
     "  const __own: Record<string, unknown> = Object.create(null);",
-    `  const __lookup = (name: string, guarded = false): any => { for (const scope of [...${scopes}, __own, globalThis] as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; throw new ReferenceError(name + " is not defined"); };`,
+    `  const __lookup = (name: string, guarded = false): any => { for (const scope of [...${scopes}, __own, globalThis] as object[]) if (name in scope) { const value: unknown = Reflect.get(scope, name); return scope === this && typeof value === "function" ? value.bind(this) : value; } if (guarded) return undefined; const error = new ReferenceError(name + " is not defined"); (Error as { captureStackTrace?: (target: object, frame: unknown) => void }).captureStackTrace?.(error, __lookup); throw error; };`,
     `  const __assign = (name: string, value: unknown): any => { for (const scope of ${scopes} as object[]) if (name in scope) { Reflect.set(scope, name, value); return value; } __own[name] = value; return value; }; void __assign;`,
     "  const __sink: any = new Proxy({}, { set: (_target, name, value) => (__assign(name as string, value), true) }); void __sink;",
     ...free.map((name) => {
