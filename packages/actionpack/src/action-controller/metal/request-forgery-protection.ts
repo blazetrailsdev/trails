@@ -1,14 +1,11 @@
 import { ActionController } from "../../namespaces.js";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstSet, TypeError } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   Base64,
-  intXor,
   chomp,
   OpenSSL,
   rbObjRespondTo,
-  rbStrGetbyte,
-  rbStrSetbyte,
   rtest,
   SecureRandom,
   URI,
@@ -530,7 +527,8 @@ export function xorByteStrings(s1: Bytes, s2: Bytes): Bytes {
   const size = s1.length;
   let i = 0;
   while (i < size) {
-    rbStrSetbyte(s2, i, intXor(rbStrGetbyte(s1, i), rbStrGetbyte(s2, i)));
+    if (s2[i] === undefined) throw new TypeError("nil can't be coerced into Integer");
+    s2[i] = s1[i] ^ s2[i];
     i += 1;
   }
   return s2;

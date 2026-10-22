@@ -4,7 +4,6 @@ import {
   fetch,
   last,
   rbRegMatchP,
-  rbStrPartition,
   registerConstant,
   rbObjAsString,
 } from "@blazetrails/ruby-compat";
@@ -986,7 +985,11 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
     if (!result) return [];
 
-    return last(rbStrPartition(result, SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX))!
+    const match = SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX.exec(result);
+    const partition = match
+      ? [result.slice(0, match.index), match[0], result.slice(match.index + match[0].length)]
+      : [result, "", ""];
+    return last(partition)!
       .replace(SQLite3Adapter.FINAL_CLOSE_PARENS_REGEX, "")
       .split(new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${rbRegSUnion(columnNames).source})"))`, "i"))
       .map((columnString) => columnString.trim());

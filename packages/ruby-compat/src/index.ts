@@ -286,7 +286,6 @@ export {
   toI,
 } from "./numeric.js";
 export {
-  intXor,
   numericMinus,
   numericModulo,
   numericMul,
@@ -396,7 +395,7 @@ export type { PrettyPrintOutput } from "./pretty-print.js";
 export { PP } from "./pp.js";
 export { b } from "./string/b.js";
 export { bytes, strNew } from "./string/bytes.js";
-export { byteslice, rbStrByteslice, rbStrGetbyte, rbStrSetbyte } from "./string/byte-methods.js";
+export { byteslice, rbStrByteslice, rbStrGetbyte } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
 export { capitalize, casecmp } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
@@ -406,7 +405,6 @@ export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
 export { strCount, trTrans } from "./string/tr.js";
 export {
-  center,
   deleteSuffix,
   lastMatchGetter,
   matchOperator,
@@ -417,7 +415,6 @@ export {
   rbStrInclude,
   rbStrPlus,
   rbStrSend,
-  rstrip,
   strip,
   STRING_METHOD_TABLE,
   stringSuperclass,
@@ -428,13 +425,7 @@ export { Struct, isStruct, rbStructInitialize, rstructGet, type StructInstance }
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
-export {
-  rbStrPartition,
-  rbStrRpartition,
-  rbStrScanSubexpCall,
-  rbStrStartWith,
-  rbStrSub,
-} from "./string/sub.js";
+export { rbStrRpartition, rbStrScanSubexpCall, rbStrStartWith, rbStrSub } from "./string/sub.js";
 export { rbCheckStringType, stringValue, strlen, strUminus } from "./string/support.js";
 export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-encoding.js";
 export { encode } from "./string/encode.js";
