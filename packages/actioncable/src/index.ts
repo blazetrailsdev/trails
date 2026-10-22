@@ -20,3 +20,6 @@ import "./subscription-adapter/subscriber-map.js";
 import "./subscription-adapter/channel-prefix.js";
 import "./connection/stream.js";
 import "./server/worker.js";
+import "./server/connections.js";
+import "./server/base.js";
+import "./channel/broadcasting.js";

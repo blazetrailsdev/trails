@@ -6,9 +6,11 @@ interface Coder {
   encode(message: unknown): unknown;
 }
 
+type PubSubLike = { broadcast(channel: string, payload: unknown): unknown };
+
 interface BroadcastingServer {
   logger: { debug(progname: unknown, block: () => unknown): unknown };
-  pubsub: { broadcast(channel: string, payload: unknown): unknown };
+  pubsub: PromiseLike<PubSubLike> | PubSubLike;
 }
 
 interface CoderOptions {
@@ -63,7 +65,7 @@ export class Broadcaster {
     const payload = { broadcasting: this.broadcasting, message, coder: this.coder };
     return Notifications.instrument("broadcast.action_cable", payload, async () => {
       const encoded = this.coder != null ? this.coder.encode(message) : message;
-      return await this.server.pubsub.broadcast(this.broadcasting, encoded);
+      return await (await this.server.pubsub).broadcast(this.broadcasting, encoded);
     });
   }
 }
