@@ -1,7 +1,7 @@
 import type { Locale } from "../../i18n.js";
-import { parent, parents, selfAndParents, type Parents } from "./parents.js";
+import { parent, parents, selfAndParents } from "./parents.js";
 
-export class Simple implements Parents {
+export class Simple {
   static tag(...tag: string[]): Simple {
     return new Simple(...tag);
   }

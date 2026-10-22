@@ -1,4 +1,4 @@
-import { rbInspect, rbObjClassname } from "@blazetrails/ruby-compat";
+import { rbInspect, rbObjClassname, rbSetClassPathString } from "@blazetrails/ruby-compat";
 import { InvalidLocale, Disabled } from "../exceptions.js";
 import { toSym, type Locale } from "../i18n.js";
 import { tag as tagFor } from "./tag.js";
@@ -6,8 +6,6 @@ import { tag as tagFor } from "./tag.js";
 export type FallbackMappings = Record<Locale, Locale | Locale[]>;
 
 export class Fallbacks extends Map<Locale, Locale[]> {
-  static override name = "I18n::Locale::Fallbacks";
-
   private mapStore: Record<Locale, Locale[]> = {};
   private defaultsStore: Locale[] = [];
 
@@ -95,3 +93,5 @@ export class Fallbacks extends Map<Locale, Locale[]> {
     return value;
   }
 }
+
+rbSetClassPathString(Fallbacks, { name: "I18n::Locale" }, "Fallbacks");
