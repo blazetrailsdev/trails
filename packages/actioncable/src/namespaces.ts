@@ -23,7 +23,9 @@ extend(SubscriptionAdapter, Autoload);
 export const Helpers = { name: "ActionCable::Helpers" } as AutoloadModule;
 extend(Helpers, Autoload);
 
-export const ActionCable = { name: "ActionCable" } as AutoloadModule & {
+const loadPath: Record<string, () => Promise<unknown>> = {};
+
+export const ActionCable = { name: "ActionCable", loadPath } as AutoloadModule & {
   INTERNAL: typeof INTERNAL;
   server: typeof server;
   Server: typeof Server;

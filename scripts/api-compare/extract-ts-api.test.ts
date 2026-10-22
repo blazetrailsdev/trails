@@ -8338,4 +8338,19 @@ describe("a top-level rbModDefineMethod seat", () => {
     const [seat] = fileFunctionsOf(info, "object.ts");
     expect(seat.noRailsEquivalent).toMatch(/^PERMANENT/);
   });
+
+  it("records one seat per name a for-of literal list defines", () => {
+    const info = extractFromFiles("/p", {
+      "proxy.ts": `
+        for (const severity of ["debug", "info"] as const) {
+          rbModDefineMethod(Proxy, severity, function (message: unknown = null) {
+            return this.log(severity, message);
+          });
+        }
+      `,
+    });
+    const seats = fileFunctionsOf(info, "proxy.ts");
+    expect(seats.map((s) => s.name)).toEqual(["debug", "info"]);
+    expect(seats[0].callSeq).toEqual(["log"]);
+  });
 });

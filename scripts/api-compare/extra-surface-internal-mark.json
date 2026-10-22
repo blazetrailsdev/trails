@@ -1,6 +1,12 @@
 {
   "abstractcontroller": 33,
+<<<<<<< HEAD
   "actioncable": 8,
+||||||| parent of 87b900a186 (feat(actioncable): port Connection::Subscriptions, MessageBuffer, TaggedLoggerProxy and Server::Configuration)
+  "actioncable": 5,
+=======
+  "actioncable": 19,
+>>>>>>> 87b900a186 (feat(actioncable): port Connection::Subscriptions, MessageBuffer, TaggedLoggerProxy and Server::Configuration)
   "actioncontroller": 182,
   "actiondispatch": 777,
   "actionpackversion": 0,
