@@ -14,11 +14,7 @@ import {
 } from "./flatten.js";
 import { Base, type TranslateOptions } from "./base.js";
 
-export interface Store {
-  get(key: string): string | undefined;
-  set(key: string, value: string): unknown;
-  keys(): Iterable<string>;
-}
+export type Store = Pick<Map<string, string>, "get" | "set" | "keys">;
 
 function isHash(value: unknown): value is TranslationData {
   return value instanceof Map || value instanceof SubtreeProxy;

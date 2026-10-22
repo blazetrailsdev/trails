@@ -77,6 +77,11 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // `def [](key)` → `get`, and :114 `def []=(key, value)` → `set`.
   "Rack::Headers": { "self.[]": ["get"], "[]": ["get"], "[]=": ["set"] },
   "Rack::Response": { "self.[]": ["get"] },
+  // i18n/locale/fallbacks.rb:60 `def [](locale)` → fallbacks.ts `get`, the
+  // `Hash#[]` its `< Hash` superclass answers as `Map#get`.
+  "I18n::Locale::Fallbacks": { "[]": ["get"] },
+  // i18n/backend/key_value.rb:172 `def [](key)` → key-value.ts `SubtreeProxy#get`.
+  "I18n::Backend::KeyValue::SubtreeProxy": { "[]": ["get"] },
   "DidYouMean::DeprecatedMapping": { "[]=": ["set"] },
   "Rack::Multipart::ParamList": { "<<": ["push"] },
   "Rack::NullLogger": { "<<": ["append"] },
