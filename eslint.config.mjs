@@ -416,6 +416,7 @@ export default defineConfig(
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
+      "packages/actioncable/src/**/*.ts",
       "packages/activejob/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
@@ -449,6 +450,7 @@ export default defineConfig(
       "packages/did-you-mean/src/**/*.ts",
       "packages/bcrypt/src/**/*.ts",
       "packages/arel/src/**/*.ts",
+      "packages/actioncable/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
       "packages/ruby-compat/src/**/*.ts",
@@ -594,6 +596,7 @@ export default defineConfig(
           files: [
             "packages/arel/src/**/*.ts",
             "packages/activemodel/src/**/*.ts",
+            "packages/actioncable/src/**/*.ts",
             "packages/activerecord/src/connection-adapters/**/*.ts",
             "packages/activerecord/src/adapters/**/*.ts",
           ],

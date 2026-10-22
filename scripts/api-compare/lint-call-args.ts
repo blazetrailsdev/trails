@@ -105,6 +105,7 @@ const AR_CLOSURE_PATH = path.join(OUTPUT_DIR, "ar-closure.json");
  */
 export const NAMING_ENROLLED_PACKAGES: readonly string[] = [
   "abstractcontroller",
+  "actioncable",
   "actioncontroller",
   "activemodel",
   "activesupport",

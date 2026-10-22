@@ -5,6 +5,10 @@
       "rendering.rb": 3
     }
   },
+  "actioncable": {
+    "total": 0,
+    "byFile": {}
+  },
   "actioncontroller": {
     "total": 2,
     "byFile": {

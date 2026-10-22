@@ -350,6 +350,7 @@ describe("inlinedFromFindings", () => {
   it("leaves the missing-tag arm off for a package that is not enrolled", () => {
     expect(messages([])).toEqual([]);
     expect(MISSING_TAG_PACKAGES).toEqual([
+      "actioncable",
       "actioncontroller",
       "actiondispatch",
       "actionview",

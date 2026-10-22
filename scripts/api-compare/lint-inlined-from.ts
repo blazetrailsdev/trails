@@ -51,6 +51,7 @@ import { TAG } from "./inlined-from-tags.js";
  * PR that converts its constructors, and none leaves to turn a red run green.
  */
 export const MISSING_TAG_PACKAGES: readonly string[] = [
+  "actioncable",
   "actioncontroller",
   "actiondispatch",
   "actionview",

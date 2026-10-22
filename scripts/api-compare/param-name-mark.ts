@@ -31,6 +31,7 @@ export const MARK_PATH = path.join(SCRIPT_DIR, "param-name-mark.json");
 /** The packages this gate covers — see the module comment. */
 export const GATED_PACKAGES = [
   "abstractcontroller",
+  "actioncable",
   "actioncontroller",
   "actiondispatch",
   "actionview",

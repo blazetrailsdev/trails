@@ -1,3 +1,5 @@
+import { readFile } from "fs/promises";
+import * as path from "path";
 import { describe, expect, it } from "vitest";
 import { GATE_ENFORCED_PACKAGES } from "../test-compare/compare.js";
 import { RULES as DEP_RULES } from "./lint-deps.js";
@@ -58,9 +60,15 @@ describe("scopedMarks", () => {
 describe("the gates scripts/ci/scoped-comparison.sh skips", () => {
   it("judge populations thor and actioncable are outside of", () => {
     for (const pkg of ["thor", "actioncable"]) {
-      expect(PARAM_NAME_GATED).not.toContain(pkg);
       expect([...GATE_ENFORCED_PACKAGES]).not.toContain(pkg);
       expect(DEP_RULES.map((rule) => rule.package)).not.toContain(pkg);
     }
+    expect(PARAM_NAME_GATED).not.toContain("thor");
+  });
+
+  it("runs the param-name gate for actioncable, which it gates", async () => {
+    expect(PARAM_NAME_GATED).toContain("actioncable");
+    const driver = await readFile(path.join(__dirname, "../ci/scoped-comparison.sh"), "utf8");
+    expect(driver).toContain("lint-param-names.ts --package $pkg");
   });
 });

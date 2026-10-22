@@ -478,9 +478,9 @@ function gateRegex(yml: string, name: string): RegExp {
  *  - virtualized-dx-type-tests and leaf-tests' DX type step skip, and
  *    unit-tests keeps only the thor_only guard set, for the same reasons.
  *    The ci aggregate accepts each skip only when actioncable_only is true.
- *  - rails-comparison still runs: actioncable has no vendored lib path until
- *    it is enrolled in the compare tooling, and scripts/ci/scoped-comparison.sh
- *    refuses a package it cannot extract alone.
+ *  - rails-comparison skips and rails-comparison-scoped runs
+ *    scripts/ci/scoped-comparison.sh over actioncable alone, fetching only the
+ *    rails source.
  *
  *  case "${{ github.event_name }}" in
  *  Website label opt-in. The Website job otherwise gates only on
@@ -520,8 +520,6 @@ const SCOPED_ONLY_CALL = "bash scripts/ci/scoped-only.sh";
  * the test that reads this table.
  */
 const SCOPED_COMPARISON_SKIPS: Record<string, string> = {
-  "scripts/api-compare/lint-param-names.ts": "no scoped package is in its GATED_PACKAGES",
-  "scripts/api-compare/lint-block-params.ts": "no scoped package is in its GATED_PACKAGES",
   "scripts/api-compare/lint-deps.ts": "no dependency rule names a scoped package",
   "scripts/api-compare/receipt-audit.ts": "runs for --package activerecord only",
   "scripts/build-rails-file-structure-manifest.ts": "method order: arel and activemodel only",
@@ -1447,19 +1445,29 @@ describe("CI runs every tooling test suite", () => {
       "needs.changes.outputs.comparison_affected == 'true' && " +
       "needs.changes.outputs.thor_only";
 
-    expect(flat(wf.jobs["rails-comparison"].if).trim()).toBe(`${gated} != 'true'`);
-    expect(flat(wf.jobs["rails-comparison-scoped"].if).trim()).toBe(`${gated} == 'true'`);
+    expect(flat(wf.jobs["rails-comparison"].if).trim()).toBe(
+      `${gated} != 'true' && needs.changes.outputs.actioncable_only != 'true'`,
+    );
+    expect(flat(wf.jobs["rails-comparison-scoped"].if).trim()).toBe(
+      `${gated.replace("needs.changes.outputs.thor_only", "")}` +
+        "(needs.changes.outputs.thor_only == 'true' || " +
+        "needs.changes.outputs.actioncable_only == 'true')",
+    );
     expect(wf.jobs.ci.needs).toContain("rails-comparison-scoped");
     expect(aggregate).toContain(
-      'if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then continue',
+      'if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || ' +
+        '[ "$ACTIONCABLE_ONLY" = "true" ]; then continue',
     );
     expect(aggregate).toContain(
       'rails-comparison-scoped) if [ "$COMPARISON_AFFECTED" = "false" ] || ' +
-        '[ "$THOR_ONLY" != "true" ]; then continue',
+        '{ [ "$THOR_ONLY" != "true" ] && [ "$ACTIONCABLE_ONLY" != "true" ]; }; then continue',
     );
 
     const job = wf.jobs["rails-comparison-scoped"];
-    expect(job.env).toEqual({ SCOPED_PACKAGE: "thor", SCOPED_SOURCE: "thor" });
+    expect(job.env).toEqual({
+      SCOPED_PACKAGE: "${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'actioncable' }}",
+      SCOPED_SOURCE: "${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'rails' }}",
+    });
     const steps = job.steps as { uses?: string; run?: string }[];
     expect(steps.map((step) => step.uses)).toContain("actions/cache/restore@v4");
     expect(steps.map((step) => step.uses)).not.toContain("actions/cache@v4");
@@ -1469,24 +1477,17 @@ describe("CI runs every tooling test suite", () => {
     );
   });
 
-  it("keeps the full comparison for an actioncable-only diff until actioncable is enrolled", async () => {
+  it("scopes the comparison to actioncable for an actioncable-only diff", async () => {
     const yml = await readFile(CI_YML, "utf8");
     const wf = parseYaml(yml);
     const runGate = await gateRunner(yml);
     const cable = await runGate("packages/actioncable/src/version.ts");
     expect(cable.actioncable_only).toBe("true");
     expect(cable.comparison_affected).toBe("true");
-    expect(wf.jobs["rails-comparison"].if).not.toContain("actioncable_only");
-    expect(wf.jobs["rails-comparison-scoped"].if).not.toContain("actioncable_only");
-
-    await expect(
-      execFileAsync("bash", [
-        path.join(REPO_ROOT, "scripts/ci/scoped-comparison.sh"),
-        "actioncable",
-      ]),
-    ).rejects.toMatchObject({
-      stdout: expect.stringContaining("not enrolled in the compare tooling"),
-    });
+    expect(wf.jobs["rails-comparison"].if).toContain("actioncable_only != 'true'");
+    expect(wf.jobs["rails-comparison-scoped"].if).toContain("actioncable_only == 'true'");
+    expect(wf.jobs["rails-comparison-scoped"].env.SCOPED_PACKAGE).toContain("'actioncable'");
+    expect(wf.jobs["rails-comparison-scoped"].env.SCOPED_SOURCE).toContain("'rails'");
   });
 
   it("accounts for every whole-surface comparison script in the scoped driver", async () => {

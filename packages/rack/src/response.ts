@@ -248,7 +248,7 @@ export class Response {
   }
 
   status: number;
-  headers: RackHeaders;
+  headers: Record<string, RackHeaders[string]>;
   protected _body: any;
   length: number | null;
   private _buffered: boolean | null;

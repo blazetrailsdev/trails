@@ -269,6 +269,7 @@ class TestExtractor
 
     replay_inherited_tests
     collect_lib_modules(filepath)
+    collect_required_modules(sexp, filepath)
     flush_collected_modules
 
     return if @test_cases.empty?
@@ -531,6 +532,35 @@ class TestExtractor
       tests = @modules[name.split("::").last]
       @modules = own
       @modules[name] = tests if tests
+    end
+  end
+
+  # A test module defined in a `require_relative`d sibling and `include`d here
+  # (actioncable's `subscription_adapter/common.rb` and `channel_prefix.rb`):
+  # Minitest runs its `test_*` once per including class, so each including file
+  # owns the cases and its TS twin ports them. Enrolled by module name, as
+  # `LIB_TEST_MODULES` is: activesupport's cache `behaviors/` modules take the
+  # same shape and are not yet ported to match.
+  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest].freeze
+
+  def collect_required_modules(sexp, filepath)
+    missing = @module_includes.keys.select do |name|
+      !@modules.key?(name) && REQUIRED_TEST_MODULES.include?(name)
+    end
+    return if missing.empty?
+    required_relative_paths(sexp).each do |required|
+      path = File.expand_path("#{required}.rb", File.dirname(filepath))
+      required_sexp = File.file?(path) && Ripper.sexp(File.read(path))
+      next unless required_sexp
+      own = [@modules, @test_cases, @module_includes, @module_def_gates]
+      @modules = {}
+      @test_cases = []
+      @module_includes = {}
+      @module_def_gates = {}
+      walk(required_sexp)
+      found = @modules
+      @modules, @test_cases, @module_includes, @module_def_gates = own
+      missing.each { |name| @modules[name] ||= found[name] if found[name] }
     end
   end
 
