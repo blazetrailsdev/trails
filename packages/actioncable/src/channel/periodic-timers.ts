@@ -1,5 +1,6 @@
 import { Concern, classAttribute, extend } from "@blazetrails/activesupport";
 import {
+  block,
   ArgumentError,
   defineModule,
   fetch,
@@ -24,7 +25,7 @@ interface Timer {
 interface PeriodicTimersConnection {
   server: { eventLoop: { timer(interval: unknown, block: () => unknown): Timer } };
   workerPool: {
-    asyncExec(receiver: unknown, options: { connection: unknown }, block: Callback): unknown;
+    asyncExec(receiver: unknown, options: { connection: unknown }, block: unknown): unknown;
   };
 }
 
@@ -95,7 +96,11 @@ function startPeriodicTimer(
   { every }: { every: unknown },
 ): Timer {
   return this.connection.server.eventLoop.timer(every, () => {
-    return this.connection.workerPool.asyncExec(this, { connection: this.connection }, callback);
+    return this.connection.workerPool.asyncExec(
+      this,
+      { connection: this.connection },
+      block(callback),
+    );
   });
 }
 

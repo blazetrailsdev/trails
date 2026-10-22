@@ -10,6 +10,7 @@ import {
   ThreadPoolExecutor,
   excBacktrace,
   isPlainHash,
+  rbBlockGivenP,
   rbFSend,
   rbModConstSet,
   rbObjClassname,
@@ -28,7 +29,7 @@ interface Logger {
 function splitArgs(
   args: unknown[],
 ): [unknown[], { connection?: unknown } | null, Block | undefined] {
-  const block = typeof args.at(-1) === "function" ? (args.pop() as Block) : undefined;
+  const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as Block) : undefined;
   const last = args.at(-1);
   const options =
     isPlainHash(last) && Object.hasOwn(last, "connection")

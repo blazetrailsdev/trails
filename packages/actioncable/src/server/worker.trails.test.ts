@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ActionCable } from "../namespaces.js";
+import { block } from "@blazetrails/ruby-compat";
 import { Worker } from "./worker.js";
 import "../index.js";
 
@@ -55,9 +56,9 @@ describe("ActionCable::Server::Worker", () => {
     worker.asyncExec(
       receiver,
       { connection: quietConnection("a") },
-      function (this: { hit: number }) {
+      block(function (this: { hit: number }) {
         this.hit++;
-      },
+      }),
     );
     await tick();
     expect(receiver.hit).toBe(1);
@@ -94,6 +95,11 @@ describe("ActionCable::Server::Worker kwargs", () => {
   it("raises missing keyword without connection:", () => {
     const worker = new Worker();
     expect(() => worker.invoke({ run() {} }, "run")).toThrow("missing keyword: :connection");
-    expect(() => worker.asyncExec({}, () => {})).toThrow("missing keyword: :connection");
+    expect(() =>
+      worker.asyncExec(
+        {},
+        block(() => {}),
+      ),
+    ).toThrow("missing keyword: :connection");
   });
 });
