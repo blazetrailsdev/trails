@@ -207,7 +207,6 @@ const ARRAY: ReadonlySet<string> = new Set(["array"]);
 const HASH: ReadonlySet<string> = new Set(["hash"]);
 const NUMERIC: ReadonlySet<string> = new Set(["numeric"]);
 const STRING: ReadonlySet<string> = new Set(["string"]);
-const NUMERIC_OR_STRING: ReadonlySet<string> = new Set(["numeric", "string"]);
 
 /** How a port writes each native Hash form, for a gate message to name. */
 export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
@@ -307,19 +306,26 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   `extract-ts-api.ts#nativeValueForms` marks the form wherever it appears.
  *   On an `array`: `compact` is `.filter((x) => x != null)` (`array.c:6234`
  *   drops `nil` only); `uniq` is `[...new Set(xs)]` / `Array.from(new Set(xs))`
- *   and `union` the same over a literal of spreads (both `eql?`-keyed,
- *   `array.c:6097`, `:5669`, which a `Set` matches for every primitive);
+ *   and `union` the same over a literal of spreads; both are `eql?`-keyed
+ *   (`ary_make_hash`, `array.c:6097`, `:5669`), which a `Set` matches for
+ *   primitive elements only, and the credit cannot see the elements, so
+ *   `[[1], [1]].uniq` ported as a `Set` is credited too;
  *   `take` / `drop` are `.slice(0, n)` / `.slice(n)`; `count` is
- *   `.filter(fn).length`; `to_h` is `Object.fromEntries(pairs)` /
- *   `new Map(pairs)`; `zip` is `.map((x, i) => [x, b[i]])`; `sort` is a
- *   `.sort()` / `.toSorted()` with no comparator. On a `hash`: `keys`,
+ *   `.filter(fn).length`; `to_h` is `Object.fromEntries(pairs)`; `zip` is
+ *   `.map((x, i) => [x, b[i]])`. `sort` has no row: a comparator-less JS
+ *   sort compares strings, where `rb_ary_sort` compares with `<=>`.
+ *   No value form names its receiver, so the credit is body-scoped: one
+ *   `.slice(1)` anywhere in the body credits every proven-array `drop` site,
+ *   as one `.length` read credits a proven-array `size` under
+ *   `POSITIONAL_ARRAY_ANALOGUES` (compare.ts). On a `hash`: `keys`,
  *   `values`, `transform_values` (an `Object.fromEntries` over a mapped
  *   `Object.entries`), `each_value` (`for … of Object.values(h)`), `values_at`
  *   (`keys.map((k) => h[k])`), `dup` (a lone `{ ...h }`) and `except`, a
  *   rest-destructure `const { a, b, ...rest } = h` whose every key is literal.
  *   `slice` has no row: it skips an absent key and an object literal does not.
- *   On a `numeric` / `string`: `to_i` (`Math.trunc` / `Number.parseInt(s, 10)`),
- *   `to_f` (`Number.parseFloat`), `nan?` (`Number.isNaN`), `round` only as the
+ *   On a `numeric` / `string`: `to_i` and `to_f` on a `string` only
+ *   (`Number.parseInt(s, 10)` / `Number.parseFloat(s)`, the leading-digits
+ *   reads of `rb_str_to_inum` / `rb_str_to_dbl`), `nan?` (`Number.isNaN`), `round` only as the
  *   half-away `Math.sign(x) * Math.round(Math.abs(x))` (`Math.round` rounds
  *   -2.5 to -2, `float.c` rounds it to -3), `strip` as `.trim()`, `rstrip` as
  *   `.trimEnd()` and `chomp` as `s.endsWith(t) ? s.slice(0, -n) : s`.
@@ -429,7 +435,6 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["count", { form: "count", receivers: "explicit", creditedKinds: ARRAY }],
   ["to_h", { form: "toH", receivers: "explicit", creditedKinds: ARRAY }],
   ["zip", { form: "zip", receivers: "explicit", creditedKinds: ARRAY }],
-  ["sort", { form: "sort", receivers: "explicit", creditedKinds: ARRAY }],
   ["keys", { form: "keys", receivers: "explicit", creditedKinds: HASH }],
   ["values", { form: "values", receivers: "explicit", creditedKinds: HASH }],
   ["transform_values", { form: "transformValues", receivers: "explicit", creditedKinds: HASH }],
@@ -437,8 +442,8 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["values_at", { form: "valuesAt", receivers: "explicit", creditedKinds: HASH }],
   ["dup", { form: "dup", receivers: "explicit", creditedKinds: HASH }],
   ["except", { form: "except", receivers: "explicit", creditedKinds: HASH }],
-  ["to_i", { form: "toI", receivers: "explicit", creditedKinds: NUMERIC_OR_STRING }],
-  ["to_f", { form: "toF", receivers: "explicit", creditedKinds: NUMERIC_OR_STRING }],
+  ["to_i", { form: "toI", receivers: "explicit", creditedKinds: STRING }],
+  ["to_f", { form: "toF", receivers: "explicit", creditedKinds: STRING }],
   ["round", { form: "round", receivers: "explicit", creditedKinds: NUMERIC }],
   ["nan?", { form: "isNaN", receivers: "explicit", creditedKinds: NUMERIC }],
   ["strip", { form: "trim", receivers: "explicit", creditedKinds: STRING }],

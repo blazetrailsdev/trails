@@ -2372,14 +2372,12 @@ describe("body call capture", () => {
           xs.filter((x) => x === 1).length;
           Object.fromEntries(xs as [string, number][]);
           xs.map((x, i) => [x, ys[i]]);
-          xs.toSorted();
           Object.keys(h);
           Object.fromEntries(Object.entries(h).map(([k, v]) => [k, v + 1]));
           for (const v of Object.values(h)) use(v);
           ["a"].map((k) => h[k]);
           const copy = { ...h };
           const { a, "b": b, ...rest } = h;
-          Math.trunc(n);
           Number.parseInt(s, 10);
           Number.parseFloat(s);
           Math.sign(n) * Math.round(Math.abs(n));
@@ -2394,6 +2392,11 @@ describe("body call capture", () => {
           xs.sort((a, b) => 0);
           Number.parseInt(s);
           Math.round(n);
+          Math.trunc(n);
+          xs.toSorted();
+          new Map(xs as [string, number][]);
+          s.endsWith("x") ? k.slice(1) : s;
+          s.endsWith("xy") ? s.slice(1) : s;
           const { [k]: picked, ...others } = h;
           const { only } = h;
           return { a: h.a };
@@ -2410,7 +2413,6 @@ describe("body call capture", () => {
       "count",
       "toH",
       "zip",
-      "sort",
       "keys",
       "values",
       "transformValues",
@@ -2428,7 +2430,17 @@ describe("body call capture", () => {
     ]) {
       expect(calls("ported")).toContain(`@${form}`);
     }
-    for (const form of ["compact", "take", "drop", "sort", "toI", "round", "except", "dup"]) {
+    for (const form of [
+      "compact",
+      "take",
+      "sort",
+      "toI",
+      "toH",
+      "round",
+      "except",
+      "dup",
+      "chomp",
+    ]) {
       expect(calls("unported")).not.toContain(`@${form}`);
     }
   });

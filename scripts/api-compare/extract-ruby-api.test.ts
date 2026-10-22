@@ -3754,6 +3754,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
             [2].sort { |a, b| b <=> a }
             [3].count
             1.5.round(1)
+            2.5.round(0)
             "a".chomp
           end
         end

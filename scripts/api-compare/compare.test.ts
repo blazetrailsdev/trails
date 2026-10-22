@@ -673,7 +673,6 @@ describe("significantMissingCalls", () => {
       ["count", "count", "array"],
       ["to_h", "toH", "array"],
       ["zip", "zip", "array"],
-      ["sort", "sort", "array"],
       ["keys", "keys", "hash"],
       ["values", "values", "hash"],
       ["transform_values", "transformValues", "hash"],
@@ -681,7 +680,6 @@ describe("significantMissingCalls", () => {
       ["values_at", "valuesAt", "hash"],
       ["dup", "dup", "hash"],
       ["except", "except", "hash"],
-      ["to_i", "toI", "numeric"],
       ["to_i", "toI", "string"],
       ["to_f", "toF", "string"],
       ["round", "round", "numeric"],
@@ -702,6 +700,22 @@ describe("significantMissingCalls", () => {
       expect(sig(["formless"])).toBe(true);
       expect(significantCallsForReceivers({}, base, forms).has(name)).toBe(true);
     }
+  });
+
+  it("significantCallsForReceivers never credits Array#sort or a numeric to_i", () => {
+    const sig = (name: string, kind: string, form: string) =>
+      significantCallsForReceivers({ [name]: [kind] }, new Set([name]), new Set([form])).has(name);
+    expect(sig("sort", "array", "sort")).toBe(true);
+    expect(sig("to_i", "numeric", "toI")).toBe(true);
+  });
+
+  it("significantCallsForReceivers credits a value form anywhere in the body, not on one receiver", () => {
+    const sig = significantCallsForReceivers(
+      { drop: ["array"] },
+      new Set(["drop"]),
+      new Set(["drop"]),
+    );
+    expect(sig.has("drop")).toBe(false);
   });
 
   it("significantCallsForReceivers never credits Hash#slice to a destructure or an object literal", () => {

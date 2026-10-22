@@ -7712,20 +7712,27 @@ function nativeValueForms(n: ts.Node): string[] {
       ? ["count"]
       : [];
   }
-  if (ts.isNewExpression(n)) {
-    return n.expression.getText() === "Map" && n.arguments?.length === 1 ? ["toH"] : [];
-  }
   if (ts.isConditionalExpression(n)) {
     const test = unwrapped(n.condition);
     const sliced = unwrapped(n.whenTrue);
-    return ts.isCallExpression(test) &&
-      ts.isPropertyAccessExpression(test.expression) &&
-      test.expression.name.text === "endsWith" &&
-      ts.isCallExpression(sliced) &&
-      ts.isPropertyAccessExpression(sliced.expression) &&
-      sliced.expression.name.text === "slice"
-      ? ["chomp"]
-      : [];
+    if (!ts.isCallExpression(test) || !ts.isPropertyAccessExpression(test.expression)) return [];
+    if (test.expression.name.text !== "endsWith" || test.arguments.length !== 1) return [];
+    if (!ts.isCallExpression(sliced) || !ts.isPropertyAccessExpression(sliced.expression)) {
+      return [];
+    }
+    const subject = test.expression.expression.getText();
+    const suffix = test.arguments[0];
+    const [start, end] = sliced.arguments;
+    const suffixLength = ts.isStringLiteral(suffix) ? `${suffix.text.length}` : undefined;
+    const chomped =
+      sliced.expression.name.text === "slice" &&
+      sliced.expression.expression.getText() === subject &&
+      unwrapped(n.whenFalse).getText() === subject &&
+      start?.getText() === "0" &&
+      end !== undefined &&
+      (end.getText() === `-${suffix.getText()}.length` ||
+        (suffixLength !== undefined && end.getText() === `-${suffixLength}`));
+    return chomped ? ["chomp"] : [];
   }
   if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.AsteriskToken) {
     const callee = (e: ts.Expression | undefined): string | undefined => {
@@ -7761,8 +7768,6 @@ function nativeValueForms(n: ts.Node): string[] {
         mapped.expression.expression.getText().startsWith("Object.entries(");
       return transform ? ["toH", "transformValues"] : ["toH"];
     }
-    case "Math.trunc":
-      return ["toI"];
     case "Number.parseInt":
       return args.length === 2 && args[1].getText() === "10" ? ["toI"] : [];
     case "Number.parseFloat":
@@ -7777,9 +7782,6 @@ function nativeValueForms(n: ts.Node): string[] {
     case "slice":
       if (args.length === 1) return ["drop"];
       return args.length === 2 && first.getText() === "0" ? ["take"] : [];
-    case "toSorted":
-    case "sort":
-      return args.length === 0 ? ["sort"] : [];
     case "trim":
     case "trimEnd":
       return args.length === 0 ? [method] : [];
