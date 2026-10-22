@@ -1033,9 +1033,11 @@ jobs:
       - run: pnpm vitest run packages/actionpack --project "!system"
 
   # RFC 0166 system tests: the `system` Vitest project, against real browsers.
-  # webkit and webdriverio are not installed by default.
+  # Only chromium is installed: `Driver#browser` launches nothing else, and
+  # browser.trails.test.ts mocks playwright, so it needs no binary.
+  # webkit, firefox and webdriverio are not installed.
   system-tests:
-    name: System Tests
+    name: System Tests (chromium)
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
@@ -1047,7 +1049,23 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
-      - run: pnpm exec playwright-core install --with-deps chromium firefox
+      - name: Resolve the playwright-core version
+        id: playwright-version
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >>"$GITHUB_OUTPUT"
+      - name: Cache the chromium download
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-v1-chromium-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      # No `--with-deps`: that is an `apt-get update` against the Azure Ubuntu
+      # mirror, which intermittently stalls until the job's timeout and
+      # cancels the whole run. The runner image ships Chrome, so chromium's
+      # shared libraries are already installed; a missing one fails loudly at
+      # launch instead.
+      - name: Install chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright-core install chromium
       - run: pnpm vitest run --project system
 
   trailties-tests:
