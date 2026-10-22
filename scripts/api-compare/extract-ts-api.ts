@@ -351,7 +351,10 @@ export function declaringFile(sym: ts.Symbol | undefined, srcDir: string): strin
   if (!decl) return undefined;
   const abs = decl.getSourceFile().fileName.replace(/\\/g, "/");
   const declFile = path.relative(srcDir, abs).replace(/\\/g, "/");
-  if (!declFile.startsWith("..")) return declFile;
+  if (!declFile.startsWith("..")) {
+    const nested = nestedPackageDeclFile(abs, srcDir);
+    return nested ?? declFile;
+  }
   // `srcDir` is `<root>/packages/<pkg>/src`, so its grandparent is the
   // workspace's packages directory — where a sibling package's own src (or the
   // `dist/*.d.ts` a cross-package import actually resolves through) lives.
@@ -360,6 +363,22 @@ export function declaringFile(sym: ts.Symbol | undefined, srcDir: string): strin
   const m = /^([^./][^/]*)\/(?:src|dist)\/(.+)$/.exec(rel);
   if (!m) return EXTERNAL_DECL_FILE;
   return `${PKG_DECL_PREFIX}${m[1]}:${m[2].replace(/\.d\.ts$/, ".ts")}`;
+}
+
+/**
+ * A file under a package that `parity:api` extracts from inside this one's
+ * `srcDir` (thor's `src/thor` within trailties) is that package's file, so it
+ * resolves through the package prefix and not as one of this package's own.
+ */
+function nestedPackageDeclFile(abs: string, srcDir: string): string | undefined {
+  const own = path.resolve(srcDir).replace(/\\/g, "/");
+  for (const pkg of TS_EXTRACT_PACKAGES) {
+    const dir = packageSrcDir(pkg).replace(/\\/g, "/");
+    if (dir.startsWith(own + "/") && abs.startsWith(dir + "/")) {
+      return `${PKG_DECL_PREFIX}${pkg}:${path.posix.relative(dir, abs)}`;
+    }
+  }
+  return undefined;
 }
 
 function resolveDeclarationSymbol(checker: ts.TypeChecker, node: ts.Node): ts.Symbol | undefined {
