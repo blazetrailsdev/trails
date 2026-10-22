@@ -44,8 +44,8 @@ export class BoundaryTooLongError extends Error {
 include(BoundaryTooLongError, BadRequest);
 
 export const EOL = "\r\n";
-export const MULTIPART = /^multipart\/.*boundary="?([^";,]+)"?/i;
-export const MULTIPART_CONTENT_TYPE = new RegExp(`Content-Type: (.*)${EOL}`, "i");
+export const MULTIPART = /^multipart\/[^\n]*boundary="?([^";,]+)"?/i;
+export const MULTIPART_CONTENT_TYPE = new RegExp(`Content-Type: ([^\n]*)${EOL}`, "i");
 export const MULTIPART_CONTENT_DISPOSITION = new RegExp(
   `Content-Disposition:([^\\n]*)(?=${EOL}(\\S|$))`,
   "i",
@@ -371,8 +371,8 @@ export class Parser {
 
   /** @internal */
   dequote(str: string): string {
-    const m = /^"(.*)"$/.exec(str);
-    return (m ? m[1] : str).replace(/\\(.)/g, "$1");
+    const m = /^"([^\n]*)"$/.exec(str);
+    return (m ? m[1] : str).replace(/\\([^\n])/g, "$1");
   }
 
   /** @internal */ private readData(

@@ -2,8 +2,8 @@ import {
   CLASS_METHOD_TABLE,
   Module,
   TypeError,
-  moduleVisibility,
   rbClassAttachedObject,
+  rbObjIsKindOf,
   rbModSingletonP,
 } from "@blazetrails/ruby-compat";
 
@@ -24,10 +24,7 @@ export namespace ClassAttribute {
   export function redefine(owner: any, name: string, namespacedName: string, value: unknown): void {
     if (rbModSingletonP(owner)) {
       const attachedObject = rbClassAttachedObject(owner);
-      if (
-        attachedObject instanceof Module ||
-        Object.hasOwn(attachedObject as object, moduleVisibility)
-      ) {
+      if (rbObjIsKindOf(attachedObject, Module)) {
         redefineMethod(owner.prototype, namespacedName, true, () => value);
       } else {
         redefineMethod(owner.prototype, name, false, () => value);

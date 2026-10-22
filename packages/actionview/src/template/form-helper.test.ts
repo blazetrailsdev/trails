@@ -44,12 +44,17 @@ import { Tse } from "./handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import {
   FormBuilder,
+  formWithGeneratesIds,
+  setFormWithGeneratesIds,
   multipleFileFieldIncludeHidden,
   setMultipleFileFieldIncludeHidden,
 } from "../helpers/form-helper.js";
+import { defaultEnforceUtf8, setDefaultEnforceUtf8 } from "../helpers/form-tag-helper.js";
 import { Base as TagsBase } from "../helpers/tags/base.js";
 import type { LabelBuilder } from "../helpers/tags/label.js";
 import { assertDomEqual } from "../testing/dom-assertions.js";
+import { assertSelect } from "../testing/selector-assertions.js";
+import { Testing } from "../testing.js";
 import { Cpk } from "../test-helpers/fake-models.js";
 
 class Post {
@@ -3948,6 +3953,617 @@ describe("FormHelperTest", () => {
         commentId(0, 1) +
         commentName(1, "comment #2") +
         commentId(1, 2),
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  function withDefaultEnforceUtf8(value: boolean, block: () => void): void {
+    const oldValue = defaultEnforceUtf8;
+    setDefaultEnforceUtf8(value);
+    try {
+      block();
+    } finally {
+      setDefaultEnforceUtf8(oldValue);
+    }
+  }
+
+  it("form for", () => {
+    formFor(post, { html: { id: "create-post" } }, (f) => {
+      concat(f.label("title", null, {}, () => "The Title"));
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+      concat(f.submit("Create post"));
+      concat(f.button("Create post"));
+      concat(f.button(null, {}, () => concat(view.contentTag("span", "Create post"))));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "create-post",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<label for='post_title'>The Title</label>" +
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />" +
+        "<input name='commit' data-disable-with='Create post' type='submit' value='Create post' />" +
+        "<button name='button' type='submit'>Create post</button>" +
+        "<button name='button' type='submit'><span>Create post</span></button>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for is not affected by form with generates ids", () => {
+    const oldValue = formWithGeneratesIds;
+    setFormWithGeneratesIds(false);
+    try {
+      formFor(post, { html: { id: "create-post" } }, (f) => {
+        concat(f.label("title", null, {}, () => "The Title"));
+        concat(f.textField("title"));
+        concat(f.textarea("body"));
+        concat(f.checkbox("secret"));
+        concat(f.submit("Create post"));
+        concat(f.button("Create post"));
+        concat(f.button(null, {}, () => concat(view.contentTag("span", "Create post"))));
+      });
+
+      const expected = wholeForm(
+        "/posts/123",
+        "create-post",
+        "edit_post",
+        { method: "patch" },
+        () =>
+          "<label for='post_title'>The Title</label>" +
+          "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+          "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+          "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+          "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />" +
+          "<input name='commit' data-disable-with='Create post' type='submit' value='Create post' />" +
+          "<button name='button' type='submit'>Create post</button>" +
+          "<button name='button' type='submit'><span>Create post</span></button>",
+      );
+
+      assertDomEqual(expected, rendered);
+    } finally {
+      setFormWithGeneratesIds(oldValue);
+    }
+  });
+
+  it("form for id", () => {
+    formFor(new Post(), {}, (form) => {
+      concat(form.button({ form: form.id() }));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post",
+      "new_post",
+      {},
+      () => '<button name="button" type="submit" form="new_post">Create Post</button>',
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with format", () => {
+    formFor(post, { format: "json", html: { id: "edit_post_123", class: "edit_post" } }, (f) => {
+      concat(f.label("title"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123.json",
+      "edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () => "<label for='post_title'>Title</label>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("new form for without format", () => {
+    formFor(post, { html: { id: "edit_post_123", class: "edit_post" } }, (f) => {
+      concat(f.label("title"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () => "<label for='post_title'>Title</label>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with symbol as", () => {
+    formFor(post, { as: "other_name", html: { id: "create-post" } }, (f) => {
+      concat(f.label("title", { class: "post_title" }));
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+      concat(f.submit("Create post"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "create-post",
+      "edit_other_name",
+      { method: "patch" },
+      () =>
+        "<label for='other_name_title' class='post_title'>Title</label>" +
+        "<input name='other_name[title]' id='other_name_title' value='Hello World' type='text' />" +
+        "<textarea name='other_name[body]' id='other_name_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='other_name[secret]' value='0' type='hidden' autocomplete='off' />" +
+        "<input name='other_name[secret]' checked='checked' id='other_name_secret' value='1' type='checkbox' />" +
+        "<input name='commit' value='Create post' data-disable-with='Create post' type='submit' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with method as part of html options", () => {
+    formFor(post, { url: "/", html: { id: "create-post", method: "delete" } }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = wholeForm(
+      "/",
+      "create-post",
+      "edit_post",
+      { method: "delete" },
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with method", () => {
+    formFor(post, { url: "/", method: "delete", html: { id: "create-post" } }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = wholeForm(
+      "/",
+      "create-post",
+      "edit_post",
+      { method: "delete" },
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with search field", () => {
+    formFor(new Post(), { url: "/search", html: { id: "search-post", method: "get" } }, (f) => {
+      concat(f.searchField("title"));
+    });
+
+    const expected = wholeForm(
+      "/search",
+      "search-post",
+      "new_post",
+      { method: "get" },
+      () => "<input name='post[title]' type='search' id='post_title' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with remote", () => {
+    formFor(post, { url: "/", remote: true, html: { id: "create-post", method: "patch" } }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = wholeForm(
+      "/",
+      "create-post",
+      "edit_post",
+      { method: "patch", remote: true },
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for enforce utf8 true", () => {
+    formFor("post", { enforceUtf8: true }, (f) => {
+      concat(f.textField("title"));
+    });
+
+    const expected = wholeForm(
+      "/",
+      null,
+      null,
+      { enforceUtf8: true },
+      () => "<input name='post[title]' type='text' id='post_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for enforce utf8 false", () => {
+    formFor("post", { enforceUtf8: false }, (f) => {
+      concat(f.textField("title"));
+    });
+
+    const expected = wholeForm(
+      "/",
+      null,
+      null,
+      { enforceUtf8: false },
+      () => "<input name='post[title]' type='text' id='post_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for default enforce utf8 false", () => {
+    withDefaultEnforceUtf8(false, () => {
+      formFor("post", {}, (f) => {
+        concat(f.textField("title"));
+      });
+
+      const expected = wholeForm(
+        "/",
+        null,
+        null,
+        { enforceUtf8: false },
+        () => "<input name='post[title]' type='text' id='post_title' value='Hello World' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("form for default enforce utf8 true", () => {
+    withDefaultEnforceUtf8(true, () => {
+      formFor("post", {}, (f) => {
+        concat(f.textField("title"));
+      });
+
+      const expected = wholeForm(
+        "/",
+        null,
+        null,
+        { enforceUtf8: true },
+        () => "<input name='post[title]' type='text' id='post_title' value='Hello World' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("form for with remote in html", () => {
+    formFor(post, { url: "/", html: { remote: true, id: "create-post", method: "patch" } }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = wholeForm(
+      "/",
+      "create-post",
+      "edit_post",
+      { method: "patch", remote: true },
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with remote without html", () => {
+    post.persisted = false;
+    stub(post as Post & { toKey(): unknown }, "toKey", null, [], () => {
+      formFor(post, { remote: true }, (f) => {
+        concat(f.textField("title"));
+        concat(f.textarea("body"));
+        concat(f.checkbox("secret"));
+      });
+
+      const expected = wholeForm(
+        "/posts",
+        "new_post",
+        "new_post",
+        { remote: true },
+        () =>
+          "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+          "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+          "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+          "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />",
+      );
+
+      assertDomEqual(expected, rendered);
+    });
+  });
+
+  it("form for without object", () => {
+    formFor("post", { html: { id: "create-post" } }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = wholeForm(
+      "/",
+      "create-post",
+      null,
+      {},
+      () =>
+        "<input name='post[title]' type='text' id='post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='post[secret]' checked='checked' type='checkbox' id='post_secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with index", () => {
+    formFor(post, { as: "post[]" }, (f) => {
+      concat(f.label("title"));
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<label for='post_123_title'>Title</label>" +
+        "<input name='post[123][title]' type='text' id='post_123_title' value='Hello World' />" +
+        "<textarea name='post[123][body]' id='post_123_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[123][secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='post[123][secret]' checked='checked' type='checkbox' id='post_123_secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with nil index option override", () => {
+    formFor(post, { as: "post[]", index: null }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post[]",
+      "edit_post[]",
+      { method: "patch" },
+      () =>
+        "<input name='post[][title]' type='text' id='post__title' value='Hello World' />" +
+        "<textarea name='post[][body]' id='post__body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[][secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='post[][secret]' checked='checked' type='checkbox' id='post__secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with namespace", () => {
+    formFor(post, { namespace: "namespace" }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(f.checkbox("secret"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "namespace_edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<input name='post[title]' type='text' id='namespace_post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='namespace_post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[secret]' type='hidden' value='0' autocomplete='off' />" +
+        "<input name='post[secret]' checked='checked' type='checkbox' id='namespace_post_secret' value='1' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with namespace with date select", () => {
+    formFor(post, { namespace: "namespace" }, (f) => {
+      concat(f.dateSelect("written_on"));
+    });
+
+    assertSelect.call(
+      {
+        _selected: null,
+        documentRootElement: () => Testing.htmlDocument().parse(String(rendered)).root,
+      },
+      "select#namespace_post_written_on_1i",
+    );
+  });
+
+  it("form for with namespace with label", () => {
+    formFor(post, { namespace: "namespace" }, (f) => {
+      concat(f.label("title"));
+      concat(f.textField("title"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "namespace_edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<label for='namespace_post_title'>Title</label>" +
+        "<input name='post[title]' type='text' id='namespace_post_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with namespace and as option", () => {
+    formFor(post, { namespace: "namespace", as: "custom_name" }, (f) => {
+      concat(f.textField("title"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "namespace_edit_custom_name",
+      "edit_custom_name",
+      { method: "patch" },
+      () =>
+        "<input id='namespace_custom_name_title' name='custom_name[title]' type='text' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("two form for with namespace", () => {
+    formFor(post, { namespace: "namespace_1" }, (f) => {
+      concat(f.label("title"));
+      concat(f.textField("title"));
+    });
+
+    const expected1 = wholeForm(
+      "/posts/123",
+      "namespace_1_edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<label for='namespace_1_post_title'>Title</label>" +
+        "<input name='post[title]' type='text' id='namespace_1_post_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected1, rendered);
+
+    formFor(post, { namespace: "namespace_2" }, (f) => {
+      concat(f.label("title"));
+      concat(f.textField("title"));
+    });
+
+    const expected2 = wholeForm(
+      "/posts/123",
+      "namespace_2_edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<label for='namespace_2_post_title'>Title</label>" +
+        "<input name='post[title]' type='text' id='namespace_2_post_title' value='Hello World' />",
+    );
+
+    assertDomEqual(expected2, rendered);
+  });
+
+  it("fields for with namespace", () => {
+    comment.body = "Hello World";
+    formFor(post, { namespace: "namespace" }, (f) => {
+      concat(f.textField("title"));
+      concat(f.textarea("body"));
+      concat(
+        f.fieldsFor(comment, null, {}, (c) => {
+          concat(c.textField("body"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "namespace_edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<input name='post[title]' type='text' id='namespace_post_title' value='Hello World' />" +
+        "<textarea name='post[body]' id='namespace_post_body'>\nBack to the hill and over it again!</textarea>" +
+        "<input name='post[comment][body]' type='text' id='namespace_post_comment_body' value='Hello World' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("fields for with file field generate multipart", () => {
+    formFor(post, {}, (f) => {
+      concat(
+        f.fieldsFor("comment", post, {}, (c) => {
+          concat(c.fileField("file"));
+        }),
+      );
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post_123",
+      "edit_post",
+      { method: "patch", multipart: true },
+      () => "<input name='post[comment][file]' type='file' id='post_comment_file' />",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for label error wrapping block and non block versions", () => {
+    formFor(post, {}, (f) => {
+      concat(f.label("author_name", "Name", { class: "label" }));
+      concat(f.label("author_name", { class: "label" }, {}, () => "Name"));
+    });
+
+    const expected = wholeForm(
+      "/posts/123",
+      "edit_post_123",
+      "edit_post",
+      { method: "patch" },
+      () =>
+        "<div class='field_with_errors'><label for='post_author_name' class='label'>Name</label></div>" +
+        "<div class='field_with_errors'><label for='post_author_name' class='label'>Name</label></div>",
+    );
+
+    assertDomEqual(expected, rendered);
+  });
+
+  it("form for with collection radio buttons", () => {
+    const post = new Post();
+    Object.assign(post, { active: false });
+    formFor(post, {}, (f) => {
+      concat(f.collectionRadioButtons("active", [true, false], "toString", "toString"));
+    });
+
+    const expected = wholeForm(
+      "/posts",
+      "new_post",
+      "new_post",
+      {},
+      () =>
+        "<input type='hidden' name='post[active]' value='' autocomplete='off' />" +
+        "<input id='post_active_true' name='post[active]' type='radio' value='true' />" +
+        "<label for='post_active_true'>true</label>" +
+        "<input checked='checked' id='post_active_false' name='post[active]' type='radio' value='false' />" +
+        "<label for='post_active_false'>false</label>",
     );
 
     assertDomEqual(expected, rendered);
