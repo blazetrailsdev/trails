@@ -42,6 +42,7 @@ type Accessors = {
   set locale(value: DetailWriter);
 };
 
+/** @noRailsEquivalent CONVERGEABLE lookup-context-register-detail-accessors-typed-on-merge */
 type DefaultAccessors = Record<"defaultLocale" | "defaultFormats", () => DetailValue>;
 
 type DigestCache = Map<string | NestedDependencies, string | NestedDependencies>;
