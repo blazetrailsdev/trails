@@ -51,11 +51,18 @@ class NamespaceNode<E> {
   ) {}
 }
 
-function namespaceNodes<E>(owner: E, inScope: Record<string, string>): NamespaceNode<E>[] {
-  const result = [new NamespaceNode(owner, "xml", XML_NAMESPACE)];
+function namespaceNodes<E>(
+  owner: E,
+  inScope: Record<string, string>,
+  previous: NamespaceNode<E>[] = [],
+): NamespaceNode<E>[] {
+  const node = (prefix: string | null, href: string) =>
+    previous.find((ns) => ns.prefix === prefix && ns.href === href) ??
+    new NamespaceNode(owner, prefix, href);
+  const result = [node("xml", XML_NAMESPACE)];
   for (const [prefix, href] of Object.entries(inScope)) {
     if (prefix === "xml" || (prefix === "" && href === "")) continue;
-    result.push(new NamespaceNode(owner, prefix === "" ? null : prefix, href));
+    result.push(node(prefix === "" ? null : prefix, href));
   }
   return result;
 }
@@ -133,11 +140,12 @@ const PARSE5_TREE: Tree<Parse5XPathNode> = {
   },
   namespaces(node) {
     if (isParse5Attr(node) || node instanceof NamespaceNode || !("tagName" in node)) return [];
-    let namespaces = parse5Namespaces.get(node);
-    if (namespaces === undefined) {
-      namespaces = namespaceNodes(node, parse5InScopeNamespaces(node));
-      parse5Namespaces.set(node, namespaces);
-    }
+    const namespaces = namespaceNodes(
+      node,
+      parse5InScopeNamespaces(node),
+      parse5Namespaces.get(node),
+    );
+    parse5Namespaces.set(node, namespaces);
     return namespaces;
   },
   localName(node) {
@@ -219,11 +227,8 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
     if (!(node instanceof LibXmlElement)) return [];
     let byPtr = libXmlNamespaces.get(node.doc);
     if (byPtr === undefined) libXmlNamespaces.set(node.doc, (byPtr = new Map()));
-    let namespaces = byPtr.get(libXmlPtr(node));
-    if (namespaces === undefined) {
-      namespaces = namespaceNodes(node, node.namespaces);
-      byPtr.set(libXmlPtr(node), namespaces);
-    }
+    const namespaces = namespaceNodes(node, node.namespaces, byPtr.get(libXmlPtr(node)));
+    byPtr.set(libXmlPtr(node), namespaces);
     return namespaces;
   },
   localName(node) {

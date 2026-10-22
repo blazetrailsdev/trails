@@ -41,11 +41,9 @@ export function extractParams(
     hashes.push(params.pop());
     if (params.length === 0) break;
   }
-  // eslint-disable-next-line prefer-const
-  let [ns, binds] = hashes.reverse() as [
-    Record<string, string> | undefined,
-    Record<string, unknown> | undefined,
-  ];
+  hashes.reverse();
+  let ns = hashes[0] as Record<string, string> | undefined;
+  const binds = hashes[1] as Record<string, unknown> | undefined;
 
   ns ??=
     (this.document as { root?: { namespaces?: Record<string, string> } | null }).root?.namespaces ??
