@@ -7,6 +7,7 @@ import {
   rbInspect,
   rbModConstSet,
   rbObjClass,
+  slice,
   RuntimeError,
   StandardError,
 } from "@blazetrails/ruby-compat";
@@ -124,10 +125,9 @@ export class Exceptions {
   declare afterDiscardProcs: AfterDiscardProc[];
 
   async retryJob(this: ExceptionsJob, options: Record<string, unknown> = {}): Promise<unknown> {
-    const payload: Record<string, unknown> = {};
-    if ("error" in options) payload["error"] = options["error"];
-    if ("wait" in options) payload["wait"] = options["wait"];
-    return await this.instrument("enqueue_retry", payload, () => this.enqueue(options));
+    return await this.instrument("enqueue_retry", slice(options, "error", "wait"), () =>
+      this.enqueue(options),
+    );
   }
 
   /** @internal */
@@ -146,7 +146,9 @@ export class Exceptions {
     jitter =
       jitter === JITTER_DEFAULT
         ? (rbObjClass(this) as unknown as ExceptionsClass).retryJitter
-        : (jitter ?? 0.0);
+        : jitter != null && jitter !== false
+          ? jitter
+          : 0.0;
 
     if (secondsOrDurationOrAlgorithm === ":polynomially_longer") {
       const delay = executions ** 4;

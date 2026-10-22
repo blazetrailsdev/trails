@@ -68,7 +68,7 @@ export class Base {
   declare static queueNameFromPart: typeof QueueNameClassMethods.queueNameFromPart;
   declare static queueName: unknown;
   declare static queueNameDelimiter: string;
-  declare static isQueueNameDelimiter: () => boolean;
+  declare static isQueueNameDelimiter: boolean;
   declare static queueNamePrefix: unknown;
   declare static defaultPriority: unknown;
   declare static queueWithPriority: typeof QueuePriorityClassMethods.queueWithPriority;
@@ -80,7 +80,7 @@ export class Base {
   declare static execute: typeof ExecutionClassMethods.execute;
   declare static rescueFrom: typeof Rescuable.ClassMethods.rescueFrom;
   declare static afterDiscardProcs: Exceptions["afterDiscardProcs"];
-  declare static isAfterDiscardProcs: () => boolean;
+  declare static isAfterDiscardProcs: boolean;
   declare static retryJitter: number;
   declare static retryOn: typeof ExceptionsClassMethods.retryOn;
   declare static discardOn: typeof ExceptionsClassMethods.discardOn;

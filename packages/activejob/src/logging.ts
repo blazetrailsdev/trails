@@ -7,7 +7,7 @@ import {
   TaggedLogging,
 } from "@blazetrails/activesupport";
 import {
-  block,
+  block as rbBlock,
   defineModule,
   rbCallSuper,
   rbModConstSet,
@@ -68,7 +68,7 @@ Concern.included.call(Logging as never, null, function (this: LoggingClass) {
 
   this.aroundEnqueue(
     { prepend: true },
-    block(function (this: LoggingJob, _: unknown, block: () => unknown) {
+    rbBlock(function (this: LoggingJob, _: unknown, block: () => unknown) {
       return this.tagLogger(block);
     }),
   );
