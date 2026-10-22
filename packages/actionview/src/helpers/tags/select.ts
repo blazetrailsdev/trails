@@ -43,7 +43,17 @@ export class Select extends Base {
     this._htmlOptions = htmlOptions;
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
   override render(): unknown {
+    if (this._choices instanceof Promise) {
+      return this._choices.then((choices) => {
+        this._choices = choices;
+        return this.render();
+      });
+    }
     const optionTagsOptions = {
       selected: fetch(
         this._options,

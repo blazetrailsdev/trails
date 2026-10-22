@@ -29,6 +29,9 @@ type ValidatorLike = ValidatorBase | EachValidator | { validate(record: Validata
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Model extends API, Access, Naming {
+  runCallbacks(
+    ...args: Parameters<Included<typeof ASCallbacks>["runCallbacks"]>
+  ): ReturnType<Included<typeof ASCallbacks>["runCallbacks"]>;
   freeze(): this;
 
   /** @internal */
@@ -136,8 +139,6 @@ export class Model {
   dup(): this {
     return rbObjDup(this);
   }
-
-  declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 }
 
 include(Model, API);

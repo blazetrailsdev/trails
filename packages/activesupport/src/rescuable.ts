@@ -8,7 +8,7 @@ import {
   rbModName,
   rbObjMethod,
 } from "@blazetrails/ruby-compat";
-import { Module, extend, type Included } from "@blazetrails/ruby-compat/include";
+import { Module, extend, rbObjIsKindOf, type Included } from "@blazetrails/ruby-compat/include";
 import { classAttribute } from "./class-attribute.js";
 import { Concern } from "./concern.js";
 import { extractOptionsBang } from "./hash-utils.js";
@@ -55,9 +55,9 @@ export const ClassMethods = {
       if (
         (typeof klass === "function" &&
           Object.getOwnPropertyDescriptor(klass, "prototype")?.writable === false) ||
-        klass instanceof Module
+        rbObjIsKindOf(klass, Module)
       ) {
-        const name = rbModName(klass);
+        const name = rbModName(klass as object);
         key = name != null && safeConstantize(name) === klass ? name : (klass as ExceptionClass);
       } else if (typeof klass === "string") {
         key = klass;

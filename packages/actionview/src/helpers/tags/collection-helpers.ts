@@ -176,6 +176,8 @@ export const CollectionHelpers = {
   /**
    * @internal
    * @missingRailsArgs join — PERMANENT
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
    */
   renderCollection(
     this: CollectionHelpersHost,
@@ -185,25 +187,31 @@ export const CollectionHelpers = {
       text: unknown,
       defaultHtmlOptions: Record<string, unknown>,
     ) => unknown,
-  ): SafeBuffer {
-    return htmlSafe(
-      globalThis.Array.from(this._collection, (item) => {
-        const value = this.valueForCollection(item, this._valueMethod);
-        const text = this.valueForCollection(item, this._textMethod);
-        const defaultHtmlOptions = this.defaultHtmlOptionsForCollection(item, value);
-        const additionalHtmlOptions = this.optionHtmlAttributes(item);
+  ): SafeBuffer | Promise<SafeBuffer> {
+    const rendered = globalThis.Array.from(this._collection, (item) => {
+      const value = this.valueForCollection(item, this._valueMethod);
+      const text = this.valueForCollection(item, this._textMethod);
+      const defaultHtmlOptions = this.defaultHtmlOptionsForCollection(item, value);
+      const additionalHtmlOptions = this.optionHtmlAttributes(item);
 
-        return block(item, value, text, { ...defaultHtmlOptions, ...additionalHtmlOptions });
-      }).join(""),
-    );
+      return block(item, value, text, { ...defaultHtmlOptions, ...additionalHtmlOptions });
+    });
+    if (rendered.some((part) => part instanceof Promise)) {
+      return Promise.all(rendered).then((parts) => htmlSafe(parts.join("")));
+    }
+    return htmlSafe(rendered.join(""));
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
   renderCollectionFor(
     this: CollectionHelpersHost,
     builderClass: typeof Builder,
     block?: (builder: Builder) => unknown,
-  ): SafeBuffer {
+  ): SafeBuffer | Promise<SafeBuffer> {
     const options = stringifyKeys(this._options);
     const renderedCollection = this.renderCollection((item, value, text, defaultHtmlOptions) => {
       const builder = this.instantiateBuilder(builderClass, item, value, text, defaultHtmlOptions);
@@ -215,6 +223,13 @@ export const CollectionHelpers = {
       }
     });
 
+    if (renderedCollection instanceof Promise) {
+      return renderedCollection.then((rendered) =>
+        rtest(fetch<unknown>(options, "includeHidden", true))
+          ? this.hiddenField().plus(rendered)
+          : rendered,
+      );
+    }
     if (rtest(fetch<unknown>(options, "includeHidden", true))) {
       return this.hiddenField().plus(renderedCollection);
     } else {

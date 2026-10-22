@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  block,
-  classModule,
-  include,
-  rbObjRespondTo,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { block, include, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
 
 import { Rescuable } from "./rescuable.js";
 
@@ -15,13 +9,11 @@ class MadRonon extends Error {}
 
 class CoolError extends Error {}
 
-class WeirdError {
-  static readonly [classModule] = true;
-
-  static caseEquals(other: unknown): boolean {
+const WeirdError = Object.defineProperty({}, "caseEquals", {
+  value(other: unknown): boolean {
     return other instanceof Error && rbObjRespondTo(other, "isWeird");
-  }
-}
+  },
+});
 
 for (const klass of [WraithAttack, MadRonon, CoolError]) {
   registerConstant(klass.name, klass);

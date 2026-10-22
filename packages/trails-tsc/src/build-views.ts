@@ -84,7 +84,9 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
           get type() {
             return template.type;
           },
-          shortIdentifier: path.relative(cwd, template.identifier).split(path.sep).join("/"),
+          get shortIdentifier() {
+            return template.shortIdentifier;
+          },
         },
         Base.annotateRenderedViewWithFilenames,
       ),

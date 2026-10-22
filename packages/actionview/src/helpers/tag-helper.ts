@@ -125,6 +125,21 @@ export function buildTagValues(...args: unknown[]): Array<string | SafeBuffer> {
   return tagValues;
 }
 
+export function tag(this: TagHelperHost): ElementTagBuilder;
+export function tag(
+  this: TagHelperHost,
+  name: string,
+  options?: Record<string, unknown> | null,
+  open?: boolean,
+  escape?: boolean,
+): SafeBuffer;
+export function tag(
+  this: TagHelperHost,
+  name?: string,
+  options?: Record<string, unknown> | null,
+  open?: boolean,
+  escape?: boolean,
+): SafeBuffer | TagBuilder;
 export function tag(
   this: TagHelperHost,
   name?: string,
@@ -225,6 +240,143 @@ export function cdataSection(content: unknown): SafeBuffer {
 export function escapeOnce(html: string): SafeBuffer {
   return htmlEscapeOnce(html);
 }
+
+type TagElementName =
+  | "area"
+  | "base"
+  | "br"
+  | "col"
+  | "embed"
+  | "hr"
+  | "img"
+  | "input"
+  | "keygen"
+  | "link"
+  | "meta"
+  | "source"
+  | "track"
+  | "wbr"
+  | "animate"
+  | "animate_motion"
+  | "animate_transform"
+  | "circle"
+  | "ellipse"
+  | "line"
+  | "path"
+  | "polygon"
+  | "polyline"
+  | "rect"
+  | "set"
+  | "stop"
+  | "use"
+  | "view"
+  | "a"
+  | "abbr"
+  | "address"
+  | "article"
+  | "aside"
+  | "audio"
+  | "b"
+  | "bdi"
+  | "bdo"
+  | "blockquote"
+  | "body"
+  | "button"
+  | "canvas"
+  | "caption"
+  | "cite"
+  | "code"
+  | "colgroup"
+  | "data"
+  | "datalist"
+  | "dd"
+  | "del"
+  | "details"
+  | "dfn"
+  | "dialog"
+  | "div"
+  | "dl"
+  | "dt"
+  | "em"
+  | "fieldset"
+  | "figcaption"
+  | "figure"
+  | "footer"
+  | "form"
+  | "h1"
+  | "h2"
+  | "h3"
+  | "h4"
+  | "h5"
+  | "h6"
+  | "head"
+  | "header"
+  | "hgroup"
+  | "html"
+  | "i"
+  | "iframe"
+  | "ins"
+  | "kbd"
+  | "label"
+  | "legend"
+  | "li"
+  | "main"
+  | "map"
+  | "mark"
+  | "menu"
+  | "meter"
+  | "nav"
+  | "noscript"
+  | "object"
+  | "ol"
+  | "optgroup"
+  | "option"
+  | "output"
+  | "p"
+  | "picture"
+  | "portal"
+  | "pre"
+  | "progress"
+  | "q"
+  | "rp"
+  | "rt"
+  | "ruby"
+  | "s"
+  | "samp"
+  | "script"
+  | "search"
+  | "section"
+  | "select"
+  | "slot"
+  | "small"
+  | "span"
+  | "strong"
+  | "style"
+  | "sub"
+  | "summary"
+  | "sup"
+  | "table"
+  | "tbody"
+  | "td"
+  | "template"
+  | "textarea"
+  | "tfoot"
+  | "th"
+  | "thead"
+  | "time"
+  | "title"
+  | "tr"
+  | "u"
+  | "ul"
+  | "var"
+  | "video";
+
+type TagElement = {
+  (...args: [...unknown[], (tagBuilder: TagBuilder) => PromiseLike<unknown>]): Promise<SafeBuffer>;
+  (...args: unknown[]): SafeBuffer;
+};
+
+type ElementTagBuilder = TagBuilder & Record<TagElementName, TagElement>;
 
 export class TagBuilder {
   static defineElement(

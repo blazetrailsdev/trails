@@ -3,7 +3,6 @@ import {
   include,
   presence,
   ToJsonWithActiveSupportEncoder,
-  type Included,
 } from "@blazetrails/activesupport";
 import {
   Enumerable,
@@ -311,13 +310,12 @@ export class Errors<TBase extends object = object> {
   }
 }
 
-export interface Errors<TBase extends object = object> {
+export interface Errors<TBase extends object = object> extends ToJsonWithActiveSupportEncoder {
   map<R>(block: (error: ActiveModelError) => R): R[];
   first(): ActiveModelError | null;
   first(n: number): ActiveModelError[];
   isAny(block?: (error: ActiveModelError) => unknown): boolean;
   [Symbol.iterator](): IterableIterator<ActiveModelError>;
-  toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
 
 include(Errors, Enumerable);

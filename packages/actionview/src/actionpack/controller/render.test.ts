@@ -342,7 +342,7 @@ class TestController extends ActionController.Base {
   async greeting(): Promise<void> {}
 
   async builderLayoutTest(): Promise<void> {
-    // BLOCKED: render-test-controller-gaps-remaining
+    // BLOCKED: render-test-controller-gaps-owner-rulings
     this.name = null as unknown as string;
     await this.render({ action: "hello", layout: "layouts/builder" });
   }
@@ -748,7 +748,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — view instance_variables list
+  // BLOCKED: render-test-controller-gaps-owner-rulings — view instance_variables list
   test.skip("controller does not leak instance variables", async () => {
     const expected = [
       "_assigns",
@@ -813,7 +813,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello world!");
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — action-name lookup folds case
+  // BLOCKED: render-test-controller-gaps-owner-rulings — action-name lookup folds case
   test.skip("render action upcased", async () => {
     await expect(testCase.get("renderActionUpcasedHelloWorld")).rejects.toThrow(MissingTemplate);
   });
@@ -1154,7 +1154,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hi web users! here is some cached stuff");
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — private name helper collides with @name
+  // BLOCKED: render-test-controller-gaps-owner-rulings — private name helper collides with @name
   test.skip("rendering with conflicting local vars", async () => {
     await testCase.get("renderingWithConflictingLocalVars");
     expect(testCase.response.body).toBe(
@@ -1277,7 +1277,7 @@ describe("RenderTest", () => {
     expect(testCase.response.body).toBe("Hello: david");
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — Parameters not read as partial locals
+  // BLOCKED: render-test-controller-gaps-owner-rulings — Parameters not read as partial locals
   test.skip("partial with hashlike locals", async () => {
     await testCase.get("partialWithHashlikeLocals");
     expect(testCase.response.body).toBe("Hello: david");
@@ -1298,10 +1298,7 @@ describe("RenderTest", () => {
   test("partial with form builder and invalid model custom field error proc", async () => {
     const oldProc = Base.fieldErrorProc;
     Base.fieldErrorProc = function (html) {
-      // BLOCKED: render-test-controller-gaps-remaining
-      return (this.tag() as unknown as { div(...args: unknown[]): unknown }).div(html, {
-        class: "errors",
-      });
+      return this.tag().div(html, { class: "errors" });
     };
     try {
       await testCase.get("partialWithFormBuilderAndInvalidModel");
@@ -1454,7 +1451,7 @@ describe("RenderTest", () => {
     );
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — annotations not emitted on controller render
+  // BLOCKED: actionview-test-fixtures-under-test-fixtures — the fixture path has no `test/fixtures/` segment
   test.skip("template annotations", async () => {
     await withAnnotationsEnabled(() => testCase.get("greeting"));
     expect(testCase.response.body).toContain("<!-- BEGIN");
@@ -1469,16 +1466,11 @@ describe("RenderTest", () => {
     expect(stringSplit(testCase.response.body, "\n").length).toBe(1);
   });
 
-  // BLOCKED: render-test-controller-gaps-remaining — annotations not emitted on controller render
-  test.skip("line offset with annotations enabled", async () => {
-    let exc: unknown;
-    try {
-      await withAnnotationsEnabled(() => testCase.get("renderLineOffset"));
-    } catch (e) {
-      exc = e;
-    }
-    expect(exc).toBeInstanceOf(Template.Error);
-    const line = (exc as InstanceType<typeof Template.Error>).backtrace()![0];
+  test("line offset with annotations enabled", async () => {
+    const exc = await assertRaises([Template.Error], {}, () =>
+      withAnnotationsEnabled(() => testCase.get("renderLineOffset")),
+    );
+    const line = exc.backtrace()![0];
     const m = line.match(/:(\d+):/);
     assert(m);
     expect(m![1]).toBe("1");

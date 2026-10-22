@@ -1,4 +1,10 @@
-import { Notifications, pluralize, SafeBuffer, toSentence } from "@blazetrails/activesupport";
+import {
+  Notifications,
+  pluralize,
+  SafeBuffer,
+  toSentence,
+  TopLevel,
+} from "@blazetrails/activesupport";
 import {
   ArgumentError,
   Encoding,
@@ -213,7 +219,12 @@ export class Template {
   }
 
   get shortIdentifier(): string {
-    return (this._shortIdentifier ??= this.identifier);
+    if (this._shortIdentifier) return this._shortIdentifier;
+    if (!rbObjRespondTo(TopLevel.Trails, "root")) return (this._shortIdentifier = this.identifier);
+    const prefix = `${TopLevel.Trails!.root() ?? ""}/`;
+    return (this._shortIdentifier = this.identifier.startsWith(prefix)
+      ? this.identifier.slice(prefix.length)
+      : this.identifier);
   }
 
   supportsStreaming(): boolean {

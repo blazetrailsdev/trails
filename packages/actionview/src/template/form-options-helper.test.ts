@@ -1579,7 +1579,6 @@ describe("FormOptionsHelperTest", () => {
   it("select with index option", () => {
     view.album = new Album();
     view.album.id = 1;
-    view.album.toParam = () => String(view.album);
     const expected =
       '<select id="album__genre" name="album[][genre]"><option value="rap">rap</option>\n<option value="rock">rock</option>\n<option value="country">country</option></select>';
     assertDomEqual(

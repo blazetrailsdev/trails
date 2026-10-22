@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TopLevel } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { DetailsKey, LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
@@ -100,5 +101,44 @@ describe("Template#compiled_source resolves top-level constants", () => {
 
   it("still resolves JS globals past the TopLevel scope", async () => {
     expect(await renderTse("<%= Math.max(1, 2) %> <%= JSON.stringify([1]) %>")).toBe("2 [1]");
+  });
+});
+
+describe("Template#shortIdentifier under a defined Trails.root", () => {
+  const originalTrails = TopLevel.Trails;
+  const originalAnnotate = Base.annotateRenderedViewWithFilenames;
+
+  beforeEach(() => {
+    TopLevel.Trails = { root: () => "/srv/app" } as unknown as typeof TopLevel.Trails;
+  });
+
+  afterEach(() => {
+    TopLevel.Trails = originalTrails;
+    Base.annotateRenderedViewWithFilenames = originalAnnotate;
+  });
+
+  const newTemplate = () =>
+    new Template("<p>hi</p>", "/srv/app/app/views/posts/show.html.tse", new TSE(), {
+      locals: [],
+      format: ":html",
+    });
+
+  it("strips the root from inspect", () => {
+    expect(newTemplate().inspect()).toBe(
+      "#<ActionView::Template app/views/posts/show.html.tse locals=[]>",
+    );
+  });
+
+  it("annotates a render with the root-relative path", () => {
+    Base.annotateRenderedViewWithFilenames = true;
+    const template = newTemplate();
+    const code = new TSE().call(template, template.source);
+    expect(code).toContain("<!-- BEGIN app/views/posts/show.html.tse -->");
+    expect(code).not.toContain("/srv/app/");
+  });
+
+  it("answers the identifier when Trails is undefined", () => {
+    TopLevel.Trails = undefined;
+    expect(newTemplate().shortIdentifier).toBe("/srv/app/app/views/posts/show.html.tse");
   });
 });
