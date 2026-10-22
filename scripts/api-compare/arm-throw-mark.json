@@ -3,6 +3,10 @@
     "total": 0,
     "byFile": {}
   },
+  "actioncable": {
+    "total": 0,
+    "byFile": {}
+  },
   "actioncontroller": {
     "total": 0,
     "byFile": {}

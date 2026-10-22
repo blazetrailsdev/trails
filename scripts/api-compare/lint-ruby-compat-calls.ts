@@ -81,6 +81,7 @@ const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
 export const ENROLLED_PACKAGES: readonly string[] = [
   "abstractcontroller",
   "actioncontroller",
+  "actioncable",
   "actiondispatch",
   "actionpackversion",
   "actionview",

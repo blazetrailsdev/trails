@@ -33,6 +33,7 @@ describe("vendor/sources.ts", () => {
         "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
+        "actioncable",
         "actionpackversion",
         "actionview",
         "activejob",
@@ -367,6 +368,7 @@ describe("vendor/sources.ts", () => {
         "abstractcontroller",
         "actioncontroller",
         "actiondispatch",
+        "actioncable",
         "actionpackversion",
         "actionview",
         "activejob",
@@ -412,6 +414,7 @@ describe("vendor/sources.ts", () => {
       [
         "abstractcontroller",
         "actioncontroller",
+        "actioncable",
         "actiondispatch",
         "actionview",
         "activejob",

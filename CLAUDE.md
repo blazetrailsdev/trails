@@ -1307,6 +1307,68 @@ ratified here so no port re-derives them.
 A test that depends on one of these ports the assertions that do not, and parks
 the rest as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
 
+## Node's event loop stands in for Action Cable's nio4r selector (`StreamEventLoop`, `Stream#write`)
+
+`ActionCable::Connection::StreamEventLoop`
+(`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/stream_event_loop.rb`)
+owns an `NIO::Selector` and one thread running `run` (`:86-133`): it drains a
+todo queue, `select`s, reads up to 4096 bytes from each readable socket with
+`read_nonblock` and hands them to `stream.receive`, and calls
+`stream.flush_write_buffer` for each writable one. `spawn` (`:62-80`) starts
+that thread and `wakeup` (`:82-84`) interrupts the `select`. `Stream#write`
+(`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/stream.rb:37-70`)
+calls `write_nonblock` and keeps the unwritten tail in `@write_head` /
+`@write_buffer` for the loop to flush (`:72-92`).
+
+A Node `net.Socket` is already registered with the process's event loop. It
+emits `data` when readable and buffers every `write` in full, so there is never
+a partial write to carry, no selector to own, no loop thread to spawn and
+nothing to wake. **Node's event loop stands in for the nio4r selector and its
+thread.** As a consequence:
+
+- The private `spawn`, `run` and `wakeup` are not ported. They are a
+  `SCOPED_SKIP_GROUPS` entry in `scripts/parity/conventions.ts` citing this
+  section.
+- **`writes_pending` and `Stream#flush_write_buffer` join that skip group**
+  (RFC 0177 Open question 5). Their only callers are `Stream#write`'s
+  partial-write arms (`stream.rb:54,65`) and `run`
+  (`stream_event_loop.rb:105`), none of which exists here, so a body would be
+  an empty stub.
+- `attach` and `detach` keep their names and callers. `attach(io, stream)`
+  (`stream_event_loop.rb:30-36`) registers the socket's `data` / `end` /
+  `error` listeners, held in `@map` where Rails holds the NIO monitor, and they
+  call `stream.receive` and `stream.close` exactly where `run` does
+  (`:111-129`). `detach` (`:38-45`) removes them, deletes the map entry and
+  closes the socket.
+- `timer`, `post` and `stop` (`:19-28`, `:56-59`) are ordinary ports over
+  ruby-compat's `TimerTask` and `ThreadPoolExecutor`.
+- `Stream#write` calls the socket's `write` and keeps its `@stream_send` arm
+  and its `rescue EOFError, Errno::ECONNRESET`. Its `write_nonblock` result
+  arms, `@write_lock`, `@write_head` and `@write_buffer` have no counterpart.
+- `Connection::ClientSocket` drives the npm `websocket-driver`, built with
+  `Driver.http` from a request-shaped object read off the Rack env where Rails
+  calls `WebSocket::Driver.rack(self, …)`
+  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/client_socket.rb:49`);
+  the driver's `io` stream's `data` event calls `ClientSocket#write` (`:76`),
+  where the Ruby driver calls `socket.write`.
+- `Connection::WebSocket` is otherwise a plain port; its one covered call is
+  `::WebSocket::Driver.websocket?(env)`
+  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/web_socket.rb:14`),
+  which is `Driver.isWebSocket` on the same request-shaped object.
+
+The files this section covers, so a grep finds every citation:
+`packages/actioncable/src/connection/stream-event-loop.ts`,
+`connection/stream.ts`, `connection/client-socket.ts`, and
+`connection/web-socket.ts` for that one call.
+
+It does **not** cover `Server::Worker`, which ports line for line over
+ruby-compat's `ThreadPoolExecutor`, and it is not a receipt for dropping a
+`synchronize` anywhere else: § "The pool monitor guards only sections that span
+an `await`" still decides those.
+
+This is a genuine runtime difference, ratified repo-wide here. A socket story
+cites this section; it is not a new decision to argue.
+
 ## `$!` is passed explicitly, and a response body is iterated async (`BadRequest#initialize`, `Response#each`)
 
 Ruby sets `$!` for the length of a `rescue`, so a constructor called there can

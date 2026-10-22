@@ -689,6 +689,18 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "Node's event loop stands in for Action Cable's `NIO::Selector` and its " +
+      "thread (CLAUDE.md, \"Node's event loop stands in for Action Cable's nio4r " +
+      'selector"). `spawn`, `run` and `wakeup` own and interrupt the selector ' +
+      "thread (stream_event_loop.rb:62-133); `writes_pending` (:47-54) and " +
+      "`Stream#flush_write_buffer` (stream.rb:72-92) carry a partial " +
+      "`write_nonblock`, which a `net.Socket` never leaves.",
+    names: ["spawn", "run", "wakeup", "writes_pending", "flush_write_buffer"],
+    rubyFiles: ["connection/stream_event_loop.rb", "connection/stream.rb"],
+    packages: ["actioncable"],
+  },
+  {
+    reason:
       "`Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs " +
       "Thorfiles) is not ported, and these `Thor::Util` members exist only for it: " +
       "`namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside " +

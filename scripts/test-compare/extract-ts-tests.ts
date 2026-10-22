@@ -33,6 +33,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "msgpack",
     "marcel",
     "actionview",
+    "actioncable",
     "activejob",
     "trailties",
     "globalid",

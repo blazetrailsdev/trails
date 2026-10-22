@@ -157,6 +157,7 @@ export const TAGGED_ONLY_PACKAGES = [
  */
 export const ROWLESS_PACKAGES = [
   "abstractcontroller",
+  "actioncable",
   "actionpackversion",
   "activemodel",
   "activerecord",

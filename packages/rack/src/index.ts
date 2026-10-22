@@ -7,7 +7,12 @@ export type RackEnv = Record<string, unknown>;
 
 export type RackBody = AsyncIterable<string | Uint8Array> | Iterable<string | Uint8Array>;
 
-export type RackHeaders = Record<string, string | string[] | ((stream: HttpSocket) => unknown)>;
+export type RackHeaders =
+  | Record<string, string | string[]>
+  | ({ "rack.hijack": (stream: HttpSocket) => unknown } & Record<
+      string,
+      string | string[] | ((stream: HttpSocket) => unknown)
+    >);
 
 export type RackResponse = [number, RackHeaders, RackBody];
 
