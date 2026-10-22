@@ -152,6 +152,23 @@ describe("withRoutesHelpers", () => {
     expect(instance.urlOptions()).toEqual({ host: "example.com" });
   });
 
+  it("skips a nested module the class already includes without shadowing a lower one", () => {
+    const lower = { helper: () => "lower" };
+    const higher = { helper: () => "higher" };
+    const urlHelpers = new RouteSet().urlHelpers();
+    urlHelpers.include(lower);
+    urlHelpers.include(higher);
+
+    const parent = class {};
+    include(parent, higher);
+    const cls = class extends parent {};
+    RoutesHelpers.with({ urlHelpers: () => urlHelpers })(
+      cls as unknown as RoutesHelpersControllerClass,
+    );
+
+    expect((new cls() as unknown as { helper(): string }).helper()).toBe("lower");
+  });
+
   it("crosses a named route drawn after the first helper read", () => {
     const routes = new RouteSet();
     routes.draw(function () {
