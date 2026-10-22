@@ -28,6 +28,7 @@ import {
   SPLAT_YIELD_ONE,
   asyncEnumBody,
 } from "./mappings/core-methods.js";
+import { OP_SPELL, OPERATORS } from "./mappings/operators.js";
 import {
   GemIndex,
   fullAncestors,
@@ -287,18 +288,6 @@ export interface InlineHook {
 function symColonHere(ctx: Ctx): boolean {
   return !!ctx.f.symbolColon && (!!GEM.symbolColon || ctx.f.rubyFile.startsWith("test/"));
 }
-
-const RB_CORE_CLASSES: Record<string, string> = {
-  String: "rbCString",
-  Integer: "rbCInteger",
-  Float: "rbCFloat",
-  Numeric: "rbCNumeric",
-  Array: "rbCArray",
-  Symbol: "rbCSymbol",
-  NilClass: "rbCNilClass",
-  TrueClass: "rbCTrueClass",
-  FalseClass: "rbCFalseClass",
-};
 const FLAT_ASSERTION_MODULES = new Set([
   "ActiveSupport::Testing::Assertions",
   "Minitest::Assertions",
@@ -5373,10 +5362,9 @@ export class Lowerer {
   operator(n: N, r: string, ctx: Ctx): string {
     const name = n.name;
     const a = n.args.map((x: N) => this.argExpr(x, ctx));
-    const SPELL = OP_SPELL;
     const rt = this.typeOf(n.recv, ctx);
-    if (rt?.k === "class" && SPELL[name]) {
-      for (const c of SPELL[name]) {
+    if (rt?.k === "class" && OP_SPELL[name]) {
+      for (const c of OP_SPELL[name]) {
         const m = this.resolver.types.member(rt.key, c, !!rt.static);
         if (m && m.info.kind === "method") {
           this.stat(ctx, "typed-operator");
@@ -5392,204 +5380,20 @@ export class Lowerer {
     if (rt?.k === "array" && name === "<<") return `${needsParens(r) ? `(${r})` : r}.push(${a[0]})`;
     const ok = this.optionKey(n, rt, ctx);
     if (ok && name === "[]") return `${needsParens(r) ? `(${r})` : r}.${ok}`;
-    const rc = (x: string) => this.rc(ctx, x);
     const lhs = needsParens(r) ? `(${r})` : r;
-    switch (name) {
-      case "==":
-        // `argument.class == String`: Ruby's class of the value (`rbObjClass`)
-        // against ruby-compat's core class (`rbCString`).
-        if (
-          n.recv?.k === "call" &&
-          n.recv.name === "class" &&
-          n.recv.args.length === 0 &&
-          n.recv.recv &&
-          n.args[0]?.k === "const" &&
-          RB_CORE_CLASSES[n.args[0].path.filter((x: string) => x).join("::")]
-        )
-          return `${rc("rbObjClass")}(${this.expr(n.recv.recv, ctx)}) === ${rc(RB_CORE_CLASSES[n.args[0].path.filter((x: string) => x).join("::")])}`;
-        if (this.primEq(n, rt, ctx)) return `${lhs} === ${a[0]}`;
-        return `${rc("rbEqual")}(${r}, ${a[0]})`;
-      case "!=":
-        if (this.primEq(n, rt, ctx)) return `${lhs} !== ${a[0]}`;
-        return `!${rc("rbEqual")}(${r}, ${a[0]})`;
-      case "!":
-        return `!${this.truthy(r, true)}`;
-      case "===":
-        if (n.recv.k === "const") {
-          const t = this.typeTest(n.recv, needsParens(a[0]) ? `(${a[0]})` : a[0], ctx);
-          if (t) return `(${t})`;
-        }
-        return `${rc("rbEqq")}(${r}, ${a[0]})`;
-      case "=~":
-        // Ruby `=~` sets the backref ($~, $1…) — ruby-compat's matchOperator /
-        // rbStrMatch do; `regex =~ str` is the same search with the string first.
-        if (n.recv.k === "regex" || n.recv.k === "dregex")
-          return `${rc("rbStrMatch")}(${a[0]}, ${r})`;
-        return `${rc("matchOperator")}(${r}, ${a[0]})`;
-      case "!~":
-        return `!${rc("rbMatch")}(${r}, ${a[0]})`;
-      case "<=>":
-        return `${rc("cmp")}(${r}, ${a[0]})`;
-      case "[]":
-        // A gem class defining `[]` (mini_magick image/info.rb `Info#[]`) answers it.
-        if (
-          (!n.recv || n.recv.k === "self") &&
-          this.resolver.member(n, n.recv, ctx, this)?.kind === "method"
-        )
-          return `${r}.${this.callName("[]")}(${a.join(", ")})`;
-        // `IsolatedExecutionState[k]` is its `get(k)` (activesupport, the hand
-        // port's `explain-registry.ts` idiom): the object has no index signature.
-        if (isIsolatedExecutionState(n.recv) && a.length === 1) return `${r}.get(${a[0]})`;
-        // `ENV[k]` is activesupport `getEnv(k)`, the hand port's idiom.
-        if (n.recv?.k === "const" && n.recv.path.filter((x: string) => x).join("::") === "ENV")
-          return `${this.as(ctx, "getEnv")}(${a[0]})`;
-        // `ActiveSupport::TimeZone[name]` (time_zone.rb `self.[]`) is `TimeZone.find`.
-        if (
-          n.recv?.k === "const" &&
-          /^(ActiveSupport::)?TimeZone$/.test(n.recv.path.filter((x: string) => x).join("::")) &&
-          !this.index.resolveConst(n.recv.path, ctx.nesting)
-        )
-          return `${r}.find(${a[0]})`;
-        // `Dir[pattern]` (dir.c dir_s_aref): one pattern is `Dir.glob(pattern)`.
-        if (
-          n.recv?.k === "const" &&
-          n.recv.path.filter((x: string) => x).join("::") === "Dir" &&
-          a.length === 1
-        )
-          return `${r}.glob(${a[0]})`;
-        if (a.length === 1 && this.mayBeMap(n.recv, ctx)) return `${rc("hashAref")}(${r}, ${a[0]})`;
-        // A Range index is a slice, which JS `[]` cannot express.
-        if (a.length === 1 && !a[0].startsWith("...") && n.args[0]?.k !== "range")
-          return `${lhs}[${a[0]}]`;
-        {
-          // `str[1..-1]` / `ary[0, 2]`: `String#[]` (string.c rb_str_aref_m) through
-          // the String method table's `get`, or `Array#[]` (array.c rb_ary_aref).
-          const t = this.typeOf(n.recv, ctx);
-          // `s[0..0]` / `s[1..-1]`: a String slice by a literal Range from a
-          // non-negative start is `slice` (string.c rb_str_aref_m), nil only where
-          // the start is past the end.
-          const native = this.nativeStrSlice(n.args[0], a.length);
-          const str = (x: string) =>
-            native ? native(x) : `${rc("rbStrSend")}(${x}, "get", ${a.join(", ")})[0]`;
-          const ary = (x: string) => `${rc("arySlice")}(${x}, ${a.join(", ")})`;
-          if (t?.k === "prim" && t.name === "string") return str(r);
-          if (t?.k === "array") return ary(r);
-          if (!a.some((x) => x.startsWith("...")))
-            return this.withOnce(
-              r,
-              (x) => `(typeof ${x} === "string" ? ${str(x)} : ${ary(`${x} as unknown[]`)})`,
-            );
-        }
-        return `${rc("rbAref")}(${r}, ${a.join(", ")})`;
-      case "<<":
-        if (n.recv.k === "str" || n.recv.k === "dstr") return `(${r} + ${a[0]})`;
-        // A gem class defining `<<` (mini_magick tool.rb:135 `Tool#<<`) answers it.
-        if (this.resolver.member(n, n.recv, ctx, this)?.kind === "method")
-          return `${needsParens(r) ? `(${r})` : r}.${this.callName("<<")}(${a[0]})`;
-        // A JS string cannot be appended to in place (CLAUDE.md "Ruby Strings are JS
-        // string primitives"): a local is reassigned the result, which for an
-        // Array is the same receiver.
-        {
-          // Array#<< / Set#<< / String#<< (array.c rb_ary_push, set.rb add,
-          // string.c rb_str_concat) append in place and answer the receiver; any
-          // other receiver answers its own `<<` (trails spells it `append`).
-          const t = this.typeOf(n.recv, ctx);
-          const b = needsParens(a[0]) ? `(${a[0]})` : a[0];
-          const app = (x: string) =>
-            t?.k === "array"
-              ? `(${x}.push(${b}), ${x})`
-              : t?.k === "prim" && t.name === "string"
-                ? `${x} + ${b}`
-                : `(typeof ${x} === "string" ? ${x} + ${b} : Array.isArray(${x}) ? (${x}.push(${b}), ${x}) : ${x} instanceof globalThis.Set ? ${x}.add(${b}) : ${x}.append(${b}))`;
-          // A local known to hold a String is reassigned the result; one of
-          // unknown type (a yielded `Tool`) is not, as nothing would read it.
-          if (n.recv.k === "lvar" && t?.k === "prim" && t.name === "string")
-            return `(${r} = ${app(r)})`;
-          // An ivar holding a String (builder xmlmarkup.rb's `@target << text`) is
-          // written back in the String arm only: another receiver's `<<` answers
-          // what it likes, which must not replace the ivar.
-          if (n.recv.k === "ivar") {
-            if (t?.k === "prim" && t.name === "string") return `(${r} = ${r} + ${b})`;
-            if (!t)
-              return `(typeof ${r} === "string" ? (${r} = ${r} + ${b}) : Array.isArray(${r}) ? (${r}.push(${b}), ${r}) : ${r} instanceof globalThis.Set ? ${r}.add(${b}) : ${r}.append(${b}))`;
-          }
-          return this.withOnce(r, app);
-        }
-      case "+":
-      case "-":
-      case "*":
-      case "/":
-      case "%":
-      case "<":
-      case ">":
-      case "<=":
-      case ">=":
-      case "&":
-      case "|":
-      case "^":
-      case "**":
-        {
-          const lt0 = this.typeOf(n.recv, ctx);
-          // `String#%` is `format(self, *arg)` (string.c `rb_str_format_m`):
-          // an Array argument is splatted, anything else (nil included) is the
-          // one argument, which `[arg].flat(1)` gives with one evaluation.
-          if (name === "%" && lt0?.k === "prim" && lt0.name === "string") {
-            const argv = n.args[0]?.k === "array" ? `...${a[0]}` : `...[${a[0]}].flat(1)`;
-            return `${this.rc(ctx, "format")}(${lhs}, ${argv})`;
-          }
-          if (lt0?.k === "prim" && (lt0.name === "number" || lt0.name === "string"))
-            return `(${lhs} ${name} ${needsParens(a[0]) ? `(${a[0]})` : a[0]})`;
-          // A class the hand port types answers the operator itself, under its
-          // trails spelling (`TimeWithZone#+` is `plus`).
-          if (lt0?.k === "class") {
-            const m = this.resolver.types.member(lt0.key, name, !!lt0.static);
-            if (m?.info.kind === "method") {
-              const call = `${lhs}.${m.tsName}(${a[0]})`;
-              if (!m.info.async) return call;
-              if (ctx.asyncBox) ctx.asyncBox.awaits = true;
-              return `(await ${call})`;
-            }
-          }
-          if (lt0?.k === "array" && name === "+") {
-            const rt0 = this.typeOf(n.args[0], ctx);
-            if (rt0?.k === "array")
-              return `[...${lhs}, ...${needsParens(a[0]) ? `(${a[0]})` : a[0]}]`;
-          }
-        }
-        if (
-          n.recv.k === "array" ||
-          (["+", "-", "|", "&", "*"].includes(name) && this.mayBeArray(n.recv)) ||
-          // An untyped comparison may be between Ruby Times (activejob).
-          (GEM.gem === "activejob" &&
-            ["<", ">", "<=", ">="].includes(name) &&
-            this.mayBeArray(n.recv) &&
-            this.typeOf(n.recv, ctx)?.k !== "prim")
-        )
-          return `${rc("rbBinop")}(${r}, ${JSON.stringify(name)}, ${a[0]})`;
-        return `(${lhs} ${name} ${needsParens(a[0]) ? `(${a[0]})` : a[0]})`;
-      case "<<<":
-        break;
-      case ">>":
-        return `${rc("rbRshift")}(${r}, ${a[0]})`;
-      case "-@": {
-        // `-str` is String#-@ (string.c str_uminus): the deduplicated frozen string,
-        // which a JS string already is.
-        const rn = n.recv;
-        const t = this.typeOf(rn, ctx);
-        if (
-          (t?.k === "prim" && t.name === "string") ||
-          rn?.k === "str" ||
-          rn?.k === "dstr" ||
-          (rn?.k === "call" && ["join", "to_s", "inspect", "dup", "freeze"].includes(rn.name))
-        )
-          return r;
-        return `-${lhs}`;
-      }
-      case "+@":
-        return r;
-      case "~":
-        return `~${lhs}`;
-    }
+    const rule = OPERATORS[name];
+    const out = rule?.({
+      lw: this,
+      ctx,
+      n,
+      name,
+      r,
+      lhs,
+      a,
+      rt,
+      rc: (x: string) => this.rc(ctx, x),
+    });
+    if (out != null) return out;
     return `${lhs}.${tsMethodName(name)}(${a.join(", ")})`;
   }
 
@@ -6094,18 +5898,6 @@ const TIME_HELPERS = new Set([
   "unfreeze_time",
 ]);
 
-/** Operator → the named member spellings a typed receiver may define. */
-const OP_SPELL: Record<string, string[]> = {
-  "[]": ["get", "at", "fetch"],
-  "[]=": ["set", "store"],
-  "==": ["equals", "eq"],
-  "<<": ["append", "push", "add"],
-  "+": ["plus", "add"],
-  "-": ["minus", "subtract"],
-  "<=>": ["compareTo", "compare", "cmp"],
-  "===": ["caseEq"],
-};
-
 /** ruby-compat's STRING_METHOD_TABLE keys (scripts/codegen/data/string-method-table.json). */
 const STRING_TABLE = new Set<string>(
   JSON.parse(
@@ -6154,7 +5946,7 @@ function callbackFilterSymbols(n: N): N {
 }
 
 /** A constant reference to `ActiveSupport::IsolatedExecutionState`. */
-function isIsolatedExecutionState(n: N | null | undefined): boolean {
+export function isIsolatedExecutionState(n: N | null | undefined): boolean {
   if (n?.k !== "const") return false;
   const path = (n.path as string[]).filter((x) => x);
   return path[path.length - 1] === "IsolatedExecutionState";
