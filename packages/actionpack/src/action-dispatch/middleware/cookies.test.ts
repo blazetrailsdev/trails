@@ -258,8 +258,11 @@ describe("SerializedCookieJars", () => {
   it("serializer honors a caller-supplied custom serializer object", () => {
     const custom: CookieSerializer = {
       dump: (v) => `!${String(v)}!`,
-      load: (s) => s.slice(1, -1),
-      dumped: (s) => s.startsWith("!") && s.endsWith("!"),
+      load: (s) => (typeof s === "string" ? s : new TextDecoder().decode(s)).slice(1, -1),
+      dumped: (s) => {
+        const text = typeof s === "string" ? s : new TextDecoder().decode(s);
+        return text.startsWith("!") && text.endsWith("!");
+      },
     };
     const host = serializedHost({ "action_dispatch.cookies_serializer": custom });
     expect(serializer.call(host)).toBe(custom);
@@ -305,8 +308,11 @@ describe("SignedKeyRotatingCookieJar serialized API", () => {
   it("honors a custom serializer from request env for round-trip", () => {
     const custom: CookieSerializer = {
       dump: (v) => `!${String(v)}!`,
-      load: (s) => s.slice(1, -1),
-      dumped: (s) => s.startsWith("!") && s.endsWith("!"),
+      load: (s) => (typeof s === "string" ? s : new TextDecoder().decode(s)).slice(1, -1),
+      dumped: (s) => {
+        const text = typeof s === "string" ? s : new TextDecoder().decode(s);
+        return text.startsWith("!") && text.endsWith("!");
+      },
     };
     const jar = CookieJar.build(
       cookieRequest({ "action_dispatch.cookies_serializer": custom }),
@@ -340,8 +346,11 @@ describe("EncryptedKeyRotatingCookieJar serialized API", () => {
   it("honors a custom serializer from request env for round-trip", () => {
     const custom: CookieSerializer = {
       dump: (v) => `!${String(v)}!`,
-      load: (s) => s.slice(1, -1),
-      dumped: (s) => s.startsWith("!") && s.endsWith("!"),
+      load: (s) => (typeof s === "string" ? s : new TextDecoder().decode(s)).slice(1, -1),
+      dumped: (s) => {
+        const text = typeof s === "string" ? s : new TextDecoder().decode(s);
+        return text.startsWith("!") && text.endsWith("!");
+      },
     };
     const jar = CookieJar.build(
       cookieRequest({ "action_dispatch.cookies_serializer": custom }),

@@ -1,5 +1,10 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { include, Module, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import {
+  include,
+  isPlainHash,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 import { TestCase } from "../test-case.js";
 import { ClassMethods, ConstantLookup } from "./constant-lookup.js";
 
@@ -8,7 +13,7 @@ class Bar extends Foo {
   index(): void {}
   static index(): void {}
 }
-const FooBar = new Module();
+const FooBar = {};
 
 registerConstant("Foo", Foo);
 registerConstant("Bar", Bar);
@@ -27,7 +32,7 @@ class ConstantLookupTest extends TestCase {
   findModule(name: string): unknown {
     return (this.constructor as typeof ConstantLookupTest).determineConstantFromTestName(
       name,
-      (constant) => constant instanceof Module,
+      (constant) => isPlainHash(constant),
     );
   }
 }

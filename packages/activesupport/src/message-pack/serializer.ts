@@ -1,4 +1,11 @@
-import { RuntimeError, env as ENV, fetch, rbObjFrozenP, toI } from "@blazetrails/ruby-compat";
+import {
+  RuntimeError,
+  env as ENV,
+  fetch,
+  rbObjFrozenP,
+  rbStrGetbyte,
+  toI,
+} from "@blazetrails/ruby-compat";
 import { rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { Factory, type Pool } from "@blazetrails/msgpack";
 import { delegate } from "../module-ext.js";
@@ -10,7 +17,7 @@ export const SIGNATURE_INT = 128;
 export interface Serializer {
   dump(object: unknown): Uint8Array;
   load(dumped: Uint8Array | string): unknown;
-  isSignature(dumped: Uint8Array): boolean;
+  isSignature(dumped: Uint8Array | string): boolean;
   messagePackFactory: Factory;
   registerType(...args: Parameters<Factory["registerType"]>): void;
   warmup(): void;
@@ -41,8 +48,8 @@ export const Serializer = {
     });
   },
 
-  isSignature(dumped: Uint8Array): boolean {
-    return dumped[0] === SIGNATURE[0] && dumped[1] === SIGNATURE[1];
+  isSignature(dumped: Uint8Array | string): boolean {
+    return rbStrGetbyte(dumped, 0) === SIGNATURE[0] && rbStrGetbyte(dumped, 1) === SIGNATURE[1];
   },
 
   get messagePackFactory(): Factory {

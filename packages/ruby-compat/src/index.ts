@@ -223,6 +223,7 @@ export { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter
 export type { Bytes, FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs-adapter.js";
 export {
   Module,
+  rbCModule,
   rbModConstDefined,
   rbModConstSet,
   defineModule,
@@ -324,6 +325,7 @@ export {
   registerProcessAdapter,
   setEnv,
   setExitCode,
+  setSourceMapsSupport,
   stderr,
   stdin,
   setRubyTzUptodate,
@@ -396,7 +398,7 @@ export type { PrettyPrintOutput } from "./pretty-print.js";
 export { PP } from "./pp.js";
 export { b } from "./string/b.js";
 export { bytes, strNew } from "./string/bytes.js";
-export { byteslice, rbStrGetbyte, rbStrSetbyte } from "./string/byte-methods.js";
+export { byteslice, rbStrByteslice, rbStrGetbyte, rbStrSetbyte } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
 export { capitalize, casecmp } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
@@ -404,7 +406,7 @@ export { rbStrEnumerateLines } from "./string/each.js";
 export { rbStrDump, rbStrHex, rbStrToF, rbStrToI } from "./string/convert.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
-export { strCount } from "./string/tr.js";
+export { strCount, trTrans } from "./string/tr.js";
 export {
   center,
   deleteSuffix,
@@ -414,6 +416,8 @@ export {
   rbObjNotMatch,
   rbStrMatch,
   rbStrRespondTo,
+  rbStrInclude,
+  rbStrPlus,
   rbStrSend,
   rstrip,
   strip,
@@ -426,7 +430,13 @@ export { Struct, isStruct, rbStructInitialize, rstructGet, type StructInstance }
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
-export { rbStrPartition, rbStrRpartition, rbStrScanSubexpCall, rbStrSub } from "./string/sub.js";
+export {
+  rbStrPartition,
+  rbStrRpartition,
+  rbStrScanSubexpCall,
+  rbStrStartWith,
+  rbStrSub,
+} from "./string/sub.js";
 export { rbCheckStringType, stringValue, strlen, strUminus } from "./string/support.js";
 export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-encoding.js";
 export { encode } from "./string/encode.js";
@@ -460,7 +470,13 @@ export {
 } from "./backtrace-location.js";
 export { ThreadError } from "./thread-error.js";
 export { Timeout } from "./timeout.js";
-export { CachedThreadPool, ThreadPoolExecutor } from "./thread-pool-executor.js";
+export {
+  CachedThreadPool,
+  globalIoExecutor,
+  RejectedExecutionError,
+  ThreadPoolExecutor,
+} from "./thread-pool-executor.js";
+export { BasicSocket, TCPSocket } from "./socket.js";
 export { ImmediateExecutor } from "./immediate-executor.js";
 export { ScheduledTask } from "./scheduled-task.js";
 export { Concurrent } from "./concurrent/map.js";
@@ -469,6 +485,8 @@ import "./concurrent/cyclic-barrier.js";
 import "./concurrent/event.js";
 import "./concurrent/atomic-boolean.js";
 import "./concurrent/read-write-lock.js";
+export { AtomicFixnum } from "./concurrent/atomic-fixnum.js";
+export { TimerTask } from "./concurrent/timer-task.js";
 export type { MonitorMixin } from "./monitor.js";
 
 export { Tempfile } from "./tempfile.js";

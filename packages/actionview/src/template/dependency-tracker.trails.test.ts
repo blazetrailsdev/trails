@@ -5,19 +5,19 @@ import { TSETracker } from "../dependency-tracker/tse-tracker.js";
 import { PathSet } from "../path-set.js";
 import { Template } from "../template.js";
 import { TemplateHandlers } from "../template/handlers.js";
-import { Tse } from "../template/handlers/tse.js";
+import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 
 describe("TSETracker reads Template#source", () => {
   afterEach(() => TemplateHandlers.clear());
 
   it("returns the same dependencies after the template has been compiled", () => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
 
     const template = new Template(
       `<%= render("comments/comment") %>`,
       "messages/_message",
-      new Tse(),
+      new TSE(),
       {
         locals: [],
         format: ":html",

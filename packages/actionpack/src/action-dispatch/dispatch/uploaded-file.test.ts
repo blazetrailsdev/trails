@@ -1,4 +1,4 @@
-import { rbObjEncoding, StringIO, Tempfile } from "@blazetrails/ruby-compat";
+import { b, rbObjEncoding, StringIO, Tempfile } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { UploadedFile } from "../http/upload.js";
@@ -105,8 +105,8 @@ describe("UploadedFileTest", () => {
     tf.write("thunderhorse");
     tf.rewind();
     const uf = new UploadedFile({ tempfile: tf });
-    expect(uf.read(7)).toBe("thunder");
-    expect(uf.read(5, new Uint8Array(5))).toBe("horse");
+    expect(uf.read(7)).toEqual(b("thunder"));
+    expect(uf.read(5, new Uint8Array(5))).toEqual(b("horse"));
   });
 
   it("delegate eof to tempfile", () => {

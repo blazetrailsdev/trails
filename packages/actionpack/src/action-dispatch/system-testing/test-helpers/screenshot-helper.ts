@@ -172,7 +172,8 @@ export function displayImage(
 }
 
 /** @internal */
-export function inlineBase64(path: string, enc: Encoding = Encoding.UTF_8): string {
+export function inlineBase64(path: string | Uint8Array, enc: Encoding = Encoding.UTF_8): string {
+  if (path instanceof Uint8Array) return Buffer.from(path).toString("base64");
   return Buffer.from(path, enc === Encoding.BINARY ? "latin1" : "utf-8").toString("base64");
 }
 

@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import {
   File,
   rbFSend,
@@ -412,7 +413,7 @@ export class ShowExceptions {
     return !this.acceptsHtml(env);
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     try {
       return await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     } catch (e: any) {
@@ -458,7 +459,7 @@ export class ShowExceptions {
     const frames = this.backtrace(exception)
       .map((line) => {
         const frame = new Frame();
-        const m = /(.*?):(\d+)(:in `(.*)')?/.exec(line);
+        const m = /([^\n]*?):(\d+)(:in `([^\n]*)')?/.exec(line);
         if (m) {
           frame.setFilename(m[1]);
           frame.setLineno(parseInt(m[2], 10));

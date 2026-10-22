@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
@@ -10,7 +11,7 @@ export class Config {
     this.block = block;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     this.block(env);
     return rbFSend(this.app, "call", env) as ReturnType<typeof this.app>;
   }

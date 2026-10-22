@@ -40,8 +40,8 @@ export class UploadedFile {
   }
 
   read(): string;
-  read(length: number | null, buffer?: Uint8Array | null): string | null;
-  read(length: number | null = null, buffer: Uint8Array | null = null): string | null {
+  read(length: number | null, buffer?: Uint8Array | null): string | Uint8Array | null;
+  read(length: number | null = null, buffer: Uint8Array | null = null): string | Uint8Array | null {
     return this.tempfile.read(length, buffer);
   }
 

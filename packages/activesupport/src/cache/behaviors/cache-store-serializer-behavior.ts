@@ -1,3 +1,4 @@
+import { b } from "@blazetrails/ruby-compat";
 import { afterEach, expect, it } from "vitest";
 import "../../message-pack.js";
 import * as Cache from "../../cache.js";
@@ -40,7 +41,7 @@ export function cacheStoreSerializerBehavior(host: CacheStoreSerializerBehaviorH
     const key = `key${Math.random()}`;
 
     await cache.write(key, 123);
-    expect(await cache.read(key)).toBe("Number");
+    expect(await cache.read(key)).toEqual(b("Number"));
   });
 
   it("serializer can be :message_pack", async () => {

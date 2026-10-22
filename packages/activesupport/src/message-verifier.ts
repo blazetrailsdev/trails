@@ -109,10 +109,7 @@ export class MessageVerifier extends Codec {
   }
 
   readMessage(message: string, options: VerifyOptions = {}): unknown {
-    return this.deserializeWithMetadata(
-      this.decode(this.extractEncoded(message)).toString("latin1"),
-      options,
-    );
+    return this.deserializeWithMetadata(this.decode(this.extractEncoded(message)), options);
   }
 
   private signEncoded(encoded: string): string {

@@ -9,8 +9,9 @@ import {
   SecureRandom,
   StandardError,
   b,
-  forceEncoding,
   rbObjAsString,
+  byteslice,
+  rbStrPlus,
   pack,
   sliceBang,
   strlen,
@@ -32,8 +33,8 @@ export class Encryptor {
   static readonly InvalidMessage = class InvalidMessage extends Encryptor.Error {};
 
   private options: Required<EncryptorOptions>;
-  private hmacSecret: string;
-  private cipherSecret: string;
+  private hmacSecret: Uint8Array;
+  private cipherSecret: Uint8Array;
   private _serializer?: typeof JSON | typeof Marshal;
 
   constructor(secret: unknown, opts: EncryptorOptions = {}) {
@@ -62,26 +63,26 @@ export class Encryptor {
     this.options = Object.assign({ serializeJson: false, padSize: 32, purpose: null }, opts);
 
     this.hmacSecret = b(secret);
-    [this.cipherSecret, this.hmacSecret] = sliceBang(this.hmacSecret, 0, 32) as [string, string];
-
-    Object.freeze(this.hmacSecret);
-    Object.freeze(this.cipherSecret);
+    [this.cipherSecret, this.hmacSecret] = sliceBang(this.hmacSecret, 0, 32) as [
+      Uint8Array,
+      Uint8Array,
+    ];
   }
 
   decrypt(base64Data: string): unknown {
     try {
-      let data = Base64.urlsafeDecode64(base64Data);
+      let data: Uint8Array = Buffer.from(Base64.urlsafeDecode64(base64Data), "latin1");
 
-      let signature: string | null = null;
+      let signature: Uint8Array | null = null;
       [signature, data] = sliceBang(data, new Range(-32, -1));
 
       this.verifyAuthenticityBang(data, signature);
 
-      let _version: string | null = null;
+      let _version: Uint8Array | null = null;
       [_version, data] = sliceBang(data, 0, 1);
-      let messageSecret: string | null = null;
+      let messageSecret: Uint8Array | null = null;
       [messageSecret, data] = sliceBang(data, 0, 32);
-      let cipherIv: string | null = null;
+      let cipherIv: Uint8Array | null = null;
       [cipherIv, data] = sliceBang(data, 0, 16);
 
       const cipher = this.newCipher();
@@ -89,10 +90,8 @@ export class Encryptor {
 
       this.setCipherKey(cipher, this.cipherSecretFromMessageSecret(messageSecret!));
 
-      cipher.iv = Buffer.from(cipherIv!, "latin1");
-      data =
-        cipher.update(Buffer.from(data, "latin1")).toString("latin1") +
-        cipher.final().toString("latin1");
+      cipher.iv = cipherIv!;
+      data = rbStrPlus(cipher.update(data), cipher.final()) as Uint8Array;
 
       return this.deserializedMessage(data);
     } catch (e) {
@@ -112,18 +111,16 @@ export class Encryptor {
 
     this.setCipherKey(cipher, cipherSecret);
 
-    const cipherIv = cipher.randomIv().toString("latin1");
+    const cipherIv = cipher.randomIv();
 
-    const encryptedData =
-      cipher.update(Buffer.from(serializedPayload, "latin1")).toString("latin1") +
-      cipher.final().toString("latin1");
+    const encryptedData = rbStrPlus(cipher.update(serializedPayload), cipher.final());
 
-    let data = "";
-    data += version;
-    data += messageSecret;
-    data += cipherIv;
-    data += encryptedData;
-    data += this.computeSignature(data);
+    let data: string | Uint8Array = new Uint8Array(0);
+    data = rbStrPlus(data, version);
+    data = rbStrPlus(data as Uint8Array, messageSecret);
+    data = rbStrPlus(data as Uint8Array, cipherIv);
+    data = rbStrPlus(data as Uint8Array, encryptedData);
+    data = rbStrPlus(data as Uint8Array, this.computeSignature(data as Uint8Array));
 
     return Base64.urlsafeEncode64(data);
   }
@@ -134,24 +131,20 @@ export class Encryptor {
   }
 
   /** @internal */
-  private newMessageAndCipherSecret(): [string, string] {
-    const messageSecret = SecureRandom.randomBytes(32).toString("latin1");
+  private newMessageAndCipherSecret(): [Uint8Array, Uint8Array] {
+    const messageSecret = SecureRandom.randomBytes(32);
 
     return [messageSecret, this.cipherSecretFromMessageSecret(messageSecret)];
   }
 
   /** @internal */
-  private cipherSecretFromMessageSecret(messageSecret: string): string {
-    return OpenSSL.HMAC.digest(
-      OpenSSL.Digest.SHA256.new(),
-      Buffer.from(this.cipherSecret, "latin1"),
-      Buffer.from(messageSecret, "latin1"),
-    ).toString("latin1");
+  private cipherSecretFromMessageSecret(messageSecret: Uint8Array): Uint8Array {
+    return OpenSSL.HMAC.digest(OpenSSL.Digest.SHA256.new(), this.cipherSecret, messageSecret);
   }
 
   /** @internal */
-  private setCipherKey(cipher: Cipher, key: string): void {
-    cipher.key = Buffer.from(key, "latin1");
+  private setCipherKey(cipher: Cipher, key: Uint8Array): void {
+    cipher.key = key;
   }
 
   /** @internal */
@@ -160,21 +153,17 @@ export class Encryptor {
   }
 
   /** @internal */
-  private computeSignature(data: string): string {
-    let signingData = data;
+  private computeSignature(data: Uint8Array): Uint8Array {
+    let signingData: string | Uint8Array = data;
     if (this.options.purpose != null && this.options.purpose !== false) {
-      signingData += b(this.options.purpose);
+      signingData = rbStrPlus(signingData, this.options.purpose);
     }
 
-    return OpenSSL.HMAC.digest(
-      OpenSSL.Digest.SHA256.new(),
-      Buffer.from(this.hmacSecret, "latin1"),
-      Buffer.from(signingData, "latin1"),
-    ).toString("latin1");
+    return OpenSSL.HMAC.digest(OpenSSL.Digest.SHA256.new(), this.hmacSecret, signingData);
   }
 
   /** @internal */
-  private verifyAuthenticityBang(data: string | null, signature: string | null): void {
+  private verifyAuthenticityBang(data: Uint8Array | null, signature: Uint8Array | null): void {
     if (data == null || signature == null) throw new Encryptor.InvalidMessage("Message is invalid");
 
     if (!Utils.secureCompare(signature, this.computeSignature(data))) {
@@ -183,28 +172,30 @@ export class Encryptor {
   }
 
   /** @internal */
-  private serializePayload(message: unknown): string {
-    const serializedData = this.serializer.dump(message);
+  private serializePayload(message: unknown): Uint8Array {
+    const dumped = this.serializer.dump(message);
+    const serializedData = this.serializer === JSON ? b(dumped as string) : dumped;
 
     if (this.options.padSize == null)
-      return `${pack([0], "v")}${this.serializer === JSON ? b(serializedData) : serializedData}`;
+      return rbStrPlus(pack([0], "v"), serializedData) as Uint8Array;
 
     const padSize = this.options.padSize as number;
-    const paddingBytes = padSize - ((2 + strlen(serializedData)) % padSize);
-    const paddingData = SecureRandom.randomBytes(paddingBytes).toString("latin1");
+    const size =
+      typeof serializedData === "string" ? strlen(serializedData) : serializedData.length;
+    const paddingBytes = padSize - ((2 + size) % padSize);
+    const paddingData = SecureRandom.randomBytes(paddingBytes);
 
-    return `${pack([paddingBytes], "v")}${paddingData}${this.serializer === JSON ? b(serializedData) : serializedData}`;
+    return rbStrPlus(
+      rbStrPlus(pack([paddingBytes], "v"), paddingData) as Uint8Array,
+      serializedData,
+    ) as Uint8Array;
   }
 
   /** @internal */
-  private deserializedMessage(data: string): unknown {
+  private deserializedMessage(data: Uint8Array): unknown {
     const [paddingBytes] = unpack(data, "v") as number[];
 
-    const start = 2 + paddingBytes;
-    let serializedData = start > data.length ? null : data.slice(start, start + data.length);
-    if (this.serializer === JSON && serializedData != null) {
-      serializedData = forceEncoding(serializedData, "UTF-8");
-    }
-    return this.serializer.load(serializedData as string);
+    const serializedData = byteslice(data, 2 + paddingBytes, data.length);
+    return this.serializer.load(serializedData!);
   }
 }

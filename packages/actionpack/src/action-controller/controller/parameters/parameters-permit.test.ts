@@ -266,9 +266,9 @@ describe("ParametersPermitTest", () => {
   });
 
   it("fetch raises ParameterMissing exception", async () => {
-    const e = (await assertRaises([ParameterMissing], {}, () => {
+    const e = await assertRaises([ParameterMissing], {}, () => {
       params.fetch("foo");
-    })) as ParameterMissing;
+    });
     assertEqual("foo", e.param);
   });
 
@@ -334,12 +334,12 @@ describe("ParametersPermitTest", () => {
 
   it("KeyError in fetch block should not be covered up", async () => {
     const params = new Parameters();
-    const e = (await assertRaises([KeyError], {}, () => {
+    const e = await assertRaises([KeyError], {}, () => {
       params.fetch(
         "missing_key",
         block(() => fetch({}, "also_missing")),
       );
-    })) as KeyError;
+    });
     assertMatch(/"also_missing"$/, e.message);
   });
 

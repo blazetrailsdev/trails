@@ -1,4 +1,5 @@
 import {
+  b,
   byteslice,
   fetch,
   Hash,
@@ -6,6 +7,8 @@ import {
   rbInspect,
   rbModToS,
   rbObjClass,
+  rbStrPlus,
+  rbStrStartWith,
 } from "@blazetrails/ruby-compat";
 
 import { extend, include, rbModConstSet } from "@blazetrails/ruby-compat/include";
@@ -22,19 +25,14 @@ import { ActiveSupport } from "../namespaces.js";
  * to an IO port (`marshal.c:1246`) —
  * so a serialized cache payload is BYTES: what `File.atomic_write` writes and
  * `File.binread` reads back at `file_store.rb:124,127`. trails' Marshal stand-in
- * answers JSON text, so its bytes are taken here — one character per byte —
+ * answers JSON text, so its bytes are taken here, an ASCII-8BIT `Uint8Array`,
  * rather than leaving the payload a decoded String the byte-exact pair cannot
  * round-trip.
  *
  * @internal
  */
-function toBinary(text: string): string {
-  return Buffer.from(text, "utf8").toString("latin1");
-}
-
-/** @internal */
-function fromBinary(binary: string): string {
-  return Buffer.from(binary, "latin1").toString("utf8");
+function toBinary(text: string): Uint8Array {
+  return b(text);
 }
 
 /**
@@ -42,19 +40,19 @@ function fromBinary(binary: string): string {
  * @noRailsEquivalent PERMANENT
  */
 export interface Serializer {
-  dump(entryOrValue: Entry | unknown): string | Entry;
-  dumpCompressed?(entry: Entry, threshold: number): string | Entry;
-  _load(dumped: string | Entry): unknown;
-  dumped(dumped: string | Entry): boolean;
+  dump(entryOrValue: Entry | unknown): Uint8Array | Entry;
+  dumpCompressed?(entry: Entry, threshold: number): Uint8Array | Entry;
+  _load(dumped: string | Uint8Array | Entry): unknown;
+  dumped(dumped: string | Uint8Array | Entry): boolean;
   load(dumped: unknown): unknown;
   /** @internal */
-  marshalLoad(payload: string): unknown;
+  marshalLoad(payload: string | Uint8Array): unknown;
   /** @internal */
   isAvailable?(): boolean;
 }
 
 function load(dumped: unknown): unknown {
-  if (typeof dumped === "string") {
+  if (typeof dumped === "string" || dumped instanceof Uint8Array) {
     if (messagePackWithFallback.dumped(dumped)) {
       return messagePackWithFallback._load(dumped);
     } else if (marshal71WithFallback.dumped(dumped)) {
@@ -63,7 +61,7 @@ function load(dumped: unknown): unknown {
       return marshal70WithFallback._load(dumped);
     } else {
       Store.logger?.warn(
-        `Unrecognized payload prefix ${rbInspect(byteslice(dumped, 0))}; deserializing as nil`,
+        `Unrecognized payload prefix ${rbInspect(byteslice(b(dumped), 0))}; deserializing as nil`,
       );
       return null;
     }
@@ -78,7 +76,7 @@ function load(dumped: unknown): unknown {
 }
 
 /** @internal */
-function marshalLoad(payload: string): unknown {
+function marshalLoad(payload: string | Uint8Array): unknown {
   try {
     return coder.load(payload);
   } catch (error) {
@@ -90,7 +88,7 @@ function marshalLoad(payload: string): unknown {
 /** @internal */
 export const SerializerWithFallback = { load, marshalLoad } as {
   load(dumped: unknown): unknown;
-  marshalLoad(payload: string): unknown;
+  marshalLoad(payload: string | Uint8Array): unknown;
   SERIALIZERS: Hash<string, Serializer>;
   get(format: string): Serializer;
 };
@@ -109,11 +107,11 @@ const passthroughWithFallback = {
     return entry.compressed(threshold);
   },
 
-  _load(entry: string | Entry): Entry {
+  _load(entry: string | Uint8Array | Entry): Entry {
     return entry as Entry;
   },
 
-  dumped(dumped: string | Entry): boolean {
+  dumped(dumped: string | Uint8Array | Entry): boolean {
     return dumped instanceof Entry;
   },
 } as Serializer;
@@ -121,34 +119,36 @@ include(passthroughWithFallback, SerializerWithFallback);
 extend(passthroughWithFallback, passthroughWithFallback);
 
 const marshal70WithFallback = {
-  dump(entry: Entry | unknown): string {
-    return MARK_UNCOMPRESSED + toBinary(coder.dump((entry as Entry).pack()));
+  dump(entry: Entry | unknown): Uint8Array {
+    return rbStrPlus(
+      b(MARK_UNCOMPRESSED),
+      toBinary(coder.dump((entry as Entry).pack())),
+    ) as Uint8Array;
   },
 
-  dumpCompressed(entry: Entry, threshold: number): string {
-    const serialized = coder.dump(entry.pack());
-    const serializedByteSize = Buffer.byteLength(serialized);
-    if (serializedByteSize >= threshold) {
+  dumpCompressed(entry: Entry, threshold: number): Uint8Array {
+    const serialized = toBinary(coder.dump(entry.pack()));
+    if (serialized.length >= threshold) {
       const compressed = deflate(serialized);
-      if (compressed.length < serializedByteSize) {
-        return MARK_COMPRESSED + compressed;
+      if (compressed.length < serialized.length) {
+        return rbStrPlus(b(MARK_COMPRESSED), compressed) as Uint8Array;
       }
     }
-    return MARK_UNCOMPRESSED + toBinary(serialized);
+    return rbStrPlus(b(MARK_UNCOMPRESSED), serialized) as Uint8Array;
   },
 
-  _load(this: Serializer, marked: string | Entry): Entry {
-    const s = marked as string;
-    const compressed = s[0] === MARK_COMPRESSED;
-    const rest = s.slice(1);
-    const payload = compressed ? inflate(rest) : fromBinary(rest);
+  _load(this: Serializer, marked: string | Uint8Array | Entry): Entry {
+    const s = b(marked as string | Uint8Array);
+    const compressed = rbStrStartWith(s, MARK_COMPRESSED);
+    const rest = s.subarray(1);
+    const payload = compressed ? inflate(rest) : rest;
     return Entry.unpack(this.marshalLoad(payload) as unknown[]);
   },
 
-  dumped(dumped: string | Entry): boolean {
+  dumped(dumped: string | Uint8Array | Entry): boolean {
     return (
-      (dumped as string).startsWith(MARK_UNCOMPRESSED) ||
-      (dumped as string).startsWith(MARK_COMPRESSED)
+      rbStrStartWith(dumped as string | Uint8Array, MARK_UNCOMPRESSED) ||
+      rbStrStartWith(dumped as string | Uint8Array, MARK_COMPRESSED)
     );
   },
 } as Serializer;
@@ -156,37 +156,34 @@ include(marshal70WithFallback, SerializerWithFallback);
 extend(marshal70WithFallback, marshal70WithFallback);
 
 const marshal71WithFallback = {
-  dump(value: Entry | unknown): string {
-    return MARSHAL_SIGNATURE + toBinary(coder.dump(value));
+  dump(value: Entry | unknown): Uint8Array {
+    return rbStrPlus(b(MARSHAL_SIGNATURE), toBinary(coder.dump(value))) as Uint8Array;
   },
 
-  _load(this: Serializer, dumped: string | Entry): unknown {
-    return this.marshalLoad(fromBinary((dumped as string).slice(MARSHAL_SIGNATURE.length)));
+  _load(this: Serializer, dumped: string | Uint8Array | Entry): unknown {
+    return this.marshalLoad(b(dumped as string | Uint8Array).subarray(MARSHAL_SIGNATURE.length));
   },
 
-  dumped(dumped: string | Entry): boolean {
-    return (dumped as string).startsWith(MARSHAL_SIGNATURE);
+  dumped(dumped: string | Uint8Array | Entry): boolean {
+    return rbStrStartWith(dumped as string | Uint8Array, MARSHAL_SIGNATURE);
   },
 } as Serializer;
 include(marshal71WithFallback, SerializerWithFallback);
 extend(marshal71WithFallback, marshal71WithFallback);
 
 const messagePackWithFallback = {
-  dump(value: Entry | unknown): string {
-    return Buffer.from(ActiveSupport.MessagePack!.CacheSerializer.dump(value)).toString("latin1");
+  dump(value: Entry | unknown): Uint8Array {
+    return ActiveSupport.MessagePack!.CacheSerializer.dump(value);
   },
 
-  _load(dumped: string | Entry): unknown {
-    const result = ActiveSupport.MessagePack!.CacheSerializer.load(
-      Buffer.from(dumped as string, "latin1"),
-    );
+  _load(dumped: string | Uint8Array | Entry): unknown {
+    const result = ActiveSupport.MessagePack!.CacheSerializer.load(dumped as string | Uint8Array);
     return result === undefined ? null : result;
   },
 
-  dumped(this: Serializer, dumped: string | Entry): boolean {
+  dumped(this: Serializer, dumped: string | Uint8Array | Entry): boolean {
     return (
-      this.isAvailable!() &&
-      ActiveSupport.MessagePack!.isSignature(Buffer.from(dumped as string, "latin1"))
+      this.isAvailable!() && ActiveSupport.MessagePack!.isSignature(dumped as string | Uint8Array)
     );
   },
 

@@ -16,7 +16,7 @@ import { UrlHelper } from "./helpers/url-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import { Template } from "./template.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
 describe("ActionView::Base include Helpers, Context (base.rb:158)", () => {
@@ -77,12 +77,12 @@ describe("ActionView::Base#render returns the renderer body unwrapped", () => {
   });
 
   const renderTse = async (source: string): Promise<string> => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     const lookupContext = new LookupContext(null, {}, []);
     lookupContext.appendViewPaths([new FixtureResolver({ "test/_bold.html.tse": "<b>bold</b>" })]);
     const view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
     return String(
-      await new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(view, {}),
+      await new Template(source, "t", new TSE(), { locals: [], format: ":html" }).render(view, {}),
     );
   };
 
@@ -97,7 +97,7 @@ describe("ActionView::Base#render returns the renderer body unwrapped", () => {
 
 describe("ActionView::Base class-hosted accessors", () => {
   afterEach(() => {
-    Tse.tseTrimMode = "-";
+    TSE.tseTrimMode = "-";
   });
 
   it("stores the field_error_proc default as the proc itself", () => {
@@ -109,7 +109,7 @@ describe("ActionView::Base class-hosted accessors", () => {
 
   it("delegates erb_trim_mode= to the handler", () => {
     Base.tseTrimMode = ">";
-    expect(Tse.tseTrimMode).toBe(">");
+    expect(TSE.tseTrimMode).toBe(">");
   });
 });
 

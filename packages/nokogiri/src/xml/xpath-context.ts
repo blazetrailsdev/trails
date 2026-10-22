@@ -20,6 +20,7 @@ import {
 import type { Node } from "../html5/node.js";
 import { HTML5, XML } from "../namespaces.js";
 import type { NodeSet } from "./node-set.js";
+import "./namespace.js";
 import {
   evaluate,
   toXPathString,
@@ -40,6 +41,31 @@ const NOKOGIRI_URI = "http://www.nokogiri.org/default_ns/ruby/extensions_functio
 const NOKOGIRI_BUILTIN_PREFIX = "nokogiri-builtin";
 const NOKOGIRI_BUILTIN_URI = "https://www.nokogiri.org/default_ns/ruby/builtins";
 const HTML_NAMESPACE = "http://www.w3.org/1999/xhtml";
+const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
+
+class NamespaceNode<E> {
+  constructor(
+    readonly owner: E,
+    readonly prefix: string | null,
+    readonly href: string,
+  ) {}
+}
+
+function namespaceNodes<E>(
+  owner: E,
+  inScope: Record<string, string>,
+  previous: NamespaceNode<E>[] = [],
+): NamespaceNode<E>[] {
+  const node = (prefix: string | null, href: string) =>
+    previous.find((ns) => ns.prefix === prefix && ns.href === href) ??
+    new NamespaceNode(owner, prefix, href);
+  const result = [node("xml", XML_NAMESPACE)];
+  for (const [prefix, href] of Object.entries(inScope)) {
+    if (prefix === "xml" || (prefix === "" && href === "")) continue;
+    result.push(node(prefix === "" ? null : prefix, href));
+  }
+  return result;
+}
 
 class Parse5AttrNode {
   constructor(
@@ -56,12 +82,27 @@ class Parse5AttrNode {
   }
 }
 
-type Parse5XPathNode = Parse5Node | Parse5AttrNode;
+type Parse5XPathNode = Parse5Node | Parse5AttrNode | NamespaceNode<Parse5Element>;
 
 const parse5Attrs = new WeakMap<Parse5Element, Parse5AttrNode[]>();
+const parse5Namespaces = new WeakMap<Parse5Element, NamespaceNode<Parse5Element>[]>();
 
 function isParse5Attr(node: Parse5XPathNode): node is Parse5AttrNode {
   return node instanceof Parse5AttrNode;
+}
+
+function parse5InScopeNamespaces(element: Parse5Element): Record<string, string> {
+  const inScope: Record<string, string> = {};
+  for (let n: Parse5Node | null = element; n !== null && "tagName" in n; n = n.parentNode) {
+    for (const attr of n.attrs) {
+      let prefix: string | null = null;
+      if (attr.prefix === "xmlns") prefix = attr.name;
+      else if (attr.name === "xmlns") prefix = "";
+      else if (attr.name.startsWith("xmlns:")) prefix = attr.name.slice(6);
+      if (prefix !== null && !Object.hasOwn(inScope, prefix)) inScope[prefix] = attr.value;
+    }
+  }
+  return inScope;
 }
 
 function parse5Children(node: Parse5Node): Parse5Node[] {
@@ -74,6 +115,7 @@ function parse5Children(node: Parse5Node): Parse5Node[] {
 
 const PARSE5_TREE: Tree<Parse5XPathNode> = {
   kind(node): NodeKind {
+    if (node instanceof NamespaceNode) return "namespace";
     if (isParse5Attr(node)) return "attribute";
     if (node.nodeName === "#text") return "text";
     if (node.nodeName === "#comment") return "comment";
@@ -81,14 +123,14 @@ const PARSE5_TREE: Tree<Parse5XPathNode> = {
     return "root";
   },
   parent(node) {
-    if (isParse5Attr(node)) return node.owner;
+    if (isParse5Attr(node) || node instanceof NamespaceNode) return node.owner;
     return (node as { parentNode?: Parse5Node | null }).parentNode ?? null;
   },
   children(node) {
-    return isParse5Attr(node) ? [] : parse5Children(node);
+    return isParse5Attr(node) || node instanceof NamespaceNode ? [] : parse5Children(node);
   },
   attributes(node) {
-    if (isParse5Attr(node) || !("tagName" in node)) return [];
+    if (isParse5Attr(node) || node instanceof NamespaceNode || !("tagName" in node)) return [];
     let attrs = parse5Attrs.get(node);
     if (attrs === undefined || attrs.length !== node.attrs.length) {
       attrs = node.attrs.map((attr) => new Parse5AttrNode(node, attr));
@@ -96,21 +138,35 @@ const PARSE5_TREE: Tree<Parse5XPathNode> = {
     }
     return attrs;
   },
+  namespaces(node) {
+    if (isParse5Attr(node) || node instanceof NamespaceNode || !("tagName" in node)) return [];
+    const namespaces = namespaceNodes(
+      node,
+      parse5InScopeNamespaces(node),
+      parse5Namespaces.get(node),
+    );
+    parse5Namespaces.set(node, namespaces);
+    return namespaces;
+  },
   localName(node) {
+    if (node instanceof NamespaceNode) return node.prefix ?? "";
     if (isParse5Attr(node)) return node.attr.name.replace(/^.*:/, "");
     return "tagName" in node ? node.tagName : "";
   },
   qualifiedName(node) {
+    if (node instanceof NamespaceNode) return node.prefix ?? "";
     if (isParse5Attr(node))
       return node.attr.prefix ? `${node.attr.prefix}:${node.attr.name}` : node.attr.name;
     return "tagName" in node ? node.tagName : "";
   },
   namespaceUri(node) {
+    if (node instanceof NamespaceNode) return null;
     if (isParse5Attr(node)) return node.attr.namespace ?? null;
     if (!("tagName" in node)) return null;
     return node.namespaceURI === HTML_NAMESPACE ? null : node.namespaceURI;
   },
   stringValue(node) {
+    if (node instanceof NamespaceNode) return node.href;
     if (isParse5Attr(node)) return node.attr.value;
     if (node.nodeName === "#text") return (node as { value: string }).value;
     if (node.nodeName === "#comment") return (node as { data: string }).data;
@@ -127,8 +183,9 @@ class LibXmlRoot {
   constructor(readonly doc: LibXmlDocument) {}
 }
 
-type LibXmlXPathNode = XmlNode | LibXmlRoot;
+type LibXmlXPathNode = XmlNode | LibXmlRoot | NamespaceNode<LibXmlElement>;
 
+const libXmlNamespaces = new WeakMap<LibXmlDocument, Map<number, NamespaceNode<LibXmlElement>[]>>();
 const libXmlRoots = new WeakMap<LibXmlDocument, LibXmlRoot>();
 
 function libXmlRoot(doc: LibXmlDocument): LibXmlRoot {
@@ -143,6 +200,7 @@ function libXmlPtr(node: XmlNode): number {
 
 const LIBXML_TREE: Tree<LibXmlXPathNode> = {
   kind(node): NodeKind {
+    if (node instanceof NamespaceNode) return "namespace";
     if (node instanceof LibXmlRoot) return "root";
     if (node instanceof LibXmlAttribute) return "attribute";
     if (node instanceof LibXmlElement) return "element";
@@ -154,6 +212,7 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
   },
   parent(node) {
     if (node instanceof LibXmlRoot) return null;
+    if (node instanceof NamespaceNode) return node.owner;
     return node.parent ?? libXmlRoot(node.doc);
   },
   children(node) {
@@ -164,12 +223,22 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
   attributes(node) {
     return node instanceof LibXmlElement ? node.attrs : [];
   },
+  namespaces(node) {
+    if (!(node instanceof LibXmlElement)) return [];
+    let byPtr = libXmlNamespaces.get(node.doc);
+    if (byPtr === undefined) libXmlNamespaces.set(node.doc, (byPtr = new Map()));
+    const namespaces = namespaceNodes(node, node.namespaces, byPtr.get(libXmlPtr(node)));
+    byPtr.set(libXmlPtr(node), namespaces);
+    return namespaces;
+  },
   localName(node) {
+    if (node instanceof NamespaceNode) return node.prefix ?? "";
     if (node instanceof LibXmlElement || node instanceof LibXmlAttribute) return node.name;
     if (node instanceof LibXmlRoot) return "";
     return node.eval("local-name()") as string;
   },
   qualifiedName(node) {
+    if (node instanceof NamespaceNode) return node.prefix ?? "";
     if (!(node instanceof LibXmlElement || node instanceof LibXmlAttribute)) return "";
     return node.prefix ? `${node.prefix}:${node.name}` : node.name;
   },
@@ -179,10 +248,12 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
   },
   stringValue(node) {
     if (node instanceof LibXmlRoot) return node.doc.root.content;
+    if (node instanceof NamespaceNode) return node.href;
     if (node instanceof LibXmlAttribute) return node.value;
     return node.content;
   },
   key(node) {
+    if (node instanceof NamespaceNode) return node;
     return node instanceof LibXmlRoot ? node : libXmlPtr(node);
   },
 };
@@ -337,6 +408,9 @@ export class XPathContext {
 
   private wrap(node: XPathNode): Node {
     if (node instanceof LibXmlRoot) return this._document as Node;
+    if (node instanceof NamespaceNode) {
+      return new XML.Namespace(node, this._document) as unknown as Node;
+    }
     if (node instanceof LibXmlAttribute || node instanceof Parse5AttrNode) {
       return new XML.Attr(node, this._document) as unknown as Node;
     }

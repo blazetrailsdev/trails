@@ -1,6 +1,7 @@
 import { rbInspect, rbRegInitStr, rbRegToS } from "@blazetrails/ruby-compat";
 import type { Html5Node, NodeSet } from "@blazetrails/nokogiri";
 
+/** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
 export class SubstitutionContext {
   private readonly _substitute: string;
 
@@ -8,6 +9,7 @@ export class SubstitutionContext {
     this._substitute = "?";
   }
 
+  /** @noRailsEquivalent CONVERGEABLE rails-dom-testing-enroll-in-parity-api */
   substituteBang(selector: string, values: unknown[], formatForPresentation = false): string {
     return selector.replaceAll(this._substitute, (match) => {
       if (values.length === 0 || !this.isSubstitutable(values[0])) return match[0];

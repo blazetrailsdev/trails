@@ -19,8 +19,8 @@ export function capture<TArgs extends unknown[]>(
   ...args: TArgs
 ): SafeBuffer | null;
 /**
- * @inventedArm if — PERMANENT
- * @inventedArm then — PERMANENT
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
  */
 export function capture<TArgs extends unknown[]>(
   this: CaptureHelperHost,

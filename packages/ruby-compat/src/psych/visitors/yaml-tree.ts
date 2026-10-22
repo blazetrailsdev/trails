@@ -1,3 +1,4 @@
+import { pack } from "../../array.js";
 import { Hash } from "../../hash.js";
 import {
   rbCDate,
@@ -182,6 +183,7 @@ export class YAMLTree {
     }
     if (target instanceof Range) return this.visitRange(target);
     if (target instanceof RegExp) return this.visitRegexp(target);
+    if (target instanceof Uint8Array) return this.visitString(target);
     if (Array.isArray(target)) return this.visitArray(target);
     if (target instanceof Omap) return this.visitPsychOmap(target);
     if (target instanceof Map) return this.visitHash(target);
@@ -257,13 +259,20 @@ export class YAMLTree {
     );
   }
 
-  private visitString(o: string): Node {
+  private visitString(str: string | Uint8Array): Node {
     let plain = true;
     let quote = true;
     let style = Scalar.PLAIN;
     let tag: string | null = null;
+    let o = typeof str === "string" ? str : new TextDecoder().decode(str);
 
-    if (/\n(?!\n?$)/.test(o)) {
+    if (str instanceof Uint8Array && !str.every((byte) => byte < 0x80)) {
+      o = pack([str], "m0");
+      tag = "!binary";
+      style = Scalar.LITERAL;
+      plain = false;
+      quote = false;
+    } else if (/\n(?!\n?$)/.test(o)) {
       style = Scalar.LITERAL;
     } else if (o === "<<") {
       style = Scalar.SINGLE_QUOTED;

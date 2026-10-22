@@ -1,6 +1,6 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { aryJoin, b, cmp, first, rbCmpint } from "@blazetrails/ruby-compat";
+import { aryJoin, b, cmp, first, rbCmpint, rbRegMatchP } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
@@ -27,7 +27,7 @@ export function isWriteQuery(sql: string | null): boolean {
     return !READ_QUERY.test(sql as string);
   } catch (error) {
     if (!(error instanceof ArgumentError)) throw error;
-    return !READ_QUERY.test(b(sql as string));
+    return !rbRegMatchP(READ_QUERY, b(sql as string));
   }
 }
 

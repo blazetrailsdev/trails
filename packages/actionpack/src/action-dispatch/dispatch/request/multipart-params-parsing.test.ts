@@ -57,7 +57,7 @@ describe("MultipartParamsParsingTest", () => {
 
     async read(): Promise<void> {
       await this.render({
-        plain: `File: ${(this.params.get("uploaded_data") as UploadedFile).read()}`,
+        plain: `File: ${new TextDecoder().decode((this.params.get("uploaded_data") as UploadedFile).read() as unknown as Uint8Array)}`,
       });
     }
   }
@@ -77,7 +77,7 @@ describe("MultipartParamsParsingTest", () => {
     TestController.lastRequestParameters = null;
   });
 
-  const fixture = (name: string): Record<string, string> =>
+  const fixture = (name: string): Record<string, string | Uint8Array> =>
     File.open(File.join(FIXTURE_PATH, name), "rb", (file) => ({
       "rack.input": file.read(),
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
@@ -87,7 +87,7 @@ describe("MultipartParamsParsingTest", () => {
   const parseMultipart = async (name: string, path = "/parse"): Promise<Record<string, unknown>> =>
     withTestRouting(async () => {
       const headers = fixture(name);
-      const params = headers["rack.input"];
+      const params = headers["rack.input"] as string;
       delete headers["rack.input"];
       await t.post(path, { params, headers });
       t.assertResponse(":ok");

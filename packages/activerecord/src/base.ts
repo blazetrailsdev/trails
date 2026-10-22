@@ -891,11 +891,11 @@ export class Base extends Model {
   declare static _deterministicEncryptedAttributes: string[] | undefined;
   declare static readonly isEncryptedAttributes: boolean;
   declare static _attrReadonly: string[];
-  declare static is_attrReadonly: boolean;
+  declare static _isAttrReadonly: boolean;
   declare static defaultScopes: import("./scoping/default.js").DefaultScope[];
   declare static defaultScopeOverride: boolean | null;
   declare static _reflections: Record<string, _Reflection.AssociationReflection>;
-  declare static is_reflections: boolean;
+  declare static _isReflections: boolean;
   declare static aggregateReflections: Record<string, _Reflection.AggregateReflection>;
   declare static isAggregateReflections: boolean;
   declare static _reflectOnAssociation: typeof _Reflection.ClassMethods._reflectOnAssociation;
@@ -1305,7 +1305,7 @@ export class Base extends Model {
   declare static resetCounters: typeof CounterCache.resetCounters;
   declare static isCounterCacheColumn: typeof CounterCache.isCounterCacheColumn;
   declare static _counterCacheColumns: string[];
-  declare static is_counterCacheColumns: boolean;
+  declare static _isCounterCacheColumns: boolean;
   declare static counterCachedAssociationNames: string[];
   declare static isCounterCachedAssociationNames: boolean;
 
@@ -1598,7 +1598,7 @@ export class Base extends Model {
   declare static isAttributesForInspect: () => boolean;
 
   declare static _destroyAssociationAsyncJob: unknown;
-  declare static is_destroyAssociationAsyncJob: boolean;
+  declare static _isDestroyAssociationAsyncJob: boolean;
 
   declare static destroyAssociationAsyncJob:
     | string

@@ -1,7 +1,7 @@
 {
   "name": "@blazetrails/builder",
   "version": "0.1.0",
-  "description": "XML markup for Trails, mirroring the builder gem",
+  "description": "XML markup builder for Trails, mirroring the builder gem",
   "type": "module",
   "main": "dist/builder.js",
   "types": "dist/builder.d.ts",

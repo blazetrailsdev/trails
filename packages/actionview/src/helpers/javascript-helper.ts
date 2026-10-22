@@ -34,18 +34,27 @@ export function javascriptCdataSection(content: unknown): SafeBuffer {
   return htmlSafe(`\n//${cdataSection(`\n${String(content ?? "")}\n//`).toString()}\n`);
 }
 
+/**
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+ */
 export function javascriptTag(
   this: TagHelperHost & { contentSecurityPolicyNonce(): string | null },
   contentOrOptionsWithBlock: unknown = null,
   htmlOptions: Record<string, unknown> = {},
   block?: () => unknown,
-): SafeBuffer {
+): SafeBuffer | Promise<SafeBuffer> {
   let content: unknown;
   if (block) {
     if (isPlainObject(contentOrOptionsWithBlock)) {
       htmlOptions = contentOrOptionsWithBlock as Record<string, unknown>;
     }
     content = capture.call(this, block);
+    if (content instanceof Promise) {
+      return content.then((content) =>
+        javascriptTag.call(this, contentOrOptionsWithBlock, htmlOptions, () => content),
+      );
+    }
   } else {
     content = contentOrOptionsWithBlock;
   }

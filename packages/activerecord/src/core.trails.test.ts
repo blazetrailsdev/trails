@@ -593,7 +593,7 @@ describe("underscore class_attribute slots", () => {
     class Child extends Parent {}
 
     expect(Base._destroyAssociationAsyncJob).toBe("ActiveRecord::DestroyAssociationAsyncJob");
-    expect(Base.is_destroyAssociationAsyncJob).toBe(true);
+    expect(Base._isDestroyAssociationAsyncJob).toBe(true);
     expect(() => Parent.destroyAssociationAsyncJob).toThrow(
       /Unable to load destroy_association_async_job: /,
     );
@@ -634,17 +634,17 @@ describe("underscore class_attribute slots", () => {
     expect(Parent._counterCacheColumns).toEqual(Topic._counterCacheColumns);
     expect(Child.isCounterCacheColumn("written_on_count")).toBe(true);
     expect(Parent.isCounterCacheColumn("written_on_count")).toBe(false);
-    expect(Child.is_attrReadonly).toBe(true);
-    expect(Child.is_counterCacheColumns).toBe(true);
+    expect(Child._isAttrReadonly).toBe(true);
+    expect(Child._isCounterCacheColumns).toBe(true);
     expect("_attrReadonly" in Child.prototype).toBe(false);
     expect("_counterCacheColumns" in Child.prototype).toBe(false);
   });
 
   it("_reflections keeps its instance reader and predicate, and no instance writer", () => {
-    expect(Reply.is_reflections).toBe(true);
-    const reply = new Reply() as unknown as { _reflections: object; is_reflections: boolean };
+    expect(Reply._isReflections).toBe(true);
+    const reply = new Reply() as unknown as { _reflections: object; _isReflections: boolean };
     expect(reply._reflections).toBe(Reply._reflections);
-    expect(reply.is_reflections).toBe(true);
+    expect(reply._isReflections).toBe(true);
     expect(Object.getOwnPropertyDescriptor(Base.prototype, "_reflections")?.set).toBeUndefined();
   });
 });

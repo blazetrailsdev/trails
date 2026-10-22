@@ -4,7 +4,7 @@ import { MockRequest, type RackApp } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
 import { UploadedFile } from "./multipart/uploaded-file.js";
 import { Request } from "./request.js";
-import { Encoding, File, StringIO, Tempfile } from "@blazetrails/ruby-compat";
+import { Encoding, File, StringIO, Tempfile, b } from "@blazetrails/ruby-compat";
 import * as path from "path";
 
 const fixtureDir = path.join(__dirname, "..", "test", "multipart");
@@ -40,7 +40,7 @@ it("should handle a non-GET request with :input String and :params", () => {
   const env = MockRequest.envFor("/", { ":method": "post", ":input": "", ":params": {} });
   expect(env["PATH_INFO"]).toBe("/");
   expect(env).toBeInstanceOf(Object);
-  expect(env["rack.input"].read()).toBe("");
+  expect(env["rack.input"].read()).toEqual(b(""));
 });
 
 it("should convert :input IO object to binary encoding", () => {
@@ -48,7 +48,7 @@ it("should convert :input IO object to binary encoding", () => {
   try {
     const env = MockRequest.envFor("/", { ":method": "post", ":input": f });
     expect(f.externalEncoding()).toBe(Encoding.BINARY);
-    expect(env["rack.input"].read()).toBe(File.binread(__filename));
+    expect(env["rack.input"].read()).toEqual(File.binread(__filename));
   } finally {
     f?.close();
   }
@@ -130,10 +130,10 @@ it("set content length", () => {
 
 it("allow posting", async () => {
   await new MockRequest(app).get("", { ":input": "foo" });
-  expect(lastEnv["mock.postdata"]).toBe("foo");
+  expect(lastEnv["mock.postdata"]).toEqual(b("foo"));
 
   await new MockRequest(app).post("", { ":input": new StringIO("foo") });
-  expect(lastEnv["mock.postdata"]).toBe("foo");
+  expect(lastEnv["mock.postdata"]).toEqual(b("foo"));
 });
 
 it("use all parts of an URL", async () => {
@@ -221,7 +221,7 @@ it("accept params and build url encoded params for POST requests", async () => {
   expect(env["QUERY_STRING"]).toBe("");
   expect(env["PATH_INFO"]).toBe("/foo");
   expect(env["CONTENT_TYPE"]).toBe("application/x-www-form-urlencoded");
-  expect(env["mock.postdata"]).toBe("foo%5Bbar%5D=1");
+  expect(env["mock.postdata"]).toEqual(b("foo%5Bbar%5D=1"));
 });
 
 it("accept raw input in params for POST requests", async () => {
@@ -232,7 +232,7 @@ it("accept raw input in params for POST requests", async () => {
   expect(env["QUERY_STRING"]).toBe("");
   expect(env["PATH_INFO"]).toBe("/foo");
   expect(env["CONTENT_TYPE"]).toBe("application/x-www-form-urlencoded");
-  expect(env["mock.postdata"]).toBe("foo%5Bbar%5D=1");
+  expect(env["mock.postdata"]).toEqual(b("foo%5Bbar%5D=1"));
 });
 
 it("accept params and build multipart encoded params for POST requests", async () => {
@@ -246,7 +246,7 @@ it("accept params and build multipart encoded params for POST requests", async (
   expect(env["QUERY_STRING"]).toBe("");
   expect(env["PATH_INFO"]).toBe("/foo");
   expect(env["CONTENT_TYPE"]).toBe("multipart/form-data; boundary=AaB03x");
-  expect(env["mock.postdata"].replace(/\r/g, "").length).toBe(206);
+  expect(Array.from(env["mock.postdata"] as Uint8Array).filter((c) => c !== 0x0d).length).toBe(206);
 });
 
 it("behave valid according to the Rack spec", async () => {

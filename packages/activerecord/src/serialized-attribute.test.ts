@@ -1,7 +1,6 @@
 import {
   ArgumentError,
   Hash,
-  Module,
   Struct,
   hashAref,
   hashAset,
@@ -39,7 +38,7 @@ import {
   yamlColumnPermittedClasses,
 } from "./active-record.js";
 
-const SerializedAttributeTest = new Module();
+const SerializedAttributeTest = {};
 registerConstant("SerializedAttributeTest", SerializedAttributeTest);
 
 const MyObject = rbModConstSet(

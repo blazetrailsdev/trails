@@ -31,6 +31,8 @@ describe("Association#marshal_dump / #marshal_load", () => {
     const firm = companies("first_firm") as Firm;
     const targets = rbObjIvarGet(firm.association("clients"), "@replaced_or_added_targets");
 
-    expect(Marshal.dump(targets)).toBe("\x04\bo:\bSet\x06:\n@hashC:\tHash}\x00F");
+    expect(Marshal.dump(targets)).toEqual(
+      Uint8Array.from("\x04\bo:\bSet\x06:\n@hashC:\tHash}\x00F", (c) => c.charCodeAt(0)),
+    );
   });
 });

@@ -33,6 +33,7 @@ export type CanonicalKind =
   | "same"
   | "notSame"
   | "instanceOf"
+  | "notInstanceOf"
   | "kindOf"
   | "respondTo"
   | "notRespondTo"
@@ -71,6 +72,8 @@ const NEGATION: Partial<Record<CanonicalKind, CanonicalKind>> = {
   notSame: "same",
   respondTo: "notRespondTo",
   notRespondTo: "respondTo",
+  instanceOf: "notInstanceOf",
+  notInstanceOf: "instanceOf",
   // `expect(() => …).not.toThrow()` is the port of `assert_nothing_raised`,
   // which minitest spells as its own assertion rather than as `refute_raises`.
   raises: "nothingRaised",
@@ -116,6 +119,8 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   assert_not_predicate: "falsy",
   refute_predicate: "falsy",
   assert_instance_of: "instanceOf",
+  assert_not_instance_of: "notInstanceOf",
+  refute_instance_of: "notInstanceOf",
   assert_kind_of: "kindOf",
   assert_respond_to: "respondTo",
   assert_not_respond_to: "notRespondTo",

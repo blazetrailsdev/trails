@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";
@@ -26,9 +27,9 @@ export class Lock {
     this.mutex = mutex || new DefaultMutex();
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     this.mutex.lock();
-    let returned: [number, Record<string, string | string[]>, any] | undefined;
+    let returned: [number, RackHeaders, any] | undefined;
     try {
       const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
       response.push(new BodyProxy(response.pop(), () => this.unlock()));

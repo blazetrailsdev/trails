@@ -1,4 +1,4 @@
-import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import type { RackEnv, RackHeaders, RackResponse } from "@blazetrails/rack";
 import { CONTENT_TYPE, RELEASE, SET_COOKIE } from "@blazetrails/rack";
 import { fetch, Gem, merge, rbFSend, toI } from "@blazetrails/ruby-compat";
 import { LOCATION, STRICT_TRANSPORT_SECURITY } from "../constants.js";
@@ -87,7 +87,7 @@ export class SSL {
   }
 
   /** @internal */
-  private setHstsHeaderBang(headers: Record<string, string | string[]>): void {
+  private setHstsHeaderBang(headers: RackHeaders): void {
     headers[STRICT_TRANSPORT_SECURITY] ??= this.hstsHeader;
   }
 
@@ -117,8 +117,8 @@ export class SSL {
   }
 
   /** @internal */
-  private flagCookiesAsSecureBang(headers: Record<string, string | string[]>): void {
-    let cookies = headers[SET_COOKIE];
+  private flagCookiesAsSecureBang(headers: RackHeaders): void {
+    let cookies = headers[SET_COOKIE] as string | string[] | undefined;
     if (cookies == null) return;
 
     if (new Gem.Version(RELEASE).compare(new Gem.Version("3"))! < 0) {

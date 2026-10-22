@@ -176,9 +176,14 @@ function subsecNanoseconds(sec: number | Rational): number {
   return fraction.mul(1_000_000_000).div(1);
 }
 
+/**
+ * `num_exact` / `num_exact_check` (`vendor/ruby/v3.3.11/time.c:518-573`). A Float, primitive or
+ * ruby-compat's boxed integral one, takes the default arm's `to_r` (`time.c:532-549`), which is `fToR`.
+ */
 function numExact(v: unknown): Rational {
   if (v instanceof Rational) return v;
   if (typeof v === "bigint") return new Rational(v, 1);
+  if (v instanceof Number) return fToR(v.valueOf());
   if (typeof v !== "number") {
     throw new TypeError(
       `can't convert ${(v as object)?.constructor?.name ?? String(v)} into an exact number`,

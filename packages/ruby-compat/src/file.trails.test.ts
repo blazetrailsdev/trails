@@ -117,7 +117,7 @@ describe("File", () => {
     const path = join(root, "sub", "w.txt");
     expect(File.write(path, "héllo")).toBe(6);
     expect(File.read(path)).toBe("héllo");
-    expect(File.binread(path)).toBe("h\xC3\xA9llo");
+    expect(File.binread(path)).toEqual(Uint8Array.of(0x68, 0xc3, 0xa9, 0x6c, 0x6c, 0x6f));
     expect(File.binread(path).length).toBe(File.stat(path).size);
     expect(File.isFile(path)).toBe(true);
     expect(File.isDirectory(join(root, "sub"))).toBe(true);
@@ -354,7 +354,7 @@ describe("File.fnmatch", () => {
     const path = File.join(mkdtempSync(join(tmpdir(), "trails-file-")), "latin1.txt");
     File.binwrite(path, "h\u00e9l");
     expect(File.read(path, { encoding: "ISO-8859-1" })).toBe("hél");
-    expect(File.read(path, { encoding: "ASCII-8BIT" })).toBe("h\u00e9l");
+    expect(File.read(path, { encoding: "ASCII-8BIT" })).toEqual(Uint8Array.of(0x68, 0xe9, 0x6c));
   });
 });
 

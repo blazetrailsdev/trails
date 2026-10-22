@@ -128,8 +128,8 @@ export class API extends Metal {
 
   declare static _wrapperOptions: ParamsWrapperOptions;
   declare _wrapperOptions: ParamsWrapperOptions;
-  declare static is_wrapperOptions: boolean;
-  declare is_wrapperOptions: boolean;
+  declare static _isWrapperOptions: boolean;
+  declare _isWrapperOptions: boolean;
   /** @internal */
   declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
   declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;

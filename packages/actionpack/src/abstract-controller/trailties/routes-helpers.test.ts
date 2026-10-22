@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { include, Module } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { UrlFor } from "../../action-dispatch/routing/url-for.js";
@@ -153,11 +153,9 @@ describe("withRoutesHelpers", () => {
   });
 
   it("skips a nested module the class already includes without shadowing a lower one", () => {
-    const lower = new Module();
-    lower.defineMethod("helper", () => "lower");
-    const higher = new Module();
-    higher.defineMethod("helper", () => "higher");
-    const urlHelpers = new Module();
+    const lower = { helper: () => "lower" };
+    const higher = { helper: () => "higher" };
+    const urlHelpers = new RouteSet().urlHelpers();
     urlHelpers.include(lower);
     urlHelpers.include(higher);
 

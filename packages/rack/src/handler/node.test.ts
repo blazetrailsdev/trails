@@ -3,7 +3,8 @@ import { connect, type Socket } from "node:net";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { HttpRequest, HttpResponse, HttpSocket, StringIO } from "@blazetrails/ruby-compat";
+import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/ruby-compat";
+import { b, TCPSocket } from "@blazetrails/ruby-compat";
 import type { RackApp, RackBody, RackEnv } from "../index.js";
 import { RACK_ERRORS, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "../constants.js";
 import { Files } from "../files.js";
@@ -84,7 +85,7 @@ describe("Rack::Handler::Node", () => {
     expect(env.REQUEST_METHOD).toBe("POST");
     const input = env["rack.input"] as StringIO;
     expect(typeof input.read).toBe("function");
-    expect(input.read()).toBe('{"name":"dean"}');
+    expect(input.read()).toEqual(b('{"name":"dean"}'));
   });
 
   it("reads a binary request body byte-identically", async () => {
@@ -99,10 +100,10 @@ describe("Rack::Handler::Node", () => {
       headers: { "content-type": "application/octet-stream" },
     });
 
-    const input = env["rack.input"] as StringIO;
+    const input = env["rack.input"] as StringIO<Uint8Array>;
     expect(input.size()).toBe(png.length);
     const read = input.read();
-    expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(Array.from(png));
+    expect(Array.from(read)).toEqual(Array.from(png));
   });
 
   it("maps content-type and content-length to CGI keys", async () => {
@@ -306,6 +307,181 @@ describe("Rack::Handler::Node", () => {
     });
   });
 
+  describe("ordinary requests", () => {
+    it("offers rack.hijack? and a callable rack.hijack", async () => {
+      const env = await envFor("/users");
+
+      expect(env[RACK_IS_HIJACK]).toBe(true);
+      expect(typeof env[RACK_HIJACK]).toBe("function");
+    });
+
+    it("full-hijacks through Rack::Lint and gets a TCPSocket", async () => {
+      let lintError: unknown = null;
+      let io: unknown = null;
+      const linted = new Lint(async (env) => {
+        io = (env[RACK_HIJACK] as () => TCPSocket)();
+        (io as TCPSocket).write("HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n");
+        (io as TCPSocket).closeWrite();
+        return [200, { "content-type": "text/plain" }, [""]];
+      });
+      await serving(
+        async (e) => {
+          try {
+            return await linted.call({ ...e, [RACK_ERRORS]: lintableErrors });
+          } catch (error) {
+            lintError = error;
+            return [500, {}, [""]];
+          }
+        },
+        async (url) => void (await rawGet(url, "/linted")),
+      );
+
+      expect(lintError).toBeNull();
+      expect(io).toBeInstanceOf(TCPSocket);
+    });
+
+    it("lets the app full-hijack a GET and write a raw HTTP/1 response itself", async () => {
+      let text = "";
+      await serving(
+        async (env) => {
+          const io = (env[RACK_HIJACK] as () => TCPSocket)();
+          io.write(
+            "HTTP/1.1 418 I'm a teapot\r\ncontent-length: 5\r\nconnection: close\r\n\r\nshort",
+          );
+          io.closeWrite();
+          return [200, {}, ["never written"]];
+        },
+        async (url) => {
+          ({ text } = await rawGet(url, "/teapot"));
+        },
+      );
+
+      expect(text).toBe(
+        "HTTP/1.1 418 I'm a teapot\r\ncontent-length: 5\r\nconnection: close\r\n\r\nshort",
+      );
+    });
+
+    it("writes the head, hands the stream to a rack.hijack response header, and lets it see the client go", async () => {
+      let sawClose!: () => void;
+      const clientGone = new Promise<void>((resolve) => (sawClose = resolve));
+      let text = "";
+      await serving(
+        async () => [
+          200,
+          {
+            "content-type": "text/event-stream",
+            "rack.hijack": (stream: TCPSocket) => {
+              void stream.waitReadable().then(sawClose);
+              stream.write("data: one\n\n");
+            },
+          },
+          ["never written"],
+        ],
+        async (url) => {
+          const socket = await rawSocket(url, "/events");
+          text = await new Promise<string>((resolve) => {
+            let received = "";
+            socket.on("data", (chunk) => {
+              received += chunk.toString();
+              if (received.endsWith("data: one\n\n")) {
+                socket.destroy();
+                resolve(received);
+              }
+            });
+          });
+          await clientGone;
+        },
+      );
+
+      expect(text.startsWith("HTTP/1.1 200 OK\r\n")).toBe(true);
+      expect(text).toContain("content-type: text/event-stream\r\n");
+      expect(text).not.toContain("rack.hijack");
+      expect(text).not.toContain("never written");
+    });
+
+    it("reports an error raised after a hijack and leaves the socket to the app", async () => {
+      const rejections: unknown[] = [];
+      const onRejection = (reason: unknown): void => void rejections.push(reason);
+      process.on("unhandledRejection", onRejection);
+      let text = "";
+      try {
+        await serving(
+          async (env) => {
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
+            setTimeout(() => {
+              io.write("still mine");
+              io.closeWrite();
+            }, 30);
+            throw new Error("after hijack");
+          },
+          async (url) => {
+            ({ text } = await rawGet(url, "/taken"));
+          },
+        );
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      } finally {
+        process.off("unhandledRejection", onRejection);
+      }
+
+      expect(text).toBe("still mine");
+      expect(rejections).toEqual([]);
+    });
+
+    it("lets an in-flight response finish on shutdown, and waits for the app to close a socket it hijacked", async () => {
+      let hijackedIo: TCPSocket | null = null;
+      let answer!: () => void;
+      const answered = new Promise<void>((resolve) => (answer = resolve));
+      const server = await Node.run(
+        async (env) => {
+          if (env.PATH_INFO === "/taken") {
+            hijackedIo = (env[RACK_HIJACK] as () => TCPSocket)();
+            return [-1, {}, [""]];
+          }
+          await answered;
+          return [200, { "content-length": "4" }, ["done"]];
+        },
+        { Port: 0, Host: "127.0.0.1" },
+      );
+      const address = server.address();
+      const port = address && typeof address === "object" ? address.port : 0;
+      const url = `http://127.0.0.1:${port}`;
+      const taken = await rawSocket(url, "/taken");
+      const inFlight = rawGet(url, "/pending");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      let stopped = false;
+      const shutdown = Node.shutdown().then(() => {
+        stopped = true;
+      });
+      answer();
+      const { text } = await inFlight;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(text.endsWith("\r\n\r\ndone")).toBe(true);
+      expect(taken.destroyed).toBe(false);
+      expect(stopped).toBe(false);
+
+      hijackedIo!.close();
+      await shutdown;
+      expect(stopped).toBe(true);
+    });
+
+    it("answers a request that does not hijack exactly as before", async () => {
+      let text = "";
+      await serving(
+        async () => [200, { "content-type": "text/plain", "content-length": "2" }, ["ok"]],
+        async (url) => {
+          ({ text } = await rawGet(url, "/plain"));
+        },
+      );
+
+      expect(text.replace(/\r\ndate: [^\r]*/i, "")).toBe(
+        "HTTP/1.1 200 OK\r\ncontent-type: text/plain\r\ncontent-length: 2\r\n" +
+          "Connection: close\r\n\r\nok",
+      );
+    });
+  });
+
   describe("upgrade requests", () => {
     it("offers the app a callable rack.hijack that Rack::Lint accepts", async () => {
       let env: RackEnv = {};
@@ -335,14 +511,39 @@ describe("Rack::Handler::Node", () => {
       expect(lintError).toBeNull();
     });
 
+    it("full-hijacks an upgrade through Rack::Lint and gets a TCPSocket", async () => {
+      let lintError: unknown = null;
+      let io: unknown = null;
+      const linted = new Lint(async (env) => {
+        io = (env[RACK_HIJACK] as () => TCPSocket)();
+        (io as TCPSocket).write("HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n");
+        (io as TCPSocket).closeWrite();
+        return [200, { "content-type": "text/plain" }, [""]];
+      });
+      await serving(
+        async (e) => {
+          try {
+            return await linted.call({ ...e, [RACK_ERRORS]: lintableErrors });
+          } catch (error) {
+            lintError = error;
+            return [500, {}, [""]];
+          }
+        },
+        async (url) => void (await upgradeRequest(url, "/cable")),
+      );
+
+      expect(lintError).toBeNull();
+      expect(io).toBeInstanceOf(TCPSocket);
+    });
+
     it("hands over the socket and writes nothing itself", async () => {
       const reply = await new Promise<string>((resolve, reject) => {
         serving(
           async (env) => {
-            const io = (env[RACK_HIJACK] as () => HttpSocket)();
-            io.on("data", (chunk) => {
-              io.write(`echo:${Buffer.from(chunk).toString()}`);
-              io.end();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
+            void io.waitReadable().then(() => {
+              io.write(`echo:${Buffer.from(io.read()).toString()}`);
+              io.closeWrite();
             });
             return [-1, {}, [""]];
           },
@@ -360,10 +561,10 @@ describe("Rack::Handler::Node", () => {
       const reply = await new Promise<string>((resolve, reject) => {
         serving(
           async (env) => {
-            const io = (env[RACK_HIJACK] as () => HttpSocket)();
-            io.on("data", (chunk) => {
-              io.write(`head:${Buffer.from(chunk).toString()}`);
-              io.end();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
+            void io.waitReadable().then(() => {
+              io.write(`head:${Buffer.from(io.read()).toString()}`);
+              io.closeWrite();
             });
             return [-1, {}, [""]];
           },
@@ -375,6 +576,99 @@ describe("Rack::Handler::Node", () => {
       });
 
       expect(reply).toBe("head:first-frame");
+    });
+
+    it("reads an upgrade request's body into rack.input and leaves the frame on the socket", async () => {
+      let input = "";
+      const reply = await new Promise<string>((resolve, reject) => {
+        serving(
+          async (env) => {
+            input = Buffer.from((env[RACK_INPUT] as StringIO<Uint8Array>).read()).toString();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
+            void io.waitReadable().then(() => {
+              io.write(`frame:${Buffer.from(io.read()).toString()}`);
+              io.closeWrite();
+            });
+            return [-1, {}, [""]];
+          },
+          async (url) => {
+            const socket = await openUpgrade(
+              Number(new URL(url).port),
+              "/cable",
+              "hello",
+              "content-length: 5\r\n",
+            );
+            await new Promise((r) => setTimeout(r, 50));
+            socket.write("first-frame");
+            let text = "";
+            socket.on("data", (chunk) => (text += chunk.toString()));
+            socket.on("close", () => resolve(text));
+          },
+        ).catch(reject);
+      });
+
+      expect(input).toBe("hello");
+      expect(reply).toBe("frame:first-frame");
+    });
+
+    it("reads an upgrade body sent after the handshake and hands the rest to the hijacker", async () => {
+      let input = "";
+      const reply = await new Promise<string>((resolve, reject) => {
+        serving(
+          async (env) => {
+            input = Buffer.from((env[RACK_INPUT] as StringIO<Uint8Array>).read()).toString();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
+            void io.waitReadable().then(() => {
+              io.write(`frame:${Buffer.from(io.read()).toString()}`);
+              io.closeWrite();
+            });
+            return [-1, {}, [""]];
+          },
+          async (url) => {
+            const socket = await openUpgrade(
+              Number(new URL(url).port),
+              "/cable",
+              "",
+              "content-length: 5\r\n",
+            );
+            await new Promise((r) => setTimeout(r, 50));
+            socket.write("hel");
+            await new Promise((r) => setTimeout(r, 50));
+            let text = "";
+            socket.on("data", (chunk) => (text += chunk.toString()));
+            const closed = new Promise((r) => socket.on("close", r));
+            socket.write("lofirst-frame");
+            await closed;
+            resolve(text);
+          },
+        ).catch(reject);
+      });
+
+      expect(input).toBe("hello");
+      expect(reply).toBe("frame:first-frame");
+    });
+
+    it("does not call the app when the peer closes mid-body", async () => {
+      let called = false;
+      await serving(
+        async () => {
+          called = true;
+          return [200, {}, [""]];
+        },
+        async (url) => {
+          const socket = await openUpgrade(
+            Number(new URL(url).port),
+            "/cable",
+            "he",
+            "content-length: 5\r\n",
+          );
+          await new Promise((r) => setTimeout(r, 50));
+          socket.end();
+          await new Promise((r) => setTimeout(r, 50));
+        },
+      );
+
+      expect(called).toBe(false);
     });
 
     it("answers an upgrade the app does not hijack and closes the socket", async () => {
@@ -408,10 +702,10 @@ describe("Rack::Handler::Node", () => {
           200,
           {
             "content-type": "text/event-stream",
-            "rack.hijack": ((stream: HttpSocket) => {
+            "rack.hijack": (stream: TCPSocket) => {
               stream.write("data: one\n\n");
-              stream.end();
-            }) as unknown as string,
+              stream.closeWrite();
+            },
           },
           ignored,
         ],
@@ -489,10 +783,10 @@ describe("Rack::Handler::Node", () => {
       try {
         await serving(
           async (env) => {
-            const io = (env[RACK_HIJACK] as () => HttpSocket)();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
             setTimeout(() => {
               io.write("still mine");
-              io.end();
+              io.closeWrite();
             }, 30);
             throw new Error("after hijack");
           },
@@ -518,8 +812,8 @@ describe("Rack::Handler::Node", () => {
           {
             async *[Symbol.asyncIterator]() {
               yield "first";
-              const io = (env[RACK_HIJACK] as () => HttpSocket)();
-              io.end();
+              const io = (env[RACK_HIJACK] as () => TCPSocket)();
+              io.closeWrite();
               yield "second";
             },
           },
@@ -533,19 +827,12 @@ describe("Rack::Handler::Node", () => {
       expect(text).not.toContain("second");
     });
 
-    it("leaves rack.hijack? false and rack.hijack unset on an ordinary request", async () => {
-      const env = await envFor("/users");
-
-      expect(env[RACK_IS_HIJACK]).toBe(false);
-      expect(env[RACK_HIJACK]).toBeUndefined();
-    });
-
     it("closes a socket it still owns on shutdown, and waits for the app to close one it hijacked", async () => {
-      let hijackedIo: HttpSocket | null = null;
+      let hijackedIo: TCPSocket | null = null;
       const server = await Node.run(
         async (env) => {
           if (env.PATH_INFO === "/taken") {
-            hijackedIo = (env[RACK_HIJACK] as () => HttpSocket)();
+            hijackedIo = (env[RACK_HIJACK] as () => TCPSocket)();
             return [-1, {}, [""]];
           }
           await new Promise(() => {});
@@ -571,7 +858,7 @@ describe("Rack::Handler::Node", () => {
       expect(taken.destroyed).toBe(false);
       expect(stopped).toBe(false);
 
-      hijackedIo!.destroy();
+      hijackedIo!.close();
       await shutdown;
       expect(stopped).toBe(true);
     });
@@ -580,12 +867,17 @@ describe("Rack::Handler::Node", () => {
 
 const lintableErrors = { puts() {}, write() {}, flush() {} };
 
-function openUpgrade(port: number, path: string, pipelined = ""): Promise<Socket> {
+function openUpgrade(
+  port: number,
+  path: string,
+  pipelined = "",
+  extraHeaders = "",
+): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const socket = connect(port, "127.0.0.1", () => {
       socket.write(
         `GET ${path} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n` +
-          `Connection: Upgrade\r\nUpgrade: websocket\r\n\r\n${pipelined}`,
+          `Connection: Upgrade\r\nUpgrade: websocket\r\n${extraHeaders}\r\n${pipelined}`,
       );
       resolve(socket);
     });
@@ -610,5 +902,23 @@ async function upgradeRequest(
       text += chunk.toString();
     });
     socket.on("close", () => resolve({ text, closed: true }));
+  });
+}
+
+async function rawSocket(url: string, path: string): Promise<Socket> {
+  const socket = connect(Number(new URL(url).port), "127.0.0.1");
+  await new Promise((resolve) => socket.once("connect", resolve));
+  socket.write(`GET ${path} HTTP/1.1\r\nhost: 127.0.0.1\r\nconnection: close\r\n\r\n`);
+  return socket;
+}
+
+async function rawGet(url: string, path: string): Promise<{ text: string }> {
+  const socket = await rawSocket(url, path);
+  return new Promise((resolve) => {
+    let text = "";
+    socket.on("data", (chunk) => {
+      text += chunk.toString();
+    });
+    socket.on("close", () => resolve({ text }));
   });
 }

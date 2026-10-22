@@ -9,8 +9,8 @@ export interface StaticOptions {
   root?: string;
   index?: string;
   cascade?: boolean;
-  header_rules?: [unknown, Record<string, string>][];
-  cache_control?: string;
+  headerRules?: [unknown, Record<string, string>][];
+  cacheControl?: string;
   gzip?: boolean;
 }
 
@@ -30,9 +30,9 @@ export class Static {
     this.cascade = options.cascade ?? false;
     this.gzip = options.gzip ?? false;
     const root = options.root ? File.expandPath(options.root) : Dir.pwd();
-    this.headerRules = options.header_rules ? [...options.header_rules] : [];
-    if (options.cache_control) {
-      this.headerRules.unshift(["all", { [CACHE_CONTROL]: options.cache_control }]);
+    this.headerRules = options.headerRules ? [...options.headerRules] : [];
+    if (options.cacheControl) {
+      this.headerRules.unshift(["all", { [CACHE_CONTROL]: options.cacheControl }]);
     }
     this.fileServer = new Files(root, {});
   }

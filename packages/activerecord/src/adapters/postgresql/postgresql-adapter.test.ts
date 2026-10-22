@@ -77,7 +77,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const error = await assertRaises([ConnectionNotEstablished], {}, () =>
         bad.execute("SELECT 1"),
       );
-      expect((error as ConnectionNotEstablished).connectionPool).toBeInstanceOf(NullPool);
+      expect(error.connectionPool).toBeInstanceOf(NullPool);
       await bad.disconnectBang();
     });
 
@@ -98,7 +98,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           a.execute("SELECT 1"),
         );
         expect(error.message).toBe("actual bad connection error");
-        expect((error as ConnectionNotEstablished).connectionPool).toBe(a.pool);
+        expect(error.connectionPool).toBe(a.pool);
       } finally {
         clientSpy.mockRestore();
         await a.disconnectBang().catch(() => {});
@@ -134,7 +134,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           await connection.execQuery("SELECT 1");
         });
         expect(connection).not.toBeNull();
-        expect((error as ConnectionNotEstablished).connectionPool).toBe(connection!.pool);
+        expect(error.connectionPool).toBe(connection!.pool);
       } finally {
         clientSpy.mockRestore();
         await (connection as PostgreSQLAdapter | null)?.disconnectBang().catch(() => {});
@@ -274,7 +274,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         adapter.serialSequence("zomg", "id"),
       );
 
-      expect((error as StatementInvalid).connectionPool).toBe(adapter.pool);
+      expect(error.connectionPool).toBe(adapter.pool);
     });
 
     it("default sequence name", async () => {
@@ -501,7 +501,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           }),
         );
         expect(error.message).toMatch(/could not create unique index/);
-        expect((error as RecordNotUnique).connectionPool).toBe(adapter.pool);
+        expect(error.connectionPool).toBe(adapter.pool);
 
         expect(await adapter.indexExists("ex", "number", { name: "invalid_index" })).toBeTruthy();
         expect(
@@ -752,7 +752,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         const error = await assertRaises([SQLWarning], {}, () =>
           adapter.execute("do $$ BEGIN RAISE WARNING 'PostgreSQL SQL warning'; END; $$"),
         );
-        expect((error as SQLWarning).connectionPool).toBe(adapter.pool);
+        expect(error.connectionPool).toBe(adapter.pool);
       });
     });
 

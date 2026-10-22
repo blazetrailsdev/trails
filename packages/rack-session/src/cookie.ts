@@ -36,7 +36,7 @@ interface RackErrors {
 
 export class Cookie extends PersistedSecure {
   static Base64 = class Base64 {
-    encode(str: string): string {
+    encode(str: string | Uint8Array): string {
       return RubyCompat.Base64.strictEncode64(str);
     }
 
@@ -103,7 +103,7 @@ export class Cookie extends PersistedSecure {
   };
 
   static Marshal = class Marshal {
-    encode(str: unknown): string {
+    encode(str: unknown): Uint8Array {
       return RubyCompat.Marshal.dump(str);
     }
 

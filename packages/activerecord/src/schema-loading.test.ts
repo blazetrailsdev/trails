@@ -1,20 +1,21 @@
 import { describe, it } from "vitest";
 import { Concern, assertEqual } from "@blazetrails/activesupport";
-import { Module, extend, include } from "@blazetrails/ruby-compat";
+import { extend, include, rbCallSuper } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
 type SchemaLoadCounted = typeof Base & { loadSchemaCalls?: number };
 
-const SchemaLoadCounter = new Module() as Module & { ClassMethods: Module };
+const SchemaLoadCounter = {
+  ClassMethods: {
+    loadSchemaBang(this: SchemaLoadCounted) {
+      this.loadSchemaCalls ??= 0;
+      this.loadSchemaCalls += 1;
+      return rbCallSuper(this, SchemaLoadCounter.ClassMethods.loadSchemaBang);
+    },
+  },
+};
 extend(SchemaLoadCounter, Concern);
-SchemaLoadCounter.ClassMethods = new Module((mod) => {
-  mod.defineMethod("loadSchemaBang", function (this: SchemaLoadCounted) {
-    this.loadSchemaCalls ??= 0;
-    this.loadSchemaCalls += 1;
-    return mod.superMethod(this, "loadSchemaBang")!();
-  });
-});
 
 describe("SchemaLoadingTest", () => {
   fixtures([]);

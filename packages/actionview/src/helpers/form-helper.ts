@@ -123,7 +123,7 @@ export function formFor(
   record: unknown,
   options: Record<string, unknown> = {},
   block?: (builder: FormBuilder) => unknown,
-): SafeBuffer {
+): SafeBuffer | Promise<SafeBuffer> {
   if (block === undefined) throw new ArgumentError("Missing block");
 
   let model: unknown;
@@ -192,9 +192,23 @@ export function applyFormForOptionsBang(
 
 export function formWith(
   this: FormHelperHost,
+  options: FormWithOptions,
+  block: (builder: FormBuilder) => PromiseLike<unknown>,
+): Promise<SafeBuffer>;
+export function formWith(
+  this: FormHelperHost,
+  options?: FormWithOptions,
+  block?: (builder: FormBuilder) => unknown,
+): SafeBuffer;
+/**
+ * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+ * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+ */
+export function formWith(
+  this: FormHelperHost,
   { scope = null, url = null, format = null, ...rest }: FormWithOptions = {},
   block?: (builder: FormBuilder) => unknown,
-): SafeBuffer {
+): SafeBuffer | Promise<SafeBuffer> {
   let model = "model" in rest ? rest.model : false;
   delete rest.model;
   if (model == null) {
@@ -223,6 +237,18 @@ export function formWith(
   if (block !== undefined) {
     const builder = instantiateBuilder.call(this, scope, model, options);
     const output = capture.call(this, block as (...args: unknown[]) => unknown, builder);
+    if (output instanceof Promise) {
+      return output.then((output) => {
+        if (options["multipart"] == null || options["multipart"] === false) {
+          options["multipart"] = builder.isMultipart();
+        }
+        return formTagWithBody.call(
+          this,
+          htmlOptionsForFormWith.call(this, url, model, options),
+          output,
+        );
+      });
+    }
     if (options["multipart"] == null || options["multipart"] === false) {
       options["multipart"] = builder.isMultipart();
     }
@@ -899,11 +925,15 @@ export class FormBuilder {
     return this._template.submitTag(value, options);
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
   button(
     value: unknown = null,
     options: Record<string, unknown> = {},
     block?: (value: unknown) => unknown,
-  ): SafeBuffer {
+  ): SafeBuffer | Promise<SafeBuffer> {
     if (isPlainObject(value) || value instanceof Hash) {
       [value, options] = [null, value as Record<string, unknown>];
     } else if (typeof value === "string" && value.startsWith(":")) {
@@ -919,6 +949,20 @@ export class FormBuilder {
 
     if (block !== undefined) {
       value = this._template.capture(() => block(value));
+      if (value instanceof Promise) {
+        return value.then((value) => {
+          const formmethod = options["formmethod"];
+          if (
+            isPresent(formmethod) &&
+            !/post|get/i.test(String(formmethod)) &&
+            !Object.hasOwn(options, "name") &&
+            !Object.hasOwn(options, "value")
+          ) {
+            Object.assign(options, { formmethod: "post", name: "_method", value: formmethod });
+          }
+          return this._template.buttonTag(value, options);
+        });
+      }
     }
 
     const formmethod = options["formmethod"];
@@ -1008,6 +1052,10 @@ export class FormBuilder {
     return null;
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
   private fieldsForNestedModel(
     name: string,
     object: unknown,
@@ -1027,6 +1075,17 @@ export class FormBuilder {
 
     return this._template.fieldsFor(name, object, fieldsOptions, (f) => {
       const output = this._template.capture(block as (...args: unknown[]) => unknown, f);
+      if (output instanceof Promise) {
+        return output.then((output) => {
+          if (output != null && emitHiddenId != null && emitHiddenId !== false) {
+            const emittedHiddenId = f.isEmittedHiddenId();
+            if (emittedHiddenId == null || emittedHiddenId === false) {
+              output.concat(f.hiddenField("id"));
+            }
+          }
+          return output;
+        });
+      }
       if (output != null && emitHiddenId != null && emitHiddenId !== false) {
         const emittedHiddenId = f.isEmittedHiddenId();
         if (emittedHiddenId == null || emittedHiddenId === false) {
@@ -1058,6 +1117,7 @@ onLoad("action_view", (base: unknown) => {
 });
 
 export class FormHelper {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 }
 

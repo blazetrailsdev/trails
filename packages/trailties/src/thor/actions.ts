@@ -12,8 +12,10 @@ import {
   included,
   last,
   mergeBang,
-  Module,
   Open3,
+  rbCallSuper,
+  rbModAttrReader,
+  rbModAttrWriter,
   type Process,
   rbFSystem,
   rbInspect,
@@ -363,10 +365,9 @@ export async function thor(
 
 /** @internal */
 function _sharedConfiguration(this: ActionsHost): Record<string, unknown> {
-  return Object.assign(
-    Actions.superMethod(this, "_sharedConfiguration")!() as Record<string, unknown>,
-    { destinationRoot: this.destinationRoot },
-  );
+  return Object.assign(rbCallSuper(this, _sharedConfiguration) as Record<string, unknown>, {
+    destinationRoot: this.destinationRoot,
+  });
 }
 
 /** @internal */
@@ -384,51 +385,47 @@ function _cleanupOptionsAndSet(
   }
 }
 
-export const Actions = new Module((mod) => {
-  (mod as unknown as Record<symbol, unknown>)[included] = function (base: object): void {
+export const Actions = {
+  [included](base: object): void {
     extend(base, ClassMethods);
-  };
-
-  mod.attrReader("behavior");
-  mod.attrWriter("behavior");
-  mod.moduleEval((m) => {
-    Object.defineProperty(m, "destinationRoot", {
-      get: destinationRoot,
-      set: setDestinationRoot,
-      configurable: true,
-    });
-    Object.assign(m, {
-      action,
-      relativeToOriginalDestinationRoot,
-      sourcePaths,
-      findInSourcePaths,
-      inside,
-      inRoot,
-      apply,
-      run,
-      runRubyScript,
-      thor,
-      emptyDirectory,
-      createFile,
-      addFile,
-      createLink,
-      addLink,
-      chmod,
-      prependToFile,
-      prependFile,
-      appendToFile,
-      appendFile,
-      injectIntoClass,
-      injectIntoModule,
-      gsubFile,
-      uncommentLines,
-      commentLines,
-      removeFile,
-      removeDir,
-      insertIntoFile,
-      injectIntoFile,
-      _sharedConfiguration,
-      _cleanupOptionsAndSet,
-    });
-  });
+  },
+  action,
+  relativeToOriginalDestinationRoot,
+  sourcePaths,
+  findInSourcePaths,
+  inside,
+  inRoot,
+  apply,
+  run,
+  runRubyScript,
+  thor,
+  emptyDirectory,
+  createFile,
+  addFile,
+  createLink,
+  addLink,
+  chmod,
+  prependToFile,
+  prependFile,
+  appendToFile,
+  appendFile,
+  injectIntoClass,
+  injectIntoModule,
+  gsubFile,
+  uncommentLines,
+  commentLines,
+  removeFile,
+  removeDir,
+  insertIntoFile,
+  injectIntoFile,
+  _sharedConfiguration,
+  _cleanupOptionsAndSet,
+};
+rbModAttrReader({ prototype: Actions }, "behavior");
+rbModAttrWriter({ prototype: Actions }, "behavior");
+Object.defineProperty(Actions, "destinationRoot", {
+  get: destinationRoot,
+  set: setDestinationRoot,
+  enumerable: true,
+  configurable: true,
 });

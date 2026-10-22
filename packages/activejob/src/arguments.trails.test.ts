@@ -7,12 +7,10 @@ import {
   rbHashSRuby2KeywordsHash,
   rbModConstSet,
   rbHashSRuby2KeywordsHashP,
-  include,
-  registerConstant,
-  StandardError,
 } from "@blazetrails/ruby-compat";
-import { GlobalID, Identification, MissingModelIdError } from "@blazetrails/globalid";
+import { GlobalID, MissingModelIdError } from "@blazetrails/globalid";
 import { ActiveJob } from "./index.js";
+import { Person } from "./test-helpers/models/person.js";
 import {
   Arguments,
   DeserializationError,
@@ -162,20 +160,6 @@ describe("Arguments.deserialize of a HashWithIndifferentAccess", () => {
 });
 
 describe("ActiveJob::Arguments GlobalID arm", () => {
-  class Person {
-    static primaryKey = "id";
-    id: string | null;
-    constructor(id: string | null) {
-      this.id = id;
-    }
-    static async find(id: unknown): Promise<Person> {
-      if (id === "404") throw new PersonRecordNotFound("Person not found");
-      return new this(String(id));
-    }
-  }
-  class PersonRecordNotFound extends StandardError {}
-  include(Person, Identification);
-  registerConstant("Person", Person);
   GlobalID.setApp("aj");
 
   it("round-trips an Identification-including object through gid:// and the locator", async () => {
@@ -218,6 +202,6 @@ describe("ActiveJob::Arguments GlobalID arm", () => {
   it("wraps a locator failure in DeserializationError with the original as cause", async () => {
     const error = await deserialize([{ _aj_globalid: "gid://aj/Person/404" }]).catch((e) => e);
     expect(error).toBeInstanceOf(DeserializationError);
-    expect((error as Error).cause).toBeInstanceOf(PersonRecordNotFound);
+    expect((error as Error).cause).toBeInstanceOf(Person.RecordNotFound);
   });
 });

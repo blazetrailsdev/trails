@@ -29,7 +29,10 @@ export class XMLConverter {
   private xml: unknown;
   private disallowedTypes: string[];
 
-  constructor(xml: string | StringIO | null | undefined, disallowedTypes?: string[] | null) {
+  constructor(
+    xml: string | Uint8Array | StringIO | null | undefined,
+    disallowedTypes?: string[] | null,
+  ) {
     this.xml = this.normalizeKeys(XmlMini.parse(xml));
     this.disallowedTypes = disallowedTypes ?? DISALLOWED_TYPES;
   }

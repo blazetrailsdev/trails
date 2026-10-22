@@ -1,4 +1,4 @@
-import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RecordNotFound } from "../../errors.js";
@@ -500,7 +500,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLUUIDHasManyThroughDisableJoinsTest", () => {
-    const PostgresqlUUIDHasManyThroughDisableJoinsTest = new Module();
+    const PostgresqlUUIDHasManyThroughDisableJoinsTest = {};
     registerConstant(
       "PostgresqlUUIDHasManyThroughDisableJoinsTest",
       PostgresqlUUIDHasManyThroughDisableJoinsTest,

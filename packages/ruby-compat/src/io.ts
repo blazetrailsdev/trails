@@ -1,12 +1,14 @@
 import { ConverterNotFoundError } from "./converter-not-found-error.js";
 import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { Encoding } from "./encoding.js";
+import { b } from "./string/b.js";
 import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
 import { EOFError } from "./eof-error.js";
 import { IOError } from "./io-error.js";
 import { ArgumentError } from "./argument-error.js";
 import { stderr, stdout, type WriteStream } from "./process-adapter.js";
 import { verbose } from "./verbose.js";
+import { Errno } from "./errno.js";
 import { format } from "./kernel-format.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/v3.3.11/io.c:8880`) is called through. */
@@ -143,8 +145,8 @@ function ioEncStr(
   length: number,
   enc: Encoding,
   destination: Encoding | null = null,
-): string {
-  if (enc === Encoding.ASCII_8BIT) return binaryString(bytes, length);
+): string | Uint8Array {
+  if (enc === Encoding.ASCII_8BIT) return bytes.slice(0, length);
   const read = bytes.subarray(0, length);
   if (enc.decoderLabel === null) {
     if (destination === null && (enc.name === "UTF-16" || enc.name === "UTF-32")) {
@@ -517,6 +519,19 @@ export const ioObjects = new Set<WeakRef<IO>>();
 const ioObjectsSweep = new FinalizationRegistry<WeakRef<IO>>((ref) => ioObjects.delete(ref));
 
 /**
+ * `IO::EAGAINWaitReadable` (`vendor/ruby/v3.3.11/io.c:15389`), the
+ * `Errno::EAGAIN` `read_nonblock` raises when a read would block.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO::EAGAINWaitReadable`.
+ */
+class EAGAINWaitReadable extends Errno.EAGAIN {
+  constructor(mesg?: string) {
+    super(mesg);
+    this.name = "IO::EAGAINWaitReadable";
+  }
+}
+
+/**
  * `IO` (`vendor/ruby/v3.3.11/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
  * Rails writes a credentials file through this class —
@@ -530,6 +545,9 @@ const ioObjectsSweep = new FinalizationRegistry<WeakRef<IO>>((ref) => ioObjects.
  * class this file's export lives in.
  */
 export class IO {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly EAGAINWaitReadable = EAGAINWaitReadable;
+
   /**
    * `vendor/ruby/v3.3.11/file.c:7848` — `File::Constants::NULL`, which `IO`
    * includes (`file.c:7773`), so it is `IO::NULL` and `File::NULL`:
@@ -736,15 +754,14 @@ export class IO {
   /**
    * `vendor/ruby/v3.3.11/io.c:12242` `rb_io_s_binread`, which opens the stream
    * `FMODE_BINMODE` under `rb_ascii8bit_encoding()` (`io.c:12257`) and so
-   * answers the file's BYTES — one character per byte, never a decoded
+   * answers the file's BYTES, an ASCII-8BIT `Uint8Array`, never a decoded
    * String. `IO.read` (`io.c:12200`) is the member that decodes.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.binread`
    * (`vendor/ruby/v3.3.11/io.c:12242`).
    */
-  static binread(name: string): string {
-    const bytes = getFs().readFileSync(name);
-    return binaryString(bytes, bytes.length);
+  static binread(name: string): Uint8Array {
+    return Uint8Array.from(getFs().readFileSync(name));
   }
 
   /**
@@ -757,8 +774,8 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO.binwrite`
    * (`vendor/ruby/v3.3.11/io.c:12396`).
    */
-  static binwrite(name: string, string: string): number {
-    const buffer = binaryBytes(string);
+  static binwrite(name: string, string: string | Uint8Array): number {
+    const buffer = typeof string === "string" ? binaryBytes(string) : string;
     getFs().writeFileSync(name, buffer);
     return buffer.length;
   }
@@ -882,12 +899,14 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
    * (`vendor/ruby/v3.3.11/io.c:3774`).
    */
-  read(): string;
-  read(length: number | null, str?: Uint8Array | null): string | null;
-  read(length?: number | null, str?: Uint8Array | null): string | null {
+  read(): string | Uint8Array;
+  read(length: null, str?: Uint8Array | null): string | Uint8Array;
+  read(length: number, str?: Uint8Array | null): Uint8Array | null;
+  read(length: number | null, str?: Uint8Array | null): string | Uint8Array | null;
+  read(length?: number | null, str?: Uint8Array | null): string | Uint8Array | null {
     if (length == null) {
       const all = this.readAll();
-      if (str) str.set(binaryBytes(all).subarray(0, str.length));
+      if (str) str.set(b(all).subarray(0, str.length));
       return all;
     }
 
@@ -900,11 +919,11 @@ export class IO {
     }
     if (n === 0) {
       if (str) str.fill(0);
-      return length === 0 ? "" : null;
+      return length === 0 ? new Uint8Array(0) : null;
     }
     this._pos += n;
     if (str) str.set(buffer.subarray(0, Math.min(n, str.length)));
-    return binaryString(buffer, n);
+    return buffer.slice(0, n);
   }
 
   /**
@@ -916,11 +935,22 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#each_line`
    * (`vendor/ruby/v3.3.11/io.c:4649`).
    */
-  eachLine(): Generator<string>;
-  eachLine(block: (line: string) => void): this;
-  eachLine(block?: (line: string) => void): this | Generator<string> {
-    const lines = function* (io: IO): Generator<string> {
-      yield* io.readAll().match(/[^\n]*\n|[^\n]+$/g) ?? [];
+  eachLine(): Generator<string | Uint8Array>;
+  eachLine(block: (line: string | Uint8Array) => void): this;
+  eachLine(block?: (line: string | Uint8Array) => void): this | Generator<string | Uint8Array> {
+    const lines = function* (io: IO): Generator<string | Uint8Array> {
+      const all = io.readAll();
+      if (typeof all === "string") {
+        yield* all.match(/[^\n]*\n|[^\n]+$/g) ?? [];
+        return;
+      }
+      let start = 0;
+      for (let i = 0; i < all.length; i++) {
+        if (all[i] !== 0x0a) continue;
+        yield all.slice(start, i + 1);
+        start = i + 1;
+      }
+      if (start < all.length) yield all.slice(start);
     };
     if (!block) return lines(this);
     for (const line of lines(this)) block(line);
@@ -933,9 +963,9 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#each`
    * (`vendor/ruby/v3.3.11/io.c:15462`).
    */
-  each(): Generator<string>;
-  each(block: (line: string) => void): this;
-  each(block?: (line: string) => void): this | Generator<string> {
+  each(): Generator<string | Uint8Array>;
+  each(block: (line: string | Uint8Array) => void): this;
+  each(block?: (line: string | Uint8Array) => void): this | Generator<string | Uint8Array> {
     return block ? this.eachLine(block) : this.eachLine();
   }
 
@@ -947,7 +977,7 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#gets`
    * (`vendor/ruby/v3.3.11/io.c:4363`).
    */
-  gets(): string | null {
+  gets(): string | Uint8Array | null {
     const bytes: number[] = [];
     let b: number | null;
     while ((b = this.getbyte()) !== null) {
@@ -972,7 +1002,7 @@ export class IO {
    * stream keeps the bytes. The chunks are joined before decoding because a
    * multi-byte character can straddle two of them.
    */
-  private readAll(): string {
+  private readAll(): string | Uint8Array {
     const buffer = new Uint8Array(READ_CHUNK);
     const chunks: Uint8Array[] = [];
     let total = 0;
@@ -1114,7 +1144,7 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#readpartial`
    * (`vendor/ruby/v3.3.11/io.c:3590`).
    */
-  readpartial(maxlen: number, outbuf?: Uint8Array | null): string {
+  readpartial(maxlen: number, outbuf?: Uint8Array | null): Uint8Array {
     const ret = this.read(maxlen, outbuf);
     if (ret === null) throw new EOFError("end of file reached");
     return ret;

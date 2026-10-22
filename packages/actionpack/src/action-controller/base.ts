@@ -220,13 +220,14 @@ export interface RenderOptions {
   json?: unknown;
   js?: unknown;
   xml?: unknown;
-  plain?: string | number | boolean | null;
+  plain?: string | number | boolean | null | object;
   html?: string | SafeBuffer | boolean | null;
   body?: string | Buffer | boolean | null;
   action?: string;
   template?: string;
   file?: string | { toPath(): string };
   inline?: string;
+  assigns?: Record<string, unknown>;
   type?: string;
   renderable?: { renderIn(...args: never[]): unknown };
   partial?: string;
@@ -256,12 +257,15 @@ type RenderOptionsFor<P extends string> = Omit<RenderOptions, "partial" | "local
       {} extends TemplateLocals<TemplateRegistry[P]>
       ? { locals?: TemplateLocals<TemplateRegistry[P]> }
       : { locals: TemplateLocals<TemplateRegistry[P]> }
-    : { locals?: Record<string, unknown> });
+    : { locals?: Record<string, unknown> | StrongParameters });
 
 type RenderArgs<P extends string> =
   | []
   | [RenderOptionsFor<P> | StrongParameters]
-  | [string | ToModel | NonNullable<RenderOptions["renderable"]>, RenderOptionsFor<P>?];
+  | [
+      string | ToModel | { toPartialPath(): string } | NonNullable<RenderOptions["renderable"]>,
+      RenderOptionsFor<P>?,
+    ];
 
 type StreamingBody = { each(block: (chunk: string) => void): Promise<unknown> };
 
@@ -583,8 +587,8 @@ export class Base extends Metal {
 
   declare static _wrapperOptions: ParamsWrapperOptions;
   declare _wrapperOptions: ParamsWrapperOptions;
-  declare static is_wrapperOptions: boolean;
-  declare is_wrapperOptions: boolean;
+  declare static _isWrapperOptions: boolean;
+  declare _isWrapperOptions: boolean;
   /** @internal */
   declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
   declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;

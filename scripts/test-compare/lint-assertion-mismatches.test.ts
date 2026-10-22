@@ -61,8 +61,13 @@ describe("main", () => {
     );
   });
 
-  it("fails when the artifact carries a package the base does not", async () => {
+  it("admits a package the base does not carry when it has no debt", async () => {
     await writeFixtures({ activerecord: [1, 1, 1], arel: [0, 0, 0] }, { activerecord: [1, 1, 1] });
+    expect(await main(paths)).toBe(0);
+  });
+
+  it("fails when the artifact carries a package the base does not", async () => {
+    await writeFixtures({ activerecord: [1, 1, 1], arel: [0, 1, 0] }, { activerecord: [1, 1, 1] });
     expect(await main(paths)).toBe(1);
     expect(vi.mocked(console.error).mock.calls.join("\n")).toContain("absent from");
   });

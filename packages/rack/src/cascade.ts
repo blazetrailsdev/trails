@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import { hasKey, rbFSend } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
@@ -14,7 +15,7 @@ export class Cascade {
     for (const s of cascadeFor) this.cascadeFor[s] = true;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     if (this.apps.length === 0) {
       return [404, { [CONTENT_TYPE]: "text/plain" }, []];
     }

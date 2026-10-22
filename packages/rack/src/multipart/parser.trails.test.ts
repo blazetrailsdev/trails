@@ -40,7 +40,9 @@ describe("Rack::Multipart::Parser encodings", () => {
 
     const file = parseBody(body, Parser.TEMPFILE_FACTORY).params!["file"];
     file.tempfile.close();
-    expect(File.binread(file.tempfile.path())).toBe(bytes);
+    expect(File.binread(file.tempfile.path())).toEqual(
+      Uint8Array.from(bytes, (c) => c.charCodeAt(0)),
+    );
   });
 
   it("decodes a text part's bytes under its charset", () => {
@@ -101,9 +103,22 @@ describe("Parser#tag_multipart_encoding", () => {
     const input = `--AaB03x\r\nContent-Disposition: form-data; name="${nameBytes}"\r\n\r\nvalue\r\n--AaB03x--\r\n`;
     const env = MockRequest.envFor("/", {
       ":method": "POST",
-      ":input": input,
+      ":input": Buffer.from(input, "latin1"),
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
     });
     expect(new Request(env).POST).toEqual({ Iñtërnâtiônàlizætiøn: "value" });
+  });
+});
+
+describe("Parser::MULTIPART_CONTENT_TYPE", () => {
+  it("matches a content-type value holding a bare CR, as Ruby's . does", () => {
+    const input = `--AaB03x\r\nContent-Disposition: form-data; name="file"; filename="a.txt"\r\nContent-Type: text/plain\r; x=1\r\n\r\ncontents\r\n--AaB03x--\r\n`;
+    const env = MockRequest.envFor("/", {
+      ":method": "POST",
+      ":input": Buffer.from(input, "latin1"),
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    });
+    const file = (new Request(env).POST as Record<string, { type: string }>).file;
+    expect(file.type).toBe("text/plain\r; x=1");
   });
 });

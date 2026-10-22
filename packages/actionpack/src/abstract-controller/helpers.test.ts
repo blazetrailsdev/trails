@@ -3,7 +3,6 @@ import {
   extend,
   include,
   isModuleIncluded,
-  Module,
   NoMethodError,
   publicInstanceMethods,
   rbModName,
@@ -175,14 +174,14 @@ describe("helperMethod", () => {
 describe("helper", () => {
   it("includes a module's methods into _helpers", () => {
     const cls = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     cls.helper(FooHelper);
     expect(view(cls).foo()).toBe("FOO");
   });
 
   it("is idempotent when the same module is included twice", () => {
     const cls = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     cls.helper(FooHelper);
     const helpersBefore = cls._helpers;
     cls.helper(FooHelper);
@@ -192,7 +191,7 @@ describe("helper", () => {
 
   it("a duplicate-include no-op does NOT fork the subclass helpers module", () => {
     const parent = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     parent.helper(FooHelper);
     const child = Object.create(parent) as HelpersClass;
 
@@ -204,8 +203,8 @@ describe("helper", () => {
 
   it("re-including a module after a later module overrode its method is a no-op (identity-based)", () => {
     const cls = makeBase();
-    const A = new Module().include({ foo: () => "A.foo" });
-    const B = new Module().include({ foo: () => "B.foo" });
+    const A = { foo: () => "A.foo" };
+    const B = { foo: () => "B.foo" };
     cls.helper(A);
     cls.helper(B);
     expect(view(cls).foo()).toBe("B.foo");
@@ -224,24 +223,15 @@ describe("helper", () => {
   it("direct-method precedence: helperMethod beats a later helper(Mod) with the same name", () => {
     const cls = makeBase();
     helperMethod.call(cls, "x");
-    const Override = new Module().include({ x: () => "from-module" });
+    const Override = { x: () => "from-module" };
     cls.helper(Override);
     expect(() => view(cls).x()).toThrow(NoMethodError);
   });
 
-  it("included modules stay live — methods added after include are visible", () => {
-    const cls = makeBase();
-    const Live = new Module().include({ early: () => "early" });
-    cls.helper(Live);
-    Live.defineMethod("late", () => "late");
-    expect(view(cls).early()).toBe("early");
-    expect(view(cls).late()).toBe("late");
-  });
-
   it("multiple includes layer in the ancestor chain (both reachable)", () => {
     const cls = makeBase();
-    const A = new Module().include({ fromA: () => "A" });
-    const B = new Module().include({ fromB: () => "B" });
+    const A = { fromA: () => "A" };
+    const B = { fromB: () => "B" };
     cls.helper(A);
     cls.helper(B);
     expect(view(cls).fromA()).toBe("A");
@@ -250,7 +240,7 @@ describe("helper", () => {
 
   it("an included module is enumerable, so including _helpers elsewhere carries it", () => {
     const cls = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     cls.helper(FooHelper);
 
     class ViewContext {}
@@ -262,8 +252,8 @@ describe("helper", () => {
 
   it("carries every layered module, and helper_method proxies with them", () => {
     const cls = makeBase();
-    cls.helper(new Module().include({ fromA: () => "A" }));
-    cls.helper(new Module().include({ fromB: () => "B" }));
+    cls.helper({ fromA: () => "A" });
+    cls.helper({ fromB: () => "B" });
     helperMethod.call(cls, "currentUser");
 
     class ViewContext {}
@@ -277,7 +267,7 @@ describe("helper", () => {
 
   it("accepts modules and a block mixed together", () => {
     const cls = makeBase();
-    const FooHelper = new Module().include({ foo: () => "FOO" });
+    const FooHelper = { foo: () => "FOO" };
     cls.helper(FooHelper, (mod) => {
       mod.bar = () => "BAR";
     });
@@ -289,7 +279,7 @@ describe("helper", () => {
 describe("identity tracking lives on the helpers module chain, not the class", () => {
   it("after clearHelpers, the same module can be re-included on the cleared child", () => {
     const parent = makeBase();
-    const Shared = new Module().include({ shared: () => "S" });
+    const Shared = { shared: () => "S" };
     parent.helper(Shared);
     const child = Object.create(parent) as HelpersClass;
 
@@ -305,7 +295,7 @@ describe("identity tracking lives on the helpers module chain, not the class", (
 describe("clearHelpers", () => {
   it("wipes _helpers + _helperMethods, then re-adds the previous helper_method proxies", () => {
     const cls = makeBase();
-    const ExtraHelper = new Module().include({ extra: () => "EXTRA" });
+    const ExtraHelper = { extra: () => "EXTRA" };
     helperMethod.call(cls, "keep");
     cls.helper(ExtraHelper);
     expect("keep" in view(cls)).toBe(true);
@@ -345,7 +335,7 @@ describe("_helpersForModification", () => {
 describe("_helpers", () => {
   it("the instance reader is self.class._helpers", () => {
     const cls = makeBase();
-    const host = new (cls as unknown as new () => { _helpers: Module })();
+    const host = new (cls as unknown as new () => { _helpers: object })();
     expect(host._helpers).toBe(cls._helpers);
   });
 
@@ -355,12 +345,12 @@ describe("_helpers", () => {
       class extends (parent as unknown as new () => object) {})() as unknown as HelpersClass;
     expect(child._helpers).toBe(parent._helpers);
 
-    const mod = new Module();
+    const mod = {};
     child._helpers = mod;
     expect(child._helpers).toBe(mod);
     expect(parent._helpers).not.toBe(mod);
 
-    (child as { _helpers: Module | null })._helpers = null;
+    (child as { _helpers: object | null })._helpers = null;
     expect(child._helpers).toBe(parent._helpers);
   });
 });
@@ -369,7 +359,7 @@ describe("defineHelpersModule", () => {
   it("is idempotent per class — same class returns the same module", () => {
     const cls = makeBase();
     expect(cls.defineHelpersModule(cls)).toBe(cls._helpers);
-    expect((cls as unknown as { HelperMethods: Module }).HelperMethods).toBe(cls._helpers);
+    expect((cls as unknown as { HelperMethods: object }).HelperMethods).toBe(cls._helpers);
   });
 
   it("names the module after the class it is seated on", () => {

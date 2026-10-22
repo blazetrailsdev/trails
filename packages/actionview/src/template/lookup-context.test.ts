@@ -23,7 +23,7 @@ import { FixtureResolver } from "../testing/resolvers.js";
 import { ActionView } from "../namespaces.js";
 import { MissingTemplate } from "./error.js";
 import { TemplateHandlers } from "./handlers.js";
-import { Tse } from "./handlers/tse.js";
+import { TSE } from "./handlers/tse.js";
 
 const FIXTURE_LOAD_PATH = new FixtureResolver({
   "test/hello_world.tse": "Hello world!",
@@ -44,7 +44,7 @@ describe("LookupContextTest", () => {
   }
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     enforceAvailableLocales = I18n.enforceAvailableLocales();
     I18n.setEnforceAvailableLocales(false);
     lookupContext = buildLookupContext([FIXTURE_LOAD_PATH], {});
@@ -62,7 +62,10 @@ describe("LookupContextTest", () => {
     try {
       Base.defaultFormats = [":foo", ":bar"];
 
-      assertEqual([":foo", ":bar"], new LookupContext([]).defaultFormats());
+      assertEqual(
+        [":foo", ":bar"],
+        (new LookupContext([]) as unknown as { defaultFormats(): unknown }).defaultFormats(),
+      );
     } finally {
       Base.defaultFormats = formats;
     }
@@ -170,7 +173,7 @@ describe("LookupContextTest", () => {
     assertEqual("Hello texty phone!", template.source);
   });
 
-  // BLOCKED: template/handlers/builder.rb is unported (scripts/parity/unported-files/actionview.ts)
+  // BLOCKED: port-builder-template-handler
   it.skip("found templates have nil format if one cannot be found from template or handler", async () => {
     const { Builder } = TemplateHandlers as unknown as { Builder: { defaultFormat: unknown } };
     await assertCalled(Builder, "defaultFormat", null, { returns: null }, () => {

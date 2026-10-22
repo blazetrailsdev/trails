@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import {
   ArgumentError,
   hasKey,
@@ -242,23 +243,19 @@ export abstract class Helpers {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:373`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
-  static get(status: number, headers: Record<string, string | string[]>, body: any): Response {
+  static get(status: number, headers: RackHeaders, body: any): Response {
     return new this(body, status, headers);
   }
 
   status: number;
-  headers: Record<string, string | string[]>;
+  headers: Record<string, RackHeaders[string]>;
   protected _body: any;
   length: number | null;
   private _buffered: boolean | null;
   private _block: ((self: Response) => void) | null;
   private _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
-  constructor(
-    body: any = null,
-    status: number | string = 200,
-    headers: Record<string, string | string[]> = {},
-  ) {
+  constructor(body: any = null, status: number | string = 200, headers: RackHeaders = {}) {
     this.status = Number(toI(status));
 
     if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {

@@ -58,7 +58,11 @@ export class MemoryStore extends Store implements CacheStore {
   private cachedSize(key: string, payload: Entry | string): number {
     return (
       UTF8.encode(String(key)).length +
-      (typeof payload === "string" ? UTF8.encode(payload).length : payload.bytesize()) +
+      (typeof payload === "string"
+        ? UTF8.encode(payload).length
+        : payload instanceof Uint8Array
+          ? payload.length
+          : payload.bytesize()) +
       PER_ENTRY_OVERHEAD
     );
   }
@@ -82,8 +86,16 @@ export class MemoryStore extends Store implements CacheStore {
     const oldPayload = this.data.get(key);
     if (oldPayload !== undefined) {
       this.cacheSize -=
-        (typeof oldPayload === "string" ? UTF8.encode(oldPayload).length : oldPayload.bytesize()) -
-        (typeof payload === "string" ? UTF8.encode(payload).length : payload.bytesize());
+        (typeof oldPayload === "string"
+          ? UTF8.encode(oldPayload).length
+          : oldPayload instanceof Uint8Array
+            ? oldPayload.length
+            : oldPayload.bytesize()) -
+        (typeof payload === "string"
+          ? UTF8.encode(payload).length
+          : payload instanceof Uint8Array
+            ? payload.length
+            : payload.bytesize());
     } else {
       this.cacheSize += this.cachedSize(key, payload);
     }

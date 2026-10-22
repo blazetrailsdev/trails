@@ -689,6 +689,18 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "Node's event loop stands in for Action Cable's `NIO::Selector` and its " +
+      "thread (CLAUDE.md, \"Node's event loop stands in for Action Cable's nio4r " +
+      'selector"). `spawn`, `run` and `wakeup` own and interrupt the selector ' +
+      "thread (stream_event_loop.rb:62-133); `writes_pending` (:47-54) and " +
+      "`Stream#flush_write_buffer` (stream.rb:72-92) carry a partial " +
+      "`write_nonblock`, which a `net.Socket` never leaves.",
+    names: ["spawn", "run", "wakeup", "writes_pending", "flush_write_buffer"],
+    rubyFiles: ["connection/stream_event_loop.rb", "connection/stream.rb"],
+    packages: ["actioncable"],
+  },
+  {
+    reason:
       "`Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs " +
       "Thorfiles) is not ported, and these `Thor::Util` members exist only for it: " +
       "`namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside " +
@@ -1715,8 +1727,6 @@ function rubyMethodToTsWithoutUnderscore(
     const literal = collides ? [snakeToCamel(base) + "?"] : [];
     const lead = /^_*/.exec(camel)![0];
     const isPrefixed = lead + "is" + camel.slice(lead.length).replace(/^./, (c) => c.toUpperCase());
-    const generatedIsPrefixed =
-      lead === "" ? [] : ["is" + camel.replace(/^./, (c) => c.toUpperCase())];
     // Names already starting with `is_` collapse to one candidate so
     // `is_number?` → ["isNumber"] (not ["isIsNumber", "isNumber"]).
     // The `isPrefixed` form is intentionally NOT offered as a fallback
@@ -1744,13 +1754,7 @@ function rubyMethodToTsWithoutUnderscore(
       return [...literal, isPrefixed, camel, containment];
     }
     const hasAlias = HAS_PREDICATE_ALIASES.get(name) ?? PLURAL_PREDICATE_ALIASES.get(name);
-    return [
-      ...literal,
-      isPrefixed,
-      ...generatedIsPrefixed,
-      camel,
-      ...(hasAlias === undefined ? [] : [hasAlias]),
-    ];
+    return [...literal, isPrefixed, camel, ...(hasAlias === undefined ? [] : [hasAlias])];
   }
 
   if (name.endsWith("!")) {

@@ -15,7 +15,7 @@ export interface SearchableHost {
 }
 
 export function css(this: SearchableHost, ...args: unknown[]): NodeSet {
-  const [rules, handler, ns] = extractParams(args);
+  const [rules, handler, ns] = extractParams.call(this, args);
 
   return cssInternal(this, rules, handler, ns);
 }
@@ -28,6 +28,7 @@ export const Searchable = { css, atCss };
 
 /** @internal */
 export function extractParams(
+  this: SearchableHost,
   params: unknown[],
 ): [string[], unknown, Record<string, string>, Record<string, unknown> | undefined] {
   const handler = params.find(
@@ -40,12 +41,15 @@ export function extractParams(
     hashes.push(params.pop());
     if (params.length === 0) break;
   }
-  const [ns, binds] = hashes.reverse() as [
-    Record<string, string> | undefined,
-    Record<string, unknown> | undefined,
-  ];
+  hashes.reverse();
+  let ns = hashes[0] as Record<string, string> | undefined;
+  const binds = hashes[1] as Record<string, unknown> | undefined;
 
-  return [params as string[], handler, ns ?? {}, binds];
+  ns ??=
+    (this.document as { root?: { namespaces?: Record<string, string> } | null }).root?.namespaces ??
+    {};
+
+  return [params as string[], handler, ns, binds];
 }
 
 function isHash(param: unknown): param is Record<string, unknown> {

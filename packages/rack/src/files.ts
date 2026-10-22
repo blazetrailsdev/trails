@@ -94,14 +94,14 @@ export class Iterator extends BaseIterator {
 
 export class Files {
   root: string;
-  private headers: Record<string, string>;
+  private headers: Record<string, string> | null;
   private defaultMime: string | null;
   private head: Head;
 
   /** @missingRailsArgs new — PERMANENT */
   constructor(
-    root: string,
-    headers: Record<string, string> = {},
+    root: string | null,
+    headers: Record<string, string> | null = {},
     defaultMime: string | null = "text/plain",
   ) {
     this.root = root ? File.expandPath(root) : "";

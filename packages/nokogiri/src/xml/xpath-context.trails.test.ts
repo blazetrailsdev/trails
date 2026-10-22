@@ -4,6 +4,7 @@ import { Document } from "../html5/document.js";
 import { XmlDocument } from "./document.js";
 import type { NodeSet } from "./node-set.js";
 import type { Attr } from "./attr.js";
+import type { Namespace } from "./namespace.js";
 import { XPathContext } from "./xpath-context.js";
 import { SyntaxError } from "./xpath/syntax-error.js";
 
@@ -102,5 +103,35 @@ describe("XPathContext", () => {
     expect(() => new XPathContext(doc).registerVariable("n", 1)).toThrow(
       "no implicit conversion of Integer into String",
     );
+  });
+  it("answers the namespace axis as XML::Namespace over the libxml2 tree", () => {
+    const doc = XmlDocument.parse('<root xmlns="urn:d" xmlns:a="urn:a"><a:c b="1"/></root>');
+    const c = doc.root.children[0];
+    const context = new XPathContext(c as never);
+    const set = context.evaluate("namespace::*") as NodeSet;
+    const pairs = set.map((n) => {
+      const ns = n as unknown as Namespace;
+      return [ns.prefix, ns.href];
+    });
+    expect(pairs).toContainEqual(["xml", "http://www.w3.org/XML/1998/namespace"]);
+    expect(pairs).toContainEqual([null, "urn:d"]);
+    expect(pairs).toContainEqual(["a", "urn:a"]);
+    expect(pairs).toHaveLength(3);
+    expect(context.evaluate("string(namespace::a)")).toBe("urn:a");
+    expect(context.evaluate("count(namespace::* | @*)")).toBe(4);
+    expect(set.plus(context.evaluate("namespace::*") as NodeSet).length).toBe(3);
+    (
+      c._node as unknown as { addNsDeclaration(uri: string, prefix: string): void }
+    ).addNsDeclaration("urn:e", "e");
+    expect(context.evaluate("string(namespace::e)")).toBe("urn:e");
+    doc.dispose();
+  });
+
+  it("answers the namespace axis over the HTML5 tree", () => {
+    const doc = Document.parse(html, null, null, {});
+    const context = new XPathContext(doc);
+    const set = context.evaluate("//p/namespace::*") as NodeSet;
+    expect(set.map((n) => (n as unknown as Namespace).prefix)).toEqual(["xml"]);
+    expect(context.evaluate("name(//p/namespace::xml)")).toBe("xml");
   });
 });

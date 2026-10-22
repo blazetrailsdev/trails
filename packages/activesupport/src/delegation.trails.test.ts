@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { NameError, NoMethodError } from "@blazetrails/ruby-compat";
-import { Module } from "@blazetrails/ruby-compat/include";
+import { classModule, NameError, NoMethodError } from "@blazetrails/ruby-compat";
+
 import { Delegation, DelegationError } from "./delegation.js";
 import { delegate } from "./module-ext.js";
 
@@ -69,15 +69,12 @@ describe("Delegation.generate", () => {
   });
 
   it("looks the method up on a module named by as", () => {
-    const Nameable = new Module((mod) => {
-      mod.moduleEval((m) => {
-        Object.assign(m, {
-          rename(first: string, last: string) {
-            return `${first} ${last}`;
-          },
-        });
-      });
-    });
+    class Nameable {
+      static readonly [classModule] = true;
+      rename(first: string, last: string) {
+        return `${first} ${last}`;
+      }
+    }
     class Order {
       customer = {
         rename(first: string, last: string) {
@@ -187,5 +184,44 @@ describe("delegate", () => {
       "name",
     ]);
     expect(new Order().name()).toBe("Ada");
+  });
+
+  it("gives a reader and writer pair one accessor", () => {
+    class Adapter {
+      x = 1;
+    }
+    class Helper {
+      adapter = new Adapter();
+      someMethod() {
+        return this.adapter;
+      }
+      declare x: number;
+    }
+    delegate.call(Helper.prototype, "x", "x=", { to: "someMethod" });
+
+    const helper = new Helper();
+    expect(helper.x).toBe(1);
+    helper.x = 2;
+    expect(helper.adapter.x).toBe(2);
+    expect(helper.x).toBe(2);
+  });
+
+  it("gives a writer and reader pair one accessor", () => {
+    class Adapter {
+      x = 1;
+    }
+    class Helper {
+      adapter = new Adapter();
+      someMethod() {
+        return this.adapter;
+      }
+      declare x: number;
+    }
+    delegate.call(Helper.prototype, "x=", "x", { to: "someMethod" });
+
+    const helper = new Helper();
+    expect(helper.x).toBe(1);
+    helper.x = 2;
+    expect(helper.adapter.x).toBe(2);
   });
 });

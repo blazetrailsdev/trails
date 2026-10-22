@@ -567,6 +567,27 @@
     "ref": "v8.0.2"
   },
   {
+    "package": "actioncable",
+    "rubyFile": "deprecator.rb",
+    "rubyName": "deprecator",
+    "digest": "1191c4914c2f4a6a",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncable",
+    "rubyFile": "gem_version.rb",
+    "rubyName": "gem_version",
+    "digest": "1575150db471364f",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "actioncable",
+    "rubyFile": "version.rb",
+    "rubyName": "version",
+    "digest": "a928486f9957840f",
+    "ref": "v8.0.2"
+  },
+  {
     "package": "actioncontroller",
     "rubyFile": "api.rb",
     "rubyName": "_allow_other_host",

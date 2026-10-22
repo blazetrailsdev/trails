@@ -19,7 +19,6 @@ import {
   Dir,
   File,
   LoadError,
-  Module,
   NoMethodError,
   rbFSend,
   rbObjSingletonClass,
@@ -223,18 +222,14 @@ describe("IntegrationTestTest", () => {
   });
 
   it("does not prevent method missing passing up to ancestors", () => {
-    const mixin = new Module((mod) => {
-      mod.defineMethod("methodMissing", (name: string) => {
+    const mixin = {
+      methodMissing(name: string) {
         if (name === "foo") return "pass";
         throw new NoMethodError(`undefined method '${name}'`, name);
-      });
-    });
-    include(test.constructor as typeof IntegrationTest, mixin);
-    try {
-      expect(rbFSend(test, "foo")).toBe("pass");
-    } finally {
-      mixin.removeMethod("methodMissing");
-    }
+      },
+    };
+    include(rbObjSingletonClass(test) as typeof IntegrationTest, mixin);
+    expect(rbFSend(test, "foo")).toBe("pass");
   });
 });
 

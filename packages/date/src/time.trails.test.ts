@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Date as RbDate, DateTime } from "./date.js";
 import { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
-import { Rational, env, rbFSend, rbObjRespondTo, setEnv } from "@blazetrails/ruby-compat";
+import { Rational, env, rbFSend, rbObjRespondTo, setEnv, toF } from "@blazetrails/ruby-compat";
 
 describe("Time#utc?, #getutc and #getlocal on an Instant and a JS Date", () => {
   afterEach(() => {
@@ -865,14 +865,15 @@ describe("Time#hash", () => {
 describe("Time through Marshal", () => {
   it("loads ruby -e 'Marshal.dump(Time.utc(2004,1,2,3,4,5.5r))' and round-trips a local time", async () => {
     const { Marshal } = await import("@blazetrails/ruby-compat");
+    const dumpStr = (value: unknown): string => String.fromCharCode(...Marshal.dump(value));
     const mri = '\x04\bIu:\tTime\rC\x00\x1A\xC0 \xA1W\x10\x06:\tzoneI"\bUTC\x06:\x06EF';
     const t = Marshal.load(mri) as Time;
     expect([t.toS(), t.usec]).toEqual(["2004-01-02 03:04:05 UTC", 500000]);
-    expect(Marshal.dump(Time.utc(2004, 1, 2, 3, 4, 5.5))).toBe(mri.replace(/F$/, "T"));
-    expect(Marshal.dump(Time.utc(1800, 3, 4, 5, 6, 7))).toBe(
+    expect(dumpStr(Time.utc(2004, 1, 2, 3, 4, 5.5))).toBe(mri.replace(/F$/, "T"));
+    expect(dumpStr(Time.utc(1800, 3, 4, 5, 6, 7))).toBe(
       '\x04\bIu:\tTime\x0F\x85\b\x00\xC0\x00\x00p\x18\x06d\x06:\tzoneI"\bUTC\x06:\x06ET',
     );
-    expect(Marshal.dump(Time.utc(70000, 1, 1))).toBe(
+    expect(dumpStr(Time.utc(70000, 1, 1))).toBe(
       '\x04\bIu:\tTime\x10 \xC0\xFF\xFF\x00\x00\x00\x00\x07\x05\n\x06:\tzoneI"\bUTC\x06:\x06ET',
     );
     const third =
@@ -909,5 +910,11 @@ describe("Date#iso8601, DateTime#iso8601 and Time#xmlschema on a Temporal seat",
     const now = DateTime.now();
     const parsed = DateTime.iso8601(rbFSend(now, "iso8601", 9) as string);
     expect(String(parsed)).toBe(String(now));
+  });
+});
+
+describe("Time.at with a boxed Float", () => {
+  it("reads an integral Float from toF as its seconds", () => {
+    expect(Time.at(toF(946684800)).toI()).toBe(946684800);
   });
 });

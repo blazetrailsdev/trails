@@ -2,7 +2,8 @@ import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import ts from "typescript-5";
-import { camelize, dasherize, pluralize, underscore } from "@blazetrails/activesupport";
+import { Encoding } from "@blazetrails/ruby-compat";
+import { camelize, chomp, dasherize, pluralize, underscore } from "@blazetrails/activesupport";
 import {
   decodeLineMappings,
   generateSourceMap,
@@ -10,7 +11,9 @@ import {
   type LineMapping,
 } from "@blazetrails/tse-compiler";
 import {
+  tseHandlerScope,
   tseLookupTransformer,
+  virtualizeHandler,
   virtualizeTseWithDeltas,
   parseLocalsSignature,
   localsParamType,
@@ -22,11 +25,13 @@ export interface BuildViewsOptions {
   viewsDir?: string;
   outDir?: string;
   inPlace?: boolean;
+  handlers?: readonly string[];
 }
 
 export interface BuildViewsResult {
   count: number;
   files: readonly string[];
+  skipped: readonly string[];
 }
 
 export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildViewsResult> {
@@ -34,26 +39,59 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
   const viewsDir = path.resolve(cwd, opts.viewsDir ?? "app/views");
   const outDir = path.resolve(cwd, opts.outDir ?? ".trails");
   const outViews = opts.inPlace ? viewsDir : path.join(outDir, "views");
-  const files = await walkTse(viewsDir);
+  const { Base, PathParser, TemplateHandlers, TseHandler, UnboundTemplate, WrongEncodingError } =
+    await import("@blazetrails/actionview");
+  for (const handlers of opts.handlers ?? []) await import(path.resolve(cwd, handlers));
+  const pathParser = new PathParser();
+  const { files, skipped } = await walkTemplates(
+    viewsDir,
+    TemplateHandlers.templateHandlerExtensions(),
+  );
   if (!opts.inPlace) await clearOutViews(cwd, outDir, outViews);
   const registryMap = new Map<string, string[]>();
   const appDir = path.dirname(viewsDir);
   const helpers = await allHelpersFromPath(path.join(appDir, "helpers"));
   const controllers = await allControllers(path.join(appDir, "controllers"));
   const views: ViewShim[] = [];
+  const handled: HandlerShim[] = [];
   for (const rel of files) {
-    const src = await fs.readFile(path.join(viewsDir, rel), "utf8");
+    const source = await fs.readFile(path.join(viewsDir, rel), "utf8");
     const outBase = path.join(outViews, rel);
+    const parsed = pathParser.parse(rel);
+    const template = new UnboundTemplate(source, path.join(viewsDir, rel), {
+      details: parsed.details,
+      virtualPath: parsed.path.virtual,
+    }).bindLocals([]);
+    await fs.mkdir(path.dirname(outBase), { recursive: true });
+    if (!(template.handler instanceof TseHandler)) {
+      const code = template.handler.call(template, source);
+      if (/\p{Surrogate}/u.test(code)) throw new WrongEncodingError(code, Encoding.defaultInternal);
+      const shim = { rel, src: source, outBase };
+      handled.push(shim);
+      await writeHandlerShim(shim, code, viewsDir);
+      continue;
+    }
+    const src = template.handler.stripTrailingNewlines ? chomp(source) : source;
     const ast = parse(src);
     views.push({
       rel,
       src,
       outBase,
+      handlerScope: tseHandlerScope(
+        {
+          handler: template.handler,
+          format: template.format,
+          get type() {
+            return template.type;
+          },
+          shortIdentifier: path.relative(cwd, template.identifier).split(path.sep).join("/"),
+        },
+        Base.annotateRenderedViewWithFilenames,
+      ),
       strictLocals: ast.localsSignature !== null,
       resolved: false,
       ...(await templateScope(appDir, rel, path.dirname(outBase), helpers, controllers)),
     });
-    await fs.mkdir(path.dirname(outBase), { recursive: true });
     await writeShim(views[views.length - 1], viewsDir);
     const registryKey = partialRegistryKey(rel);
     if (registryKey !== null && ast.localsSignature !== null) {
@@ -62,7 +100,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
       registryMap.set(registryKey, [...existing, localsParamType(ast, locals)]);
     }
   }
-  const shimPaths = views.map((v) => v.outBase + ".ts");
+  const shimPaths = [...views, ...handled].map((v) => v.outBase + ".ts");
   if (shimPaths.length > 0) {
     const host = cachingHost();
     const helperFiles = helpers.map((file) => path.join(appDir, "helpers", file));
@@ -77,26 +115,26 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
       program = ts.createProgram(roots, EMIT_OPTIONS, host, program);
     }
     emitViews(program, host, outViews);
-    for (const view of views) await chainSourceMap(view, viewsDir);
+    for (const view of [...views, ...handled]) await chainSourceMap(view, viewsDir);
   }
   const registryEntries = Array.from(registryMap, ([key, types]) => ({
     key,
     localsType: types.length === 1 ? types[0] : types.map((t) => `(${t})`).join(" & "),
   }));
   if (opts.inPlace) {
-    for (const view of views) {
+    for (const view of [...views, ...handled]) {
       for (const ext of [".ts", ".ts.map", ".d.ts", ".d.ts.map"]) {
         await fs.rm(view.outBase + ext, { force: true });
       }
     }
-    return { count: files.length, files };
+    return { count: files.length, files, skipped };
   }
   await fs.mkdir(outDir, { recursive: true });
   await fs.writeFile(
     path.join(outDir, "template-registry-augmentation.d.ts"),
     emitRegistryAugmentation(registryEntries),
   );
-  return { count: files.length, files };
+  return { count: files.length, files, skipped };
 }
 
 async function clearOutViews(cwd: string, outDir: string, outViews: string): Promise<void> {
@@ -133,20 +171,26 @@ async function deepestExisting(p: string): Promise<string> {
   return cur;
 }
 
-async function walkTse(dir: string): Promise<string[]> {
-  if (!(await exists(dir))) return [];
-  const out: string[] = [];
+async function walkTemplates(
+  dir: string,
+  extensions: readonly string[],
+): Promise<{ files: string[]; skipped: string[] }> {
+  if (!(await exists(dir))) return { files: [], skipped: [] };
+  const files: string[] = [];
+  const skipped: string[] = [];
   const entries = await fs.readdir(dir, { recursive: true, withFileTypes: true });
   for (const e of entries) {
-    if (!e.isFile() || !e.name.endsWith(".tse")) continue;
+    if (!e.isFile()) continue;
     const parent =
       (e as Dirent & { parentPath?: string }).parentPath ??
       (e as Dirent & { path?: string }).path ??
       dir;
-    const full = path.join(parent, e.name);
-    out.push(path.relative(dir, full).split(path.sep).join("/"));
+    const rel = path.relative(dir, path.join(parent, e.name)).split(path.sep).join("/");
+    const dot = e.name.lastIndexOf(".");
+    if (dot !== -1 && extensions.includes(e.name.slice(dot + 1))) files.push(rel);
+    else if (!e.name.startsWith(".") && !/\.(?:js|ts)(?:\.map)?$/u.test(e.name)) skipped.push(rel);
   }
-  return out.sort();
+  return { files: files.sort(), skipped: skipped.sort() };
 }
 
 async function allHelpersFromPath(helpersDir: string): Promise<string[]> {
@@ -188,10 +232,14 @@ function constantName(path_: string): string {
   return camelize(underscore(path_)).split("::").join("");
 }
 
-interface ViewShim {
+interface HandlerShim {
   rel: string;
   src: string;
   outBase: string;
+}
+
+interface ViewShim extends HandlerShim {
+  handlerScope: Partial<TseScope>;
   strictLocals: boolean;
   resolved: boolean;
   model?: { file: string; klass: string };
@@ -209,7 +257,7 @@ async function writeShim(shim: ViewShim, viewsDir: string): Promise<void> {
     view: relocateImports(shim.view.join(" & "), shimDir),
     locals: relocateImports(locals.length === 0 ? "{}" : `{ ${locals.join("; ")} }`, shimDir),
     resolved: shim.resolved,
-    escapeIgnore: path.basename(shim.rel).split(".").slice(1, -1).includes("text"),
+    ...shim.handlerScope,
   };
   const { ts: code, mappings } = virtualizeTseWithDeltas(shim.src, scope);
   const base = path.basename(shim.rel);
@@ -222,7 +270,19 @@ async function writeShim(shim: ViewShim, viewsDir: string): Promise<void> {
   await fs.writeFile(shim.outBase + ".ts.map", JSON.stringify(map));
 }
 
-async function chainSourceMap(shim: ViewShim, viewsDir: string): Promise<void> {
+async function writeHandlerShim(shim: HandlerShim, code: string, viewsDir: string): Promise<void> {
+  const { ts: text, mappings } = virtualizeHandler(code, shim.src);
+  const base = path.basename(shim.rel);
+  await fs.writeFile(shim.outBase + ".ts", text + `//# sourceMappingURL=${base}.ts.map\n`);
+  const sourceFileName = path
+    .relative(path.dirname(shim.outBase), path.join(viewsDir, shim.rel))
+    .split(path.sep)
+    .join("/");
+  const map = generateSourceMap(`${base}.ts`, sourceFileName, shim.src, mappings);
+  await fs.writeFile(shim.outBase + ".ts.map", JSON.stringify(map));
+}
+
+async function chainSourceMap(shim: HandlerShim, viewsDir: string): Promise<void> {
   const jsMap = JSON.parse(await fs.readFile(shim.outBase + ".js.map", "utf8")) as {
     mappings: string;
   };

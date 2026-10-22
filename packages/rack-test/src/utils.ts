@@ -46,9 +46,9 @@ function buildMultipart(
 
   params = normalizeMultipartParams(params, true);
 
-  const buffer = new StringIO();
+  const buffer = new StringIO(new Uint8Array(0));
   buildParts(buffer, params as Record<string, unknown>);
-  return Uint8Array.from(buffer.string(), (byte) => byte.charCodeAt(0));
+  return buffer.string();
 }
 
 function normalizeMultipartParams(
@@ -84,12 +84,12 @@ function normalizeMultipartParams(
   return flattenedParams;
 }
 
-function buildParts(buffer: StringIO, parameters: Record<string, unknown>): void {
+function buildParts(buffer: StringIO<Uint8Array>, parameters: Record<string, unknown>): void {
   _buildParts(buffer, parameters);
   buffer.write(END_BOUNDARY);
 }
 
-function _buildParts(buffer: StringIO, parameters: Record<string, unknown>): void {
+function _buildParts(buffer: StringIO<Uint8Array>, parameters: Record<string, unknown>): void {
   Object.entries(parameters).map(([name, value]) => {
     if (/\[\]\n?$/.test(name) && Array.isArray(value) && value.every((v) => isPlainObject(v))) {
       value.forEach((hash) => {
@@ -109,7 +109,11 @@ function _buildParts(buffer: StringIO, parameters: Record<string, unknown>): voi
   });
 }
 
-function buildPrimitivePart(buffer: StringIO, parameterName: string, value: unknown): StringIO {
+function buildPrimitivePart(
+  buffer: StringIO<Uint8Array>,
+  parameterName: string,
+  value: unknown,
+): StringIO<Uint8Array> {
   buffer.write(START_BOUNDARY);
   buffer.write('content-disposition: form-data; name="');
   buffer.write(b(String(parameterName)));
@@ -121,10 +125,10 @@ function buildPrimitivePart(buffer: StringIO, parameterName: string, value: unkn
 
 /** @missingRailsArgs b — PERMANENT */
 function buildFilePart(
-  buffer: StringIO,
+  buffer: StringIO<Uint8Array>,
   parameterName: string,
   uploadedFile: UploadedFile,
-): StringIO {
+): StringIO<Uint8Array> {
   buffer.write(START_BOUNDARY);
   buffer.write('content-disposition: form-data; name="');
   buffer.write(b(String(parameterName)));

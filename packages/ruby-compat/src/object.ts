@@ -5,7 +5,7 @@ import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.js";
 import { rbPlus } from "./numeric.js";
-import { STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
+import { BINARY_METHOD_TABLE, STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
@@ -17,6 +17,19 @@ import { rbRegToS } from "./regexp.js";
 import { NoMethodError } from "./no-method-error.js";
 import { Hash } from "./hash.js";
 import { toEnum } from "./enumerator.js";
+
+/**
+ * Each method's `super` slot, which {@link rbSeatSuper} writes and
+ * `rbCallSuper` reads (MRI `vm_search_super_method`,
+ * `vendor/ruby/v3.3.11/vm_insnhelper.c:4680`).
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export const superSlots = new WeakMap<
+  (...args: never[]) => unknown,
+  { slot: symbol; key: string }
+>();
 
 type Klass = abstract new (...args: never) => unknown;
 
@@ -51,6 +64,7 @@ export function rbObjClass(obj: unknown): Klass {
   if (typeof obj === "number") return Number.isInteger(obj) ? rbCInteger : rbCFloat;
   if (obj instanceof Number) return rbCFloat;
   if (typeof obj === "string") return rbCString;
+  if (obj instanceof String && obj.constructor === String) return rbCString;
   if (obj instanceof Uint8Array) {
     const klass = obj.constructor;
     const nodeBuffer = (globalThis as { Buffer?: unknown }).Buffer;
@@ -644,6 +658,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     return true;
   }
   if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
+  if (obj instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) return true;
   if (Array.isArray(obj) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) return true;
   if (Array.isArray(obj) && Object.hasOwn(enumerableModule(), mid)) return true;
   if (temporalMethod(obj, mid) !== undefined) return true;
@@ -791,6 +806,45 @@ export function rbModMethodDefined(
 }
 
 /**
+ * Seats on `target`, in `descriptors`, the `key` method `method` is about to
+ * shadow, for {@link rbCallSuper}. A function keeps the key it was first
+ * installed under, as MRI's `super` searches by the method's `original_id`
+ * (`vendor/ruby/v3.3.11/vm_insnhelper.c:4680`, `vm_search_super_method`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbSeatSuper(
+  target: object,
+  key: string,
+  method: unknown,
+  descriptors: PropertyDescriptorMap,
+): void {
+  if (typeof method !== "function") return;
+  let shadowed: unknown;
+  for (
+    let link: object | null = target;
+    link;
+    link = Object.getPrototypeOf(link) as object | null
+  ) {
+    const desc = Object.getOwnPropertyDescriptor(link, key);
+    if (desc) {
+      shadowed = desc.value;
+      break;
+    }
+  }
+  if (typeof shadowed !== "function" || shadowed === method) return;
+  let entry = superSlots.get(method as (...args: never[]) => unknown);
+  if (entry === undefined) {
+    superSlots.set(
+      method as (...args: never[]) => unknown,
+      (entry = { slot: Symbol(`super:${key}`), key }),
+    );
+  }
+  if (Object.hasOwn(descriptors, entry.slot)) return;
+  descriptors[entry.slot] = { value: shadowed, configurable: true };
+}
+
+/**
  * `Module#define_method` on a class receiver (`rb_mod_define_method`,
  * `vendor/ruby/v3.3.11/proc.c:2325`): binds `body` as `mod`'s instance method
  * `mid`. `body` is the block, or the method `define_method(symbol, method)`
@@ -800,6 +854,9 @@ export function rbModMethodDefined(
  * statics (CLAUDE.md, "`singleton_class` is a per-object subclass"), so a
  * class's `singleton_class.define_method` passes `{ prototype: klass }`.
  *
+ * It replaces `mod`'s own `mid`, and its `super` reaches the next `mid` in
+ * the ancestry ({@link rbCallSuper}).
+ *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModDefineMethod(
@@ -807,13 +864,19 @@ export function rbModDefineMethod(
   mid: string,
   body: ((...args: never[]) => unknown) | PropertyDescriptor,
 ): string {
-  Object.defineProperty(
-    mod.prototype,
+  const descriptors: PropertyDescriptorMap = {
+    [mid]:
+      typeof body === "function"
+        ? { value: body, writable: true, configurable: true }
+        : { configurable: true, ...body },
+  };
+  rbSeatSuper(
+    Object.getPrototypeOf(mod.prototype) as object,
     mid,
-    typeof body === "function"
-      ? { value: body, writable: true, configurable: true }
-      : { configurable: true, ...body },
+    typeof body === "function" ? body : body.value,
+    descriptors,
   );
+  Object.defineProperties(mod.prototype, descriptors);
   return mid;
 }
 
@@ -882,19 +945,21 @@ function absentHalf(id: string, write: boolean): (this: object, value?: unknown)
  * `vendor/ruby/v3.3.11/vm_method.c:1146`). A JS accessor is one descriptor, so
  * the half not given keeps `target`'s own, and where `target` has none it
  * defers to the next table up the prototype chain, as Ruby's method search
- * does for an entry the table lacks.
+ * does for an entry the table lacks. `enumerable` is set on a plain-object
+ * module, whose enumerable members are the instance methods `include()` copies
+ * (CLAUDE.md, "A Ruby module is a plain object or a class module").
  *
  * @noRailsEquivalent PERMANENT
  */
 export function defineAccessorHalf(
   target: object,
   name: string,
-  half: { get?: () => unknown; set?: (value: unknown) => void },
+  half: { get?: () => unknown; set?: (value: unknown) => void; enumerable?: boolean },
 ): void {
   const existing = Object.getOwnPropertyDescriptor(target, name);
   Object.defineProperty(target, name, {
     configurable: true,
-    enumerable: existing?.enumerable ?? false,
+    enumerable: existing?.enumerable ?? half.enumerable ?? false,
     get: half.get ?? existing?.get ?? absentHalf(name, false),
     set: half.set ?? existing?.set ?? absentHalf(name, true),
   });
@@ -909,6 +974,7 @@ function rbAttr(klass: { prototype: object }, id: string, read: boolean, write: 
   const attriv = `_${id}`;
   rbDeclareIvar(klass, `@${id.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}`, attriv);
   defineAccessorHalf(klass.prototype, id, {
+    enumerable: klass.prototype.constructor?.prototype !== klass.prototype,
     ...(read
       ? {
           get(this: Record<string, unknown>) {
@@ -1152,6 +1218,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   const bound = temporalMethod(recv, mid);
   if (bound !== undefined) return bound(recv, ...args);
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
+    return rbStrSend(recv, mid, ...args)[0];
+  }
+  if (recv instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
   }
   if (mid === "call" && rbObjIsProc(recv)) return recv(...args);
@@ -1666,7 +1735,7 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
   if (typeof value === "string") return value;
   if (value instanceof Uint8Array) return value;
   if (Array.isArray(value)) return rbInspect(value);
-  if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
+  if (isPlainHash(value) || value instanceof Map || value instanceof Set) return rbInspect(value);
   if (typeof value === "number" || value instanceof Number) return floToS(value);
   if (value instanceof RegExp) return rbRegToS(value);
   if (rbObjRespondTo(value, "toS")) {
@@ -1682,6 +1751,7 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
     return rbModToS(value as abstract new (...args: never) => unknown);
   }
   if (typeof value === "object") {
+    if (value.toString === Object.prototype.toString) return rbAnyToS(value);
     const str: unknown = value.toString();
     if (typeof str === "string" || str instanceof Uint8Array) return str;
     return rbAnyToS(value);

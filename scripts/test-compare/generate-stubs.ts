@@ -33,10 +33,12 @@ const PKG_DIRS: Record<string, string> = {
   "rack-test": "packages/rack-test/src/",
   bcrypt: "packages/bcrypt/src/",
   msgpack: "packages/msgpack/src/",
+  marcel: "packages/marcel/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
+  actioncable: "packages/actioncable/src/",
   activejob: "packages/activejob/src/",
   thor: PKG_SRC_DIRS.thor,
 };

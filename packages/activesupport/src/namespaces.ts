@@ -73,9 +73,7 @@ export const TopLevel: {
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
       envConfig(): Record<string, unknown>;
       executor: { wrap<T>(block: () => T): T };
-      call(
-        env: Record<string, unknown>,
-      ): Promise<[number, Record<string, string | string[]>, unknown]>;
+      call(env: Record<string, unknown>): Promise<[number, Record<string, unknown>, unknown]>;
     } | null;
     Application: abstract new (...args: never[]) => unknown;
     Engine: abstract new (...args: never[]) => unknown;
@@ -96,8 +94,11 @@ export const TopLevel: {
     };
   };
   ActionController?: { Parameters: new (...args: never[]) => ParametersInstance };
-  ActiveRecord?: { Railties: { ControllerRuntime?: object } };
-  ActionCable?: { Engine?: unknown };
+  ActiveRecord?: {
+    Railties: { ControllerRuntime?: object };
+    afterAllTransactionsCommit(block: () => unknown): unknown;
+  };
+  ActionCable?: { name?: string; Engine?: unknown; server?(): unknown };
   BCrypt?: {
     Engine: { readonly MIN_COST: number; readonly cost: number };
     Password: {

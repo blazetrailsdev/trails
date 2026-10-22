@@ -1,3 +1,4 @@
+import type { RackHeaders } from "../../index.js";
 import { CONTENT_LENGTH, CONTENT_TYPE } from "../../constants.js";
 import type { RackApp } from "../../mock-request.js";
 
@@ -20,9 +21,7 @@ export class AbstractHandler {
     return "";
   }
 
-  protected unauthorized(
-    wwwAuthenticate = this.challenge(),
-  ): [number, Record<string, string | string[]>, any] {
+  protected unauthorized(wwwAuthenticate = this.challenge()): [number, RackHeaders, any] {
     return [
       401,
       { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: "0", "www-authenticate": wwwAuthenticate },
@@ -30,7 +29,7 @@ export class AbstractHandler {
     ];
   }
 
-  protected badRequest(): [number, Record<string, string | string[]>, any] {
+  protected badRequest(): [number, RackHeaders, any] {
     return [400, { [CONTENT_TYPE]: "text/plain", [CONTENT_LENGTH]: "0" }, []];
   }
 }

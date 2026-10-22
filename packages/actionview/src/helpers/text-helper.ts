@@ -129,7 +129,7 @@ export function highlight(
 export interface ExcerptOptions {
   radius?: number;
   omission?: string;
-  separator?: string;
+  separator?: string | null;
 }
 
 export function excerpt(

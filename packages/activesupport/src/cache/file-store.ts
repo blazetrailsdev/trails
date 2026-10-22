@@ -133,7 +133,7 @@ export class FileStore extends Store implements CacheStore {
     return null;
   }
 
-  protected async readSerializedEntry(key: string): Promise<string | null> {
+  protected async readSerializedEntry(key: string): Promise<Uint8Array | null> {
     try {
       return File.isExist(key) ? File.binread(key) : null;
     } catch (error) {

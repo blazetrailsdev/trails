@@ -60,6 +60,8 @@ import {
   rbModToS,
   UNDEF_METHOD_TABLES,
   reopened,
+  rbSeatSuper,
+  superSlots,
 } from "./object.js";
 import { isSymbol } from "./symbol.js";
 
@@ -1256,7 +1258,8 @@ export function rbModAncestors(mod: { prototype: object } | ModuleObject): objec
 /**
  * `rb_obj_is_kind_of` (`vendor/ruby/v3.3.11/object.c:889`), `Object#kind_of?`
  * and `Module#===`: whether `c` is in the ancestry of `obj`'s class. A plain
- * object is a module's seat, as `include()` takes one, and JS's own `Set` is
+ * object is a module once seated or built by `defineModule`, as `include()`
+ * takes one, and JS's own `Set` is
  * the seat of the `Set` that reopens it (`class Set extends JsSet`). A Symbol
  * is a colon-spelled string, whose class `rbObjClass` answers as `String`, so
  * `Symbol === obj` and `String === obj` are answered by the spelling.
@@ -1269,6 +1272,13 @@ export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
   if (
     (typeof c === "function" || (typeof c === "object" && c !== null)) &&
     singletonSearchAncestor(obj, c)
+  ) {
+    return true;
+  }
+  if (
+    c === Module &&
+    isPlainHash(obj) &&
+    (classpaths.has(obj) || Object.hasOwn(obj, moduleVisibility))
   ) {
     return true;
   }
@@ -1341,6 +1351,9 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
       if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
     }
     if (p === Uint8Array.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
+    if (p === String.prototype && (c === rbCString || classSearchAncestor(rbCString, c))) {
+      return true;
+    }
     if (p === globalThis.Set.prototype && c === registeredConstant("Set")) return true;
     if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
   }
@@ -1762,44 +1775,6 @@ export function rbModAppendFeatures(
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
-}
-
-const superSlots = new WeakMap<AnyFunction, { slot: symbol; key: string }>();
-
-/**
- * Seats on `target`, in `descriptors`, the `key` method `method` is about to
- * shadow, for {@link rbCallSuper}. A function keeps the key it was first
- * installed under, as MRI's `super` searches by the method's `original_id`
- * (`vendor/ruby/v3.3.11/vm_insnhelper.c:4680`, `vm_search_super_method`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbSeatSuper(
-  target: object,
-  key: string,
-  method: unknown,
-  descriptors: PropertyDescriptorMap,
-): void {
-  if (typeof method !== "function") return;
-  let shadowed: unknown;
-  for (
-    let link: object | null = target;
-    link;
-    link = Object.getPrototypeOf(link) as object | null
-  ) {
-    const desc = Object.getOwnPropertyDescriptor(link, key);
-    if (desc) {
-      shadowed = desc.value;
-      break;
-    }
-  }
-  if (typeof shadowed !== "function" || shadowed === method) return;
-  let entry = superSlots.get(method as AnyFunction);
-  if (entry === undefined) {
-    superSlots.set(method as AnyFunction, (entry = { slot: Symbol(`super:${key}`), key }));
-  }
-  if (Object.hasOwn(descriptors, entry.slot)) return;
-  descriptors[entry.slot] = { value: shadowed, configurable: true };
 }
 
 /**
@@ -2362,6 +2337,11 @@ classpaths.set(Enumerable, { path: "Enumerable", permanent: true });
 const rbMComparable = {};
 classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
 
+/**
+ * `rb_cModule` (`vendor/ruby/v3.3.11/object.c:4202`), `Class`'s superclass.
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCModule = Module;
 Object.setPrototypeOf(rbCClass, Module);
 Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
 

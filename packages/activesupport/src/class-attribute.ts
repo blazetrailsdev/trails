@@ -2,8 +2,8 @@ import {
   CLASS_METHOD_TABLE,
   Module,
   TypeError,
-  moduleVisibility,
   rbClassAttachedObject,
+  rbObjIsKindOf,
   rbModSingletonP,
 } from "@blazetrails/ruby-compat";
 
@@ -24,10 +24,7 @@ export namespace ClassAttribute {
   export function redefine(owner: any, name: string, namespacedName: string, value: unknown): void {
     if (rbModSingletonP(owner)) {
       const attachedObject = rbClassAttachedObject(owner);
-      if (
-        attachedObject instanceof Module ||
-        Object.hasOwn(attachedObject as object, moduleVisibility)
-      ) {
+      if (rbObjIsKindOf(attachedObject, Module)) {
         redefineMethod(owner.prototype, namespacedName, true, () => value);
       } else {
         redefineMethod(owner.prototype, name, false, () => value);
@@ -117,7 +114,9 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     if (methods.get || methods.set) Object.defineProperty(this.prototype, name, methods);
 
     if (instancePredicate) {
-      const predicateName = `is${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+      const lead = /^_*/.exec(name)![0];
+      const bare = name.slice(lead.length);
+      const predicateName = `${lead}is${bare.charAt(0).toUpperCase()}${bare.slice(1)}`;
       ClassAttribute.redefineMethod(this, predicateName, false, function (this: any) {
         return this[name] != null && this[name] !== false;
       });

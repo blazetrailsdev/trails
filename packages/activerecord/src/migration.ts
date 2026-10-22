@@ -1135,7 +1135,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         .migrations;
 
       for (const migration of sourceMigrations) {
-        let source = File.binread(migration.filename);
+        let source = Buffer.from(File.binread(migration.filename)).toString("latin1");
         const insertedComment = `// This migration comes from ${scope} (originally ${migration.version})\n`;
         let magicComments = "";
         let substituted: unknown;

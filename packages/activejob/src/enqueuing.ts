@@ -27,7 +27,7 @@ interface QueueAdapterLike {
 }
 
 interface EnqueuingJob {
-  queueAdapter: QueueAdapterLike;
+  queueAdapter: unknown;
   scheduledAt: unknown;
   successfullyEnqueued: unknown;
   enqueueError: unknown;
@@ -35,14 +35,13 @@ interface EnqueuingJob {
   set(options: Record<string, unknown>): unknown;
   runCallbacks(kind: string, block?: () => unknown): unknown;
   enqueue(options?: Record<string, unknown>): Promise<unknown>;
-  rawEnqueue(): Promise<unknown>;
 }
 
 export async function performAllLater(...jobs: unknown[]): Promise<null> {
   jobs.splice(0, jobs.length, ...flatten(jobs));
   for (const [queueAdapter, adapterJobs] of groupBy(
     jobs as EnqueuingJob[],
-    (job) => job.queueAdapter,
+    (job) => job.queueAdapter as QueueAdapterLike,
   )) {
     await ActiveJob.instrumentEnqueueAll(queueAdapter, adapterJobs, async () => {
       if (rbObjRespondTo(queueAdapter, "enqueueAll")) {
@@ -96,7 +95,10 @@ export class Enqueuing {
   static readonly [classModule] = true;
   declare static ClassMethods: typeof ClassMethods;
 
-  async enqueue(this: EnqueuingJob, options: Record<string, unknown> = {}): Promise<unknown> {
+  async enqueue(
+    this: Enqueuing & EnqueuingJob,
+    options: Record<string, unknown> = {},
+  ): Promise<unknown> {
     this.set(options);
     this.successfullyEnqueued = false;
 
@@ -111,12 +113,12 @@ export class Enqueuing {
   }
 
   /** @internal */
-  private async rawEnqueue(this: EnqueuingJob): Promise<unknown> {
+  private async rawEnqueue(this: Enqueuing & EnqueuingJob): Promise<unknown> {
     try {
       if (this.scheduledAt != null && this.scheduledAt !== false) {
-        await this.queueAdapter.enqueueAt(this, toF(this.scheduledAt));
+        await (this.queueAdapter as QueueAdapterLike).enqueueAt(this, toF(this.scheduledAt));
       } else {
-        await this.queueAdapter.enqueue(this);
+        await (this.queueAdapter as QueueAdapterLike).enqueue(this);
       }
 
       return (this.successfullyEnqueued = true);

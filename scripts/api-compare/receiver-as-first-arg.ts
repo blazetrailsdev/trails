@@ -125,6 +125,10 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // JS method both filters and maps, so @blazetrails/activesupport exports it
   // as `filterMap(collection, block)` and the receiver is TS argument 1.
   "filter_map",
+  // Ruby core `Enumerable#tally` — `enqueued_jobs.map(&:class).tally`
+  // (activejob/lib/active_job/log_subscriber.rb:208). No JS method counts
+  // elements, so @blazetrails/activesupport exports it as `tally(collection)`.
+  "tally",
   // Ruby core `Array#empty?` / `Hash#empty?` / `String#empty?` — a language
   // built-in on the same receivers as `blank?` above, and the same shape: no
   // prototype to hang it on, so activerecord's `ruby-empty.ts` exports it as

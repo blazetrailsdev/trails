@@ -2,7 +2,7 @@ import { RouteSet } from "@blazetrails/actionpack";
 import { include } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
-import { Tse } from "../template/handlers/tse.js";
+import { TSE } from "../template/handlers/tse.js";
 
 class Context extends Base {}
 
@@ -19,7 +19,7 @@ export class BlockTestCase {
     const view = class extends BlockTestCase.Context {};
     include(view, routes.urlHelpers());
 
-    return new Template(this.blockHelper(start, inside), `test${Math.random()}`, new Tse(), {
+    return new Template(this.blockHelper(start, inside), `test${Math.random()}`, new TSE(), {
       virtualPath: "partial",
       format: ":html",
       locals: [],

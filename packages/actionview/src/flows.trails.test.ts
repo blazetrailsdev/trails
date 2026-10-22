@@ -6,12 +6,12 @@ import { StreamingFlow } from "./flows.js";
 import type { Template } from "./template.js";
 import { LookupContext } from "./lookup-context.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
 describe("StreamingFlow", () => {
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
   });
   afterEach(async () => {
     TemplateHandlers.clear();

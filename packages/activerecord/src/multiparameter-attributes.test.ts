@@ -118,7 +118,7 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time with no date", async () => {
-    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const attributes = {
         "written_on(4i)": "16",
         "written_on(5i)": "24",
@@ -126,12 +126,12 @@ describe("MultiParameterAttributeTest", () => {
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-    })) as MultiparameterAssignmentErrors;
+    });
     expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
   });
 
   it("multiparameter attributes on time with invalid time params", async () => {
-    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const attributes = {
         "written_on(1i)": "2004",
         "written_on(2i)": "6",
@@ -142,7 +142,7 @@ describe("MultiParameterAttributeTest", () => {
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-    })) as MultiparameterAssignmentErrors;
+    });
     expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
   });
 
@@ -160,19 +160,19 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter attributes on time will raise on big time if missing date parts", async () => {
-    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const attributes = {
         "written_on(4i)": "16",
         "written_on(5i)": "24",
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-    })) as MultiparameterAssignmentErrors;
+    });
     expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
   });
 
   it("multiparameter attributes on time with raise on small time if missing date parts", async () => {
-    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const attributes = {
         "written_on(4i)": "16",
         "written_on(5i)": "12",
@@ -180,7 +180,7 @@ describe("MultiParameterAttributeTest", () => {
       };
       const topic = await Topic.find(1);
       await topic.assignAttributes(attributes);
-    })) as MultiparameterAssignmentErrors;
+    });
     expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
   });
 
@@ -499,12 +499,12 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter assignment of aggregation with missing values", async () => {
-    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const customer = new Customer();
       const address = new Address("The Street", "The City", "The Country");
       const attributes = { "address(2)": address.city, "address(3)": address.country };
       await customer.assignAttributes(attributes);
-    })) as MultiparameterAssignmentErrors;
+    });
     expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("address");
   });
 
@@ -523,7 +523,7 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("multiparameter assignment of aggregation with large index", async () => {
-    const ex = (await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
+    const ex = await assertRaise([MultiparameterAssignmentErrors], {}, async () => {
       const customer = new Customer();
       const address = new Address("The Street", "The City", "The Country");
       const attributes = {
@@ -532,7 +532,7 @@ describe("MultiParameterAttributeTest", () => {
         "address(3000)": address.country,
       };
       await customer.assignAttributes(attributes);
-    })) as MultiparameterAssignmentErrors;
+    });
 
     expect((ex.errors[0] as AttributeAssignmentError).attribute).toBe("address");
   });

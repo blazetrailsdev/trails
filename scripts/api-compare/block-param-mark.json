@@ -5,6 +5,10 @@
       "rendering.rb": 3
     }
   },
+  "actioncable": {
+    "total": 0,
+    "byFile": {}
+  },
   "actioncontroller": {
     "total": 2,
     "byFile": {
@@ -51,6 +55,10 @@
     "byFile": {}
   },
   "globalid": {
+    "total": 0,
+    "byFile": {}
+  },
+  "marcel": {
     "total": 0,
     "byFile": {}
   },

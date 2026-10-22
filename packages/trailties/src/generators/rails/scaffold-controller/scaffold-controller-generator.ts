@@ -17,7 +17,7 @@ import { ResourceHelpers } from "../../resource-helpers.js";
 import type { GeneratorClass } from "../../../generators.js";
 import { tsBody, tsField, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass, parentRefForRelative } from "../controller/controller-paths.js";
-import * as Tse from "../../tse/scaffold/scaffold-generator.js";
+import * as TSE from "../../tse/scaffold/scaffold-generator.js";
 
 export interface ScaffoldControllerGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {
   api?: boolean;
@@ -118,7 +118,7 @@ export class ScaffoldControllerGenerator extends NamedBase {
 
     if (!api) {
       this.createdFiles.push(
-        ...new Tse.ScaffoldGenerator({ ...this.options, behavior: this.behavior }).run(),
+        ...new TSE.ScaffoldGenerator({ ...this.options, behavior: this.behavior }).run(),
       );
     }
 

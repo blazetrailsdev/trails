@@ -8,12 +8,12 @@ import { Template } from "../template.js";
 import { StrictLocalsError } from "./error.js";
 import { TemplateHandlers, type TemplateHandler } from "./handlers.js";
 import { Raw } from "./handlers/raw.js";
-import { Tse, type Spot } from "./handlers/tse.js";
+import { TSE, type Spot } from "./handlers/tse.js";
 
 describe("TestTSETemplate", () => {
   afterEach(() => TemplateHandlers.clear());
 
-  const TSEHandler = new Tse();
+  const TSEHandler = new TSE();
 
   class Context extends Base {
     constructor(...args: ConstructorParameters<typeof Base>) {
@@ -250,7 +250,7 @@ describe("TestTSETemplate", () => {
       );
       await render();
     });
-    expect((error.cause as Error).stack!.split("\n")[1]).toMatch(/at (?:\S+\.)?hello\b/);
+    expect(error.cause.stack!.split("\n")[1]).toMatch(/at (?:\S+\.)?hello\b/);
     expect(error.cause).toBeInstanceOf(ArgumentError);
   });
 

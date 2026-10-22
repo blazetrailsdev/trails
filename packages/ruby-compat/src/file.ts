@@ -511,7 +511,11 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.read` (`IO.read`,
    * `vendor/ruby/v3.3.11/io.c:12200`).
    */
-  static read(name: string, opt?: { encoding?: Encoding | string }): string {
+  static read(name: string): string;
+  /** @noRailsEquivalent PERMANENT — Ruby core `File.read` (`vendor/ruby/v3.3.11/io.c:12200`). */
+  static read(name: string, opt: { encoding?: Encoding | string }): string | Uint8Array;
+  /** @noRailsEquivalent PERMANENT — Ruby core `File.read` (`vendor/ruby/v3.3.11/io.c:12200`). */
+  static read(name: string, opt?: { encoding?: Encoding | string }): string | Uint8Array {
     const file = File.open(name, "r", { externalEncoding: opt?.encoding });
     try {
       return file.read();

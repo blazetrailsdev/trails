@@ -7,7 +7,6 @@ import {
   ArgumentError,
   extend,
   include,
-  Module,
   publicInstanceMethods,
   registerConstant,
   unregisterConstant,
@@ -17,9 +16,9 @@ import { Helpers, Resolution, type HelperMethodsModule, type HelpersClass } from
 
 const { modulesForHelpers, allHelpersFromPath } = Resolution;
 
-const FooHelper = new Module().include({ foo: () => "FOO" });
-const BarHelper = new Module().include({ bar: () => "BAR" });
-const NamespacedHelper = new Module().include({ ns: () => "NS" });
+const FooHelper = { foo: () => "FOO" };
+const BarHelper = { bar: () => "BAR" };
+const NamespacedHelper = { ns: () => "NS" };
 
 type Probe = Record<string, () => unknown>;
 

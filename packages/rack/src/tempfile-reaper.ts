@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { RACK_TEMPFILES } from "./constants.js";
 import { BodyProxy } from "./body-proxy.js";
@@ -10,10 +11,10 @@ export class TempfileReaper {
     this.app = app;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     env[RACK_TEMPFILES] ||= [];
 
-    let response: [number, Record<string, string | string[]>, any];
+    let response: [number, RackHeaders, any];
     try {
       response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     } catch (e) {

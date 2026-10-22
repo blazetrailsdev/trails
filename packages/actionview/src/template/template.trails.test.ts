@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { Template } from "../template.js";
 import { TemplateHandlers } from "./handlers.js";
-import { Tse } from "./handlers/tse.js";
+import { TSE } from "./handlers/tse.js";
 import { File as SourcesFile } from "./sources/file.js";
 
 const dirs: string[] = [];
@@ -38,7 +38,7 @@ describe("Template#encode!", () => {
   });
 
   const newTemplate = (body: string | SourcesFile): Template =>
-    new Template(body, "hello template", new Tse(), {
+    new Template(body, "hello template", new TSE(), {
       virtualPath: null,
       format: "html",
       locals: [],

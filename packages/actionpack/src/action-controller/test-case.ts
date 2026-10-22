@@ -26,6 +26,7 @@ import {
   KeyError,
   merge,
   rbModConstSet,
+  rbModAttrReader,
   rbObjIvarSet,
   RuntimeError,
   SecureRandom,
@@ -500,15 +501,7 @@ include(Behavior, TestProcess);
 include(Behavior, ConstantLookup);
 include(Behavior, DomTestingAssertions);
 
-for (const id of ["response", "request"]) {
-  Object.defineProperty(Behavior, id, {
-    get(this: Record<string, unknown>) {
-      return this[`_${id}`] ?? null;
-    },
-    enumerable: true,
-    configurable: true,
-  });
-}
+rbModAttrReader({ prototype: Behavior }, "response", "request");
 
 Object.assign(Behavior, {
   get,
@@ -556,7 +549,7 @@ export class TestCase extends ActiveSupportTestCase {
 export declare namespace TestCase {
   /** @internal */
   let _controllerClass: ControllerClass | null | undefined;
-  let is_controllerClass: boolean;
+  let _isControllerClass: boolean;
   const tests: BehaviorClassMethods["tests"];
   let controllerClass: ControllerClass | null;
   const determineDefaultControllerClass: BehaviorClassMethods["determineDefaultControllerClass"];

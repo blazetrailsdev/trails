@@ -63,7 +63,7 @@ function cookieRequest(
 function setCookieHeaders(jar: CookieJar): string[] {
   const response = new Response();
   jar.write(response);
-  const header = response.headers["set-cookie"];
+  const header = response.headers["set-cookie"] as string | string[] | undefined;
   if (header === undefined || header === null) return [];
   return Array.isArray(header) ? header : [header];
 }
@@ -445,7 +445,10 @@ describe("CookiesTest", () => {
     const verifier = new MessageVerifier(secret, { serializer: Marshal, digest: "SHA1" });
     const message = verifier.generate(45);
 
-    tc.request.headers.set("Cookie", `user_id=${Marshal.dump(45)}--${message.split("--").at(-1)}`);
+    tc.request.headers.set(
+      "Cookie",
+      `user_id=${String.fromCharCode(...Marshal.dump(45))}--${message.split("--").at(-1)}`,
+    );
     await tc.get("getSignedCookie");
     assertNil(controllerCookies().signed.get("user_id"));
   });

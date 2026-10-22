@@ -46,7 +46,7 @@ export interface GzipWriterHandle {
  * @noRailsEquivalent PERMANENT
  */
 export interface GzipReaderIO {
-  read(length: number): string | null;
+  read(length: number): string | Uint8Array | null;
 }
 
 /**
@@ -232,11 +232,11 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
         });
       });
       const readMore = async (): Promise<void> => {
-        let str: string | null;
+        let str: string | Uint8Array | null;
         while (failure === null && (str = io.read(GZFILE_READ_SIZE)) !== null) {
           if (str.length === 0) continue;
-          const bytes = new Uint8Array(str.length);
-          for (let i = 0; i < str.length; i++) bytes[i] = str.charCodeAt(i) & 0xff;
+          const bytes =
+            typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
           if (!stream.write(bytes)) {
             await new Promise<void>((res) => {
               stream.once("drain", res);

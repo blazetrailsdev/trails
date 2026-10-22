@@ -143,6 +143,12 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "actionview/test",
       },
       {
+        name: "actioncable",
+        libPath: "actioncable/lib/action_cable",
+        libEntryFile: "actioncable/lib/action_cable.rb",
+        testPath: "actioncable/test",
+      },
+      {
         name: "activejob",
         libPath: "activejob/lib/active_job",
         libEntryFile: "activejob/lib/active_job.rb",
@@ -354,6 +360,26 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "marcel",
         libPath: "lib/marcel",
         libEntryFile: "lib/marcel.rb",
+        testPath: "test",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
+  },
+  {
+    name: "builder",
+    origin: {
+      type: "git",
+      url: "https://github.com/rails/builder.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:156 resolves builder (3.3.0), which
+      // ActionView's `Template::Handlers::Builder` requires.
+      ref: "v3.3.0",
+    },
+    packages: [
+      {
+        name: "builder",
+        libPath: "lib/builder",
+        libEntryFile: "lib/builder.rb",
         testPath: "test",
         compareApi: false,
         compareTests: false,

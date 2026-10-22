@@ -82,7 +82,8 @@ export class Generator {
 
   /** @internal */
   private contentForTempfile(io: UploadedFile, file: UploadedFile, name: string): string {
-    const content = io.read();
+    const read = io.read() as string | Uint8Array;
+    const content = typeof read === "string" ? read : Buffer.from(read).toString("latin1");
     const length = file.path !== undefined ? File.stat(file.path).size : null;
     const filename = `; filename="${escapePath(file.originalFilename)}"`;
     const lenLine = length !== null ? `content-length: ${length}\r\n` : "";

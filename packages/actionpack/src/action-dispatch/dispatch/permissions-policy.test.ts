@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, it, expect } from "vitest";
-import { Module, assertEqual, assertRaises } from "@blazetrails/activesupport";
+import { assertEqual, assertRaises } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   registerConstant,
@@ -210,11 +210,11 @@ describe("PermissionsPolicyIntegrationTest", () => {
 });
 
 describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
-  const ApplicationHelper = new Module().include({
+  const ApplicationHelper = {
     isPigsCanFly(): boolean {
       return false;
     },
-  });
+  };
 
   const helperName = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationHelper";
   registerConstant(helperName, ApplicationHelper);

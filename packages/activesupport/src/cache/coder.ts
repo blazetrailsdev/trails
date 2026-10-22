@@ -1,8 +1,19 @@
 import { Temporal } from "@blazetrails/date";
-import { b, byteslice, forceEncoding, pack, Range, unpack1 } from "@blazetrails/ruby-compat";
+import {
+  Encoding,
+  Marshal,
+  Range,
+  b,
+  forceEncoding,
+  pack,
+  rbObjEncoding,
+  byteslice,
+  rbStrPlus,
+  rbStrStartWith,
+  unpack1,
+} from "@blazetrails/ruby-compat";
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
-import { SerializerWithFallback } from "./serializer-with-fallback.js";
 
 const PREFIX = "~#";
 const UNDEF = "~#u";
@@ -11,6 +22,7 @@ const DATE = "~#d";
 const INSTANT = "~#i";
 const NUMBER = "~#n";
 const ARRAY_ESCAPE = "~#a";
+const BYTES = "~#B";
 
 function looksTagged(head: unknown): head is string {
   return typeof head === "string" && head.startsWith(PREFIX);
@@ -36,6 +48,8 @@ function encode(value: unknown): unknown {
 
   // boundary: Ruby Marshal round-trips a Time, and `Temporal.Instant` is the
   if (value instanceof Temporal.Instant) return [INSTANT, value.toString()];
+
+  if (value instanceof Uint8Array) return [BYTES, Array.from(value)];
 
   if (Array.isArray(value)) {
     const encoded = value.map(encode);
@@ -71,6 +85,8 @@ function decode(node: unknown): unknown {
         }
         case ARRAY_ESCAPE:
           return node.slice(1).map(decode);
+        case BYTES:
+          return Uint8Array.from(node[1] as number[]);
       }
     }
     return node.map(decode);
@@ -105,22 +121,23 @@ export const coder = {
   dump(value: unknown): string {
     return unescapeControlChars(JSON.stringify(encode(value)));
   },
-  load(dumped: string): unknown {
-    return decode(JSON.parse(escapeControlChars(dumped)));
+  load(dumped: string | Uint8Array): unknown {
+    const text = typeof dumped === "string" ? dumped : new TextDecoder().decode(dumped);
+    return decode(JSON.parse(escapeControlChars(text)));
   },
 };
 
 /** @internal */
 export interface CoderSerializer {
-  dump(value: unknown): string;
-  load(dumped: string): unknown;
-  dumpCompressed?(entry: Entry, threshold: number): string;
+  dump(value: unknown): string | Uint8Array;
+  load(dumped: string | Uint8Array): unknown;
+  dumpCompressed?(entry: Entry, threshold: number): string | Uint8Array;
 }
 
 /** @internal */
 export interface CoderCompressor {
-  deflate(value: string): string;
-  inflate(value: string): string;
+  deflate(value: string | Uint8Array): string | Uint8Array;
+  inflate(value: string | Uint8Array): string | Uint8Array;
 }
 
 const SIGNATURE = b("\x00\x11");
@@ -154,7 +171,7 @@ class StringDeserializer implements CoderSerializer {
     return value as string;
   }
 
-  load(payload: string): string {
+  load(payload: string | Uint8Array): string | Uint8Array {
     return forceEncoding(payload, this.encoding);
   }
 }
@@ -163,9 +180,14 @@ const STRING_DESERIALIZERS = new Map(
   [...STRING_ENCODINGS].map(([type, encoding]) => [type, new StringDeserializer(encoding)]),
 );
 
-type LazyEntryOptions = { version: string | null; expiresAt: number | null };
+type LazyEntryOptions = { version: string | Uint8Array | null; expiresAt: number | null };
 let lazyEntry:
-  | (new (s: CoderSerializer, c: CoderCompressor | null, p: string, o: LazyEntryOptions) => Entry)
+  | (new (
+      s: CoderSerializer,
+      c: CoderCompressor | null,
+      p: string | Uint8Array,
+      o: LazyEntryOptions,
+    ) => Entry)
   | undefined;
 
 function lazyEntryClass(): NonNullable<typeof lazyEntry> {
@@ -177,7 +199,7 @@ function lazyEntryClass(): NonNullable<typeof lazyEntry> {
     constructor(
       serializer: CoderSerializer,
       compressor: CoderCompressor | null,
-      payload: string,
+      payload: string | Uint8Array,
       options: LazyEntryOptions,
     ) {
       super(payload, options);
@@ -188,8 +210,8 @@ function lazyEntryClass(): NonNullable<typeof lazyEntry> {
     override get value(): unknown {
       if (!this._resolved) {
         const raw = this._lazyCompressor
-          ? this._lazyCompressor.inflate(this._value as string)
-          : (this._value as string);
+          ? this._lazyCompressor.inflate(this._value as string | Uint8Array)
+          : (this._value as string | Uint8Array);
         this._value = this._lazySerializer.load(raw);
         this._resolved = true;
       }
@@ -225,20 +247,20 @@ export class Coder {
     this.legacySerializer = options.legacySerializer ?? false;
   }
 
-  dump(entry: Entry): string {
+  dump(entry: Entry): string | Uint8Array {
     if (this.legacySerializer) return this.serializer.dump(entry);
 
     return this.dumpCompressed(entry, Infinity);
   }
 
   /** @missingRailsArgs b — PERMANENT */
-  dumpCompressed(entry: Entry, threshold: number): string {
+  dumpCompressed(entry: Entry, threshold: number): string | Uint8Array {
     if (this.legacySerializer) return this.serializer.dumpCompressed!(entry, threshold);
 
     let type = this.typeForString(entry.value);
-    let payload: string;
+    let payload: string | Uint8Array;
     if (type !== undefined) {
-      payload = b(entry.value as string);
+      payload = b(entry.value as string | Uint8Array);
     } else {
       type = OBJECT_DUMP_TYPE;
       payload = this.serializer.dump(entry.value);
@@ -255,15 +277,15 @@ export class Coder {
     const version = entry.version != null ? this.dumpVersion(entry.version) : null;
     const versionLength = version?.length ?? -1;
 
-    let packed = SIGNATURE;
-    packed += pack([type, expiresAt, versionLength], PACKED_TEMPLATE);
-    if (version != null) packed += version;
-    packed += payload;
+    let packed: string | Uint8Array = b(SIGNATURE);
+    packed = rbStrPlus(packed, pack([type, expiresAt, versionLength], PACKED_TEMPLATE));
+    if (version != null) packed = rbStrPlus(packed as Uint8Array, version);
+    packed = rbStrPlus(packed as Uint8Array, payload);
     return packed;
   }
 
   load(dumped: unknown): unknown {
-    if (!this.isSignature(dumped)) return this.serializer.load(dumped as string);
+    if (!this.isSignature(dumped)) return this.serializer.load(dumped as string | Uint8Array);
 
     const type = unpack1(dumped, PACKED_TYPE_TEMPLATE)!;
     let expiresAt = unpack1(dumped, PACKED_EXPIRES_AT_TEMPLATE);
@@ -285,35 +307,39 @@ export class Coder {
     return new (lazyEntryClass())(serializer, compressor, payload, { version, expiresAt });
   }
 
-  private isSignature(dumped: unknown): dumped is string {
-    return typeof dumped === "string" && dumped.startsWith(SIGNATURE);
+  private isSignature(dumped: unknown): dumped is Uint8Array {
+    return dumped instanceof Uint8Array && rbStrStartWith(dumped, SIGNATURE);
   }
 
   private typeForString(value: unknown): number | undefined {
-    if (typeof value !== "string") return undefined;
-    for (const [type, encoding] of STRING_ENCODINGS) if (encoding === "UTF-8") return type;
+    if (!(typeof value === "string" || value instanceof Uint8Array)) return undefined;
+    const encoding = rbObjEncoding(value);
+    for (const [type, name] of STRING_ENCODINGS) if (Encoding.find(name) === encoding) return type;
     return undefined;
   }
 
-  private tryCompress(string: string, threshold: number): string | undefined {
-    if (this.compressor && string.length >= threshold) {
+  private tryCompress(
+    string: string | Uint8Array,
+    threshold: number,
+  ): string | Uint8Array | undefined {
+    if (this.compressor && b(string).length >= threshold) {
       const compressed = this.compressor.deflate(string);
-      if (compressed.length < string.length) return compressed;
+      if (b(compressed).length < b(string).length) return compressed;
     }
     return undefined;
   }
 
-  private dumpVersion(version: string): string {
-    if (version.startsWith(MARSHAL_SIGNATURE)) {
-      return SerializerWithFallback.get("marshal_7_1").dump(version) as string;
+  private dumpVersion(version: string | Uint8Array): Uint8Array {
+    if (rbObjEncoding(version) !== Encoding.UTF_8 || rbStrStartWith(version, MARSHAL_SIGNATURE)) {
+      return Marshal.dump(version);
     } else {
       return b(version);
     }
   }
 
-  private loadVersion(dumpedVersion: string): string {
-    if (dumpedVersion.startsWith(MARSHAL_SIGNATURE)) {
-      return SerializerWithFallback.get("marshal_7_1").load(dumpedVersion) as string;
+  private loadVersion(dumpedVersion: Uint8Array): string | Uint8Array {
+    if (rbStrStartWith(dumpedVersion, MARSHAL_SIGNATURE)) {
+      return Marshal.load(dumpedVersion) as string | Uint8Array;
     } else {
       return forceEncoding(dumpedVersion, "UTF-8");
     }

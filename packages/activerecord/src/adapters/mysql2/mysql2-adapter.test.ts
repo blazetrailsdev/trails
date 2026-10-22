@@ -46,9 +46,9 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("connection error", async () => {
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
-      const error = (await assertRaises([ConnectionNotEstablished], {}, () =>
+      const error = await assertRaises([ConnectionNotEstablished], {}, () =>
         badAdapter.connectBang(),
-      )) as ConnectionNotEstablished;
+      );
       expect(error.connectionPool).toBeInstanceOf(NullPool);
     } finally {
       await badAdapter.disconnectBang();
@@ -58,9 +58,9 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("reconnection error", async () => {
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
-      const error = (await assertRaises([ConnectionNotEstablished], {}, () =>
+      const error = await assertRaises([ConnectionNotEstablished], {}, () =>
         badAdapter.reconnectBang(),
-      )) as ConnectionNotEstablished;
+      );
       expect(error.connectionPool).toBe(badAdapter.pool);
     } finally {
       await badAdapter.disconnectBang();
@@ -163,7 +163,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
         /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer\. \(For example `t.integer :old_car_id`\)\./,
       );
       expect(error.cause ?? null).not.toBeNull();
-      expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
+      expect(error.connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.execute("ALTER TABLE engines DROP COLUMN old_car_id").catch(() => null);
     }
@@ -184,7 +184,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
           /To resolve this issue, change the type of the `old_car_id` column on `engines` to be :integer\. \(For example `t.integer :old_car_id`\)\./,
         );
         expect(error.cause ?? null).not.toBeNull();
-        expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
+        expect(error.connectionPool).toBe(adapter.pool);
       } finally {
         await adapter.removeReference("engines", "person");
         await adapter.removeReference("engines", "old_car");
@@ -213,7 +213,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
         /To resolve this issue, change the type of the `old_car_id` column on `foos` to be :integer\. \(For example `t.integer :old_car_id`\)\./,
       );
       expect(error.cause ?? null).not.toBeNull();
-      expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
+      expect(error.connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.dropTable("foos", { ifExists: true });
     }
@@ -240,7 +240,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
         /To resolve this issue, change the type of the `car_id` column on `foos` to be :bigint\. \(For example `t.bigint :car_id`\)\./,
       );
       expect(error.cause ?? null).not.toBeNull();
-      expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
+      expect(error.connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.dropTable("foos", { ifExists: true });
     }
@@ -267,7 +267,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
           "column on `foos` to be :string. (For example `t.string :subscriber_id`).",
       );
       expect(error.cause ?? null).not.toBeNull();
-      expect((error as MismatchedForeignKey).connectionPool).toBe(adapter.pool);
+      expect(error.connectionPool).toBe(adapter.pool);
     } finally {
       await adapter.dropTable("foos", { ifExists: true });
     }
@@ -276,9 +276,9 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("read timeout exception", async () => {
     const connection = new Mysql2Adapter({ uri: MYSQL_TEST_URL, readTimeout: 1 });
     try {
-      const error = (await assertRaises([AdapterTimeout], {}, () =>
+      const error = await assertRaises([AdapterTimeout], {}, () =>
         connection.execute("SELECT SLEEP(2)"),
-      )) as AdapterTimeout;
+      );
       expect(error).toBeInstanceOf(QueryAborted);
       expect((error.cause as { code?: string }).code).toBe("PROTOCOL_SEQUENCE_TIMEOUT");
       expect(error.connectionPool).toBe(connection.pool);
@@ -293,17 +293,13 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     vi.spyOn(rawConn, "query").mockRejectedValueOnce(
       Object.assign(new Error("fail"), { errno: AbstractMysqlAdapter.ER_FILSORT_ABORT }),
     );
-    let error = (await assertRaises([StatementTimeout], {}, () =>
-      adapter.execute("SELECT 1"),
-    )) as StatementTimeout;
+    let error = await assertRaises([StatementTimeout], {}, () => adapter.execute("SELECT 1"));
     expect(error.connectionPool).toBe(adapter.pool);
 
     vi.spyOn(rawConn, "query").mockRejectedValueOnce(
       Object.assign(new Error("fail"), { errno: AbstractMysqlAdapter.ER_QUERY_TIMEOUT }),
     );
-    error = (await assertRaises([StatementTimeout], {}, () =>
-      adapter.execute("SELECT 1"),
-    )) as StatementTimeout;
+    error = await assertRaises([StatementTimeout], {}, () => adapter.execute("SELECT 1"));
     expect(error.connectionPool).toBe(adapter.pool);
   });
 

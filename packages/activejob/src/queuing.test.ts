@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 import { Notifications } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { block, NotImplementedError } from "@blazetrails/ruby-compat";
@@ -27,7 +28,7 @@ describe("QueuingTest", () => {
           performLater(...args: unknown[]): Promise<unknown>;
         }
       ).performLater("Jamie");
-      expect(result).toBeTruthy();
+      expect(result).toBeRubyTruthy();
     } catch (e) {
       if (!(e instanceof NotImplementedError)) throw e;
     }
@@ -118,7 +119,7 @@ describe("QueuingTest", () => {
     const subscriber = (...args: unknown[]) => {
       const payload = args[4] as Record<string, unknown>;
       called = true;
-      expect(payload["adapter"]).toBeTruthy();
+      expect(payload["adapter"]).toBeRubyTruthy();
       expect(payload["jobs"]).toEqual(jobs);
       expect(payload["enqueued_count"]).toBe(2);
     };

@@ -23,7 +23,7 @@ import { Base } from "../base.js";
 import { LogSubscriber } from "../log-subscriber.js";
 import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "./handlers.js";
-import { Tse } from "./handlers/tse.js";
+import { TSE } from "./handlers/tse.js";
 import { Customer, GoodCustomer } from "../test-helpers/fake-models.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
@@ -102,7 +102,7 @@ describe("AVLogSubscriberTest", () => {
   let viewPathsWas: unknown;
 
   beforeEach(({ task }) => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     viewPathsWas = ActionController.Base.viewPaths();
     ActionController.Base.viewPaths(FIXTURE_LOAD_PATH);
     tc = new AVLogSubscriberTest(task.name);

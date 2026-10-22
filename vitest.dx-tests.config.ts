@@ -51,6 +51,18 @@ export default defineConfig({
           },
         },
       },
+      {
+        extends: true,
+        test: {
+          name: "rack",
+          typecheck: {
+            enabled: true,
+            only: true,
+            include: ["packages/rack/dx-tests/**/*.test-d.ts"],
+            tsconfig: "./packages/rack/dx-tests/tsconfig.json",
+          },
+        },
+      },
     ],
   },
 });

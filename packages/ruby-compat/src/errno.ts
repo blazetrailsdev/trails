@@ -51,6 +51,27 @@ class ENOTTY extends SystemCallError {
 }
 
 /**
+ * `Errno::EAGAIN`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is: the error a non-blocking `read(2)` raises with nothing to read.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EAGAIN`.
+ */
+class EAGAIN extends SystemCallError {
+  static readonly Errno = 11;
+  readonly code = "EAGAIN";
+
+  constructor(mesg?: string) {
+    super(
+      mesg == null
+        ? "Resource temporarily unavailable"
+        : `Resource temporarily unavailable - ${mesg}`,
+    );
+    this.name = "Errno::EAGAIN";
+    this.errno = EAGAIN.Errno;
+  }
+}
+
+/**
  * `Errno::EPIPE`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
  * {@link ENOTTY} is. A write to a closed pipe reaches JS as the host's own
  * error carrying `code: "EPIPE"`, which is this class to `rescue Errno::EPIPE`.
@@ -243,4 +264,15 @@ class EMFILE extends SystemCallError {
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-export const Errno = { EEXIST, EISDIR, EMFILE, ENOENT, ENOTDIR, ENOTTY, EPIPE, ESPIPE, ESRCH };
+export const Errno = {
+  EAGAIN,
+  EEXIST,
+  EISDIR,
+  EMFILE,
+  ENOENT,
+  ENOTDIR,
+  ENOTTY,
+  EPIPE,
+  ESPIPE,
+  ESRCH,
+};

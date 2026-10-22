@@ -37,7 +37,7 @@ export interface TseTemplate {
 
 export type TseImplementation = (source: string, options?: EmitJsOptions) => EmitResult;
 
-export class Tse implements TemplateHandler {
+export class TSE implements TemplateHandler {
   declare static tseTrimMode: string;
   declare static isTseTrimMode: boolean;
   declare static tseImplementation: TseImplementation;
@@ -91,7 +91,7 @@ export class Tse implements TemplateHandler {
 
   /** @missingRailsCall include? — PERMANENT */
   call(template: TseTemplate, source: string): string {
-    const ctor = this.constructor as typeof Tse;
+    const ctor = this.constructor as typeof TSE;
     const prepared = this.stripTrailingNewlines ? chomp(source) : source;
     const options: EmitJsOptions = {
       escapeIgnore: ctor.escapeIgnoreList.some((type) => rbEqual(type, template.type)),
@@ -161,4 +161,4 @@ export class Tse implements TemplateHandler {
   }
 }
 
-registerConstant("ActionView::Template::Handlers::TSE", Tse);
+registerConstant("ActionView::Template::Handlers::TSE", TSE);

@@ -164,6 +164,7 @@ export function setLocale(this: ViewPaths, value: string | null): void {
 
 export class ViewPaths {
   static ClassMethods = ClassMethods;
+  /** @noRailsEquivalent PERMANENT */
   declare ["constructor"]: ViewPathsClass;
   /** @internal */
   declare _lookupContext?: LookupContext;

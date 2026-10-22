@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { RoutingUrlFor, type RoutingUrlForHost } from "./routing-url-for.js";
 import { _backUrl, type UrlHelperHost } from "./helpers/url-helper.js";
 import { TopLevel, include } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
 
 class Parameters {
   constructor(private readonly data: Record<string, unknown>) {}
@@ -33,24 +32,30 @@ interface Host extends RoutingUrlFor, RoutingUrlForHost, UrlHelperHost {
 
 let host: Host;
 
-RoutingUrlFor.include(
-  new Module((mod) =>
-    mod.include({
-      urlFor(this: Host, options?: unknown) {
-        this.seen.push(options);
-        return "/super";
-      },
-      urlOptions: () => ({ host: "example.com" }),
-      optimizeRoutesGeneration: () => true,
-      polymorphicPath: (record: unknown, options: unknown) =>
-        `path:${JSON.stringify([record, options])}`,
-      polymorphicUrl: (record: unknown, options: unknown) =>
-        `url:${JSON.stringify([record, options])}`,
-    }),
-  ),
-);
+class UrlForSuper {
+  urlFor(this: Host, options?: unknown) {
+    this.seen.push(options);
+    return "/super";
+  }
 
-class View {}
+  urlOptions() {
+    return { host: "example.com" };
+  }
+
+  optimizeRoutesGeneration() {
+    return true;
+  }
+
+  polymorphicPath(record: unknown, options: unknown) {
+    return `path:${JSON.stringify([record, options])}`;
+  }
+
+  polymorphicUrl(record: unknown, options: unknown) {
+    return `url:${JSON.stringify([record, options])}`;
+  }
+}
+
+class View extends UrlForSuper {}
 include(View, RoutingUrlFor);
 
 beforeEach(() => {

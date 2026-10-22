@@ -4,7 +4,7 @@ import "../message-pack.js";
 import { Encoding } from "../json/encoding.js";
 import { NullSerializer } from "../message-encryptor.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, b } from "@blazetrails/ruby-compat";
 import { currentTimeInstant, setFrozenInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { Metadata, type ExpectedMetadataOptions, type MetadataOptions } from "./metadata.js";
@@ -79,8 +79,9 @@ const CustomSerializer: MessageSerializer = {
     return `${JSON.stringify(value)}!`;
   },
 
-  load(value: string): unknown {
-    return JSON.parse(value.replace(/!$/, ""));
+  load(value: string | Uint8Array): unknown {
+    const text = typeof value === "string" ? value : new TextDecoder().decode(value);
+    return JSON.parse(text.replace(/!$/, ""));
   },
 };
 
@@ -129,7 +130,9 @@ export function messageMetadataTests<T>(hooks: MetadataCodecHooks<T>): void {
     encodeOptions: MetadataOptions = {},
     decodeOptions: ExpectedMetadataOptions = {},
   ): void => {
-    expect(roundtrip(data, codec, encodeOptions, decodeOptions)).toEqual(data);
+    const result = roundtrip(data, codec, encodeOptions, decodeOptions);
+    if (result instanceof Uint8Array) expect(Uint8Array.from(result)).toEqual(b(data as string));
+    else expect(result).toEqual(data);
   };
 
   const assertNoRoundtrip = (

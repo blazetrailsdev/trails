@@ -16,8 +16,14 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > application-helpe
 `;
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > application-job.ts 1`] = `
-"export class ApplicationJob {
-  queueAs = "default";
+"import { ActiveJob } from "@blazetrails/activejob";
+
+export class ApplicationJob extends ActiveJob.Base {
+  // Automatically retry jobs that encountered a deadlock
+  // static { this.retryOn(ActiveRecord.Deadlocked); }
+
+  // Most jobs are safe to ignore if the underlying records are no longer available
+  // static { this.discardOn(ActiveJob.DeserializationError); }
 }
 "
 `;

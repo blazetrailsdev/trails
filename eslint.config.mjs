@@ -140,6 +140,8 @@ export default defineConfig(
       "packages/actionpack/src/test-helpers/fixtures/公共/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
       "packages/marcel/src/test-helpers/fixtures/**",
+      // Byte-for-byte copies of vendor/rack/v3.1.14/test/cgi/assets.
+      "packages/rack/test/cgi/assets/**",
       "**/dist-test/**",
       "**/.trails/**",
       "packages/website/static/**",
@@ -416,6 +418,7 @@ export default defineConfig(
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
+      "packages/actioncable/src/**/*.ts",
       "packages/activejob/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
@@ -449,6 +452,7 @@ export default defineConfig(
       "packages/did-you-mean/src/**/*.ts",
       "packages/bcrypt/src/**/*.ts",
       "packages/arel/src/**/*.ts",
+      "packages/actioncable/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
       "packages/ruby-compat/src/**/*.ts",
@@ -594,6 +598,7 @@ export default defineConfig(
           files: [
             "packages/arel/src/**/*.ts",
             "packages/activemodel/src/**/*.ts",
+            "packages/actioncable/src/**/*.ts",
             "packages/activerecord/src/connection-adapters/**/*.ts",
             "packages/activerecord/src/adapters/**/*.ts",
           ],
@@ -1040,6 +1045,20 @@ export default defineConfig(
       "vitest/no-conditional-in-test": "error",
       "vitest/no-conditional-expect": "error",
       "vitest/no-conditional-tests": "error",
+    },
+  },
+
+  {
+    files: ["packages/marcel/src/extension.test.ts"],
+    rules: {
+      "vitest/no-conditional-tests": "off",
+    },
+  },
+  {
+    files: ["packages/marcel/src/test-helpers/test-helper.ts"],
+    rules: {
+      "no-useless-assignment": "off",
+      "prefer-const": ["error", { destructuring: "all" }],
     },
   },
 

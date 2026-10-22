@@ -13,7 +13,7 @@ import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMetadata as MysqlTypeMetadata } from "./mysql/type-metadata.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
-import { File, Hash, Marshal } from "@blazetrails/ruby-compat";
+import { File, Hash, Marshal, rbStrStartWith } from "@blazetrails/ruby-compat";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -479,10 +479,10 @@ describe("SchemaCacheMarshalDumpTest", () => {
     await cache.dumpTo(filename);
 
     const bytes = File.binread(filename);
-    expect(bytes).toBe(Marshal.dump(cache));
-    expect(bytes.startsWith("\x04\bU:2ActiveRecord::ConnectionAdapters::SchemaCache[\v0")).toBe(
-      true,
-    );
+    expect(bytes).toEqual(Marshal.dump(cache));
+    expect(
+      rbStrStartWith(bytes, "\x04\bU:2ActiveRecord::ConnectionAdapters::SchemaCache[\v0"),
+    ).toBe(true);
   });
 
   it.each(["schema_cache.dump", "schema_cache.dump.gz"])(

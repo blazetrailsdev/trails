@@ -144,6 +144,7 @@ export const COUNTED_PACKAGES = [] as const;
 export const TAGGED_ONLY_PACKAGES = [
   "actioncontroller",
   "actiondispatch",
+  "actionview",
   "i18n",
   "ruby-compat",
   "thor",
@@ -156,6 +157,7 @@ export const TAGGED_ONLY_PACKAGES = [
  */
 export const ROWLESS_PACKAGES = [
   "abstractcontroller",
+  "actioncable",
   "actionpackversion",
   "activemodel",
   "activerecord",
@@ -163,6 +165,7 @@ export const ROWLESS_PACKAGES = [
   "bcrypt",
   "did-you-mean",
   "globalid",
+  "marcel",
   "rack",
   "rack-session",
   "rack-test",

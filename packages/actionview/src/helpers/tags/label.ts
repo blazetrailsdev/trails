@@ -78,6 +78,10 @@ export class Label extends Base {
     this._content = content;
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE output-buffer-capture-async-block-converge
+   * @inventedArm then — CONVERGEABLE output-buffer-capture-async-block-converge
+   */
   override render(block?: (builder: LabelBuilder) => unknown): unknown {
     const options = stringifyKeys(this._options);
     const tagValue = hashDelete(options, "value");
@@ -111,6 +115,9 @@ export class Label extends Base {
       content = this.renderComponent(builder);
     }
 
+    if (content instanceof Promise) {
+      return content.then((content) => this.labelTag(nameAndId["id"], content, options));
+    }
     return this.labelTag(nameAndId["id"], content, options);
   }
 

@@ -3,7 +3,7 @@ import { Base } from "./base.js";
 import { DetailsKey } from "./lookup-context.js";
 import { Template } from "./template.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { Tse } from "./template/handlers/tse.js";
+import { TSE } from "./template/handlers/tse.js";
 import {
   buildViewContextClass,
   isInheritViewContextClass,
@@ -34,7 +34,7 @@ const renderTse = async (
   view: Base,
 ): Promise<string> =>
   String(
-    await new Template(source, "t", new Tse(), { locals: [], format: ":html" }).render(
+    await new Template(source, "t", new TSE(), { locals: [], format: ":html" }).render(
       view,
       locals,
     ),
@@ -115,7 +115,7 @@ describe("ActionView::Rendering::ClassMethods", () => {
   });
 
   it("includes routes.url_helpers so a route helper is a bare identifier in a template", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     try {
       class C extends Controller {
         static override _routes = routesWith({ postsPath: () => "/posts" });
@@ -128,7 +128,7 @@ describe("ActionView::Rendering::ClassMethods", () => {
   });
 
   it("makes a helper_method-style helper resolvable as a bare identifier in a template", async () => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     try {
       class C extends Controller {
         static override _helpers = {

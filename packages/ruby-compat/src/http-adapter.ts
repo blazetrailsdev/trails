@@ -13,6 +13,7 @@ export interface HttpResponse {
   writeHead(status: number, headers?: Record<string, string | string[]>): unknown;
   write(chunk: string | Uint8Array): unknown;
   end(chunk?: string | Uint8Array): unknown;
+  socket?: HttpSocket | null;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -21,9 +22,13 @@ export interface HttpSocket {
   end(chunk?: string | Uint8Array): unknown;
   destroy(): unknown;
   unshift(chunk: Uint8Array): unknown;
+  pause(): unknown;
+  resume(): unknown;
   on(event: "data", listener: (chunk: Uint8Array) => void): unknown;
   on(event: "close" | "end", listener: () => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
+  removeListener(event: "data", listener: (chunk: Uint8Array) => void): unknown;
+  removeListener(event: "close" | "end", listener: () => void): unknown;
   removeListener(event: "error", listener: (error: Error) => void): unknown;
 }
 

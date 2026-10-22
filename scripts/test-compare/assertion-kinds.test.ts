@@ -156,6 +156,12 @@ describe("normalizeTrailsKind", () => {
     expect(normalizeTrailsKind("not:toBeTruthy")).toBe("falsy");
   });
 
+  it("folds not.toBeExactInstanceOf onto assert_not_instance_of", () => {
+    expect(normalizeTrailsKind("not:toBeExactInstanceOf")).toBe("notInstanceOf");
+    expect(normalizeRailsKind("assert_not_instance_of")).toBe("notInstanceOf");
+    expect(normalizeRailsKind("refute_instance_of")).toBe("notInstanceOf");
+  });
+
   it("folds not.toThrow onto assert_nothing_raised", () => {
     expect(normalizeTrailsKind("not:toThrow")).toBe("nothingRaised");
     expect(normalizeTrailsKind("not:toThrow")).toBe(normalizeRailsKind("assert_nothing_raised"));

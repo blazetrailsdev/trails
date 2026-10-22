@@ -10,7 +10,14 @@ import {
   setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
-import { getFs, getPath, rbConstGet, RuntimeError, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  getFs,
+  getPath,
+  rbConstGet,
+  RuntimeError,
+  setSourceMapsSupport,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -152,6 +159,7 @@ export class Application extends Engine {
 
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
+    setSourceMapsSupport(true);
     setTrailsRoot(() => this.config.root);
     if (getEnv("SECRET_KEY_BASE_DUMMY") != null || Trails.env["local?"]()) {
       await this.config.loadLocalSecret();

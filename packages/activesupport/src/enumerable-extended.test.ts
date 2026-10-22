@@ -121,11 +121,17 @@ describe("EnumerableTests", () => {
   });
 
   it("tally — counts occurrences", () => {
-    expect(tally(["a", "b", "a", "c", "b", "a"])).toEqual({ a: 3, b: 2, c: 1 });
+    expect(tally(["a", "b", "a", "c", "b", "a"])).toEqual(
+      new Map([
+        ["a", 3],
+        ["b", 2],
+        ["c", 1],
+      ]),
+    );
   });
 
   it("tally — empty array", () => {
-    expect(tally([])).toEqual({});
+    expect(tally([])).toEqual(new Map());
   });
 
   it("filterMap — maps and removes nullish results", () => {

@@ -1,13 +1,45 @@
 import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
+import { connect } from "node:net";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RackApp } from "@blazetrails/actionpack";
+import type { TCPSocket } from "@blazetrails/ruby-compat";
 import { build } from "vite";
 import { AppGenerator } from "../generators/app-generator.js";
 import { DevServer } from "./dev-server.js";
 
-const rackApp: RackApp = async () => [200, { "content-type": "text/plain" }, ["from rack"]];
+const rackApp: RackApp = async (env) => {
+  if (env["rack.hijack?"] && env.HTTP_UPGRADE === "websocket") {
+    const io = (env["rack.hijack"] as () => TCPSocket)();
+    io.write("HTTP/1.1 101 Switching Protocols\r\n\r\nfrom rack");
+    io.closeWrite();
+    return [-1, {}, [""]];
+  }
+  return [200, { "content-type": "text/plain" }, ["from rack"]];
+};
+
+function upgrade(origin: string, path: string, protocol?: string): Promise<string> {
+  const { hostname, port } = new URL(origin);
+  return new Promise((resolve, reject) => {
+    const socket = connect(Number(port), hostname, () => {
+      socket.write(
+        `GET ${path} HTTP/1.1\r\nHost: ${hostname}:${port}\r\n` +
+          "Connection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\n" +
+          "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+          (protocol ? `Sec-WebSocket-Protocol: ${protocol}\r\n` : "") +
+          "\r\n",
+      );
+    });
+    let received = "";
+    socket.on("data", (chunk) => {
+      received += chunk.toString();
+      if (protocol && received.includes("\r\n\r\n")) socket.destroy();
+    });
+    socket.on("close", () => resolve(received));
+    socket.on("error", reject);
+  });
+}
 
 let tmpDir: string | undefined;
 let server: DevServer | undefined;
@@ -43,6 +75,17 @@ async function startOn(cwd: string): Promise<string> {
 }
 
 describe("DevServer", () => {
+  it("hands a WebSocket upgrade to the Rack app and leaves Vite's to Vite", async () => {
+    const origin = await startOn(await generateApp());
+
+    expect(await upgrade(origin, "/cable")).toBe(
+      "HTTP/1.1 101 Switching Protocols\r\n\r\nfrom rack",
+    );
+    const hmr = await upgrade(origin, "/", "vite-ping");
+    expect(hmr.startsWith("HTTP/1.1 101")).toBe(true);
+    expect(hmr).not.toContain("from rack");
+  }, 30_000);
+
   it("serves the Rack app at / with the generated vite.config in place", async () => {
     const origin = await startOn(await generateApp());
 

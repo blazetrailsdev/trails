@@ -1,5 +1,6 @@
 import {
   Concern,
+  DescendantsTracker,
   classAttribute,
   delegate,
   demodulize,
@@ -11,9 +12,12 @@ import {
   ArgumentError,
   classModule,
   deleteSuffix,
+  rbCModule,
+  rbClassSuperclass,
   rbModConstSet,
   rbModName,
   rbObjClass,
+  rbObjIsKindOf,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { ActiveJob, QueueAdapters } from "./namespaces.js";
@@ -33,7 +37,7 @@ export function adapterName(adapter: unknown): string {
     return (adapter as { queueAdapterName: string }).queueAdapterName;
   }
 
-  const adapterClass = typeof adapter === "function" ? adapter : rbObjClass(adapter);
+  const adapterClass = rbObjIsKindOf(adapter, rbCModule) ? adapter : rbObjClass(adapter);
   const name = demodulize(rbModName(adapterClass as object) as string);
   return `${deleteSuffix(name, "Adapter")}`;
 }
@@ -73,6 +77,10 @@ export class ClassMethods {
   static assignAdapter(this: QueueAdapterClass, adapterName: string, queueAdapter: unknown): void {
     this._queueAdapterName = adapterName;
     this._queueAdapter = queueAdapter;
+    let klass = this as unknown as Parameters<typeof DescendantsTracker.registerSubclass>[1];
+    for (let superclass; (superclass = rbClassSuperclass(klass)); klass = superclass) {
+      DescendantsTracker.registerSubclass(superclass, klass);
+    }
   }
 
   /** @internal */

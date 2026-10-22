@@ -378,7 +378,10 @@ export class Session {
       (env["rack.errors"] as { flush(): unknown }).flush(),
     );
     this.closeBody(body);
-    this.cookieJar.merge(this.lastResponse().headers["set-cookie"], uri);
+    this.cookieJar.merge(
+      this.lastResponse().headers["set-cookie"] as string | string[] | undefined,
+      uri,
+    );
     this._afterRequest.forEach((hook) => hook());
     this._lastResponse.finish();
 

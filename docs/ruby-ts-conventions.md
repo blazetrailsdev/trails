@@ -204,6 +204,8 @@ parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
+- Node's event loop stands in for Action Cable's `NIO::Selector` and its thread (CLAUDE.md, "Node's event loop stands in for Action Cable's nio4r selector"). `spawn`, `run` and `wakeup` own and interrupt the selector thread (stream_event_loop.rb:62-133); `writes_pending` (:47-54) and `Stream#flush_write_buffer` (stream.rb:72-92) carry a partial `write_nonblock`, which a `net.Socket` never leaves.
+  - `spawn`, `run`, `wakeup`, `writes_pending`, `flush_write_buffer` (only in: `connection/stream_event_loop.rb`, `connection/stream.rb`)
 - `Thor::Runner` (`runner.rb`, the `thor` executable that installs and runs Thorfiles) is not ported, and these `Thor::Util` members exist only for it: `namespaces_in_content` and `load_thorfile` evaluate a Thorfile inside `Thor::Sandbox` (util.rb:58-70, :153-166), and `user_home`, `thor_root`, `thor_root_glob` and `globs_for` (util.rb:168-216) locate the Thorfiles installed under `~/.thor`. railties never reaches them. Scoped to thor's util.rb.
   - `namespaces_in_content`, `load_thorfile`, `user_home`, `thor_root`, `thor_root_glob`, `globs_for` (only in: `util.rb`)
 - `Thor::Util.escape_html` (util.rb:280-282) is `CGI.escapeHTML`, called only by `Thor::Shell::HTML`, which is not ported: there is no terminal rendering HTML. Scoped to thor's util.rb.

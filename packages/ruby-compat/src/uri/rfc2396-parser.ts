@@ -128,17 +128,20 @@ export class RFC2396Parser {
    * The second `else if` arm is not in the Ruby: `gsub` replaces every match
    * whatever the Regexp is, where a JS `replace` replaces one unless the
    * Regexp carries `g`, so a caller's own unsafe set is re-made global here.
+   * An ASCII-8BIT `str`, a `Uint8Array`, is searched a byte per character, and
+   * each matched character is the byte `each_byte` yields.
    */
-  escape(str: string, unsafe: RegExp | string = this.regexp.UNSAFE): string {
+  escape(str: string | Uint8Array, unsafe: RegExp | string = this.regexp.UNSAFE): string {
     if (!(unsafe instanceof RegExp)) {
       unsafe = new RegExp(`[${regexpEscape(unsafe)}]`, "g");
     } else if (!unsafe.flags.includes("g")) {
       unsafe = new RegExp(unsafe.source, `${unsafe.flags}g`);
     }
-    return str.replace(unsafe, (us) => {
+    const binary = str instanceof Uint8Array;
+    return (binary ? String.fromCharCode(...str) : str).replace(unsafe, (us) => {
       let tmp = "";
-      for (const uc of b(us)) {
-        tmp += `%${uc.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`;
+      for (const uc of binary ? Array.from(us, (c) => c.charCodeAt(0)) : b(us)) {
+        tmp += `%${uc.toString(16).toUpperCase().padStart(2, "0")}`;
       }
       return tmp;
     });

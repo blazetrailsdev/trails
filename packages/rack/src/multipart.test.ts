@@ -16,7 +16,7 @@ import {
   multipartTotalPartLimit,
   setMultipartTotalPartLimit,
 } from "./utils.js";
-import { ArgumentError, Errno, StringIO } from "@blazetrails/ruby-compat";
+import { ArgumentError, Errno, StringIO, b } from "@blazetrails/ruby-compat";
 import { MockRequest } from "./mock-request.js";
 import { Params, QueryParser } from "./query-parser.js";
 import { Request } from "./request.js";
@@ -27,7 +27,7 @@ const fixtureDir = path.join(__dirname, "..", "test", "multipart");
 
 function multipartFixture(name: string, boundary = "AaB03x"): Record<string, any> {
   const file = multipartFile(name);
-  const data = fs.readFileSync(file, "binary");
+  const data = Uint8Array.from(fs.readFileSync(file));
 
   const type = `multipart/form-data; boundary=${boundary}`;
   const length = data.length;
@@ -62,7 +62,7 @@ function envFor(data: string, contentType: string): Record<string, any> {
   return {
     CONTENT_TYPE: contentType,
     CONTENT_LENGTH: String(data.length),
-    "rack.input": new StringIO(data),
+    "rack.input": new StringIO(Buffer.from(data, "latin1")),
   };
 }
 
@@ -88,7 +88,7 @@ it("parses filename with unescaped percentage characters that look like partial 
   );
 
   expect(files.name).toBe("document[attachment]");
-  expect(files.tempfile.read()).toBe("contents");
+  expect(files.tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses filename with unescaped percentage characters that look like partial hex escapes", () => {
@@ -108,7 +108,7 @@ it("parses filename with unescaped percentage characters that look like partial 
   );
 
   expect(files.name).toBe("document[attachment]");
-  expect(files.tempfile.read()).toBe("contents");
+  expect(files.tempfile.read()).toEqual(b("contents"));
 });
 
 it("raises a RuntimeError for invalid file path", () => {
@@ -136,7 +136,7 @@ it("builds multipart body", () => {
   const params = parseMultipart(env)!;
   expect(params["submit-name"]).toBe("Larry");
   expect(params["files"].filename).toBe("file1.txt");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("builds multipart filename with space", () => {
@@ -147,7 +147,7 @@ it("builds multipart filename with space", () => {
   const params = parseMultipart(env)!;
   expect(params["submit-name"]).toBe("Larry");
   expect(params["files"].filename).toBe("space case.txt");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("builds nested multipart body using array", () => {
@@ -158,7 +158,7 @@ it("builds nested multipart body using array", () => {
   const params = parseMultipart(env)!;
   expect(params["people"][0]["submit-name"]).toBe("Larry");
   expect(params["people"][0]["files"].filename).toBe("file1.txt");
-  expect(params["people"][0]["files"].tempfile.read()).toBe("contents");
+  expect(params["people"][0]["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("builds nested multipart body using hash", () => {
@@ -169,7 +169,7 @@ it("builds nested multipart body using hash", () => {
   const params = parseMultipart(env)!;
   expect(params["people"]["foo"]["submit-name"]).toBe("Larry");
   expect(params["people"]["foo"]["files"].filename).toBe("file1.txt");
-  expect(params["people"]["foo"]["files"].tempfile.read()).toBe("contents");
+  expect(params["people"]["foo"]["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("builds multipart body from StringIO", () => {
@@ -180,7 +180,7 @@ it("builds multipart body from StringIO", () => {
   const params = parseMultipart(env)!;
   expect(params["submit-name"]).toBe("Larry");
   expect(params["files"].filename).toBe("bar.txt");
-  expect(params["files"].tempfile.read()).toBe("foo");
+  expect(params["files"].tempfile.read()).toEqual(b("foo"));
 });
 
 it("can parse fields that end at the end of the buffer", () => {
@@ -190,7 +190,7 @@ it("can parse fields that end at the end of the buffer", () => {
     MockRequest.envFor("/", {
       CONTENT_TYPE: "multipart/form-data, boundary=1yy3laWhgX31qpiHinh67wJXqKalukEUTvqTzmon",
       CONTENT_LENGTH: input.length,
-      ":input": input,
+      ":input": Buffer.from(input, "latin1"),
     }),
   );
 
@@ -209,7 +209,7 @@ it("builds complete params with the chunk size of 16384 slicing exactly on bound
     const options = {
       CONTENT_TYPE: "multipart/form-data; boundary=----WebKitFormBoundaryWsY0GnpbI5U7ztzo",
       CONTENT_LENGTH: String(data.length),
-      ":input": new StringIO(data),
+      ":input": new StringIO(Buffer.from(data, "latin1")),
     };
     const env = MockRequest.envFor("/", options);
     const params = parseMultipart(env)!;
@@ -327,7 +327,7 @@ contents\r
   const options = {
     CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
     CONTENT_LENGTH: String(data.length),
-    ":input": new StringIO(data),
+    ":input": new StringIO(Buffer.from(data, "latin1")),
   };
   const env = MockRequest.envFor("/", options);
   const params = parseMultipart(env)!;
@@ -348,7 +348,7 @@ contents\r
     const options = {
       CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
       CONTENT_LENGTH: String(data.length),
-      ":input": new StringIO(data),
+      ":input": new StringIO(Buffer.from(data, "latin1")),
     };
     const env = MockRequest.envFor("/", options);
     const params = parseMultipart(env)!;
@@ -369,7 +369,7 @@ contents\r
   const options = {
     CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
     CONTENT_LENGTH: String(data.length),
-    ":input": new StringIO(data),
+    ":input": new StringIO(Buffer.from(data, "latin1")),
   };
   const env = MockRequest.envFor("/", options);
   const params = parseMultipart(env)!;
@@ -390,7 +390,7 @@ true\r
   const options = {
     CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
     CONTENT_LENGTH: String(data.length),
-    ":input": new StringIO(data),
+    ":input": new StringIO(Buffer.from(data, "latin1")),
   };
   const env = MockRequest.envFor("/", options);
   const params = parseMultipart(env)!;
@@ -409,7 +409,7 @@ true\r
   const options = {
     CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
     CONTENT_LENGTH: String(data.length),
-    ":input": new StringIO(data),
+    ":input": new StringIO(Buffer.from(data, "latin1")),
   };
   const env = MockRequest.envFor("/", options);
   const params = parseMultipart(env)!;
@@ -427,7 +427,7 @@ it("supports mixed case metadata", () => {
       "content-type: text/plain\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("falls back to content-type for the name", () => {
@@ -451,7 +451,7 @@ ${rackLogo}\r
   const options = {
     CONTENT_TYPE: "multipart/related; boundary=AaB03x",
     CONTENT_LENGTH: String(data.length),
-    ":input": new StringIO(data),
+    ":input": new StringIO(Buffer.from(data, "latin1")),
   };
   const env = MockRequest.envFor("/", options);
   const params = parseMultipart(env)!;
@@ -760,7 +760,7 @@ it("parses multipart upload with text file", () => {
       "content-type: text/plain\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("accepts the params hash class to use for multipart parsing", () => {
@@ -786,7 +786,7 @@ it("parses multipart upload with text file with a no name field", () => {
       "content-type: text/plain\r\n",
   );
   expect(params["file1.txt"].name).toBe("file1.txt");
-  expect(params["file1.txt"].tempfile.read()).toBe("contents");
+  expect(params["file1.txt"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses multipart upload file using custom tempfile class", () => {
@@ -819,7 +819,7 @@ it("parses multipart upload with nested parameters", () => {
       "content-type: text/plain\r\n",
   );
   expect(params["foo"]["files"].name).toBe("foo[files]");
-  expect(params["foo"]["files"].tempfile.read()).toBe("contents");
+  expect(params["foo"]["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses multipart upload with binary file", () => {
@@ -850,7 +850,7 @@ it("parses multipart upload with an empty file", () => {
       "content-type: text/plain\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("");
+  expect(params["files"].tempfile.read()).toEqual(b(""));
 });
 
 it("parses multipart upload with a filename containing semicolons", () => {
@@ -864,7 +864,7 @@ it("parses multipart upload with a filename containing semicolons", () => {
       "content-type: text/plain\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses multipart upload with quoted boundary", () => {
@@ -880,7 +880,7 @@ it("parses multipart upload with quoted boundary", () => {
       "content-type: text/plain\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses multipart upload with a filename containing invalid characters", () => {
@@ -894,7 +894,7 @@ it("parses multipart upload with a filename containing invalid characters", () =
     "content-type: text/plain\r\n";
   expect(params["files"].head).toBe(head);
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses multipart form with an encoded word filename", () => {
@@ -945,7 +945,7 @@ it("parses IE multipart upload and cleans up the filename", () => {
       "\r\ncontent-type: text/plain\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses filename and modification param", () => {
@@ -962,7 +962,7 @@ it("parses filename and modification param", () => {
       "Content-Description: a complete map of the human genome\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses filename with escaped quotes", () => {
@@ -977,7 +977,7 @@ it("parses filename with escaped quotes", () => {
       "content-type: application/octet-stream\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses filename with plus character", () => {
@@ -992,7 +992,7 @@ it("parses filename with plus character", () => {
       "content-type: application/octet-stream\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses filename with percent escaped quotes", () => {
@@ -1007,7 +1007,7 @@ it("parses filename with percent escaped quotes", () => {
       "content-type: application/octet-stream\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses filename with escaped quotes and modification param", () => {
@@ -1027,7 +1027,7 @@ it("parses filename with escaped quotes and modification param", () => {
       "Content-Description: a complete map of the human genome\r\n",
   );
   expect(params["files"].name).toBe("files");
-  expect(params["files"].tempfile.read()).toBe("contents");
+  expect(params["files"].tempfile.read()).toEqual(b("contents"));
 });
 
 it("parses filename with unescaped percentage characters", () => {
@@ -1047,5 +1047,5 @@ it("parses filename with unescaped percentage characters", () => {
   );
 
   expect(files.name).toBe("document[attachment]");
-  expect(files.tempfile.read()).toBe("contents");
+  expect(files.tempfile.read()).toEqual(b("contents"));
 });

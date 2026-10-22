@@ -3,7 +3,7 @@ import { isHtmlSafe } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { LookupContext } from "../lookup-context.js";
 import { TemplateHandlers } from "../template/handlers.js";
-import { Tse } from "../template/handlers/tse.js";
+import { TSE } from "../template/handlers/tse.js";
 import { FixtureResolver } from "../testing/resolvers.js";
 import type { ViewContext } from "./abstract-renderer.js";
 import type { Renderer } from "./renderer.js";
@@ -14,7 +14,7 @@ describe("PartialRenderer render blocks", () => {
   let renderer: Renderer;
 
   beforeEach(() => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+    TemplateHandlers.registerTemplateHandler("tse", new TSE());
     const resolver = new FixtureResolver({
       "layouts/_yield_only.html.tse": "<%= yield %>\n",
       "test/_partial.html.tse": "partial html",

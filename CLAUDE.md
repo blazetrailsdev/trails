@@ -1246,6 +1246,19 @@ only. A Rails body that branches on a String's encoding ports the UTF-8 arm,
 and a test asserting `str.encoding` is permanently unportable for that
 assertion.
 
+**An ASCII-8BIT String is a `Uint8Array`, end to end.** `String#b`,
+`IO#read` and `StringIO#read`'s length arm, a binmode or binary-tagged
+stream's whole read, `IO.binread`, `Marshal.dump`, `Zlib::Deflate.deflate` and
+a binary-directive `Array#pack` answer one, and `bytesize` is its `length`. An encoding-aware `bytesize` over a one-character-per-byte string
+was rejected: without a tag, `"\xD0\xCF".b` and the UTF-8 text `"ÐÏ"` are the
+same JS string, so any rule telling them apart is a guess, and the guess
+answers 4 for `"café".bytesize` where Ruby answers 5. A call site that reads a
+`.b` result as a JS string (interpolation, `===`, a regex) converges at that
+site, as Ruby keeps binary and text apart there too. A JS regex cannot match
+bytes, so where Ruby scans a binary String with one (`Multipart::Parser`,
+`Migration.copy`'s `sub!`), the bytes are read one character per byte for the
+scan and written back as bytes. Ruled by the repo owner on 2026-10-21.
+
 ## Runtime facts Node does not expose
 
 Each of these is a Ruby or C-library fact with no Node source. They are
@@ -1293,6 +1306,70 @@ ratified here so no port re-derives them.
 
 A test that depends on one of these ports the assertions that do not, and parks
 the rest as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
+
+## Node's event loop stands in for Action Cable's nio4r selector (`StreamEventLoop`, `Stream#write`)
+
+`ActionCable::Connection::StreamEventLoop`
+(`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/stream_event_loop.rb`)
+owns an `NIO::Selector` and one thread running `run` (`:86-133`): it drains a
+todo queue, `select`s, reads up to 4096 bytes from each readable socket with
+`read_nonblock` and hands them to `stream.receive`, and calls
+`stream.flush_write_buffer` for each writable one. `spawn` (`:62-80`) starts
+that thread and `wakeup` (`:82-84`) interrupts the `select`. `Stream#write`
+(`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/stream.rb:37-70`)
+calls `write_nonblock` and keeps the unwritten tail in `@write_head` /
+`@write_buffer` for the loop to flush (`:72-92`).
+
+A Node `net.Socket` is already registered with the process's event loop. It
+emits `data` when readable and buffers every `write` in full, so there is never
+a partial write to carry, no selector to own, no loop thread to spawn and
+nothing to wake. **Node's event loop stands in for the nio4r selector and its
+thread.** The `connection/` port, when it lands, follows these rules:
+
+- The private `spawn`, `run` and `wakeup` are not ported. They are a
+  `SCOPED_SKIP_GROUPS` entry in `scripts/parity/conventions.ts` citing this
+  section.
+- **`writes_pending` and `Stream#flush_write_buffer` join that skip group**
+  (RFC 0177 Open question 5). Their only callers are `Stream#write`'s
+  partial-write arms (`stream.rb:54,65`) and `run`
+  (`stream_event_loop.rb:105`), none of which exists here, so a body would be
+  an empty stub.
+- `attach` and `detach` keep their Rails names and callers. `attach(io, stream)`
+  (`stream_event_loop.rb:30-36`) registers the socket's `data` / `end` /
+  `error` listeners, held in `@map` where Rails holds the NIO monitor, and they
+  call `stream.receive` and `stream.close` exactly where `run` does
+  (`:111-129`). `detach` (`:38-45`) removes them, deletes the map entry and
+  closes the socket.
+- `timer`, `post` and `stop` (`:19-28`, `:56-59`) port as ordinary methods over
+  ruby-compat's `TimerTask` and `ThreadPoolExecutor`.
+- `Stream#write` calls the socket's `write` and keeps its `@stream_send` arm
+  and its `rescue EOFError, Errno::ECONNRESET`. Its `write_nonblock` result
+  arms, `@write_lock`, `@write_head` and `@write_buffer` have no counterpart.
+- `Connection::ClientSocket` drives the npm `websocket-driver` (its own story
+  adds the dependency), built with
+  `Driver.http` from a request-shaped object read off the Rack env where Rails
+  calls `WebSocket::Driver.rack(self, …)`
+  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/client_socket.rb:49`);
+  the driver's `io` stream's `data` event calls `ClientSocket#write` (`:76`),
+  where the Ruby driver calls `socket.write`.
+- `Connection::WebSocket` is otherwise a plain port; its one covered call is
+  `::WebSocket::Driver.websocket?(env)`
+  (`vendor/rails/v8.0.2/actioncable/lib/action_cable/connection/web_socket.rb:14`),
+  which is `Driver.isWebSocket` on the same request-shaped object.
+
+The files this section will cover, none ported yet, so a grep finds every
+citation once they are:
+`packages/actioncable/src/connection/stream-event-loop.ts`,
+`connection/stream.ts`, `connection/client-socket.ts`, and
+`connection/web-socket.ts` for that one call.
+
+It does **not** cover `Server::Worker`, which is to port line for line over
+ruby-compat's `ThreadPoolExecutor`, and it is not a receipt for dropping a
+`synchronize` anywhere else: § "The pool monitor guards only sections that span
+an `await`" still decides those.
+
+This is a genuine runtime difference, ratified repo-wide here. A socket story
+cites this section; it is not a new decision to argue.
 
 ## `$!` is passed explicitly, and a response body is iterated async (`BadRequest#initialize`, `Response#each`)
 
@@ -1344,6 +1421,22 @@ backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
 `domTestingDefaultHtmlVersion`, and the `:html4` arm of `chooseHtmlParser` raises
 `NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
 the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
+
+## Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)
+
+Ruby's `case`/`in` and rightward `=>` pattern matching
+(`vendor/ruby/v3.3.11/compile.c`, `iseq_compile_pattern_each`) are syntax: a
+pattern binds and destructures through `deconstruct` / `deconstruct_keys` and
+raises `NoMatchingPatternKeyError` on a miss. JS has no pattern syntax, and a
+pattern written as data or a predicate is a new mini-language Rails readers
+would not recognise. **trails does not port Ruby pattern matching**: Minitest's
+`assert_pattern` / `refute_pattern` have no trails counterpart, and the
+`deconstruct_keys` members already ported (`Date`, `GlobalID`, `URI::GID`,
+ruby-compat's `Hash`) stay as plain methods. A Rails test
+whose assertions are patterns (`PatternMatchingTestCases`,
+`vendor/rails/v8.0.2/actionview/test/template/test_case_test.rb:490-516`) is
+parked as `it.skip` under a `PERMANENT-SKIP:` line citing this section. Ruled by
+the repo owner on 2026-10-21.
 
 ## A dispatch by name is spelled directly (`send`, `public_send`)
 
@@ -1494,6 +1587,7 @@ the capability, in a different place. Each is decided here, and each but
 | `action_dispatch/testing/integration.rb`              | Proxy (proto chain)   |
 | `thor/core_ext/hash_with_indifferent_access.rb`       | Proxy (proto chain)   |
 | `rack/multipart/uploaded_file.rb`                     | Proxy                 |
+| `builder/xmlbase.rb`                                  | Proxy (misses only)   |
 
 Rules that apply across the table:
 
@@ -1514,6 +1608,9 @@ Rules that apply across the table:
   `method_missing`. Thor's HWIA reads a missed name as `self[method]` with
   Ruby truthiness, and a missed assignment as `[]=` (so a frozen hash raises
   `FrozenError`); its one-argument compare arm is reached only by `rbFSend`.
+- A `Proxy (misses only)` row reaches `method_missing` only for a name the
+  object does not already answer, so a builder tag named `constructor`,
+  `toString` or `append` is written `xml.tagBang(name)`, Ruby's `tag!`.
 - A "named method, no trap" row answers only an explicit `methodMissing` call.
   A "nothing" row with a dispatch-dependent Rails test is a gap, filed against
   its package; the rows are decided per class, not ratified.
@@ -1913,10 +2010,15 @@ environment, and shipped code has no eval pipeline.** The split is:
   TypeScript module, and `build-views` (`trails-tsc-views build`) writes one
   for every `.tse` file, partials and unused templates included, into
   `.trails/views/` (`--in-place` beside the file, for a package's own
-  templates).
+  templates). It builds each stand-in with the options `Tse#call` would use
+  (annotation, trim mode, trailing newlines, escape-ignore), and a file under
+  any other registered handler gets a module wrapping that handler's `call`
+  output, built at build time.
 - **`tsc` is the compiler.** `build-views` emits `<template>.js` with a source
   map chained back to the `.tse` file, so a backtrace names the template's own
-  line (Rails' `identifier, offset`) when Node runs with source maps enabled.
+  line (Rails' `identifier, offset`). `Application#initialize` turns on
+  Node's source-map support (`setSourceMapsSupport`, through the process
+  adapter) before any template module loads.
 
 The loader reads a template's module from where `build-views` writes it by
 default: an identifier under `<root>/app/views/` loads

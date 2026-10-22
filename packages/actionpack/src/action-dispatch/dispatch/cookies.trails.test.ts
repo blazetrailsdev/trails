@@ -26,7 +26,7 @@ function cookieRequest(): RequestCookieMethodsHost {
 function setCookieHeaders(jar: CookieJar): string[] {
   const response = new Response();
   jar.write(response);
-  const header = response.headers["set-cookie"];
+  const header = response.headers["set-cookie"] as string | string[] | undefined;
   if (header === undefined || header === null) return [];
   return Array.isArray(header) ? header : [header];
 }

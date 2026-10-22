@@ -7,7 +7,7 @@ import {
   stderr,
   registerConstant,
 } from "@blazetrails/ruby-compat";
-import { Module, rbModConstSet } from "@blazetrails/ruby-compat/include";
+import { include, rbModConstSet } from "@blazetrails/ruby-compat/include";
 import {
   Deprecation,
   DeprecationException,
@@ -89,7 +89,7 @@ expect.addEqualityTesters([
 ]);
 
 class Undeprecated {}
-const UndeprecatedFoo = Object.assign(rbModConstSet(Undeprecated, "Foo", new Module()), {
+const UndeprecatedFoo = Object.assign(rbModConstSet(Undeprecated, "Foo", {}), {
   BAR: "foo bar",
 });
 registerConstant("Undeprecated::Foo", UndeprecatedFoo);
@@ -596,16 +596,16 @@ describe("DeprecationTest", () => {
     });
   });
 
-  type Legacy = Module & {
+  type Legacy = {
     FUBAR: unknown;
     Error: new () => Error;
     deprecateConstant(a: string, b: string, o?: object): void;
   };
 
   it("deprecate_constant", async () => {
-    const legacy = new Module() as Legacy;
+    const legacy = {} as Legacy;
     Object.defineProperty(legacy, "name", { value: "Legacy" });
-    legacy.include(DeprecatedConstantAccessor);
+    include(legacy, DeprecatedConstantAccessor);
     legacy.deprecateConstant("FUBAR", "Undeprecated::Foo::BAR", { deprecator });
 
     await assertDeprecated("Legacy::FUBAR", deprecator, () => {
@@ -614,9 +614,9 @@ describe("DeprecationTest", () => {
   });
 
   it("deprecate_constant when rescuing a deprecated error", async () => {
-    const legacy = new Module() as Legacy;
+    const legacy = {} as Legacy;
     Object.defineProperty(legacy, "name", { value: "Legacy" });
-    legacy.include(DeprecatedConstantAccessor);
+    include(legacy, DeprecatedConstantAccessor);
     legacy.deprecateConstant("Error", "Undeprecated::Error", { deprecator });
 
     await assertDeprecated("Legacy::Error", deprecator, async () => {
@@ -631,7 +631,8 @@ describe("DeprecationTest", () => {
   });
 
   it("deprecate_constant requires a deprecator", async () => {
-    const legacy = new Module().include(DeprecatedConstantAccessor) as Legacy;
+    const legacy = {} as Legacy;
+    include(legacy, DeprecatedConstantAccessor);
     await assertRaises([ArgumentError], {}, () => {
       legacy.deprecateConstant("OLD", "NEW");
     });

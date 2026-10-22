@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbClassNewInstance } from "./include.js";
+import { rbCallSuper, rbClassNewInstance } from "./include.js";
 import { rbAbsintSize } from "./numeric.js";
 import {
   rbCArray,
@@ -172,6 +172,19 @@ describe("Object#inspect", () => {
 });
 
 describe("Object#to_s", () => {
+  it("answers rb_any_to_s for an instance with no to_s of its own", () => {
+    class Foo {
+      static toString(): string {
+        return "Foo";
+      }
+    }
+    expect(toS(new Foo())).toMatch(/^#<Foo:0x[0-9a-f]+>$/);
+  });
+
+  it("answers Set#inspect for a Set", () => {
+    expect(toS(new Set([1]))).toBe(inspect(new Set([1])));
+  });
+
   it("accepts a to_s answer that is a String and never calls to_str on it", () => {
     class Str extends stringSuperclass("eql") {
       toS(): this {
@@ -708,6 +721,22 @@ describe("rbModPublicMethodDefined", () => {
 });
 
 describe("rbModDefineMethod", () => {
+  it("replaces an own method, whose super reaches the ancestor, not the replaced definition", () => {
+    class Parent {
+      greet(): string {
+        return "parent";
+      }
+    }
+    class Child extends Parent {}
+    const define = () =>
+      rbModDefineMethod(Child, "greet", function greet(this: object): unknown {
+        return `child:${rbCallSuper(this, greet) as string}`;
+      });
+    define();
+    define();
+    expect((new Child() as Parent).greet()).toBe("child:parent");
+  });
+
   it("defines an instance method on the class, which method_defined? sees without its ancestors", () => {
     class Parent {}
     class Child extends Parent {}
@@ -734,6 +763,20 @@ describe("rbModDefineMethod", () => {
 });
 
 describe("rbModAttrReader / rbModAttrWriter / rbModMethodDefined", () => {
+  it("defines a plain-object module's reader where include() copies it", () => {
+    const mod = {};
+    rbModAttrReader({ prototype: mod }, "x");
+    class K {
+      _x = 1;
+    }
+    include(K, mod);
+    expect(new K() as unknown as { x: number }).toHaveProperty("x", 1);
+
+    class C {}
+    rbModAttrReader(C, "x");
+    expect(Object.getOwnPropertyDescriptor(C.prototype, "x")!.enumerable).toBe(false);
+  });
+
   it("defines a reader and a writer over one ivar, each keeping the other half", () => {
     class Person {}
     expect(rbModMethodDefined(Person, "name")).toBe(false);
@@ -1263,5 +1306,31 @@ describe("rbClassAttachedObject", () => {
     class Foo {}
     expect(() => rbClassAttachedObject(Foo)).toThrow(TypeError);
     expect(() => rbClassAttachedObject(Foo)).toThrow("`Foo' is not a singleton class");
+  });
+});
+
+describe("a JS String object as a Ruby String", () => {
+  class MyString extends String {}
+
+  it("classes a bare String object as String and a subclass as itself", () => {
+    expect(rbObjClass(new String("a"))).toBe(rbCString);
+    expect(rbObjClass(new MyString("a"))).toBe(MyString);
+  });
+
+  it("answers kind_of?(String) for a String subclass and keeps Object above it", () => {
+    expect(rbObjIsKindOf(new MyString("a"), rbCString)).toBe(true);
+    expect(rbObjIsKindOf(new MyString("a"), Object)).toBe(true);
+    expect(rbObjIsKindOf(new MyString("a"), rbCSymbol)).toBe(false);
+  });
+});
+
+describe("rbObjIsKindOf(obj, Module)", () => {
+  it("answers a named plain-object module and a class, not a bare hash", () => {
+    class Outer {}
+    const mod = {};
+    rbModConstSet(Outer, "Inner", mod);
+    expect(rbObjIsKindOf(mod, Module)).toBe(true);
+    expect(rbObjIsKindOf(Outer, Module)).toBe(true);
+    expect(rbObjIsKindOf({ a: 1 }, Module)).toBe(false);
   });
 });

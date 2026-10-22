@@ -1,3 +1,4 @@
+import type { RackHeaders } from "../index.js";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { AbstractHandler } from "./abstract/handler.js";
 import { AbstractRequest } from "./abstract/request.js";
@@ -5,7 +6,7 @@ import { AbstractRequest } from "./abstract/request.js";
 export class Basic extends AbstractHandler {
   declare static Request: typeof Request;
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const auth = new Basic.Request(env);
 
     if (!auth.provided()) return this.unauthorized();

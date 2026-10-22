@@ -146,11 +146,10 @@ export function many<T>(collection: T[], fn?: (item: T) => boolean): boolean {
   return false;
 }
 
-export function tally<T extends string | number>(collection: T[]): Record<string, number> {
-  const result: Record<string, number> = {};
+export function tally<T>(collection: readonly T[]): Map<T, number> {
+  const result = new Map<T, number>();
   for (const item of collection) {
-    const key = String(item);
-    result[key] = (result[key] ?? 0) + 1;
+    result.set(item, (result.get(item) ?? 0) + 1);
   }
   return result;
 }

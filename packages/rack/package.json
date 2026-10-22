@@ -16,6 +16,9 @@
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
+  },
   "engines": {
     "node": ">=24"
   }

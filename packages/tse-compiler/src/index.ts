@@ -2,6 +2,7 @@ export { tokenize, TseSyntaxError, type Token, type TokenKind } from "./lexer.js
 export { parse, type TseAst, type TseNode } from "./parser.js";
 export {
   compileJs,
+  emitSteps,
   ARROW_BLOCK_RE,
   BLOCK_CLOSE_RE,
   awaitFlowReads,
@@ -10,6 +11,7 @@ export {
   netUnclosedParens,
   YIELD_EXPR_RE,
   type EmitJsOptions,
+  type EmitStep,
   type EmitResult,
 } from "./emit-js.js";
 export { parseFilename, type ParsedFilename } from "./parse-filename.js";

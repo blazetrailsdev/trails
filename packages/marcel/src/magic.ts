@@ -14,13 +14,16 @@ import {
   Encoding,
   encode,
   rbModConstSet,
+  b,
+  rbEqual,
+  rbStrInclude,
 } from "@blazetrails/ruby-compat";
 import { Marcel as MarcelSeat } from "./namespaces.js";
 
-export type MagicMatch = [number | Range<number>, string | null, MagicMatch[]?];
+export type MagicMatch = [number | Range<number>, string | Uint8Array | null, MagicMatch[]?];
 
 interface MagicIO {
-  read(length: number, buffer?: string | Uint8Array): string | null;
+  read(length: number, buffer?: string | Uint8Array): string | Uint8Array | null;
   rewind(): unknown;
   binmode(): unknown;
   setEncoding(encoding: Encoding): unknown;
@@ -30,10 +33,6 @@ export class Magic {
   declare _type: string;
   declare _mediatype: string | undefined;
   declare _subtype: string | undefined;
-
-  static toString(): string {
-    return "Marcel::Magic";
-  }
 
   get type() {
     return this._type;
@@ -159,16 +158,15 @@ export class Magic {
     if (!rbObjRespondTo(io, "read")) {
       return this.magicMatch(new StringIO(rbObjAsString(io)), method);
     }
-    const io_ = io as MagicIO;
-    if (rbObjRespondTo(io_, "binmode")) {
-      io_.binmode();
+    if (rbObjRespondTo(io, "binmode")) {
+      (io as MagicIO).binmode();
     }
-    if (rbObjRespondTo(io_, "setEncoding")) {
-      io_.setEncoding(Encoding.BINARY);
+    if (rbObjRespondTo(io, "setEncoding")) {
+      (io as MagicIO).setEncoding(Encoding.BINARY);
     }
     const buffer = encode("", Encoding.BINARY);
     const block = ([_type, matches]: [string, MagicMatch[]]) =>
-      this.magicMatchIo(io_, matches, buffer);
+      this.magicMatchIo(io as MagicIO, matches, buffer);
     return method === "find" ? MAGIC.find(block) : MAGIC.filter(block);
   }
 
@@ -176,13 +174,14 @@ export class Magic {
     return matches.some(([offset, value, children]) => {
       let match: boolean | null = null;
       if (value != null) {
+        const bytesize = b(value).length;
         if (offset instanceof Range) {
           io.read(offset.begin!, buffer);
-          const x = io.read(offset.end! - offset.begin! + value.length, buffer);
-          match = x != null && x.includes(value);
+          const x = io.read(offset.end! - offset.begin! + bytesize, buffer);
+          match = x != null && rbStrInclude(x, value);
         } else {
           io.read(offset, buffer);
-          match = io.read(value.length, buffer) === value;
+          match = rbEqual(io.read(bytesize, buffer), value);
         }
       }
       io.rewind();

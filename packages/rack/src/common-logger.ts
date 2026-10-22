@@ -1,3 +1,4 @@
+import type { RackHeaders } from "./index.js";
 import { SERVER_PROTOCOL, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
 import { Process, sprintf, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
@@ -20,7 +21,7 @@ export class CommonLogger {
     this.logger = logger || null;
   }
 
-  async call(env: Record<string, any>): Promise<[number, Record<string, string | string[]>, any]> {
+  async call(env: Record<string, any>): Promise<[number, RackHeaders, any]> {
     const beganAt = clockTime();
     const response = await (rbFSend(this.app, "call", env) as ReturnType<typeof this.app>);
     const [status, headers, body] = response;
@@ -35,7 +36,7 @@ export class CommonLogger {
   private log(
     env: Record<string, any>,
     status: number,
-    responseHeaders: Record<string, string | string[]>,
+    responseHeaders: RackHeaders,
     beganAt: number,
   ): void {
     const request = new Request(env);
@@ -70,7 +71,7 @@ export class CommonLogger {
     }
   }
 
-  private extractContentLength(headers: Record<string, string | string[]>): string {
+  private extractContentLength(headers: RackHeaders): string {
     const value = headers[CONTENT_LENGTH];
     return !value || value === "0" ? "-" : String(value);
   }

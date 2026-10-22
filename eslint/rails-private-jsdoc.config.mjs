@@ -18,7 +18,7 @@ import unbackedInternalNeedsReceipt from "./unbacked-internal-needs-receipt.mjs"
 import rubyCompatNeedsMriCitation from "./ruby-compat-needs-mri-citation.mjs";
 
 export default [
-  { ignores: ["packages/marcel/src/test-helpers/fixtures/**"] },
+  { ignores: ["packages/marcel/src/test-helpers/fixtures/**", "packages/rack/test/cgi/assets/**"] },
   // Plugin registration is global (no `files`): ESLint refuses to redefine a
   // plugin, so the two rule blocks below cannot each declare it.
   {
@@ -39,6 +39,7 @@ export default [
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
+      "packages/actioncable/src/**/*.ts",
       "packages/activejob/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
@@ -76,6 +77,7 @@ export default [
       "packages/did-you-mean/src/**/*.ts",
       "packages/bcrypt/src/**/*.ts",
       "packages/arel/src/**/*.ts",
+      "packages/actioncable/src/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
       "packages/ruby-compat/src/**/*.ts",

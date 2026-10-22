@@ -1,12 +1,12 @@
 import { MockRequest, type RackEnv } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
-import { b, merge } from "@blazetrails/ruby-compat";
+import { merge } from "@blazetrails/ruby-compat";
 
 /** @internal */
 const DEFAULT_ENV: RackEnv = MockRequest.envFor("/", {
-  HTTP_HOST: b("test.host"),
-  REMOTE_ADDR: b("0.0.0.0"),
-  HTTP_USER_AGENT: b("Rails Testing"),
+  HTTP_HOST: "test.host",
+  REMOTE_ADDR: "0.0.0.0",
+  HTTP_USER_AGENT: "Rails Testing",
 });
 
 export class TestRequest extends Request {

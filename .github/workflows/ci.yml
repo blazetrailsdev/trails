@@ -64,6 +64,7 @@ jobs:
       actionpack_affected: ${{ steps.filter.outputs.actionpack_affected }}
       actionview_affected: ${{ steps.filter.outputs.actionview_affected }}
       rack_affected: ${{ steps.filter.outputs.rack_affected }}
+      actioncable_affected: ${{ steps.filter.outputs.actioncable_affected }}
       trailties_affected: ${{ steps.filter.outputs.trailties_affected }}
       trails_tsc_affected: ${{ steps.filter.outputs.trails_tsc_affected }}
       tse_compiler_affected: ${{ steps.filter.outputs.tse_compiler_affected }}
@@ -72,6 +73,7 @@ jobs:
       website_affected: ${{ steps.filter.outputs.website_affected }}
       comparison_affected: ${{ steps.filter.outputs.comparison_affected }}
       thor_only: ${{ steps.filter.outputs.thor_only }}
+      actioncable_only: ${{ steps.filter.outputs.actioncable_only }}
       website_label: ${{ steps.filter.outputs.website_label }}
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
@@ -120,6 +122,7 @@ jobs:
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
           TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
           RACK_PKGS_RE='^packages/(rack|rack-session|rack-test|activesupport|date|vitest-matchers)/'
+          ACTIONCABLE_PKGS_RE='^(packages/(actioncable|actionpack|actionview|activemodel|activesupport|bcrypt|date|did-you-mean|html-sanitizer|i18n|msgpack|nokogiri|rack|rack-session|rack-test|ruby-compat|tse-compiler|vitest-matchers)/|scripts/parity/unported-files/actioncable\.ts$)'
           # `packages/`, `scripts/` and `eslint/` are listed whole rather than
           # enumerated, because several tests in this lane report on the WHOLE
           # tree rather than on their own package: stale-story-references
@@ -176,6 +179,7 @@ jobs:
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
             echo "actionview_affected=true"   >> "$GITHUB_OUTPUT"
             echo "rack_affected=true"         >> "$GITHUB_OUTPUT"
+            echo "actioncable_affected=true"  >> "$GITHUB_OUTPUT"
             echo "trailties_affected=true"    >> "$GITHUB_OUTPUT"
             echo "trails_tsc_affected=true"   >> "$GITHUB_OUTPUT"
             echo "tse_compiler_affected=true" >> "$GITHUB_OUTPUT"
@@ -253,6 +257,7 @@ jobs:
                   echo "actionpack_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "actionview_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "rack_affected=false"         >> "$GITHUB_OUTPUT"
+                  echo "actioncable_affected=false"  >> "$GITHUB_OUTPUT"
                   echo "trailties_affected=false"    >> "$GITHUB_OUTPUT"
                   echo "trails_tsc_affected=false"   >> "$GITHUB_OUTPUT"
                   echo "tse_compiler_affected=false" >> "$GITHUB_OUTPUT"
@@ -292,6 +297,7 @@ jobs:
                   set_gate actionpack_affected   "$AP_PKGS_RE"
                   set_gate actionview_affected   "$AV_PKGS_RE"
                   set_gate rack_affected         "$RACK_PKGS_RE"
+                  set_gate actioncable_affected  "$ACTIONCABLE_PKGS_RE"
                   set_gate trailties_affected    "$TRAILTIES_PKGS_RE"
                   set_gate trails_tsc_affected   "$TRAILS_TSC_PKGS_RE"
                   set_gate tse_compiler_affected "$TSE_COMPILER_PKGS_RE"
@@ -299,7 +305,7 @@ jobs:
                   set_gate guides_affected       "$GUIDES_PKGS_RE" "$GUIDES_EXCL_RE"
                   set_gate website_affected      "$WEBSITE_PKGS_RE"
                   set_gate comparison_affected   "$COMPARISON_RE" '^packages/website/'
-                  bash scripts/ci/thor-only.sh "$files" >> "$GITHUB_OUTPUT"
+                  bash scripts/ci/scoped-only.sh "$files" >> "$GITHUB_OUTPUT"
                 fi
                 ;;
             esac
@@ -638,6 +644,15 @@ jobs:
           pnpm parity:api:sends
           pnpm vitest run scripts/parity/send-count.test.ts
 
+      - name: ruby-compat Module count
+        id: module-count
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm parity:modules
+          pnpm vitest run scripts/parity/module-count.test.ts
+
       # PR attribution check. Scoped to deanmarano-authored PRs: the project
       # forbids Claude attribution in *his* PR descriptions and commits (see
       # CLAUDE.md "Do NOT add ... Generated with Claude Code"). Other
@@ -826,7 +841,8 @@ jobs:
       (needs.changes.outputs.activerecord_affected == 'true' ||
       needs.changes.outputs.trails_tsc_affected == 'true' ||
       (needs.changes.outputs.trailties_affected == 'true' &&
-      needs.changes.outputs.thor_only != 'true'))
+      needs.changes.outputs.thor_only != 'true' &&
+      needs.changes.outputs.actioncable_only != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -859,7 +875,7 @@ jobs:
       # scripts/parity/pipeline/query/node spawns the dump runners as real subprocesses;
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
-      - if: needs.changes.outputs.thor_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
         run: pnpm build
       # The scripts/* suites added here are the compare tooling's own unit
       # tests; none needs Ruby or the `pnpm build` above (that step exists for
@@ -868,7 +884,16 @@ jobs:
       # scripts/schema-compare is the one suite that belongs elsewhere: it
       # parses the REAL vendored test/schema/schema.rb, so it runs as a step of
       # rails-comparison, the job that fetches vendor/.
-      - if: needs.changes.outputs.thor_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
+        env:
+          AJ_ADAPTER: test
+        run: pnpm vitest run packages/activejob
+      # activejob/Rakefile:38-41 runs async_adapter_test.rb only in this lane.
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
+        env:
+          AJ_ADAPTER: async
+        run: pnpm vitest run packages/activejob
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
         env:
           AJ_ADAPTER: inline
         run: >
@@ -878,6 +903,7 @@ jobs:
           packages/activemodel
           packages/activesupport
           packages/bcrypt
+          packages/builder
           packages/date
           packages/did-you-mean
           packages/globalid
@@ -916,13 +942,14 @@ jobs:
           scripts/require-canonical-rebuild-directives.test.ts
           scripts/ruby-compat-leaf.test.ts
           scripts/ruby-compat-entry-modules.test.ts
+          scripts/actionview-test-case-dist.test.ts
           scripts/rack-activesupport-free.test.ts
           scripts/generate-canonical-zone-identifiers.test.ts
           scripts/generate-tzdata-isdst.test.ts
           scripts/vendor-recite.test.ts
           vendor/sources.test.ts
           vendor/fetch.test.ts
-      - if: needs.changes.outputs.thor_only == 'true'
+      - if: needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true'
         run: >
           pnpm vitest run
           scripts/stale-story-references.test.ts
@@ -949,11 +976,13 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       (needs.changes.outputs.rack_affected == 'true' ||
+      needs.changes.outputs.actioncable_affected == 'true' ||
       needs.changes.outputs.actionview_affected == 'true' ||
       needs.changes.outputs.tse_compiler_affected == 'true' ||
       needs.changes.outputs.activerecord_affected == 'true' ||
       (needs.changes.outputs.trailties_affected == 'true' &&
-      needs.changes.outputs.thor_only != 'true'))
+      needs.changes.outputs.thor_only != 'true' &&
+      needs.changes.outputs.actioncable_only != 'true'))
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -970,6 +999,9 @@ jobs:
       - name: Rack tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.rack_affected == 'true' }}
         run: pnpm vitest run packages/rack packages/rack-session packages/rack-test
+      - name: Action Cable tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.actioncable_affected == 'true' }}
+        run: pnpm vitest run packages/actioncable
       - name: Action View tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.actionview_affected == 'true' }}
         run: pnpm vitest run packages/actionview
@@ -983,7 +1015,8 @@ jobs:
           ${{ !cancelled() && steps.install.outcome == 'success' &&
           (needs.changes.outputs.activerecord_affected == 'true' ||
           (needs.changes.outputs.trailties_affected == 'true' &&
-          needs.changes.outputs.thor_only != 'true')) }}
+          needs.changes.outputs.thor_only != 'true' &&
+          needs.changes.outputs.actioncable_only != 'true')) }}
         run: pnpm test:types
 
   actionpack-tests:
@@ -1023,7 +1056,8 @@ jobs:
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.trailties_affected == 'true'
+      (needs.changes.outputs.trailties_affected == 'true' ||
+      needs.changes.outputs.actioncable_only == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
@@ -1031,8 +1065,12 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm build
-      - if: needs.changes.outputs.thor_only != 'true'
+      - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
         run: pnpm vitest run packages/trailties
+      - if: needs.changes.outputs.actioncable_only == 'true'
+        run: >
+          pnpm vitest related --run --passWithNoTests --project trailties
+          $(git ls-files 'packages/actioncable/src/*.ts')
       - if: needs.changes.outputs.thor_only == 'true'
         run: >
           pnpm vitest related --run --project trailties
@@ -1066,10 +1104,12 @@ jobs:
         run: >
           pnpm vitest run
           packages/arel
+          packages/actioncable
           packages/activejob
           packages/activemodel
           packages/activesupport
           packages/bcrypt
+          packages/builder
           packages/date
           packages/did-you-mean
           packages/globalid
@@ -1731,7 +1771,8 @@ jobs:
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
-      needs.changes.outputs.thor_only != 'true'
+      needs.changes.outputs.thor_only != 'true' &&
+      needs.changes.outputs.actioncable_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -2156,15 +2197,18 @@ jobs:
         if: always()
         run: node scripts/ci/bg-gates.mjs summary
 
-  rails-comparison-thor:
-    name: Rails API/Test Comparison (thor)
+  rails-comparison-scoped:
+    name: Rails API/Test Comparison (scoped)
     needs: changes
     if: >-
       needs.changes.outputs.docs_only != 'true' &&
       needs.changes.outputs.comparison_affected == 'true' &&
-      needs.changes.outputs.thor_only == 'true'
+      (needs.changes.outputs.thor_only == 'true' || needs.changes.outputs.actioncable_only == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SCOPED_PACKAGE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'actioncable' }}
+      SCOPED_SOURCE: ${{ needs.changes.outputs.thor_only == 'true' && 'thor' || 'rails' }}
     permissions:
       contents: read
       actions: read
@@ -2184,12 +2228,12 @@ jobs:
         with:
           path: vendor/*/*/
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
-      - name: Fetch the thor source
-        run: pnpm vendor:fetch --source thor
-      - name: Thor comparison
+      - name: Fetch the scoped package's source
+        run: pnpm vendor:fetch --source "$SCOPED_SOURCE"
+      - name: Scoped comparison
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bash scripts/ci/thor-comparison.sh
+        run: bash scripts/ci/scoped-comparison.sh "$SCOPED_PACKAGE"
 
   schema-parity-rails:
     name: Schema Parity (Rails side)
@@ -2414,7 +2458,7 @@ jobs:
       - maria-tests
       - website
       - rails-comparison
-      - rails-comparison-thor
+      - rails-comparison-scoped
       - schema-parity-rails
       - schema-parity-trails
       - schema-parity-diff
@@ -2442,6 +2486,8 @@ jobs:
           WEBSITE_AFFECTED: ${{ needs.changes.outputs.website_affected }}
           COMPARISON_AFFECTED: ${{ needs.changes.outputs.comparison_affected }}
           THOR_ONLY: ${{ needs.changes.outputs.thor_only }}
+          ACTIONCABLE_ONLY: ${{ needs.changes.outputs.actioncable_only }}
+          ACTIONCABLE_AFFECTED: ${{ needs.changes.outputs.actioncable_affected }}
           WEBSITE_LABEL: ${{ needs.changes.outputs.website_label }}
           PARITY_SQLITE: ${{ needs.changes.outputs.parity_sqlite }}
           PARITY_POSTGRES: ${{ needs.changes.outputs.parity_postgres }}
@@ -2529,7 +2575,7 @@ jobs:
                   fi
                   ;;
                 trailties-tests)
-                  if [ "$TRAILTIES_AFFECTED" = "false" ]; then
+                  if [ "$TRAILTIES_AFFECTED" = "false" ] && [ "$ACTIONCABLE_ONLY" != "true" ]; then
                     continue
                   fi
                   ;;
@@ -2538,10 +2584,11 @@ jobs:
                   # A skip is legitimate only when EVERY member flag is false
                   # (the DX type step is gated on activerecord OR trailties).
                   if [ "$RACK_AFFECTED" = "false" ] && \
+                     [ "$ACTIONCABLE_AFFECTED" = "false" ] && \
                      [ "$AV_AFFECTED" = "false" ] && \
                      [ "$TSE_COMPILER_AFFECTED" = "false" ] && \
                      [ "$AR_AFFECTED" = "false" ] && \
-                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }; then
+                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }; then
                     continue
                   fi
                   ;;
@@ -2561,12 +2608,12 @@ jobs:
                   # (no packages/**, scripts/{api,test,fixtures,schema}-compare/**,
                   # comparison-consumed manifest builders, vendor/**, or
                   # cross-cutting infra — see COMPARISON_RE).
-                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; then
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; then
                     continue
                   fi
                   ;;
-                rails-comparison-thor)
-                  if [ "$COMPARISON_AFFECTED" = "false" ] || [ "$THOR_ONLY" != "true" ]; then
+                rails-comparison-scoped)
+                  if [ "$COMPARISON_AFFECTED" = "false" ] || { [ "$THOR_ONLY" != "true" ] && [ "$ACTIONCABLE_ONLY" != "true" ]; }; then
                     continue
                   fi
                   ;;
@@ -2587,7 +2634,7 @@ jobs:
                   ;;
                 virtualized-dx-type-tests)
                   if [ "$AR_AFFECTED" = "false" ] && [ "$TRAILS_TSC_AFFECTED" = "false" ] && \
-                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ]; }; then
+                     { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }; then
                     continue
                   fi
                   ;;

@@ -1,5 +1,5 @@
 import { Concern, SafeBuffer, extend, htmlSafe, mattrAccessor } from "@blazetrails/activesupport";
-import { HTML4 } from "@blazetrails/html-sanitizer";
+import { ActionView as RailsHtmlSanitizer, HTML4 } from "@blazetrails/html-sanitizer";
 
 export interface Sanitizer {
   sanitize(
@@ -90,14 +90,6 @@ export const ClassMethods = {
     return this.sanitizerVendor.safeListSanitizer.allowedAttributes;
   },
 
-  setSanitizedAllowedTags(this: SanitizeHelperClass, tags: Iterable<string>): void {
-    this.sanitizerVendor.safeListSanitizer.allowedTags = tags;
-  },
-
-  setSanitizedAllowedAttributes(this: SanitizeHelperClass, attributes: Iterable<string>): void {
-    this.sanitizerVendor.safeListSanitizer.allowedAttributes = attributes;
-  },
-
   get fullSanitizer(): Sanitizer {
     const self = this as unknown as SanitizeHelperClass;
     if (!Object.hasOwn(self, "_fullSanitizer") || self._fullSanitizer == null) {
@@ -122,6 +114,13 @@ export const ClassMethods = {
     return self._safeListSanitizer;
   },
 };
+
+Object.defineProperties(
+  ClassMethods,
+  Object.getOwnPropertyDescriptors(RailsHtmlSanitizer.Helpers.SanitizeHelper.ClassMethods),
+);
+RailsHtmlSanitizer.Helpers.SanitizeHelper.ClassMethods = ClassMethods as typeof ClassMethods &
+  typeof RailsHtmlSanitizer.Helpers.SanitizeHelper.ClassMethods;
 
 export class SanitizeHelper {
   static ClassMethods = ClassMethods;
