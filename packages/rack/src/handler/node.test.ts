@@ -611,6 +611,66 @@ describe("Rack::Handler::Node", () => {
       expect(reply).toBe("frame:first-frame");
     });
 
+    it("reads an upgrade body sent after the handshake and hands the rest to the hijacker", async () => {
+      let input = "";
+      const reply = await new Promise<string>((resolve, reject) => {
+        serving(
+          async (env) => {
+            input = Buffer.from((env[RACK_INPUT] as StringIO<Uint8Array>).read()).toString();
+            const io = (env[RACK_HIJACK] as () => TCPSocket)();
+            void io.waitReadable().then(() => {
+              io.write(`frame:${Buffer.from(io.read()).toString()}`);
+              io.closeWrite();
+            });
+            return [-1, {}, [""]];
+          },
+          async (url) => {
+            const socket = await openUpgrade(
+              Number(new URL(url).port),
+              "/cable",
+              "",
+              "content-length: 5\r\n",
+            );
+            await new Promise((r) => setTimeout(r, 50));
+            socket.write("hel");
+            await new Promise((r) => setTimeout(r, 50));
+            let text = "";
+            socket.on("data", (chunk) => (text += chunk.toString()));
+            const closed = new Promise((r) => socket.on("close", r));
+            socket.write("lofirst-frame");
+            await closed;
+            resolve(text);
+          },
+        ).catch(reject);
+      });
+
+      expect(input).toBe("hello");
+      expect(reply).toBe("frame:first-frame");
+    });
+
+    it("does not call the app when the peer closes mid-body", async () => {
+      let called = false;
+      await serving(
+        async () => {
+          called = true;
+          return [200, {}, [""]];
+        },
+        async (url) => {
+          const socket = await openUpgrade(
+            Number(new URL(url).port),
+            "/cable",
+            "he",
+            "content-length: 5\r\n",
+          );
+          await new Promise((r) => setTimeout(r, 50));
+          socket.end();
+          await new Promise((r) => setTimeout(r, 50));
+        },
+      );
+
+      expect(called).toBe(false);
+    });
+
     it("answers an upgrade the app does not hijack and closes the socket", async () => {
       let text = "";
       let closed = false;

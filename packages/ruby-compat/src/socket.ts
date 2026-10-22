@@ -45,6 +45,7 @@ export class BasicSocket extends IO {
       }
       this._wake();
     });
+    socket.resume();
     socket.on("end", () => {
       this._eof = true;
       this._wake();
@@ -67,7 +68,8 @@ export class BasicSocket extends IO {
    * (`io.c:1029` `rb_io_check_char_readable`). The `str` buffer receives the
    * bytes as `IO#read` fills it: up to its own length, since a `Uint8Array`
    * cannot be resized, and zero-filled at end of file, where `io_read`
-   * empties the String (`io.c:3800`).
+   * empties the String (`io.c:3800`). The return value holds exactly the
+   * bytes read, so a short read leaves the buffer's tail as it was.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -170,6 +172,10 @@ export class BasicSocket extends IO {
     this._readClosed = true;
     this._rbuf = [];
     this._rbufLength = 0;
+    if (this._paused) {
+      this._paused = false;
+      this._socket.resume();
+    }
     this._eof = true;
     this._wake();
     return null;

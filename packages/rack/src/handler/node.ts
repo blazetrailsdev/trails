@@ -163,6 +163,9 @@ export class Node {
           if (n < length) {
             await new Promise<void>((resolve, reject) => {
               const onEnd = (): void => {
+                socket.removeListener("data", onData);
+                socket.removeListener("end", onEnd);
+                socket.removeListener("close", onEnd);
                 reject(new EOFError("end of file reached"));
               };
               const onData = (chunk: Uint8Array): void => {
@@ -180,6 +183,7 @@ export class Node {
               socket.on("data", onData);
               socket.on("end", onEnd);
               socket.on("close", onEnd);
+              socket.resume();
             });
           }
           input = bodyBytes;

@@ -41,7 +41,7 @@ describe("TCPSocket", () => {
     expect(() => io.write("x")).toThrow(IOError);
     io.closeRead();
     expect(io.isClosed()).toBe(true);
-    expect(calls).toEqual(["end", "destroy"]);
+    expect(calls).toEqual(["resume", "end", "destroy"]);
     expect(() => io.read()).toThrow(IOError);
   });
 
@@ -51,6 +51,9 @@ describe("TCPSocket", () => {
     expect(io.readNonblock(4096, null, { exception: false })).toBe("wait_readable");
     expect(() => io.readNonblock(4096)).toThrow(IO.EAGAINWaitReadable);
     expect(() => io.readNonblock(4096)).toThrow(Errno.EAGAIN);
+    expect(() => io.readNonblock(4096)).toThrow(
+      "Resource temporarily unavailable - read would block",
+    );
     emit("data", new Uint8Array([1, 2, 3]));
     expect(io.readNonblock(2, null, { exception: false })).toEqual(new Uint8Array([1, 2]));
     expect(io.readNonblock(4096, null, { exception: false })).toEqual(new Uint8Array([3]));
@@ -75,10 +78,10 @@ describe("TCPSocket", () => {
     const { socket, calls, emit } = fakeSocket();
     const io = new TCPSocket(socket);
     emit("data", new Uint8Array(64 * 1024));
-    expect(calls).toEqual([]);
+    expect(calls).toEqual(["resume"]);
     emit("data", new Uint8Array(1));
-    expect(calls).toEqual(["pause"]);
+    expect(calls).toEqual(["resume", "pause"]);
     io.readNonblock(1);
-    expect(calls).toEqual(["pause", "resume"]);
+    expect(calls).toEqual(["resume", "pause", "resume"]);
   });
 });
