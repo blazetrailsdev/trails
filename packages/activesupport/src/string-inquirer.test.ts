@@ -80,6 +80,13 @@ describe("StringInquirer", () => {
     expect(s.isProduction()).toBe(false);
   });
 
+  it("leaves Kernel and protocol is-names to the receiver", () => {
+    const s = inquiry.call("blank") as any;
+    expect("isBlank" in s).toBe(false);
+    expect("isNil" in s).toBe(false);
+    expect(() => s.isNil()).toThrow(/undefined method .isNil./);
+  });
+
   it("valueOf returns original string", () => {
     const s = inquiry.call("test");
     expect(s.valueOf()).toBe("test");
