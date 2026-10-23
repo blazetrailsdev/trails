@@ -205,16 +205,14 @@ registerConstant("Blog", Blog);
 rbModConstSet(
   Blog,
   "Post",
-  class Post {
+  class Post extends Struct.new("title", "id") {
+    declare title: string;
+    declare id: unknown;
+
     static {
       extend(this, Naming);
       include(this, Conversion);
     }
-
-    constructor(
-      public title: string,
-      public id: unknown,
-    ) {}
 
     isPersisted(): boolean {
       return isPresent(this.id);

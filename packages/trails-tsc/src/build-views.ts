@@ -197,7 +197,7 @@ async function walkTemplates(
 async function loadConfigInitializers(initializersDir: string): Promise<void> {
   if (!(await exists(initializersDir))) return;
   const existent = (await fs.readdir(initializersDir, { recursive: true, encoding: "utf8" }))
-    .filter((file) => /\.(ts|js)$/u.test(file))
+    .filter((file) => /\.(ts|js)$/u.test(file) && !file.endsWith(".d.ts"))
     .map((file) => path.join(initializersDir, file));
   for (const initializer of existent.sort()) await import(initializer);
 }
