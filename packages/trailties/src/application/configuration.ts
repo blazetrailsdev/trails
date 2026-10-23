@@ -548,6 +548,7 @@ export class Configuration extends EngineConfiguration {
 
     const f = File.open(path, "a");
     f.binmode();
+    f.sync = this.autoflushLog;
     return f;
   }
 

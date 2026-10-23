@@ -18,6 +18,7 @@ export interface BootstrapConfig {
   logger?: Logger | null;
   logLevel: LogLevel | number | string;
   logFormatter: Logger["formatter"];
+  logFileSize?: number | null;
   broadcastLogLevel?: LogLevel | number | string | null;
   defaultLogFile(): Promise<LoggerOutput>;
   paths(): { get(path: string): { first(): Promise<string | undefined> } | undefined };
@@ -36,12 +37,16 @@ export abstract class Bootstrap extends Initializable implements BootstrapHost {
 
 Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {});
 
+/** @missingRailsArgs new — CONVERGEABLE activesupport-logger-new-takes-shift-age-and-size */
 Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, async function () {
   TopLevel.Trails!.logger ??=
     this.config.logger ??
     (await (async () => {
       try {
-        let logger = new Logger(await this.config.defaultLogFile());
+        let logger =
+          this.config.logFileSize != null
+            ? new Logger(await this.config.defaultLogFile())
+            : new Logger(await this.config.defaultLogFile());
         logger.formatter = this.config.logFormatter;
         logger = TaggedLogging.new(logger);
         return logger;

@@ -41,7 +41,7 @@ describe("Bootstrap", () => {
   });
 
   describe(":initialize_logger", () => {
-    it("broadcasts to config.logger when provided", async () => {
+    it("uses config.logger when provided", async () => {
       const app = new TestApp();
       const custom = new Logger(null);
       app.config = { ...baseConfig(), logger: custom };
@@ -69,7 +69,7 @@ describe("Bootstrap", () => {
       expect(Trails.logger?.level).toBe(Logger.WARN);
     });
 
-    it("preserves a pre-existing broadcast logger", async () => {
+    it("preserves a pre-existing logger", async () => {
       const app = new TestApp();
       const preset = new BroadcastLogger(new Logger(null));
       Trails.logger = preset;

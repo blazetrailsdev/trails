@@ -955,6 +955,7 @@ jobs:
           scripts/ruby-compat-leaf.test.ts
           scripts/ruby-compat-entry-modules.test.ts
           scripts/actionview-test-case-dist.test.ts
+          scripts/root-build-templates.test.ts
           scripts/rack-activesupport-free.test.ts
           scripts/generate-canonical-zone-identifiers.test.ts
           scripts/generate-tzdata-isdst.test.ts
