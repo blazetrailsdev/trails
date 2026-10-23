@@ -7,6 +7,7 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Ship } from "./test-helpers/models/ship.js";
+import { Car } from "./test-helpers/models/car.js";
 import { adapterType } from "./test-adapter.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
 import { assertNoQueriesMatch } from "./testing/query-assertions.js";
@@ -210,4 +211,18 @@ describe("InsertAllTest (trails)", () => {
       });
     },
   );
+});
+
+describe("InsertAll on a model whose schema is not loaded", () => {
+  fixtures([]);
+
+  it("records timestamps on a model whose columns are not loaded yet", async () => {
+    await (await Car.connection)!.schemaCache.clearDataSourceCacheBang("cars");
+    Car.reloadSchemaFromCache();
+
+    await Car.insertAllBang([{ name: "cold" }]);
+
+    const car = (await Car.findBy({ name: "cold" }))!;
+    expect(car.created_at).not.toBeNull();
+  });
 });

@@ -6,5 +6,13 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "references": [{ "path": "../activejob" }, { "path": "../activerecord" }]
+  "references": [
+    { "path": "../activejob" },
+    { "path": "../activerecord" },
+    { "path": "../activesupport" },
+    { "path": "../arel" },
+    { "path": "../date" },
+    { "path": "../globalid" },
+    { "path": "../ruby-compat" }
+  ]
 }
