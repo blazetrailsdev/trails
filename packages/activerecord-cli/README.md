@@ -1,74 +1,129 @@
 # @blazetrails/activerecord-cli
 
-The trails counterpart to Rails' `bin/rails` CLI for ActiveRecord workflows.
-Owns `ar init` / `ar new` / `ar generate:*` / `ar destroy:*` / `ar db:*` /
-`ar console` / `ar runner` / `ar typecheck` / `ar models:dump`.
-It is the tooling layer on top of `@blazetrails/activerecord`; the runtime
-package carries no CLI dependency.
+The `ar` CLI, for using `@blazetrails/activerecord` without the rest of trails.
+It plays the part of the `rails db:*` / `rails generate` tasks for a
+standalone ActiveRecord project: `ar new` / `ar init` / `ar generate:*` /
+`ar destroy:*` / `ar db:*` / `ar console` / `ar runner` / `ar typecheck` /
+`ar models:dump`. It also ships the `trails-tsc` binary, the schema-aware `tsc`
+that types models from `db/schema.ts`.
+
+It is the tooling layer on top of `@blazetrails/activerecord`. The runtime
+package carries no CLI dependency. A full trails application (`trails new`)
+does not need this package's commands. It uses `bin/trails db ...` and
+`bin/trails generate ...`, and takes only `trails-tsc` from here.
 
 ## Install
 
+None of the `@blazetrails/*` packages is on npm yet. Build them from a checkout
+and link them into your project, as the
+[root README's quickstart](../../README.md#quickstart) shows. Once published,
+the split will be:
+
 ```sh
-pnpm add -D @blazetrails/activerecord-cli   # tooling — dev dep
-pnpm add @blazetrails/activerecord          # runtime — prod dep
+pnpm add -D @blazetrails/activerecord-cli   # tooling: dev dependency
+pnpm add @blazetrails/activerecord          # runtime: prod dependency
 pnpm add <driver>                           # one of: better-sqlite3 | pg | mysql2
 ```
 
-`activerecord-cli` is a devDependency. `activerecord` is a runtime dependency.
-Driver packages follow the same split (dev for SQLite in-memory testing, prod
-for PG/MySQL server targets is the common pattern).
-
 ## Quickstart
 
+Verified on 2026-09-29 (`main` at `41b8c7edb7`, Node 24.16.0, SQLite), with
+the packages linked from a checkout, and with no `TRAILS_ENV` or `NODE_ENV`
+set:
+
 ```sh
-ar new myapp --driver better-sqlite3
-cd myapp
+ar new shop --driver better-sqlite3
+cd shop
 pnpm install
-ar db:create
-ar generate:migration AddUsers name:string email:string
-# edit db/migrate/<ts>_add_users.ts
-ar db:migrate
-pnpm console
+npx ar db:create
+npx ar generate:model Product name:string price:integer
+pnpm migrate
+npx ar db:migrate:status
+npx ar generate:manifest
+npx ar db:schema:dump
+```
+
+```text
+Created database '.../shop/db/development.sqlite3'
+  create  .../shop/app/models/product.ts
+  create  .../shop/db/migrate/20260929192331_create_products.ts
+== 20260929192331 CreateProducts: migrating ===================================
+-- createTable("products")
+   -> 0.0090s
+== 20260929192331 CreateProducts: migrated (0.0090s) ==========================
+database: .../shop/db/development.sqlite3
+ Status   Migration ID    Migration Name
+--------------------------------------------------
+   up     20260929192331  Create products
+  write   .../shop/app/models/index.ts
+Dumped schema to .../shop/db/schema.ts
 ```
 
 Commands that load app code (`console`, `runner`, `db:migrate`, `db:seed`)
 must run under the `tsx` loader, because models import each other with `.js`
-specifiers. The generated `package.json` scripts do this: `pnpm console`,
-`pnpm runner <script.ts>`, or `pnpm ar <command>` for any other command.
+specifiers. The generated `package.json` scripts do this: `pnpm migrate`,
+`pnpm seed`, `pnpm console`, `pnpm runner <script.ts>`, or `pnpm ar <command>`
+for any other command.
+
+```ts
+// try-runner.ts
+import { Product } from "./app/models/index.js";
+
+const p = await Product.createBang({ name: "Gadget", price: 7 });
+console.log(p.id, await Product.count(), Product.where({ price: 7 }).toSql());
+```
+
+```sh
+pnpm runner try-runner.ts
+```
+
+```text
+1 1 SELECT "products".* FROM "products" WHERE "products"."price" = 7
+```
+
+For code that runs outside `ar` (a server, a worker), the generated `db.ts`
+exports `connect()`, described under [Bootstrap](#bootstrap). It connects to
+`development` when `TRAILS_ENV` and `NODE_ENV` are unset, as the `ar` commands do.
+
+`ar typecheck` runs `trails-tsc`, and passes on a fresh project.
 
 ## Project layout
 
-`ar init` (and `ar new`, which wraps it) writes:
+`ar new <name>` creates the directory and runs `ar init` in it. `ar init`
+writes:
 
-| Path                  | Purpose                                                     |
-| --------------------- | ----------------------------------------------------------- |
-| `config/database.ts`  | Connection config keyed by `TRAILS_ENV`                     |
-| `db/migrate/`         | Timestamped migration files                                 |
-| `db/seeds.ts`         | Seed data loaded by `ar db:seed`                            |
-| `db/schema.ts`        | Schema snapshot written by `ar db:schema:dump`              |
-| `app/models/base.ts`  | Project `Base` subclass with `establishConnection()`        |
-| `app/models/index.ts` | Generated manifest — re-exported model classes              |
-| `db.ts`               | Two-line bootstrap: `establishConnection` + manifest import |
-| `tsconfig.json`       | AR-required compiler settings (merged if one exists)        |
-| `.gitignore`          | Ignores `node_modules/`, `dist/`, SQLite files              |
+| Path                  | Purpose                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `package.json`        | `ar` / `migrate` / `seed` / `console` / `runner` scripts (through `tsx`), the driver dependency |
+| `tsconfig.json`       | AR-required compiler settings (merged if one exists)                                            |
+| `config/database.ts`  | Connection config keyed by environment, like Rails' `config/database.yml`                       |
+| `db/migrate/`         | Timestamped migration files                                                                     |
+| `db/seeds.ts`         | Seed data loaded by `ar db:seed`                                                                |
+| `app/models/index.ts` | Generated manifest that registers every model class                                             |
+| `db.ts`               | A `connect()` helper for code that runs outside `ar`                                            |
+| `.gitignore`          | Ignores `node_modules/`, `dist/`, SQLite files                                                  |
 
-**`TRAILS_ENV`** (not `NODE_ENV`): the JS ecosystem treats `NODE_ENV` as a
+`ar db:schema:dump` later writes `db/schema.ts`, and `ar generate:model` writes
+`app/models/<name>.ts`.
+
+**`TRAILS_ENV`, not `NODE_ENV`.** The JS ecosystem treats `NODE_ENV` as a
 build-time hint, so reusing it to select a database silently picks the wrong
-environment in many setups. `ar` resolves `TRAILS_ENV → NODE_ENV → "development"`.
+environment in many setups. `ar` reads `TRAILS_ENV` first, then `NODE_ENV`,
+then falls back to `development`.
 
 ## Commands
 
 ### Scaffolding
 
-| Command                                      | Description                                          |
-| -------------------------------------------- | ---------------------------------------------------- |
-| `ar new <app-name>`                          | Create directory + scaffold (does not run install)   |
-| `ar init`                                    | Scaffold into the current directory                  |
-| `ar generate:migration <Name> [field:type…]` | Emit `db/migrate/<ts>_<snake>.ts`                    |
-| `ar generate:model <Name> [field:type…]`     | Emit model + create migration                        |
-| `ar generate:manifest`                       | Scan `app/models/` and rewrite `app/models/index.ts` |
-| `ar destroy:migration <Name>`                | Delete the matching migration file                   |
-| `ar destroy:model <Name>`                    | Delete model + its create migration                  |
+| Command                                      | Description                                                |
+| -------------------------------------------- | ---------------------------------------------------------- |
+| `ar new <app-name>`                          | Create directory + scaffold (does not run install)         |
+| `ar init`                                    | Scaffold into the current directory                        |
+| `ar generate:migration <Name> [field:type…]` | Emit `db/migrate/<ts>_<snake>.ts`                          |
+| `ar generate:model <Name> [field:type…]`     | Emit model (with a `declare` per field) + create migration |
+| `ar generate:manifest`                       | Scan `app/models/` and rewrite `app/models/index.ts`       |
+| `ar destroy:migration <Name>`                | Delete the matching migration file                         |
+| `ar destroy:model <Name>`                    | Delete model + its create migration                        |
 
 ### Database
 
@@ -97,11 +152,11 @@ environment in many setups. `ar` resolves `TRAILS_ENV → NODE_ENV → "developm
 
 ### Tooling
 
-| Command                | Description                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------- |
-| `ar typecheck`         | Type-check models via `trails-tsc`                                                                  |
-| `ar models:dump`       | Dump model classes from `db/schema.ts` (auto-discovered); or `--schema <path>` for an explicit path |
-| `ar generate:manifest` | Regenerate `app/models/index.ts` (also listed under Scaffolding)                                    |
+| Command                | Description                                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ar typecheck`         | Type-check models via `trails-tsc`                                                                                                                                              |
+| `ar models:dump`       | Emit one model class per table in `db/schema.ts`, with `belongsTo` / `hasMany` from foreign keys. `--schema`, `--out`, `--only`, `--ignore`, `--strip-prefix`, `--strip-suffix` |
+| `ar generate:manifest` | Regenerate `app/models/index.ts` (also listed under Scaffolding)                                                                                                                |
 
 Pass `--help` to any command for its full option set.
 
@@ -112,14 +167,20 @@ load time. TypeScript has no equivalent hook for ES modules. The solution is a
 generated barrel:
 
 ```ts
-// app/models/index.ts  (generated — do not edit by hand)
-export { User } from "./user.js";
-export { Post } from "./post.js";
-export { Comment } from "./comment.js";
+// app/models/index.ts, as `ar generate:manifest` wrote it for the quickstart
+// AUTO-GENERATED by @blazetrails/activerecord-cli. Do not edit by hand.
+// Re-run `ar generate:manifest` (or `ar init`) to update.
+import { registerModel } from "@blazetrails/activerecord";
+import { Product } from "./product.js";
+
+export const models = [Product] as const;
+for (const m of models) registerModel(m);
+
+export { Product };
 ```
 
-Importing this file as a side-effect registers every model with ActiveRecord's
-inheritance tracker. `ar generate:manifest` keeps it current whenever you add
+Importing this file registers every model with ActiveRecord, so that
+string class names in associations (`className:`, `through:`) resolve. `ar generate:manifest` keeps it current whenever you add
 or remove a model file. Run it after any model change, or in CI with `--check`
 to catch drift:
 
@@ -163,15 +224,22 @@ if (pending.length > 0) {
 
 ## Bootstrap
 
-The bootstrap every project puts in `db.ts`:
+`ar init` writes a `db.ts` with a `connect()` helper:
 
 ```ts
 import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { loadDatabaseConfig } from "@blazetrails/activerecord-cli";
-import "./app/models/index.js"; // side-effect: registers all models
+import { models } from "./app/models/index.js";
 
-await loadDatabaseConfig(import.meta.dirname);
-await Base.establishConnection(`:${DatabaseTasks.env}`);
+let connected = false;
+
+export async function connect(): Promise<void> {
+  if (connected) return;
+  await loadDatabaseConfig(import.meta.dirname);
+  await Base.establishConnection(`:${DatabaseTasks.env}`);
+  await Promise.all(models.map((m) => m.loadSchema()));
+  connected = true;
+}
 ```
 
 `loadDatabaseConfig` reads `config/database.ts` into `Base.configurations`, the
@@ -179,9 +247,18 @@ way Rails' railtie loads `config/database.yml`, and resolves `DatabaseTasks.env`
 `TRAILS_ENV` (or `NODE_ENV`), or `"development"` when neither is set, which is
 `Rails.env`'s default. `establishConnection` with that env name raises
 `AdapterNotSpecified` when the config has no entry for it. A bare
-`Base.establishConnection()` resolves `DEFAULT_ENV` instead, which is `default_env`
-when both vars are unset, as in Rails. The manifest import must happen before any AR query so models
-are registered in the inheritance tracker.
+`Base.establishConnection()` resolves `DEFAULT_ENV` instead, which is
+`default_env` when both vars are unset, as in Rails. In the quickstart project,
+with `TRAILS_ENV` and `NODE_ENV` unset, this script printed `2`:
+
+```ts
+import { connect } from "./db.js";
+import { Product } from "./app/models/index.js";
+
+await connect();
+await Product.createBang({ name: "Widget", price: 5 });
+console.log(await Product.count());
+```
 
 ## Architecture / design choices
 
@@ -201,11 +278,12 @@ are registered in the inheritance tracker.
   split prevents the CLI and its dependencies (TypeScript compiler API, node
   readline, etc.) from landing in production bundles.
 
-- **Lazy async reflection (`ensureSchemaLoaded`).** The query and persistence
-  path awaits a one-shot schema-load gate, so most consumers do not need to
-  call `loadSchema()` explicitly. Residual edge: accessing attributes on `new
-Model()` before any query has fired will find an empty attribute set. This is
-  accepted — the common path is always query-first.
+- **Lazy async reflection (`ensureSchemaLoaded`).** The class-level query and
+  persistence paths await a one-shot schema-load gate, so most consumers do not
+  need to call `loadSchema()` explicitly. Association creates reflect their
+  target the same way. One edge remains, and it is accepted: attributes on
+  `new Model()` before any query has fired read an empty attribute set, since
+  the common path is query-first.
 
 - **`_abstractClass` as per-class own-property.** Rails sets
   `self.abstract_class = true` on the declaring class, not on a shared
@@ -224,9 +302,9 @@ Model()` before any query has fired will find an empty attribute set. This is
   zero-dependency pre-deploy health check — connects, checks, prints, exits.
   No application server needs to be running.
 
-- **Driver selection at scaffold time.** `--driver` writes the correct adapter
-  key into `config/database.ts` and the correct devDependency into
-  `package.json` so `pnpm install` pulls the right native module.
+- **Driver selection at scaffold time.** `--driver` writes the adapter key
+  into `config/database.ts` and the driver into `package.json`'s
+  `dependencies`, so `pnpm install` pulls the right native module.
 
 ## Testing
 
@@ -239,8 +317,9 @@ supported driver:
 - `src/__e2e__/mysql-happy-path.test.ts`
 
 E2E suites exercise `ar init → ar db:migrate → ar db:version` against a real
-database in a temp directory. They run in CI under the `activerecord-cli` job
-matrix (sqlite / postgres / mysql).
+database in a temp directory, and CI runs them against SQLite, PostgreSQL and
+MySQL. The SQLite suite also runs `db:create` → `db:migrate` with `TRAILS_ENV`
+and `NODE_ENV` unset, to pin the `development` default.
 
 ## Versioning / stability
 
