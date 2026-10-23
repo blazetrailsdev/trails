@@ -121,7 +121,7 @@ export async function main(args: string[] = [], root = ROOT_DIR): Promise<string
     throw new Error(
       `module-count gate: ${grew.length} count(s) above their mark. Build a plain-object ` +
         `or class module and reach \`super\` through \`rbCallSuper\` (CLAUDE.md § "A Ruby ` +
-        `module is a plain object or a class module"); never raise the mark:\n` +
+        `module is a JS object or a JS class"); never raise the mark:\n` +
         grew.map((v) => `  ${v.pkg} ${v.kind}: ${v.mark} → ${v.current}`).join("\n"),
     );
   }

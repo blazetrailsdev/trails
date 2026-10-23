@@ -1036,10 +1036,12 @@ For a module-eval read, two shapes are sanctioned, and only these:
   module with a plain `Namespace.Name = Klass` assignment, which is type-checked
   against the namespace's declared property, and is read where a module-eval
   read needs it (`include(Base, ActiveRecord.Scoping)`). `rbModConstSet` is
-  written only where the Rails body itself calls `const_set` — 18 sites in the
-  vendored tree, tabled in the tasks repo's
+  written only where the ported body itself calls `const_set` — 18 sites in the
+  vendored Rails tree, tabled in the tasks repo's
   `rfcs/0205-namespace-seats-are-plain-javascript/README.md` — and never as the
-  seat spelling. A class's qualified Ruby path comes from the table generated
+  seat spelling. The rule is per body, not per count: a ported gem that calls
+  `const_set` qualifies the same way (thor's `rake_compat.rb:64` is the one
+  such site outside Rails, and is unported). A class's qualified Ruby path comes from the table generated
   out of `rails-api.json`, not from the seat. A constant Rails
   `require`s rather than autoloads is seated with no `autoload` call. Ruby's
   top-level `Object` is `TopLevel` in `activesupport/src/namespaces.ts`: the
