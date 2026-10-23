@@ -1,8 +1,8 @@
 import { Info } from "./image/info.js";
 import { Utilities } from "./utilities.js";
-import { eachSlice } from "@blazetrails/activesupport";
 import {
   StringIO,
+  eachSlice,
   Enumerator,
   IO,
   rbStrSend,
