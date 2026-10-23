@@ -7471,6 +7471,13 @@ describe("extractFromProgram — defineModule section visibility", () => {
     return out;
   }
 
+  it("records an empty defineModule so an include of it resolves", () => {
+    const info = extractFromFiles("/p", {
+      "mod.ts": `export const Mod = defineModule({}) as { run(): void };`,
+    });
+    expect(info.modules["mod.ts:Mod"]).toBeDefined();
+  });
+
   it("stamps protected and private sections onto their top-level functions", () => {
     expect(
       visibilities(`
