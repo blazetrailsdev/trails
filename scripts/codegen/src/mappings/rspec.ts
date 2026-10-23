@@ -128,6 +128,16 @@ export function rspec(lw: Lowerer, n: N, ctx: Ctx): string | null {
         const r = m.args[0]?.k === "call" ? one(m.args[0], act) : null;
         return l && r ? `${l}; ${r}` : null;
       }
+      case "or": {
+        // Compound `a.or(b)`: either holds (rspec compound.rb), the actual read once.
+        if (neg) return null;
+        const v = lw.tmp(ctx, "actual");
+        const l = m.recv?.k === "call" ? one(m.recv, v) : null;
+        const r = m.args[0]?.k === "call" ? one(m.args[0], v) : null;
+        return l && r
+          ? `((${v}: unknown) => { try { return ${l}; } catch { return ${r}; } })(${act})`
+          : null;
+      }
       case ">":
       case ">=":
       case "<":

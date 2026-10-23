@@ -314,7 +314,15 @@ export class Resolver {
     return this.depsMemo.has(spec) && this.pkgExports(spec).size ? spec : undefined;
   }
 
+  /** `Mod::NAME` set in a `class << self` body of `Mod` → the TS file exporting it. */
+  sclassConsts = new Map<string, string>();
+
   constRef(p: string[], nesting: string[], ctx: Ctx, lw: Lowerer): string {
+    if (p.length === 1)
+      for (const n of [...nesting].reverse()) {
+        const file = this.sclassConsts.get(`${n}::${p[0]}`);
+        if (file) return this.importFrom(file, p[0], ctx, lw);
+      }
     let hit = this.index.resolveConst(p, nesting);
     // A test support file reopening a dependency class (`ActiveSupport::TestCase`
     // in `support/job_buffer.rb`) does not make it the gem's own for lib code.

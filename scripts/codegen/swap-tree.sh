@@ -10,11 +10,11 @@
 #     runs the generated tests (ported from the gem's own) instead of the hand
 #     port's, so the gate measures the generated tree on its own terms.
 #
-# Writes packages/$GEM/codegen-out/swap-tree-tsc.txt and swap-tree-vitest.txt.
+# Writes packages/<pkg>/codegen-out/swap-tree-tsc.txt and swap-tree-vitest.txt.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GEM="${CODEGEN_GEM:-activerecord}"
-PKG="$ROOT/packages/$GEM"
+PKG="$ROOT/packages/${CODEGEN_PKG:-${GEM//_/-}}"
 GEN="$PKG/codegen-out"
 [ -d "$PKG/src.hand" ] && { echo "src.hand exists — previous run did not restore; fix by hand" >&2; exit 1; }
 restore() {
@@ -44,7 +44,7 @@ echo "tsc errors: $(grep -c 'error TS' "$GEN/swap-tree-tsc.txt")  in tests: $(gr
 # activejob's Rakefile runs the suite once per adapter (AJ_ADAPTER), leaving out a
 # file that names another adapter (async, delayed_job): SWAP_ADAPTER picks one.
 export AJ_ADAPTER="${SWAP_ADAPTER:-inline}"
-mapfile -t tests < <(cd "$ROOT" && find "packages/$GEM/src" -name "${SWAP_TESTS:-*}.test.ts" | sort |
+mapfile -t tests < <(cd "$ROOT" && find "${PKG#$ROOT/}/src" -name "${SWAP_TESTS:-*}.test.ts" | sort |
   { if [ "$GEM" = activejob ]; then grep -v -e "$( [ "$AJ_ADAPTER" = async ] && echo '^$' || echo async)" -e "$( [ "$AJ_ADAPTER" = delayed_job ] && echo '^$' || echo delayed-job)"; else cat; fi; })
 # An empty list would hand vitest no paths, and it would run every project.
 [ "${#tests[@]}" -gt 0 ] || { echo "no test files match ${SWAP_TESTS:-*}.test.ts" >&2; exit 1; }

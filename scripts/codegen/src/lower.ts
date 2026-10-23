@@ -671,9 +671,21 @@ export class Lowerer {
           return [`${ctx.selfExpr}${key} = ${fn};`];
         }
         return ret(this.decline(ctx, "unhandled-node", n, `nested ${n.k} in body`));
+      case "sclass": {
+        // `class << t; def zone; …; end; end` on a local: each `def` is `def t.zone`.
+        const defs = this.seqBody(n.body);
+        if (
+          n.target?.k === "lvar" &&
+          defs.length &&
+          defs.every((d: N) => d.k === "def" && !d.singleton)
+        )
+          return defs.flatMap((d: N) =>
+            this.stmt({ ...d, singleton: true, receiver: n.target }, ctx, false),
+          );
+        return ret(this.decline(ctx, "unhandled-node", n, `nested ${n.k} in body`));
+      }
       case "class":
       case "module":
-      case "sclass":
         return ret(this.decline(ctx, "unhandled-node", n, `nested ${n.k} in body`));
       case "nil":
         return tail ? ["return null;"] : [];
@@ -1570,7 +1582,11 @@ export class Lowerer {
       const name = b.name as string;
       // `&:to_s` / `&:to_sym` go through the call lowering (Symbol convention).
       if (name === "to_s" || name === "to_sym" || name === "class") {
-        const inner = this.child(ctx, { scope: { locals: new Set(["x"]), parent: ctx.scope } });
+        // A sync arrow: nothing in it is awaited, whatever the enclosing test awaits.
+        const inner = this.child(ctx, {
+          scope: { locals: new Set(["x"]), parent: ctx.scope },
+          testMode: false,
+        });
         const call: N = {
           k: "call",
           recv: { k: "lvar", name: "x" },

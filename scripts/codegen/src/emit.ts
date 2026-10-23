@@ -326,6 +326,11 @@ export class Emitter {
     const tsFile = rubyFileToTsAr(file.file);
     const taken = new Set<string>();
     for (const u of collectUnits(file)) {
+      // A constant set in `class << self` is the singleton class's: every
+      // `class << self` body of the module reads it bare, whichever file it is in.
+      for (const s of u.sbody ?? [])
+        if (s.k === "casgn" && s.path?.length === 1)
+          this.resolver.sclassConsts.set(`${u.fqn}::${s.path[0]}`, tsFile);
       if (
         this.resolver.exportNames.has(u.fqn) &&
         this.index.scopes.get(u.fqn)?.primaryFile !== file.file
@@ -639,22 +644,16 @@ export class Emitter {
         ) {
           // CLAUDE.md "Method visibility is compile-time only".
           continue;
-        } else if (
-          s.k === "call" &&
-          s.name === "each" &&
-          s.recv?.k === "array" &&
-          s.block?.k === "block" &&
-          s.block.params.length === 1
-        ) {
+        } else if (this.isTableLoop(s)) {
           // Tests generated per element (`[nil, 1, ...].each do |arg| test "..." end`):
           // the loop runs as vitest collects, as Ruby's runs at class definition.
-          const p = s.block.params[0].name;
+          const loop = this.tableLoop(s, nameCtx());
           const inner: string[] = [];
-          const list = this.lw.expr(s.recv, nameCtx());
-          loopLocals.push(p);
+          const mark = loopLocals.length;
+          loopLocals.push(...loop.names);
           emitBody(this.lw.seqBody(s.block.body), inner, guard);
-          loopLocals.pop();
-          out.push(`for (const ${jsIdent(p)} of ${list}) {`, ...indent(inner), "}");
+          loopLocals.length = mark;
+          out.push(`for (const ${loop.binding} of ${loop.list}) {`, ...indent(inner), "}");
         } else if (s.k === "class" || s.k === "module") {
           // A nested class is its own unit, emitted beside the test case.
           continue;
@@ -854,6 +853,44 @@ export class Emitter {
   }
 
   /** A test whose body names a constant a ratified CLAUDE.md section rules out. */
+  /**
+   * A test-body `each` over a literal table (`[[a, s], …].each do |a, s|`,
+   * `{ k => v }.each do |k, (x, y)|`): its `for … of` head, Ruby's block-param
+   * splatting written as an array pattern. A Hash literal iterates its pairs in
+   * order whatever the key type, as `Hash#each` does.
+   */
+  isTableLoop(s: N): boolean {
+    return (
+      s.k === "call" &&
+      s.name === "each" &&
+      (s.recv?.k === "array" ||
+        (s.recv?.k === "hash" && !s.recv.pairs.some((p: any) => p.splat))) &&
+      s.block?.k === "block" &&
+      s.block.params.length >= 1 &&
+      s.block.params.every((p: any) => p.name || p.destructure)
+    );
+  }
+
+  tableLoop(s: N, ctx: Ctx): { binding: string; list: string; names: string[] } {
+    const params: { name?: string; destructure?: string[] }[] = s.block.params;
+    const one = (p: { name?: string; destructure?: string[] }) =>
+      p.destructure
+        ? `[${p.destructure.map((d) => (d ? jsIdent(d) : "")).join(", ")}]`
+        : jsIdent(p.name!);
+    const binding = params.length === 1 ? one(params[0]) : `[${params.map(one).join(", ")}]`;
+    const names = params.flatMap((p) => (p.destructure ?? [p.name!]).filter(Boolean));
+    const list =
+      s.recv.k === "array"
+        ? this.lw.expr(s.recv, ctx)
+        : `[${s.recv.pairs
+            .map(
+              (p: any) =>
+                `[${p.key.k === "sym" ? JSON.stringify(p.key.value) : this.lw.expr(p.key, ctx)}, ${this.lw.expr(p.value, ctx)}]`,
+            )
+            .join(", ")}]`;
+    return { binding, list, names };
+  }
+
   permanentSkip(u: Unit, stmts: N[]): string | null {
     let why: string | null = null;
     let stringSub = false;
@@ -1179,7 +1216,9 @@ export class Emitter {
           s.k === "call" &&
           s.recv === null &&
           (s.name === "test" || s.name === "it") &&
-          (s.args[0]?.k === "str" || s.args[0]?.k === "dstr") &&
+          (s.args[0]?.k === "str" ||
+            s.args[0]?.k === "dstr" ||
+            (u.rspec && s.args[0]?.k === "lvar")) &&
           s.block?.k === "block"
         ) {
           it(
@@ -1256,20 +1295,14 @@ export class Emitter {
           const and = (x: string) => (guard ? `(${guard}) && ${x}` : x);
           emitBody(this.lw.seqBody(s.then), out, and(`(${c})`));
           emitBody(this.lw.seqBody(s.else), out, and(`!(${c})`));
-        } else if (
-          s.k === "call" &&
-          s.name === "each" &&
-          s.recv?.k === "array" &&
-          s.block?.k === "block" &&
-          s.block.params.length === 1
-        ) {
-          const p = s.block.params[0].name;
+        } else if (this.isTableLoop(s)) {
+          const loop = this.tableLoop(s, nameCtx());
           const inner: string[] = [];
-          const list = this.lw.expr(s.recv, nameCtx());
-          loopLocals.push(p);
+          const mark = loopLocals.length;
+          loopLocals.push(...loop.names);
           emitBody(this.lw.seqBody(s.block.body), inner, guard);
-          loopLocals.pop();
-          out.push(`for (const ${jsIdent(p)} of ${list}) {`, ...indent(inner), "}");
+          loopLocals.length = mark;
+          out.push(`for (const ${loop.binding} of ${loop.list}) {`, ...indent(inner), "}");
         } else if (s.k === "def" || s.k === "sclass" || s.k === "class" || s.k === "module") {
           continue;
         } else if (
@@ -1300,7 +1333,17 @@ export class Emitter {
             ...indent(inner),
             "});",
           );
-        } else if (s.k === "lasgn" || (s.k === "call" && !s.block)) {
+        } else if (u.rspec && s.k === "casgn" && s.path?.length === 1) {
+          // A constant set in a `describe` block lands on Object in Ruby; every
+          // example the file defines after it reads it, so a block-scoped const.
+          out.push(`const ${s.path[0]} = ${this.lw.expr(s.value, nameCtx())};`);
+          if (!loopLocals.includes(s.path[0])) loopLocals.push(s.path[0]);
+        } else if (
+          s.k === "lasgn" ||
+          s.k === "opasgn" ||
+          s.k === "masgn" ||
+          (s.k === "call" && !s.block)
+        ) {
           const lines = this.lw.stmt(s, nameCtx(), false);
           out.push(...(guard ? [`if (${guard}) {`, ...indent(lines), "}"] : lines));
           if (s.k === "lasgn" && !loopLocals.includes(s.name)) loopLocals.push(s.name);
@@ -1561,7 +1604,9 @@ export class Emitter {
           sbody: [],
           // RSpec's `described_class`: the constant a top-level describe names.
           describedClass: s.args[0]?.k === "const" ? s.args[0] : undefined,
-          rspec: rspecRecv,
+          // A bare `describe` in an RSpec suite (`expose_dsl_globally`, raabro's
+          // and et-orbi's spec/) is RSpec's, not Minitest::Spec's.
+          rspec: rspecRecv || GEM.testDir === "spec",
         } as unknown as Unit;
         const sups = [
           ...Emitter.SPEC_SUPPORT,
@@ -3478,7 +3523,11 @@ export class Emitter {
     if (sclassStmts.length) {
       const scVar = `${name}Singleton`;
       const tc = this.baseCtx(u, f, { selfKind: "static", selfExpr: scVar });
-      const lines = this.lw.block(sclassStmts, tc, false);
+      const lines = sclassStmts.flatMap((s) =>
+        s.k === "casgn" && s.path?.length === 1
+          ? [`export const ${s.path[0]} = ${this.lw.expr(s.value, tc)};`]
+          : this.lw.block([s], tc, false),
+      );
       const hoisted: Set<string> | undefined = tc.scope.hoisted;
       if (hoisted?.size) lines.unshift(`let ${[...hoisted].map((h) => jsIdent(h)).join(", ")};`);
       if (lines.some((l) => l.includes(scVar)))
@@ -3730,7 +3779,11 @@ export class Emitter {
     if (sclassStmts.length) {
       const scVar = `${name}Singleton`;
       const tc = this.baseCtx(u, f, { selfKind: "static", selfExpr: scVar });
-      const lines = this.lw.block(sclassStmts, tc, false);
+      const lines = sclassStmts.flatMap((s) =>
+        s.k === "casgn" && s.path?.length === 1
+          ? [`export const ${s.path[0]} = ${this.lw.expr(s.value, tc)};`]
+          : this.lw.block([s], tc, false),
+      );
       const hoisted: Set<string> | undefined = tc.scope.hoisted;
       if (hoisted?.size)
         lines.unshift(`let ${[...hoisted].map((h) => `${jsIdent(h)}: any`).join(", ")};`);
