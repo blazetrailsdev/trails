@@ -15,6 +15,18 @@ describe("Thread::Queue", () => {
     expect(await q.pop()).toBe(2);
   });
 
+  it("pop with a timeout answers null once it expires, and a later push still queues", async () => {
+    const q = new Queue<number>();
+    expect(await q.pop(false, { timeout: 0 })).toBeNull();
+    expect(await q.pop(false, { timeout: 0.02 })).toBeNull();
+    await q.push(1);
+    expect(await q.pop()).toBe(1);
+    const waiting = q.pop(false, { timeout: 1 });
+    await q.push(2);
+    expect(await waiting).toBe(2);
+    expect(() => q.pop(true as false, { timeout: 1 })).toThrow(ArgumentError);
+  });
+
   it("pop waits for a later push", async () => {
     const q = new Queue<string>();
     let popped: string | undefined;

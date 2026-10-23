@@ -3,6 +3,8 @@ import { ArgumentError } from "./argument-error.js";
 import { EOFError } from "./eof-error.js";
 import { IO } from "./io.js";
 import { IOError } from "./io-error.js";
+import { NotImplementedError } from "./not-implemented-error.js";
+import { getProcessAdapter } from "./process-adapter.js";
 
 const HIGH_WATER_MARK = 64 * 1024;
 
@@ -226,3 +228,21 @@ export class BasicSocket extends IO {
  * @noRailsEquivalent PERMANENT
  */
 export class TCPSocket extends BasicSocket {}
+
+/**
+ * @noRailsEquivalent PERMANENT — Ruby core `Socket`
+ * (`vendor/ruby/v3.3.11/ext/socket/socket.c:1983`).
+ */
+export class Socket extends BasicSocket {
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Socket.gethostname`
+   * (`vendor/ruby/v3.3.11/ext/socket/socket.c:847`).
+   */
+  static gethostname(): string {
+    const adapter = getProcessAdapter();
+    if (adapter.hostname == null) {
+      throw new NotImplementedError("gethostname() function is unimplemented on this machine");
+    }
+    return adapter.hostname();
+  }
+}

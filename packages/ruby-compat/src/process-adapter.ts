@@ -32,6 +32,8 @@ export interface ProcessAdapter {
   platform(): string;
   execPath?(): string;
   pid(): number;
+  ppid?(): number;
+  hostname?(): string;
   setEnv(key: string, value: string | undefined): void;
   exit(code?: number): never;
   /**
@@ -518,6 +520,7 @@ interface NodeProcessLike {
   platform: string;
   execPath: string;
   pid: number;
+  ppid: number;
   exit(code?: number): never;
   exitCode: number | string | undefined;
   on(event: string, handler: () => void): void;
@@ -588,6 +591,8 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
     platform: () => proc.platform,
     execPath: () => proc.execPath,
     pid: () => proc.pid,
+    ppid: () => proc.ppid,
+    hostname: () => (proc.getBuiltinModule?.("node:os") as { hostname(): string }).hostname(),
     setEnv: (key, value) => {
       if (value === undefined) delete proc.env[key];
       else proc.env[key] = value;

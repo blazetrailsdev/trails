@@ -36,6 +36,26 @@ describe("TimerTask", () => {
     expect(runs).toBeGreaterThanOrEqual(2);
   });
 
+  it("notifies observers of each run's result or error", async () => {
+    const seen: unknown[][] = [];
+    let runs = 0;
+    const task = new TimerTask({ executionInterval: 0.02 }, () => {
+      runs += 1;
+      if (runs === 2) throw new Error("boom");
+      return runs;
+    });
+    task.addObserver((_time, result, error) => {
+      seen.push([result, (error as Error | null)?.message ?? null]);
+    });
+    task.execute();
+    await sleep(70);
+    task.shutdown();
+    expect(seen.slice(0, 2)).toEqual([
+      [1, null],
+      [null, "boom"],
+    ]);
+  });
+
   it("does not overlap a pending async run", async () => {
     let active = 0;
     let peak = 0;

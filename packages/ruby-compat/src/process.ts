@@ -128,6 +128,16 @@ export class Process {
   }
 
   /**
+   * `proc_get_ppid` (`vendor/ruby/v3.3.11/process.c:559`), `getppid(2)`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process.ppid`
+   * (`vendor/ruby/v3.3.11/process.c:559`).
+   */
+  static get ppid(): number {
+    return getProcessAdapter().ppid!();
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/process.c:8283` `rb_clock_gettime`, which reads the tick for
    * `clockId` and then hands it to `make_clock_result` for `unit`.
    *

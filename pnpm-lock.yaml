@@ -581,6 +581,9 @@ importers:
       '@blazetrails/activejob':
         specifier: workspace:*
         version: link:../activejob
+      '@blazetrails/activemodel':
+        specifier: workspace:*
+        version: link:../activemodel
       '@blazetrails/activerecord':
         specifier: workspace:*
         version: link:../activerecord
