@@ -26,19 +26,19 @@ See [the correction](#correction-the-32gb-wall-is-resolution-not-module-count).
 
 Status of each wall after re-verification:
 
-| Wall                                       | Status                                                                                                                                                                                                |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — codegen memory                         | **Gone** on `main` @ `e284a293`. Every rung to 1133 modules completes codegen inside 20GB; peak grows ~8 MiB/module, nothing superlinear. See [below](#wall-1-is-gone-the-compiler-now-sees-the-cap). |
-| 1b — resolver symlink cycle                | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased.                       |
-| 2 — WebAssembly cannot link                | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                                                |
-| 3a — `importedClass.prototype`             | **Fixed upstream**, unreleased.                                                                                                                                                                       |
-| 3b — shape-mint abort                      | **Gone** on `main` @ `20fde48d`. Re-verified 2026-10-20: 04d compiles, links and starts. Never filed; nothing to file.                                                                                |
-| 3c — init-time hang at 362 modules         | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                                      |
-| 4 — TDZ check ate a spread call's receiver | **Fixed upstream** — our patch merged as [PR 12990](https://github.com/PerryTS/perry/pull/12990) (`ccad647e7a`). Unreleased.                                                                          |
-| 5 — parentless class got a live `super`    | **Fixed upstream** — our patch merged as [PR 13001](https://github.com/PerryTS/perry/pull/13001) (`71a8beb530`), closing [issue 12889](https://github.com/PerryTS/perry/issues/12889). Unreleased.    |
-| 6 — namespace kind lost over a named hop   | **Fixed by us** — [PR 13091](https://github.com/PerryTS/perry/pull/13091), open. Blocked the link of every rung above 429 modules.                                                                    |
-| 7 — static ShapeId refused                 | **Open, pre-existing** — 04-activesupport (429). A/B-confirmed against an unpatched build of the same commit. Not filed yet.                                                                          |
-| 8 — `defineMethod is not a function`       | **Open** — the three largest rungs. Needs the populated graph: a 2-module probe of the same constructor matches Node.                                                                                 |
+| Wall                                       | Status                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — codegen memory                         | **Gone** on `main` @ `e284a293`. Every rung to 1133 modules completes codegen inside 20GB; peak grows ~8 MiB/module, nothing superlinear. See [below](#wall-1-is-gone-the-compiler-now-sees-the-cap).                                                                                   |
+| 1b — resolver symlink cycle                | **Fixed upstream** — [PR 12895](https://github.com/PerryTS/perry/pull/12895) merged as `86ab1c0c8f` ([issue 12822](https://github.com/PerryTS/perry/issues/12822)). Unreleased.                                                                                                         |
+| 2 — WebAssembly cannot link                | **Gone** from source. An npm-distribution gap, not a capability limit.                                                                                                                                                                                                                  |
+| 3a — `importedClass.prototype`             | **Fixed upstream**, unreleased.                                                                                                                                                                                                                                                         |
+| 3b — shape-mint abort                      | **Gone** on `main` @ `20fde48d`. Re-verified 2026-10-20: 04d compiles, links and starts. Never filed; nothing to file.                                                                                                                                                                  |
+| 3c — init-time hang at 362 modules         | **Fixed upstream** — our patch merged into Perry `main` as `39bea98d` ([PR 12588](https://github.com/PerryTS/perry/pull/12588)).                                                                                                                                                        |
+| 4 — TDZ check ate a spread call's receiver | **Fixed upstream** — our patch merged as [PR 12990](https://github.com/PerryTS/perry/pull/12990) (`ccad647e7a`). Unreleased.                                                                                                                                                            |
+| 5 — parentless class got a live `super`    | **Fixed upstream** — our patch merged as [PR 13001](https://github.com/PerryTS/perry/pull/13001) (`71a8beb530`), closing [issue 12889](https://github.com/PerryTS/perry/issues/12889). Unreleased.                                                                                      |
+| 6 — namespace kind lost over a named hop   | **Fixed by us** — [PR 13091](https://github.com/PerryTS/perry/pull/13091), **merged** `22ad61bd`. Blocked the link of every rung above 429 modules.                                                                                                                                     |
+| 7 — static ShapeId refused                 | **Open, pre-existing** — 04-activesupport (429). A/B-confirmed against an unpatched build of the same commit. Not filed yet.                                                                                                                                                            |
+| 8 — `defineMethod is not a function`       | **Fixed** — an explicit import lost its class id to a same-named class reached transitively, because codegen binds the name in two maps with opposite tie-breaks. 3-file reproducer. Fix committed on `fix-import-name-collision` @ `43edf8e5`; not pushed or filed. Unblocks 05-model. |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
@@ -689,15 +689,15 @@ Re-measured 2026-10-22 on `main` @ `e284a293`, built from source, every rung
 under `systemd-run MemoryMax=20G`, peak read from the scope's cgroup
 `memory.peak` so it counts `perry` **and** the `clang` children:
 
-| Rung                 | Modules | Before           | Peak now | Now                |
-| -------------------- | ------- | ---------------- | -------- | ------------------ |
-| 04c-ruby-compat      | 54      | ok               | 0.54 GiB | ok, correct output |
-| 04d-ruby-compat-barr | 139     | ok (after 2 fix) | 1.58 GiB | ok, correct output |
-| 04b-deep-import      | 364     | **MEM**          | 3.37 GiB | **ok, correct**    |
-| 04-activesupport     | 429     | **MEM**          | 3.76 GiB | links; wall 7      |
-| 05-model             | ~700    | **MEM** (12GB)   | 8.14 GiB | links; wall 8      |
-| 06b-crud             | 891     | **MEM** @ 61/891 | 8.63 GiB | links; wall 8      |
-| 06d-adapter-read     | 1133    | never run        | 8.91 GiB | links; wall 8      |
+| Rung                 | Modules | Before           | Peak now | Now                                       |
+| -------------------- | ------- | ---------------- | -------- | ----------------------------------------- |
+| 04c-ruby-compat      | 54      | ok               | 0.54 GiB | ok, correct output                        |
+| 04d-ruby-compat-barr | 139     | ok (after 2 fix) | 1.58 GiB | ok, correct output                        |
+| 04b-deep-import      | 364     | **MEM**          | 3.37 GiB | **ok, correct**                           |
+| 04-activesupport     | 429     | **MEM**          | 3.76 GiB | links; wall 7                             |
+| 05-model             | ~700    | **MEM** (12GB)   | 8.14 GiB | runs; `[05] Trail function`               |
+| 06b-crud             | 891     | **MEM** @ 61/891 | 8.63 GiB | wall 8 cleared; now `establishConnection` |
+| 06d-adapter-read     | 1133    | never run        | 8.91 GiB | wall 8 cleared; now `setQuery`            |
 
 **Nothing fails to compile any more.** Peak is linear at roughly 8 MiB per
 module, and parallelism is nearly free: 04b costs 2.87 GiB serial and 3.37 GiB
@@ -784,14 +784,152 @@ carries a `:member` suffix that my regex had truncated at the `.`.
   identical ShapeId. It is a deliberate codegen self-check
   (`static_shape_ids_tests.rs:778`), not a crash. Unfiled.
 - **Wall 8 — `TypeError: defineMethod is not a function at new Module`**, on
-  05-model, 06b-crud and 06d-adapter-read, identical on all three. `defineMethod`
-  is an ordinary instance method of ruby-compat's `Module`
-  (`include.ts:332`), and the throw is inside the constructor callback.
-  **Attribution is open and cannot be settled by A/B**: those rungs do not link
-  without 13091, so there is no before. What is known is that a two-module probe
-  doing `new Module((mod) => mod.defineMethod(...))` matches Node exactly, and
-  that 04d — which exercises ruby-compat and booted before — still prints
-  `[04d] a\.b\*c`. So it needs the populated graph, like the shape mint did.
+  05-model, 06b-crud and 06d-adapter-read, identical on all three.
+  **Root-caused; pre-existing and not ours.** See the section below. It
+  reproduces on unpatched upstream `main` @ `cad69fd3` (which contains 13091)
+  and reduces to four files with no trails code at all.
+
+### Bug 8 — an explicit import loses its class id to a same-named class
+
+**What breaks.** `packages/activemodel/src/validations.ts:403` does the same
+thing ruby-compat's own `Kernel` does — `new Module((mod) => mod.defineMethod(…))`
+— and throws `TypeError: defineMethod is not a function at new Module`, while
+`Kernel` succeeds earlier in the _same binary_.
+
+**Why.** Three classes are registered under the name `Module`:
+
+```
+[mono] prefix="packages_ruby_compat_src_include_ts"                registers id=0xd   name="Module"                   methods=20
+[mono] prefix="packages_ruby_compat_src_include_ts"                registers id=0x849 name="Module$Record_never_never" methods=20
+[mono] prefix="packages_activesupport_src_core_ext_object_json_ts" registers id=0x4a3 name="Module"                   methods=0
+```
+
+The third is **an unrelated class**: `activesupport/src/core-ext/object/json.ts:29`
+declares its own `export class Module` holding a single _static_ `asJson`. That
+file declares 18 such classes — `Object`, `String`, `Array`, `Hash`, `Time`,
+`Date` … — as namespaces for ActiveSupport's JSON encoders.
+
+`validations.ts` imports `Module` only from `@blazetrails/ruby-compat`, and the
+one `Module` the activesupport barrel re-exports is _also_ ruby-compat's. json.ts's
+`Module` is exported by nothing in the chain. It arrives anyway, because
+`run_pipeline.rs:5472` registers every exported class of every module
+transitively reachable through an import — `origin_paths` is the imported module
+plus every origin in its export map, and the barrel re-exports `asJson` from
+json.ts, which drags in all 18. The dedup at `:5510` is by **bare class name**.
+
+Codegen then binds the name first-writer-wins (`codegen/mod.rs:892`,
+`or_insert`, deliberate per #665), so whichever entry lands first owns the name:
+
+```
+[w8import] consumer="…validations_length_ts" imports name="Module" source_prefix="…core_ext_object_json_ts"  source_class_id=Some(1187) methods=0
+[w8import] consumer="…validations_length_ts" imports name="Module" source_prefix="…ruby_compat_src_include_ts" source_class_id=Some(13)   methods=20
+[w8import] consumer="…validations_length_ts" class_ids["Module"] = Some(1187)
+```
+
+`new Module(...)` stamps 1187, whose method table is empty, so every
+`mod.defineMethod(…)` misses every dispatch tower and the catch-all throws. Sister
+chunks of the same file that happen to see only the real entry
+(`…validations_numericality_ts`) get `Some(13)` and work.
+
+The code anticipates this exact failure one branch earlier: `:5500` skips a
+transitively-reached class whose name is a global intrinsic, because
+`new Request(...)` was building an exporter's `class Request`. The comment there
+asserts "An EXPLICIT `import { Request } from "./mod.js"` is pushed by the
+specifier-driven sites above and already wins the name dedup below" — that is the
+assumption that fails. Nothing orders the specifier-driven push before the
+transitive walk.
+
+**Reproducer** — four files, no trails code, Node prints `thing:x` and Perry
+throws. `perry/probe/w8-name-collision/`:
+
+```ts
+// real.ts
+export class Shared {
+  constructor(block?: (s: Shared) => void) {
+    if (block !== undefined) block(this);
+  }
+  defineThing(name: string): string {
+    return `thing:${name}`;
+  }
+}
+// decoy.ts — unrelated class of the same name, nobody imports `Shared` from here
+export class Shared {
+  static asText(v: { name: string }): string {
+    return v.name;
+  }
+}
+export function helper(): string {
+  return Shared.asText({ name: "decoy" });
+}
+// consumer.ts
+import { helper } from "./decoy.js"; // reaches decoy FIRST
+import { Shared } from "./real.js";
+export const made = new Shared((s) => {
+  console.log("[repro]", s.defineThing("x"));
+});
+export const helped = helper();
+// main.ts
+import { made, helped } from "./consumer.js";
+console.log("[repro] ok", typeof made, helped);
+```
+
+**Import order is the whole trigger.** Swap the two lines in `consumer.ts` so
+`./real.js` comes first and it passes. That is why eight earlier synthetic
+reductions all passed: they had two modules, never a _third_ declaring an
+unrelated same-named class, and they imported the real one first.
+
+**A source-level A/B confirms it** without touching the compiler: rename json.ts's
+`Module` and 05-model walks straight past `validations.ts:403` — then dies on
+`new Hash`, the identical bug on the next name. `Hash` is declared in three
+packages (`ruby-compat/src/hash.ts:1011`, that same json.ts`:150`,
+`msgpack/src/core-ext.ts:103`).
+
+**Why it looked like it needed a big graph.** It needs activesupport in the
+module set, not a module count: 04b-deep-import at 364 modules does not pull it
+in, the 531-module probe does.
+
+**Ordering is not the fix, and finding out why found the real defect.** The
+first patch sorted specifier-driven entries ahead of transitively-reached ones.
+It fixed the method table and left `new Shared(cb)` binding the _decoy's_
+argument-less constructor, silently never calling the callback — a loud
+`TypeError` turned into a silently wrong program:
+
+```
+Perry: [D] ranCallback false   [D] has method function  [D] direct thing:y
+Node:  [D] in-callback thing:x [D] ranCallback true     [D] has method function  [D] direct thing:y
+```
+
+The reason is that codegen binds the bare name **twice, with opposite
+tie-breaks**: `class_ids` (`codegen/mod.rs:892`, `entry().or_insert()`) is
+first-writer-wins, while `imported_class_ctors` (`codegen/mod.rs:2963`, a
+`collect()` into a `HashMap` keyed on `effective_name()`) is last-writer-wins.
+No ordering of `imported_classes` can satisfy both. The duplicate entry has to
+go, not move.
+
+**Fixed.** In the importing module's scope the colliding name cannot refer to
+the transitive class at all — the explicit import binds it. So once the import
+list is complete, drop any transitively-reached entry whose bare name a
+specifier of this module already claims; exactly one entry holds the name and
+both maps agree. Transitive entries no specifier claims are untouched, which is
+how a class reached only through a re-export barrel still resolves.
+`constructor_contracts.rs` is already keyed on `(source_prefix, name)`, so no
+ABI resolution changed.
+
+Committed on `fix-import-name-collision` as `43edf8e5`, with
+`test-files/test_import_name_collision*.ts` (red before, green after, matching
+Node) and a `changelog.d` fragment. PR body drafted; **not pushed and not
+filed.** `test_affected_crates.sh --base origin/main`: 5854 passed, 1 failed —
+`perry-runtime`'s `every_net_transport_sabotage_makes_its_witness_red`, in a
+crate this diff does not touch, passing in isolation twice on this tree.
+
+**What it unblocks.** 05-model now compiles _and runs_ (`[05] Trail function`).
+06b-crud and 06d-adapter-read move past wall 8 to new, later failures —
+`establishConnection is not a function` and `setQuery is not a function`
+respectively. Those are the next walls, not this one; whether they are the same
+collision in a shape the fix does not cover (two _transitively_-reached
+same-named classes, neither explicitly imported, where the first/last-writer
+disagreement survives) is unexamined. `Base` is declared in at least nine
+trails packages.
 
 ### Upstream filings from this round
 
@@ -803,7 +941,7 @@ carries a `:member` suffix that my regex had truncated at the `.`.
 | [12889](https://github.com/PerryTS/perry/issues/12889) | parentless class emits a `super` construct (pre-existing report we closed)    | **closed** by 13001     |
 | [13001](https://github.com/PerryTS/perry/pull/13001)   | **PR** — no live heritage for a class that extends nothing                    | **merged** `71a8beb530` |
 | [13009](https://github.com/PerryTS/perry/pull/13009)   | **PR** — three `cargo test` failures on `main` (CI, not our rung)             | **merged** `ce79cdac2f` |
-| [13091](https://github.com/PerryTS/perry/pull/13091)   | **PR** — follow an import+export hop when classifying a namespace             | **open**, draft         |
+| [13091](https://github.com/PerryTS/perry/pull/13091)   | **PR** — follow an import+export hop when classifying a namespace             | **merged** `22ad61bd`   |
 
 Both re-verified against `main` @ `20fde48d` immediately before filing, and
 both duplicate-searched first. 12978's reproducer is the 23-line
