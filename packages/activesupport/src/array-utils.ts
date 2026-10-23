@@ -3,7 +3,7 @@ import { I18n } from "./i18n.js";
 import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
 import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
-import { ARRAY_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, eachSlice } from "@blazetrails/ruby-compat";
 import { isSymbol, rbEqq, rbObjClassname, symbolToS } from "@blazetrails/ruby-compat";
 
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
@@ -52,12 +52,12 @@ export function inGroupsOf<T>(
     );
   }
 
-  const result: (T | null | false)[][] = [];
-  for (let i = 0; i < collection.length; i += numberToI) {
-    result.push(collection.slice(i, i + numberToI));
+  if (block) {
+    eachSlice(collection, number, block);
+    return collection as unknown as (T | null | false)[][];
+  } else {
+    return eachSlice(collection, number);
   }
-  if (block) result.forEach(block);
-  return result;
 }
 
 export function toSentence(

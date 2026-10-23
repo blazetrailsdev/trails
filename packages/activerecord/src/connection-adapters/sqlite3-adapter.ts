@@ -68,7 +68,7 @@ import {
   runLoadHooks,
   trailsRoot,
 } from "@blazetrails/activesupport";
-import { File, FileUtils, rbRegSUnion } from "@blazetrails/ruby-compat";
+import { File, FileUtils, rbRegSUnion, sortBy } from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -415,7 +415,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async primaryKeys(tableName: string): Promise<string[]> {
     const pks = (await this.tableStructure(tableName)).filter((f) => Number(f["pk"]) > 0);
-    return pks.sort((a, b) => Number(a["pk"]) - Number(b["pk"])).map((f) => String(f["name"]));
+    return sortBy(pks, (f) => f["pk"]).map((f) => String(f["name"]));
   }
 
   async removeIndex(

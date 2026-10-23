@@ -31,6 +31,7 @@ export {
   AsyncEnumerable,
   Enumerable,
   eachSlice,
+  sortBy,
   filterMap,
   findAll,
   groupBy,
