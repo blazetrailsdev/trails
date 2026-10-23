@@ -1023,7 +1023,8 @@ export function extractFromProgram(
                   )
                   .flatMap((o) => harvestObjectLiteralMethods(o, checker, relPath))
               : harvestModuleInstanceMethods(decl.initializer, checker, relPath);
-          if (methods.length === 0) continue;
+          if (methods.length === 0 && !isDefineModuleCall(unwrapAssertions(decl.initializer)))
+            continue;
           const modKey = `${relPath}:${decl.name.text}`;
           if (info.classes[modKey]) continue;
           const prior = info.modules[modKey];
