@@ -38,7 +38,7 @@ const iterBreak = Symbol("rb_iter_break");
  * `rb_block_call(obj, id_each, …)`: an `each` member where the receiver has
  * one, else its JS iterator, which is how an Array (`rb_ary_each`,
  * `vendor/ruby/v3.3.11/array.c:2532`), a Set or a generator yields, and a Map
- * yields `[key, value]` as `rb_hash_each_pair` does (`hash.c:3132`).
+ * yields `[key, value]` as `rb_hash_each_pair` does (`vendor/ruby/v3.3.11/hash.c:3149`).
  */
 function rbBlockCall<T, E, R>(
   obj: Iterable<T> | Each<T, E>,
@@ -333,10 +333,10 @@ export function eachSlice<T, E = unknown>(
   block?: (slice: T[]) => unknown,
 ): unknown {
   const size = n;
-  const slices: T[][] = [];
-  const yieldSlice = block ?? ((slice: T[]) => slices.push(slice));
 
   if (size <= 0) throw new ArgumentError("invalid slice size");
+  const slices: T[][] = [];
+  const yieldSlice = block ?? ((slice: T[]) => slices.push(slice));
   let ary: T[] = [];
   return rbBlockCall(
     obj,
