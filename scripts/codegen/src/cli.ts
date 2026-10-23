@@ -7,6 +7,7 @@
  * plus `report.json` (declines, wanted ruby-compat helpers, unresolved
  * constants, per-file stats).
  */
+import { mergeConditionalDefs } from "./conditional-defs.js";
 import { execFileSync } from "node:child_process";
 import {
   cpSync,
@@ -206,6 +207,7 @@ const files: IrFile[] = listJson(irDir)
   }
 }
 
+for (const f of files) mergeConditionalDefs(f);
 const index = new GemIndex();
 for (const f of files) index.add(f);
 // A file that requires a library trails neither ports nor gets from Ruby's

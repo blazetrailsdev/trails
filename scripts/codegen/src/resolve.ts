@@ -341,6 +341,11 @@ export class Resolver {
       if (rest.length === 1 && ext.consts?.[rest[0]] !== undefined) return ext.consts[rest[0]];
       return [v, ...rest].join(".");
     }
+    // The tzinfo gem is activesupport's `Intl`-backed stand-in (et-orbi's zones).
+    if (root === "TZInfo") {
+      const t = lw.imp(ctx, "@blazetrails/activesupport", "TZInfo");
+      return [t, ...rest].join(".");
+    }
     if (root === "Arel") {
       const a = lw.imp(ctx, "@blazetrails/arel", "*", "Arel");
       return [a, ...rest].join(".");

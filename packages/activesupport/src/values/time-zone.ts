@@ -507,6 +507,10 @@ export class AmbiguousTime extends Error {
 
 /** @noRailsEquivalent PERMANENT */
 export class Timezone {
+  static all(): Timezone[] {
+    return Intl.supportedValuesOf("timeZone").map((id) => new Timezone(id));
+  }
+
   static get(identifier: string): Timezone {
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: identifier });
@@ -588,6 +592,10 @@ export class Timezone {
     );
   }
 
+  currentPeriod(): TimezonePeriod {
+    return this.periodForUtc(Time.now());
+  }
+
   utcToLocal(time: Time): Temporal.ZonedDateTime {
     return time.toZonedDateTime().toInstant().toZonedDateTimeISO(this.identifier);
   }
@@ -599,6 +607,15 @@ export class Timezone {
     return Time.at(new Rational(localMs - period.observedUtcOffset * 1000, 1000)).getutc();
   }
 }
+
+/** @noRailsEquivalent PERMANENT */
+export const TZInfo = {
+  Timezone,
+  TimezonePeriod,
+  AmbiguousTime,
+  PeriodNotFound,
+  InvalidTimezoneIdentifier,
+};
 
 export class TimeZone {
   static toString(): string {

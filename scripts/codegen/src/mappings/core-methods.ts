@@ -527,6 +527,35 @@ rule("with_index", (c) => {
   return rubyCompatCall(c);
 });
 
+// Integer#abs / Float#floor / #ceil (numeric.c) with no digits argument: the
+// JS Math function, where ruby-compat has no helper; a gem or typed non-number
+// receiver keeps the dispatch.
+for (const k of ["abs", "floor", "ceil"])
+  rules[k] = (c) => {
+    if (c.lw.index.methodNames.has(c.name) || argc(c) !== 0 || c.blk) return null;
+    const t = c.recvNode ? c.lw.typeOf(c.recvNode, c.ctx) : null;
+    if (
+      c.lw.resolver.pkgExports("@blazetrails/ruby-compat").has(c.name) ||
+      (t && !(t.k === "prim" && t.name === "number"))
+    )
+      return rubyCompatCall(c);
+    return `Math.${c.name}(${c.r})`;
+  };
+// Module#remove_const (variable.c rb_mod_remove_const), `Object`'s table the
+// one `registerConstant` fills.
+rule("remove_const", (c) => {
+  if (argc(c) !== 1 || c.recvNode?.k !== "const" || c.recvNode.path.length > 2) return null;
+  const a = c.n.args[0];
+  const name = a?.k === "sym" || a?.k === "str" ? JSON.stringify(a.value) : null;
+  return name && `${c.rc("rbModRemoveConst")}(${c.r}, ${name})`;
+});
+// Array#reverse (array.c rb_ary_reverse_m) on an Array: a reversed copy.
+rule("reverse", (c) => {
+  if (argc(c) === 0 && !c.blk && c.recvNode && c.lw.typeOf(c.recvNode, c.ctx)?.k === "array")
+    return `${needsParens(c.r) ? `(${c.r})` : c.r}.toReversed()`;
+  return rubyCompatCall(c);
+});
+
 for (const k of RUBY_COMPAT_CORE_FNS) rules[k] ??= rubyCompatCall;
 
 /** Ruby method name → its rule. */

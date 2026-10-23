@@ -139,7 +139,7 @@ export class TypeOracle {
         ? "@arel/"
         : path[0] === "ActiveModel"
           ? "@activemodel/"
-          : path[0] === "ActiveSupport"
+          : path[0] === "ActiveSupport" || path[0] === "TZInfo"
             ? "@activesupport/"
             : null;
     const narrowed = pkg ? cands.filter((k) => k.startsWith(pkg)) : cands;

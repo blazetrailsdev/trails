@@ -54,6 +54,33 @@ import { GEM, PKG_DIR, ROOT, coreExtSends } from "./gem.js";
 import type { Resolver } from "./resolve.js";
 import { isBool, isObjectLike, type TypeRef } from "./types.js";
 
+/** Enumerable calls whose block takes one element of the receiver. */
+const ELEMENT_BLOCK_CALLS = new Set([
+  "map",
+  "collect",
+  "flat_map",
+  "collect_concat",
+  "select",
+  "filter",
+  "reject",
+  "filter_map",
+  "find",
+  "detect",
+  "any?",
+  "all?",
+  "none?",
+  "sort_by",
+  "min_by",
+  "max_by",
+  "group_by",
+  "partition",
+  "each",
+  "find_index",
+  "count",
+  "sum",
+  "uniq",
+]);
+
 export const RESERVED = new Set(
   (
     "break case catch class const continue debugger default delete do else enum export extends false finally for " +
@@ -187,6 +214,8 @@ interface Ctx {
   paramTypes?: (string | null)[];
   /** Lowering `Hash.new { |h, k| … }`: the block's first parameter is that Hash. */
   hashNewBlock?: boolean;
+  /** The element type of the Array whose iterating call's block is being lowered. */
+  blockElType?: TypeRef;
   /** Ruby `def` is singleton (static). */
   singleton?: boolean;
   isModule?: boolean;
@@ -1581,7 +1610,14 @@ export class Lowerer {
     if (b.k === "symproc") {
       const name = b.name as string;
       // `&:to_s` / `&:to_sym` go through the call lowering (Symbol convention).
-      if (name === "to_s" || name === "to_sym" || name === "class") {
+      // So do Ruby core methods the gem does not define (`sort_by(&:size)` on Strings).
+      if (
+        name === "to_s" ||
+        name === "to_sym" ||
+        name === "class" ||
+        (["size", "length", "strip", "upcase", "downcase", "to_i", "to_f"].includes(name) &&
+          !this.index.methodNames.has(name))
+      ) {
         // A sync arrow: nothing in it is awaited, whatever the enclosing test awaits.
         const inner = this.child(ctx, {
           scope: { locals: new Set(["x"]), parent: ctx.scope },
@@ -1620,6 +1656,7 @@ export class Lowerer {
       scope,
       paramTypes: undefined,
       hashNewBlock: undefined,
+      blockElType: undefined,
       fnScope: scope,
       inBlock: true,
       inLoop: false,
@@ -1631,6 +1668,8 @@ export class Lowerer {
     const ps = this.paramList(params, inner, true);
     if (ctx.hashNewBlock && params[0]?.name)
       (scope.types ??= new Map()).set(params[0].name, { k: "hash", map: true });
+    if (ctx.blockElType && params.length === 1 && params[0].kind === "req" && params[0].name)
+      (scope.types ??= new Map()).set(params[0].name, ctx.blockElType);
     const stmts = [...(inner.prologue ?? []), ...this.block(this.seqBody(body), inner, true)];
     inner.prologue = undefined;
     const hz: Set<string> | undefined = scope.hoisted;
@@ -2317,7 +2356,12 @@ export class Lowerer {
 
   definedExpr(n: N, ctx: Ctx): string {
     const v: N = n.value;
-    if (v.k === "const") return `(typeof ${this.constRef(v, ctx)} !== "undefined")`;
+    if (v.k === "const") {
+      // `defined?(A::B::C)` is false where any step is missing, not a raise.
+      const ref = this.constRef(v, ctx);
+      const safe = /^[\w$]+(\.[\w$]+)+$/.test(ref) ? ref.replace(/\./g, "?.") : ref;
+      return `(typeof ${safe} !== "undefined")`;
+    }
     if (v.k === "ivar") return `(${this.ivar(v.name, ctx)} !== undefined)`;
     if (v.k === "call" && v.recv === null)
       return `(typeof ${ctx.selfExpr}.${this.callName(v.name)} !== "undefined")`;
@@ -2506,6 +2550,8 @@ export class Lowerer {
   }
 
   constRef(n: N, ctx: Ctx): string {
+    // A spec's `describe`-body constant, declared as a block-scoped const.
+    if (n.path.length === 1 && this.isLocal(ctx, n.path[0])) return n.path[0];
     return this.resolver.constRef(n.path, ctx.nesting, ctx, this);
   }
 
@@ -3026,13 +3072,20 @@ export class Lowerer {
 
   call(n0: N, ctx0: Ctx): string {
     let n = callbackFilterSymbols(n0);
-    const ctx =
+    let ctx =
       n.name === "new" &&
       n.block?.k === "block" &&
       n.recv?.k === "const" &&
       n.recv.path.filter((x: string) => x).join("::") === "Hash"
         ? this.child(ctx0, { hashNewBlock: true })
         : ctx0;
+    // `ary.collect { |z| z.name }`: `z` is an element of a typed Array.
+    let elType: TypeRef | undefined;
+    if (n.block?.k === "block" && n.recv && ELEMENT_BLOCK_CALLS.has(n.name)) {
+      const rt = this.typeOf(n.recv, ctx0);
+      if (rt?.k === "array" && rt.el) elType = rt.el;
+    }
+    if (elType !== ctx.blockElType) ctx = this.child(ctx, { blockElType: elType });
     // A Minitest assertion outside a test body (a test helper's `assert_equal`,
     // a test class's own helper method) is the same vitest `expect` a test body
     // uses: autorun counts both toward the test's assertions.
@@ -3631,7 +3684,13 @@ export class Lowerer {
         ? this.index.scopes.get(ctx.owner)
         : undefined;
     const sd = selfMod?.kind === "module" ? selfMod.sdefs.get(name) : undefined;
-    if (sd && !/=$/.test(name) && this.resolver.tsFileOf(sd.file) !== ctx.f.tsFile) {
+    // So is one in a reopening file to its own: that file's functions are not
+    // seated on the module (emit.ts emitModule), so `Mod.x` would miss.
+    const reopening =
+      !!sd &&
+      this.resolver.tsFileOf(sd.file) === ctx.f.tsFile &&
+      this.resolver.exportNames.get(selfMod!.fqn)?.tsFile !== ctx.f.tsFile;
+    if (sd && !/=$/.test(name) && (this.resolver.tsFileOf(sd.file) !== ctx.f.tsFile || reopening)) {
       this.stat(ctx, "module-function-call");
       const fn = this.resolver.importFrom(
         this.resolver.tsFileOf(sd.file),

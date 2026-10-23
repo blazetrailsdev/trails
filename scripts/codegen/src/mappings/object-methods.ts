@@ -150,12 +150,25 @@ rule("presence", (c) => `${c.lw.as(c.ctx, "presence")}(${c.R})`);
 rule("dup", (c) => `${c.rc("rbObjDup")}(${c.R})`);
 rule("clone", (c) => `${c.rc("rbObjClone")}(${c.R})`);
 
+const CORE_SEND = new Set([
+  "remove_const",
+  "const_set",
+  "const_get",
+  "define_method",
+  "include",
+  "extend",
+]);
+
 rule("send __send__", (c) => {
   const { n, R, ctx, lw } = c;
   // A literal name is the TS member's (`:deserialize_arguments_if_needed` is
   // `deserializeArgumentsIfNeeded`), awaited when a gem def of it is async.
   if (n.args[0]?.k === "sym") {
     const sym: string = n.args[0].value;
+    // A Ruby core method a mapping lowers (`Object.send(:remove_const, :X)`):
+    // the call itself, since trails has no run-time visibility to bypass.
+    if (CORE_SEND.has(sym) && !lw.index.methodNames.has(sym))
+      return lw.expr({ ...n, name: sym, args: n.args.slice(1) }, ctx);
     const call = `${R}.${tsMethodName(sym)}(${n.args
       .slice(1)
       .map((x: N) => lw.argExpr(x, ctx))
