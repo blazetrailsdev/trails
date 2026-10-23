@@ -324,6 +324,26 @@ export function drop<T, E = unknown>(obj: Iterable<T> | Each<T, E>, n: number): 
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#each_with_object — `vendor/ruby/v3.3.11/enum.c:3285`
+ * `enum_each_with_object`, yielding each element with the memo
+ * (`each_with_object_i`) and answering the memo.
+ * @noRailsEquivalent PERMANENT
+ */
+export function eachWithObject<T, M, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  memo: M,
+  block: (i: T, memo: M) => unknown,
+): Enumerated<E, M> {
+  return rbBlockCall(
+    obj,
+    (i) => {
+      block(i, memo);
+    },
+    () => memo,
+  );
+}
+
+/**
  * Mirrors: Ruby's Enumerable#sort_by — `vendor/ruby/v3.3.11/enum.c:1651` `enum_sort_by`,
  * which pairs each element with its block value (`sort_by_i`) and sorts the
  * pairs by `<=>` on the values (`sort_by_cmp`, `:1379`).

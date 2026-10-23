@@ -68,7 +68,7 @@ import {
   runLoadHooks,
   trailsRoot,
 } from "@blazetrails/activesupport";
-import { File, FileUtils, rbRegSUnion, sortBy } from "@blazetrails/ruby-compat";
+import { File, FileUtils, eachWithObject, rbRegSUnion, sortBy } from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -441,14 +441,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async virtualTables(): Promise<Array<[string, [string, string]]>> {
     const query = "SELECT name, sql FROM sqlite_master WHERE sql LIKE 'CREATE VIRTUAL %';";
 
-    const rows = (await this.execQuery(query, "SCHEMA")).castValues() as unknown[][];
-    const memo = new Map<string, [string, string]>();
-    for (const row of rows) {
-      const [tableName, sql] = row as [string, string];
-      const [, moduleName, args] = SQLite3Adapter.VIRTUAL_TABLE_REGEX.exec(sql) ?? [];
-      memo.set(tableName, [moduleName, args]);
-    }
-    return [...memo];
+    return [
+      ...eachWithObject(
+        (await this.execQuery(query, "SCHEMA")).castValues() as unknown[][],
+        new Map<string, [string, string]>(),
+        (row, memo) => {
+          const [tableName, sql] = row as [string, string];
+          const [, moduleName, args] = SQLite3Adapter.VIRTUAL_TABLE_REGEX.exec(sql) ?? [];
+          memo.set(tableName, [moduleName, args]);
+        },
+      ),
+    ];
   }
 
   override async createVirtualTable(

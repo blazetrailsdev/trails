@@ -22,6 +22,7 @@ import {
   toS,
   valuesAt,
   coreHashMergeKwd,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
@@ -1233,10 +1234,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
   async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
     if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
 
-    const quotedColumns = new Map<string, string>();
-    for (const name of columnNames) {
-      quotedColumns.set(name, this.quoteColumnName(name));
-    }
+    const quotedColumns = eachWithObject(columnNames, new Map<string, string>(), (name, result) => {
+      result.set(name, this.quoteColumnName(name));
+    });
     return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
   }
 

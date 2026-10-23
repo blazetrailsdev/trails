@@ -13,7 +13,7 @@ import {
   type MonitorMixin,
   type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { Hash, rbObjId, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
+import { Hash, eachWithObject, rbObjId, Thread, throwDataP, uniq } from "@blazetrails/ruby-compat";
 import { beforeCommittedOnAllRecords } from "../../active-record.js";
 
 /** @internal */
@@ -448,10 +448,13 @@ export class Transaction {
         if (beforeCommittedOnAllRecords()) {
           const ite = this.uniqueRecords();
 
-          const instancesToRunCallbacksOn = new Hash<TransactionRecord, TransactionRecord>();
-          for (const record of this.records) {
-            instancesToRunCallbacksOn.set(record, record);
-          }
+          const instancesToRunCallbacksOn = eachWithObject(
+            this.records,
+            new Hash<TransactionRecord, TransactionRecord>(),
+            (record, candidates) => {
+              candidates.set(record, record);
+            },
+          );
 
           await this.runActionOnRecords(
             ite,
@@ -539,28 +542,30 @@ export class Transaction {
   private prepareInstancesToRunCallbacksOn(
     records: TransactionRecord[],
   ): Hash<TransactionRecord, TransactionRecord> {
-    const candidates = new Hash<TransactionRecord, TransactionRecord>();
-    for (const record of records) {
-      if (!record.isTriggerTransactionalCallbacks()) continue;
+    return eachWithObject(
+      records,
+      new Hash<TransactionRecord, TransactionRecord>(),
+      (record, candidates) => {
+        if (!record.isTriggerTransactionalCallbacks()) return;
 
-      const earlierSavedCandidate = candidates.get(record);
+        const earlierSavedCandidate = candidates.get(record);
 
-      if (
-        earlierSavedCandidate &&
-        (record.constructor as typeof Base).runCommitCallbacksOnFirstSavedInstancesInTransaction
-      ) {
-        continue;
-      }
+        if (
+          earlierSavedCandidate &&
+          (record.constructor as typeof Base).runCommitCallbacksOnFirstSavedInstancesInTransaction
+        ) {
+          return;
+        }
 
-      if (earlierSavedCandidate?.isDestroyed() && !record.isDestroyed()) continue;
+        if (earlierSavedCandidate?.isDestroyed() && !record.isDestroyed()) return;
 
-      if (earlierSavedCandidate?._newRecordBeforeLastCommit) {
-        record._newRecordBeforeLastCommit = true;
-      }
+        if (earlierSavedCandidate?._newRecordBeforeLastCommit) {
+          record._newRecordBeforeLastCommit = true;
+        }
 
-      candidates.set(record, record);
-    }
-    return candidates;
+        candidates.set(record, record);
+      },
+    );
   }
 
   async restart(): Promise<void> {}

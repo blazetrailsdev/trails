@@ -22,7 +22,7 @@ import {
   kernelArray as Array,
   wrap,
 } from "@blazetrails/activesupport";
-import { zip } from "@blazetrails/ruby-compat";
+import { eachWithObject, zip } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import type { Association } from "./association.js";
@@ -97,11 +97,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   protected distribution(array: Base[]): Distribution {
-    const distribution: Distribution = new Hash(0);
-    for (const record of array) {
+    return eachWithObject(array, new Hash(0) as Distribution, (record, distribution) => {
       distribution.set(record, distribution.get(record)! + 1);
-    }
-    return distribution;
+    });
   }
 
   /**

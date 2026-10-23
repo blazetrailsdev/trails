@@ -9,6 +9,7 @@ import {
   toS,
   uniq,
   zip,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
@@ -107,14 +108,14 @@ export class Association {
   }
 
   get ownersByKey(): Hash<unknown, Base[]> {
-    this._ownersByKey ??= (() => {
-      const result = new Hash<unknown, Base[]>();
-      for (const owner of this.owners) {
+    this._ownersByKey ??= eachWithObject(
+      this.owners,
+      new Hash<unknown, Base[]>(),
+      (owner, result) => {
         const key = this.deriveKey(owner, this.ownerKeyName);
         if (key != null) (result.get(key) ?? result.set(key, []).get(key)!).push(owner);
-      }
-      return result;
-    })();
+      },
+    );
     return this._ownersByKey;
   }
 

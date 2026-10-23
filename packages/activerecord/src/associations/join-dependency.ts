@@ -17,6 +17,7 @@ import {
   symbolToS,
   toS,
   toSym,
+  eachWithObject,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
@@ -42,14 +43,17 @@ export class Aliases {
 
   constructor(tables: Aliases.Table[]) {
     this._tables = tables;
-    this._aliasCache = new Map();
-    for (const table of tables) {
-      const i = new Map<string, string>();
-      for (const column of table.columns) i.set(column.name, column.alias);
-      this._aliasCache.set(table.node, i);
-    }
-    this._columnsCache = new Map();
-    for (const table of tables) this._columnsCache.set(table.node, table.columns);
+    this._aliasCache = eachWithObject(tables, new Map(), (table, h) => {
+      h.set(
+        table.node,
+        eachWithObject(table.columns, new Map<string, string>(), (column, i) => {
+          i.set(column.name, column.alias);
+        }),
+      );
+    });
+    this._columnsCache = eachWithObject(tables, new Map(), (table, h) => {
+      h.set(table.node, table.columns);
+    });
   }
 
   columns(): Nodes.As[] {
