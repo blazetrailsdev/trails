@@ -99,7 +99,7 @@ rule(
 
 rule("puts warn", (c) => `console.warn(${c.argList()})`);
 rule("format sprintf", (c) => `${c.rc("rbFormat")}(${c.argList()})`);
-rule("Array", (c) => `${c.rc("rbFArray")}(${c.argList()})`);
+rule("Array", (c) => c.lw.aryEnsure(c.argList()));
 rule("Integer", (c) => `${c.rc("rbInteger")}(${c.argList()})`);
 rule("Float", (c) => `${c.rc("rbFloat")}(${c.argList()})`);
 rule("String", (c) => `String(${c.argList()})`);

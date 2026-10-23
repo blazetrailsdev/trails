@@ -705,8 +705,7 @@ export class Lowerer {
 
   /** `when X` against subject → Ruby `X === subject`. */
   caseEq(c: N, subj: string, ctx: Ctx): string {
-    if (c.k === "splat")
-      return `${this.expr(c.value, ctx)}.some((x: any) => ${this.rc(ctx, "rbEqq")}(x, ${subj}))`;
+    if (c.k === "splat") return `${this.expr(c.value, ctx)}.some((x: unknown) => x === ${subj})`;
     if (c.k === "const") {
       // `when SomeClass` is a type test; `when SOME_VALUE` (a value constant,
       // `::Float::INFINITY`) is Ruby `===` on the value.
@@ -719,15 +718,15 @@ export class Lowerer {
         const t = this.typeTest(c, subj, ctx);
         if (t) return t;
       }
-      return `${this.rc(ctx, "rbEqq")}(${this.expr(c, ctx)}, ${subj})`;
+      return `${this.expr(c, ctx)} === ${subj}`;
     }
     // `when nil` is also JS `undefined` (a missed key or slot reads it).
     if (c.k === "nil") return `${subj} == null`;
     if (c.k === "str" || c.k === "sym" || c.k === "int" || c.k === "true" || c.k === "false")
       return `${subj} === ${this.expr(c, ctx)}`;
     if (c.k === "regex") return `${this.expr(c, ctx)}.test(${subj})`;
-    if (c.k === "range") return `${this.rc(ctx, "rbEqq")}(${this.expr(c, ctx)}, ${subj})`;
-    return `${this.rc(ctx, "rbEqq")}(${this.expr(c, ctx)}, ${subj})`;
+    if (c.k === "range") return `${this.expr(c, ctx)}.cover(${subj})`;
+    return `${this.expr(c, ctx)} === ${subj}`;
   }
 
   /** `x.is_a?(K)` / `K === x` for a constant K, using JS type tests for core classes. */
@@ -745,20 +744,29 @@ export class Lowerer {
       // Ruby's Integer includes a bigint, and a Float may be a boxed integral
       // Number (`1.0`): ruby-compat's classes answer both (`rbObjClass`).
       case "Integer":
-        return `${this.rc(ctx, "rbObjIsKindOf")}(${subj}, ${this.rc(ctx, "rbCInteger")})`;
+        return `(typeof ${subj} === "bigint" || Number.isInteger(${subj}))`;
       case "Float":
-        return `${this.rc(ctx, "rbObjIsKindOf")}(${subj}, ${this.rc(ctx, "rbCFloat")})`;
+        return `typeof ${subj} === "number"`;
       case "Numeric":
         return `typeof ${subj} === "number"`;
       case "Array":
         return `Array.isArray(${subj})`;
       // A Ruby Hash is a plain object, a Map or a ruby-compat `Hash`; ruby-compat's
       // `kind_of?` answers all three (the hand port's `rbObjIsKindOf(argument, Hash)`).
+      // A plain object, or a Map subclass (ruby-compat's Hash); a bare Map is not a Ruby Hash.
       case "Hash":
-        return `${this.rc(ctx, "rbObjIsKindOf")}(${subj}, ${this.rc(ctx, "Hash")})`;
-      // A JS class is a function too; ruby-compat's `rbObjIsProc` answers a proc only.
+        return this.withOnce(
+          subj,
+          (x) =>
+            `(typeof ${x} === "object" && ${x} !== null && ([Object.prototype, null].includes(Object.getPrototypeOf(${x})) || (${x} instanceof Map && ${x}.constructor !== Map)))`,
+        );
+      // A JS class is a function too, and not a Proc.
       case "Proc":
-        return `${this.rc(ctx, "rbObjIsProc")}(${subj})`;
+        return this.withOnce(
+          subj,
+          (x) =>
+            `(typeof ${x} === "function" && !Function.prototype.toString.call(${x}).startsWith("class"))`,
+        );
       case "NilClass":
         return `${subj} == null`;
       case "TrueClass":
@@ -874,7 +882,7 @@ export class Lowerer {
     // A value already an Array (a literal, `split`) needs no conversion.
     const vt = n.value.k === "array" ? null : this.typeOf(n.value, ctx);
     const ensure = (v: string) =>
-      n.value.k === "array" || (vt?.k === "array" && !vt.nullable) ? v : this.aryEnsure(v, ctx);
+      n.value.k === "array" || (vt?.k === "array" && !vt.nullable) ? v : this.aryEnsure(v);
     // `@mediatype, @subtype = …`: the fields destructured in place.
     if (targets.every((t) => t.k === "ivar") && !tail)
       return [`[${targets.map((t) => this.ivar(t.name, ctx)).join(", ")}] = ${ensure(value)};`];
@@ -1278,13 +1286,12 @@ export class Lowerer {
 
   /**
    * Splat / multiple assignment's array conversion (vm_insnhelper.c
-   * vm_expandarray): nil is empty, an Array (or `to_ary`) itself, else `[x]`.
+   * vm_expandarray): nil is empty, an Array itself, else `[x]`.
    */
-  aryEnsure(value: string, ctx: Ctx): string {
-    const check = this.rc(ctx, "rbCheckArrayType");
+  aryEnsure(value: string): string {
     return this.withOnce(
       value,
-      (x) => `(${x} == null ? [] : ((${check}(${x}) as unknown[] | null) ?? [${x}]))`,
+      (x) => `(${x} == null ? [] : Array.isArray(${x}) ? (${x} as unknown[]) : [${x}])`,
     );
   }
 
@@ -1396,8 +1403,7 @@ export class Lowerer {
     )
       return "${" + this.symName(e, ctx, `${needsParens(e) ? `(${e})` : e} ?? ""`) + "}";
     if (["str", "dstr", "int", "float"].includes(p.k) || t?.k === "prim") return "${" + e + "}";
-    if (p.k === "const" || (t?.k === "class" && t.static) || t?.k === "gemClass")
-      return "${" + `${this.rc(ctx, "rbObjAsString")}(${e})` + "}";
+    if (p.k === "const") return "${" + e + "}";
     return "${" + `${needsParens(e) ? `(${e})` : e} ?? ""` + "}";
   }
 
@@ -1483,7 +1489,7 @@ export class Lowerer {
     if (a.k === "splat") {
       const t = this.typeOf(a.value, ctx);
       if (t?.k === "array") return `...${this.expr(a.value, ctx)}`;
-      return `...${this.aryEnsure(this.expr(a.value, ctx), ctx)}`;
+      return `...${this.aryEnsure(this.expr(a.value, ctx))}`;
     }
     if (a.k === "kwargs") return this.kwargs(a.pairs, ctx, !!a.columnKeys);
     if (a.k === "fwdargs") return `...args`;
@@ -1748,7 +1754,8 @@ export class Lowerer {
       if (blk) {
         ctx.scope.locals.add(blk.name ?? "block");
         pro.push(
-          `const ${jsIdent(blk.name ?? "block")} = ${this.rc(ctx, "rbBlockGivenP")}(${restName}[${restName}.length - 1]) ? ${restName}.pop() : undefined;`,
+          // A block is a trailing function that is not a class (`retry_on(SomeError)`).
+          `const ${jsIdent(blk.name ?? "block")} = typeof ${restName}[${restName}.length - 1] === "function" && !Function.prototype.toString.call(${restName}[${restName}.length - 1]).startsWith("class") ? (${restName}.pop() as (...args: unknown[]) => unknown) : undefined;`,
         );
       }
       const kws = after.filter(
@@ -2200,6 +2207,34 @@ export class Lowerer {
    * typed a String, Number, Boolean or nil (`String#==`, `Integer#==`), or the
    * argument is `nil` (`BasicObject#==` identity; a nil answers `==` only to nil).
    */
+  /**
+   * A Hash argument to a plain-object merge: as written when the type pass knows
+   * it is a plain object; an untyped one may be a Map (a ruby-compat Hash), whose
+   * entries the spread and `Object.assign` cannot see.
+   */
+  plainArg(n: N, e: string, ctx: Ctx): string {
+    if (n.k === "hash" || n.k === "kwargs" || this.plainHash(n, ctx)) return e;
+    return this.withOnce(e, (x) => `(${x} instanceof Map ? Object.fromEntries(${x}) : ${x})`);
+  }
+
+  /**
+   * Whether `==` needs Ruby's dispatching equality (`rbEqual`): either side is
+   * typed an Array, a Hash, an Array / Hash literal, or an object whose class
+   * may define `==`. Anything else, the untyped included, is JS `===`.
+   */
+  rubyEq(n: N, rt: TypeRef, ctx: Ctx): boolean {
+    if (n.args.length !== 1) return true;
+    const deep = (t: TypeRef, x: N | null) =>
+      x?.k === "array" ||
+      x?.k === "hash" ||
+      t?.k === "array" ||
+      t?.k === "hash" ||
+      (t?.k === "class" && !t.static) ||
+      (t?.k === "gemClass" &&
+        rubyAncestors(this.index, t.fqn).some((a) => this.index.scopes.get(a)?.defs.has("==")));
+    return deep(rt, n.recv) || deep(this.typeOf(n.args[0], ctx), n.args[0]);
+  }
+
   primEq(n: N, rt: TypeRef, ctx: Ctx): boolean {
     if (n.args.length !== 1) return false;
     if (n.args[0].k === "nil") return true;
@@ -3398,10 +3433,11 @@ export class Lowerer {
         // positional (`set_callback(:enqueue, :around, *filters, &blk)`): brand it
         // with ruby-compat `block()`, which `rbBlockGivenP` reads
         // (`rb_block_given_p`). A `&blk` that is nil passes no block at all.
+        // A gem method takes its block as a plain trailing function; only a
+        // dependency whose hand port reads the brand gets one.
         if (
-          n.args.some((x: N) => x.k === "splat") ||
-          (this.index.depRestBlock.has(name) && !this.index.methodNames.has(name)) ||
-          this.index.gemRestBlock.has(name)
+          !this.index.methodNames.has(name) &&
+          (n.args.some((x: N) => x.k === "splat") || this.index.depRestBlock.has(name))
         ) {
           const b = this.blockArg(n.block, ctx);
           // Imported as `rbBlock`: a method's own block parameter is usually

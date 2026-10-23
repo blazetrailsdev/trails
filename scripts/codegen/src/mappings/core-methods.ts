@@ -148,6 +148,19 @@ rule("each_with_object", (c) => {
   return `${c.lw.entries(c.r, c.ctx, c.recvNode)}.reduce((memo: any, x: any) => ((${f})(x, memo), memo), ${memo})`;
 });
 
+/**
+ * A receiver the type pass types as an object (a Relation, a ConnectionPool, a
+ * gem class), or an untyped one whose method the gem defines, answers the Ruby method itself, as a member call; the native
+ * Array / String / Hash forms are for the values that are those.
+ */
+const objectRecv = (c: CoreSite) => {
+  const t = c.recvType ?? c.lw.typeOf(c.recvNode, c.ctx);
+  if (t?.k === "class" || t?.k === "gemClass" || t?.k === "fn") return true;
+  // An untyped receiver of a name the gem defines (`RecurringSchedule#empty?`)
+  // may be that gem object.
+  return !t && (c.lw.index.methodNames.get(c.name)?.def ?? 0) > 0;
+};
+
 // enum.c enum_inject with a block: Array#reduce, which seeds with the first
 // element as Ruby does; an empty receiver with no seed is nil in Ruby, where
 // JS throws.
@@ -161,6 +174,7 @@ rule("inject reduce", (c) => {
 });
 
 rule("include? member?", (c) => {
+  if (objectRecv(c)) return null;
   if (argc(c) === 1 && !c.blk && hashNamed(c.recvNode))
     return c.lw.hasKeyForm(c.recvNode, c.r, c.args()[0], c.ctx);
   if (argc(c) === 1 && !c.blk) return `${c.E}${c.nav}includes(${c.args()[0]})`;
@@ -172,6 +186,7 @@ rule("key? has_key?", (c) =>
 );
 
 rule("size length", (c) => {
+  if (objectRecv(c)) return null;
   if (argc(c) === 0 && !c.blk && hashNamed(c.recvNode)) return `${c.rc("size")}(${c.r})`;
   // In a ported test an untyped receiver may be a Set (`Serializers.serializers`).
   if (
@@ -189,22 +204,34 @@ rule("size length", (c) => {
   return null;
 });
 
-rule("empty?", (c) => (argc(c) === 0 ? `${c.rc("isEmpty")}(${c.r})` : null));
+// Native unless the type pass says the receiver is a Map-backed Hash.
+rule("empty?", (c) => {
+  if (objectRecv(c)) return null;
+  if (argc(c) !== 0) return null;
+  if (c.lw.mayBeMap(c.recvNode, c.ctx)) return `${c.rc("isEmpty")}(${c.r})`;
+  if (c.recvType?.k === "hash" || hashNamed(c.recvNode))
+    return `(Object.keys(${c.r}).length === 0)`;
+  return `(${c.R}${c.nav}length === 0)`;
+});
 
 rule("first", (c) => {
+  if (objectRecv(c)) return null;
   if (c.blk) return null;
   // ActiveSupport String#first(limit) (core_ext/string/access.rb); an
   // Array's `first(n)` is `take(ary, n)`, ruby-compat's `first` takes none.
   if (c.recvIsString()) return `${c.lw.as(c.ctx, "first")}(${[c.r, ...c.args()].join(", ")})`;
-  if (argc(c) === 1 && c.lw.typeOf(c.recvNode, c.ctx)?.k === "array")
-    return `${c.rc("take")}(${c.r}, ${c.args()[0]})`;
-  return `${c.rc("first")}(${[c.r, ...c.args()].join(", ")})`;
+  if (c.lw.mayBeMap(c.recvNode, c.ctx)) return `${c.rc("first")}(${[c.r, ...c.args()].join(", ")})`;
+  if (argc(c) === 1) return `${c.R}${c.nav}slice(0, ${c.args()[0]})`;
+  return `${c.R}${c.nav === "?." ? "?." : ""}[0]`;
 });
 
 rule("last", (c) => {
+  if (objectRecv(c)) return null;
   if (c.blk) return null;
   if (c.recvIsString()) return `${c.lw.as(c.ctx, "last")}(${[c.r, ...c.args()].join(", ")})`;
-  return `${c.rc("last")}(${[c.r, ...c.args()].join(", ")})`;
+  if (c.lw.mayBeMap(c.recvNode, c.ctx)) return `${c.rc("last")}(${[c.r, ...c.args()].join(", ")})`;
+  if (argc(c) === 1) return `${c.R}${c.nav}slice(-${c.args()[0]})`;
+  return `${c.R}${c.nav}at(-1)`;
 });
 
 // Array#join (array.c rb_ary_join) converts each element by its Ruby `to_s`
@@ -216,18 +243,23 @@ rule("join", (c) => {
 });
 
 rule("drop", (c) =>
-  !c.blk && argc(c) === 1 ? `${c.rc("drop")}(${c.r} as unknown[], ${c.args()[0]})` : null,
+  objectRecv(c) ? null : !c.blk && argc(c) === 1 ? `${c.R}${c.nav}slice(${c.args()[0]})` : null,
 );
 
 rule("compact", (c) => {
+  if (objectRecv(c)) return null;
   // Hash#compact (hash.c rb_hash_compact) on a plain object is activesupport's.
   if (!c.blk && argc(c) === 0 && c.recvNode.k === "hash")
     return `${c.lw.imp(c.ctx, "@blazetrails/activesupport", "compact", "hashCompact")}(${c.r})`;
-  if (!c.blk && argc(c) === 0) return `${c.rc("compact")}(${c.r})`;
+  if (!c.blk && argc(c) === 0 && (c.recvType?.k === "hash" || hashNamed(c.recvNode)))
+    return `${c.rc("compact")}(${c.r})`;
+  if (!c.blk && argc(c) === 0) return `${c.R}${c.nav}filter((x) => x != null)`;
   return null;
 });
 
-rule("uniq", (c) => (!c.blk && argc(c) === 0 ? `${c.rc("uniq")}(${c.r})` : null));
+rule("uniq", (c) =>
+  objectRecv(c) ? null : !c.blk && argc(c) === 0 ? `[...new Set(${c.r})]` : null,
+);
 rule("flatten", (c) => `${c.R}${c.nav}flat(${argc(c) ? c.args()[0] : "Infinity"})`);
 rule("keys", (c) => (argc(c) === 0 ? `Object.keys(${c.r})` : null));
 rule("values", (c) => (argc(c) === 0 ? `Object.values(${c.r})` : null));
@@ -235,36 +267,68 @@ rule("values", (c) => (argc(c) === 0 ? `Object.values(${c.r})` : null));
 // The native spread / `Object.assign` copies only a plain object's own keys,
 // so an argument that may be a Map (a caller's Hash) keeps the helper.
 rule("merge", (c) => {
-  if (!c.blk && argc(c) === 1 && c.lw.plainHash(c.n.args[0], c.ctx))
-    return `{ ...${c.R}, ...${c.args()[0]} }`;
+  if (objectRecv(c)) return null;
+  const map = c.lw.mayBeMap(c.recvNode, c.ctx) || c.lw.mayBeMap(c.n.args[0], c.ctx);
+  if (!c.blk && argc(c) === 1 && !map)
+    return `{ ...${c.R}, ...${c.lw.plainArg(c.n.args[0], c.args()[0], c.ctx)} }`;
   if (!c.blk && argc(c) === 1) return `${c.rc("merge")}(${c.r}, ${c.args()[0]})`;
   return null;
 });
 
 rule("merge! update", (c) => {
-  if (!c.blk && argc(c) === 1 && c.name === "merge!" && c.lw.plainHash(c.n.args[0], c.ctx))
-    return `Object.assign(${c.r}, ${c.args()[0]})`;
+  if (objectRecv(c)) return null;
+  const map = c.lw.mayBeMap(c.recvNode, c.ctx) || c.lw.mayBeMap(c.n.args[0], c.ctx);
+  if (!c.blk && argc(c) === 1 && !map)
+    return `Object.assign(${c.r}, ${c.lw.plainArg(c.n.args[0], c.args()[0], c.ctx)})`;
   if (!c.blk && argc(c) === 1) return `${c.rc("update")}(${c.r}, ${c.args()[0]})`;
   return null;
 });
 
 rule("to_sym to_str", (c) => (argc(c) === 0 ? c.r : null));
-rule("to_i", (c) => (argc(c) === 0 ? `${c.rc("rbToI")}(${c.r})` : null));
+// string.c rb_str_to_i: the leading integer, else 0.
+rule("to_i", (c) => {
+  if (objectRecv(c)) return null;
+  if (argc(c) !== 0) return null;
+  if (c.recvType?.k === "prim" && c.recvType.name === "number") return `Math.trunc(${c.r})`;
+  return `(parseInt(String(${c.r}), 10) || 0)`;
+});
 
 // A value with its own `to_f` (a Ruby Time) answers it; `Number(time)` is NaN.
 rule("to_f", (c) => {
   if (argc(c) !== 0) return null;
   const t = c.lw.typeOf(c.recvNode, c.ctx);
-  return t?.k === "prim" ? `Number(${c.r})` : `${c.rc("toF")}(${c.r})`;
+  return t?.k === "class" || t?.k === "gemClass" ? `${c.rc("toF")}(${c.r})` : `Number(${c.r})`;
 });
 
-rule("to_a", (c) => (argc(c) === 0 ? `${c.rc("rbToA")}(${c.r})` : null));
+rule("to_a", (c) => {
+  if (objectRecv(c)) return null;
+  if (argc(c) !== 0) return null;
+  if (c.recvType?.k === "array") return c.r;
+  if (c.lw.mayBeMap(c.recvNode, c.ctx)) return `[...${c.r}]`;
+  if (c.recvType?.k === "hash" || hashNamed(c.recvNode)) return `Object.entries(${c.r})`;
+  return `Array.from(${c.r})`;
+});
 
 // An Array of pairs is a plain-object Hash (CLAUDE.md "A Ruby Hash is a
 // plain object"); `toH` answers a Map-backed Hash.
 rule("to_h", (c) => {
+  if (objectRecv(c)) return null;
   if (argc(c) === 0 && !c.blk && c.recvType?.k === "array") return `Object.fromEntries(${c.r})`;
-  if (argc(c) === 0 && !c.blk) return `${c.rc("rbToH")}(${c.r})`;
+  if (
+    argc(c) === 0 &&
+    !c.blk &&
+    !c.lw.mayBeMap(c.recvNode, c.ctx) &&
+    (c.recvType?.k === "hash" || hashNamed(c.recvNode))
+  )
+    return `{ ...${c.r} }`;
+  // Array#to_h builds a Hash; any other value answers its own `to_h`, or is a
+  // Hash already (hash.c rb_hash_to_h).
+  if (argc(c) === 0 && !c.blk)
+    return c.lw.withOnce(
+      c.r,
+      (x) =>
+        `(Array.isArray(${x}) ? Object.fromEntries(${x}) : typeof ${x}?.toH === "function" ? ${x}.toH() : ${x})`,
+    );
   return null;
 });
 
@@ -278,6 +342,13 @@ rule("strip", (c) => `${c.R}${c.nav}trim()`);
 // trailing empty fields drop, and `" "` / no pattern split awk-style; JS
 // `split` does none of these.
 rule("split", (c) => {
+  // A literal separator other than `" "`, or a Regexp, with no limit: JS `split`
+  // less Ruby's trailing empty fields.
+  const sep = c.n.args[0];
+  if (argc(c) === 1 && ((sep.k === "str" && sep.value !== " ") || sep.k === "regex"))
+    return `${c.R}${c.nav}split(${c.args()[0]})${c.nav === "?." ? "?." : "."}filter((x, i, a) => x !== "" || a.slice(i).some((y) => y !== ""))`;
+  if (argc(c) === 0 || (sep.k === "str" && sep.value === " " && argc(c) === 1))
+    return `${c.R}${c.nav}trim()${c.nav === "?." ? "?." : "."}split(/\\s+/).filter((x) => x !== "")`;
   if (c.nav === "?.")
     return c.lw.withOnce(
       c.r,
@@ -288,12 +359,25 @@ rule("split", (c) => {
 });
 
 rule("sub", (c) => (!c.blk ? `${c.R}${c.nav}replace(${c.args().join(", ")})` : null));
-rule("gsub", (c) =>
-  !c.blk && argc(c) === 2 ? `${c.rc("gsub")}(${c.r}, ${c.args().join(", ")})` : null,
-);
+// A String pattern is `replaceAll`; a Regexp one a global replace. A
+// replacement naming groups (`"\\1"`) keeps the helper, which reads Ruby's syntax.
+rule("gsub", (c) => {
+  if (c.blk || argc(c) !== 2) return null;
+  const [pat, rep] = c.n.args;
+  if (rep.k === "str" && !rep.value.includes("\\")) {
+    if (pat.k === "str") return `${c.R}${c.nav}replaceAll(${c.args().join(", ")})`;
+    if (pat.k === "regex") {
+      const re = c.args()[0];
+      const g = re.replace(/\/([a-z]*)$/, (_m, f: string) => `/${f.includes("g") ? f : f + "g"}`);
+      return `${c.R}${c.nav}replace(${g}, ${c.args()[1]})`;
+    }
+  }
+  return `${c.rc("gsub")}(${c.r}, ${c.args().join(", ")})`;
+});
 
 rule("match?", (c) => {
   if (argc(c) === 1 && c.recvNode.k === "regex") return `${c.R}.test(${c.args()[0]})`;
+  if (argc(c) === 1 && c.n.args[0].k === "regex") return `${c.args()[0]}.test(${c.r})`;
   return `${c.rc("isMatch")}(${c.r}, ${c.args().join(", ")})`;
 });
 

@@ -55,20 +55,36 @@ rule("nil?", (c) => `(${c.R} == null)`);
 rule("is_a? kind_of? instance_of?", (c) => {
   if (argc(c.n) === 1 && c.n.args[0].k === "const")
     return `(${c.lw.typeTest(c.n.args[0], c.R, c.ctx)})`;
+  // A class known only at run time may be a core one (`String`), which a
+  // primitive is not an `instanceof`: Ruby's `kind_of?`, unless the type pass
+  // names a class.
+  const t = c.lw.typeOf(c.n.args[0], c.ctx);
+  if (argc(c.n) === 1 && (t?.k === "gemClass" || (t?.k === "class" && t.static)))
+    return `${c.R} instanceof ${c.argList()}`;
   return `${c.rc("rbObjIsKindOf")}(${c.R}, ${c.argList()})`;
 });
 
 rule("respond_to?", (c) => {
   const { n, R, ctx, lw } = c;
-  const rest = () => n.args.slice(1).map((x: N) => lw.argExpr(x, ctx));
   // The name asked about is the TS member's (`:permitted?` is `isPermitted`).
-  if (n.args[0]?.k === "sym")
-    return `${c.rc("rbObjRespondTo")}(${[R, JSON.stringify(tsMethodName(n.args[0].value)), ...rest()].join(", ")})`;
+  // JS's `respond_to?` is `in`: a method, or the property a reader ports as.
+  // A name every JS function or object answers natively (`call` on a class)
+  // counts only where the value defines its own.
+  if (n.args[0]?.k === "sym") {
+    const m = JSON.stringify(tsMethodName(n.args[0].value));
+    if (n.args[0].value in Function.prototype)
+      return c.lw.withOnce(
+        R,
+        (x) =>
+          `(${x} != null && ${m} in Object(${x}) && (${x} as { [name: string]: unknown })[${m}] !== (Function.prototype as unknown as { [name: string]: unknown })[${m}] && (${x} as { [name: string]: unknown })[${m}] !== (Object.prototype as unknown as { [name: string]: unknown })[${m}])`,
+      );
+    return `(${m} in Object(${R}))`;
+  }
   // A Ruby method name known only at run time (`QUEUE_ADAPTER_METHODS`'s
   // `:enqueue_at`) is translated to the TS member name when asked.
   // docs/ruby-ts-conventions.md: snake_case is camelCase, `x?` is `isX`.
   const tsName = `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${lw.argExpr(n.args[0], ctx)}))`;
-  return `${c.rc("rbObjRespondTo")}(${[R, tsName, ...rest()].join(", ")})`;
+  return `(${tsName} in Object(${R}))`;
 });
 
 // Class#descendants / #subclasses (core_ext/class/subclasses.rb) are
@@ -98,7 +114,10 @@ rule("send __send__", (c) => {
   // `deserializeArgumentsIfNeeded`), awaited when a gem def of it is async.
   if (n.args[0]?.k === "sym") {
     const sym: string = n.args[0].value;
-    const call = `${c.rc("rbFSend")}(${[R, JSON.stringify(tsMethodName(sym)), ...n.args.slice(1).map((x: N) => lw.argExpr(x, ctx))].join(", ")})`;
+    const call = `${R}.${tsMethodName(sym)}(${n.args
+      .slice(1)
+      .map((x: N) => lw.argExpr(x, ctx))
+      .join(", ")})`;
     if ([...lw.resolver.asyncDefs].some((k) => k.endsWith(`#${sym}`))) {
       if (ctx.asyncBox) ctx.asyncBox.awaits = true;
       return `(await ${call})`;
@@ -137,15 +156,34 @@ rule("send __send__", (c) => {
     const f = lw.blockArg(n.block, ctx);
     return `${c.rc("rbFSend")}(${[R, ...plain, `(x: unknown) => (${f})(...(Array.isArray(x) ? x : [x]))`].join(", ")})`;
   }
-  return `${c.rc("rbFSend")}(${R}, ${c.argList()})`;
+  return dynamicSend(c);
 });
+
+/**
+ * `obj.send(name, *args)` with a name known at run time: the TS member it
+ * names (docs/ruby-ts-conventions.md: snake_case is camelCase, `x?` is `isX`).
+ */
+function dynamicSend(c: Parameters<CallRule>[0]): string {
+  const { n, R, ctx, lw } = c;
+  const name = `((s: string) => { const c = s.replace(/[?!]$/, "").replace(/_([a-z0-9])/g, (_m: string, x: string) => x.toUpperCase()); return s.endsWith("?") ? "is" + c[0].toUpperCase() + c.slice(1) : c; })(String(${lw.argExpr(n.args[0], ctx)}))`;
+  const rest = n.args.slice(1).map((x: N) => lw.argExpr(x, ctx));
+  if (n.block) rest.push(lw.blockArg(n.block, ctx));
+  return `(${R} as unknown as { [name: string]: (...args: unknown[]) => unknown })[${name}](${rest.join(", ")})`;
+}
 
 // Ruby `Range#cover?` is ruby-compat Range's `cover`.
 rule("cover?", (c) =>
   argc(c.n) === 1 ? `${c.R}${c.nav}cover(${c.lw.argExpr(c.n.args[0], c.ctx)})` : null,
 );
 
-rule("public_send", (c) => `${c.rc("rbFPublicSend")}(${c.R}, ${c.argList()})`);
+rule("public_send", (c) =>
+  c.n.args[0]?.k === "sym"
+    ? `${c.R}.${tsMethodName(c.n.args[0].value)}(${c.n.args
+        .slice(1)
+        .map((x: N) => c.lw.argExpr(x, c.ctx))
+        .join(", ")})`
+    : dynamicSend(c),
+);
 
 rule("class", (c) => {
   const { n, ctx, recvNode, lw, R } = c;
@@ -158,9 +196,9 @@ rule("class", (c) => {
   // activejob core.ts), typed as the class it is written in.
   if (own && lw.index.scopes.get(ctx.owner!)?.kind === "class") {
     const ref = lw.resolver.fqnRef(ctx.owner!, ctx, lw);
-    return `(${c.rc("rbObjClass")}(${R}) as unknown as typeof ${ref})`;
+    return `(${R}.constructor as typeof ${ref})`;
   }
-  return `${c.rc("rbObjClass")}(${R})`;
+  return `${R}.constructor`;
 });
 
 rule("freeze", (c) => {
@@ -308,7 +346,16 @@ rule("set_backtrace", (c) =>
 rule("equal?", (c) => `(${c.R} === ${c.argList()})`);
 rule("hash", (c) => (argc(c.n) === 0 ? `${c.rc("rbHash")}(${c.R})` : null));
 rule("eql?", (c) => `${c.rc("rbEql")}(${c.R}, ${c.argList()})`);
-rule("inspect", (c) => `${c.rc("rbInspect")}(${c.R})`);
+// A Number or Boolean inspects as its JS string, a String as JSON where no
+// Symbol keeps its colon; anything else keeps Ruby's `inspect` format.
+rule("inspect", (c) => {
+  const t = c.lw.typeOf(c.recvNode, c.ctx);
+  if (t?.k === "prim" && !t.nullable && (t.name === "number" || t.name === "boolean"))
+    return `String(${c.r})`;
+  if (t?.k === "prim" && !t.nullable && t.name === "string" && !c.ctx.f.symbolColon)
+    return `JSON.stringify(${c.r})`;
+  return `${c.rc("rbInspect")}(${c.R})`;
+});
 
 rule("to_s", (c) => {
   const { n, ctx, R, r, lw, recvNode } = c;
@@ -323,7 +370,13 @@ rule("to_s", (c) => {
   // A value known not to be nil, a String / Number / Boolean, is JS `String(x)`.
   const t = lw.typeOf(recvNode, ctx);
   if (t?.k === "prim" && t.name !== "null" && !t.nullable) return `String(${r})`;
-  return `${c.rc("rbObjAsString")}(${R})`;
+  // Array#to_s is `inspect` (array.c rb_ary_inspect).
+  if (t?.k === "array") return `${c.rc("rbInspect")}(${R})`;
+  if (t) return `String(${R} ?? "")`;
+  return c.lw.withOnce(
+    R,
+    (x) => `(Array.isArray(${x}) ? ${c.rc("rbInspect")}(${x}) : String(${x} ?? ""))`,
+  );
 });
 
 rule("fetch", (c) => (c.r !== null ? `${c.rc("fetch")}(${c.R}, ${c.argList()})` : null));

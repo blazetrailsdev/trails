@@ -62,13 +62,13 @@ rule("==", (o) => {
     n.recv.recv &&
     core
   )
-    return `${o.rc("rbObjClass")}(${o.lw.expr(n.recv.recv, o.ctx)}) === ${o.rc(core)}`;
-  if (o.lw.primEq(n, o.rt, o.ctx)) return `${o.lhs} === ${o.a[0]}`;
+    return `(${o.lw.typeTest(n.args[0], o.lw.expr(n.recv.recv, o.ctx), o.ctx)})`;
+  if (!o.lw.rubyEq(n, o.rt, o.ctx)) return `${o.lhs} === ${o.a[0]}`;
   return `${o.rc("rbEqual")}(${o.r}, ${o.a[0]})`;
 });
 
 rule("!=", (o) => {
-  if (o.lw.primEq(o.n, o.rt, o.ctx)) return `${o.lhs} !== ${o.a[0]}`;
+  if (!o.lw.rubyEq(o.n, o.rt, o.ctx)) return `${o.lhs} !== ${o.a[0]}`;
   return `!${o.rc("rbEqual")}(${o.r}, ${o.a[0]})`;
 });
 
@@ -79,7 +79,10 @@ rule("===", (o) => {
     const t = o.lw.typeTest(o.n.recv, needsParens(o.a[0]) ? `(${o.a[0]})` : o.a[0], o.ctx);
     if (t) return `(${t})`;
   }
-  return `${o.rc("rbEqq")}(${o.r}, ${o.a[0]})`;
+  if (o.n.recv.k === "regex") return `${o.r}.test(${o.a[0]})`;
+  if (o.n.recv.k === "range") return `${o.r}.cover(${o.a[0]})`;
+  if (o.rt?.k === "class" && o.rt.static) return `${o.a[0]} instanceof ${o.r}`;
+  return `${o.lhs} === ${o.a[0]}`;
 });
 
 // Ruby `=~` sets the backref ($~, $1…) — ruby-compat's matchOperator /
