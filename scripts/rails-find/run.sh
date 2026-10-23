@@ -28,6 +28,7 @@ if [[ ! -f "$API_JSON" ]]; then
   echo "==> rails:find: building api manifest (one-time)…" >&2
   LIB_PATHS_JSON="$(pnpm --silent vendor:fetch --print-lib-paths)" \
   LIB_ENTRY_FILES_JSON="$(pnpm --silent vendor:fetch --print-lib-entry-files)" \
+  LIB_EXTRA_PATHS_JSON="$(pnpm --silent vendor:fetch --print-lib-extra-paths)" \
     LOCKFILE_PATH="$ROOT/vendor/sources.lock.json" \
     ruby "$ROOT/scripts/api-compare/extract-ruby-api.rb" >&2
 fi

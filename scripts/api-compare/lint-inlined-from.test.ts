@@ -189,6 +189,22 @@ describe("inlinedFromFindings on a method inlining module super", () => {
     ]);
   });
 
+  it("reads a tagged method once, at its own file, when a barrel re-exports the class", () => {
+    const save = { ...def("save", "", 1, 1), file: "base.ts", inlinedFrom: [PLAIN_SAVE] };
+    const ts = {
+      packages: {
+        activerecord: {
+          classes: {
+            "base.ts:Base": { ...entity("base.ts", [save]), name: "Base" },
+            "index.ts:Base": { ...entity("index.ts", [save]), name: "Base" },
+          },
+          modules: {},
+        },
+      },
+    } as unknown as ApiManifest;
+    expect(inlinedFromFindings(ruby, ts, [])).toEqual([]);
+  });
+
   it("flags a tag naming a different method from the member's other tags", () => {
     expect(
       methodMessages([PLAIN_SAVE, tag("ActiveRecord::Core#initialize", `${AR}/core.rb:471-482`)]),

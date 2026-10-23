@@ -19,9 +19,10 @@ if [ "$(echo "$LIB_PATHS_JSON" | jq -c "$only")" = "{}" ]; then
   exit 1
 fi
 LIB_ENTRY_FILES_JSON=$(pnpm --silent vendor:fetch --print-lib-entry-files | jq -c "$only")
+LIB_EXTRA_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-extra-paths | jq -c "$only")
 TEST_PATHS_JSON=$(pnpm --silent vendor:fetch --print-test-paths | jq -c "$only")
 LOCKFILE_PATH="$PWD/vendor/sources.lock.json"
-export LIB_PATHS_JSON LIB_ENTRY_FILES_JSON TEST_PATHS_JSON LOCKFILE_PATH
+export LIB_PATHS_JSON LIB_ENTRY_FILES_JSON LIB_EXTRA_PATHS_JSON TEST_PATHS_JSON LOCKFILE_PATH
 
 api='pnpm exec tsx scripts/api-compare'
 tests='pnpm exec tsx scripts/test-compare'

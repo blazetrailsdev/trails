@@ -5303,3 +5303,47 @@ describe(
     });
   },
 );
+
+describe(
+  "Ruby extractor Concern included-block includes",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+    it("records an include inside `included do` as an included-hook mixin", () => {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "included-rb-"));
+      try {
+        fs.writeFileSync(
+          path.join(dir, "executable.rb"),
+          `
+          module Job
+            module Executable
+              extend ActiveSupport::Concern
+
+              included do
+                include ConcurrencyControls, Schedulable
+              end
+            end
+          end
+        `,
+        );
+        const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "executable.rb"), ${JSON.stringify(dir)})
+        m = ex.modules["Job::Executable"]
+        puts JSON.generate(includes: m[:includes], mixinOrder: m[:mixinOrder], hook: m[:includedHookMixins])
+      `;
+        const out = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+        expect(out.includes).toEqual(["ConcurrencyControls", "Schedulable"]);
+        expect(out.mixinOrder).toEqual([{ kind: "extend", names: ["ActiveSupport::Concern"] }]);
+        expect(out.hook).toEqual([
+          { kind: "include", names: ["ConcurrencyControls", "Schedulable"] },
+        ]);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    });
+  },
+);

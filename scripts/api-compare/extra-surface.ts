@@ -111,7 +111,7 @@ import {
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { manifestIsStale } from "./build-freshness.js";
-import { libPathsManifest } from "../../vendor/sources.js";
+import { libExtraPathsManifest, libPathsManifest } from "../../vendor/sources.js";
 
 /**
  * Track the FQN alongside the entity so namespace-scoped include resolution
@@ -1589,6 +1589,7 @@ export async function loadConcernHooks(
   filterPkg: string | null,
 ): Promise<Map<string, Set<string>>> {
   const libPaths = libPathsManifest();
+  const extraPaths = libExtraPathsManifest();
   const hooks = new Map<string, Set<string>>();
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
     if (filterPkg !== null && pkg !== filterPkg) continue;
@@ -1596,12 +1597,16 @@ export async function loadConcernHooks(
     if (libDir === undefined) continue;
     const initializeFiles = moduleInitializeFiles(rubyPkg);
     for (const rubyFile of rubyFilesOf(rubyPkg)) {
-      let source: string;
-      try {
-        source = await fsp.readFile(path.join(libDir, rubyFile), "utf-8");
-      } catch {
-        continue;
+      let source: string | undefined;
+      for (const dir of [libDir, ...(extraPaths[pkg] ?? [])]) {
+        try {
+          source = await fsp.readFile(path.join(dir, rubyFile), "utf-8");
+          break;
+        } catch {
+          continue;
+        }
       }
+      if (source === undefined) continue;
       const names = concernHookNames(source);
       if (initializeFiles.has(rubyFile)) names.add(CONCERN_HOOK_MEMBERS.initialize);
       if (names.size > 0) hooks.set(concernHookKey(pkg, rubyFile), names);
