@@ -10,8 +10,16 @@ import { runTrailtieInitializers } from "./support/trailtie-initializers.js";
 import { Trailtie as ActionDispatchTrailtie } from "./trailties/action-dispatch.js";
 import { Trailtie as ActiveSupportTrailtie } from "./trailties/active-support.js";
 
+const baseConfig = (): BootstrapConfig => ({
+  activeSupport: {},
+  logLevel: "debug",
+  logFormatter: null,
+  defaultLogFile: async () => ({ write() {} }),
+  paths: () => ({ get: () => ({ first: async () => "log/test.log" }) }),
+});
+
 class TestApp extends Bootstrap implements BootstrapHost {
-  config: BootstrapConfig = { activeSupport: {} };
+  config: BootstrapConfig = { ...baseConfig() };
 }
 
 const MESSAGE_PACK = "active_support/message_pack";
@@ -67,7 +75,7 @@ describe("active_support/message_pack is awaited at boot", () => {
   it("raises LoadError with warnings on when the cache store names message_pack and the peer is absent", async () => {
     const testApp = new TestApp();
     testApp.config = {
-      activeSupport: {},
+      ...baseConfig(),
       cacheStore: [":memory_store", { serializer: ":message_pack" }],
     };
     await expect(testApp.runInitializers("all")).rejects.toThrow(LoadError);
@@ -103,7 +111,7 @@ describe("active_support/message_pack is awaited at boot", () => {
     ActiveSupport.loadPath[MESSAGE_PACK] = seatingLoad;
     const testApp = new TestApp();
     testApp.config = {
-      activeSupport: {},
+      ...baseConfig(),
       cacheStore: [":memory_store", { serializer: ":message_pack" }],
     };
     await testApp.runInitializers("all");

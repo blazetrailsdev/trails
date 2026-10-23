@@ -1,3 +1,4 @@
+import { BroadcastLogger, Logger } from "@blazetrails/activesupport";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
@@ -68,6 +69,7 @@ describe("trails server environment (trails)", () => {
     watchState.closed = 0;
     runOptions = [];
     runApps = [];
+    Trails.logger = new BroadcastLogger(new Logger(null));
     vi.spyOn(Trails, "initialize").mockResolvedValue({ app: () => () => [200, {}, []] } as never);
     vi.spyOn(Handler.Node, "run").mockImplementation((async (
       app: RackApp,
@@ -107,6 +109,15 @@ describe("trails server environment (trails)", () => {
     expect(runOptions).toEqual([]);
     expect(devServerStarts).toHaveLength(1);
     expect(env.TRAILS_ENV).toBe("development");
+  });
+
+  it("broadcasts the Trails logger to stdout in development only", async () => {
+    await serverCommand().parseAsync([], { from: "user" });
+    expect((Trails.logger as BroadcastLogger).broadcasts).toHaveLength(2);
+
+    Trails.logger = new BroadcastLogger(new Logger(null));
+    await serverCommand().parseAsync(["-e", "production"], { from: "user" });
+    expect((Trails.logger as BroadcastLogger).broadcasts).toHaveLength(1);
   });
 
   it("does not override an already-set TRAILS_ENV", async () => {

@@ -3,11 +3,12 @@ import {
   publicInstanceMethods,
   rbFSend,
   rbModConstSet,
+  StringIO,
   rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
-import { afterEach, beforeEach, describe, expect, it, onTestFinished } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import {
-  NullLogger,
+  BroadcastLogger,
   Executor,
   onLoad,
   Reloader,
@@ -99,6 +100,8 @@ function installFs(dirs: Set<string>, files: Set<string>, cwd = "/"): void {
         throw new Error("ENOENT");
       },
       realpath: async (p: string) => p,
+      openSync: () => 3,
+      writeSync: (_fd: number, b: Uint8Array) => b.length,
     } as unknown as FsAdapter,
     posixPath,
   );
@@ -236,7 +239,7 @@ describe("Application", () => {
       const app = IApp2.instance();
       await app.initialize();
       expect(app.initialized()).toBe(true);
-      expect(Trails.logger).toBeInstanceOf(NullLogger);
+      expect(Trails.logger).toBeInstanceOf(BroadcastLogger);
       expect(Trails.cache).toBeInstanceOf(FileStore);
     });
 
@@ -519,6 +522,48 @@ describe("Trails.application integration (boot-app fixture)", () => {
     const [status] = await app.call({ REQUEST_METHOD: "GET", PATH_INFO: "/boom" });
     expect(status).toBe(500);
   });
+
+  it("answers rescue_responses statuses with the debug page and logs the exception", async () => {
+    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+    class BootAppRescues extends BootApp {}
+    Application.register(BootAppRescues);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    app.config.considerAllRequestsLocal = true;
+    const lines: string[] = [];
+    vi.spyOn(app.config, "defaultLogFile").mockResolvedValue({
+      write: (s: string) => void lines.push(s),
+    } as never);
+    Trails.logger = null;
+    await Trails.initialize();
+    const { PostsController } =
+      await import("./__fixtures__/boot-app/app/controllers/posts-controller.js");
+    PostsController.protectFromForgery({ with: "exception" });
+    ActionController.Base.allowForgeryProtection = true;
+
+    try {
+      const [notFound, , notFoundBody] = await app.call({
+        REQUEST_METHOD: "GET",
+        PATH_INFO: "/nope",
+      });
+      expect(notFound).toBe(404);
+      expect([...(notFoundBody as Iterable<string>)].join("")).toContain("Routing Error");
+      expect(lines.join("")).toContain("ActionController::RoutingError");
+
+      const [unprocessable, , body] = await app.call({
+        REQUEST_METHOD: "POST",
+        PATH_INFO: "/posts",
+        CONTENT_TYPE: "application/x-www-form-urlencoded",
+        CONTENT_LENGTH: "22",
+        "rack.input": new StringIO("authenticity_token=bad"),
+      });
+      expect(unprocessable).toBe(422);
+      expect([...(body as Iterable<string>)].join("")).toContain("InvalidAuthenticityToken");
+      expect(lines.join("")).toContain("ActionController::InvalidAuthenticityToken");
+    } finally {
+      ActionController.Base.allowForgeryProtection = false;
+    }
+  }, 20_000);
 
   it("includes every application helper into ApplicationController at boot, before any request", async () => {
     const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
