@@ -14,6 +14,7 @@
  *   other class-body call→ `static { this.macro(...) }`
  */
 import { handPortGem } from "./hand-port-gems.js";
+import { CORE_REOPEN } from "./resolve.js";
 import { VITEST_MATCHERS } from "./mappings/vitest-matchers.js";
 import { rubyMethodToTsIgnoringSkip } from "../../parity/conventions.js";
 import { TS_CONSTANT_RENAMES } from "./constant-renames.js";
@@ -1402,6 +1403,86 @@ export class Emitter {
   }
 
   /** `setup` / `teardown` blocks of a reopened `ActiveSupport::TestCase` as top-level hooks. */
+  /**
+   * A test file reopening a Ruby core class (`class Time; def to_debug_s`):
+   * Ruby adds the methods to that class, so the port defines them on trails'
+   * class with `rbModDefineMethod`, the class's statics through its
+   * `{ prototype: klass }` form. Nothing new is declared.
+   */
+  emitCoreReopen(u: Unit, f: FileCtx): string {
+    const ctx = this.baseCtx(u, f, {});
+    const [spec, exp, local] = CORE_REOPEN[u.fqn];
+    const K = this.lw.imp(ctx, spec, exp, local);
+    const def = this.lw.rc(ctx, "rbModDefineMethod");
+    const out: string[] = [];
+    const seat = (target: string, member0: string) => {
+      const member = member0.replace(/^((?:\/\*\*[^]*?\*\/\n)?)static /, "$1");
+      const acc = /^((?:\/\*\*[^]*?\*\/\n)?)(get|set) ([\w$]+)\(([^]*)$/.exec(member);
+      if (acc) {
+        out.push(
+          `${acc[1]}${def}(${target}, ${JSON.stringify(acc[3])}, { ${acc[2]}: function (${acc[4]} });`,
+        );
+        return;
+      }
+      out.push(
+        toDefineMethod(member.replace(/^((?:\/\*\*[^]*?\*\/\n)?)static /, "$1")).replace(
+          /\bmod\.defineMethod\(/,
+          `${def}(${target}, `,
+        ),
+      );
+    };
+    for (const s of this.flattenDefs(u.body)) {
+      if (s.k === "def" && !s.singleton)
+        seat(
+          K,
+          this.emitMethod(s, u, f, {
+            static: false,
+            module: false,
+            vis: "public",
+            selfExpr: "this",
+          }),
+        );
+      else if (s.k === "alias") {
+        const [nw, old] = [tsMethodName(s.new, u.fqn), tsMethodName(s.old, u.fqn)];
+        out.push(
+          `${def}(${K}, ${JSON.stringify(nw)}, Object.getOwnPropertyDescriptor(${K}.prototype, ${JSON.stringify(old)})!);`,
+        );
+      } else if (
+        !(s.k === "call" && s.recv === null && ["private", "protected", "public"].includes(s.name))
+      )
+        out.push(
+          `${this.lw.decline(ctx, "unhandled-node", s, `reopened core class body: ${s.k}`)};`,
+        );
+    }
+    const statics = `{ prototype: ${K} }`;
+    for (const s of this.flattenDefs(u.sbody)) {
+      if (s.k === "def")
+        seat(
+          statics,
+          this.emitMethod(s, u, f, {
+            static: true,
+            module: false,
+            vis: "public",
+            selfExpr: "this",
+          }),
+        );
+      else if (s.k === "call" && s.recv === null && /^attr_(reader|writer|accessor)$/.test(s.name))
+        for (const a of s.args.filter((x: N) => x.k === "sym")) {
+          const js = propName(a.value);
+          const acc = [
+            s.name !== "attr_writer" ? `get(this: any) { return this._${js} ?? null; }` : "",
+            s.name !== "attr_reader" ? `set(this: any, v: unknown) { this._${js} = v; }` : "",
+          ].filter(Boolean);
+          out.push(`${def}(${statics}, ${JSON.stringify(js)}, { ${acc.join(", ")} });`);
+        }
+      else
+        out.push(
+          `${this.lw.decline(ctx, "unhandled-node", s, `reopened core class body: ${s.k}`)};`,
+        );
+    }
+    return out.join("\n");
+  }
+
   emitTestHooks(u: Unit, f: FileCtx): string {
     const out: string[] = [];
     for (const s of u.body) {
@@ -1519,6 +1600,16 @@ export class Emitter {
       // A test support file reopening `ActiveSupport::TestCase` to add a
       // `setup` / `teardown` (`support/job_buffer.rb`): top-level vitest hooks,
       // which apply to every test file importing it, the scope Ruby's reopen has.
+      if (
+        file.file.startsWith("test/") &&
+        u.kind === "class" &&
+        CORE_REOPEN[u.fqn] &&
+        [...(this.index.scopes.get(u.fqn)?.files ?? [])].every((x) => x.startsWith("test/"))
+      ) {
+        nativeUnits.add(u.fqn);
+        chunks.push(this.emitCoreReopen(u, f));
+        continue;
+      }
       if (file.file.startsWith("test/") && u.fqn === "ActiveSupport::TestCase") {
         chunks.push(this.emitTestHooks(u, f));
         continue;
@@ -1602,7 +1693,11 @@ export class Emitter {
           rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "ENV" &&
           // RSpec's own configuration and DSL (`RSpec.configure`, `RSpec.describe`,
           // `RSpec::Matchers.define`): vitest's describe / it / setupFiles replace it.
-          rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "RSpec",
+          rootConst(s.recv)!.path.filter((x: string) => x)[0] !== "RSpec" &&
+          // An RSpec suite's helper is ported to vitest, not run: it keeps the
+          // configuration it writes (`X.y = …`, `X.configure do`), not its
+          // bootstrap output (et-orbi spec_helper.rb:24 `EtOrbi._make_info`).
+          (GEM.testDir !== "spec" || /=$/.test(s.name) || !!s.block),
       );
       const stmts = file.body?.k === "seq" ? file.body.body : file.body ? [file.body] : [];
       const fake = { nesting: [], fqn: undefined, body: [], sbody: [] } as unknown as Unit;

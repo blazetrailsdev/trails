@@ -326,6 +326,14 @@ export class Resolver {
     let hit = this.index.resolveConst(p, nesting);
     // A test support file reopening a dependency class (`ActiveSupport::TestCase`
     // in `support/job_buffer.rb`) does not make it the gem's own for lib code.
+    // A test file's reopening of a Ruby core class (et-orbi spec_helper.rb's
+    // `class Time`) adds to that class (emit.ts emitCoreReopen): the name is still it.
+    if (
+      hit?.kind === "scope" &&
+      CORE_REOPEN[hit.fqn] &&
+      [...(this.index.scopes.get(hit.fqn)?.files ?? [])].every((f) => f.startsWith("test/"))
+    )
+      hit = undefined;
     if (
       hit?.kind === "scope" &&
       !ctx.f.rubyFile.startsWith("test/") &&
@@ -837,6 +845,11 @@ export class Resolver {
 }
 
 /** Ruby file (relative to the gem's lib) → TS file (relative to packages/<gem>/src). */
+/** Ruby core classes a test file may reopen → the package, export and local name of their port. */
+export const CORE_REOPEN: Record<string, [string, string, string]> = {
+  Time: ["@blazetrails/date", "Time", "RubyTime"],
+};
+
 export function rubyFileToTsAr(rubyFile: string): string {
   // Ported tests (`--tests`): `test/cases/callbacks_test.rb` is `callbacks.test.ts`,
   // the path test-compare maps it to; `test/jobs/callback_job.rb` and the other
