@@ -1,4 +1,9 @@
-import { ThreadPoolExecutor, TimerTask, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  ThreadPoolExecutor,
+  TimerTask,
+  rbDeclareIvar,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 import { Connection } from "../namespaces.js";
 
 interface Io {
@@ -79,4 +84,5 @@ export class StreamEventLoop {
   }
 }
 
+rbDeclareIvar(StreamEventLoop, "@executor", "_executor");
 rbModConstSet(Connection, "StreamEventLoop", StreamEventLoop);
