@@ -18,3 +18,4 @@ export { SolidQueueAdapter } from "./active-job/queue-adapters/solid-queue-adapt
 export { Process } from "./process.js";
 export { Pool } from "./pool.js";
 export { Worker } from "./worker.js";
+export { Dispatcher } from "./dispatcher.js";
