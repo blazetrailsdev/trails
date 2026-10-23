@@ -33,6 +33,7 @@ import {
   excBacktraceLocations,
   include,
   isModuleIncluded,
+  NotImplementedError,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Resolver } from "./template/resolver.js";
@@ -143,7 +144,8 @@ export class Base {
   }
 
   static compiledMethodContainer(): CompiledMethodContainer {
-    throw new Error(
+    // @nie disposition=TODO
+    throw new NotImplementedError(
       "Subclasses of ActionView::Base must implement `compiledMethodContainer` " +
         "or use the class method `withEmptyTemplateCache` for constructing " +
         "an ActionView::Base subclass that has an empty cache.",
@@ -267,7 +269,12 @@ export class Base {
   }
 
   compiledMethodContainer(): CompiledMethodContainer {
-    return (this.constructor as typeof Base).compiledMethodContainer();
+    // @nie disposition=TODO
+    throw new NotImplementedError(
+      "Subclasses of ActionView::Base must implement `compiledMethodContainer` " +
+        "or use the class method `withEmptyTemplateCache` for constructing " +
+        "an ActionView::Base subclass that has an empty cache.",
+    );
   }
 
   /** @missingRailsArgs _run — PERMANENT */

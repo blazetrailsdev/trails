@@ -708,7 +708,8 @@ function unparenthesized(node: ts.Expression): ts.Expression {
 }
 
 export function transpileTse(source: string): { outputText: string; sourceMapText: string } {
-  const { outputText, sourceMapText } = ts.transpileModule(source, {
+  const { outputText, sourceMapText, diagnostics } = ts.transpileModule(source, {
+    reportDiagnostics: true,
     compilerOptions: {
       target: ts.ScriptTarget.ES2022,
       module: ts.ModuleKind.CommonJS,
@@ -717,5 +718,8 @@ export function transpileTse(source: string): { outputText: string; sourceMapTex
     },
     transformers: { before: [tseLookupTransformer] },
   });
+  if (diagnostics && diagnostics.length > 0) {
+    throw new SyntaxError(ts.flattenDiagnosticMessageText(diagnostics[0].messageText, "\n"));
+  }
   return { outputText, sourceMapText: sourceMapText! };
 }

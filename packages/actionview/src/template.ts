@@ -10,6 +10,7 @@ import {
   Encoding,
   forceEncoding,
   isValidEncoding,
+  Exception,
   LoadError,
   NotImplementedError,
   rbModConstSet,
@@ -17,6 +18,7 @@ import {
   rbModName,
   rbObjRespondTo,
   rbStrEnumerateLines,
+  StandardError,
 } from "@blazetrails/ruby-compat";
 import { ENCODING_FLAG } from "./action-view.js";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
@@ -353,6 +355,7 @@ export class Template {
         }
       });
     } catch (e) {
+      if (e instanceof Exception && !(e instanceof StandardError)) throw e;
       return this.handleRenderError(view, e);
     }
   }
